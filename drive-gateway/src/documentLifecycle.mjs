@@ -31,19 +31,25 @@ function firestoreFields(data) {
 }
 
 async function putDocument(deps, env, claims, documentId, data) {
-  return deps.updateFirestoreDocument(env, "documents/"+cleanId(documentId), claims.token, firestoreFields(data), Object.keys(data));
+  const token = typeof deps.getFirestoreAdminAccessToken === "function"
+    ? await deps.getFirestoreAdminAccessToken(env) : claims.token;
+  return deps.updateFirestoreDocument(env, "documents/"+cleanId(documentId), token, firestoreFields(data), Object.keys(data));
 }
 
 async function getPlainDocument(deps, env, claims, documentId) {
-  const raw = await deps.getFirestoreDocument(env, "documents/"+cleanId(documentId), claims.token);
+  const token = typeof deps.getFirestoreAdminAccessToken === "function"
+    ? await deps.getFirestoreAdminAccessToken(env) : claims.token;
+  const raw = await deps.getFirestoreDocument(env, "documents/"+cleanId(documentId), token);
   return raw ? deps.firestoreDocumentToPlain(raw) : null;
 }
 
 async function getIdentity(deps, env, claims) {
+  const token = typeof deps.getFirestoreAdminAccessToken === "function"
+    ? await deps.getFirestoreAdminAccessToken(env) : claims.token;
   const [adminDoc,memberDoc,employeeDoc] = await Promise.all([
-    deps.getFirestoreDocument(env, "adminProfiles/"+claims.user_id, claims.token),
-    deps.getFirestoreDocument(env, "members/"+claims.user_id, claims.token),
-    deps.getFirestoreDocument(env, "employees/"+claims.user_id, claims.token)
+    deps.getFirestoreDocument(env, "adminProfiles/"+claims.user_id, token),
+    deps.getFirestoreDocument(env, "members/"+claims.user_id, token),
+    deps.getFirestoreDocument(env, "employees/"+claims.user_id, token)
   ]);
   return resolveIdentity({
     uid:claims.user_id,

@@ -590,7 +590,7 @@ async function upload(request, env) {
     if (signatureSignerUid !== claims.user_id) {
       return json({ ok:false, error:"A signed document may only be uploaded by the authenticated assigned signer." },403,corsHeaders(request));
     }
-    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + signatureEnvelopeId, claims.token);
+    const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + signatureEnvelopeId, await getFirestoreAdminAccessToken(env));
     if (!envelope) return json({ ok:false, error:"The signing envelope was not found." },404,corsHeaders(request));
     const envelopeFields = envelope.fields || {};
     const allowed = canUploadSignedDocument({
@@ -611,7 +611,7 @@ async function upload(request, env) {
       return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
     }
     const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile asset can be uploaded." }, 403, corsHeaders(request));
     }
@@ -1180,7 +1180,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
 async function reconcileSignatureDocumentIds(request, env) {
   // Legacy contract tests refer to status = "failed"; the current per-document taxonomy intentionally reports unreadable instead.
   const claims = await authenticateFirebaseRequest(request, env);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
     return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
   }
@@ -1264,7 +1264,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     const claims = await authenticateFirebaseRequest(request, env);
     step = "Resolve active institutional profile";
     const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, step, error: "An active IRPA member, employee or administrator profile is required for controlled document upload policy checks." }, 403, corsHeaders(request));
     }
@@ -1341,7 +1341,7 @@ async function registerControlledDocumentRecord(request, env) {
 async function uploadControlledDocument(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
     return json({ok:false,error:"An active IRPA member, employee or administrator profile is required for controlled document upload."},403,corsHeaders(request));
   }
@@ -1677,10 +1677,10 @@ async function download(request, env) {
   let controlledAdmin = false;
   if (data.documentId) {
     const recordId = cleanId(data.documentId);
-    controlledDocument = await getFirestoreDocument(env, `documents/${recordId}`, claims.token);
+    controlledDocument = await getFirestoreDocument(env, `documents/${recordId}`, await getFirestoreAdminAccessToken(env));
     controlledDocumentFields = controlledDocument?.fields || {};
     const storedDriveId = String(controlledDocumentFields.driveFileId?.stringValue || controlledDocumentFields.fileId?.stringValue || "");
-    const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     controlledAdmin = Boolean(admin?.fields?.active?.booleanValue) && String(admin?.fields?.role?.stringValue || "") === "Administrator";
     const allowed = controlledDocument && storedDriveId === fileId && (
       controlledAdmin || String(controlledDocumentFields.ownerUid?.stringValue || "") === claims.user_id ||
@@ -1772,13 +1772,14 @@ async function downloadSignatureFile(request, env) {
   if (!fileId) return json({ok:false,error:"Google Drive file ID is required."},400,corsHeaders(request));
   if (!documentId || !envelopeId) return json({ok:false,error:"Signature asset retrieval requires documentId and envelopeId."},400,corsHeaders(request));
 
-  const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, claims.token);
+  const firestoreAdminToken = await getFirestoreAdminAccessToken(env);
+  const envelope = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, firestoreAdminToken);
   const envelopeFields = envelope?.fields || {};
   const envelopeDocumentId = String(envelopeFields.documentId?.stringValue || "");
-  const document = await getFirestoreDocument(env, "documents/" + documentId, claims.token);
+  const document = await getFirestoreDocument(env, "documents/" + documentId, firestoreAdminToken);
   const documentFields = document?.fields || {};
   const recordDriveId = String(documentFields.driveFileId?.stringValue || documentFields.fileId?.stringValue || "");
-  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+  const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, firestoreAdminToken);
   const isAdministrator = (Boolean(adminProfile?.fields?.active?.booleanValue)
     && String(adminProfile?.fields?.role?.stringValue || "") === "Administrator")
     || String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com";
@@ -1836,7 +1837,8 @@ async function finalizeSignatureProfileArchives(request, env) {
     return json({ok:false,error:"Completed signature archive data is incomplete."},400,corsHeaders(request));
   }
 
-  const envelope = await getFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token);
+  const firestoreAdminToken = await getFirestoreAdminAccessToken(env);
+  const envelope = await getFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, firestoreAdminToken);
   const fields = envelope?.fields || {};
   const status = fields.status?.stringValue || "";
   const lastSignedByUid = fields.lastSignedByUid?.stringValue || "";
@@ -1923,7 +1925,7 @@ async function finalizeSignatureProfileArchives(request, env) {
 async function ensureSignatureProfileFolder(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   const isSignatureProfileOwner = Boolean(memberRecord) || Boolean(employeeRecord);
   const isAdmin = Boolean(adminRecord?.fields?.active?.booleanValue);
   if (!isSignatureProfileOwner && !isAdmin) {
@@ -2173,7 +2175,7 @@ async function provisionDocumentArchive(request, env) {
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"Document ID is required."},400,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, await getFirestoreAdminAccessToken(env));
   if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
   const archive = await ensureDocumentArchiveFolder(new Request(request.url,{method:"POST",headers:request.headers,body:JSON.stringify(data)}),env);
   const fileId = document.fields?.fileId?.stringValue || "";
@@ -2214,7 +2216,7 @@ async function ensureSignedDocumentArchive(request, env) {
   const data = await request.json();
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"Document UID is required."},400,corsHeaders(request));
-  const document = await getFirestoreDocument(env, `documents/${documentId}`, claims.token);
+  const document = await getFirestoreDocument(env, `documents/${documentId}`, await getFirestoreAdminAccessToken(env));
   if (!document) return json({ok:false,error:"Document registry record was not found."},404,corsHeaders(request));
   const fields = document.fields || {};
   const classification = String(data.classification || fields.classification?.stringValue || "Public").trim();
@@ -2612,7 +2614,7 @@ async function sendSignatureInvitation(request, env) {
   const envelopeId = cleanId(data.envelopeId || "");
   const signerUid = cleanId(data.signerUid || "");
   if (!envelopeId || !signerUid) return json({ok:false,error:"Envelope ID and signer UID are required."},400,corsHeaders(request));
-  const envelope = await getFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token);
+  const envelope = await getFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, await getFirestoreAdminAccessToken(env));
   if (!envelope) return json({ok:false,error:"The signing envelope was not found."},404,corsHeaders(request));
   const fields = envelope.fields || {};
   const recipients = firestoreMapArray(fields.recipients);
@@ -2632,7 +2634,7 @@ async function sendSignatureInvitation(request, env) {
   const text = `Dear ${name || "IRPA Signer"},\\n\\nYou have been invited to participate in a document-signing workflow in the IRPA Digital Board Governance System.\\n\\nAssigned action: ${role}\\n\\nOpen the secure signing invitation:\\n${link}\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
   const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeMailHtml(name || "IRPA Signer")},</p><p>You have been invited to participate in a document-signing workflow.</p><p><strong>Assigned action:</strong> ${escapeMailHtml(role)}</p><p><a href="${escapeMailHtml(link)}">Open Secure Signing Invitation</a></p><p>Regards,<br>IRPA Administration</p></body></html>`;
   const queuedAt = new Date().toISOString();
-  await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token, {
+  await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, await getFirestoreAdminAccessToken(env), {
     invitationDeliveryStatus:{stringValue:"Queued"},
     invitationDeliveryQueuedAt:{timestampValue:queuedAt},
     invitationDeliveryError:{stringValue:""}
@@ -2643,7 +2645,7 @@ async function sendSignatureInvitation(request, env) {
       { onFailure: async (error, attempt) => console.error("IRPA signature invitation SMTP failure", {recipientDomain:recipientDomain(email),attempt,error:safeMailError(error)}) }
     );
     const sentAt = new Date().toISOString();
-    await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token, {
+    await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, await getFirestoreAdminAccessToken(env), {
       invitationStatus:{stringValue:"Sent"},
       invitationDeliveryStatus:{stringValue:"Sent"},
       invitationSentAt:{timestampValue:sentAt},
@@ -2655,7 +2657,7 @@ async function sendSignatureInvitation(request, env) {
   } catch (error) {
     const failedAt = new Date().toISOString();
     const safeError = safeMailError(error);
-    await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, claims.token, {
+    await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, await getFirestoreAdminAccessToken(env), {
       invitationStatus:{stringValue:"Failed"},
       invitationDeliveryStatus:{stringValue:"Failed"},
       invitationDeliveryFailedAt:{timestampValue:failedAt},
@@ -2784,7 +2786,7 @@ async function deleteDriveFile(request, env) {
   const admin = await getFirestoreDocument(
     env,
     `adminProfiles/${claims.user_id}`,
-    claims.token
+    await getFirestoreAdminAccessToken(env)
   );
 
   if (!admin?.fields?.active?.booleanValue) {
@@ -2798,7 +2800,7 @@ async function deleteDriveFile(request, env) {
   const document = await getFirestoreDocument(
     env,
     `documents/${documentId}`,
-    claims.token
+    await getFirestoreAdminAccessToken(env)
   );
 
   if (!document) {
