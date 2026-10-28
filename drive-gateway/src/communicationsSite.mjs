@@ -225,14 +225,23 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   function cpanelConfig(env) {
+    const configuredEndpoint = String(env.CPANEL_BASE_URL || "").trim();
     let base;
-    try { base = new URL(String(env.CPANEL_BASE_URL || "")); }
-    catch { throw Object.assign(new Error("Missing required Worker secrets: CPANEL_BASE_URL, CPANEL_USERNAME, CPANEL_API_TOKEN."), { status: 503 }); }
-    // cPanel's HTTPS service is on port 2083. Some hosting dashboards provide
-    // the bare HTTPS hostname; normalize only an omitted port, never an
-    // explicitly different port or a path that could bypass endpoint checks.
+    try {
+      // The known IRPA cPanel host may be stored as a bare hostname or as an
+      // HTTPS URL. Never infer HTTPS for an arbitrary hostname.
+      const endpoint = configuredEndpoint === "cpanel.habari.co.tz"
+        ? "https://cpanel.habari.co.tz"
+        : configuredEndpoint;
+      base = new URL(endpoint);
+    } catch {
+      throw Object.assign(new Error("Missing or invalid required Worker setting: CPANEL_BASE_URL."), { status: 503 });
+    }
+    // cPanel's HTTPS service is on port 2083. Normalize only an omitted port,
+    // never an explicitly different port or a path that could bypass checks.
     if (base.protocol === "https:" && !base.port) base.port = "2083";
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
+    if (base.protocol !== "https:" || base.hostname.toLowerCase() !== "cpanel.habari.co.tz" ||
+        base.username || base.password || base.search || base.hash || base.pathname !== "/" || base.port !== "2083") {
       throw new Error("cPanel endpoint configuration is invalid.");
     }
     const username = String(env.CPANEL_USERNAME || "").trim();
