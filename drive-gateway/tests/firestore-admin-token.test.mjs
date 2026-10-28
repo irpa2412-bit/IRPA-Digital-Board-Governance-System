@@ -19,8 +19,8 @@ test("signing and Drive routes never pass the caller token to Firestore document
   for (const name of names) {
     const start = source.indexOf("async function " + name + "(");
     if (start < 0) continue;
-    let end = source.indexOf("\\nasync function ", start + 10);
-    const nextFunction = source.indexOf("\\nfunction ", start + 10);
+    let end = source.indexOf("\nasync function ", start + 10);
+    const nextFunction = source.indexOf("\nfunction ", start + 10);
     if (end < 0 || (nextFunction >= 0 && nextFunction < end)) end = nextFunction;
     if (end < 0) end = source.length;
     const route = source.slice(start, end);
