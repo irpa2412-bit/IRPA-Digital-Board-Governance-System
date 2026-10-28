@@ -274,6 +274,9 @@ export default {
         return await controlledDocumentUploadPolicyCheck(request, env);
       }
 
+      if (pathname === "/api/upload-controlled-document/register" && request.method === "POST") {
+        return await registerControlledDocumentRecord(request, env);
+      }
       if (pathname === "/api/upload-controlled-document" && request.method === "POST") {
         return await uploadControlledDocument(request, env);
       }
@@ -1275,6 +1278,46 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
   } catch (error) {
     return json({ ok: false, step, error: step + " failed: " + String(error?.message || error).slice(0, 240), writesPerformed: false, driveUploadPerformed: false }, Number(error?.status) || 500, corsHeaders(request));
   }
+}
+
+
+function firestoreRestValue(value) {
+  if (value === null || value === undefined) return {nullValue:null};
+  if (typeof value === "boolean") return {booleanValue:value};
+  if (typeof value === "number") return Number.isInteger(value) ? {integerValue:String(value)} : {doubleValue:value};
+  if (Array.isArray(value)) return {arrayValue:{values:value.map(firestoreRestValue)}};
+  if (typeof value === "object") return {mapValue:{fields:Object.fromEntries(Object.entries(value).map(([key,item])=>[key,firestoreRestValue(item)]))}};
+  return {stringValue:String(value)};
+}
+
+async function registerControlledDocumentRecord(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
+  const adminToken = await getFirestoreAdminAccessToken(env);
+  const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,adminToken);
+  const isAdmin = String(claims.email||"").toLowerCase()==="irpa2412@gmail.com" || adminRecord?.fields?.active?.booleanValue===true;
+  if (!memberRecord && !employeeRecord && !isAdmin) return json({ok:false,error:"An active IRPA member, employee or administrator profile is required."},403,corsHeaders(request));
+  const data = await request.json();
+  const documentId = cleanId(data.documentId||"");
+  const supplied = data.documentPayload && typeof data.documentPayload==="object" ? data.documentPayload : null;
+  if (!documentId || !supplied) return json({ok:false,error:"STEP Firestore documents record: document ID and record payload are required."},400,corsHeaders(request));
+  if (String(supplied.uploadedByUid||"")!==String(claims.user_id||"") || !Array.isArray(supplied.authorizedUids) || !supplied.authorizedUids.includes(claims.user_id)) {
+    return json({ok:false,error:"STEP Firestore documents record: uploader identity and self-authorization must match the authenticated user."},403,corsHeaders(request));
+  }
+  if (supplied.status!=="Draft" || supplied.authorizationStatus!=="Draft") return json({ok:false,error:"STEP Firestore documents record: initial controlled documents must remain Draft."},400,corsHeaders(request));
+  const gate = await getFirestoreDocument(env,"systemSettings/actualDataAccess",adminToken);
+  const gateFields = gate?.fields||{};
+  const actualOpen = gateFields.enabled?.booleanValue===true && gateFields.status?.stringValue==="OPEN" && gateFields.finalTestsAttested?.booleanValue===true;
+  const recordOrigin = actualOpen && String(supplied.recordOrigin||"").toUpperCase()==="PRODUCTION" ? "PRODUCTION" : "TRIAL";
+  const record = {...supplied,recordOrigin,trialData:recordOrigin==="TRIAL",isTrial:recordOrigin==="TRIAL",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const path = "documents/"+documentId;
+  const existing = await getFirestoreDocument(env,path,adminToken);
+  if (existing) return json({ok:false,error:"STEP Firestore documents record: this document ID is already registered."},409,corsHeaders(request));
+  const fields = Object.fromEntries(Object.entries(record).filter(([,value])=>value!==undefined).map(([key,value])=>[key,firestoreRestValue(value)]));
+  await updateFirestoreDocument(env,path,adminToken,fields,Object.keys(fields));
+  const persisted = await getFirestoreDocument(env,path,adminToken);
+  if (!persisted?.fields) return json({ok:false,error:"STEP Firestore documents record: Worker write completed but record verification failed."},502,corsHeaders(request));
+  return json({ok:true,documentId,recordOrigin,trial:recordOrigin==="TRIAL"},201,corsHeaders(request));
 }
 
 async function uploadControlledDocument(request, env) {
