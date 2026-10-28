@@ -293,8 +293,10 @@ export function createCommunicationsSiteRouter(deps) {
         /not found|does not exist|no such file|cannot find/.test(errorText) ? "not_found" :
         /invalid|unsupported|unknown function|unknown api/.test(errorText) ? "invalid_operation" :
         /auth|token|login/.test(errorText) ? "authentication_rejected" : "uapi_error";
-      throw new Error("cPanel operation failed (" + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
-        "; HTTP " + status + "; UAPI status " + uapiStatus + "; error_count " + errorCount + "; category " + category + ").");
+      const diagnosticCode = "cpanel_" + category;
+      throw Object.assign(new Error("cPanel " + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
+        " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category + "."),
+        { diagnosticCode, httpStatus: status, uapiStatus, errorCount });
     }
     return data;
   }
@@ -608,15 +610,14 @@ export function createCommunicationsSiteRouter(deps) {
         const message = String(error?.message || "");
         const lower = message.toLowerCase();
         if (error?.diagnosticCode) {
-          result.cpanel = error.diagnosticCode === "cpanel_credentials_missing" || error.diagnosticCode === "cpanel_base_url_missing" ? "not_configured" : "unavailable";
+          result.cpanel = error.diagnosticCode === "cpanel_credentials_missing" || error.diagnosticCode === "cpanel_base_url_missing" ? "not_configured" :
+            error.diagnosticCode === "cpanel_authentication_rejected" ? "authentication_rejected" :
+            error.diagnosticCode === "cpanel_permission_denied" ? "permission_denied" : "unavailable";
           result.cpanelDiagnostic = safeCode(error.diagnosticCode);
           result.cpanelDiagnosticMessage = message.slice(0, 240);
-        } else if (/category authentication_rejected/.test(message)) {
-          result.cpanel = "authentication_rejected";
-          result.cpanelDiagnostic = "authentication_rejected";
-        } else if (/category permission_denied/.test(message)) {
-          result.cpanel = "permission_denied";
-          result.cpanelDiagnostic = "permission_denied";
+          if (Number.isInteger(error.httpStatus)) result.cpanelHttpStatus = error.httpStatus;
+          if (error.uapiStatus !== undefined) result.cpanelUapiStatus = error.uapiStatus;
+          if (Number.isInteger(error.errorCount)) result.cpanelApiErrorCount = error.errorCount;
         } else {
           result.cpanel = "unavailable";
           result.cpanelDiagnostic = error?.name === "TimeoutError" || error?.name === "AbortError" ? "cpanel_request_timeout" :
