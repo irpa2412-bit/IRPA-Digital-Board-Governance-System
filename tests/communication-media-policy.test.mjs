@@ -14,6 +14,7 @@ const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const wrangler=read("../drive-gateway/wrangler.toml");
 const site=read("../drive-gateway/src/communicationsSite.mjs");
+const websitePolicy=read("../drive-gateway/src/communicationsWebsitePolicy.mjs");
 const functionsIndex=read("../functions/index.js");
 const docs=read("../docs/COMMUNICATION_MEDIA_PORTAL.md");
 const readability=read("../src/styles/readability-harmony.css");
@@ -138,7 +139,8 @@ test("website editor provides a sandboxed live preview without bypassing live-wr
 
 test("website page editing is staging-host-only, Communication & Media scoped, revision-backed and secret-safe",()=>{
  assert.ok(site.includes('String(env.IRPA_ENVIRONMENT || "").toLowerCase() !== "staging"'));
- assert.ok(site.includes('base.hostname.toLowerCase() !== "staging.irpa.or.tz"'));
+ assert.ok(site.includes("assertStagingWebsiteHost"));
+ assert.ok(websitePolicy.includes('url.hostname.toLowerCase() !== "staging.irpa.or.tz"'));
  assert.ok(site.includes('redirect: "manual"'));
  assert.ok(site.includes("WEBSITE_EDITOR_ROLES"));
  assert.ok(site.includes("COMMUNICATION_WEBSITE_EDIT_SNAPSHOT_SAVED"));
