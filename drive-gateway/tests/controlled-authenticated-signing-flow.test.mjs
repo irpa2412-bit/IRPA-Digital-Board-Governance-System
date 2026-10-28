@@ -419,3 +419,22 @@ test("Gateway open keeps later signers' assignments hidden while retaining the a
   assert.equal(opened.fields[0].page,3);
   assert.equal(opened.fields.some(field=>field.signerUid==="second-user"),false);
 });
+
+
+test("later signer sees earlier confirmed signature but never an unsigned later assignment", async () => {
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  fixture.envelope.signers[0].order=2;
+  fixture.envelope.signers[1].order=1;
+  fixture.envelope.signers[1].status="Signed";
+  fixture.envelope.signers[1].fieldValues={"prior-signature":SIGNATURE_PNG};
+  fixture.envelope.fields=[
+    {fieldId:"prior-signature",type:"Signature",page:1,x:10,y:20,width:30,height:8,signerUid:"second-user",required:true},
+    {fieldId:"current-signature",type:"Signature",page:3,x:50,y:30,width:30,height:8,signerUid:"member-uid",required:true},
+    {fieldId:"future-signature",type:"Signature",page:3,x:70,y:30,width:20,height:8,signerUid:"future-user",required:true}
+  ];
+  const opened=await openSigning(fixture.ctx,fixture.token,{uid:"member-uid",email:"member@example.org"});
+  assert.deepEqual(opened.fields.map(field=>field.fieldId),["current-signature"]);
+  assert.deepEqual(opened.appliedFields.map(field=>field.fieldId),["prior-signature"]);
+  assert.equal(opened.appliedFields[0].value,SIGNATURE_PNG);
+  assert.equal(opened.fields.some(field=>field.fieldId==="future-signature"),false);
+});
