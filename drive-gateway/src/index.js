@@ -21,7 +21,7 @@ import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs"
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
-import { canReadSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
+import { canReadSignatureAsset, canReadFirestoreSignatureAsset, canUploadSignedDocument } from "./signatureAssetAuthorization.mjs";
 import { filterSignatureEnvelopeForCaller } from "./signatureWorkflowVisibility.mjs";
 
 import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPasswordSetup, getInvitationSessionState } from "./invitationRedemption.mjs";
@@ -1635,6 +1635,11 @@ async function download(request, env) {
     return json({ ok: false, error: "The requested file is not an IRPA governance document." }, 403, corsHeaders(request));
   }
   const purpose = String(description.purpose || "");
+  if ((purpose === "Controlled Documents" || purpose === "Board of Directors Governance Documents") &&
+      controlledDocument && String(controlledDocumentFields.driveFileId?.stringValue || controlledDocumentFields.fileId?.stringValue || "") === fileId &&
+      String(description.documentId || "") !== cleanId(data.documentId || "")) {
+    await repairSignatureAssetDescription(env, accessToken, fileId, description, cleanId(data.documentId), claims, "", "controlled-document/download");
+  }
   if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))) {
     return json({ ok:false, error:"Your registered IRPA role does not permit access to the communications media archive." },403,corsHeaders(request));
   }
@@ -1731,7 +1736,12 @@ async function downloadSignatureFile(request, env) {
   const role = isAdministrator ? "administrator" : actor === owner ? "owner" : actor === sender ? "sender" : participantUids.includes(actor) ? "participant" : "stranger";
   const envelopeExists = Boolean(envelope), envelopeDocumentMatches = Boolean(envelope && envelopeDocumentId === documentId);
   const documentRecordExists = Boolean(document), fileIdMatches = Boolean(document && recordDriveId === fileId);
-  const relationshipAllowed = isAdministrator || actor === owner || actor === sender || signerVisible;
+  const relationshipAllowed = canReadFirestoreSignatureAsset({
+    authenticatedUid:actor,isAdmin:isAdministrator,envelopeExists,envelopeDocumentId,
+    requestedDocumentId:documentId,documentRecordExists,recordDriveFileId:recordDriveId,
+    requestedDriveFileId:fileId,envelopeOwnerUid:owner,envelopeSenderUid:sender,
+    recipients,currentSignerUid,workflowHistory:firestoreMapArray(envelopeFields.workflowHistory)
+  });
   if (!envelopeExists || !envelopeDocumentMatches || !documentRecordExists || !fileIdMatches || !relationshipAllowed) {
     const driveToken = await getDriveAccessToken(env);
     const driveMetadata = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"?fields=id,description").catch(()=>({}));
