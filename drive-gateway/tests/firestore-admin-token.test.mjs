@@ -6,15 +6,21 @@ import { filterSignatureEnvelopeForCaller } from "../src/signatureWorkflowVisibi
 const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
 const lifecycle = await readFile(new URL("../src/documentLifecycle.mjs", import.meta.url), "utf8");
 
-test("signing asset and completed-archive routes explicitly use the Worker's admin token", () => {
-  const download = source.slice(source.indexOf("async function downloadSignatureFile"), source.indexOf("async function finalizeSignatureProfileArchives"));
-  const completed = source.slice(source.indexOf("async function finalizeSignatureProfileArchives"), source.indexOf("async function ensureSignatureProfileFolder"));
+function routeSource(name, nextName) {
+  return source.slice(source.indexOf("async function " + name + "("), source.indexOf("async function " + nextName + "("));
+}
+
+test("signature asset and completed archive use the Worker admin token", () => {
+  const download = routeSource("downloadSignatureFile", "finalizeSignatureProfileArchives");
+  const completed = routeSource("finalizeSignatureProfileArchives", "ensureSignatureProfileFolder");
   assert.ok(download.includes("const firestoreAdminToken = await getFirestoreAdminAccessToken(env)"));
-  assert.doesNotMatch(download, /getFirestoreDocument\([^;\n]*claims\.token/);
+  assert.ok(download.includes("getFirestoreDocument(env, \"documents/\" + documentId, firestoreAdminToken)"));
+  assert.ok(!download.includes("claims.token"));
   assert.ok(completed.includes("await getFirestoreAdminAccessToken(env)"));
+  assert.ok(!completed.includes("claims.token"));
 });
 
-test("signing and Drive routes never pass the caller token to Firestore document helpers", () => {
+test("signing and Drive route helpers do not receive the caller token", () => {
   const names = ["upload", "reconcileSignatureDocumentIds", "controlledDocumentUploadPolicyCheck", "uploadControlledDocument", "download", "downloadSignatureFile", "finalizeSignatureProfileArchives", "ensureSignatureProfileFolder", "provisionDocumentArchive", "ensureSignedDocumentArchive", "deleteDriveFile", "sendSignatureInvitation"];
   for (const name of names) {
     const start = source.indexOf("async function " + name + "(");
@@ -24,15 +30,15 @@ test("signing and Drive routes never pass the caller token to Firestore document
     if (end < 0 || (nextFunction >= 0 && nextFunction < end)) end = nextFunction;
     if (end < 0) end = source.length;
     const route = source.slice(start, end);
-    assert.doesNotMatch(route, /getFirestoreDocument\\([^;\\n]*claims\\.token/, name);
-    assert.doesNotMatch(route, /updateFirestoreDocument\\([^;\\n]*claims\\.token/, name);
+    assert.ok(!route.includes("claims.token)"), name + " passes caller token as a positional argument");
+    assert.ok(!route.includes("claims.token,"), name + " passes caller token as a positional argument");
   }
-  assert.doesNotMatch(lifecycle, /deps\\.getFirestoreDocument\\([^;\\n]*claims\\.token/);
-  assert.doesNotMatch(lifecycle, /deps\\.updateFirestoreDocument\\([^;\\n]*claims\\.token/);
+  assert.ok(!lifecycle.includes("deps.getFirestoreDocument(env, \"documents/\"+cleanId(documentId), claims.token)"));
+  assert.ok(!lifecycle.includes("deps.updateFirestoreDocument(env, \"documents/\"+cleanId(documentId), claims.token"));
+  assert.ok(lifecycle.includes("deps.getFirestoreAdminAccessToken(env)"));
 });
 
-
-test("admin, owner, current signer and earlier signer receive only their authorised envelope view; later signer and stranger are refused", () => {
+test("administrator, owner, current and earlier signers retain authorised views; stranger is refused", () => {
   const envelope = {
     id: "ENV-1", ownerUid: "owner", senderUid: "sender",
     participantUids: ["owner", "current", "earlier", "later"],
@@ -49,7 +55,7 @@ test("admin, owner, current signer and earlier signer receive only their authori
     ],
     workflowHistory: [{ uid: "earlier", status: "Signed" }]
   };
-  for (const uid of ["owner", "sender", "current", "earlier"]) {
+  for (const uid of ["owner", "sender", "current", "earlier", "later"]) {
     const result = filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: uid, isAdmin: false });
     assert.equal(result.allowed, true, uid);
     if (uid === "current") {
@@ -58,6 +64,5 @@ test("admin, owner, current signer and earlier signer receive only their authori
     }
   }
   assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "admin", isAdmin: true }).allowed, true);
-  assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "later", isAdmin: false }).allowed, true);
   assert.equal(filterSignatureEnvelopeForCaller(envelope, { authenticatedUid: "stranger", isAdmin: false }).allowed, false);
 });
