@@ -1,7 +1,9 @@
 const AUTHOR_ROLES = new Set([
-  "Communications Officer", "Communications Manager", "Media Officer",
-  "Public Relations Officer", "Director Outreach", "Outreach Director",
-  "Director Community Development", "Community Development Director",
+  "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
+  "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
+  "Media Officer", "Media Manager", "Communications & Media Officer", "Communications and Media Officer",
+  "Media and Communications Officer", "Media & Communications Officer", "Public Relations Officer",
+  "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director",
   "Executive Director", "Administrator"
 ]);
 const REVIEW_ROLES = new Set([
