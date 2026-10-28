@@ -67,7 +67,8 @@ test("Signature Portal palette queries include document owner and signature owne
 
 test("adding the first signing officer creates a signature field assigned to that officer", () => {
   assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)\)\)nextFields\.push\(makeField\("Signature",nextFields\.length,m\.uid,1\)\)/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,m\.uid,preparationPage\),placeholder:"Tap to sign after preparation"\}\)/);
+  assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
 });
