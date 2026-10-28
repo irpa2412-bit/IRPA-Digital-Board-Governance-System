@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, updateDoc, setDoc, where, } from "firebase/firestore";
 import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
-import { sendEmployeeRegistrationEmail } from "./auth";
+import { sendEmployeeRegistrationEmail } from "./employeeRegistrationEmail";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
