@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: communication-website-staging-acceptance
+  group: communication-website-staging-acceptance-finalized
   cancel-in-progress: false
 jobs:
   verify:
