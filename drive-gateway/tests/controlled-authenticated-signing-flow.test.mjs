@@ -392,10 +392,10 @@ test("confirmed signature is rendered on the saved third-page field position", a
   assert.equal(pdf.getPageCount(),4,"three source pages plus the signature certificate");
   const pageThree=pdf.getPages()[2];
   const xObjects=pageThree.node.Resources()?.lookup(PDFName.of("XObject"));
-  assert.ok(xObjects && xObjects.size()>0,"the confirmed signature image must be on page 3");
+  assert.ok(xObjects,"the confirmed signature image must be on page 3");
   const pageOne=pdf.getPages()[0];
   const firstPageObjects=pageOne.node.Resources()?.lookup(PDFName.of("XObject"));
-  assert.ok(!firstPageObjects||firstPageObjects.size()===0,"the page-3 signature must not be moved to page 1");
+  assert.equal(Boolean(firstPageObjects),false,"the page-3 signature must not be moved to page 1");
 });
 
 test("a non-assigned signer cannot apply another officer's signature field", async () => {
