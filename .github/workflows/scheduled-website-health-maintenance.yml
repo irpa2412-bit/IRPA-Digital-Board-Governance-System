@@ -19,6 +19,8 @@ jobs:
       STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
       STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
       STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+      STAGING_MAINTENANCE_API_URL: ${{ secrets.STAGING_MAINTENANCE_API_URL }}
+      STAGING_MAINTENANCE_API_TOKEN: ${{ secrets.STAGING_MAINTENANCE_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +30,10 @@ jobs:
         run: |
           set -o pipefail
           node scripts/staging-website-health-maintenance.mjs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Run allowlisted staging maintenance and rollback verification
+        run: |
+          set -o pipefail
+          node scripts/website-maintenance-engine.mjs | tee -a "$GITHUB_STEP_SUMMARY"
       - name: State safety boundary
         if: always()
         run: |
@@ -36,8 +42,8 @@ jobs:
             echo "## Maintenance safety boundary"
             echo "- Scheduled cadence: every two days (UTC cron)."
             echo "- Target: staging.irpa.or.tz and the dedicated staging Worker only."
-            echo "- Automatic behavior: bounded retries for transient failures and read-only diagnostics."
+            echo "- Automatic behavior: bounded retries, plus allowlisted staging repairs only when the restricted host adapter is configured."
             echo "- No content, plugin, theme, WordPress core, user, settings, or website-file changes are made by this job."
             echo "- Human approval remains required for content changes in the Communications Portal."
-            echo "- Technical repairs that require an unsupported or destructive API are reported rather than attempted."
+            echo "- WordPress updates require a verified restorable backup, exact pinned staging manifest, compatibility plan, post-update checks, and rollback on failure."\n            echo "- No host adapter/token means maintenance mutations are disabled; no production host is accepted."
           } >> "$GITHUB_STEP_SUMMARY"
