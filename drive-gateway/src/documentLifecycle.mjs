@@ -336,7 +336,7 @@ export function createDocumentLifecycleRouter(deps) {
       const document=await getPlainDocument(deps,env,claims,documentId);if(!document)return deps.json({ok:false,error:"Document registry record was not found."},404,deps.corsHeaders(request));
       const access=canRead(identity,document);if(!access.allowed)return deps.json({ok:false,error:access.reason},403,deps.corsHeaders(request));
       if(document.status!=="PENDING_SIGNATURE")return deps.json({ok:false,error:"The document is not awaiting signature."},409,deps.corsHeaders(request));
-      const envelopeRaw=await deps.getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,claims.token);const envelope=envelopeRaw?deps.firestoreDocumentToPlain(envelopeRaw):null;
+      const firestoreToken=await deps.getFirestoreAdminAccessToken(env);const envelopeRaw=await deps.getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,firestoreToken);const envelope=envelopeRaw?deps.firestoreDocumentToPlain(envelopeRaw):null;
       if(!envelope||clean(envelope.documentId)!==documentId)return deps.json({ok:false,error:"The signature envelope does not belong to this document."},403,deps.corsHeaders(request));
       if(clean(envelope.status)!=="Completed")return deps.json({ok:false,error:"The signature envelope is not completed."},409,deps.corsHeaders(request));
       const signedFileId=fileIdFromUrl(envelope.signedDocumentUrl||envelope.ownerCompletedDocumentUrl||envelope.signedDocumentPath||"");
