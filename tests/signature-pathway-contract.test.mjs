@@ -169,3 +169,16 @@ test("Communication Media uploads accept only the provisioned archive folder and
   assert.match(route, /folderDescription\.irpaCommunicationMediaArchive !== true/);
   assert.match(route, /folderDescription\.purpose !== "IRPA Communication and Media Archive"/);
 });
+
+
+test("document lifecycle opens its existing signature envelope instead of preparing a duplicate envelope", async () => {
+  const [platform, lifecycle] = await Promise.all([
+    read("../src/pages/SignaturePlatform.jsx"),
+    read("../src/pages/DocumentLifecycleModule.jsx")
+  ]);
+  assert.match(lifecycle, /<SignaturePlatform initialDocument=\{\{\.\.\.selected,id:selected\.documentId\}\}\/>/);
+  assert.match(platform, /if\(initialDocument\.signatureEnvelopeId\)\{setSigningCircle\("Signing Circle"\);setTab\("Envelopes"\)/);
+  assert.match(platform, /envelopes\.find\(item=>String\(item\.id\|\|""\)===envelopeId\|\|String\(item\.gatewayEnvelopeId\|\|""\)===envelopeId\)/);
+  assert.match(platform, /setSelected\(envelope\);setTab\("Sign Document"\)/);
+  assert.match(platform, /a duplicate envelope was not created/);
+});
