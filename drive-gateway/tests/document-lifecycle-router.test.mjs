@@ -194,3 +194,26 @@ test("translated derivative upload is denied if client attempts to lower source 
   assert.match(await response.text(),/retain the source document's classification and archive category/i);
   assert.deepEqual(state.writes,[]);
 });
+
+
+test("signature completion reads document and envelope with Worker admin token, never caller ID token",async()=>{
+  const state={docs:{"DOC-signing":{plain:{documentId:"DOC-signing",ownerUid:"emp-1",status:"PENDING_SIGNATURE",classification:"Internal",authorizedUids:["emp-1"]}}},writes:[],deletedFiles:[],tokenCalls:[]};
+  const deps=makeDeps(state);
+  deps.getFirestoreAdminAccessToken=async()=> "worker-admin-token";
+  deps.getFirestoreDocument=async(_env,path,token)=>{
+    state.tokenCalls.push({path,token});
+    if(token!=="worker-admin-token") throw Object.assign(new Error("Firestore GET "+path+" failed: HTTP 403 PERMISSION_DENIED Missing or insufficient permissions."),{status:403});
+    if(path==="adminProfiles/emp-1")return null;
+    if(path==="members/emp-1")return null;
+    if(path==="employees/emp-1")return {fields:{status:{stringValue:"Active"},department:{stringValue:"Finance"}}};
+    if(path==="documents/DOC-signing")return {plain:state.docs["DOC-signing"].plain,fields:{ownerUid:{stringValue:"emp-1"},status:{stringValue:"PENDING_SIGNATURE"},classification:{stringValue:"Internal"},authorizedUids:{arrayValue:{values:[{stringValue:"emp-1"}]}}}};
+    if(path==="signatureEnvelopes/ENV-123456")return {plain:{documentId:"DOC-signing",status:"Completed",lastSignedByUid:"emp-1"},fields:{}};
+    return null;
+  };
+  const router=createDocumentLifecycleRouter(deps);
+  const response=await router(req("/api/document-lifecycle/signature-complete",{documentId:"DOC-signing",envelopeId:"ENV-123456"}),env);
+  assert.equal(response.status,200,await response.text());
+  assert.ok(state.tokenCalls.length>0);
+  assert.ok(state.tokenCalls.every(call=>call.token==="worker-admin-token"),JSON.stringify(state.tokenCalls));
+  assert.ok(state.tokenCalls.some(call=>call.path==="signatureEnvelopes/ENV-123456"));
+});
