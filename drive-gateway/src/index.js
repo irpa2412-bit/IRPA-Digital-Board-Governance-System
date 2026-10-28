@@ -59,6 +59,7 @@ let jwksFetchedAt = 0;
 
 const documentLifecycleRouter = createDocumentLifecycleRouter({
   getFirebaseProjectId: env => getFirebaseProjectId(env),
+  getFirestoreAdminAccessToken: env => getFirestoreAdminAccessToken(env),
   allowedContentTypes: ALLOWED_CONTENT_TYPES,
   authenticateFirebaseRequest,
   getFirestoreDocument,
