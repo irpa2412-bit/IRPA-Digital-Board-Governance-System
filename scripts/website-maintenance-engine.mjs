@@ -46,7 +46,8 @@ export function validateUpdateManifest(manifest = {}) {
   const seen = new Set();
   for (const update of manifest.updates) {
     if (!ALLOWED_UPDATE_TYPES.has(update?.type) || typeof update?.version !== "string" ||
-        !/^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$/.test(update.version)) {
+        !/^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$/.test(update.version) ||
+        /^(latest|stable|nightly|dev)$/i.test(update.version) || /[~^*<>| ]/.test(update.version)) {
       throw new Error("Every update must specify an allowlisted type and an exact pinned version.");
     }
     if (update.type !== "core" && !/^[a-z0-9][a-z0-9._-]{0,99}$/.test(String(update.slug || ""))) {
