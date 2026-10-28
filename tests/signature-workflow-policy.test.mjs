@@ -39,7 +39,7 @@ test("uploaded controlled PDF enters the pre-signing palette with scoped documen
   assert.match(page, /setDocumentId\(initialDocument\.id\);setDocumentUrl\(url\)/);
   assert.match(page, /setSigningCircle\("Document Selected"\);setTab\("Prepare Envelope"\)/);
   assert.match(page, /import\{downloadControlledDocumentBytes,downloadSignatureBytes\}from"\.\.\/firebase\/signatureStorage"/);
-  assert.match(page, /envelopeId\?await downloadSignatureBytes\([^;]+:await downloadControlledDocumentBytes\(url\.slice\("drive:\/\/"\.length\),documentId\)/);
+  assert.match(page, /signingStage&&envelopeId\?await downloadSignatureBytes\([^;]+:await downloadControlledDocumentBytes\(url\.slice\("drive:\/\/"\.length\),documentId\)/);
   assert.match(storage, /export async function downloadControlledDocumentBytes\(fileId, documentId\)/);
   assert.match(storage, /if \(!fileId \|\| !documentId\) throw new Error/);
 });
@@ -111,4 +111,16 @@ test("Signature Portal PDF palette remains legible and reports retrieval failure
   assert.match(page, /background:"#ffffff"/);
   assert.match(page, /PDF could not be loaded\. Check your access to this controlled document/);
   assert.ok(page.includes('setPdf(null);setPageNum(1);setError("")'));
+});
+
+
+test("signature PDF palette uses controlled-document authorization during Draft preparation and signature-file authorization only in signing stage", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  assert.match(page, /signingStage=false/);
+  assert.match(page, /signingStage&&envelopeId\\?await downloadSignatureBytes/);
+  assert.match(page, /signingStage=\\{tab===\\"Sign Document\\"\\}/);
+  const gateway = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.match(gateway, /failedCondition=/);
+  assert.match(gateway, /Drive\\.description\\.documentId=/);
+  assert.match(gateway, /callerRole=/);
 });
