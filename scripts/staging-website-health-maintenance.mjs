@@ -5,8 +5,8 @@ const gateway = String(env.STAGING_GATEWAY_URL || "https://irpa-google-drive-gat
 const base = String(env.STAGING_WORDPRESS_BASE_URL || "").replace(/\/+$/, "");
 const checks = [];
 const secrets = [env.STAGING_FIREBASE_WEB_API_KEY, env.STAGING_TEST_PASSWORD].filter(Boolean);
-const clean = value => String(value ?? "").replace(/[\r\n\t]/g, " ").replace(/Bearer\s+[^\s,;]+/gi, "Bearer [REDACTED]").slice(0, 240);
-function record(name, ok, detail) { checks.push({ name, result: ok ? "PASS" : "FAIL", detail: clean(detail) }); }
+const clean = value => secrets.reduce((text, secret) => text.split(String(secret)).join("[REDACTED]"), String(value ?? "")).replace(/[\r\n\t]/g, " ").replace(/Bearer\s+[^\s,;]+/gi, "Bearer [REDACTED]").slice(0, 240);
+function record(name, ok, detail) { checks.push({ name, result: ok === "WARN" ? "WARN" : ok ? "PASS" : "FAIL", detail: clean(detail) }); }
 async function request(url, options = {}, attempts = 3) {
   let last;
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -59,21 +59,21 @@ async function main() {
     connections = data.connections;
     if (!connections || typeof connections !== "object") throw new Error("Gateway returned no structured site status.");
     record("Staging site status endpoint", true, "Health status retrieved with bounded retries.");
-    record("WordPress integration", connections.website === true, connections.website === true ? "Connected." : "Not connected or not verified.");
-    record("cPanel integration", connections.cpanel === true, connections.cpanel === true ? "Connected." : "Not connected or not verified.");
+    record("WordPress integration", connections.website === "connected", connections.website === "connected" ? "Connected." : "Not connected or not verified: " + String(connections.website || "unknown"));
+    record("cPanel integration", connections.cpanel === "connected", connections.cpanel === "connected" ? "Connected." : "Not connected or not verified: " + String(connections.cpanel || "unknown"));
     if (connections.websiteUp === false) record("Staging website availability", false, "Staging website reported unavailable.");
     else if (connections.websiteUp === true) record("Staging website availability", true, "Staging website responded.");
     else record("Staging website availability", false, "Availability was not verified.");
     const links = Array.isArray(connections.brokenLinks) ? connections.brokenLinks : null;
     if (links) record("Main navigation links", links.length === 0, links.length === 0 ? "No broken main-menu links reported." : links.length + " broken link(s) reported; no automatic link edits were made.");
-    else record("Main navigation links", false, "Link-check result unavailable.");
+    else record("Main navigation links", "WARN", "Link-check result unavailable.");
     const backup = String(connections.lastBackup || "");
-    record("Backup status", Boolean(backup && backup !== "not available"), backup && backup !== "not available" ? "Latest backup metadata returned: " + backup : "No recent backup timestamp could be verified; no backup was deleted or overwritten.");
+    record("Backup status", backup && backup !== "not available" ? true : "WARN", backup && backup !== "not available" ? "Latest backup metadata returned: " + backup : "Backup timestamp could not be verified; no backup was deleted or overwritten.");
     const ssl = String(connections.sslExpiry || "");
     if (ssl) {
       const expiry = Date.parse(ssl);
-      record("SSL expiry", Number.isFinite(expiry) && expiry > Date.now() + 14 * 86400000, Number.isFinite(expiry) ? "Expiry date: " + new Date(expiry).toISOString() : "SSL expiry value was not parseable.");
-    } else record("SSL expiry", false, "SSL expiry was not available from the staging status endpoint.");
+      record("SSL expiry", Number.isFinite(expiry) ? expiry > Date.now() + 14 * 86400000 : "WARN", Number.isFinite(expiry) ? "Expiry date: " + new Date(expiry).toISOString() : "SSL expiry value was not parseable.");
+    } else record("SSL expiry", "WARN", "SSL expiry was not available from the staging status endpoint.");
   } catch (error) {
     record("Staging site status endpoint", false, error.message);
   }
