@@ -59,7 +59,7 @@ async function listVisibleDocuments(deps, env, claims, identity) {
   const response = await fetch("https://firestore.googleapis.com/v1/projects/"+deps.getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
     method:"POST",
     headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-    body:JSON.stringify({structuredQuery:{from:[{collectionId:"documents"}],limit:100}})
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:"documents"}]}})
   });
   if(!response.ok) throw new Error("Unable to retrieve the controlled-document register.");
   const rows=await response.json();
