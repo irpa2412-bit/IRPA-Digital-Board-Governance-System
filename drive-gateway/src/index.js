@@ -1306,6 +1306,16 @@ async function registerControlledDocumentRecord(request, env) {
     return json({ok:false,error:"STEP Firestore documents record: uploader identity and self-authorization must match the authenticated user."},403,corsHeaders(request));
   }
   if (supplied.status!=="Draft" || supplied.authorizationStatus!=="Draft") return json({ok:false,error:"STEP Firestore documents record: initial controlled documents must remain Draft."},400,corsHeaders(request));
+  const driveFileId = cleanId(supplied.fileId||supplied.archiveFileId||"");
+  const archiveFolderId = cleanId(supplied.archiveFolderId||"");
+  if (!driveFileId || !archiveFolderId) return json({ok:false,error:"STEP Drive file verification: Drive file ID and archive destination folder ID are required."},400,corsHeaders(request));
+  const driveToken = await getDriveAccessToken(env);
+  const driveFile = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(driveFileId)+"?fields=id,name,parents,description,trashed");
+  let driveDescription = {};
+  try { driveDescription = JSON.parse(driveFile.description||"{}"); } catch {}
+  if (driveFile.trashed || String(driveFile.id||"")!==driveFileId || String(driveDescription.documentId||"")!==documentId || String(driveDescription.uploadedByUid||"")!==String(claims.user_id||"") || !Array.isArray(driveFile.parents) || !driveFile.parents.includes(archiveFolderId)) {
+    return json({ok:false,error:"STEP Drive file verification: Drive file ownership, document ID, or archive destination did not match the authenticated upload."},403,corsHeaders(request));
+  }
   const gate = await getFirestoreDocument(env,"systemSettings/actualDataAccess",adminToken);
   const gateFields = gate?.fields||{};
   const actualOpen = gateFields.enabled?.booleanValue===true && gateFields.status?.stringValue==="OPEN" && gateFields.finalTestsAttested?.booleanValue===true;
