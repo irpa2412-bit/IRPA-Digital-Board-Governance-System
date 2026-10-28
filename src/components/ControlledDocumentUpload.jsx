@@ -220,6 +220,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         uploadedAt: uploadedAt,
         uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
       }, workflowContext || {});
+      documentPayload.recordOrigin = persistedOrigin(documentPayload);
       const doc = {
         id: null,
         title: name,
