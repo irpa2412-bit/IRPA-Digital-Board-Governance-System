@@ -116,11 +116,11 @@ test("Signature Portal PDF palette remains legible and reports retrieval failure
 
 test("signature PDF palette uses controlled-document authorization during Draft preparation and signature-file authorization only in signing stage", () => {
   const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
-  assert.match(page, /signingStage=false/);
-  assert.match(page, /signingStage&&envelopeId\\?await downloadSignatureBytes/);
-  assert.match(page, /signingStage=\\{tab===\\"Sign Document\\"\\}/);
+  assert.ok(page.includes("signingStage=false"));
+  assert.ok(page.includes("signingStage&&envelopeId?await downloadSignatureBytes"));
+  assert.ok(page.includes('signingStage={tab==="Sign Document"}'));
   const gateway = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
-  assert.match(gateway, /failedCondition=/);
-  assert.match(gateway, /Drive\\.description\\.documentId=/);
-  assert.match(gateway, /callerRole=/);
+  assert.ok(gateway.includes("failedCondition="));
+  assert.ok(gateway.includes("Drive.description.documentId="));
+  assert.ok(gateway.includes("callerRole="));
 });
