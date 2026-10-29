@@ -33,11 +33,23 @@ export default function ReleaseReadiness({ admin = false }) {
         setReport(lines.join("\n"));
         return;
       }
-      const response = await fetch(gateway + "/api/system/release-readiness", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ webBuildCommit: webCommit })
-      });
+      const startedAt = Date.now();
+      let response;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        try { response = await fetch(gateway + "/api/system/release-readiness", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ webBuildCommit: webCommit }),
+          signal: controller.signal
+        }); } finally { clearTimeout(timer); }
+      } catch (networkError) {
+        const elapsedMs = Date.now() - startedAt;
+        add("Worker Release Readiness route", false, "could not reach the Worker (network or timeout); elapsed " + elapsedMs + " ms. " + String(networkError?.message || "No HTTP response."));
+        setReport(lines.join("\n"));
+        return;
+      }
       const payload = await response.json().catch(() => ({}));
       setIntegrationSecrets(Array.isArray(payload.integrationSecrets) ? payload.integrationSecrets : []);
       if (!response.ok) {
@@ -80,11 +92,16 @@ export default function ReleaseReadiness({ admin = false }) {
       ];
       for (const [name, path, method, body, expected] of portalProbes) {
         try {
-          const probeResponse = await fetch(gateway + path, {
+          const probeStartedAt = Date.now();
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          let probeResponse;
+          try { probeResponse = await fetch(gateway + path, {
             method,
             headers: { Authorization: "Bearer " + token, Accept: "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
-            ...(body ? { body: JSON.stringify(body) } : {})
-          });
+            ...(body ? { body: JSON.stringify(body) } : {}),
+            signal: controller.signal
+          }); } finally { clearTimeout(timer); }
           const responseText = await probeResponse.text();
           let responseData = {};
           try { responseData = JSON.parse(responseText); } catch {}
@@ -108,7 +125,7 @@ export default function ReleaseReadiness({ admin = false }) {
             }
           }
         } catch (probeError) {
-          add("Portal Self-Test: " + name, false, String(probeError?.message || probeError));
+          add("Portal Self-Test: " + name, false, "could not reach the Worker (network or timeout); elapsed " + (Date.now() - (typeof probeStartedAt === "number" ? probeStartedAt : Date.now())) + " ms. " + String(probeError?.message || probeError));
         }
       }
             const passCount = lines.filter(line => line.startsWith("PASS |")).length;
