@@ -4,7 +4,7 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 async function boundedFetch(input, init = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error("Outbound request timed out after 8 seconds.")), 8000);
-  try { return await globalThis.boundedFetch(input, { ...init, signal: controller.signal }); }
+  try { return await globalThis.fetch(input, { ...init, signal: controller.signal }); }
   finally { clearTimeout(timer); }
 }
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -201,6 +201,7 @@ const metaOAuthRouter = createMetaOAuthRouter({
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const routeName = url.pathname.replace(/\/+$/, "") || "/";
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -473,7 +474,10 @@ export default {
 
       return json({
         ok: false,
-        error: message,
+        error: "Worker request failed",
+        route: routeName,
+        step: "dispatch",
+        message: String(message).slice(0, 300),
         ...(error?.googleStatus ? {googleStatus:error.googleStatus} : {}),
         ...(error?.googleMessage ? {googleMessage:error.googleMessage} : {})
       }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
