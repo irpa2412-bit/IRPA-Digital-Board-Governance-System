@@ -1228,7 +1228,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
 async function reconcileSignatureDocumentIds(request, env) {
   // Legacy contract tests refer to status = "failed"; the current per-document taxonomy intentionally reports unreadable instead.
   const claims = await authenticateFirebaseRequest(request, env);
-  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
   if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
     return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
   }
@@ -1316,7 +1316,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     const claims = await authenticateFirebaseRequest(request, env);
     step = "Resolve active institutional profile";
     const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
-    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+    const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, step, error: "An active IRPA member, employee or administrator profile is required for controlled document upload policy checks." }, 403, corsHeaders(request));
     }
