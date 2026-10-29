@@ -590,12 +590,36 @@ export function createCommunicationsSiteRouter(deps) {
               try { detail = JSON.parse(raw); } catch {}
             }
             result.websiteErrorCode = safeCode(detail.code);
+            const wpReason = cleanText(detail.message || detail.error || "", 220).replace(/[\\r\\n]/g, " ");
+            const wpCode = String(detail.code || "").toLowerCase();
             result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable";
-            result.websiteDiagnosticCode = response.status === 401 ? "authentication_rejected" :
-              response.status === 403 ? "permission_denied" :
-              response.status >= 300 && response.status < 400 ? "unexpected_redirect" :
-              response.status >= 500 ? "wordpress_server_error" :
-              result.websiteErrorCode ? "wordpress_api_error" : "unexpected_http_response";
+            if ((response.status === 401 || response.status === 403) && /application.?password|application_passwords_disabled|application passwords are disabled/i.test(wpCode + " " + wpReason)) {
+              result.websiteDiagnosticCode = "application_passwords_disabled";
+              result.websiteDiagnosticMessage = "WordPress application passwords are disabled (HTTP " + response.status + ")." + (wpReason ? " Reason: " + wpReason : "");
+            } else if (response.status === 401 || response.status === 403) {
+              result.websiteDiagnosticCode = response.status === 401 ? "authentication_rejected" : "permission_denied";
+              result.websiteDiagnosticMessage = "WordPress rejected the integration credentials or permissions (HTTP " + response.status + ")." + (wpReason ? " Reason: " + wpReason : "");
+            } else if (response.status === 404) {
+              let restResponse;
+              try {
+                restResponse = await wordpressEditorFetch(wp, wp.root + "/wp-json/", {
+                  headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
+                  signal: AbortSignal.timeout(8000)
+                });
+              } catch {}
+              if (restResponse && restResponse.status === 404) {
+                result.websiteDiagnosticCode = "rest_api_disabled";
+                result.websiteDiagnosticMessage = "WordPress REST API endpoint /wp-json/ returned HTTP 404; the REST API may be disabled or blocked (HTTP 404).";
+              } else {
+                result.websiteDiagnosticCode = "wordpress_endpoint_not_found";
+                result.websiteDiagnosticMessage = "WordPress returned HTTP 404 for the authenticated users/me endpoint." + (wpReason ? " Reason: " + wpReason : "");
+              }
+            } else {
+              result.websiteDiagnosticCode = response.status >= 300 && response.status < 400 ? "unexpected_redirect" :
+                response.status >= 500 ? "wordpress_server_error" :
+                result.websiteErrorCode ? "wordpress_api_error" : "unexpected_http_response";
+              result.websiteDiagnosticMessage = "WordPress connection probe returned HTTP " + response.status + "." + (wpReason ? " Reason: " + wpReason : "");
+            }
           }
         }
       } catch (error) {
