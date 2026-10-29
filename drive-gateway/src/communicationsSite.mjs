@@ -1,3 +1,13 @@
+
+const OUTBOUND_TIMEOUT_MS = 8000;
+async function timedFetch(input, init = {}, timeoutMs = OUTBOUND_TIMEOUT_MS) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  try { return await fetch(input, { ...init, signal: controller.signal }); }
+  catch (error) { if (timedOut) throw Object.assign(new Error("Outbound request timed out after " + timeoutMs + "ms."), { code: "OUTBOUND_TIMEOUT", timeoutMs }); throw error; }
+  finally { clearTimeout(timer); }
+}
 const AUTHOR_ROLES = new Set([
   "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
   "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
@@ -230,7 +240,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (target.protocol !== "https:" || target.hostname.toLowerCase() !== wp.hostname || target.port || target.username || target.password) {
       throw new Error("WordPress editor request attempted to leave the configured HTTPS host.");
     }
-    return fetch(target.toString(), { ...init, redirect: "manual" });
+    return timedFetch(target.toString(), { ...init, redirect: "manual" });
   }
 
   async function verifyDedicatedWordPressEditor(wp) {
@@ -285,7 +295,7 @@ export function createCommunicationsSiteRouter(deps) {
     const url = new URL(config.root + "/" + operation);
     const body = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) body.set(key, String(value));
-    const response = await fetch(method === "GET" ? (url.search = body.toString(), url) : url, {
+    const response = await timedFetch(method === "GET" ? (url.search = body.toString(), url) : url, {
       method, headers: {
         Authorization: authHeader(config.username, config.token),
         Accept: "application/json",
@@ -475,7 +485,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (!projectId) return json({ error: "FIREBASE_PROJECT_ID is not configured for this Worker." }, 500, corsHeaders(request));
       const token = await getFirestoreAdminAccessToken(env);
       const endpoint = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents/" + collectionName;
-      const response = await fetch(endpoint + "?pageSize=100", { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+      const response = await timedFetch(endpoint + "?pageSize=100", { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) return json({ error: "Firestore register read failed (HTTP " + response.status + "): " + String(body?.error?.status || "UNKNOWN") + " " + String(body?.error?.message || "").slice(0, 180) }, 502, corsHeaders(request));
       const items = (Array.isArray(body.documents) ? body.documents : []).map(document => ({ id: String(document.name || "").split("/").pop(), ...(firestoreDocumentToPlain(document) || {}) }));
@@ -946,14 +956,14 @@ export function createCommunicationsSiteRouter(deps) {
       const requestedSlug = cleanText(item.slug, 100).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
       const languageSuffix = String(item.language || "English").toLowerCase().startsWith("kiswahili") ? "-sw" : "-en";
       const slug = requestedSlug ? requestedSlug + languageSuffix : "irpa-" + itemId;
-      const lookup = await fetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
+      const lookup = await timedFetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const found = await lookup.json().catch(() => null);
       if (!lookup.ok || !Array.isArray(found)) throw new Error("Could not safely check existing website content before publishing.");
       let post = found.find(p => Number.isInteger(p.id) && typeof p.link === "string");
       if (!post) {
-        const response = await fetch(endpoint, {
+        const response = await timedFetch(endpoint, {
           method: "POST",
           headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
           body: JSON.stringify({ title, content: plainContent(body) + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : ""), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
