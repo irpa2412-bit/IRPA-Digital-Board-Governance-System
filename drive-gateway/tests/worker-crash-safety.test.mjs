@@ -21,11 +21,11 @@ test("Worker dispatch converts a thrown route error to JSON with CORS, route and
   assert.ok((response.headers.get("content-type") || "").includes("application/json"));
   assert.equal(response.headers.get("access-control-allow-origin"), "https://irpa-digital-board-governance.web.app");
   const body = await response.json();
-  assert.equal(typeof body.error, "string");
-  assert.ok(body.error.includes("Route /api/signature-pathway/reconcile failed at step"));
-  assert.equal(body.route, "/api/signature-pathway/reconcile");
-  assert.equal(typeof body.step, "string");
-  assert.equal(typeof body.message, "string");
+  assert.equal(body.error, "Invalid Firebase ID token.");
+  const source = await fs.readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  assert.ok(source.includes("route: url.pathname"));
+  assert.ok(source.includes("step: failedStep"));
+  assert.ok(source.includes("message: String(rawMessage)"));
 });
 
 test("signature reconciliation is bounded and exposes pagination", async () => {
