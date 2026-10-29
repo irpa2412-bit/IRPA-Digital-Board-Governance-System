@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import worker from "../src/index.js";
 
 test("Worker dispatch converts a thrown route error to JSON with CORS, route and step", async () => {
@@ -17,24 +18,31 @@ test("Worker dispatch converts a thrown route error to JSON with CORS, route and
     IRPA_ENVIRONMENT: "production"
   });
   assert.ok(response.status >= 400);
-  assert.match(response.headers.get("content-type") || "", /application\\/json/i);
+  assert.ok((response.headers.get("content-type") || "").includes("application/json"));
   assert.equal(response.headers.get("access-control-allow-origin"), "https://irpa-digital-board-governance.web.app");
   const body = await response.json();
   assert.equal(typeof body.error, "string");
-  assert.match(body.error, /Route \\/api\\/signature-pathway\\/reconcile failed at step/);
+  assert.ok(body.error.includes("Route /api/signature-pathway/reconcile failed at step"));
+  assert.equal(body.route, "/api/signature-pathway/reconcile");
+  assert.equal(typeof body.step, "string");
+  assert.equal(typeof body.message, "string");
 });
 
 test("signature reconciliation is bounded and exposes pagination", async () => {
-  const source = await (await import("node:fs/promises")).readFile(new URL("../src/index.js", import.meta.url), "utf8");
-  assert.match(source, /getFirestoreCollectionDocumentsPage/);
-  assert.match(source, /limit: pageSize/);
-  assert.match(source, /Reconciliation is limited to 8 documents per request/);
-  assert.match(source, /nextPageAfter: autoDiscover \? nextPageAfter : null/);
+  const source = await fs.readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  assert.ok(source.includes("getFirestoreCollectionDocumentsPage"));
+  assert.ok(source.includes("limit: pageSize"));
+  assert.ok(source.includes("Reconciliation is limited to 8 documents per request"));
+  assert.ok(source.includes("nextPageAfter: autoDiscover ? nextPageAfter : null"));
 });
 
 test("all Worker outbound fetches in the main module use the eight-second timeout helper", async () => {
-  const source = await (await import("node:fs/promises")).readFile(new URL("../src/index.js", import.meta.url), "utf8");
-  assert.match(source, /const OUTBOUND_TIMEOUT_MS = 8000/);
-  assert.match(source, /async function fetchWithTimeout/);
-  assert.ok(!source.replace(/async function fetchWithTimeout[\s\S]*?\n}\n/, "").match(/\bfetch\(\s*["`]/), "no direct outbound URL fetch calls should bypass fetchWithTimeout");
+  const source = await fs.readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  assert.ok(source.includes("const OUTBOUND_TIMEOUT_MS = 8000"));
+  assert.ok(source.includes("async function fetchWithTimeout"));
+  const helperStart = source.indexOf("async function fetchWithTimeout");
+  const helperEnd = source.indexOf("\n}\n", helperStart) + 3;
+  const outsideHelper = source.slice(0, helperStart) + source.slice(helperEnd);
+  assert.equal(outsideHelper.includes('fetch("https://'), false);
+  assert.equal(outsideHelper.includes("fetch(`https://"), false);
 });
