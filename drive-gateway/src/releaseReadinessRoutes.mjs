@@ -19,13 +19,13 @@ async function timedFetch(url, init = {}, timeoutMs = OUTBOUND_TIMEOUT_MS) {
     throw error;
   } finally { clearTimeout(timer); }
 }
-function safeReason(value) { return String(value || "No diagnostic detail returned.").replace(/[\\r\\n]/g, " ").slice(0, 240); }
+function safeReason(value) { return String(value || "No diagnostic detail returned.").replace(/[\r\n]/g, " ").slice(0, 240); }
 function wordpressConfig(env) {
   const missing = [];
   if (!String(env.WORDPRESS_BASE_URL || "").trim()) missing.push("WORDPRESS_BASE_URL");
   if (!String(env.WORDPRESS_USERNAME || "").trim()) missing.push("WORDPRESS_USERNAME");
   if (!String(env.WORDPRESS_APPLICATION_PASSWORD || "").trim()) missing.push("WORDPRESS_APPLICATION_PASSWORD");
-  return { missing, base: String(env.WORDPRESS_BASE_URL || "").trim().replace(/\\/+$/, ""), username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "") };
+  return { missing, base: String(env.WORDPRESS_BASE_URL || "").trim().replace(/\/+$/, ""), username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "") };
 }
 function cpanelConfig(env) {
   const missing = [];
@@ -33,7 +33,7 @@ function cpanelConfig(env) {
   if (!String(env.CPANEL_USERNAME || "").trim()) missing.push("CPANEL_USERNAME");
   if (!String(env.CPANEL_API_TOKEN || "").trim()) missing.push("CPANEL_API_TOKEN");
   if (!String(env.CPANEL_DOCUMENT_ROOT || "").trim()) missing.push("CPANEL_DOCUMENT_ROOT");
-  return { missing, base: String(env.CPANEL_BASE_URL || "").trim().replace(/\\/+$/, ""), username: String(env.CPANEL_USERNAME || "").trim(), token: String(env.CPANEL_API_TOKEN || ""), root: String(env.CPANEL_DOCUMENT_ROOT || "").trim() };
+  return { missing, base: String(env.CPANEL_BASE_URL || "").trim().replace(/\/+$/, ""), username: String(env.CPANEL_USERNAME || "").trim(), token: String(env.CPANEL_API_TOKEN || ""), root: String(env.CPANEL_DOCUMENT_ROOT || "").trim() };
 }
 async function responseJson(response) { return await response.json().catch(() => ({})); }
 async function wordpressProbe(env) {
@@ -71,7 +71,7 @@ async function cpanelProbe(env) {
   if (cfg.missing.length) return { status: "BLOCKED", code: "MISSING_SETTINGS", reason: "Missing Worker setting names: " + cfg.missing.join(", "), missing: cfg.missing };
   let base;
   try { base = new URL(cfg.base); } catch { return { status: "BLOCKED", code: "INVALID_BASE_URL", reason: "CPANEL_BASE_URL is not a valid URL." }; }
-  const root = cfg.root.replace(/^\\/home\\/[^/]+\\//, "").replace(/^\\/+/, "");
+  const root = cfg.root.replace(/^\/home\/[^/]+\//, "").replace(/^\/+/, "");
   const url = new URL("/execute/Fileman/list_files", base);
   url.searchParams.set("dir", root);
   url.searchParams.set("limit", "1");
@@ -93,7 +93,7 @@ async function cpanelProbe(env) {
 export function createReleaseReadinessRoute(deps) {
   return async function releaseReadinessRoute(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.replace(/\\/+$/, "") !== "/api/system/release-readiness") return null;
+    if (url.pathname.replace(/\/+$/, "") !== "/api/system/release-readiness") return null;
     if (request.method !== "POST") return json({ error: "Use POST for administrator-only Release Readiness diagnostics." }, 405, deps.corsHeaders?.(request));
     let claims;
     try {
