@@ -49,7 +49,10 @@ async function wordpressProbe(env) {
       const code = String(meData.code || "HTTP_" + me.status);
       const message = safeReason(meData.message || me.statusText);
       let reason = "WordPress users/me returned HTTP " + me.status + " (code " + code + "): " + message;
-      if (me.status === 401) reason += "; credentials were rejected or WordPress Application Passwords are disabled.";
+      if (me.status === 401) {
+        if (/application.?password.*disabled|application_passwords_disabled/i.test(code + " " + message)) reason += "; WordPress Application Passwords are disabled.";
+        else reason += "; WordPress rejected the supplied username/Application Password (wrong credentials or an invalid/revoked Application Password).";
+      }
       if (me.status === 403) reason += "; authenticated account may lack the required REST capability.";
       if (me.status === 404) reason += "; WordPress REST API may be disabled, blocked, or routed under a different path.";
       return { status: "BLOCKED", code, httpStatus: me.status, reason };
@@ -76,7 +79,7 @@ async function cpanelProbe(env) {
     const response = await timedFetch(url, { headers: { Authorization: "cpanel " + cfg.username + ":" + cfg.token, Accept: "application/json" } });
     const data = await responseJson(response);
     const apiStatus = Number(data.status ?? data.result?.status ?? 0);
-    if (!response.ok) return { status: "BLOCKED", code: "HTTP_" + response.status, httpStatus: response.status, reason: "cPanel read-only Fileman request returned HTTP " + response.status + "." };
+    if (!response.ok) return { status: "BLOCKED", code: "HTTP_" + response.status, httpStatus: response.status, reason: "cPanel read-only Fileman request returned HTTP " + response.status + (response.status === 401 ? "; cPanel rejected the API token or username." : response.status === 403 ? "; the API token lacks permission for the configured document root." : ".") };
     if (apiStatus !== 1) {
       const message = safeReason(data.errors?.join?.("; ") || data.error || data.statusmsg || data.result?.errors?.join?.("; ") || "cPanel API returned unsuccessful status.");
       return { status: "BLOCKED", code: apiStatus === 0 ? "CPANEL_API_ERROR" : "CPANEL_UNSUCCESSFUL", httpStatus: response.status, reason: "cPanel API rejected the read-only Fileman request: " + message + (apiStatus === 0 ? " Check API token and document-root access." : "") };
@@ -142,9 +145,8 @@ export function createReleaseReadinessRoute(deps) {
           add(name + " publishing", "NEEDS CONFIGURATION", "credentials not bound and publishing adapter not built");
         }
       } else if (section === "website") {
-        const wp = await wordpressProbe(env);
+        const [wp, cp] = await Promise.all([wordpressProbe(env), cpanelProbe(env)]);
         add("WordPress integration", wp.status === "WORKING" ? true : "NEEDS CONFIGURATION", wp.reason, { integrationStatus: wp.status, errorCode: wp.code, ...(wp.httpStatus ? { httpStatus: wp.httpStatus } : {}), ...(wp.missing ? { missingSettings: wp.missing } : {}) });
-        const cp = await cpanelProbe(env);
         add("cPanel integration", cp.status === "WORKING" ? true : "NEEDS CONFIGURATION", cp.reason, { integrationStatus: cp.status, errorCode: cp.code, ...(cp.httpStatus ? { httpStatus: cp.httpStatus } : {}), ...(cp.missing ? { missingSettings: cp.missing } : {}) });
       } else {
         return json({ ok: false, route: url.pathname, step: "Validate section", error: "Unknown Release Readiness section. Use core, signing, communications, or website." }, 400, deps.corsHeaders?.(request));
