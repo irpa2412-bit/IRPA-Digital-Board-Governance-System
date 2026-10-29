@@ -43,7 +43,7 @@ async function wordpressProbe(env) {
   try { base = new URL(cfg.base); } catch { return { status: "BLOCKED", code: "INVALID_BASE_URL", reason: "WORDPRESS_BASE_URL is not a valid URL." }; }
   const auth = "Basic " + btoa(cfg.username + ":" + cfg.password);
   try {
-    const me = await timedFetch(new URL("/wp-json/wp/v2/users/me?context=edit", base), { headers: { Authorization: auth, Accept: "application/json" } });
+    const me = await timedFetch(new URL("/wp-json/wp/v2/users/me", base), { headers: { Authorization: auth, Accept: "application/json" } });
     const meData = await responseJson(me);
     if (!me.ok) {
       const code = String(meData.code || "HTTP_" + me.status);
