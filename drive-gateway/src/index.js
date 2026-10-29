@@ -1402,7 +1402,7 @@ async function uploadControlledDocument(request, env) {
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
-  const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
+  const title = cleanName(data.title || fileName.replace(/\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"STEP upload-controlled-document: the final Firestore document ID is required before Drive upload."},400,corsHeaders(request));
@@ -2737,7 +2737,7 @@ async function smtpSend(env,{to,subject,text,html}) {
   const smtpPort = Number(env.SMTP_PORT || 465);
   const smtpFrom = String(env.SMTP_FROM || "").trim();
   if (!smtpHost || /[\s/]/.test(smtpHost) || ![465,587].includes(smtpPort)) throw new Error("IRPA SMTP host or port is not configured correctly.");
-  if (!/^[^\s<>@]+@[^\s<>@]+\\.[^\s<>@]+$/.test(smtpFrom)) throw new Error("IRPA SMTP sender address is not configured correctly.");
+  if (!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(smtpFrom)) throw new Error("IRPA SMTP sender address is not configured correctly.");
   if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
   if (env.SMTP_MOCK === "fail") throw new Error("Mock SMTP provider failure.");
   if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
@@ -2782,7 +2782,7 @@ async function smtpSend(env,{to,subject,text,html}) {
     await command("DATA","3");
     const boundary="IRPA-"+crypto.randomUUID();
     const mime=[
-      "From: \"IRPA Administration\" <"+SMTP_FROM+">",
+      "From: \"IRPA Administration\" <"+smtpFrom+">",
       "To: <"+toEmail+">",
       "Subject: "+cleanSubject,
       "MIME-Version: 1.0",
