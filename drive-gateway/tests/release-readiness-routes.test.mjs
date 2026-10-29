@@ -91,7 +91,7 @@ test("WordPress probe reports HTTP status and WordPress error code without crede
     assert.equal(wp.integrationStatus, "BLOCKED");
     assert.equal(wp.httpStatus, 401);
     assert.equal(wp.errorCode, "rest_not_logged_in");
-    assert.match(wp.reason, /Application Passwords are disabled/);
+    assert.match(wp.reason, /wrong credentials/);
     assert.equal(JSON.stringify(body).includes("not-for-output"), false);
   } finally { globalThis.fetch = original; }
 });
