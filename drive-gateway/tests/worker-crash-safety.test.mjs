@@ -36,5 +36,5 @@ test("all Worker outbound fetches in the main module use the eight-second timeou
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/index.js", import.meta.url), "utf8");
   assert.match(source, /const OUTBOUND_TIMEOUT_MS = 8000/);
   assert.match(source, /async function fetchWithTimeout/);
-  assert.ok(!source.replace(/async function fetchWithTimeout[\\s\\S]*?\\n}\\n/, "").match(/\\bfetch\\(/), "no direct outbound fetch calls should bypass fetchWithTimeout");
+  assert.ok(!source.replace(/async function fetchWithTimeout[\s\S]*?\n}\n/, "").match(/\bfetch\(\s*["`]/), "no direct outbound URL fetch calls should bypass fetchWithTimeout");
 });
