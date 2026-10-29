@@ -92,6 +92,21 @@ export default function ReleaseReadiness({ admin = false }) {
           const needsConfiguration = probeResponse.status === 503 && /Missing required Worker secrets:/i.test(detail);
           const passed = expected.includes(probeResponse.status) && !needsConfiguration;
           add("Portal Self-Test: " + name, needsConfiguration ? "NEEDS CONFIGURATION" : passed, "HTTP " + probeResponse.status + "; expected " + expected.join("/") + ". " + detail);
+          if (name === "WordPress connection status" && probeResponse.ok) {
+            const websiteState = String(responseData.website || "unknown");
+            const diagnosticCode = String(responseData.websiteDiagnosticCode || "");
+            const diagnosticMessage = String(responseData.websiteDiagnosticMessage || "");
+            const missing = Array.isArray(responseData.websiteMissingSettings) ? responseData.websiteMissingSettings : [];
+            if (websiteState === "not_configured" || missing.length) {
+              add("WordPress connection configuration", "NEEDS CONFIGURATION",
+                missing.length ? "Missing Worker setting names: " + missing.join(", ") + "." : diagnosticCode + (diagnosticMessage ? ": " + diagnosticMessage : "."));
+            } else {
+              const httpStatus = Number(responseData.websiteHttpStatus || 0);
+              const reason = diagnosticMessage || diagnosticCode || websiteState;
+              add("WordPress connection diagnosis", websiteState === "connected" ? "PASS" : false,
+                "State: " + websiteState + (httpStatus ? "; HTTP " + httpStatus : "") + "; " + reason + ".");
+            }
+          }
         } catch (probeError) {
           add("Portal Self-Test: " + name, false, String(probeError?.message || probeError));
         }
