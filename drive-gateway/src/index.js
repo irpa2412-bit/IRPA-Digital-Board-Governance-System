@@ -1234,9 +1234,11 @@ async function reconcileSignatureDocumentIds(request, env) {
   if (!dryRun && !autoDiscover && body?.repairMismatches !== true) return json({ok:false,error:"Repair requires explicit repairMismatches:true confirmation."},400,corsHeaders(request));
   const firestoreToken = await getFirestoreAdminAccessToken(env);
   let items = Array.isArray(body.documents) ? body.documents : [];
+  let nextPageAfter = null;
   if (autoDiscover) {
     const page = await getFirestoreCollectionDocumentsPage(env, "documents", firestoreToken, pageAfter, 8);
     const docs = page.documents;
+    nextPageAfter = page.nextPageAfter;
     items = docs.map(record => {
       const data = firestoreDocumentToPlain(record) || {};
       const documentId = String(record.name || "").split("/").pop();
@@ -1299,7 +1301,7 @@ async function reconcileSignatureDocumentIds(request, env) {
     results.push(line);
   }
   const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
-  return json({ok:true,dryRun,autoDiscover,results,summary,nextPageAfter: autoDiscover ? (typeof page !== "undefined" ? page.nextPageAfter : null) : null,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
+  return json({ok:true,dryRun,autoDiscover,results,summary,nextPageAfter: autoDiscover ? nextPageAfter : null,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
 }
 
 async function controlledDocumentUploadPolicyCheck(request, env) {
