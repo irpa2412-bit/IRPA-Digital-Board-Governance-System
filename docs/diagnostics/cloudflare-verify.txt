@@ -1,0 +1,222 @@
+IRPA Cloudflare live verification
+UTC: 2026-10-29T05:20:47Z
+Branch: diagnose/cloudflare-verify-20261029
+Target: https://irpa-google-drive-gateway.irpa-governance.workers.dev
+
+=== LIVE PROBE GET /health ===
+HTTP status: 200
+Response headers (all):
+HTTP/2 200 
+date: Thu, 29 Oct 2026 05:20:52 GMT
+content-type: application/json; charset=utf-8
+content-length: 239
+access-control-allow-origin: https://irpa.or.tz
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=c4ZPKJI85BsA0OH%2Fl7ptXKZO9%2BVaw0fI3grdoc4yKyMHiTmA9XJULzQrZtEh6Jv7Fhn4gfP2KX42nW2HZYb6YfEbOFo1Xm1FQTF18iMkpwgQPD3eqQeTu5a9yOG%2BjZbh3%2B8q%2BfUAe%2BiXpJ6AleyfPlI3z%2Bek6WKAdUheKdJJQrx5y%2FCtkmP8gw%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbc9ccc13adc-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+{"ok":true,"service":"IRPA Google Drive Gateway","storageProvider":"Google Drive","version":"fecfeafec22459b3711f81b65cd97b1a94d65983","commit":"fecfeafec22459b3711f81b65cd97b1a94d65983","firebaseProjectId":"irpa-digital-board-governance"}
+Classification: Worker's JSON or JSON-like response
+
+=== LIVE PROBE OPTIONS /api/signature-pathway/reconcile ===
+HTTP status: 204
+Response headers (all):
+HTTP/2 204 
+date: Thu, 29 Oct 2026 05:20:52 GMT
+access-control-allow-origin: https://irpa-digital-board-governance.web.app
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=v8PKlsnt8Dx5bchxN41Xg7zXcI89C8DjzZJel4XkxAH7ynAN%2FUUvszWPOAX81N%2BmWXK58mAF88I0LThA7mLNq%2FX049uSlCZsQg3ngiNk4nN8dx0SOKpjbwsDHvLWL0XeZE5T7lctjZ2WxuEgN1u%2BnAuyXfiId%2BPScIFg%2BFmwm3MvyNB2c9FBUA%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbcada3b11db-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+
+Classification: unclassified response
+
+=== LIVE PROBE POST /api/signature-pathway/reconcile ===
+HTTP status: 401
+Response headers (all):
+HTTP/2 401 
+date: Thu, 29 Oct 2026 05:20:53 GMT
+content-type: application/json; charset=utf-8
+content-length: 59
+access-control-allow-origin: https://irpa-digital-board-governance.web.app
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=%2BH1KVz0xlOrR7PTpWhLE%2Fg8LO%2B%2BB7QkRaUmssryeK%2BsM%2B6V5voETvhgQTo77w8dEmFXqr9ZNxXBk%2FyFgfn1koswVcqKEfr1VEt6VfAyMETB9%2FPcDGg49sUvSFljKe1f3b0SpVEEEooZZylQHPvVp5QbOCWPZ%2FCiHmvVheJkRmGybwhdKMpHQTA%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbcb892da351-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+{"ok":false,"error":"Firebase authentication is required."}
+Classification: Worker's JSON or JSON-like response
+
+=== LIVE PROBE OPTIONS /api/upload-controlled-document/policy-check ===
+HTTP status: 204
+Response headers (all):
+HTTP/2 204 
+date: Thu, 29 Oct 2026 05:20:53 GMT
+access-control-allow-origin: https://irpa-digital-board-governance.web.app
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=incYvawM3tkQ5NEj6tHRsYoa1kNe3r4K9zIVzElh6S7TKQBkK%2FBl8UrZ9d7LGvlS9%2BoHjQioKHIPFjGq8dxAs3VPWz7VcNQH3qplP8mD5Lb5F0kI52pTQXcVtNmBTDZKr%2BRVu60xkncaCXZQ0gZzhpVywGyuj9ktdB6MswRSPIazG%2B04XiGPcg%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbcc7f84cb9f-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+
+Classification: unclassified response
+
+=== LIVE PROBE POST /api/upload-controlled-document/policy-check ===
+HTTP status: 500
+Response headers (all):
+HTTP/2 500 
+date: Thu, 29 Oct 2026 05:20:53 GMT
+content-type: application/json; charset=utf-8
+content-length: 177
+access-control-allow-origin: https://irpa-digital-board-governance.web.app
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=zAuknRA6mivRJg4gp2Ksqu42J%2B9mlNY4YfVpjnRDKP%2B1QkJl08HmAysgoYAAUUT47cyQpR9dxW4Ei0eYSaNzGT09rir70THsXOdduyuhUIcsgq7IL1KSNSjmOZn7bG%2FmimUFd5SAuBUmMs68srXO50tpG41ILud%2B%2Bf77AZIBXYQKOsg3TAeLow%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbcdab662b65-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+{"ok":false,"step":"Firebase authentication","error":"Firebase authentication failed: Firebase authentication is required.","writesPerformed":false,"driveUploadPerformed":false}
+Classification: Worker's JSON or JSON-like response
+
+=== LIVE PROBE OPTIONS /api/system/release-readiness ===
+HTTP status: 204
+Response headers (all):
+HTTP/2 204 
+date: Thu, 29 Oct 2026 05:20:53 GMT
+access-control-allow-origin: https://irpa-digital-board-governance.web.app
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=jI8YBCu4SGMdAzEyz9e7Qcquea1AA62QHFlSDroZ%2BaBDQOUXxRJHbwsELNN%2BUFTCOAOEc5GmpC5k2J%2BEkW9Ln5yDoLIvqetmGIkeiWR%2FvKbXFuTzaPfJ9HGgRsqih6xnuIHb3A9ymJxBgoqyJ1exMnu63FYJpWVjUKf9vFqKft00nGwoyya3sw%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbcedd6f77f7-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+
+Classification: unclassified response
+
+=== LIVE PROBE POST /api/system/release-readiness ===
+HTTP status: 401
+Response headers (all):
+HTTP/2 401 
+date: Thu, 29 Oct 2026 05:20:53 GMT
+content-type: application/json; charset=utf-8
+content-length: 85
+access-control-allow-origin: https://irpa-digital-board-governance.web.app
+cache-control: no-store
+vary: Origin
+access-control-allow-headers: Authorization, Content-Type, X-IRPA-Invitation-Version, x-signing-token
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=NEjJUWfVywPxIdZqirTRApPKZlG2bom4nWYHiKRyp7Vah3LUSEdse%2Fu8h9bPAwPyNhncn%2Fo2es7qXyYD%2Bst0zHLfjuqcEH8IW91uCPKx8YVOPOKWMzKp2d%2BdhNMbfBdG66gFbU3MMddSdEhb87u3n3gb%2BsLZSDfNr9QY0rFxpfsyow5Vsxgupw%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a51fbbcf8fb749d0-LAX
+alt-svc: h3=":443"; ma=86400
+
+Body first 400 characters:
+{"error":"Administrator authentication failed: Firebase authentication is required."}
+Classification: Worker's JSON or JSON-like response
+
+=== LIVE TAIL (90-second capture; exceptions and target route lines) ===
+    "exceptions": [],
+    "exceptions": [],
+            "url": "https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/signature-pathway/reconcile",
+    "exceptions": [],
+            "errorInfo": [
+                    "name": "Error",
+                "Drive gateway error",
+                "Error: Firebase authentication is required."
+            "level": "error",
+            "url": "https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/signature-pathway/reconcile",
+    "exceptions": [],
+            "url": "https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/upload-controlled-document/policy-check",
+    "exceptions": [],
+            "url": "https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/upload-controlled-document/policy-check",
+    "exceptions": [],
+            "url": "https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/system/release-readiness",
+    "exceptions": [],
+            "url": "https://irpa-google-drive-gateway.irpa-governance.workers.dev/api/system/release-readiness",
+
+
+=== CLOUDFLARE ANALYTICS: last 24 hours ===
+GraphQL HTTP status: 200
+GraphQL error: unknown field "subrequests"
+
+=== WORKER SETTINGS (binding names only) ===
+Endpoint category: worker-settings; HTTP status: 200
+{
+  "binding_names": [
+    "AUTHORIZED_DRIVE_EMAIL",
+    "CLOUDFLARE_AUTH_FUNCTIONS_ENABLED",
+    "CPANEL_API_TOKEN",
+    "CPANEL_BASE_URL",
+    "CPANEL_DOCUMENT_ROOT",
+    "CPANEL_USERNAME",
+    "DRIVE_KV",
+    "DRIVE_MOCK",
+    "DRIVE_ROOT_FOLDER_NAME",
+    "ESIGN_DO",
+    "ESIGN_MODULE_ENABLED",
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_SERVICE_ACCOUNT_JSON",
+    "FIRESTORE_COLLECTION_PREFIX",
+    "GIT_SHA",
+    "GOOGLE_DRIVE_CLIENT_ID",
+    "GOOGLE_DRIVE_CLIENT_SECRET",
+    "GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY",
+    "IRPA_APP_URL",
+    "IRPA_ENVIRONMENT",
+    "IRPA_PRODUCTION_CUTOVER",
+    "IRPA_WORKER_ENVIRONMENT",
+    "IRPA_WORKER_NAME",
+    "LOCAL_TEST_MODE",
+    "SMTP_FROM",
+    "SMTP_HOST",
+    "SMTP_PASSWORD",
+    "SMTP_PORT",
+    "WORDPRESS_APPLICATION_PASSWORD",
+    "WORDPRESS_BASE_URL",
+    "WORDPRESS_USERNAME"
+  ],
+  "compatibility_date": "2026-09-29",
+  "usage_model": "standard",
+  "limits": null
+}
+Endpoint category: account-plan; HTTP status: 200
+{
+  "account_name": "Irpa2412@gmail.com's Account",
+  "plan": "standard",
+  "plan_details": null
+}
+
+=== SAFE SUMMARY ===
+Only binding names are reported. No secret values are printed.
+Review status codes, CORS headers, analytics permission/errors, and tail exceptions above.
