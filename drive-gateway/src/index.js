@@ -213,8 +213,9 @@ const metaOAuthRouter = createMetaOAuthRouter({
 });
 
 export default {
-  async fetchWithTimeout(request, env) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+    let routeStep = "route dispatch";
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -477,7 +478,7 @@ export default {
 
       const rawMessage = error?.message || "Drive gateway request failed.";
       const message = "Route " + url.pathname + " failed at step " + String(error?.diagnosticStep || routeStep) + ": " + String(rawMessage).replace(/[\\r\\n]/g, " ").slice(0, 240);
-      if (message === "Google Drive has not yet been authorized.") {
+      if (rawMessage === "Google Drive has not yet been authorized.") {
         return json({ok:false,code:"GOOGLE_DRIVE_NOT_AUTHORIZED",error:"Google Drive has not yet been authorized. An active IRPA administrator must complete Google Drive authorization in Settings before retrying this operation."},503,corsHeaders(request));
       }
       const isAuthError =
