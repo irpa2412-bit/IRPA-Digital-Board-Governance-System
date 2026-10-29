@@ -6,7 +6,10 @@ const AUTHOR_ROLES = new Set([
   "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director",
   "Executive Director", "Administrator"
 ]);
-const REVIEW_ROLES = new Set(["Approver"]);
+const REVIEW_ROLES = new Set([
+  "Executive Director", "Director Outreach", "Outreach Director",
+  "Director Community Development", "Community Development Director", "Approver", "Administrator"
+]);
 const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
 const MAX_EDIT_BYTES = 512 * 1024;
 const WEBSITE_EDITOR_ROLES = new Set(["Administrator", "Communications Officer", "Executive Director"]);
@@ -163,7 +166,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (!isActive || !roles.some(role => WEBSITE_EDITOR_ROLES.has(role))) {
       const required = "website.content.draft_edit";
       const holders = [...WEBSITE_EDITOR_ROLES].join(", ");
-      throw new Error("Website authorisation denied; effective roles: " + (roles.join(", ") || "none") + "; required capability: " + required + "; roles holding capability: " + holders + "; active profile: " + String(isActive) + ".");
+      throw new Error("Your registered Communication & Media role does not permit this website-editing action. Effective roles: " + (roles.join(", ") || "none") + "; required capability: " + required + "; roles holding capability: " + holders + "; active profile: " + String(isActive) + ".");
     }
     return { claims, roles, admin: false };
   }
