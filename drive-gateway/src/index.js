@@ -477,20 +477,25 @@ export default {
       console.error("Drive gateway error", { route: url.pathname, step: String(error?.diagnosticStep || routeStep), code: String(error?.code || error?.status || "UNKNOWN"), message: String(error?.message || error).slice(0, 240) });
 
       const rawMessage = error?.message || "Drive gateway request failed.";
-      const message = "Route " + url.pathname + " failed at step " + String(error?.diagnosticStep || routeStep) + ": " + String(rawMessage).replace(/[\\r\\n]/g, " ").slice(0, 240);
+      const failedStep = String(error?.diagnosticStep || routeStep);
+      const message = "Route " + url.pathname + " failed at step " + failedStep + ": " + String(rawMessage).replace(/[\\r\\n]/g, " ").slice(0, 240);
       if (rawMessage === "Google Drive has not yet been authorized.") {
         return json({ok:false,code:"GOOGLE_DRIVE_NOT_AUTHORIZED",error:"Google Drive has not yet been authorized. An active IRPA administrator must complete Google Drive authorization in Settings before retrying this operation."},503,corsHeaders(request));
       }
       const isAuthError =
-        message === "Firebase authentication is required." ||
-        message.startsWith("Invalid Firebase ID token") ||
-        message.startsWith("Invalid Firebase token") ||
-        message === "Firebase token is expired." ||
-        message === "Firebase token signing key not found.";
+        rawMessage === "Firebase authentication is required." ||
+        rawMessage.startsWith("Invalid Firebase ID token") ||
+        rawMessage.startsWith("Invalid Firebase token") ||
+        rawMessage === "Firebase token is expired." ||
+        rawMessage === "Firebase token signing key not found.";
 
       return json({
         ok: false,
+        route: url.pathname,
+        step: failedStep,
+        message: String(rawMessage).replace(/[\\r\\n]/g, " ").slice(0, 240),
         error: message,
+        ...(error?.code ? { code: String(error.code) } : {}),
         ...(error?.googleStatus ? {googleStatus:error.googleStatus} : {}),
         ...(error?.googleMessage ? {googleMessage:error.googleMessage} : {})
       }, Number(error?.status || 0) || (isAuthError ? 401 : 500), corsHeaders(request));
