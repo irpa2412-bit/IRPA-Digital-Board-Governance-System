@@ -146,8 +146,8 @@ export function createReleaseReadinessRoute(deps) {
         }
       } else if (section === "website") {
         const [wp, cp] = await Promise.all([wordpressProbe(env), cpanelProbe(env)]);
-        add("WordPress integration", wp.status === "WORKING" ? true : wp.errorCode === "MISSING_SETTINGS" ? "NEEDS CONFIGURATION" : false, wp.reason, { integrationStatus: wp.status, errorCode: wp.code, ...(wp.httpStatus ? { httpStatus: wp.httpStatus } : {}), ...(wp.missing ? { missingSettings: wp.missing } : {}) });
-        add("cPanel integration", cp.status === "WORKING" ? true : cp.errorCode === "MISSING_SETTINGS" ? "NEEDS CONFIGURATION" : false, cp.reason, { integrationStatus: cp.status, errorCode: cp.code, ...(cp.httpStatus ? { httpStatus: cp.httpStatus } : {}), ...(cp.missing ? { missingSettings: cp.missing } : {}) });
+        add("WordPress integration", wp.status === "WORKING" ? true : wp.errorCode === "MISSING_SETTINGS" ? "NEEDS CONFIGURATION" : false, wp.reason, { integrationStatus: wp.status, credentialBinding: wp.missing?.length ? "NOT BOUND" : "BOUND", errorCode: wp.code, ...(wp.httpStatus ? { httpStatus: wp.httpStatus } : {}), ...(wp.missing ? { missingSettings: wp.missing } : {}) });
+        add("cPanel integration", cp.status === "WORKING" ? true : cp.errorCode === "MISSING_SETTINGS" ? "NEEDS CONFIGURATION" : false, cp.reason, { integrationStatus: cp.status, credentialBinding: cp.missing?.length ? "NOT BOUND" : "BOUND", errorCode: cp.code, ...(cp.httpStatus ? { httpStatus: cp.httpStatus } : {}), ...(cp.missing ? { missingSettings: cp.missing } : {}) });
       } else {
         return json({ ok: false, route: url.pathname, step: "Validate section", error: "Unknown Release Readiness section. Use core, signing, communications, or website." }, 400, deps.corsHeaders?.(request));
       }
