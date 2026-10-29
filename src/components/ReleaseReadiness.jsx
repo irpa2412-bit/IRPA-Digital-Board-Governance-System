@@ -65,7 +65,7 @@ export default function ReleaseReadiness({ admin = false }) {
             }
             for (const item of Array.isArray(payload.checks) ? payload.checks : []) {
               const status = item.status === "NEEDS CONFIGURATION" ? "NEEDS CONFIGURATION" : item.status === "PASS" ? "PASS" : "FAIL";
-              const extra = item.integrationStatus ? " [" + item.integrationStatus + (item.errorCode ? "; code " + item.errorCode : "") + (item.httpStatus ? "; HTTP " + item.httpStatus : "") + "]" : "";
+              const extra = item.integrationStatus ? " [" + item.integrationStatus + (item.credentialBinding ? "; credentials " + item.credentialBinding : "") + (item.errorCode ? "; code " + item.errorCode : "") + (item.httpStatus ? "; HTTP " + item.httpStatus : "") + "]" : "";
               add(item.name || label + " check", status, String(item.reason || "No diagnostic reason returned.") + extra);
             }
           }
