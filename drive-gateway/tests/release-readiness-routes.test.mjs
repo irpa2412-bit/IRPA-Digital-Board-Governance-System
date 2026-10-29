@@ -73,9 +73,11 @@ test("each integration failure names its integration and exposes no credential v
   const cp = body.checks.find(c => c.name === "cPanel integration");
   assert.equal(wp.integrationStatus, "BLOCKED");
   assert.equal(wp.errorCode, "MISSING_SETTINGS");
+  assert.equal(wp.credentialBinding, "NOT BOUND");
   assert.match(wp.reason, /WORDPRESS_BASE_URL/);
   assert.equal(cp.integrationStatus, "BLOCKED");
   assert.equal(cp.errorCode, "MISSING_SETTINGS");
+  assert.equal(cp.credentialBinding, "NOT BOUND");
   assert.match(cp.reason, /CPANEL_BASE_URL/);
   assert.equal(JSON.stringify(body).includes("configured-test-only"), false);
 });
