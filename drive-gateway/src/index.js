@@ -788,6 +788,24 @@ async function getFirestoreCollectionDocuments(env, collectionName, token) {
   return (await response.json()).filter(row => row.document).map(row => row.document);
 }
 
+async function getFirestoreCollectionDocumentsPage(env, collectionName, token, pageAfter = "", pageSize = 8) {
+  const projectId = getFirebaseProjectId(env);
+  const structuredQuery = {
+    from: [{ collectionId: collectionName }],
+    limit: pageSize,
+    ...(pageAfter ? { startAt: { values: [{ referenceValue: "projects/" + projectId + "/databases/(default)/documents/" + collectionName + "/" + cleanId(pageAfter) }], before: false } } : {})
+  };
+  const response = await fetchWithTimeout("https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents:runQuery", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery })
+  });
+  if (!response.ok) throw new Error("Firestore " + collectionName + " paged read failed: HTTP " + response.status);
+  const documents = (await response.json()).filter(row => row.document).map(row => row.document);
+  const nextPageAfter = documents.length === pageSize ? String(documents[documents.length - 1].name || "").split("/").pop() : null;
+  return { documents, nextPageAfter };
+}
+
 async function updateSignerAuthorityRoute(request, env) {
   let step = "Firebase authentication";
   try {
@@ -1211,12 +1229,14 @@ async function reconcileSignatureDocumentIds(request, env) {
   const body = await request.json().catch(() => ({}));
   const dryRun = body?.dryRun === true;
   const autoDiscover = body?.autoDiscover === true || !Array.isArray(body.documents) || body.documents.length === 0;
+  const pageAfter = String(body?.pageAfter || "").trim();
   if (!dryRun && body?.repairMismatches !== true && autoDiscover) return json({ok:false,error:"Set dryRun:true to inspect all controlled documents, or repairMismatches:true to repair confirmed mismatches."},400,corsHeaders(request));
   if (!dryRun && !autoDiscover && body?.repairMismatches !== true) return json({ok:false,error:"Repair requires explicit repairMismatches:true confirmation."},400,corsHeaders(request));
   const firestoreToken = await getFirestoreAdminAccessToken(env);
   let items = Array.isArray(body.documents) ? body.documents : [];
   if (autoDiscover) {
-    const docs = await getFirestoreCollectionDocuments(env, "documents", firestoreToken);
+    const page = await getFirestoreCollectionDocumentsPage(env, "documents", firestoreToken, pageAfter, 8);
+    const docs = page.documents;
     items = docs.map(record => {
       const data = firestoreDocumentToPlain(record) || {};
       const documentId = String(record.name || "").split("/").pop();
@@ -1224,7 +1244,7 @@ async function reconcileSignatureDocumentIds(request, env) {
       return { documentId, fileId, title: String(data.title || data.fileName || data.reference || documentId) };
     });
     const requiredId = "wiAfPSIxHLTd6MdeM04q";
-    if (!items.some(item => item.documentId === requiredId)) {
+    if (!pageAfter && docs.length < 8 && !items.some(item => item.documentId === requiredId)) {
       const known = await getFirestoreDocument(env, "documents/" + requiredId, firestoreToken);
       if (known?.fields) {
         const data = firestoreDocumentToPlain(known) || {};
@@ -1235,7 +1255,7 @@ async function reconcileSignatureDocumentIds(request, env) {
     }
   }
   if (!items.length) return json({ok:true,dryRun,autoDiscover,results:[],summary:{total:0,repaired:0,wouldRepair:0,alreadyCorrect:0,unreadable:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"No Firestore controlled-document records were found."},200,corsHeaders(request));
-  if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
+  if (items.length > 8) return json({ok:false,error:"Reconciliation is limited to 8 documents per request to stay within Cloudflare subrequest limits. Use pageAfter to continue."},400,corsHeaders(request));
   const accessToken = await getDriveAccessToken(env);
   const results = [];
   for (const item of items) {
@@ -1279,7 +1299,7 @@ async function reconcileSignatureDocumentIds(request, env) {
     results.push(line);
   }
   const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
-  return json({ok:true,dryRun,autoDiscover,results,summary,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
+  return json({ok:true,dryRun,autoDiscover,results,summary,nextPageAfter: autoDiscover ? (typeof page !== "undefined" ? page.nextPageAfter : null) : null,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
 }
 
 async function controlledDocumentUploadPolicyCheck(request, env) {
