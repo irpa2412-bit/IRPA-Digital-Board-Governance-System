@@ -2412,7 +2412,7 @@ async function lookupInductionRegistration(request, env) {
   const enteredName = String(data.fullName || "").trim();
   if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
 
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\s+/g," ");
   const target = normalize(enteredName);
   const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
   const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
@@ -2736,8 +2736,8 @@ async function smtpSend(env,{to,subject,text,html}) {
   const smtpHost = String(env.SMTP_HOST || "").trim();
   const smtpPort = Number(env.SMTP_PORT || 465);
   const smtpFrom = String(env.SMTP_FROM || "").trim();
-  if (!smtpHost || /[\\s/]/.test(smtpHost) || ![465,587].includes(smtpPort)) throw new Error("IRPA SMTP host or port is not configured correctly.");
-  if (!/^[^\\s<>@]+@[^\\s<>@]+\\.[^\\s<>@]+$/.test(smtpFrom)) throw new Error("IRPA SMTP sender address is not configured correctly.");
+  if (!smtpHost || /[\s/]/.test(smtpHost) || ![465,587].includes(smtpPort)) throw new Error("IRPA SMTP host or port is not configured correctly.");
+  if (!/^[^\s<>@]+@[^\s<>@]+\\.[^\s<>@]+$/.test(smtpFrom)) throw new Error("IRPA SMTP sender address is not configured correctly.");
   if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
   if (env.SMTP_MOCK === "fail") throw new Error("Mock SMTP provider failure.");
   if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
