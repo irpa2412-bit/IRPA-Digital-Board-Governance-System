@@ -1,6 +1,6 @@
 # PR #576 gateway test diagnosis
 
-Generated: 2026-10-29T04:22:03Z
+Generated: 2026-10-29T04:23:43Z
 PR branch: fix/communications-website-authorisation-diagnostics
 
 ## PR branch failures
@@ -16,679 +16,679 @@ TAP version 13
 # Subtest: flag off leaves migrated routes untouched
 ok 1 - flag off leaves migrated routes untouched
   ---
-  duration_ms: 32.618827
+  duration_ms: 33.753234
   type: 'test'
   ...
 # Subtest: password state starts in FIRST stage with three attempts
 ok 2 - password state starts in FIRST stage with three attempts
   ---
-  duration_ms: 12.401486
+  duration_ms: 16.041176
   type: 'test'
   ...
 # Subtest: three failures lock the account for five minutes
 ok 3 - three failures lock the account for five minutes
   ---
-  duration_ms: 9.658851
+  duration_ms: 27.161977
   type: 'test'
   ...
 # Subtest: clear resets suspended state back to FIRST
 ok 4 - clear resets suspended state back to FIRST
   ---
-  duration_ms: 23.45706
+  duration_ms: 24.253397
   type: 'test'
   ...
 # Subtest: next document reference requires Firebase authentication
 ok 5 - next document reference requires Firebase authentication
   ---
-  duration_ms: 0.768253
+  duration_ms: 1.085049
   type: 'test'
   ...
 # Subtest: next document references increment atomically in the dedicated DO
 ok 6 - next document references increment atomically in the dedicated DO
   ---
-  duration_ms: 1.080818
+  duration_ms: 2.936175
   type: 'test'
   ...
 # Subtest: invalid email is rejected without creating state
 ok 7 - invalid email is rejected without creating state
   ---
-  duration_ms: 3.553566
+  duration_ms: 3.775625
   type: 'test'
   ...
 # Subtest: creates, reads, updates with version guard, lists and deletes records
 ok 8 - creates, reads, updates with version guard, lists and deletes records
   ---
-  duration_ms: 41.763729
+  duration_ms: 54.686001
   type: 'test'
   ...
 # Subtest: rejects missing storage configuration instead of using ephemeral fallback
 ok 9 - rejects missing storage configuration instead of using ephemeral fallback
   ---
-  duration_ms: 0.20827
+  duration_ms: 0.317
   type: 'test'
   ...
 # Subtest: validates collection names, record IDs and patches
 ok 10 - validates collection names, record IDs and patches
   ---
-  duration_ms: 0.326476
+  duration_ms: 0.475305
   type: 'test'
   ...
 # Subtest: editorial routes require authenticated active role
 ok 11 - editorial routes require authenticated active role
   ---
-  duration_ms: 38.343682
+  duration_ms: 44.31193
   type: 'test'
   ...
 # Subtest: create, submit, and approve require a distinct approver
 ok 12 - create, submit, and approve require a distinct approver
   ---
-  duration_ms: 2.378978
+  duration_ms: 4.025029
   type: 'test'
   ...
 # Subtest: pause-all defaults to paused and only admin may change it
 ok 13 - pause-all defaults to paused and only admin may change it
   ---
-  duration_ms: 0.748173
+  duration_ms: 1.293035
   type: 'test'
   ...
 # Subtest: audit log is approver-only
 ok 14 - audit log is approver-only
   ---
-  duration_ms: 0.27554
+  duration_ms: 0.407047
   type: 'test'
   ...
 # Subtest: social publishing router is included and manual export never publishes
 ok 15 - social publishing router is included and manual export never publishes
   ---
-  duration_ms: 1.223019
+  duration_ms: 2.19278
   type: 'test'
   ...
 # Subtest: Member: unauthenticated and wrong UID cannot open an institutional signing link
 ok 16 - Member: unauthenticated and wrong UID cannot open an institutional signing link
   ---
-  duration_ms: 24.786327
+  duration_ms: 39.025871
   type: 'test'
   ...
 # Subtest: Member: matching Firebase UID can open and retrieve the signing PDF
 ok 17 - Member: matching Firebase UID can open and retrieve the signing PDF
   ---
-  duration_ms: 2.145581
+  duration_ms: 3.601822
   type: 'test'
   ...
 # Subtest: Member: matching UID can complete its signing action and the envelope advances
 ok 18 - Member: matching UID can complete its signing action and the envelope advances
   ---
-  duration_ms: 2.474951
+  duration_ms: 7.720435
   type: 'test'
   ...
 # Subtest: Employee: matching Firebase UID is accepted; email alone is not an identity substitute
 ok 19 - Employee: matching Firebase UID is accepted; email alone is not an identity substitute
   ---
-  duration_ms: 1.459221
+  duration_ms: 4.165801
   type: 'test'
   ...
 # Subtest: Employee: authenticated router path passes the verified UID to open and submit
 ok 20 - Employee: authenticated router path passes the verified UID to open and submit
   ---
-  duration_ms: 23.191155
+  duration_ms: 41.025586
   type: 'test'
   ...
 # Subtest: UID-bound signer can decline only with the matching authenticated UID
 ok 21 - UID-bound signer can decline only with the matching authenticated UID
   ---
-  duration_ms: 1.966746
+  duration_ms: 4.845345
   type: 'test'
   ...
 # Subtest: External token signer remains usable without Firebase authentication
 ok 22 - External token signer remains usable without Firebase authentication
   ---
-  duration_ms: 1.330479
+  duration_ms: 3.023246
   type: 'test'
   ...
 # Subtest: Gateway open returns only fields assigned to the authenticated signer
 ok 23 - Gateway open returns only fields assigned to the authenticated signer
   ---
-  duration_ms: 1.053928
+  duration_ms: 2.555545
   type: 'test'
   ...
 # Subtest: Gateway signing refuses missing required assigned fields before mutating the signer
 ok 24 - Gateway signing refuses missing required assigned fields before mutating the signer
   ---
-  duration_ms: 1.223499
+  duration_ms: 6.237476
   type: 'test'
   ...
 # Subtest: Gateway signing stores only the authenticated signer's assigned field values
 ok 25 - Gateway signing stores only the authenticated signer's assigned field values
   ---
-  duration_ms: 2.965552
+  duration_ms: 8.805304
   type: 'test'
   ...
 # Subtest: Gateway idempotent signing retry still requires the invited authenticated UID
 ok 26 - Gateway idempotent signing retry still requires the invited authenticated UID
   ---
-  duration_ms: 4.787781
+  duration_ms: 8.423343
   type: 'test'
   ...
 # Subtest: Gateway completed-PDF verification accepts the exact hash and rejects tampered bytes
 ok 27 - Gateway completed-PDF verification accepts the exact hash and rejects tampered bytes
   ---
-  duration_ms: 3.033552
+  duration_ms: 6.370724
   type: 'test'
   ...
 # Subtest: Gateway completed-PDF verification requires the invited UID even for a valid hash
 ok 28 - Gateway completed-PDF verification requires the invited UID even for a valid hash
   ---
-  duration_ms: 1.164331
+  duration_ms: 3.036961
   type: 'test'
   ...
 # Subtest: Production-mode Gateway signing fails closed without server-side Member/Employee authority verification
 ok 29 - Production-mode Gateway signing fails closed without server-side Member/Employee authority verification
   ---
-  duration_ms: 1.342677
+  duration_ms: 2.766387
   type: 'test'
   ...
 # Subtest: Production-mode Gateway signing records the server-verified authority in the audit chain
 ok 30 - Production-mode Gateway signing records the server-verified authority in the audit chain
   ---
-  duration_ms: 3.507457
+  duration_ms: 8.460112
   type: 'test'
   ...
 # Subtest: signature application without explicit confirmation is rejected
 ok 31 - signature application without explicit confirmation is rejected
   ---
-  duration_ms: 3.148293
+  duration_ms: 5.737556
   type: 'test'
   ...
 # Subtest: confirmed signature is rendered on the saved third-page field position
 ok 32 - confirmed signature is rendered on the saved third-page field position
   ---
-  duration_ms: 102.026843
+  duration_ms: 187.50578
   type: 'test'
   ...
 # Subtest: a non-assigned signer cannot apply another officer's signature field
 ok 33 - a non-assigned signer cannot apply another officer's signature field
   ---
-  duration_ms: 4.86765
+  duration_ms: 20.815781
   type: 'test'
   ...
 # Subtest: Gateway open keeps later signers' assignments hidden while retaining the assigned field page
 ok 34 - Gateway open keeps later signers' assignments hidden while retaining the assigned field page
   ---
-  duration_ms: 1.260034
+  duration_ms: 2.334093
   type: 'test'
   ...
 # Subtest: later signer sees earlier confirmed signature but never an unsigned later assignment
 ok 35 - later signer sees earlier confirmed signature but never an unsigned later assignment
   ---
-  duration_ms: 1.2706
+  duration_ms: 3.83743
   type: 'test'
   ...
 # Subtest: upload validation reports missing document type instead of disabling the submit action
 ok 36 - upload validation reports missing document type instead of disabling the submit action
   ---
-  duration_ms: 0.849214
+  duration_ms: 1.699983
   type: 'test'
   ...
 # Subtest: upload validation reports missing file with a direct next step
 ok 37 - upload validation reports missing file with a direct next step
   ---
-  duration_ms: 0.178024
+  duration_ms: 0.309145
   type: 'test'
   ...
 # Subtest: unauthenticated upload is rejected before upload work begins
 ok 38 - unauthenticated upload is rejected before upload work begins
   ---
-  duration_ms: 0.116824
+  duration_ms: 0.206184
   type: 'test'
   ...
 # Subtest: unsupported document types are rejected
 ok 39 - unsupported document types are rejected
   ---
-  duration_ms: 0.140669
+  duration_ms: 0.223546
   type: 'test'
   ...
 # Subtest: Administrator documents remain blocked without special permission
 ok 40 - Administrator documents remain blocked without special permission
   ---
-  duration_ms: 0.103324
+  duration_ms: 0.243023
   type: 'test'
   ...
 # Subtest: Administrator documents are allowed through UI validation when permission is provided
 ok 41 - Administrator documents are allowed through UI validation when permission is provided
   ---
-  duration_ms: 0.095051
+  duration_ms: 0.249935
   type: 'test'
   ...
 # Subtest: empty and oversized files remain blocked
 ok 42 - empty and oversized files remain blocked
   ---
-  duration_ms: 0.096524
+  duration_ms: 0.219849
   type: 'test'
   ...
 # Subtest: unsupported file formats remain blocked
 ok 43 - unsupported file formats remain blocked
   ---
-  duration_ms: 0.223533
+  duration_ms: 0.354219
   type: 'test'
   ...
 # Subtest: valid public governance document passes validation
 ok 44 - valid public governance document passes validation
   ---
-  duration_ms: 0.278664
+  duration_ms: 0.509498
   type: 'test'
   ...
 # Subtest: C-G01 key architecture: asymmetric P-256 key pair has an opaque private key boundary
 ok 45 - C-G01 key architecture: asymmetric P-256 key pair has an opaque private key boundary
   ---
-  duration_ms: 11.851508
+  duration_ms: 19.040962
   type: 'test'
   ...
 # Subtest: C-G02 canonical signing payload is deterministic and contains the exact signed fields
 ok 46 - C-G02 canonical signing payload is deterministic and contains the exact signed fields
   ---
-  duration_ms: 1.744695
+  duration_ms: 4.627788
   type: 'test'
   ...
 # Subtest: C-G03 cryptographic signing produces an actual asymmetric signature
 ok 47 - C-G03 cryptographic signing produces an actual asymmetric signature
   ---
-  duration_ms: 2.498557
+  duration_ms: 4.201647
   type: 'test'
   ...
 # Subtest: C-G04 cryptographic verification independently verifies the signature
 ok 48 - C-G04 cryptographic verification independently verifies the signature
   ---
-  duration_ms: 2.559046
+  duration_ms: 3.572327
   type: 'test'
   ...
 # Subtest: C-G05 signer binding rejects verification under another institutional identity
 ok 49 - C-G05 signer binding rejects verification under another institutional identity
   ---
-  duration_ms: 1.222999
+  duration_ms: 2.10688
   type: 'test'
   ...
 # Subtest: C-G06 document binding is to the exact completed-document SHA-256
 ok 50 - C-G06 document binding is to the exact completed-document SHA-256
   ---
-  duration_ms: 2.079323
+  duration_ms: 4.393335
   type: 'test'
   ...
 # Subtest: C-G07 changing signed document metadata or payload invalidates verification
 ok 51 - C-G07 changing signed document metadata or payload invalidates verification
   ---
-  duration_ms: 1.132996
+  duration_ms: 8.103377
   type: 'test'
   ...
 # Subtest: C-G08 cryptographic evidence persists independently beside the completed document
 ok 52 - C-G08 cryptographic evidence persists independently beside the completed document
   ---
-  duration_ms: 1.512219
+  duration_ms: 7.502622
   type: 'test'
   ...
 # Subtest: C-G09 verification after persistence/retrieval remains cryptographically valid
 ok 53 - C-G09 verification after persistence/retrieval remains cryptographically valid
   ---
-  duration_ms: 2.284839
+  duration_ms: 6.477984
   type: 'test'
   ...
 # Subtest: C-G10 cryptographic failure rolls back partial evidence and never leaves SEALED state
 ok 54 - C-G10 cryptographic failure rolls back partial evidence and never leaves SEALED state
   ---
-  duration_ms: 2.19859
+  duration_ms: 9.244842
   type: 'test'
   ...
 # Subtest: C-G11 retries are idempotent and cannot create conflicting evidence
 ok 55 - C-G11 retries are idempotent and cannot create conflicting evidence
   ---
-  duration_ms: 4.481055
+  duration_ms: 9.473597
   type: 'test'
   ...
 # Subtest: C-G12 cryptographic operation emits verifiable audit evidence
 ok 56 - C-G12 cryptographic operation emits verifiable audit evidence
   ---
-  duration_ms: 1.869501
+  duration_ms: 4.144181
   type: 'test'
   ...
 # Subtest: Trial keeps its staging route in production builds while staging builds use one isolated gateway
 ok 57 - Trial keeps its staging route in production builds while staging builds use one isolated gateway
   ---
-  duration_ms: 0.626612
+  duration_ms: 1.173494
   type: 'test'
   ...
 # Subtest: multipart request uses actual CRLF framing rather than backslash literals
 ok 58 - multipart request uses actual CRLF framing rather than backslash literals
   ---
-  duration_ms: 0.728284
+  duration_ms: 1.470837
   type: 'test'
   ...
 # Subtest: restricted upload is denied server-side without restricted permission
 ok 59 - restricted upload is denied server-side without restricted permission
   ---
-  duration_ms: 27.37017
+  duration_ms: 73.372353
   type: 'test'
   ...
 # Subtest: download requires documentId even when fileId is supplied
 ok 60 - download requires documentId even when fileId is supplied
   ---
-  duration_ms: 0.699761
+  duration_ms: 1.14465
   type: 'test'
   ...
 # Subtest: wrong fileId is rejected against registered document
 ok 61 - wrong fileId is rejected against registered document
   ---
-  duration_ms: 0.841312
+  duration_ms: 1.442334
   type: 'test'
   ...
 # Subtest: post-signature cannot be reached before signed state
 ok 62 - post-signature cannot be reached before signed state
   ---
-  duration_ms: 0.675164
+  duration_ms: 1.274561
   type: 'test'
   ...
 # Subtest: share is restricted to owner or administrator
 ok 63 - share is restricted to owner or administrator
   ---
-  duration_ms: 1.08214
+  duration_ms: 2.201766
   type: 'test'
   ...
 # Subtest: multipart body uses real CRLF separators and preserves binary payload
 ok 64 - multipart body uses real CRLF separators and preserves binary payload
   ---
-  duration_ms: 0.22187
+  duration_ms: 0.342077
   type: 'test'
   ...
 # Subtest: upload rolls back Drive file when atomic document/audit commit fails
 ok 65 - upload rolls back Drive file when atomic document/audit commit fails
   ---
-  duration_ms: 9.749231
+  duration_ms: 16.326268
   type: 'test'
   ...
 # Subtest: successful upload atomically writes document registry and audit event
 ok 66 - successful upload atomically writes document registry and audit event
   ---
-  duration_ms: 3.149304
+  duration_ms: 4.136757
   type: 'test'
   ...
 # Subtest: download retrieves stored bytes and verifies the registered SHA-256 digest
 ok 67 - download retrieves stored bytes and verifies the registered SHA-256 digest
   ---
-  duration_ms: 2.445738
+  duration_ms: 2.789681
   type: 'test'
   ...
 # Subtest: download rejects retrieved bytes whose SHA-256 differs from the register
 ok 68 - download rejects retrieved bytes whose SHA-256 differs from the register
   ---
-  duration_ms: 4.599321
+  duration_ms: 2.368918
   type: 'test'
   ...
 # Subtest: failed Drive rollback is explicitly recorded and reported after atomic commit failure
 ok 69 - failed Drive rollback is explicitly recorded and reported after atomic commit failure
   ---
-  duration_ms: 4.201549
+  duration_ms: 2.219079
   type: 'test'
   ...
 # Subtest: translated derivative inherits the source classification and all access grants server-side
 ok 70 - translated derivative inherits the source classification and all access grants server-side
   ---
-  duration_ms: 6.6963
+  duration_ms: 2.354201
   type: 'test'
   ...
 # Subtest: translated derivative upload is denied if client attempts to lower source classification
 ok 71 - translated derivative upload is denied if client attempts to lower source classification
   ---
-  duration_ms: 0.653542
+  duration_ms: 1.038964
   type: 'test'
   ...
 # Subtest: active employee may upload internal finance document within department
 ok 72 - active employee may upload internal finance document within department
   ---
-  duration_ms: 2.196868
+  duration_ms: 3.57386
   type: 'test'
   ...
 # Subtest: finance employee cannot upload restricted document without explicit permission
 ok 73 - finance employee cannot upload restricted document without explicit permission
   ---
-  duration_ms: 0.191445
+  duration_ms: 0.272467
   type: 'test'
   ...
 # Subtest: administrator may upload restricted administrator document
 ok 74 - administrator may upload restricted administrator document
   ---
-  duration_ms: 0.105697
+  duration_ms: 0.227714
   type: 'test'
   ...
 # Subtest: confidential document is readable by owner
 ok 75 - confidential document is readable by owner
   ---
-  duration_ms: 0.525912
+  duration_ms: 0.688391
   type: 'test'
   ...
 # Subtest: confidential document is denied to unrelated department
 ok 76 - confidential document is denied to unrelated department
   ---
-  duration_ms: 0.179607
+  duration_ms: 0.35424
   type: 'test'
   ...
 # Subtest: administrator can read controlled document
 ok 77 - administrator can read controlled document
   ---
-  duration_ms: 0.113199
+  duration_ms: 0.24735
   type: 'test'
   ...
 # Subtest: workflow follows working -> pending signature -> signed -> post signature -> final archive
 ok 78 - workflow follows working -> pending signature -> signed -> post signature -> final archive
   ---
-  duration_ms: 0.260577
+  duration_ms: 0.539184
   type: 'test'
   ...
 # Subtest: invalid workflow transition is denied
 ok 79 - invalid workflow transition is denied
   ---
-  duration_ms: 0.133829
+  duration_ms: 0.237021
   type: 'test'
   ...
 # Subtest: document record contains owner and integrity fields
 ok 80 - document record contains owner and integrity fields
   ---
-  duration_ms: 0.829944
+  duration_ms: 1.47787
   type: 'test'
   ...
 # Subtest: finance document accepts spreadsheet format required for financial schedules
 ok 81 - finance document accepts spreadsheet format required for financial schedules
   ---
-  duration_ms: 0.370661
+  duration_ms: 0.714219
   type: 'test'
   ...
 # Subtest: finance document accepts PDF format
 ok 82 - finance document accepts PDF format
   ---
-  duration_ms: 0.153028
+  duration_ms: 0.298065
   type: 'test'
   ...
 # Subtest: finance document rejects presentation format
 ok 83 - finance document rejects presentation format
   ---
-  duration_ms: 0.081652
+  duration_ms: 0.188691
   type: 'test'
   ...
 # Subtest: research document accepts presentation format
 ok 84 - research document accepts presentation format
   ---
-  duration_ms: 0.061922
+  duration_ms: 0.17198
   type: 'test'
   ...
 # Subtest: other document type supports broader formats
 ok 85 - other document type supports broader formats
   ---
-  duration_ms: 0.051186
+  duration_ms: 0.195404
   type: 'test'
   ...
 # Subtest: Gate 4: physical PDF upload validates and stores a retrievable document
 ok 86 - Gate 4: physical PDF upload validates and stores a retrievable document
   ---
-  duration_ms: 54.192255
+  duration_ms: 168.657251
   type: 'test'
   ...
 # Subtest: Gate 4: multi-channel storage preserves every selected archive
 ok 87 - Gate 4: multi-channel storage preserves every selected archive
   ---
-  duration_ms: 23.292556
+  duration_ms: 37.659171
   type: 'test'
   ...
 # Subtest: Gate 4: interrupted/invalid physical upload is rejected before persistence
 ok 88 - Gate 4: interrupted/invalid physical upload is rejected before persistence
   ---
-  duration_ms: 6.024931
+  duration_ms: 10.357452
   type: 'test'
   ...
 # Subtest: Gate 4: storage failure rolls back already-written objects and metadata
 ok 89 - Gate 4: storage failure rolls back already-written objects and metadata
   ---
-  duration_ms: 13.46673
+  duration_ms: 48.676241
   type: 'test'
   ...
 # Subtest: Gate 4: rollback deletion failure creates durable cleanup work
 ok 90 - Gate 4: rollback deletion failure creates durable cleanup work
   ---
-  duration_ms: 10.279771
+  duration_ms: 31.901268
   type: 'test'
   ...
 # Subtest: Gate 4: duplicate document IDs do not overwrite an existing document
 ok 91 - Gate 4: duplicate document IDs do not overwrite an existing document
   ---
-  duration_ms: 14.298999
+  duration_ms: 47.072183
   type: 'test'
   ...
 # Subtest: Gate 4: retrieval detects stored-document tampering
 ok 92 - Gate 4: retrieval detects stored-document tampering
   ---
-  duration_ms: 9.683554
+  duration_ms: 29.462401
   type: 'test'
   ...
 # Subtest: 1 valid PDF stored in every archive
 ok 93 - 1 valid PDF stored in every archive
   ---
-  duration_ms: 88.294039
+  duration_ms: 222.274032
   type: 'test'
   ...
 # Subtest: 2 invalid PDF rejected
 ok 94 - 2 invalid PDF rejected
   ---
-  duration_ms: 2.800265
+  duration_ms: 8.072591
   type: 'test'
   ...
 # Subtest: 3 truncated PDF rejected
 ok 95 - 3 truncated PDF rejected
   ---
-  duration_ms: 8.636816
+  duration_ms: 20.073922
   type: 'test'
   ...
 # Subtest: 4 empty PDF rejected
 ok 96 - 4 empty PDF rejected
   ---
-  duration_ms: 1.314796
+  duration_ms: 1.865862
   type: 'test'
   ...
 # Subtest: 5 oversize PDF rejected
 ok 97 - 5 oversize PDF rejected
   ---
-  duration_ms: 47.034839
+  duration_ms: 77.202051
   type: 'test'
   ...
 # Subtest: 6 bad archive/classification rejected
 ok 98 - 6 bad archive/classification rejected
   ---
-  duration_ms: 11.377713
+  duration_ms: 21.902573
   type: 'test'
   ...
 # Subtest: 7 unauthenticated retrieval denied
 ok 99 - 7 unauthenticated retrieval denied
   ---
-  duration_ms: 6.693226
+  duration_ms: 18.354532
   type: 'test'
   ...
 # Subtest: 8 owner retrieval passes hash
 ok 100 - 8 owner retrieval passes hash
   ---
-  duration_ms: 8.199727
+  duration_ms: 21.016305
   type: 'test'
   ...
 # Subtest: 9 duplicate ID returns 409
 ok 101 - 9 duplicate ID returns 409
   ---
-  duration_ms: 13.071583
+  duration_ms: 24.831764
   type: 'test'
   ...
 # Subtest: 10 rollback releases ID
 ok 102 - 10 rollback releases ID
   ---
-  duration_ms: 10.364396
+  duration_ms: 14.308334
   type: 'test'
   ...
 # Subtest: 11 cleanup removes failed rollback
 ok 103 - 11 cleanup removes failed rollback
   ---
-  duration_ms: 9.074898
+  duration_ms: 34.27249
   type: 'test'
   ...
 # Subtest: 12 envelope owner authorization
 ok 104 - 12 envelope owner authorization
   ---
-  duration_ms: 8.399514
+  duration_ms: 20.896842
   type: 'test'
   ...
 # Subtest: 13 invitation transport required
 ok 105 - 13 invitation transport required
   ---
-  duration_ms: 4.002292
+  duration_ms: 9.425518
   type: 'test'
   ...
 # Subtest: 14 signing order enforced
 ok 106 - 14 signing order enforced
   ---
-  duration_ms: 11.327639
+  duration_ms: 18.236041
   type: 'test'
   ...
 # Subtest: 15 sequential signing completes and creates copies
 ok 107 - 15 sequential signing completes and creates copies
   ---
-  duration_ms: 70.737134
+  duration_ms: 129.131904
   type: 'test'
   ...
 # Subtest: 16 malformed and tampered token rejected
 ok 108 - 16 malformed and tampered token rejected
   ---
-  duration_ms: 12.604478
+  duration_ms: 12.252979
   type: 'test'
   ...
 # Subtest: 17 invalid signature and wrong linked account rejected
 ok 109 - 17 invalid signature and wrong linked account rejected
   ---
-  duration_ms: 5.782561
+  duration_ms: 10.843917
   type: 'test'
   ...
 # Subtest: 18 audit chain detects tampering and completed PDF integrity
 ok 110 - 18 audit chain detects tampering and completed PDF integrity
   ---
-  duration_ms: 12.656495
+  duration_ms: 39.379172
   type: 'test'
   ...
 # Subtest: 19 forced completion failure is contained and retryable
 ok 111 - 19 forced completion failure is contained and retryable
   ---
-  duration_ms: 34.252967
+  duration_ms: 88.637136
   type: 'test'
   ...
 # Subtest: 20 real final-signer completion mirrors portal envelope/event and passes documentLifecycle signed-check
 ok 112 - 20 real final-signer completion mirrors portal envelope/event and passes documentLifecycle signed-check
   ---
-  duration_ms: 9.579418
+  duration_ms: 53.072371
   type: 'test'
   ...
 # Subtest: 21 completed signing status exposes archive entries and only the caller's signer copy; PDF access is owner/signer scoped
 ok 113 - 21 completed signing status exposes archive entries and only the caller's signer copy; PDF access is owner/signer scoped
   ---
-  duration_ms: 12.94208
+  duration_ms: 48.670789
   type: 'test'
   ...
 # Drive gateway error Error: Firebase authentication is required.
@@ -715,259 +715,259 @@ ok 113 - 21 completed signing status exposes archive entries and only the caller
 # Subtest: entrypoint flag-off: /api/envelopes remains 404
 ok 114 - entrypoint flag-off: /api/envelopes remains 404
   ---
-  duration_ms: 26.880632
+  duration_ms: 78.323305
   type: 'test'
   ...
 # Subtest: entrypoint flag-off: /api/sign/open remains 404
 ok 115 - entrypoint flag-off: /api/sign/open remains 404
   ---
-  duration_ms: 0.515607
+  duration_ms: 0.814506
   type: 'test'
   ...
 # Subtest: entrypoint flag-on: /api/sign/open reaches e-sign router
 ok 116 - entrypoint flag-on: /api/sign/open reaches e-sign router
   ---
-  duration_ms: 1.743142
+  duration_ms: 12.182597
   type: 'test'
   ...
 # Subtest: entrypoint flag-on: malformed signing token is rejected
 ok 117 - entrypoint flag-on: malformed signing token is rejected
   ---
-  duration_ms: 0.773661
+  duration_ms: 7.360195
   type: 'test'
   ...
 # Subtest: entrypoint flag-on: unauthenticated document upload is rejected
 ok 118 - entrypoint flag-on: unauthenticated document upload is rejected
   ---
-  duration_ms: 1.015501
+  duration_ms: 3.546269
   type: 'test'
   ...
 # Subtest: CORS preflight from production web app allows signing token header
 ok 119 - CORS preflight from production web app allows signing token header
   ---
-  duration_ms: 0.491652
+  duration_ms: 0.827219
   type: 'test'
   ...
 # Subtest: regression: /health remains available
 ok 120 - regression: /health remains available
   ---
-  duration_ms: 1.06259
+  duration_ms: 7.38422
   type: 'test'
   ...
 # Subtest: regression: /api/upload-controlled-document remains authentication-gated
 ok 121 - regression: /api/upload-controlled-document remains authentication-gated
   ---
-  duration_ms: 1.978433
+  duration_ms: 10.003273
   type: 'test'
   ...
 # Subtest: regression: /api/signature-invitations/send remains authentication-gated
 ok 122 - regression: /api/signature-invitations/send remains authentication-gated
   ---
-  duration_ms: 1.087357
+  duration_ms: 8.282027
   type: 'test'
   ...
 # Subtest: regression: /api/invitations/send remains authentication-gated
 ok 123 - regression: /api/invitations/send remains authentication-gated
   ---
-  duration_ms: 4.406324
+  duration_ms: 5.431457
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration flag-off keeps password attempt state unavailable
 ok 124 - Cloudflare auth migration flag-off keeps password attempt state unavailable
   ---
-  duration_ms: 0.536538
+  duration_ms: 0.931323
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration flag-on returns initial password attempt state
 ok 125 - Cloudflare auth migration flag-on returns initial password attempt state
   ---
-  duration_ms: 14.14548
+  duration_ms: 32.277097
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration preserves three-attempt lock semantics
 ok 126 - Cloudflare auth migration preserves three-attempt lock semantics
   ---
-  duration_ms: 21.464006
+  duration_ms: 95.272135
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration clears password attempt state
 ok 127 - Cloudflare auth migration clears password attempt state
   ---
-  duration_ms: 10.005893
+  duration_ms: 53.190567
   type: 'test'
   ...
 # Subtest: Cloudflare document-reference migration remains authentication-gated
 ok 128 - Cloudflare document-reference migration remains authentication-gated
   ---
-  duration_ms: 0.39683
+  duration_ms: 3.952545
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration rejects malformed password-state input
 ok 129 - Cloudflare auth migration rejects malformed password-state input
   ---
-  duration_ms: 0.343681
+  duration_ms: 4.000083
   type: 'test'
   ...
 # Subtest: buildEsignContext preserves injected function properties
 ok 130 - buildEsignContext preserves injected function properties
   ---
-  duration_ms: 0.686411
+  duration_ms: 1.413279
   type: 'test'
   ...
 # Subtest: e-sign Drive upload uses RFC-compliant CRLF multipart framing
 ok 131 - e-sign Drive upload uses RFC-compliant CRLF multipart framing
   ---
-  duration_ms: 21.671374
+  duration_ms: 103.857205
   type: 'test'
   ...
 # Subtest: production deploy safely syncs the Firebase service account secret to the exact Worker
 ok 132 - production deploy safely syncs the Firebase service account secret to the exact Worker
   ---
-  duration_ms: 0.792709
+  duration_ms: 1.287105
   type: 'test'
   ...
 # Subtest: diagnostics classify Firebase service account failures without exposing values
 ok 133 - diagnostics classify Firebase service account failures without exposing values
   ---
-  duration_ms: 0.416109
+  duration_ms: 0.54317
   type: 'test'
   ...
 # Subtest: signature asset and completed archive use the Worker admin token
 ok 134 - signature asset and completed archive use the Worker admin token
   ---
-  duration_ms: 0.795804
+  duration_ms: 1.387996
   type: 'test'
   ...
 # Subtest: signing and Drive route helpers do not receive the caller token
 ok 135 - signing and Drive route helpers do not receive the caller token
   ---
-  duration_ms: 2.77002
+  duration_ms: 0.927061
   type: 'test'
   ...
 # Subtest: administrator, owner, current and earlier signers retain authorised views; stranger is refused
 ok 136 - administrator, owner, current and earlier signers retain authorised views; stranger is refused
   ---
-  duration_ms: 0.859969
+  duration_ms: 1.151643
   type: 'test'
   ...
 # Subtest: document lifecycle fails closed instead of falling back to claims.token
 ok 137 - document lifecycle fails closed instead of falling back to claims.token
   ---
-  duration_ms: 0.368318
+  duration_ms: 0.56928
   type: 'test'
   ...
 # Subtest: mock Firestore denies caller-token reads and permits Worker-admin reads
 ok 138 - mock Firestore denies caller-token reads and permits Worker-admin reads
   ---
-  duration_ms: 1.671837
+  duration_ms: 1.437314
   type: 'test'
   ...
 # Subtest: G5-01 — typed signature punching
 ok 139 - G5-01 — typed signature punching
   ---
-  duration_ms: 195.422125
+  duration_ms: 270.300173
   type: 'test'
   ...
 # Subtest: G5-02 — drawn signature punching
 ok 140 - G5-02 — drawn signature punching
   ---
-  duration_ms: 71.464771
+  duration_ms: 91.737534
   type: 'test'
   ...
 # Subtest: G5-03 — original document preservation
 ok 141 - G5-03 — original document preservation
   ---
-  duration_ms: 34.861362
+  duration_ms: 71.980377
   type: 'test'
   ...
 # Subtest: G5-04 — final hash exactness
 ok 142 - G5-04 — final hash exactness
   ---
-  duration_ms: 23.231204
+  duration_ms: 49.433891
   type: 'test'
   ...
 # Subtest: G5-05 — all-copy equality
 ok 143 - G5-05 — all-copy equality
   ---
-  duration_ms: 40.834723
+  duration_ms: 63.838373
   type: 'test'
   ...
 # Subtest: G5-06 — retrieval equality
 ok 144 - G5-06 — retrieval equality
   ---
-  duration_ms: 29.807811
+  duration_ms: 26.744372
   type: 'test'
   ...
 # Subtest: G5-07 — signed-PDF tamper detection
 ok 145 - G5-07 — signed-PDF tamper detection
   ---
-  duration_ms: 30.474738
+  duration_ms: 25.027728
   type: 'test'
   ...
 # Subtest: G5-08 — partial completion rollback
 ok 146 - G5-08 — partial completion rollback
   ---
-  duration_ms: 24.419842
+  duration_ms: 16.558451
   type: 'test'
   ...
 # Subtest: G5-09 — retry persistence
 ok 147 - G5-09 — retry persistence
   ---
-  duration_ms: 23.203023
+  duration_ms: 20.758695
   type: 'test'
   ...
 # Subtest: G5-10 — completion idempotency
 ok 148 - G5-10 — completion idempotency
   ---
-  duration_ms: 9.595432
+  duration_ms: 12.966817
   type: 'test'
   ...
 # Subtest: Google Drive OAuth explicitly prompts for account selection and consent
 ok 149 - Google Drive OAuth explicitly prompts for account selection and consent
   ---
-  duration_ms: 0.740011
+  duration_ms: 1.130323
   type: 'test'
   ...
 # Subtest: induction matching rejects unauthenticated requests
 ok 150 - induction matching rejects unauthenticated requests
   ---
-  duration_ms: 31.139031
+  duration_ms: 50.356077
   type: 'test'
   ...
 # Subtest: induction matching rejects another user's email lookup
 ok 151 - induction matching rejects another user's email lookup
   ---
-  duration_ms: 1.594692
+  duration_ms: 2.635333
   type: 'test'
   ...
 # Subtest: induction matching rejects malformed requests and wrong methods
 ok 152 - induction matching rejects malformed requests and wrong methods
   ---
-  duration_ms: 0.748263
+  duration_ms: 1.204411
   type: 'test'
   ...
 # Subtest: induction matching response never exposes invitation token hashes or internal fields
 ok 153 - induction matching response never exposes invitation token hashes or internal fields
   ---
-  duration_ms: 2.798333
+  duration_ms: 3.990765
   type: 'test'
   ...
 # Subtest: induction matching refuses expired or activated invitations for tokens without email
 ok 154 - induction matching refuses expired or activated invitations for tokens without email
   ---
-  duration_ms: 1.339803
+  duration_ms: 2.593315
   type: 'test'
   ...
 # Subtest: active administrator can look up another person's email
 ok 155 - active administrator can look up another person's email
   ---
-  duration_ms: 0.788683
+  duration_ms: 1.494671
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption creates/signs Firebase custom token and records PASSWORD_SETUP_PENDING without consuming invitation
 ok 156 - Cloudflare invitation redemption creates/signs Firebase custom token and records PASSWORD_SETUP_PENDING without consuming invitation
   ---
-  duration_ms: 58.365462
+  duration_ms: 75.174396
   type: 'test'
   ...
 # Invitation administrator notification failed {
@@ -982,73 +982,73 @@ ok 156 - Cloudflare invitation redemption creates/signs Firebase custom token an
 # Subtest: Cloudflare invitation redemption self-heals an existing password account
 ok 157 - Cloudflare invitation redemption self-heals an existing password account
   ---
-  duration_ms: 19.071807
+  duration_ms: 27.647584
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rejects malformed tokens before contacting Firebase
 ok 158 - Cloudflare invitation redemption rejects malformed tokens before contacting Firebase
   ---
-  duration_ms: 4.790325
+  duration_ms: 2.512936
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rejects an expired invitation token before Firebase account lookup
 ok 159 - Cloudflare invitation redemption rejects an expired invitation token before Firebase account lookup
   ---
-  duration_ms: 2.489002
+  duration_ms: 2.885619
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rejects explicitly revoked invitations before Firebase account lookup
 ok 160 - Cloudflare invitation redemption rejects explicitly revoked invitations before Firebase account lookup
   ---
-  duration_ms: 1.133186
+  duration_ms: 1.798536
   type: 'test'
   ...
 # Subtest: password-set returns 401 when Firebase authentication is missing
 ok 161 - password-set returns 401 when Firebase authentication is missing
   ---
-  duration_ms: 0.622646
+  duration_ms: 0.900265
   type: 'test'
   ...
 # Subtest: session-state returns 401 when Firebase authentication is missing
 ok 162 - session-state returns 401 when Firebase authentication is missing
   ---
-  duration_ms: 1.036692
+  duration_ms: 2.459807
   type: 'test'
   ...
 # Subtest: password-set refuses activation when Firebase Auth has not independently confirmed a password provider
 ok 163 - password-set refuses activation when Firebase Auth has not independently confirmed a password provider
   ---
-  duration_ms: 9.614451
+  duration_ms: 9.383319
   type: 'test'
   ...
 # Subtest: password-set verifies the password provider and activates the invitation on the server
 ok 164 - password-set verifies the password provider and activates the invitation on the server
   ---
-  duration_ms: 4.774571
+  duration_ms: 8.552062
   type: 'test'
   ...
 # Subtest: password-set refuses activation when the registered member record does not exist
 ok 165 - password-set refuses activation when the registered member record does not exist
   ---
-  duration_ms: 6.923868
+  duration_ms: 8.703545
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption resumes setup after its 60-minute session expires while the invitation remains valid
 ok 166 - Cloudflare invitation redemption resumes setup after its 60-minute session expires while the invitation remains valid
   ---
-  duration_ms: 9.108528
+  duration_ms: 9.140809
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rate-limits the sixth attempt for one invitation
 ok 167 - Cloudflare invitation redemption rate-limits the sixth attempt for one invitation
   ---
-  duration_ms: 42.378684
+  duration_ms: 48.56804
   type: 'test'
   ...
 # Subtest: password-set resumes an invitation that is already PROVISIONING_PENDING
 ok 168 - password-set resumes an invitation that is already PROVISIONING_PENDING
   ---
-  duration_ms: 5.426952
+  duration_ms: 4.947536
   type: 'test'
   ...
 # Drive gateway error Error: IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED
@@ -1063,67 +1063,67 @@ ok 168 - password-set resumes an invitation that is already PROVISIONING_PENDING
 # Subtest: portal activation gate rejects a valid Firebase ID token whose member record is not Activated
 ok 169 - portal activation gate rejects a valid Firebase ID token whose member record is not Activated
   ---
-  duration_ms: 2.624644
+  duration_ms: 4.20841
   type: 'test'
   ...
 # Subtest: session-state returns the invitation state for the authenticated UID
 ok 170 - session-state returns the invitation state for the authenticated UID
   ---
-  duration_ms: 2.623142
+  duration_ms: 3.819247
   type: 'test'
   ...
 # Subtest: password-set rejects a UID that is not assigned to the invitation
 ok 171 - password-set rejects a UID that is not assigned to the invitation
   ---
-  duration_ms: 1.750834
+  duration_ms: 3.601311
   type: 'test'
   ...
 # Subtest: password-set rejects a Firebase email that does not match the invitation email
 ok 172 - password-set rejects a Firebase email that does not match the invitation email
   ---
-  duration_ms: 1.796682
+  duration_ms: 4.201888
   type: 'test'
   ...
 # Subtest: password-set is idempotent after invitation activation
 ok 173 - password-set is idempotent after invitation activation
   ---
-  duration_ms: 8.837695
+  duration_ms: 5.818968
   type: 'test'
   ...
 # Subtest: password-set activates a registered Special Invitee from the third register
 ok 174 - password-set activates a registered Special Invitee from the third register
   ---
-  duration_ms: 9.170059
+  duration_ms: 9.463258
   type: 'test'
   ...
 # Subtest: Board Member uses the identical password-set activation path
 ok 175 - Board Member uses the identical password-set activation path
   ---
-  duration_ms: 3.16663
+  duration_ms: 5.828464
   type: 'test'
   ...
 # Subtest: Employee uses the identical password-set activation path
 ok 176 - Employee uses the identical password-set activation path
   ---
-  duration_ms: 2.322445
+  duration_ms: 5.131157
   type: 'test'
   ...
 # Subtest: Auditor uses the identical password-set activation path
 ok 177 - Auditor uses the identical password-set activation path
   ---
-  duration_ms: 7.087282
+  duration_ms: 6.375132
   type: 'test'
   ...
 # Subtest: redeem rejects a second click on an already activated invitation with a specific message
 ok 178 - redeem rejects a second click on an already activated invitation with a specific message
   ---
-  duration_ms: 5.374144
+  duration_ms: 6.884199
   type: 'test'
   ...
 # Subtest: password-set writes the requested password through Firebase Admin before activation
 ok 179 - password-set writes the requested password through Firebase Admin before activation
   ---
-  duration_ms: 3.762256
+  duration_ms: 7.535401
   type: 'test'
   ...
 # Invitation operation failure {
@@ -1134,13 +1134,19 @@ ok 179 - password-set writes the requested password through Firebase Admin befor
 # Subtest: password-set resumes PROVISIONING_PENDING after a transient institutional-record failure
 ok 180 - password-set resumes PROVISIONING_PENDING after a transient institutional-record failure
   ---
-  duration_ms: 156.057268
+  duration_ms: 156.643638
   type: 'test'
   ...
 # Subtest: activated canonical Board Member record authorizes portal access when its document ID differs from Firebase UID
 ok 181 - activated canonical Board Member record authorizes portal access when its document ID differs from Firebase UID
   ---
-  duration_ms: 8.529837
+  duration_ms: 4.185969
+  type: 'test'
+  ...
+# Subtest: inactive canonical institutional records remain blocked by portal activation guard
+ok 182 - inactive canonical institutional records remain blocked by portal activation guard
+  ---
+  duration_ms: 3.466571
   type: 'test'
   ...
 # Drive gateway error Error: IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED
@@ -1153,53 +1159,47 @@ ok 181 - activated canonical Board Member record authorizes portal access when i
 #     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
 #   status: 403
 # }
-# Subtest: inactive canonical institutional records remain blocked by portal activation guard
-ok 182 - inactive canonical institutional records remain blocked by portal activation guard
-  ---
-  duration_ms: 5.572849
-  type: 'test'
-  ...
 # Invitation removal atomic commit failed { status: 503 }
 # Subtest: unmatched routes are not handled
 ok 183 - unmatched routes are not handled
   ---
-  duration_ms: 26.22708
+  duration_ms: 44.527762
   type: 'test'
   ...
 # Subtest: rejects requests without verified authentication
 ok 184 - rejects requests without verified authentication
   ---
-  duration_ms: 2.819224
+  duration_ms: 6.839526
   type: 'test'
   ...
 # Subtest: rejects non-admin users before reading or deleting invitations
 ok 185 - rejects non-admin users before reading or deleting invitations
   ---
-  duration_ms: 0.4909
+  duration_ms: 1.0583
   type: 'test'
   ...
 # Subtest: preserves meeting-linked invitation records
 ok 186 - preserves meeting-linked invitation records
   ---
-  duration_ms: 0.498822
+  duration_ms: 1.012944
   type: 'test'
   ...
 # Subtest: preserves activated identities
 ok 187 - preserves activated identities
   ---
-  duration_ms: 0.676406
+  duration_ms: 1.20922
   type: 'test'
   ...
 # Subtest: atomically deletes pending invitation and writes audit event
 ok 188 - atomically deletes pending invitation and writes audit event
   ---
-  duration_ms: 2.290457
+  duration_ms: 3.523226
   type: 'test'
   ...
 # Subtest: does not report success when Firestore commit fails
 ok 189 - does not report success when Firestore commit fails
   ---
-  duration_ms: 1.623725
+  duration_ms: 2.384907
   type: 'test'
   ...
 # MEETING_ACCESS_INVITATION_STAGE {
@@ -1246,13 +1246,13 @@ ok 189 - does not report success when Firestore commit fails
 # Subtest: meeting portal router ignores unrelated paths
 ok 190 - meeting portal router ignores unrelated paths
   ---
-  duration_ms: 29.799633
+  duration_ms: 52.920456
   type: 'test'
   ...
 # Subtest: issue rejects a participant linked to a different meeting
 ok 191 - issue rejects a participant linked to a different meeting
   ---
-  duration_ms: 3.630109
+  duration_ms: 6.074764
   type: 'test'
   ...
 # MEETING_ACCESS_INVITATION_STAGE {
@@ -1268,582 +1268,582 @@ ok 191 - issue rejects a participant linked to a different meeting
 #   meetingId: 'meeting-1',
 #   participantId: 'participant-1',
 #   actorUid: 'organizer-1',
-#   accessId: '3d37aab7-12cf-4c8c-b01f-9eddbbfde9c9'
+#   accessId: 'da3eed53-6545-4fff-8b6b-35f128f43411'
 # }
 # Subtest: issue creates an access pass and updates invitee tally in one atomic Firestore commit
 ok 192 - issue creates an access pass and updates invitee tally in one atomic Firestore commit
   ---
-  duration_ms: 8.392814
+  duration_ms: 23.096618
   type: 'test'
   ...
 # Subtest: meeting access issuance is routed through Cloudflare and rejects unauthenticated callers
 ok 193 - meeting access issuance is routed through Cloudflare and rejects unauthenticated callers
   ---
-  duration_ms: 23.697237
+  duration_ms: 28.595968
   type: 'test'
   ...
 # Subtest: meeting access revocation is routed through Cloudflare and rejects unauthenticated callers
 ok 194 - meeting access revocation is routed through Cloudflare and rejects unauthenticated callers
   ---
-  duration_ms: 0.835222
+  duration_ms: 1.05873
   type: 'test'
   ...
 # Subtest: meeting entry authorization is routed through Cloudflare and rejects unauthenticated callers
 ok 195 - meeting entry authorization is routed through Cloudflare and rejects unauthenticated callers
   ---
-  duration_ms: 0.561706
+  duration_ms: 0.744655
   type: 'test'
   ...
 # Subtest: meeting access routes do not accept GET requests
 ok 196 - meeting access routes do not accept GET requests
   ---
-  duration_ms: 3.157686
+  duration_ms: 4.937567
   type: 'test'
   ...
 # Subtest: recording output targets private Cloudflare R2 using path-style S3 access
 ok 197 - recording output targets private Cloudflare R2 using path-style S3 access
   ---
-  duration_ms: 0.865378
+  duration_ms: 1.178763
   type: 'test'
   ...
 # Subtest: recording output fails closed when R2 credentials are missing
 ok 198 - recording output fails closed when R2 credentials are missing
   ---
-  duration_ms: 0.489999
+  duration_ms: 0.567776
   type: 'test'
   ...
 # Subtest: recording output rejects non-Cloudflare endpoints and unsafe object paths
 ok 199 - recording output rejects non-Cloudflare endpoints and unsafe object paths
   ---
-  duration_ms: 0.222952
+  duration_ms: 0.332168
   type: 'test'
   ...
 # Subtest: meeting services router ignores unrelated paths
 ok 200 - meeting services router ignores unrelated paths
   ---
-  duration_ms: 21.47394
+  duration_ms: 40.287753
   type: 'test'
   ...
 # Subtest: meeting record operations require Firebase-authenticated identity
 ok 201 - meeting record operations require Firebase-authenticated identity
   ---
-  duration_ms: 1.276478
+  duration_ms: 3.272269
   type: 'test'
   ...
 # Subtest: LiveKit token issuance also requires an authenticated identity
 ok 202 - LiveKit token issuance also requires an authenticated identity
   ---
-  duration_ms: 1.141368
+  duration_ms: 0.847887
   type: 'test'
   ...
 # Subtest: meeting register, decision, and voting control routes require authenticated identity
 ok 203 - meeting register, decision, and voting control routes require authenticated identity
   ---
-  duration_ms: 3.957726
+  duration_ms: 7.404167
   type: 'test'
   ...
 # Subtest: connect returns a read-only Meta authorization URL and one-time staging state
 ok 204 - connect returns a read-only Meta authorization URL and one-time staging state
   ---
-  duration_ms: 25.953042
+  duration_ms: 40.658503
   type: 'test'
   ...
 # Subtest: connect and status deny unapproved origins, inactive roles and non-staging environments
 ok 205 - connect and status deny unapproved origins, inactive roles and non-staging environments
   ---
-  duration_ms: 1.016191
+  duration_ms: 2.236271
   type: 'test'
   ...
 # Subtest: callback rejects missing or replayed OAuth state without calling Meta
 ok 206 - callback rejects missing or replayed OAuth state without calling Meta
   ---
-  duration_ms: 0.635876
+  duration_ms: 1.0645
   type: 'test'
   ...
 # Subtest: OAuth callback verifies Pages and linked Instagram, encrypts tokens and never returns token material
 ok 207 - OAuth callback verifies Pages and linked Instagram, encrypts tokens and never returns token material
   ---
-  duration_ms: 13.254564
+  duration_ms: 35.102414
   type: 'test'
   ...
 # Subtest: missing required Meta scopes fail closed without persisting an encrypted token
 ok 208 - missing required Meta scopes fail closed without persisting an encrypted token
   ---
-  duration_ms: 3.12569
+  duration_ms: 9.460944
   type: 'test'
   ...
 # Subtest: C-I01 production finalize seals the exact final PDF before Completed
 ok 209 - C-I01 production finalize seals the exact final PDF before Completed
   ---
-  duration_ms: 117.479619
+  duration_ms: 145.782605
   type: 'test'
   ...
 # Subtest: C-I02 production finalize fails closed when signer key custody is unavailable
 ok 210 - C-I02 production finalize fails closed when signer key custody is unavailable
   ---
-  duration_ms: 22.489551
+  duration_ms: 37.201961
   type: 'test'
   ...
 # Subtest: C-I03 production completion fails closed when the cryptographic key provider is absent
 ok 211 - C-I03 production completion fails closed when the cryptographic key provider is absent
   ---
-  duration_ms: 40.400301
+  duration_ms: 35.734911
   type: 'test'
   ...
 # Subtest: Release Readiness route requires POST and rejects non-administrators
 ok 212 - Release Readiness route requires POST and rejects non-administrators
   ---
-  duration_ms: 36.511617
+  duration_ms: 40.908999
   type: 'test'
   ...
 # Subtest: Release Readiness runs read-only diagnostics and explicitly reports blocked probes
 ok 213 - Release Readiness runs read-only diagnostics and explicitly reports blocked probes
   ---
-  duration_ms: 3.696328
+  duration_ms: 6.337632
   type: 'test'
   ...
 # Subtest: closed actual-data gate names the exact gate
 ok 214 - closed actual-data gate names the exact gate
   ---
-  duration_ms: 1.910422
+  duration_ms: 3.630745
   type: 'test'
   ...
 # Subtest: Signature Profile folder provisioning is self-only unless the caller is an active admin
 ok 215 - Signature Profile folder provisioning is self-only unless the caller is an active admin
   ---
-  duration_ms: 0.730627
+  duration_ms: 1.408871
   type: 'test'
   ...
 # Subtest: Signature Profile assets are readable only by their owner
 ok 216 - Signature Profile assets are readable only by their owner
   ---
-  duration_ms: 0.250543
+  duration_ms: 0.487607
   type: 'test'
   ...
 # Subtest: controlled documents require matching document metadata and document-level authority
 ok 217 - controlled documents require matching document metadata and document-level authority
   ---
-  duration_ms: 1.414744
+  duration_ms: 1.809757
   type: 'test'
   ...
 # Subtest: an assigned envelope participant can read the exact controlled source document
 ok 218 - an assigned envelope participant can read the exact controlled source document
   ---
-  duration_ms: 0.144484
+  duration_ms: 0.273659
   type: 'test'
   ...
 # Subtest: signed workflow PDFs require the matching document, envelope, and participant identity
 ok 219 - signed workflow PDFs require the matching document, envelope, and participant identity
   ---
-  duration_ms: 0.257703
+  duration_ms: 0.455257
   type: 'test'
   ...
 # Subtest: signed-document upload is restricted to the authenticated assigned action signer
 ok 220 - signed-document upload is restricted to the authenticated assigned action signer
   ---
-  duration_ms: 0.210594
+  duration_ms: 0.369428
   type: 'test'
   ...
 # Subtest: Signature Portal gateway routes are wired to the fail-closed authorization policies
 ok 221 - Signature Portal gateway routes are wired to the fail-closed authorization policies
   ---
-  duration_ms: 1.265673
+  duration_ms: 2.147396
   type: 'test'
   ...
 # Subtest: signature-complete atomic commit sends valid document and audit writes
 ok 222 - signature-complete atomic commit sends valid document and audit writes
   ---
-  duration_ms: 56.439608
+  duration_ms: 142.128075
   type: 'test'
   ...
 # Subtest: owner and administrator remain authorized when Drive description documentId is mismatched
 ok 223 - owner and administrator remain authorized when Drive description documentId is mismatched
   ---
-  duration_ms: 1.7149
+  duration_ms: 2.927306
   type: 'test'
   ...
 # Subtest: current signer is allowed to read the signature asset
 ok 224 - current signer is allowed to read the signature asset
   ---
-  duration_ms: 0.2151
+  duration_ms: 0.282616
   type: 'test'
   ...
 # Subtest: earlier signer is allowed only after completing their turn
 ok 225 - earlier signer is allowed only after completing their turn
   ---
-  duration_ms: 1.228597
+  duration_ms: 1.54936
   type: 'test'
   ...
 # Subtest: later signer and stranger are refused without leaking future assignment data
 ok 226 - later signer and stranger are refused without leaking future assignment data
   ---
-  duration_ms: 0.136062
+  duration_ms: 0.165889
   type: 'test'
   ...
 # Subtest: requested Drive file ID must match the documents record
 ok 227 - requested Drive file ID must match the documents record
   ---
-  duration_ms: 0.169582
+  duration_ms: 0.307301
   type: 'test'
   ...
 # Subtest: envelope and document record identities are required
 ok 228 - envelope and document record identities are required
   ---
-  duration_ms: 0.106589
+  duration_ms: 0.237952
   type: 'test'
   ...
 # Subtest: completed gateway signing updates portal envelope, appends trail event, and exposes lifecycle-compatible fields
 ok 229 - completed gateway signing updates portal envelope, appends trail event, and exposes lifecycle-compatible fields
   ---
-  duration_ms: 1.225823
+  duration_ms: 2.389165
   type: 'test'
   ...
 # Subtest: per-signer and completion audit events use stable IDs and are idempotent
 ok 230 - per-signer and completion audit events use stable IDs and are idempotent
   ---
-  duration_ms: 2.519327
+  duration_ms: 3.408221
   type: 'test'
   ...
 # Subtest: missing portal envelope rejects mirror write so caller can log it
 ok 231 - missing portal envelope rejects mirror write so caller can log it
   ---
-  duration_ms: 0.516038
+  duration_ms: 0.885578
   type: 'test'
   ...
 # Subtest: mirror fails once, records Pending, then resync succeeds
 ok 232 - mirror fails once, records Pending, then resync succeeds
   ---
-  duration_ms: 150.359674
+  duration_ms: 217.670638
   type: 'test'
   ...
 # Subtest: an authenticated member or employee may provision only their own Signature Profile folder
 ok 233 - an authenticated member or employee may provision only their own Signature Profile folder
   ---
-  duration_ms: 1.013718
+  duration_ms: 0.9081
   type: 'test'
   ...
 # Subtest: an active administrator may provision another profile's folder
 ok 234 - an active administrator may provision another profile's folder
   ---
-  duration_ms: 0.166137
+  duration_ms: 0.144308
   type: 'test'
   ...
 # Subtest: missing actor or target and non-boolean administrator claims fail closed
 ok 235 - missing actor or target and non-boolean administrator claims fail closed
   ---
-  duration_ms: 0.123243
+  duration_ms: 0.148777
   type: 'test'
   ...
 # Subtest: signature profile folder provisioning uses a defined active-admin authorization result
 ok 236 - signature profile folder provisioning uses a defined active-admin authorization result
   ---
-  duration_ms: 0.57817
+  duration_ms: 1.433888
   type: 'test'
   ...
 # Subtest: controlled trust state machine permits the intended happy path
 ok 237 - controlled trust state machine permits the intended happy path
   ---
-  duration_ms: 0.924755
+  duration_ms: 1.761177
   type: 'test'
   ...
 # Subtest: controlled trust state machine rejects unsafe skips and reversals
 ok 238 - controlled trust state machine rejects unsafe skips and reversals
   ---
-  duration_ms: 0.471481
+  duration_ms: 1.056045
   type: 'test'
   ...
 # Subtest: terminal states cannot transition
 ok 239 - terminal states cannot transition
   ---
-  duration_ms: 0.218085
+  duration_ms: 0.593103
   type: 'test'
   ...
 # Subtest: completion failure permits controlled retry transitions
 ok 240 - completion failure permits controlled retry transitions
   ---
-  duration_ms: 0.118767
+  duration_ms: 0.350573
   type: 'test'
   ...
 # Subtest: identity normalization is deterministic and does not duplicate roles
 ok 241 - identity normalization is deterministic and does not duplicate roles
   ---
-  duration_ms: 0.754081
+  duration_ms: 1.44543
   type: 'test'
   ...
 # Subtest: authority assertion requires authenticated identity and authoritative reference
 ok 242 - authority assertion requires authenticated identity and authoritative reference
   ---
-  duration_ms: 0.254388
+  duration_ms: 0.453705
   type: 'test'
   ...
 # Subtest: authority assertion accepts only declared authority sources
 ok 243 - authority assertion accepts only declared authority sources
   ---
-  duration_ms: 0.127099
+  duration_ms: 0.350412
   type: 'test'
   ...
 # Subtest: authority assertion rejects malformed validity windows
 ok 244 - authority assertion rejects malformed validity windows
   ---
-  duration_ms: 0.161701
+  duration_ms: 0.34395
   type: 'test'
   ...
 # Subtest: active authority is evaluated against its effective window
 ok 245 - active authority is evaluated against its effective window
   ---
-  duration_ms: 0.55814
+  duration_ms: 0.944798
   type: 'test'
   ...
 # Subtest: signature lifecycle allows the protected happy path
 ok 246 - signature lifecycle allows the protected happy path
   ---
-  duration_ms: 0.701863
+  duration_ms: 1.324754
   type: 'test'
   ...
 # Subtest: signature lifecycle rejects a signing bypass
 ok 247 - signature lifecycle rejects a signing bypass
   ---
-  duration_ms: 0.375369
+  duration_ms: 0.732843
   type: 'test'
   ...
 # Subtest: authority assertion requires an institutional identity and source
 ok 248 - authority assertion requires an institutional identity and source
   ---
-  duration_ms: 1.749682
+  duration_ms: 3.38059
   type: 'test'
   ...
 # Subtest: signature draft save is routed through the authenticated Worker
 ok 249 - signature draft save is routed through the authenticated Worker
   ---
-  duration_ms: 0.944234
+  duration_ms: 1.513185
   type: 'test'
   ...
 # Subtest: Worker reconciliation reports the previous Drive ID and verifies the repaired value
 ok 250 - Worker reconciliation reports the previous Drive ID and verifies the repaired value
   ---
-  duration_ms: 0.196973
+  duration_ms: 0.265734
   type: 'test'
   ...
 # Subtest: new controlled uploads verify the exact canonical document ID in Drive metadata
 ok 251 - new controlled uploads verify the exact canonical document ID in Drive metadata
   ---
-  duration_ms: 0.128381
+  duration_ms: 0.245336
   type: 'test'
   ...
 # Subtest: existing Firestore rules are unchanged and their actual-data gate remains explicit
 ok 252 - existing Firestore rules are unchanged and their actual-data gate remains explicit
   ---
-  duration_ms: 0.806189
+  duration_ms: 1.035066
   type: 'test'
   ...
 # Subtest: owner, sender and administrator receive the complete workflow
 ok 253 - owner, sender and administrator receive the complete workflow
   ---
-  duration_ms: 0.938326
+  duration_ms: 1.802814
   type: 'test'
   ...
 # Subtest: earlier signer sees own assignments but not later signers
 ok 254 - earlier signer sees own assignments but not later signers
   ---
-  duration_ms: 0.925617
+  duration_ms: 2.560915
   type: 'test'
   ...
 # Subtest: current signer sees own fields and already-applied earlier signatures only
 ok 255 - current signer sees own fields and already-applied earlier signatures only
   ---
-  duration_ms: 1.048519
+  duration_ms: 1.591284
   type: 'test'
   ...
 # Subtest: later signer receives their own assignment but not the next signer's data
 ok 256 - later signer receives their own assignment but not the next signer's data
   ---
-  duration_ms: 0.328979
+  duration_ms: 0.49436
   type: 'test'
   ...
 # Subtest: stranger receives no envelope data
 ok 257 - stranger receives no envelope data
   ---
-  duration_ms: 0.22154
+  duration_ms: 0.432535
   type: 'test'
   ...
 # Subtest: external signer tokens remain usable without an authenticated user
 ok 258 - external signer tokens remain usable without an authenticated user
   ---
-  duration_ms: 0.722375
+  duration_ms: 1.350864
   type: 'test'
   ...
 # Subtest: UID-bound signer requires the matching authenticated UID
 ok 259 - UID-bound signer requires the matching authenticated UID
   ---
-  duration_ms: 0.126368
+  duration_ms: 0.229878
   type: 'test'
   ...
 # Subtest: UID-bound signer comparison is exact and cannot be bypassed by email alone
 ok 260 - UID-bound signer comparison is exact and cannot be bypassed by email alone
   ---
-  duration_ms: 0.126889
+  duration_ms: 0.214469
   type: 'test'
   ...
 # Subtest: staging sign rejects a context without signing-authority verification
 ok 261 - staging sign rejects a context without signing-authority verification
   ---
-  duration_ms: 6.188539
+  duration_ms: 13.423025
   type: 'test'
   ...
 # Subtest: social status accepts the Worker verifier's user_id claim as the authenticated UID
 ok 262 - social status accepts the Worker verifier's user_id claim as the authenticated UID
   ---
-  duration_ms: 0.770165
+  duration_ms: 0.913921
   type: 'test'
   ...
 # Subtest: social status still rejects requests without any authenticated UID
 ok 263 - social status still rejects requests without any authenticated UID
   ---
-  duration_ms: 0.156263
+  duration_ms: 0.205582
   type: 'test'
   ...
 # Subtest: C-G13 staging custody resolves the signer key through the Cloudflare-style environment binding
 ok 264 - C-G13 staging custody resolves the signer key through the Cloudflare-style environment binding
   ---
-  duration_ms: 31.14857
+  duration_ms: 48.452835
   type: 'test'
   ...
 # Subtest: C-G13R non-extractable Cloudflare-style public custody produces independently verifiable persisted evidence
 ok 265 - C-G13R non-extractable Cloudflare-style public custody produces independently verifiable persisted evidence
   ---
-  duration_ms: 29.534946
+  duration_ms: 47.861026
   type: 'test'
   ...
 # Subtest: C-G14 through C-G20 staging transaction persists and independently verifies cryptographic evidence
 ok 266 - C-G14 through C-G20 staging transaction persists and independently verifies cryptographic evidence
   ---
-  duration_ms: 16.944223
+  duration_ms: 32.130483
   type: 'test'
   ...
 # Subtest: C-G19 staging transaction rejects tampered persisted cryptographic payload
 ok 267 - C-G19 staging transaction rejects tampered persisted cryptographic payload
   ---
-  duration_ms: 9.85662
+  duration_ms: 16.468755
   type: 'test'
   ...
 # Subtest: C-G21 authenticated Gateway status and evidence retrieval bind the completed envelope, signer, PDF hash, and audit chain
 ok 268 - C-G21 authenticated Gateway status and evidence retrieval bind the completed envelope, signer, PDF hash, and audit chain
   ---
-  duration_ms: 10.269259
+  duration_ms: 16.239595
   type: 'test'
   ...
 # Subtest: C-G22 evidence retrieval fails closed when persisted cryptographic evidence is tampered
 ok 269 - C-G22 evidence retrieval fails closed when persisted cryptographic evidence is tampered
   ---
-  duration_ms: 11.597995
+  duration_ms: 22.971014
   type: 'test'
   ...
 # Subtest: staging Drive storage requires a dedicated root folder
 ok 270 - staging Drive storage requires a dedicated root folder
   ---
-  duration_ms: 2.069848
+  duration_ms: 3.147777
   type: 'test'
   ...
 # Subtest: Wrangler staging project and application URLs are isolated from production
 ok 271 - Wrangler staging project and application URLs are isolated from production
   ---
-  duration_ms: 0.434135
+  duration_ms: 0.640892
   type: 'test'
   ...
 # Subtest: staging workflow enforces the approved Firebase project, app origin, scoped credentials, and dedicated KV namespace
 ok 272 - staging workflow enforces the approved Firebase project, app origin, scoped credentials, and dedicated KV namespace
   ---
-  duration_ms: 0.888982
+  duration_ms: 1.417207
   type: 'test'
   ...
 # Subtest: staging users/me connection check returns HTTP 200 without exposing credentials
 ok 273 - staging users/me connection check returns HTTP 200 without exposing credentials
   ---
-  duration_ms: 23.280267
+  duration_ms: 40.141631
   type: 'test'
   ...
 # Subtest: one staging page can be read with editable fields
 ok 274 - one staging page can be read with editable fields
   ---
-  duration_ms: 2.901936
+  duration_ms: 3.722616
   type: 'test'
   ...
 # Subtest: an edit saves a snapshot and one-click restore returns all allowed fields exactly
 ok 275 - an edit saves a snapshot and one-click restore returns all allowed fields exactly
   ---
-  duration_ms: 8.416368
+  duration_ms: 10.073424
   type: 'test'
   ...
 # Subtest: the registered Communication & Media authority can access the website connection check
 ok 276 - the registered Communication & Media authority can access the website connection check
   ---
-  duration_ms: 1.015661
+  duration_ms: 1.570973
   type: 'test'
   ...
 # Subtest: a user without a Communication & Media role or active admin profile is refused
 ok 277 - a user without a Communication & Media role or active admin profile is refused
   ---
-  duration_ms: 1.078695
+  duration_ms: 1.079649
   type: 'test'
   ...
 # Subtest: production hostname with a staging path is rejected before any WordPress request
 ok 278 - production hostname with a staging path is rejected before any WordPress request
   ---
-  duration_ms: 0.505772
+  duration_ms: 1.180015
   type: 'test'
   ...
 # Subtest: cPanel Fileman reads use the relative path for the exact staging document root
 ok 279 - cPanel Fileman reads use the relative path for the exact staging document root
   ---
-  duration_ms: 0.967398
+  duration_ms: 2.159328
   type: 'test'
   ...
 # Subtest: cPanel file access refuses any document root other than the exact staging directory
 ok 280 - cPanel file access refuses any document root other than the exact staging directory
   ---
-  duration_ms: 0.345414
+  duration_ms: 0.804417
   type: 'test'
   ...
 # Subtest: audit records and application logs never contain the Worker credential
 ok 281 - audit records and application logs never contain the Worker credential
   ---
-  duration_ms: 1.046086
+  duration_ms: 3.033094
   type: 'test'
   ...
 # Subtest: editing is refused when WordPress has no current revision ID
 ok 282 - editing is refused when WordPress has no current revision ID
   ---
-  duration_ms: 1.479651
+  duration_ms: 2.442054
   type: 'test'
   ...
 # Subtest: the page editor rejects plugins, themes, users, settings and other non-content fields
 ok 283 - the page editor rejects plugins, themes, users, settings and other non-content fields
   ---
-  duration_ms: 3.162118
+  duration_ms: 0.587343
   type: 'test'
   ...
 # Subtest: WordPress items that advertise a production-host link are refused
 ok 284 - WordPress items that advertise a production-host link are refused
   ---
-  duration_ms: 0.889654
+  duration_ms: 1.22548
   type: 'test'
   ...
 # Subtest: WordPress Administrator credentials are rejected even when authentication returns HTTP 200
 ok 285 - WordPress Administrator credentials are rejected even when authentication returns HTTP 200
   ---
-  duration_ms: 0.574554
+  duration_ms: 1.083465
   type: 'test'
   ...
 # Subtest: authenticated staging image upload accepts safe image types and records an audit event
 ok 286 - authenticated staging image upload accepts safe image types and records an audit event
   ---
-  duration_ms: 1.159725
+  duration_ms: 2.022734
   type: 'test'
   ...
 # Subtest: image upload rejects unsupported formats and oversized payloads before WordPress writes
 ok 287 - image upload rejects unsupported formats and oversized payloads before WordPress writes
   ---
-  duration_ms: 81.151409
+  duration_ms: 130.325396
   type: 'test'
   ...
 1..287
@@ -1854,7 +1854,7 @@ ok 287 - image upload rejects unsupported formats and oversized payloads before 
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 2582.868778
+# duration_ms 4184.140222
 
 ## main failures
 
@@ -1869,679 +1869,679 @@ TAP version 13
 # Subtest: flag off leaves migrated routes untouched
 ok 1 - flag off leaves migrated routes untouched
   ---
-  duration_ms: 17.331028
+  duration_ms: 33.008839
   type: 'test'
   ...
 # Subtest: password state starts in FIRST stage with three attempts
 ok 2 - password state starts in FIRST stage with three attempts
   ---
-  duration_ms: 8.170241
+  duration_ms: 16.730235
   type: 'test'
   ...
 # Subtest: three failures lock the account for five minutes
 ok 3 - three failures lock the account for five minutes
   ---
-  duration_ms: 5.206263
+  duration_ms: 28.173715
   type: 'test'
   ...
 # Subtest: clear resets suspended state back to FIRST
 ok 4 - clear resets suspended state back to FIRST
   ---
-  duration_ms: 18.774806
+  duration_ms: 14.586975
   type: 'test'
   ...
 # Subtest: next document reference requires Firebase authentication
 ok 5 - next document reference requires Firebase authentication
   ---
-  duration_ms: 0.649917
+  duration_ms: 1.126356
   type: 'test'
   ...
 # Subtest: next document references increment atomically in the dedicated DO
 ok 6 - next document references increment atomically in the dedicated DO
   ---
-  duration_ms: 3.029677
+  duration_ms: 4.968681
   type: 'test'
   ...
 # Subtest: invalid email is rejected without creating state
 ok 7 - invalid email is rejected without creating state
   ---
-  duration_ms: 0.42363
+  duration_ms: 1.254941
   type: 'test'
   ...
 # Subtest: creates, reads, updates with version guard, lists and deletes records
 ok 8 - creates, reads, updates with version guard, lists and deletes records
   ---
-  duration_ms: 22.36843
+  duration_ms: 41.896889
   type: 'test'
   ...
 # Subtest: rejects missing storage configuration instead of using ephemeral fallback
 ok 9 - rejects missing storage configuration instead of using ephemeral fallback
   ---
-  duration_ms: 0.232025
+  duration_ms: 0.309916
   type: 'test'
   ...
 # Subtest: validates collection names, record IDs and patches
 ok 10 - validates collection names, record IDs and patches
   ---
-  duration_ms: 0.297493
+  duration_ms: 0.570154
   type: 'test'
   ...
 # Subtest: editorial routes require authenticated active role
 ok 11 - editorial routes require authenticated active role
   ---
-  duration_ms: 30.683674
+  duration_ms: 40.000144
   type: 'test'
   ...
 # Subtest: create, submit, and approve require a distinct approver
 ok 12 - create, submit, and approve require a distinct approver
   ---
-  duration_ms: 2.524024
+  duration_ms: 4.23997
   type: 'test'
   ...
 # Subtest: pause-all defaults to paused and only admin may change it
 ok 13 - pause-all defaults to paused and only admin may change it
   ---
-  duration_ms: 0.816214
+  duration_ms: 1.281884
   type: 'test'
   ...
 # Subtest: audit log is approver-only
 ok 14 - audit log is approver-only
   ---
-  duration_ms: 0.257994
+  duration_ms: 0.455291
   type: 'test'
   ...
 # Subtest: social publishing router is included and manual export never publishes
 ok 15 - social publishing router is included and manual export never publishes
   ---
-  duration_ms: 1.259723
+  duration_ms: 2.015988
   type: 'test'
   ...
 # Subtest: Member: unauthenticated and wrong UID cannot open an institutional signing link
 ok 16 - Member: unauthenticated and wrong UID cannot open an institutional signing link
   ---
-  duration_ms: 16.613044
+  duration_ms: 28.514327
   type: 'test'
   ...
 # Subtest: Member: matching Firebase UID can open and retrieve the signing PDF
 ok 17 - Member: matching Firebase UID can open and retrieve the signing PDF
   ---
-  duration_ms: 2.102438
+  duration_ms: 4.853329
   type: 'test'
   ...
 # Subtest: Member: matching UID can complete its signing action and the envelope advances
 ok 18 - Member: matching UID can complete its signing action and the envelope advances
   ---
-  duration_ms: 5.607902
+  duration_ms: 4.318825
   type: 'test'
   ...
 # Subtest: Employee: matching Firebase UID is accepted; email alone is not an identity substitute
 ok 19 - Employee: matching Firebase UID is accepted; email alone is not an identity substitute
   ---
-  duration_ms: 1.253413
+  duration_ms: 1.898222
   type: 'test'
   ...
 # Subtest: Employee: authenticated router path passes the verified UID to open and submit
 ok 20 - Employee: authenticated router path passes the verified UID to open and submit
   ---
-  duration_ms: 18.305408
+  duration_ms: 42.337079
   type: 'test'
   ...
 # Subtest: UID-bound signer can decline only with the matching authenticated UID
 ok 21 - UID-bound signer can decline only with the matching authenticated UID
   ---
-  duration_ms: 2.230157
+  duration_ms: 7.113765
   type: 'test'
   ...
 # Subtest: External token signer remains usable without Firebase authentication
 ok 22 - External token signer remains usable without Firebase authentication
   ---
-  duration_ms: 1.886045
+  duration_ms: 3.081594
   type: 'test'
   ...
 # Subtest: Gateway open returns only fields assigned to the authenticated signer
 ok 23 - Gateway open returns only fields assigned to the authenticated signer
   ---
-  duration_ms: 1.482915
+  duration_ms: 2.635614
   type: 'test'
   ...
 # Subtest: Gateway signing refuses missing required assigned fields before mutating the signer
 ok 24 - Gateway signing refuses missing required assigned fields before mutating the signer
   ---
-  duration_ms: 1.787679
+  duration_ms: 2.887553
   type: 'test'
   ...
 # Subtest: Gateway signing stores only the authenticated signer's assigned field values
 ok 25 - Gateway signing stores only the authenticated signer's assigned field values
   ---
-  duration_ms: 3.696158
+  duration_ms: 8.279054
   type: 'test'
   ...
 # Subtest: Gateway idempotent signing retry still requires the invited authenticated UID
 ok 26 - Gateway idempotent signing retry still requires the invited authenticated UID
   ---
-  duration_ms: 5.570265
+  duration_ms: 4.173064
   type: 'test'
   ...
 # Subtest: Gateway completed-PDF verification accepts the exact hash and rejects tampered bytes
 ok 27 - Gateway completed-PDF verification accepts the exact hash and rejects tampered bytes
   ---
-  duration_ms: 1.265743
+  duration_ms: 6.243206
   type: 'test'
   ...
 # Subtest: Gateway completed-PDF verification requires the invited UID even for a valid hash
 ok 28 - Gateway completed-PDF verification requires the invited UID even for a valid hash
   ---
-  duration_ms: 1.165293
+  duration_ms: 2.834203
   type: 'test'
   ...
 # Subtest: Production-mode Gateway signing fails closed without server-side Member/Employee authority verification
 ok 29 - Production-mode Gateway signing fails closed without server-side Member/Employee authority verification
   ---
-  duration_ms: 0.940209
+  duration_ms: 2.267208
   type: 'test'
   ...
 # Subtest: Production-mode Gateway signing records the server-verified authority in the audit chain
 ok 30 - Production-mode Gateway signing records the server-verified authority in the audit chain
   ---
-  duration_ms: 3.496471
+  duration_ms: 6.786316
   type: 'test'
   ...
 # Subtest: signature application without explicit confirmation is rejected
 ok 31 - signature application without explicit confirmation is rejected
   ---
-  duration_ms: 2.886893
+  duration_ms: 6.566558
   type: 'test'
   ...
 # Subtest: confirmed signature is rendered on the saved third-page field position
 ok 32 - confirmed signature is rendered on the saved third-page field position
   ---
-  duration_ms: 84.735521
+  duration_ms: 159.708794
   type: 'test'
   ...
 # Subtest: a non-assigned signer cannot apply another officer's signature field
 ok 33 - a non-assigned signer cannot apply another officer's signature field
   ---
-  duration_ms: 2.753165
+  duration_ms: 7.694916
   type: 'test'
   ...
 # Subtest: Gateway open keeps later signers' assignments hidden while retaining the assigned field page
 ok 34 - Gateway open keeps later signers' assignments hidden while retaining the assigned field page
   ---
-  duration_ms: 1.313523
+  duration_ms: 2.289718
   type: 'test'
   ...
 # Subtest: later signer sees earlier confirmed signature but never an unsigned later assignment
 ok 35 - later signer sees earlier confirmed signature but never an unsigned later assignment
   ---
-  duration_ms: 1.263369
+  duration_ms: 2.07962
   type: 'test'
   ...
 # Subtest: upload validation reports missing document type instead of disabling the submit action
 ok 36 - upload validation reports missing document type instead of disabling the submit action
   ---
-  duration_ms: 0.906659
+  duration_ms: 1.6714
   type: 'test'
   ...
 # Subtest: upload validation reports missing file with a direct next step
 ok 37 - upload validation reports missing file with a direct next step
   ---
-  duration_ms: 0.193167
+  duration_ms: 0.319599
   type: 'test'
   ...
 # Subtest: unauthenticated upload is rejected before upload work begins
 ok 38 - unauthenticated upload is rejected before upload work begins
   ---
-  duration_ms: 0.102763
+  duration_ms: 0.256169
   type: 'test'
   ...
 # Subtest: unsupported document types are rejected
 ok 39 - unsupported document types are rejected
   ---
-  duration_ms: 1.261246
+  duration_ms: 1.392718
   type: 'test'
   ...
 # Subtest: Administrator documents remain blocked without special permission
 ok 40 - Administrator documents remain blocked without special permission
   ---
-  duration_ms: 0.146598
+  duration_ms: 0.251758
   type: 'test'
   ...
 # Subtest: Administrator documents are allowed through UI validation when permission is provided
 ok 41 - Administrator documents are allowed through UI validation when permission is provided
   ---
-  duration_ms: 0.119347
+  duration_ms: 0.22356
   type: 'test'
   ...
 # Subtest: empty and oversized files remain blocked
 ok 42 - empty and oversized files remain blocked
   ---
-  duration_ms: 0.113329
+  duration_ms: 0.234827
   type: 'test'
   ...
 # Subtest: unsupported file formats remain blocked
 ok 43 - unsupported file formats remain blocked
   ---
-  duration_ms: 0.250482
+  duration_ms: 0.408019
   type: 'test'
   ...
 # Subtest: valid public governance document passes validation
 ok 44 - valid public governance document passes validation
   ---
-  duration_ms: 0.292725
+  duration_ms: 0.518883
   type: 'test'
   ...
 # Subtest: C-G01 key architecture: asymmetric P-256 key pair has an opaque private key boundary
 ok 45 - C-G01 key architecture: asymmetric P-256 key pair has an opaque private key boundary
   ---
-  duration_ms: 15.976449
+  duration_ms: 18.553005
   type: 'test'
   ...
 # Subtest: C-G02 canonical signing payload is deterministic and contains the exact signed fields
 ok 46 - C-G02 canonical signing payload is deterministic and contains the exact signed fields
   ---
-  duration_ms: 6.92483
+  duration_ms: 3.534264
   type: 'test'
   ...
 # Subtest: C-G03 cryptographic signing produces an actual asymmetric signature
 ok 47 - C-G03 cryptographic signing produces an actual asymmetric signature
   ---
-  duration_ms: 5.272232
+  duration_ms: 5.417086
   type: 'test'
   ...
 # Subtest: C-G04 cryptographic verification independently verifies the signature
 ok 48 - C-G04 cryptographic verification independently verifies the signature
   ---
-  duration_ms: 5.840027
+  duration_ms: 5.075525
   type: 'test'
   ...
 # Subtest: C-G05 signer binding rejects verification under another institutional identity
 ok 49 - C-G05 signer binding rejects verification under another institutional identity
   ---
-  duration_ms: 1.986355
+  duration_ms: 2.849828
   type: 'test'
   ...
 # Subtest: C-G06 document binding is to the exact completed-document SHA-256
 ok 50 - C-G06 document binding is to the exact completed-document SHA-256
   ---
-  duration_ms: 4.28921
+  duration_ms: 6.37767
   type: 'test'
   ...
 # Subtest: C-G07 changing signed document metadata or payload invalidates verification
 ok 51 - C-G07 changing signed document metadata or payload invalidates verification
   ---
-  duration_ms: 3.538758
+  duration_ms: 1.941682
   type: 'test'
   ...
 # Subtest: C-G08 cryptographic evidence persists independently beside the completed document
 ok 52 - C-G08 cryptographic evidence persists independently beside the completed document
   ---
-  duration_ms: 2.269941
+  duration_ms: 4.690861
   type: 'test'
   ...
 # Subtest: C-G09 verification after persistence/retrieval remains cryptographically valid
 ok 53 - C-G09 verification after persistence/retrieval remains cryptographically valid
   ---
-  duration_ms: 3.151938
+  duration_ms: 4.967317
   type: 'test'
   ...
 # Subtest: C-G10 cryptographic failure rolls back partial evidence and never leaves SEALED state
 ok 54 - C-G10 cryptographic failure rolls back partial evidence and never leaves SEALED state
   ---
-  duration_ms: 2.842899
+  duration_ms: 5.801374
   type: 'test'
   ...
 # Subtest: C-G11 retries are idempotent and cannot create conflicting evidence
 ok 55 - C-G11 retries are idempotent and cannot create conflicting evidence
   ---
-  duration_ms: 2.209687
+  duration_ms: 10.158831
   type: 'test'
   ...
 # Subtest: C-G12 cryptographic operation emits verifiable audit evidence
 ok 56 - C-G12 cryptographic operation emits verifiable audit evidence
   ---
-  duration_ms: 2.461691
+  duration_ms: 4.042459
   type: 'test'
   ...
 # Subtest: Trial keeps its staging route in production builds while staging builds use one isolated gateway
 ok 57 - Trial keeps its staging route in production builds while staging builds use one isolated gateway
   ---
-  duration_ms: 0.749535
+  duration_ms: 1.519697
   type: 'test'
   ...
 # Subtest: multipart request uses actual CRLF framing rather than backslash literals
 ok 58 - multipart request uses actual CRLF framing rather than backslash literals
   ---
-  duration_ms: 0.821942
+  duration_ms: 1.310157
   type: 'test'
   ...
 # Subtest: restricted upload is denied server-side without restricted permission
 ok 59 - restricted upload is denied server-side without restricted permission
   ---
-  duration_ms: 33.478176
+  duration_ms: 44.961753
   type: 'test'
   ...
 # Subtest: download requires documentId even when fileId is supplied
 ok 60 - download requires documentId even when fileId is supplied
   ---
-  duration_ms: 0.851456
+  duration_ms: 1.183031
   type: 'test'
   ...
 # Subtest: wrong fileId is rejected against registered document
 ok 61 - wrong fileId is rejected against registered document
   ---
-  duration_ms: 0.92805
+  duration_ms: 1.560203
   type: 'test'
   ...
 # Subtest: post-signature cannot be reached before signed state
 ok 62 - post-signature cannot be reached before signed state
   ---
-  duration_ms: 2.963408
+  duration_ms: 1.287646
   type: 'test'
   ...
 # Subtest: share is restricted to owner or administrator
 ok 63 - share is restricted to owner or administrator
   ---
-  duration_ms: 1.091564
+  duration_ms: 2.090089
   type: 'test'
   ...
 # Subtest: multipart body uses real CRLF separators and preserves binary payload
 ok 64 - multipart body uses real CRLF separators and preserves binary payload
   ---
-  duration_ms: 0.199877
+  duration_ms: 0.490021
   type: 'test'
   ...
 # Subtest: upload rolls back Drive file when atomic document/audit commit fails
 ok 65 - upload rolls back Drive file when atomic document/audit commit fails
   ---
-  duration_ms: 15.523625
+  duration_ms: 17.449202
   type: 'test'
   ...
 # Subtest: successful upload atomically writes document registry and audit event
 ok 66 - successful upload atomically writes document registry and audit event
   ---
-  duration_ms: 3.873933
+  duration_ms: 4.166562
   type: 'test'
   ...
 # Subtest: download retrieves stored bytes and verifies the registered SHA-256 digest
 ok 67 - download retrieves stored bytes and verifies the registered SHA-256 digest
   ---
-  duration_ms: 2.405668
+  duration_ms: 2.844703
   type: 'test'
   ...
 # Subtest: download rejects retrieved bytes whose SHA-256 differs from the register
 ok 68 - download rejects retrieved bytes whose SHA-256 differs from the register
   ---
-  duration_ms: 1.878324
+  duration_ms: 2.810258
   type: 'test'
   ...
 # Subtest: failed Drive rollback is explicitly recorded and reported after atomic commit failure
 ok 69 - failed Drive rollback is explicitly recorded and reported after atomic commit failure
   ---
-  duration_ms: 1.66101
+  duration_ms: 2.838872
   type: 'test'
   ...
 # Subtest: translated derivative inherits the source classification and all access grants server-side
 ok 70 - translated derivative inherits the source classification and all access grants server-side
   ---
-  duration_ms: 1.471158
+  duration_ms: 2.771998
   type: 'test'
   ...
 # Subtest: translated derivative upload is denied if client attempts to lower source classification
 ok 71 - translated derivative upload is denied if client attempts to lower source classification
   ---
-  duration_ms: 0.667382
+  duration_ms: 1.196817
   type: 'test'
   ...
 # Subtest: active employee may upload internal finance document within department
 ok 72 - active employee may upload internal finance document within department
   ---
-  duration_ms: 2.418167
+  duration_ms: 3.462142
   type: 'test'
   ...
 # Subtest: finance employee cannot upload restricted document without explicit permission
 ok 73 - finance employee cannot upload restricted document without explicit permission
   ---
-  duration_ms: 0.213037
+  duration_ms: 0.344511
   type: 'test'
   ...
 # Subtest: administrator may upload restricted administrator document
 ok 74 - administrator may upload restricted administrator document
   ---
-  duration_ms: 0.107991
+  duration_ms: 0.223486
   type: 'test'
   ...
 # Subtest: confidential document is readable by owner
 ok 75 - confidential document is readable by owner
   ---
-  duration_ms: 0.545061
+  duration_ms: 0.812792
   type: 'test'
   ...
 # Subtest: confidential document is denied to unrelated department
 ok 76 - confidential document is denied to unrelated department
   ---
-  duration_ms: 0.160319
+  duration_ms: 0.326087
   type: 'test'
   ...
 # Subtest: administrator can read controlled document
 ok 77 - administrator can read controlled document
   ---
-  duration_ms: 0.138826
+  duration_ms: 0.224378
   type: 'test'
   ...
 # Subtest: workflow follows working -> pending signature -> signed -> post signature -> final archive
 ok 78 - workflow follows working -> pending signature -> signed -> post signature -> final archive
   ---
-  duration_ms: 0.323081
+  duration_ms: 0.458232
   type: 'test'
   ...
 # Subtest: invalid workflow transition is denied
 ok 79 - invalid workflow transition is denied
   ---
-  duration_ms: 0.130334
+  duration_ms: 0.245757
   type: 'test'
   ...
 # Subtest: document record contains owner and integrity fields
 ok 80 - document record contains owner and integrity fields
   ---
-  duration_ms: 0.844066
+  duration_ms: 1.293878
   type: 'test'
   ...
 # Subtest: finance document accepts spreadsheet format required for financial schedules
 ok 81 - finance document accepts spreadsheet format required for financial schedules
   ---
-  duration_ms: 0.389209
+  duration_ms: 0.67713
   type: 'test'
   ...
 # Subtest: finance document accepts PDF format
 ok 82 - finance document accepts PDF format
   ---
-  duration_ms: 0.16805
+  duration_ms: 0.284089
   type: 'test'
   ...
 # Subtest: finance document rejects presentation format
 ok 83 - finance document rejects presentation format
   ---
-  duration_ms: 0.109783
+  duration_ms: 0.175367
   type: 'test'
   ...
 # Subtest: research document accepts presentation format
 ok 84 - research document accepts presentation format
   ---
-  duration_ms: 0.064716
+  duration_ms: 0.196866
   type: 'test'
   ...
 # Subtest: other document type supports broader formats
 ok 85 - other document type supports broader formats
   ---
-  duration_ms: 0.057025
+  duration_ms: 0.16152
   type: 'test'
   ...
 # Subtest: Gate 4: physical PDF upload validates and stores a retrievable document
 ok 86 - Gate 4: physical PDF upload validates and stores a retrievable document
   ---
-  duration_ms: 46.323531
+  duration_ms: 93.755942
   type: 'test'
   ...
 # Subtest: Gate 4: multi-channel storage preserves every selected archive
 ok 87 - Gate 4: multi-channel storage preserves every selected archive
   ---
-  duration_ms: 16.465521
+  duration_ms: 18.778488
   type: 'test'
   ...
 # Subtest: Gate 4: interrupted/invalid physical upload is rejected before persistence
 ok 88 - Gate 4: interrupted/invalid physical upload is rejected before persistence
   ---
-  duration_ms: 5.347904
+  duration_ms: 6.021323
   type: 'test'
   ...
 # Subtest: Gate 4: storage failure rolls back already-written objects and metadata
 ok 89 - Gate 4: storage failure rolls back already-written objects and metadata
   ---
-  duration_ms: 10.720601
+  duration_ms: 13.582881
   type: 'test'
   ...
 # Subtest: Gate 4: rollback deletion failure creates durable cleanup work
 ok 90 - Gate 4: rollback deletion failure creates durable cleanup work
   ---
-  duration_ms: 10.623871
+  duration_ms: 14.688709
   type: 'test'
   ...
 # Subtest: Gate 4: duplicate document IDs do not overwrite an existing document
 ok 91 - Gate 4: duplicate document IDs do not overwrite an existing document
   ---
-  duration_ms: 13.242777
+  duration_ms: 13.958721
   type: 'test'
   ...
 # Subtest: Gate 4: retrieval detects stored-document tampering
 ok 92 - Gate 4: retrieval detects stored-document tampering
   ---
-  duration_ms: 12.596802
+  duration_ms: 14.050787
   type: 'test'
   ...
 # Subtest: 1 valid PDF stored in every archive
 ok 93 - 1 valid PDF stored in every archive
   ---
-  duration_ms: 83.924905
+  duration_ms: 117.241456
   type: 'test'
   ...
 # Subtest: 2 invalid PDF rejected
 ok 94 - 2 invalid PDF rejected
   ---
-  duration_ms: 8.851305
+  duration_ms: 6.299921
   type: 'test'
   ...
 # Subtest: 3 truncated PDF rejected
 ok 95 - 3 truncated PDF rejected
   ---
-  duration_ms: 17.099995
+  duration_ms: 18.253241
   type: 'test'
   ...
 # Subtest: 4 empty PDF rejected
 ok 96 - 4 empty PDF rejected
   ---
-  duration_ms: 1.229739
+  duration_ms: 2.336998
   type: 'test'
   ...
 # Subtest: 5 oversize PDF rejected
 ok 97 - 5 oversize PDF rejected
   ---
-  duration_ms: 45.27368
+  duration_ms: 65.455923
   type: 'test'
   ...
 # Subtest: 6 bad archive/classification rejected
 ok 98 - 6 bad archive/classification rejected
   ---
-  duration_ms: 26.555408
+  duration_ms: 34.390946
   type: 'test'
   ...
 # Subtest: 7 unauthenticated retrieval denied
 ok 99 - 7 unauthenticated retrieval denied
   ---
-  duration_ms: 17.805343
+  duration_ms: 24.887453
   type: 'test'
   ...
 # Subtest: 8 owner retrieval passes hash
 ok 100 - 8 owner retrieval passes hash
   ---
-  duration_ms: 20.943641
+  duration_ms: 25.180459
   type: 'test'
   ...
 # Subtest: 9 duplicate ID returns 409
 ok 101 - 9 duplicate ID returns 409
   ---
-  duration_ms: 27.772108
+  duration_ms: 30.948545
   type: 'test'
   ...
 # Subtest: 10 rollback releases ID
 ok 102 - 10 rollback releases ID
   ---
-  duration_ms: 16.94262
+  duration_ms: 18.273338
   type: 'test'
   ...
 # Subtest: 11 cleanup removes failed rollback
 ok 103 - 11 cleanup removes failed rollback
   ---
-  duration_ms: 14.998709
+  duration_ms: 19.123099
   type: 'test'
   ...
 # Subtest: 12 envelope owner authorization
 ok 104 - 12 envelope owner authorization
   ---
-  duration_ms: 11.18098
+  duration_ms: 14.660256
   type: 'test'
   ...
 # Subtest: 13 invitation transport required
 ok 105 - 13 invitation transport required
   ---
-  duration_ms: 10.322815
+  duration_ms: 13.86672
   type: 'test'
   ...
 # Subtest: 14 signing order enforced
 ok 106 - 14 signing order enforced
   ---
-  duration_ms: 22.721015
+  duration_ms: 19.808435
   type: 'test'
   ...
 # Subtest: 15 sequential signing completes and creates copies
 ok 107 - 15 sequential signing completes and creates copies
   ---
-  duration_ms: 55.093936
+  duration_ms: 62.345248
   type: 'test'
   ...
 # Subtest: 16 malformed and tampered token rejected
 ok 108 - 16 malformed and tampered token rejected
   ---
-  duration_ms: 9.67071
+  duration_ms: 10.511939
   type: 'test'
   ...
 # Subtest: 17 invalid signature and wrong linked account rejected
 ok 109 - 17 invalid signature and wrong linked account rejected
   ---
-  duration_ms: 5.339952
+  duration_ms: 14.311737
   type: 'test'
   ...
 # Subtest: 18 audit chain detects tampering and completed PDF integrity
 ok 110 - 18 audit chain detects tampering and completed PDF integrity
   ---
-  duration_ms: 11.222717
+  duration_ms: 15.614697
   type: 'test'
   ...
 # Subtest: 19 forced completion failure is contained and retryable
 ok 111 - 19 forced completion failure is contained and retryable
   ---
-  duration_ms: 27.827316
+  duration_ms: 45.298195
   type: 'test'
   ...
 # Subtest: 20 real final-signer completion mirrors portal envelope/event and passes documentLifecycle signed-check
 ok 112 - 20 real final-signer completion mirrors portal envelope/event and passes documentLifecycle signed-check
   ---
-  duration_ms: 16.992981
+  duration_ms: 12.360289
   type: 'test'
   ...
 # Subtest: 21 completed signing status exposes archive entries and only the caller's signer copy; PDF access is owner/signer scoped
 ok 113 - 21 completed signing status exposes archive entries and only the caller's signer copy; PDF access is owner/signer scoped
   ---
-  duration_ms: 13.162488
+  duration_ms: 26.08165
   type: 'test'
   ...
 # Drive gateway error Error: Firebase authentication is required.
@@ -2568,259 +2568,259 @@ ok 113 - 21 completed signing status exposes archive entries and only the caller
 # Subtest: entrypoint flag-off: /api/envelopes remains 404
 ok 114 - entrypoint flag-off: /api/envelopes remains 404
   ---
-  duration_ms: 37.288047
+  duration_ms: 41.703702
   type: 'test'
   ...
 # Subtest: entrypoint flag-off: /api/sign/open remains 404
 ok 115 - entrypoint flag-off: /api/sign/open remains 404
   ---
-  duration_ms: 0.612341
+  duration_ms: 1.007184
   type: 'test'
   ...
 # Subtest: entrypoint flag-on: /api/sign/open reaches e-sign router
 ok 116 - entrypoint flag-on: /api/sign/open reaches e-sign router
   ---
-  duration_ms: 1.946785
+  duration_ms: 3.522093
   type: 'test'
   ...
 # Subtest: entrypoint flag-on: malformed signing token is rejected
 ok 117 - entrypoint flag-on: malformed signing token is rejected
   ---
-  duration_ms: 2.821366
+  duration_ms: 1.522913
   type: 'test'
   ...
 # Subtest: entrypoint flag-on: unauthenticated document upload is rejected
 ok 118 - entrypoint flag-on: unauthenticated document upload is rejected
   ---
-  duration_ms: 1.037784
+  duration_ms: 2.094357
   type: 'test'
   ...
 # Subtest: CORS preflight from production web app allows signing token header
 ok 119 - CORS preflight from production web app allows signing token header
   ---
-  duration_ms: 0.49721
+  duration_ms: 0.892571
   type: 'test'
   ...
 # Subtest: regression: /health remains available
 ok 120 - regression: /health remains available
   ---
-  duration_ms: 1.141468
+  duration_ms: 2.516262
   type: 'test'
   ...
 # Subtest: regression: /api/upload-controlled-document remains authentication-gated
 ok 121 - regression: /api/upload-controlled-document remains authentication-gated
   ---
-  duration_ms: 3.250255
+  duration_ms: 2.932336
   type: 'test'
   ...
 # Subtest: regression: /api/signature-invitations/send remains authentication-gated
 ok 122 - regression: /api/signature-invitations/send remains authentication-gated
   ---
-  duration_ms: 1.241086
+  duration_ms: 1.851565
   type: 'test'
   ...
 # Subtest: regression: /api/invitations/send remains authentication-gated
 ok 123 - regression: /api/invitations/send remains authentication-gated
   ---
-  duration_ms: 1.367174
+  duration_ms: 2.338982
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration flag-off keeps password attempt state unavailable
 ok 124 - Cloudflare auth migration flag-off keeps password attempt state unavailable
   ---
-  duration_ms: 0.60547
+  duration_ms: 1.110065
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration flag-on returns initial password attempt state
 ok 125 - Cloudflare auth migration flag-on returns initial password attempt state
   ---
-  duration_ms: 9.427422
+  duration_ms: 20.815668
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration preserves three-attempt lock semantics
 ok 126 - Cloudflare auth migration preserves three-attempt lock semantics
   ---
-  duration_ms: 31.184874
+  duration_ms: 22.443339
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration clears password attempt state
 ok 127 - Cloudflare auth migration clears password attempt state
   ---
-  duration_ms: 9.121317
+  duration_ms: 4.00468
   type: 'test'
   ...
 # Subtest: Cloudflare document-reference migration remains authentication-gated
 ok 128 - Cloudflare document-reference migration remains authentication-gated
   ---
-  duration_ms: 0.356841
+  duration_ms: 0.684844
   type: 'test'
   ...
 # Subtest: Cloudflare auth migration rejects malformed password-state input
 ok 129 - Cloudflare auth migration rejects malformed password-state input
   ---
-  duration_ms: 0.315319
+  duration_ms: 0.62886
   type: 'test'
   ...
 # Subtest: buildEsignContext preserves injected function properties
 ok 130 - buildEsignContext preserves injected function properties
   ---
-  duration_ms: 0.795493
+  duration_ms: 0.96745
   type: 'test'
   ...
 # Subtest: e-sign Drive upload uses RFC-compliant CRLF multipart framing
 ok 131 - e-sign Drive upload uses RFC-compliant CRLF multipart framing
   ---
-  duration_ms: 22.226279
+  duration_ms: 38.392831
   type: 'test'
   ...
 # Subtest: production deploy safely syncs the Firebase service account secret to the exact Worker
 ok 132 - production deploy safely syncs the Firebase service account secret to the exact Worker
   ---
-  duration_ms: 0.908241
+  duration_ms: 1.603714
   type: 'test'
   ...
 # Subtest: diagnostics classify Firebase service account failures without exposing values
 ok 133 - diagnostics classify Firebase service account failures without exposing values
   ---
-  duration_ms: 0.413285
+  duration_ms: 0.588765
   type: 'test'
   ...
 # Subtest: signature asset and completed archive use the Worker admin token
 ok 134 - signature asset and completed archive use the Worker admin token
   ---
-  duration_ms: 0.741783
+  duration_ms: 1.369188
   type: 'test'
   ...
 # Subtest: signing and Drive route helpers do not receive the caller token
 ok 135 - signing and Drive route helpers do not receive the caller token
   ---
-  duration_ms: 0.666551
+  duration_ms: 1.049803
   type: 'test'
   ...
 # Subtest: administrator, owner, current and earlier signers retain authorised views; stranger is refused
 ok 136 - administrator, owner, current and earlier signers retain authorised views; stranger is refused
   ---
-  duration_ms: 0.642696
+  duration_ms: 1.328732
   type: 'test'
   ...
 # Subtest: document lifecycle fails closed instead of falling back to claims.token
 ok 137 - document lifecycle fails closed instead of falling back to claims.token
   ---
-  duration_ms: 0.327577
+  duration_ms: 0.519617
   type: 'test'
   ...
 # Subtest: mock Firestore denies caller-token reads and permits Worker-admin reads
 ok 138 - mock Firestore denies caller-token reads and permits Worker-admin reads
   ---
-  duration_ms: 0.867411
+  duration_ms: 1.595779
   type: 'test'
   ...
 # Subtest: G5-01 — typed signature punching
 ok 139 - G5-01 — typed signature punching
   ---
-  duration_ms: 186.679947
+  duration_ms: 241.788865
   type: 'test'
   ...
 # Subtest: G5-02 — drawn signature punching
 ok 140 - G5-02 — drawn signature punching
   ---
-  duration_ms: 44.04342
+  duration_ms: 67.611151
   type: 'test'
   ...
 # Subtest: G5-03 — original document preservation
 ok 141 - G5-03 — original document preservation
   ---
-  duration_ms: 40.586863
+  duration_ms: 47.568623
   type: 'test'
   ...
 # Subtest: G5-04 — final hash exactness
 ok 142 - G5-04 — final hash exactness
   ---
-  duration_ms: 35.387986
+  duration_ms: 30.755987
   type: 'test'
   ...
 # Subtest: G5-05 — all-copy equality
 ok 143 - G5-05 — all-copy equality
   ---
-  duration_ms: 28.28421
+  duration_ms: 28.19386
   type: 'test'
   ...
 # Subtest: G5-06 — retrieval equality
 ok 144 - G5-06 — retrieval equality
   ---
-  duration_ms: 20.183721
+  duration_ms: 29.711163
   type: 'test'
   ...
 # Subtest: G5-07 — signed-PDF tamper detection
 ok 145 - G5-07 — signed-PDF tamper detection
   ---
-  duration_ms: 58.125425
+  duration_ms: 49.289362
   type: 'test'
   ...
 # Subtest: G5-08 — partial completion rollback
 ok 146 - G5-08 — partial completion rollback
   ---
-  duration_ms: 20.843052
+  duration_ms: 24.477705
   type: 'test'
   ...
 # Subtest: G5-09 — retry persistence
 ok 147 - G5-09 — retry persistence
   ---
-  duration_ms: 15.594375
+  duration_ms: 28.817691
   type: 'test'
   ...
 # Subtest: G5-10 — completion idempotency
 ok 148 - G5-10 — completion idempotency
   ---
-  duration_ms: 9.883821
+  duration_ms: 20.020017
   type: 'test'
   ...
 # Subtest: Google Drive OAuth explicitly prompts for account selection and consent
 ok 149 - Google Drive OAuth explicitly prompts for account selection and consent
   ---
-  duration_ms: 0.688024
+  duration_ms: 1.120615
   type: 'test'
   ...
 # Subtest: induction matching rejects unauthenticated requests
 ok 150 - induction matching rejects unauthenticated requests
   ---
-  duration_ms: 23.023185
+  duration_ms: 45.340037
   type: 'test'
   ...
 # Subtest: induction matching rejects another user's email lookup
 ok 151 - induction matching rejects another user's email lookup
   ---
-  duration_ms: 1.307565
+  duration_ms: 2.632238
   type: 'test'
   ...
 # Subtest: induction matching rejects malformed requests and wrong methods
 ok 152 - induction matching rejects malformed requests and wrong methods
   ---
-  duration_ms: 0.830125
+  duration_ms: 1.238755
   type: 'test'
   ...
 # Subtest: induction matching response never exposes invitation token hashes or internal fields
 ok 153 - induction matching response never exposes invitation token hashes or internal fields
   ---
-  duration_ms: 3.096696
+  duration_ms: 3.904195
   type: 'test'
   ...
 # Subtest: induction matching refuses expired or activated invitations for tokens without email
 ok 154 - induction matching refuses expired or activated invitations for tokens without email
   ---
-  duration_ms: 1.083942
+  duration_ms: 2.606621
   type: 'test'
   ...
 # Subtest: active administrator can look up another person's email
 ok 155 - active administrator can look up another person's email
   ---
-  duration_ms: 0.622406
+  duration_ms: 1.5689
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption creates/signs Firebase custom token and records PASSWORD_SETUP_PENDING without consuming invitation
 ok 156 - Cloudflare invitation redemption creates/signs Firebase custom token and records PASSWORD_SETUP_PENDING without consuming invitation
   ---
-  duration_ms: 43.391521
+  duration_ms: 91.214673
   type: 'test'
   ...
 # Invitation administrator notification failed {
@@ -2835,73 +2835,73 @@ ok 156 - Cloudflare invitation redemption creates/signs Firebase custom token an
 # Subtest: Cloudflare invitation redemption self-heals an existing password account
 ok 157 - Cloudflare invitation redemption self-heals an existing password account
   ---
-  duration_ms: 9.222898
+  duration_ms: 30.578575
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rejects malformed tokens before contacting Firebase
 ok 158 - Cloudflare invitation redemption rejects malformed tokens before contacting Firebase
   ---
-  duration_ms: 1.931443
+  duration_ms: 4.608756
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rejects an expired invitation token before Firebase account lookup
 ok 159 - Cloudflare invitation redemption rejects an expired invitation token before Firebase account lookup
   ---
-  duration_ms: 2.766916
+  duration_ms: 6.107554
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rejects explicitly revoked invitations before Firebase account lookup
 ok 160 - Cloudflare invitation redemption rejects explicitly revoked invitations before Firebase account lookup
   ---
-  duration_ms: 1.306263
+  duration_ms: 1.874829
   type: 'test'
   ...
 # Subtest: password-set returns 401 when Firebase authentication is missing
 ok 161 - password-set returns 401 when Firebase authentication is missing
   ---
-  duration_ms: 0.774652
+  duration_ms: 4.083438
   type: 'test'
   ...
 # Subtest: session-state returns 401 when Firebase authentication is missing
 ok 162 - session-state returns 401 when Firebase authentication is missing
   ---
-  duration_ms: 1.402235
+  duration_ms: 4.378417
   type: 'test'
   ...
 # Subtest: password-set refuses activation when Firebase Auth has not independently confirmed a password provider
 ok 163 - password-set refuses activation when Firebase Auth has not independently confirmed a password provider
   ---
-  duration_ms: 21.0234
+  duration_ms: 21.701494
   type: 'test'
   ...
 # Subtest: password-set verifies the password provider and activates the invitation on the server
 ok 164 - password-set verifies the password provider and activates the invitation on the server
   ---
-  duration_ms: 10.473178
+  duration_ms: 8.59352
   type: 'test'
   ...
 # Subtest: password-set refuses activation when the registered member record does not exist
 ok 165 - password-set refuses activation when the registered member record does not exist
   ---
-  duration_ms: 11.687123
+  duration_ms: 12.482582
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption resumes setup after its 60-minute session expires while the invitation remains valid
 ok 166 - Cloudflare invitation redemption resumes setup after its 60-minute session expires while the invitation remains valid
   ---
-  duration_ms: 12.158094
+  duration_ms: 6.685579
   type: 'test'
   ...
 # Subtest: Cloudflare invitation redemption rate-limits the sixth attempt for one invitation
 ok 167 - Cloudflare invitation redemption rate-limits the sixth attempt for one invitation
   ---
-  duration_ms: 42.818218
+  duration_ms: 21.187115
   type: 'test'
   ...
 # Subtest: password-set resumes an invitation that is already PROVISIONING_PENDING
 ok 168 - password-set resumes an invitation that is already PROVISIONING_PENDING
   ---
-  duration_ms: 3.40871
+  duration_ms: 5.53026
   type: 'test'
   ...
 # Drive gateway error Error: IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED
@@ -2916,67 +2916,67 @@ ok 168 - password-set resumes an invitation that is already PROVISIONING_PENDING
 # Subtest: portal activation gate rejects a valid Firebase ID token whose member record is not Activated
 ok 169 - portal activation gate rejects a valid Firebase ID token whose member record is not Activated
   ---
-  duration_ms: 8.083694
+  duration_ms: 12.918104
   type: 'test'
   ...
 # Subtest: session-state returns the invitation state for the authenticated UID
 ok 170 - session-state returns the invitation state for the authenticated UID
   ---
-  duration_ms: 2.517725
+  duration_ms: 3.716866
   type: 'test'
   ...
 # Subtest: password-set rejects a UID that is not assigned to the invitation
 ok 171 - password-set rejects a UID that is not assigned to the invitation
   ---
-  duration_ms: 2.075096
+  duration_ms: 4.774684
   type: 'test'
   ...
 # Subtest: password-set rejects a Firebase email that does not match the invitation email
 ok 172 - password-set rejects a Firebase email that does not match the invitation email
   ---
-  duration_ms: 2.124059
+  duration_ms: 3.820759
   type: 'test'
   ...
 # Subtest: password-set is idempotent after invitation activation
 ok 173 - password-set is idempotent after invitation activation
   ---
-  duration_ms: 3.042054
+  duration_ms: 5.790484
   type: 'test'
   ...
 # Subtest: password-set activates a registered Special Invitee from the third register
 ok 174 - password-set activates a registered Special Invitee from the third register
   ---
-  duration_ms: 6.314322
+  duration_ms: 8.57199
   type: 'test'
   ...
 # Subtest: Board Member uses the identical password-set activation path
 ok 175 - Board Member uses the identical password-set activation path
   ---
-  duration_ms: 3.010258
+  duration_ms: 4.687842
   type: 'test'
   ...
 # Subtest: Employee uses the identical password-set activation path
 ok 176 - Employee uses the identical password-set activation path
   ---
-  duration_ms: 2.232841
+  duration_ms: 3.575673
   type: 'test'
   ...
 # Subtest: Auditor uses the identical password-set activation path
 ok 177 - Auditor uses the identical password-set activation path
   ---
-  duration_ms: 5.371339
+  duration_ms: 4.938719
   type: 'test'
   ...
 # Subtest: redeem rejects a second click on an already activated invitation with a specific message
 ok 178 - redeem rejects a second click on an already activated invitation with a specific message
   ---
-  duration_ms: 3.434168
+  duration_ms: 7.621582
   type: 'test'
   ...
 # Subtest: password-set writes the requested password through Firebase Admin before activation
 ok 179 - password-set writes the requested password through Firebase Admin before activation
   ---
-  duration_ms: 2.791962
+  duration_ms: 12.658864
   type: 'test'
   ...
 # Invitation operation failure {
@@ -2987,19 +2987,13 @@ ok 179 - password-set writes the requested password through Firebase Admin befor
 # Subtest: password-set resumes PROVISIONING_PENDING after a transient institutional-record failure
 ok 180 - password-set resumes PROVISIONING_PENDING after a transient institutional-record failure
   ---
-  duration_ms: 154.414431
+  duration_ms: 156.682326
   type: 'test'
   ...
 # Subtest: activated canonical Board Member record authorizes portal access when its document ID differs from Firebase UID
 ok 181 - activated canonical Board Member record authorizes portal access when its document ID differs from Firebase UID
   ---
-  duration_ms: 2.481792
-  type: 'test'
-  ...
-# Subtest: inactive canonical institutional records remain blocked by portal activation guard
-ok 182 - inactive canonical institutional records remain blocked by portal activation guard
-  ---
-  duration_ms: 2.162807
+  duration_ms: 4.40687
   type: 'test'
   ...
 # Drive gateway error Error: IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED
@@ -3012,47 +3006,53 @@ ok 182 - inactive canonical institutional records remain blocked by portal activ
 #     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7) {
 #   status: 403
 # }
+# Subtest: inactive canonical institutional records remain blocked by portal activation guard
+ok 182 - inactive canonical institutional records remain blocked by portal activation guard
+  ---
+  duration_ms: 5.641487
+  type: 'test'
+  ...
 # Invitation removal atomic commit failed { status: 503 }
 # Subtest: unmatched routes are not handled
 ok 183 - unmatched routes are not handled
   ---
-  duration_ms: 24.41854
+  duration_ms: 34.011114
   type: 'test'
   ...
 # Subtest: rejects requests without verified authentication
 ok 184 - rejects requests without verified authentication
   ---
-  duration_ms: 3.011249
+  duration_ms: 5.129605
   type: 'test'
   ...
 # Subtest: rejects non-admin users before reading or deleting invitations
 ok 185 - rejects non-admin users before reading or deleting invitations
   ---
-  duration_ms: 0.513624
+  duration_ms: 0.813734
   type: 'test'
   ...
 # Subtest: preserves meeting-linked invitation records
 ok 186 - preserves meeting-linked invitation records
   ---
-  duration_ms: 0.607845
+  duration_ms: 0.961459
   type: 'test'
   ...
 # Subtest: preserves activated identities
 ok 187 - preserves activated identities
   ---
-  duration_ms: 0.530368
+  duration_ms: 1.168685
   type: 'test'
   ...
 # Subtest: atomically deletes pending invitation and writes audit event
 ok 188 - atomically deletes pending invitation and writes audit event
   ---
-  duration_ms: 2.339509
+  duration_ms: 3.647738
   type: 'test'
   ...
 # Subtest: does not report success when Firestore commit fails
 ok 189 - does not report success when Firestore commit fails
   ---
-  duration_ms: 1.493822
+  duration_ms: 2.546889
   type: 'test'
   ...
 # MEETING_ACCESS_INVITATION_STAGE {
@@ -3099,13 +3099,13 @@ ok 189 - does not report success when Firestore commit fails
 # Subtest: meeting portal router ignores unrelated paths
 ok 190 - meeting portal router ignores unrelated paths
   ---
-  duration_ms: 24.663094
+  duration_ms: 52.354405
   type: 'test'
   ...
 # Subtest: issue rejects a participant linked to a different meeting
 ok 191 - issue rejects a participant linked to a different meeting
   ---
-  duration_ms: 4.094811
+  duration_ms: 11.461626
   type: 'test'
   ...
 # MEETING_ACCESS_INVITATION_STAGE {
@@ -3121,582 +3121,582 @@ ok 191 - issue rejects a participant linked to a different meeting
 #   meetingId: 'meeting-1',
 #   participantId: 'participant-1',
 #   actorUid: 'organizer-1',
-#   accessId: '3e94def0-9220-44f3-baab-2703f68fe78a'
+#   accessId: '9e9cecf7-5fe6-40dd-97ec-3df4bbb145e7'
 # }
 # Subtest: issue creates an access pass and updates invitee tally in one atomic Firestore commit
 ok 192 - issue creates an access pass and updates invitee tally in one atomic Firestore commit
   ---
-  duration_ms: 11.972758
+  duration_ms: 28.992511
   type: 'test'
   ...
 # Subtest: meeting access issuance is routed through Cloudflare and rejects unauthenticated callers
 ok 193 - meeting access issuance is routed through Cloudflare and rejects unauthenticated callers
   ---
-  duration_ms: 22.345297
+  duration_ms: 51.651026
   type: 'test'
   ...
 # Subtest: meeting access revocation is routed through Cloudflare and rejects unauthenticated callers
 ok 194 - meeting access revocation is routed through Cloudflare and rejects unauthenticated callers
   ---
-  duration_ms: 1.004955
+  duration_ms: 1.533744
   type: 'test'
   ...
 # Subtest: meeting entry authorization is routed through Cloudflare and rejects unauthenticated callers
 ok 195 - meeting entry authorization is routed through Cloudflare and rejects unauthenticated callers
   ---
-  duration_ms: 0.699491
+  duration_ms: 1.097922
   type: 'test'
   ...
 # Subtest: meeting access routes do not accept GET requests
 ok 196 - meeting access routes do not accept GET requests
   ---
-  duration_ms: 3.100662
+  duration_ms: 5.908484
   type: 'test'
   ...
 # Subtest: recording output targets private Cloudflare R2 using path-style S3 access
 ok 197 - recording output targets private Cloudflare R2 using path-style S3 access
   ---
-  duration_ms: 0.758148
+  duration_ms: 1.684875
   type: 'test'
   ...
 # Subtest: recording output fails closed when R2 credentials are missing
 ok 198 - recording output fails closed when R2 credentials are missing
   ---
-  duration_ms: 0.502107
+  duration_ms: 1.646591
   type: 'test'
   ...
 # Subtest: recording output rejects non-Cloudflare endpoints and unsafe object paths
 ok 199 - recording output rejects non-Cloudflare endpoints and unsafe object paths
   ---
-  duration_ms: 0.161691
+  duration_ms: 0.449176
   type: 'test'
   ...
 # Subtest: meeting services router ignores unrelated paths
 ok 200 - meeting services router ignores unrelated paths
   ---
-  duration_ms: 19.148281
+  duration_ms: 37.921339
   type: 'test'
   ...
 # Subtest: meeting record operations require Firebase-authenticated identity
 ok 201 - meeting record operations require Firebase-authenticated identity
   ---
-  duration_ms: 1.309347
+  duration_ms: 3.112952
   type: 'test'
   ...
 # Subtest: LiveKit token issuance also requires an authenticated identity
 ok 202 - LiveKit token issuance also requires an authenticated identity
   ---
-  duration_ms: 0.414556
+  duration_ms: 0.858678
   type: 'test'
   ...
 # Subtest: meeting register, decision, and voting control routes require authenticated identity
 ok 203 - meeting register, decision, and voting control routes require authenticated identity
   ---
-  duration_ms: 2.587388
+  duration_ms: 5.190756
   type: 'test'
   ...
 # Subtest: connect returns a read-only Meta authorization URL and one-time staging state
 ok 204 - connect returns a read-only Meta authorization URL and one-time staging state
   ---
-  duration_ms: 25.258389
+  duration_ms: 39.258577
   type: 'test'
   ...
 # Subtest: connect and status deny unapproved origins, inactive roles and non-staging environments
 ok 205 - connect and status deny unapproved origins, inactive roles and non-staging environments
   ---
-  duration_ms: 0.947038
+  duration_ms: 2.316981
   type: 'test'
   ...
 # Subtest: callback rejects missing or replayed OAuth state without calling Meta
 ok 206 - callback rejects missing or replayed OAuth state without calling Meta
   ---
-  duration_ms: 0.476469
+  duration_ms: 0.764212
   type: 'test'
   ...
 # Subtest: OAuth callback verifies Pages and linked Instagram, encrypts tokens and never returns token material
 ok 207 - OAuth callback verifies Pages and linked Instagram, encrypts tokens and never returns token material
   ---
-  duration_ms: 11.736317
+  duration_ms: 16.768831
   type: 'test'
   ...
 # Subtest: missing required Meta scopes fail closed without persisting an encrypted token
 ok 208 - missing required Meta scopes fail closed without persisting an encrypted token
   ---
-  duration_ms: 6.339966
+  duration_ms: 4.146966
   type: 'test'
   ...
 # Subtest: C-I01 production finalize seals the exact final PDF before Completed
 ok 209 - C-I01 production finalize seals the exact final PDF before Completed
   ---
-  duration_ms: 115.227298
+  duration_ms: 119.215663
   type: 'test'
   ...
 # Subtest: C-I02 production finalize fails closed when signer key custody is unavailable
 ok 210 - C-I02 production finalize fails closed when signer key custody is unavailable
   ---
-  duration_ms: 20.094779
+  duration_ms: 31.416155
   type: 'test'
   ...
 # Subtest: C-I03 production completion fails closed when the cryptographic key provider is absent
 ok 211 - C-I03 production completion fails closed when the cryptographic key provider is absent
   ---
-  duration_ms: 24.562874
+  duration_ms: 33.830029
   type: 'test'
   ...
 # Subtest: Release Readiness route requires POST and rejects non-administrators
 ok 212 - Release Readiness route requires POST and rejects non-administrators
   ---
-  duration_ms: 21.772699
+  duration_ms: 38.41586
   type: 'test'
   ...
 # Subtest: Release Readiness runs read-only diagnostics and explicitly reports blocked probes
 ok 213 - Release Readiness runs read-only diagnostics and explicitly reports blocked probes
   ---
-  duration_ms: 2.84389
+  duration_ms: 5.587506
   type: 'test'
   ...
 # Subtest: closed actual-data gate names the exact gate
 ok 214 - closed actual-data gate names the exact gate
   ---
-  duration_ms: 1.53271
+  duration_ms: 3.478923
   type: 'test'
   ...
 # Subtest: Signature Profile folder provisioning is self-only unless the caller is an active admin
 ok 215 - Signature Profile folder provisioning is self-only unless the caller is an active admin
   ---
-  duration_ms: 0.727482
+  duration_ms: 1.265064
   type: 'test'
   ...
 # Subtest: Signature Profile assets are readable only by their owner
 ok 216 - Signature Profile assets are readable only by their owner
   ---
-  duration_ms: 0.237854
+  duration_ms: 0.425792
   type: 'test'
   ...
 # Subtest: controlled documents require matching document metadata and document-level authority
 ok 217 - controlled documents require matching document metadata and document-level authority
   ---
-  duration_ms: 0.897105
+  duration_ms: 1.055013
   type: 'test'
   ...
 # Subtest: an assigned envelope participant can read the exact controlled source document
 ok 218 - an assigned envelope participant can read the exact controlled source document
   ---
-  duration_ms: 0.146288
+  duration_ms: 0.186707
   type: 'test'
   ...
 # Subtest: signed workflow PDFs require the matching document, envelope, and participant identity
 ok 219 - signed workflow PDFs require the matching document, envelope, and participant identity
   ---
-  duration_ms: 0.286096
+  duration_ms: 0.317591
   type: 'test'
   ...
 # Subtest: signed-document upload is restricted to the authenticated assigned action signer
 ok 220 - signed-document upload is restricted to the authenticated assigned action signer
   ---
-  duration_ms: 0.180469
+  duration_ms: 0.235468
   type: 'test'
   ...
 # Subtest: Signature Portal gateway routes are wired to the fail-closed authorization policies
 ok 221 - Signature Portal gateway routes are wired to the fail-closed authorization policies
   ---
-  duration_ms: 1.340574
+  duration_ms: 1.510962
   type: 'test'
   ...
 # Subtest: signature-complete atomic commit sends valid document and audit writes
 ok 222 - signature-complete atomic commit sends valid document and audit writes
   ---
-  duration_ms: 60.336885
+  duration_ms: 191.876828
   type: 'test'
   ...
 # Subtest: owner and administrator remain authorized when Drive description documentId is mismatched
 ok 223 - owner and administrator remain authorized when Drive description documentId is mismatched
   ---
-  duration_ms: 2.211319
+  duration_ms: 2.885208
   type: 'test'
   ...
 # Subtest: current signer is allowed to read the signature asset
 ok 224 - current signer is allowed to read the signature asset
   ---
-  duration_ms: 0.184415
+  duration_ms: 0.293025
   type: 'test'
   ...
 # Subtest: earlier signer is allowed only after completing their turn
 ok 225 - earlier signer is allowed only after completing their turn
   ---
-  duration_ms: 0.130664
+  duration_ms: 0.270763
   type: 'test'
   ...
 # Subtest: later signer and stranger are refused without leaking future assignment data
 ok 226 - later signer and stranger are refused without leaking future assignment data
   ---
-  duration_ms: 0.166818
+  duration_ms: 0.234326
   type: 'test'
   ...
 # Subtest: requested Drive file ID must match the documents record
 ok 227 - requested Drive file ID must match the documents record
   ---
-  duration_ms: 0.195591
+  duration_ms: 0.342267
   type: 'test'
   ...
 # Subtest: envelope and document record identities are required
 ok 228 - envelope and document record identities are required
   ---
-  duration_ms: 0.102773
+  duration_ms: 0.208908
   type: 'test'
   ...
 # Subtest: completed gateway signing updates portal envelope, appends trail event, and exposes lifecycle-compatible fields
 ok 229 - completed gateway signing updates portal envelope, appends trail event, and exposes lifecycle-compatible fields
   ---
-  duration_ms: 1.194637
+  duration_ms: 1.960177
   type: 'test'
   ...
 # Subtest: per-signer and completion audit events use stable IDs and are idempotent
 ok 230 - per-signer and completion audit events use stable IDs and are idempotent
   ---
-  duration_ms: 0.960508
+  duration_ms: 1.216935
   type: 'test'
   ...
 # Subtest: missing portal envelope rejects mirror write so caller can log it
 ok 231 - missing portal envelope rejects mirror write so caller can log it
   ---
-  duration_ms: 0.424752
+  duration_ms: 0.665478
   type: 'test'
   ...
 # Subtest: mirror fails once, records Pending, then resync succeeds
 ok 232 - mirror fails once, records Pending, then resync succeeds
   ---
-  duration_ms: 120.784989
+  duration_ms: 165.671276
   type: 'test'
   ...
 # Subtest: an authenticated member or employee may provision only their own Signature Profile folder
 ok 233 - an authenticated member or employee may provision only their own Signature Profile folder
   ---
-  duration_ms: 0.529387
+  duration_ms: 1.216293
   type: 'test'
   ...
 # Subtest: an active administrator may provision another profile's folder
 ok 234 - an active administrator may provision another profile's folder
   ---
-  duration_ms: 0.1139
+  duration_ms: 0.215982
   type: 'test'
   ...
 # Subtest: missing actor or target and non-boolean administrator claims fail closed
 ok 235 - missing actor or target and non-boolean administrator claims fail closed
   ---
-  duration_ms: 0.104786
+  duration_ms: 0.207787
   type: 'test'
   ...
 # Subtest: signature profile folder provisioning uses a defined active-admin authorization result
 ok 236 - signature profile folder provisioning uses a defined active-admin authorization result
   ---
-  duration_ms: 0.746841
+  duration_ms: 1.202027
   type: 'test'
   ...
 # Subtest: controlled trust state machine permits the intended happy path
 ok 237 - controlled trust state machine permits the intended happy path
   ---
-  duration_ms: 0.904736
+  duration_ms: 1.304697
   type: 'test'
   ...
 # Subtest: controlled trust state machine rejects unsafe skips and reversals
 ok 238 - controlled trust state machine rejects unsafe skips and reversals
   ---
-  duration_ms: 1.64063
+  duration_ms: 1.912529
   type: 'test'
   ...
 # Subtest: terminal states cannot transition
 ok 239 - terminal states cannot transition
   ---
-  duration_ms: 0.258444
+  duration_ms: 0.388543
   type: 'test'
   ...
 # Subtest: completion failure permits controlled retry transitions
 ok 240 - completion failure permits controlled retry transitions
   ---
-  duration_ms: 0.131606
+  duration_ms: 0.215811
   type: 'test'
   ...
 # Subtest: identity normalization is deterministic and does not duplicate roles
 ok 241 - identity normalization is deterministic and does not duplicate roles
   ---
-  duration_ms: 0.664939
+  duration_ms: 1.00479
   type: 'test'
   ...
 # Subtest: authority assertion requires authenticated identity and authoritative reference
 ok 242 - authority assertion requires authenticated identity and authoritative reference
   ---
-  duration_ms: 0.265936
+  duration_ms: 0.330175
   type: 'test'
   ...
 # Subtest: authority assertion accepts only declared authority sources
 ok 243 - authority assertion accepts only declared authority sources
   ---
-  duration_ms: 0.120249
+  duration_ms: 0.237742
   type: 'test'
   ...
 # Subtest: authority assertion rejects malformed validity windows
 ok 244 - authority assertion rejects malformed validity windows
   ---
-  duration_ms: 0.150333
+  duration_ms: 0.271525
   type: 'test'
   ...
 # Subtest: active authority is evaluated against its effective window
 ok 245 - active authority is evaluated against its effective window
   ---
-  duration_ms: 0.598891
+  duration_ms: 0.665037
   type: 'test'
   ...
 # Subtest: signature lifecycle allows the protected happy path
 ok 246 - signature lifecycle allows the protected happy path
   ---
-  duration_ms: 1.530726
+  duration_ms: 0.904423
   type: 'test'
   ...
 # Subtest: signature lifecycle rejects a signing bypass
 ok 247 - signature lifecycle rejects a signing bypass
   ---
-  duration_ms: 0.467205
+  duration_ms: 0.439447
   type: 'test'
   ...
 # Subtest: authority assertion requires an institutional identity and source
 ok 248 - authority assertion requires an institutional identity and source
   ---
-  duration_ms: 1.216619
+  duration_ms: 1.228947
   type: 'test'
   ...
 # Subtest: signature draft save is routed through the authenticated Worker
 ok 249 - signature draft save is routed through the authenticated Worker
   ---
-  duration_ms: 0.907029
+  duration_ms: 2.205664
   type: 'test'
   ...
 # Subtest: Worker reconciliation reports the previous Drive ID and verifies the repaired value
 ok 250 - Worker reconciliation reports the previous Drive ID and verifies the repaired value
   ---
-  duration_ms: 0.183053
+  duration_ms: 0.371932
   type: 'test'
   ...
 # Subtest: new controlled uploads verify the exact canonical document ID in Drive metadata
 ok 251 - new controlled uploads verify the exact canonical document ID in Drive metadata
   ---
-  duration_ms: 0.123935
+  duration_ms: 0.290791
   type: 'test'
   ...
 # Subtest: existing Firestore rules are unchanged and their actual-data gate remains explicit
 ok 252 - existing Firestore rules are unchanged and their actual-data gate remains explicit
   ---
-  duration_ms: 0.13412
+  duration_ms: 0.331286
   type: 'test'
   ...
 # Subtest: owner, sender and administrator receive the complete workflow
 ok 253 - owner, sender and administrator receive the complete workflow
   ---
-  duration_ms: 0.982201
+  duration_ms: 4.340929
   type: 'test'
   ...
 # Subtest: earlier signer sees own assignments but not later signers
 ok 254 - earlier signer sees own assignments but not later signers
   ---
-  duration_ms: 0.918967
+  duration_ms: 1.5956
   type: 'test'
   ...
 # Subtest: current signer sees own fields and already-applied earlier signatures only
 ok 255 - current signer sees own fields and already-applied earlier signatures only
   ---
-  duration_ms: 0.278023
+  duration_ms: 0.538412
   type: 'test'
   ...
 # Subtest: later signer receives their own assignment but not the next signer's data
 ok 256 - later signer receives their own assignment but not the next signer's data
   ---
-  duration_ms: 0.310361
+  duration_ms: 0.529856
   type: 'test'
   ...
 # Subtest: stranger receives no envelope data
 ok 257 - stranger receives no envelope data
   ---
-  duration_ms: 0.219817
+  duration_ms: 0.52127
   type: 'test'
   ...
 # Subtest: external signer tokens remain usable without an authenticated user
 ok 258 - external signer tokens remain usable without an authenticated user
   ---
-  duration_ms: 0.700281
+  duration_ms: 1.424861
   type: 'test'
   ...
 # Subtest: UID-bound signer requires the matching authenticated UID
 ok 259 - UID-bound signer requires the matching authenticated UID
   ---
-  duration_ms: 0.123894
+  duration_ms: 0.24201
   type: 'test'
   ...
 # Subtest: UID-bound signer comparison is exact and cannot be bypassed by email alone
 ok 260 - UID-bound signer comparison is exact and cannot be bypassed by email alone
   ---
-  duration_ms: 0.108672
+  duration_ms: 0.218707
   type: 'test'
   ...
 # Subtest: staging sign rejects a context without signing-authority verification
 ok 261 - staging sign rejects a context without signing-authority verification
   ---
-  duration_ms: 5.747399
+  duration_ms: 14.985268
   type: 'test'
   ...
 # Subtest: social status accepts the Worker verifier's user_id claim as the authenticated UID
 ok 262 - social status accepts the Worker verifier's user_id claim as the authenticated UID
   ---
-  duration_ms: 0.736706
+  duration_ms: 1.345413
   type: 'test'
   ...
 # Subtest: social status still rejects requests without any authenticated UID
 ok 263 - social status still rejects requests without any authenticated UID
   ---
-  duration_ms: 0.144225
+  duration_ms: 0.272978
   type: 'test'
   ...
 # Subtest: C-G13 staging custody resolves the signer key through the Cloudflare-style environment binding
 ok 264 - C-G13 staging custody resolves the signer key through the Cloudflare-style environment binding
   ---
-  duration_ms: 31.784105
+  duration_ms: 48.297667
   type: 'test'
   ...
 # Subtest: C-G13R non-extractable Cloudflare-style public custody produces independently verifiable persisted evidence
 ok 265 - C-G13R non-extractable Cloudflare-style public custody produces independently verifiable persisted evidence
   ---
-  duration_ms: 32.790332
+  duration_ms: 50.271995
   type: 'test'
   ...
 # Subtest: C-G14 through C-G20 staging transaction persists and independently verifies cryptographic evidence
 ok 266 - C-G14 through C-G20 staging transaction persists and independently verifies cryptographic evidence
   ---
-  duration_ms: 20.050563
+  duration_ms: 25.805766
   type: 'test'
   ...
 # Subtest: C-G19 staging transaction rejects tampered persisted cryptographic payload
 ok 267 - C-G19 staging transaction rejects tampered persisted cryptographic payload
   ---
-  duration_ms: 12.124925
+  duration_ms: 16.683733
   type: 'test'
   ...
 # Subtest: C-G21 authenticated Gateway status and evidence retrieval bind the completed envelope, signer, PDF hash, and audit chain
 ok 268 - C-G21 authenticated Gateway status and evidence retrieval bind the completed envelope, signer, PDF hash, and audit chain
   ---
-  duration_ms: 15.478623
+  duration_ms: 27.019826
   type: 'test'
   ...
 # Subtest: C-G22 evidence retrieval fails closed when persisted cryptographic evidence is tampered
 ok 269 - C-G22 evidence retrieval fails closed when persisted cryptographic evidence is tampered
   ---
-  duration_ms: 12.528615
+  duration_ms: 21.588825
   type: 'test'
   ...
 # Subtest: staging Drive storage requires a dedicated root folder
 ok 270 - staging Drive storage requires a dedicated root folder
   ---
-  duration_ms: 1.688791
+  duration_ms: 2.499811
   type: 'test'
   ...
 # Subtest: Wrangler staging project and application URLs are isolated from production
 ok 271 - Wrangler staging project and application URLs are isolated from production
   ---
-  duration_ms: 0.370672
+  duration_ms: 0.679243
   type: 'test'
   ...
 # Subtest: staging workflow enforces the approved Firebase project, app origin, scoped credentials, and dedicated KV namespace
 ok 272 - staging workflow enforces the approved Firebase project, app origin, scoped credentials, and dedicated KV namespace
   ---
-  duration_ms: 0.891977
+  duration_ms: 1.514648
   type: 'test'
   ...
 # Subtest: staging users/me connection check returns HTTP 200 without exposing credentials
 ok 273 - staging users/me connection check returns HTTP 200 without exposing credentials
   ---
-  duration_ms: 19.004016
+  duration_ms: 35.174648
   type: 'test'
   ...
 # Subtest: one staging page can be read with editable fields
 ok 274 - one staging page can be read with editable fields
   ---
-  duration_ms: 1.953666
+  duration_ms: 3.95048
   type: 'test'
   ...
 # Subtest: an edit saves a snapshot and one-click restore returns all allowed fields exactly
 ok 275 - an edit saves a snapshot and one-click restore returns all allowed fields exactly
   ---
-  duration_ms: 6.845432
+  duration_ms: 10.411843
   type: 'test'
   ...
 # Subtest: the registered Communication & Media authority can access the website connection check
 ok 276 - the registered Communication & Media authority can access the website connection check
   ---
-  duration_ms: 0.935301
+  duration_ms: 1.249004
   type: 'test'
   ...
 # Subtest: a user without a Communication & Media role or active admin profile is refused
 ok 277 - a user without a Communication & Media role or active admin profile is refused
   ---
-  duration_ms: 0.621555
+  duration_ms: 0.700323
   type: 'test'
   ...
 # Subtest: production hostname with a staging path is rejected before any WordPress request
 ok 278 - production hostname with a staging path is rejected before any WordPress request
   ---
-  duration_ms: 1.456306
+  duration_ms: 1.800951
   type: 'test'
   ...
 # Subtest: cPanel Fileman reads use the relative path for the exact staging document root
 ok 279 - cPanel Fileman reads use the relative path for the exact staging document root
   ---
-  duration_ms: 1.04882
+  duration_ms: 1.78942
   type: 'test'
   ...
 # Subtest: cPanel file access refuses any document root other than the exact staging directory
 ok 280 - cPanel file access refuses any document root other than the exact staging directory
   ---
-  duration_ms: 0.355909
+  duration_ms: 0.59137
   type: 'test'
   ...
 # Subtest: audit records and application logs never contain the Worker credential
 ok 281 - audit records and application logs never contain the Worker credential
   ---
-  duration_ms: 1.303519
+  duration_ms: 2.129272
   type: 'test'
   ...
 # Subtest: editing is refused when WordPress has no current revision ID
 ok 282 - editing is refused when WordPress has no current revision ID
   ---
-  duration_ms: 1.47859
+  duration_ms: 2.402691
   type: 'test'
   ...
 # Subtest: the page editor rejects plugins, themes, users, settings and other non-content fields
 ok 283 - the page editor rejects plugins, themes, users, settings and other non-content fields
   ---
-  duration_ms: 0.527264
+  duration_ms: 0.867865
   type: 'test'
   ...
 # Subtest: WordPress items that advertise a production-host link are refused
 ok 284 - WordPress items that advertise a production-host link are refused
   ---
-  duration_ms: 0.902131
+  duration_ms: 2.66417
   type: 'test'
   ...
 # Subtest: WordPress Administrator credentials are rejected even when authentication returns HTTP 200
 ok 285 - WordPress Administrator credentials are rejected even when authentication returns HTTP 200
   ---
-  duration_ms: 0.660322
+  duration_ms: 1.023905
   type: 'test'
   ...
 # Subtest: authenticated staging image upload accepts safe image types and records an audit event
 ok 286 - authenticated staging image upload accepts safe image types and records an audit event
   ---
-  duration_ms: 0.927119
+  duration_ms: 1.581292
   type: 'test'
   ...
 # Subtest: image upload rejects unsupported formats and oversized payloads before WordPress writes
 ok 287 - image upload rejects unsupported formats and oversized payloads before WordPress writes
   ---
-  duration_ms: 77.332323
+  duration_ms: 143.356902
   type: 'test'
   ...
 1..287
@@ -3707,4 +3707,4 @@ ok 287 - image upload rejects unsupported formats and oversized payloads before 
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 2380.290609
+# duration_ms 3579.475572
