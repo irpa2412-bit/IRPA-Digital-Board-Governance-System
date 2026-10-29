@@ -1,4 +1,12 @@
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+
+// Bound every outbound request so a third-party stall cannot pin a Worker invocation.
+async function boundedFetch(input, init = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("Outbound request timed out after 8 seconds.")), 8000);
+  try { return await globalThis.boundedFetch(input, { ...init, signal: controller.signal }); }
+  finally { clearTimeout(timer); }
+}
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
   "application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -523,7 +531,7 @@ async function oauthCallback(request, env) {
   await env.DRIVE_KV.delete(stateKey);
 
   const redirectUri = `${url.origin}/oauth/callback`;
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+  const tokenResponse = await boundedFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -693,7 +701,7 @@ async function upload(request, env) {
 
   const boundary = `irpa-${crypto.randomUUID()}`;
   const body = buildMultipartBody(boundary, metadata, bytes, contentType);
-  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
+  const response = await boundedFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -731,7 +739,7 @@ async function getFirebaseAuthAdminAccessToken(env) {
   const unsigned = base64UrlEncodeText(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." + base64UrlEncodeText(JSON.stringify(claims));
   const key = await crypto.subtle.importKey("pkcs8", pemPrivateKeyBytes(serviceAccount.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
-  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature)) }) });
+  const response = await boundedFetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature)) }) });
   const result = await response.json();
   if (!response.ok || typeof result.access_token !== "string") { firebaseAuthAdminTokenCache = { token: "", expiresAt: 0 }; throw new Error("Firebase Authentication service identity could not obtain an Identity Toolkit access token."); }
   firebaseAuthAdminTokenCache = { token: result.access_token, expiresAt: now + Math.min(Number(result.expires_in) || 3600, 3600) };
@@ -745,7 +753,7 @@ async function listFirebaseAuthUsers(env, token) {
     const url = new URL(`https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(getFirebaseProjectId(env))}/accounts:batchGet`);
     url.searchParams.set("maxResults", "1000");
     if (pageToken) url.searchParams.set("nextPageToken", pageToken);
-    const response = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
+    const response = await boundedFetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error("Firebase Authentication account listing failed: HTTP " + response.status + " " + String(body?.error?.message || ""));
     users.push(...(Array.isArray(body.users) ? body.users : []));
@@ -755,7 +763,7 @@ async function listFirebaseAuthUsers(env, token) {
 }
 
 async function getFirestoreCollectionDocuments(env, collectionName, token) {
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
+  const response = await boundedFetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
     body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collectionName }] } })
@@ -974,7 +982,7 @@ async function actualDataAccessRoute(request, env) {
       {update:{name:settingName,fields:nextFields},updateMask:{fieldPaths:Object.keys(nextFields)}},
       {update:{name:auditName,fields:auditFields},currentDocument:{exists:false}}
     ];
-    const commitResponse = await fetch('https://firestore.googleapis.com/v1/' + base + ':commit',{method:'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({writes})});
+    const commitResponse = await boundedFetch('https://firestore.googleapis.com/v1/' + base + ':commit',{method:'POST',headers:{Authorization:'Bearer '+adminToken,'Content-Type':'application/json'},body:JSON.stringify({writes})});
     if (!commitResponse.ok) {
       const detail = await commitResponse.json().catch(()=>({}));
       throw new Error('Firestore atomic setting/audit commit returned HTTP ' + commitResponse.status + ': ' + String(detail?.error?.message||'no detail').slice(0,180));
@@ -1048,7 +1056,7 @@ async function getSignatureWorkflowListRoute(request, env) {
   const adminProfile = await getFirestoreDocument(env, "adminProfiles/" + actorUid, token);
   const isAdmin = String(claims.email || "").trim().toLowerCase() === "irpa2412@gmail.com" || Boolean(adminProfile?.fields?.active?.booleanValue === true && adminProfile?.fields?.role?.stringValue === "Administrator");
   const query = async (fieldPath, op) => {
-    const response = await fetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:runQuery", {
+    const response = await boundedFetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:runQuery", {
       method:"POST", headers:{Authorization:"Bearer " + token,"Content-Type":"application/json"},
       body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatureEnvelopes"}],where:{fieldFilter:{field:{fieldPath},op,value:{stringValue:actorUid}}},limit:100}})
     });
@@ -1056,7 +1064,7 @@ async function getSignatureWorkflowListRoute(request, env) {
     return (await response.json()).filter(row=>row.document).map(row=>row.document);
   };
   const rows = isAdmin
-    ? await (async()=>{const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signatureEnvelopes?pageSize=100",{headers:{Authorization:"Bearer "+token}});if(!response.ok)throw new Error("Unable to retrieve signing envelopes.");return (await response.json()).documents||[];})()
+    ? await (async()=>{const response=await boundedFetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents/signatureEnvelopes?pageSize=100",{headers:{Authorization:"Bearer "+token}});if(!response.ok)throw new Error("Unable to retrieve signing envelopes.");return (await response.json()).documents||[];})()
     : (await Promise.all([query("participantUids","ARRAY_CONTAINS"),query("ownerUid","EQUAL"),query("senderUid","EQUAL")])).flat();
   const unique = new Map(rows.map(row=>[String(row.name||"").split("/").pop(),row]));
   const envelopes = [];
@@ -1172,7 +1180,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
       {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
     ];
     step = "Firestore commit";
-    const response = await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:commit",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes})});
+    const response = await boundedFetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:commit",{method:"POST",headers:{Authorization:"Bearer "+adminToken,"Content-Type":"application/json"},body:JSON.stringify({writes})});
     if (!response.ok) { const detail=await response.json().catch(()=>({})); const ge=detail && detail.error || {}; const err=new Error(String(ge.message || "Google returned no error message").replace(/[\r\n]/g," ").slice(0,240)); err.firestoreHttpStatus=response.status; err.googleStatus=String(ge.status || "UNKNOWN").slice(0,100); err.googleMessage=String(ge.message || "No Google error message").replace(/[\r\n]/g," ").slice(0,240); throw err; }
     return json({ok:true,envelopeId,draft:envelope,writePath:"authenticated-worker",atomic:true},200,corsHeaders(request));
   } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
@@ -1211,10 +1219,12 @@ async function reconcileSignatureDocumentIds(request, env) {
     }
   }
   if (!items.length) return json({ok:true,dryRun,autoDiscover,results:[],summary:{total:0,repaired:0,wouldRepair:0,alreadyCorrect:0,unreadable:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"No Firestore controlled-document records were found."},200,corsHeaders(request));
-  if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
+  const requestedOffset = Math.max(0, Number.isInteger(Number(body.offset)) ? Number(body.offset) : 0);
+  const pageItems = items.slice(requestedOffset, requestedOffset + 5);
+  const more = requestedOffset + pageItems.length < items.length;
   const accessToken = await getDriveAccessToken(env);
   const results = [];
-  for (const item of items) {
+  for (const item of pageItems) {
     const documentId = String(item?.documentId || "").trim();
     const fileId = String(item?.fileId || "").trim();
     const line = {documentId:documentId || "(missing Firestore ID)",fileId:fileId || "(missing Drive file ID)",title:String(item?.title||documentId||"Untitled"),status:"unreadable",reason:""};
@@ -1255,7 +1265,7 @@ async function reconcileSignatureDocumentIds(request, env) {
     results.push(line);
   }
   const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
-  return json({ok:true,dryRun,autoDiscover,results,summary,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
+  return json({ok:true,dryRun,autoDiscover,results,summary,offset:requestedOffset,nextOffset:more?requestedOffset+pageItems.length:null,more,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
 }
 
 async function controlledDocumentUploadPolicyCheck(request, env) {
@@ -1283,7 +1293,9 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     if (!allowedClassifications.includes(classification)) problems.push("Invalid document access classification.");
     return json({ ok: problems.length === 0, step, policyAllowed: problems.length === 0, problems, checked: { contentType, fileSize, archiveCategory, classification }, writesPerformed: false, driveUploadPerformed: false, firebaseProjectId: getFirebaseProjectId(env) }, problems.length ? 400 : 200, corsHeaders(request));
   } catch (error) {
-    return json({ ok: false, step, error: step + " failed: " + String(error?.message || error).slice(0, 240), writesPerformed: false, driveUploadPerformed: false }, Number(error?.status) || 500, corsHeaders(request));
+    const message = String(error?.message || error);
+    const status = Number(error?.status) || (/authentication|authorization header|bearer token|token is required|missing.*token/i.test(message) ? 401 : 500);
+    return json({ ok: false, step, error: step + " failed: " + message.slice(0, 240), writesPerformed: false, driveUploadPerformed: false }, status, corsHeaders(request));
   }
 }
 
@@ -1451,7 +1463,7 @@ async function uploadControlledDocument(request, env) {
     };
     const boundary=`irpa-${crypto.randomUUID()}`;
     const body=buildMultipartBody(boundary,metadata,bytes,contentType);
-    const response=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents",{
+    const response=await boundedFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents",{
       method:"POST",
       headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
       body
@@ -1719,7 +1731,7 @@ async function download(request, env) {
   const size = Number(metadata.size || 0);
   if (size > (purpose === "Communication Media" ? 25 * 1024 * 1024 : MAX_BYTES)) return json({ ok: false, error: purpose === "Communication Media" ? "The requested media file exceeds the 25 MB limit." : "The requested file exceeds the 10 MB limit." }, 400, corsHeaders(request));
 
-  const media = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+  const media = await boundedFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
   if (!media.ok) throw new Error("Google Drive download failed.");
@@ -1755,7 +1767,7 @@ async function repairSignatureAssetDescription(env, accessToken, fileId, descrip
     repairedDescriptionDocumentId:{stringValue:String(documentId)}, route:{stringValue:String(routeName)},
     createdAt:{timestampValue:new Date().toISOString()}
   };
-  const response = await fetch("https://firestore.googleapis.com/v1/" + base + "/audit?documentId=" + encodeURIComponent(auditId), {
+  const response = await boundedFetch("https://firestore.googleapis.com/v1/" + base + "/audit?documentId=" + encodeURIComponent(auditId), {
     method:"POST", headers:{"Authorization":"Bearer " + firebaseToken,"Content-Type":"application/json"},
     body:JSON.stringify({fields:auditFields})
   });
@@ -1819,7 +1831,7 @@ async function downloadSignatureFile(request, env) {
   if (String(description.documentId||"") !== documentId) await repairSignatureAssetDescription(env,accessToken,fileId,description,documentId,claims,envelopeId,"signature-file/download");
   const size = Number(metadata.size||0);
   if (size > MAX_BYTES) return json({ok:false,error:"The requested file exceeds the 10 MB limit."},400,corsHeaders(request));
-  const media = await fetch("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(fileId)+"?alt=media",{headers:{Authorization:"Bearer "+accessToken}});
+  const media = await boundedFetch("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(fileId)+"?alt=media",{headers:{Authorization:"Bearer "+accessToken}});
   if (!media.ok) throw new Error("Google Drive download failed.");
   const buffer = new Uint8Array(await media.arrayBuffer());
   return json({ok:true,fileId,fileName:metadata.name,contentType:metadata.mimeType,base64:uint8ToBase64(buffer)},200,corsHeaders(request));
@@ -1899,7 +1911,7 @@ async function finalizeSignatureProfileArchives(request, env) {
     };
     const boundary = `irpa-${crypto.randomUUID()}`;
     const body = buildMultipartBody(boundary, metadata, bytes, "application/pdf");
-    const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
+    const response = await boundedFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,createdTime,parents", {
       method:"POST",
       headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":`multipart/related; boundary=${boundary}`},
       body
@@ -2025,7 +2037,7 @@ function firestoreFieldValue(field) {
   return null;
 }
 async function queryMeetingArchiveRecords(env, collectionName, meetingId, token) {
-  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
+  const response=await boundedFetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{
     method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
     body:JSON.stringify({structuredQuery:{from:[{collectionId:collectionName}],where:{fieldFilter:{field:{fieldPath:"meetingId"},op:"EQUAL",value:{stringValue:meetingId}}},limit:200}})
   });
@@ -2839,7 +2851,7 @@ async function deleteDriveFile(request, env) {
     );
   }
 
-  const response = await fetch(
+  const response = await boundedFetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
     {
       method: "DELETE",
@@ -2876,7 +2888,7 @@ async function getDriveAccessToken(env) {
   if (!stored?.encrypted) throw new Error("Google Drive has not yet been authorized.");
 
   const refreshToken = await decryptText(stored.encrypted, env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY);
-  const response = await fetch("https://oauth2.googleapis.com/token", {
+  const response = await boundedFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -2950,7 +2962,7 @@ async function findOrCreateFolder(env, accessToken, name, parentId = null, descr
 }
 
 async function driveFetch(env, accessToken, path, options = {}) {
-  const response = await fetch(`https://www.googleapis.com${path}`, {
+  const response = await boundedFetch(`https://www.googleapis.com${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -3039,7 +3051,7 @@ async function getFirebaseJwks() {
     return jwksCache;
   }
 
-  const response = await fetch(
+  const response = await boundedFetch(
     "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
   );
 
@@ -3066,7 +3078,7 @@ async function getFirebaseJwks() {
 async function queryFirestoreByEmail(env, collectionName, fieldName, email, firebaseToken) {
   const value = String(email || "").trim().toLowerCase();
   if (!value) return [];
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
+  const response = await boundedFetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`, {
     method:"POST",
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({
@@ -3104,7 +3116,7 @@ function firestoreDocumentToPlain(document) {
  
 async function getFirestoreDocumentsByField(env, collectionName, fieldName, value, firebaseToken) {
   if (value === null || value === undefined || String(value) === "") return [];
-  const response = await fetch(
+  const response = await boundedFetch(
     `https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`,
     {
       method: "POST",
@@ -3129,7 +3141,7 @@ async function getFirestoreDocumentsByField(env, collectionName, fieldName, valu
 async function getFirestoreDocumentsByEmail(env, collectionName, email, firebaseToken) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) return [];
-  const response = await fetch(
+  const response = await boundedFetch(
     `https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`,
     {
       method: "POST",
@@ -3237,7 +3249,7 @@ async function getFirestoreAdminAccessToken(env) {
   );
   const assertion = unsigned + "." + base64UrlEncodeBytes(new Uint8Array(signature));
   diagnosticStep = "token exchange";
-  const response = await fetch("https://oauth2.googleapis.com/token", {
+  const response = await boundedFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -3274,7 +3286,7 @@ export async function commitFirestoreDocumentAndAudit(env, documentId, _firebase
     documentWrite,
     {update:{name:`${base}/audit/${auditId}`,fields:auditFields},currentDocument:{exists:false}}
   ];
-  const response=await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:commit`,{
+  const response=await boundedFetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:commit`,{
     method:"POST",
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({writes})
@@ -3307,7 +3319,7 @@ async function recordDocumentLifecycleFailure(env, claims, documentId, action, d
     details: {mapValue: {fields: Object.fromEntries(Object.entries(details).map(([key, value]) => [key, value == null ? {nullValue: null} : {stringValue: String(value).slice(0, 1000)}]))}},
     createdAt: {timestampValue: new Date().toISOString()}
   };
-  const response = await fetch(`https://firestore.googleapis.com/v1/${base}/audit?documentId=${encodeURIComponent(auditId)}`, {
+  const response = await boundedFetch(`https://firestore.googleapis.com/v1/${base}/audit?documentId=${encodeURIComponent(auditId)}`, {
     method: "POST",
     headers: {"Authorization": `Bearer ${firebaseToken}`, "Content-Type": "application/json"},
     body: JSON.stringify({fields: auditFields})
@@ -3319,7 +3331,7 @@ async function recordDocumentLifecycleFailure(env, claims, documentId, action, d
 async function updateFirestoreDocument(env, path, firebaseToken, fields, updateMask) {
   const url = new URL(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`);
   for (const fieldPath of updateMask || Object.keys(fields)) url.searchParams.append("updateMask.fieldPaths", fieldPath);
-  const response = await fetch(url.toString(), {
+  const response = await boundedFetch(url.toString(), {
     method:"PATCH",
     headers:{"Authorization":`Bearer ${firebaseToken}`,"Content-Type":"application/json"},
     body:JSON.stringify({fields})
@@ -3338,7 +3350,7 @@ async function updateFirestoreDocument(env, path, firebaseToken, fields, updateM
 }
 
 async function getFirestoreDocument(env, path, firebaseToken) {
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`, {
+  const response = await boundedFetch(`https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents/${path}`, {
     headers: { Authorization: `Bearer ${firebaseToken}` }
   });
   if (response.status === 404) return null;
