@@ -37,6 +37,28 @@ import { createReleaseReadinessRoute } from "./releaseReadinessRoutes.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
+const OUTBOUND_TIMEOUT_MS = 8000;
+async function fetchWithTimeout(input, init = {}, timeoutMs = OUTBOUND_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const externalSignal = init.signal;
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(new Error("Outbound request timed out after " + timeoutMs + "ms.")); }, timeoutMs);
+  const abortFromCaller = () => controller.abort(externalSignal.reason);
+  if (externalSignal) {
+    if (externalSignal.aborted) abortFromCaller();
+    else externalSignal.addEventListener("abort", abortFromCaller, { once: true });
+  }
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) throw Object.assign(new Error("Outbound request timed out after " + timeoutMs + "ms."), { code: "OUTBOUND_TIMEOUT", timeoutMs });
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener("abort", abortFromCaller);
+  }
+}
+
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
