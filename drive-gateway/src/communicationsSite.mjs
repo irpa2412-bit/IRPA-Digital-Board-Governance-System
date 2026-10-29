@@ -6,18 +6,23 @@ const AUTHOR_ROLES = new Set([
   "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director",
   "Executive Director", "Administrator"
 ]);
-const REVIEW_ROLES = new Set([
-  "Executive Director", "Director Outreach", "Outreach Director",
-  "Director Community Development", "Community Development Director", "Approver", "Administrator"
-]);
+const REVIEW_ROLES = new Set(["Approver"]);
 const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
 const MAX_EDIT_BYTES = 512 * 1024;
-const WEBSITE_EDITOR_ROLES = new Set([
-  "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
-  "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
-  "Media Officer", "Media Manager", "Public Relations Officer", "Communications & Media Officer",
-  "Communications and Media Officer", "Media and Communications Officer", "Media & Communications Officer"
+const WEBSITE_EDITOR_ROLES = new Set(["Administrator", "Communications Officer", "Executive Director"]);
+const WEBSITE_EDITOR_ROLE_ALIASES = new Map([
+  ["communication & media", "Communications Officer"], ["communications & media", "Communications Officer"],
+  ["communication and media", "Communications Officer"], ["communications and media", "Communications Officer"],
+  ["communication officer", "Communications Officer"], ["communications manager", "Communications Officer"],
+  ["communication manager", "Communications Officer"], ["media officer", "Communications Officer"],
+  ["media manager", "Communications Officer"], ["public relations officer", "Communications Officer"],
+  ["communications & media officer", "Communications Officer"], ["communications and media officer", "Communications Officer"],
+  ["media and communications officer", "Communications Officer"], ["media & communications officer", "Communications Officer"]
 ]);
+function canonicalWebsiteRole(role) {
+  const value = String(role || "").trim();
+  return WEBSITE_EDITOR_ROLE_ALIASES.get(value.toLowerCase()) || value;
+}
 const MAX_WEBSITE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 
 function values(record) {
@@ -152,10 +157,13 @@ export function createCommunicationsSiteRouter(deps) {
       ...(Array.isArray(claims.irpaRoles) ? claims.irpaRoles : []),
       claims.role, claims.title, claims.position
     ].filter(Boolean).flatMap(v => String(v).split(",").map(s => s.trim()).filter(Boolean));
-    const roles = [...new Set([...tokenRoles, ...values(member), ...values(employee)])];
+    const rawRoles = [...new Set([...tokenRoles, ...values(member), ...values(employee)])];
+    const roles = [...new Set(rawRoles.map(canonicalWebsiteRole))];
     const isActive = active(member) || active(employee);
     if (!isActive || !roles.some(role => WEBSITE_EDITOR_ROLES.has(role))) {
-      throw new Error("Your registered Communication & Media role does not permit this website-editing action.");
+      const required = "website.content.draft_edit";
+      const holders = [...WEBSITE_EDITOR_ROLES].join(", ");
+      throw new Error("Website authorisation denied; effective roles: " + (roles.join(", ") || "none") + "; required capability: " + required + "; roles holding capability: " + holders + "; active profile: " + String(isActive) + ".");
     }
     return { claims, roles, admin: false };
   }
