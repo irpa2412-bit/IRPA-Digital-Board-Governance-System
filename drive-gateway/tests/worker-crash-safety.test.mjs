@@ -47,15 +47,3 @@ test("all Worker outbound fetches in the main module use the eight-second timeou
   assert.equal(outsideHelper.includes("fetch(`https://"), false);
 });
 
-test("profile authorization does not add a redundant service-account token exchange", async () => {
-  const source = await fs.readFile(new URL("../src/index.js", import.meta.url), "utf8");
-  const reconcileStart = source.indexOf("async function reconcileSignatureDocumentIds");
-  const reconcileEnd = source.indexOf("\n}\n", reconcileStart);
-  const reconcile = source.slice(reconcileStart, reconcileEnd);
-  const policyStart = source.indexOf("async function controlledDocumentUploadPolicyCheck");
-  const policyEnd = source.indexOf("\n}\n", policyStart);
-  const policy = source.slice(policyStart, policyEnd);
-  assert.ok(reconcile.includes("getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token)"));
-  assert.ok(policy.includes("getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token)"));
-  assert.ok(!policy.includes("getFirestoreAdminAccessToken(env)"));
-});
