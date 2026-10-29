@@ -51,7 +51,7 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = OUTBOUND_TIMEOUT_M
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (error) {
-    if (timedOut) throw Object.assign(new Error("Outbound request timed out after " + timeoutMs + "ms."), { code: "OUTBOUND_TIMEOUT", timeoutMs });
+    if (timedOut) { let target = "unknown outbound endpoint"; try { const parsed = new URL(typeof input === "string" ? input : input.url); target = parsed.hostname + parsed.pathname; } catch {} throw Object.assign(new Error("Outbound request timed out after " + timeoutMs + "ms."), { code: "OUTBOUND_TIMEOUT", timeoutMs, diagnosticStep: "outbound HTTP request " + target }); }
     throw error;
   } finally {
     clearTimeout(timeout);
