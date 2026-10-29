@@ -1804,7 +1804,7 @@ jobs:
       staging_gateway_url: ${{ steps.staging_health.outputs.gateway_url }}
       staging_signer_uid: ${{ steps.staging_crypto_key.outputs.signer_uid }}
       staging_key_id: ${{ steps.staging_crypto_key.outputs.key_id }}
-    if: ((github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness')) || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && github.ref == 'refs/heads/fix/signature-pathway-20261025')
+    if: ((github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness')) || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && github.ref == 'refs/heads/fix/signature-pathway-20261025'))
     concurrency:
       group: irpa-staging-gateway-deploy
       cancel-in-progress: false
