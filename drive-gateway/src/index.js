@@ -10,9 +10,6 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
-const SMTP_HOST = "mail.irpa.or.tz";
-const SMTP_PORT = 465;
-const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
@@ -2736,11 +2733,16 @@ async function enforceMailRateLimit(env, uid) {
 async function smtpSend(env,{to,subject,text,html}) {
   const toEmail = normalizeRecipientEmail(to);
   const cleanSubject = validateMailHeader(subject, "Subject");
+  const smtpHost = String(env.SMTP_HOST || "").trim();
+  const smtpPort = Number(env.SMTP_PORT || 465);
+  const smtpFrom = String(env.SMTP_FROM || "").trim();
+  if (!smtpHost || /[\\s/]/.test(smtpHost) || ![465,587].includes(smtpPort)) throw new Error("IRPA SMTP host or port is not configured correctly.");
+  if (!/^[^\\s<>@]+@[^\\s<>@]+\\.[^\\s<>@]+$/.test(smtpFrom)) throw new Error("IRPA SMTP sender address is not configured correctly.");
   if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
   if (env.SMTP_MOCK === "fail") throw new Error("Mock SMTP provider failure.");
   if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
   const { connect } = await import("cloudflare:sockets");
-  const socket = connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
+  const socket = connect({hostname:smtpHost,port:smtpPort},{secureTransport:"on"});
   const reader = socket.readable.getReader();
   const writer = socket.writable.getWriter();
   let buffer = "";
@@ -2769,13 +2771,13 @@ async function smtpSend(env,{to,subject,text,html}) {
     await readResponse();
     await command("EHLO irpa-digital-board-governance","2");
     await authenticateSmtpPlain({
-      username:env.SMTP_USERNAME||SMTP_FROM,
+      username:env.SMTP_USERNAME||smtpFrom,
       password:env.SMTP_PASSWORD,
       writeLine:async line=>writer.write(new TextEncoder().encode(line+"\r\n")),
       readResponse,
       command
     });
-    await command("MAIL FROM:<"+SMTP_FROM+">","2");
+    await command("MAIL FROM:<"+smtpFrom+">","2");
     await command("RCPT TO:<"+toEmail+">","2");
     await command("DATA","3");
     const boundary="IRPA-"+crypto.randomUUID();
