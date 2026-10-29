@@ -2400,7 +2400,7 @@ jobs:
 
   deploy-staging-frontend:
     needs: [local-e2e, preflight-staging]
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024') || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025'))
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness')) || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
