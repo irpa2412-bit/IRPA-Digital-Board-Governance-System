@@ -488,6 +488,9 @@ export default {
         rawMessage.startsWith("Invalid Firebase token") ||
         rawMessage === "Firebase token is expired." ||
         rawMessage === "Firebase token signing key not found.";
+      // Preserve established client contracts for expected authorization/domain errors.
+      if (isAuthError) return json({ ok: false, error: rawMessage }, 401, corsHeaders(request));
+      if (rawMessage.startsWith("IRPA_INVITATION_FAILURE:")) return json({ ok: false, error: rawMessage }, Number(error?.status || 403), corsHeaders(request));
 
       return json({
         ok: false,
