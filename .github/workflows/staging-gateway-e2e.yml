@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024, fix/signature-pathway-20261025]
+    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024, fix/signature-pathway-20261025, fix/worker-crash-proof-release-readiness]
   pull_request:
     branches: [main]
     paths:
@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025'))
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -109,7 +109,7 @@ jobs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
     # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
 # dispatch isolated runtime acceptance is an explicit staging-only opt-in; production is not targeted.
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration')
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -234,6 +234,9 @@ jobs:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           APP_URL: https://irpa-dbg-staging-a73ec.web.app
           CP_ROOT: ${{ secrets.STAGING_CPANEL_DOCUMENT_ROOT }}
+          SMTP_HOST: ${{ vars.STAGING_SMTP_HOST }}
+          SMTP_PORT: ${{ vars.STAGING_SMTP_PORT }}
+          SMTP_FROM: ${{ vars.STAGING_SMTP_FROM }}
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
@@ -1631,7 +1634,7 @@ jobs:
 # Archive acceptance is staging-only; production deployment remains separately manual.
 
   preflight-staging:
-    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025'))) 
+    if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness'))) 
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1776,7 +1779,7 @@ jobs:
           NODE
 
   dispatch-staging-acceptance:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025') && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness') && contains(github.event.head_commit.message, 'dispatch isolated runtime acceptance')
     needs: [local-e2e, preflight-staging]
     runs-on: ubuntu-latest
     permissions:
@@ -1801,7 +1804,7 @@ jobs:
       staging_gateway_url: ${{ steps.staging_health.outputs.gateway_url }}
       staging_signer_uid: ${{ steps.staging_crypto_key.outputs.signer_uid }}
       staging_key_id: ${{ steps.staging_crypto_key.outputs.key_id }}
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024') || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && github.ref == 'refs/heads/fix/signature-pathway-20261025')
+    if: ((github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness')) || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && github.ref == 'refs/heads/fix/signature-pathway-20261025'))
     concurrency:
       group: irpa-staging-gateway-deploy
       cancel-in-progress: false
@@ -1938,7 +1941,7 @@ jobs:
               GIT_SHA:process.env.GIT_SHA,
               AUTHORIZED_DRIVE_EMAIL:"irpa2412@gmail.com",
               IRPA_APP_URL:process.env.APP_URL,
-              SMTP_HOST:"mail.irpa.or.tz",SMTP_PORT:"465",SMTP_FROM:"info@irpa.or.tz",
+              SMTP_HOST:process.env.SMTP_HOST,SMTP_PORT:String(process.env.SMTP_PORT||""),SMTP_FROM:process.env.SMTP_FROM,
               DRIVE_ROOT_FOLDER_NAME:"IRPA Governance System - STAGING",
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
               IRPA_PRODUCTION_CUTOVER:"false",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
@@ -1954,6 +1957,7 @@ jobs:
             triggers:{crons:["0 * * * *"]}
           };
           if(c.vars.FIREBASE_PROJECT_ID!=="irpa-dbg-staging-a73ec"||c.vars.IRPA_PRODUCTION_CUTOVER!=="false"||c.vars.IRPA_ENVIRONMENT!=="staging") throw new Error("Staging deployment refused unsafe Firebase project or production cutover configuration.");
+          if(!c.vars.SMTP_HOST||c.vars.SMTP_HOST.toLowerCase()==="mail.irpa.or.tz"||!["465","587"].includes(c.vars.SMTP_PORT)||!c.vars.SMTP_FROM||c.vars.SMTP_FROM.toLowerCase()==="info@irpa.or.tz") throw new Error("Staging SMTP variables are missing or match the blocked production mail configuration.");
           fs.writeFileSync("wrangler.staging.generated.json",JSON.stringify(c,null,2)+"\n");
           NODE
 
@@ -2396,7 +2400,7 @@ jobs:
 
   deploy-staging-frontend:
     needs: [local-e2e, preflight-staging]
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/fix/signature-trail-20261024') || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025'))
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness')) || (github.event_name == 'workflow_dispatch' && (inputs.deploy_staging == true || inputs.deploy_staging == 'true') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/worker-crash-proof-release-readiness' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
