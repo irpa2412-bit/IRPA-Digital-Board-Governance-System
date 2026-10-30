@@ -49,7 +49,7 @@ jobs:
           if (!scripts.length) throw new Error("No existing test scripts were discovered.");
           for (const name of scripts) {
             console.log("\n=== npm run " + name + " ===");
-            const emulatorRequired = name === "test:meeting-category" || name === "test:security-rules";
+            const emulatorRequired = name === "test:meeting-category" || name === "test:finance-policy" || name === "test:security-rules";
             const command = emulatorRequired
               ? ["--yes", "firebase-tools", "emulators:exec", "--only", "firestore", "npm run " + name]
               : ["run", name];
