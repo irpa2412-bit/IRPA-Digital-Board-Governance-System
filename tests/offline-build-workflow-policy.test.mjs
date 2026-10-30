@@ -50,3 +50,43 @@ test("production promotion gate does not depend on desktop or Android wrappers",
   assert.doesNotMatch(promotion, /desktop\/|electron\/|android\//);
   assert.doesNotMatch(promotion, /electron-builder|assembleDebug/);
 });
+
+const androidRelease = read(".github/workflows/android-release-signed.yml");
+const installUi = read("public/install.js");
+const manifest = JSON.parse(read("public/manifest.webmanifest"));
+const serviceWorker = read("public/sw.js");
+
+test("Android PR artifact remains debug-only and signed release is separately gated", () => {
+  assert.match(android, /assembleDebug/);
+  assert.match(androidRelease, /workflow_dispatch/);
+  assert.match(androidRelease, /secrets\.ANDROID_KEYSTORE_BASE64/);
+  assert.match(androidRelease, /secrets\.ANDROID_KEYSTORE_PASSWORD/);
+  assert.match(androidRelease, /secrets\.ANDROID_KEY_ALIAS/);
+  assert.match(androidRelease, /secrets\.ANDROID_KEY_PASSWORD/);
+  assert.match(androidRelease, /assembleRelease/);
+  assert.match(androidRelease, /apksigner.*verify/);
+  assert.match(androidRelease, /aapt.*dump badging/);
+  assert.match(androidRelease, /sha256sum/);
+  assert.match(androidRelease, /tag_name: offline-app-v1/);
+  assert.match(androidRelease, /prerelease: true/);
+  assert.match(androidRelease, /versionCode 2/);
+  assert.match(androidRelease, /minSdkVersion = 23/);
+  assert.match(androidRelease, /targetSdkVersion = 36/);
+  assert.match(androidRelease, /tz\.or\.irpa\.governance/);
+  assert.match(androidRelease, /refs\/heads\/main/);
+});
+
+test("PWA has install prompt handling and visible platform-specific fallback", () => {
+  assert.match(installUi, /beforeinstallprompt/);
+  assert.match(installUi, /Install app/);
+  assert.match(installUi, /Installation help/);
+  assert.match(installUi, /Add to Home Screen/);
+  assert.match(installUi, /Microsoft Edge|Edge/);
+  assert.match(manifest.start_url, /^\/$/);
+  assert.match(manifest.scope, /^\/$/);
+  assert.ok(manifest.icons.some(icon => icon.sizes === "192x192"));
+  assert.ok(manifest.icons.some(icon => icon.sizes === "512x512"));
+  assert.ok(manifest.icons.some(icon => icon.purpose === "maskable"));
+  assert.match(serviceWorker, /addAll\(APP_SHELL\)/);
+  assert.match(serviceWorker, /offline\.html/);
+});
