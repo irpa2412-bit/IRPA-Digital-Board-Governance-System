@@ -1,0 +1,100 @@
+name: Signature Palette Visibility and Full Regression
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/SignatureFieldConfirmationPad.jsx"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/pages/GatewaySigningPortal.jsx"
+      - "tests/fixtures/signature-palette-harness.*"
+      - "tests/signature-palette-visibility.playwright.mjs"
+      - ".github/workflows/signature-palette-visibility.yml"
+  push:
+    branches: ["fix/signature-palette-visibility-20261031"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signature-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Check syntax and lint every JavaScript test module
+        run: |
+          set -uo pipefail
+          mapfile -t modules < <(find tests -type f -name '*.mjs' -print | sort)
+          if [[ ${#modules[@]} -eq 0 ]]; then
+            echo "No test .mjs modules were discovered." >&2
+            exit 1
+          fi
+          failures=0
+          for file in "${modules[@]}"; do
+            echo "=== node --check $file ==="
+            if output=$(node --check "$file" 2>&1); then
+              echo "PASS: $file"
+            else
+              echo "FAIL: $file"
+              printf '%s\n' "$output"
+              failures=$((failures + 1))
+            fi
+          done
+          if [[ "$failures" -gt 0 ]]; then
+            echo "Syntax failures: $failures"
+            exit 1
+          fi
+          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --global window --global localStorage --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' "${modules[@]}"
+      - name: Install ephemeral Playwright runner without changing lockfiles
+        run: npm install --no-save --package-lock=false playwright
+      - name: Install Chromium for desktop and mobile viewport emulation
+        run: npx playwright install --with-deps chromium
+      - name: Run existing explicit-confirmation policy tests
+        run: node --test tests/signature-explicit-confirmation.test.mjs
+      - name: Setup Java for Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run all existing npm test scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(node -e 'const p=require("./package.json"); for (const n of Object.keys(p.scripts||{})) if (n.startsWith("test:")) console.log(n)')
+          if [[ ${#scripts[@]} -eq 0 ]]; then
+            echo "No existing test scripts were discovered." >&2
+            exit 1
+          fi
+          for name in "${scripts[@]}"; do
+            echo
+            echo "=== npm run $name ==="
+            case "$name" in
+              test:meeting-category|test:finance-policy|test:security-rules)
+                npx --yes firebase-tools emulators:exec --only firestore "npm run $name"
+                ;;
+              *)
+                npm run "$name"
+                ;;
+            esac
+          done
+      - name: Run desktop and mobile signature ceremony Playwright tests
+        run: node tests/signature-palette-visibility.playwright.mjs
+      - name: Run production readability and contrast checks
+        run: npm run check:production-readability
+      - name: Build application
+        env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
+          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
+        run: npm run build
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-palette-playwright-results
+          path: test-results/
+          if-no-files-found: ignore
