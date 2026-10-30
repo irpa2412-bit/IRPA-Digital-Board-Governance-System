@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 
+mkdirSync("test-results",{recursive:true});
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4173","--strictPort"],{stdio:"ignore"});
 let browser;
 async function waitForServer(){
@@ -25,6 +27,12 @@ async function runViewport(name,viewport){
  await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
  await page.getByRole("heading",{name:/Signing ceremony/}).waitFor();
  assert.equal(await page.getByTestId("page-number").innerText(),"1");
+ // Cancel must close the dock without placing a signature.
+ await page.getByTestId("field-sig-page-1").click();
+ await assertDockDoesNotCoverPdf(page);
+ await page.getByRole("button",{name:"Cancel",exact:true}).click();
+ assert.equal(await page.getByRole("dialog").count(),0,"Cancel closes the palette");
+ assert.equal(await page.getByTestId("placed-sig-page-1").count(),0,"Cancel does not apply a signature");
  // Draw a signature on page 1.
  await page.getByTestId("field-sig-page-1").click();
  await assertDockDoesNotCoverPdf(page);
