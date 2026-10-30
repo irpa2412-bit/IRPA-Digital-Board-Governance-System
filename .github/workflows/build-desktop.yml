@@ -2,28 +2,71 @@ name: Build IRPA-DBGS Windows installer
 on:
   pull_request:
     branches: [main]
-    paths: ["package.json","electron/**","electron-builder.yml","vite.config.js","index.html","src/**","public/**",".github/workflows/build-desktop.yml"]
+    paths:
+      - "desktop/**"
+      - "electron/**"
+      - "electron-builder.yml"
+      - ".github/workflows/build-desktop.yml"
   push:
     branches: [main]
-    paths: ["package.json","electron/**","electron-builder.yml","vite.config.js","index.html","src/**","public/**"]
-  workflow_dispatch:
+    paths:
+      - "desktop/**"
+      - "electron/**"
+      - "electron-builder.yml"
+      - ".github/workflows/build-desktop.yml"
 permissions:
-  contents: read
+  contents: write
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PR source branch (internal PRs only)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Checkout pushed branch
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+      - name: Reject external PR lockfile write attempts
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          if ($env:HEAD_REPOSITORY -ne $env:BASE_REPOSITORY) { throw "Desktop dependency lock generation is restricted to internal PR branches." }
       - uses: actions/setup-node@v4
-        with: {node-version: 22, cache: npm}
-      - name: Install locked application dependencies
-        run: npm ci
-      - name: Install isolated desktop packager
-        run: npm install --no-save electron@38.2.0 electron-builder@26.0.12
-      - name: Build Windows installer
-        run: npx electron-builder --config electron-builder.yml --win nsis --publish never
+        with:
+          node-version: 22
+      - name: Generate isolated desktop lockfile with npm install
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+      - name: Verify clean desktop installation with npm ci
+        run: npm ci --prefix desktop --no-audit --no-fund
+      - name: Commit generated desktop lockfile to the PR branch
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        env:
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop/package-lock.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Add generated desktop dependency lockfile"
+            git push origin "HEAD:$env:BRANCH_NAME"
+          }
+      - name: Build Windows installer only (no publishing or deployment)
+        shell: pwsh
+        run: |
+          & "desktop/node_modules/.bin/electron-builder.cmd" --config electron-builder.yml --win nsis --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: IRPA-DBGS-Windows-Installer
           path: release/IRPA-DBGS-Setup-1.0.0.exe
           if-no-files-found: error
+          retention-days: 14

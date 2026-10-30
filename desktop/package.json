@@ -1,0 +1,10 @@
+{
+  "name": "irpa-dbgs-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Isolated Windows desktop packaging toolchain for IRPA-DBGS",
+  "devDependencies": {
+    "electron": "38.2.0",
+    "electron-builder": "26.0.12"
+  }
+}
