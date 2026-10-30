@@ -1,0 +1,69 @@
+name: Documentation SRS validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/srs/**'
+      - '.github/workflows/docs-validation.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-validation-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out PR documentation branch
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          repository: \${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          fetch-depth: 0
+      - name: Install independent document and browser tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc libreoffice-writer poppler-utils
+          python -m pip install --upgrade pip
+          python -m pip install python-docx pypdf beautifulsoup4 html5lib playwright
+          python -m playwright install --with-deps chromium
+      - name: Generate exports and run complete documentation validation
+        id: validation
+        continue-on-error: true
+        run: python docs/srs/validate_docs.py
+      - name: Commit regenerated documentation to the PR branch
+        if: always()
+        env:
+          GH_TOKEN: \${{ github.token }}
+          TARGET_BRANCH: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          TARGET_REPOSITORY: \${{ github.event.pull_request.head.repo.full_name || github.repository }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/srs/SRS.docx docs/srs/SRS.pdf docs/srs/WIRE_FRAMES.pdf docs/srs/wireframes/index.html docs/srs/VALIDATION.json docs/srs/VALIDATION.md
+          git diff --cached --quiet || git commit -m "docs(srs): regenerate exports and validation evidence"
+          git push "https://x-access-token:\${GH_TOKEN}@github.com/\${TARGET_REPOSITORY}.git" "HEAD:\${TARGET_BRANCH}"
+      - name: Upload single validation report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-585-docs-validation
+          path: |
+            artifacts/docs-validation/
+            docs/srs/VALIDATION.md
+            docs/srs/VALIDATION.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Enforce validation result
+        if: always()
+        run: |
+          if [ "\${{ steps.validation.outcome }}" != "success" ]; then
+            echo "Documentation validation failed. See RESULTS.md in the artifact."
+            exit 1
+          fi
