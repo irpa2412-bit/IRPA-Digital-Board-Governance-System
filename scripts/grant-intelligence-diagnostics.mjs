@@ -227,19 +227,34 @@ async function browserSuite(target) {
       if (target.name === "staging" && width === 1440) {
         const request = page.getByRole("textbox", { name: "AI Assistant request" });
         const draftRequest = "Draft a concise first-contact partnership request to the Climate Justice Resilience Fund (CJRF) about suitable funding pathways for IRPA's community-led climate resilience and regenerative rangeland work in Longido, Tanzania. Do not claim previous project delivery or secured funding.";
-        await request.fill(draftRequest);
-        // The institutional data-entry gate must be completed through its real UI before generating a draft.
         const fieldGate = page.locator('[data-irpa-field-gate][role="dialog"]');
-        if (await fieldGate.isVisible().catch(() => false)) {
+        const completeTrialFieldGate = async () => {
+          if (!(await fieldGate.isVisible().catch(() => false))) return false;
           await fieldGate.locator('input[name="irpa-data-type"][value="other"]').check();
           await fieldGate.locator('input[name="irpa-data-environment"][value="TRIAL"]').check();
           const confirmGate = fieldGate.getByRole("button", { name: "Confirm environment and continue" });
           await confirmGate.waitFor({ state: "visible", timeout: 10000 });
           await confirmGate.click();
           await fieldGate.waitFor({ state: "hidden", timeout: 10000 });
+          return true;
+        };
+        // Complete the required first-entry gate through its UI and retry any interrupted input.
+        await completeTrialFieldGate();
+        try { await request.fill(draftRequest); }
+        catch (error) {
+          if (!(await fieldGate.isVisible().catch(() => false))) throw error;
+          await completeTrialFieldGate();
           await request.fill(draftRequest);
         }
-        await page.getByRole("button", { name: "Generate requested output" }).click();
+        if (await completeTrialFieldGate()) await request.fill(draftRequest);
+        const generate = page.getByRole("button", { name: "Generate requested output" });
+        try { await generate.click({ timeout: 15000 }); }
+        catch (error) {
+          if (!(await fieldGate.isVisible().catch(() => false))) throw error;
+          await completeTrialFieldGate();
+          await request.fill(draftRequest);
+          await generate.click({ timeout: 15000 });
+        }
         await page.getByRole("textbox", { name: "Editable AI output" }).waitFor({ state: "visible", timeout: 100000 });
         const draft = await page.getByRole("textbox", { name: "Editable AI output" }).inputValue();
         record(target.name, "AI Assistant CJRF browser draft", draft.length > 80 ? "PASS" : "FAIL", draft.length + " characters returned.");
