@@ -255,6 +255,10 @@ async function browserSuite(target) {
           await request.fill(draftRequest);
           await generate.click({ timeout: 15000 });
         }
+        if (await fieldGate.isVisible().catch(() => false)) {
+          await completeTrialFieldGate();
+          await generate.click({ timeout: 15000 });
+        }
         await page.getByRole("textbox", { name: "Editable AI output" }).waitFor({ state: "visible", timeout: 100000 });
         const draft = await page.getByRole("textbox", { name: "Editable AI output" }).inputValue();
         record(target.name, "AI Assistant CJRF browser draft", draft.length > 80 ? "PASS" : "FAIL", draft.length + " characters returned.");
