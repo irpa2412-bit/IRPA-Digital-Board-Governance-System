@@ -129,7 +129,7 @@ async function login(page, target) {
   }
   const search = page.getByRole("textbox", { name: "Search opportunities" });
   if (!(await search.isVisible().catch(() => false))) {
-    const heading = page.locator(".topbar-title-line h2").filter({ hasText: "Grant Intelligence & Funding Opportunities" });
+    const heading = page.getByTestId("grant-intelligence-portal-heading");
     let clickedVisibleNavigation = false;
     if (page.viewportSize().width < 700) {
       const portalsButton = page.getByRole("button", { name: "Portals", exact: true });
