@@ -61,10 +61,10 @@ async function runViewport(name,viewport){
  // into the viewport before using page.mouse (whose coordinates are viewport-relative).
  await canvas.scrollIntoViewIfNeeded();
  const rect=await canvas.boundingBox();
- const viewport=page.viewportSize();
+ const viewportSize=page.viewportSize();
  assert.ok(rect&&rect.width>20&&rect.height>20,"drawing canvas must have a non-zero visible CSS box");
- assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=viewport.width&&rect.y+rect.height<=viewport.height,
-   "drawing canvas must be inside the viewport before pointer input: "+JSON.stringify({rect,viewport}));
+ assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=viewportSize.width&&rect.y+rect.height<=viewportSize.height,
+   "drawing canvas must be inside the viewport before pointer input: "+JSON.stringify({rect,viewport:viewportSize}));
  activeCanvasBox=rect;
  console.log("CANVAS_BOUNDING_BOX "+name+": "+JSON.stringify(rect));
  await canvas.evaluate(el=>{
