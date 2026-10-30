@@ -969,6 +969,7 @@ Access is least-privilege and enforced server-side. A person holding multiple as
 - **GR-07 — AI analysis evidence.** Given an authorised analyst requests eligibility, geographic fit, IRPA strategic alignment or donor alignment, when the analyser completes, then it returns PASS/FAIL/UNKNOWN with cited source evidence, retrieval timestamp, confidence and explicit unknowns and never fabricates donor criteria.
 - **GR-08 — Concept note advisor.** Given authorised staff provide verified opportunity and IRPA project facts, when the advisor drafts guidance, then it produces an editable internal draft with assumptions, missing information, risks and fit rationale and does not submit or send it externally.
 - **GR-09 — Communication & Media funding.** Given a funding record is prepared in Communication & Media, when it is submitted for decision, then it follows the same Executive Director approval state machine and never enters a governance workflow.
+- **GR-10 — Server-side Executive Director grant approval enforcement.** <strong>GAP — NOT VERIFIED IN IMPLEMENTATION.</strong> Given an authenticated user calls any grant/funding approval endpoint directly, when the server processes the decision, then it must independently verify the explicit Executive Director grant-approval entitlement, reject every other role with HTTP 403, persist no state change on rejection, and audit both accepted and denied decisions. UI role labels or hidden controls are not evidence of enforcement. The required server-side entitlement and endpoint enforcement are not confirmed by this documentation review and remain a release-blocking implementation gap.
 
 ### Cross-cutting requirements
 
@@ -990,7 +991,7 @@ Access is least-privilege and enforced server-side. A person holding multiple as
 
 | Requirement ID | Scope | Acceptance criteria | Wireframe / module | Verification |
 |---|---|---|---|---|
-| GR-01–GR-09 | Grant preparation, Executive Director approval, non-submission and crawler boundary | GR-01–GR-09 | MOD-23, MOD-24; grant and communication wireframes | Proposed role/API integration tests |
+| GR-01–GR-10 | Grant preparation, Executive Director approval, server-side enforcement GAP, non-submission and crawler boundary | GR-01–GR-10 | MOD-23, MOD-24; grant and communication wireframes | Proposed role/API integration tests; GR-10 implementation verification GAP |
 | ROLE-01–ROLE-02 | Explicit ED approval role and separation of duties | ROLE-01–ROLE-02 | Role matrix; MOD-23/MOD-24 | Proposed positive and negative permission tests |
 | OFF-01–OFF-02 | Installable/offline app and security boundary | OFF-01–OFF-02 | SHARED-03, SHARED-04 | Proposed install/offline/revocation tests |
 | MOB-01–MOB-02 | Mobile/desktop layout stack | MOB-01–MOB-02 | All 72 wireframes | Browser viewport and overflow tests |
@@ -999,4 +1000,4 @@ Access is least-privilege and enforced server-side. A person holding multiple as
 
 ### Module requirement coverage register
 
-The 31 source-baseline modules retain their existing MOD-01 through MOD-31 requirement headers and two or more Given/When/Then criteria each; the standalone portals retain STD-01 through STD-03, the nested portals retain SUB-01 through SUB-15, and the 59 enumerated route/path families retain API-01 through API-59. Grant-specific additional requirements are GR-01 through GR-09 and ROLE-01 through ROLE-02; shared offline/mobile requirements are OFF-01 through OFF-02 and MOB-01 through MOB-02; AI additions are AI-05 through AI-06; recovery is DR-01. Existing test IDs remain PROPOSED until executable tests are implemented and run.
+The 31 source-baseline modules retain their existing MOD-01 through MOD-31 requirement headers and two or more Given/When/Then criteria each; the standalone portals retain STD-01 through STD-03, the nested portals retain SUB-01 through SUB-15, and the 59 enumerated route/path families retain API-01 through API-59. Grant-specific additional requirements are GR-01 through GR-10 (GR-10 server-side enforcement GAP) and ROLE-01 through ROLE-02; shared offline/mobile requirements are OFF-01 through OFF-02 and MOB-01 through MOB-02; AI additions are AI-05 through AI-06; recovery is DR-01. Existing test IDs remain PROPOSED until executable tests are implemented and run.
