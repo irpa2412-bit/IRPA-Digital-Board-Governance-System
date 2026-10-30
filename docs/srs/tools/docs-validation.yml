@@ -30,8 +30,11 @@ jobs:
           p=Path('docs/srs/tools/docs-validation.yml')
           d=yaml.safe_load(p.read_text())
           assert isinstance(d,dict) and 'jobs' in d and 'workflow_dispatch' in d.get('on',d.get(True,{}))
-          print('YAML parsed; workflow_dispatch trigger and jobs found')
+          assert 'push' in d.get('on',d.get(True,{}))
+          print('YAML parsed; dispatch and docs push triggers found')
           PY
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          "$HOME/go/bin/actionlint" docs/srs/tools/docs-validation.yml
       - name: Generate exports and validate all documentation
         id: validate
         run: |
@@ -53,6 +56,7 @@ jobs:
           srs=(d/'SRS.md').read_text(); add=(d/'ACCEPTANCE-CRITERIA-ADDENDUM.md').read_text()
           combined=out/'SRS-source.md'; combined.write_text(srs+'\n\n---\n\n'+add)
           cmd(['pandoc',str(combined),'-o',str(d/'SRS.docx'),'--toc','--number-sections'])
+          (d/'SRS.pdf').unlink(missing_ok=True)
           cmd(['libreoffice','-env:UserInstallation=file:///tmp/lo-profile','--headless','--convert-to','pdf','--outdir',str(d),str(d/'SRS.docx')])
           # Parse index, require exactly 72 distinct linked HTML wireframes.
           soup=BeautifulSoup((w/'index.html').read_text(),'html.parser')
@@ -61,6 +65,15 @@ jobs:
               href=a['href'].split('#')[0]
               if href.lower().endswith('.html') and Path(href).name not in ('index.html','_wireframe-template.html') and href not in links: links.append(href)
           pages=[w/x for x in links]; missing=[str(x) for x in pages if not x.is_file()]
+          # Rebuild the navigation index from the verified ordered links and their current labels.
+          items=[]
+          for a in soup.select('a[href]'):
+              href=a['href'].split('#')[0]
+              if href in links:
+                  li=a.find_parent('li')
+                  if li and str(li) not in items: items.append(str(li))
+          index_html='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IRPA-DBGS Wireframe Index</title></head><body><h1>IRPA-DBGS Wireframe Index</h1><p>72 responsive wireframes with EMPTY, LOADING, ERROR and OFFLINE states.</p><ol>'+''.join(items)+'</ol></body></html>'
+          (w/'index.html').write_text(index_html)
           record('Index links exactly 72 unique wireframes',len(links)==72,len(links))
           record('Every index link resolves',not missing,missing)
           parsebad=[]
