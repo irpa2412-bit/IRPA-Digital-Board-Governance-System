@@ -80,6 +80,13 @@ Date: 30 October 2026. Scope: documentation-only PR #585. No application code, F
 - `WIRE_FRAMES.pdf`: generated from all 72 indexed wireframe pages; 142,590 bytes; 72 pages.
 - The Word package and both PDFs pass structural/signature checks performed during generation. They were not opened in Microsoft Word, LibreOffice or a desktop PDF viewer; external viewer compatibility remains unverified.
 
+## Downloadable exports added
+
+- `SRS.docx`: generated from the current `SRS.md` source; 302,468 bytes.
+- `SRS.pdf`: generated from the same SRS source; 23 pages.
+- `WIRE_FRAMES.pdf`: generated from all 72 indexed wireframe pages; 72 pages.
+- External Microsoft Word/LibreOffice and independent PDF-viewer opening was not available; structural generation checks do not replace viewer acceptance.
+
 ## Failures / limitations
 
 1. **Rendering validation incomplete:** all 72 pages still require real Chromium runs at both viewport sizes. Horizontal overflow is unverified.
