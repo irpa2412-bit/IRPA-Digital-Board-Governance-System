@@ -1,4 +1,4 @@
-name: Build IRPA Android APK
+name: Build and sign IRPA Android APK
 on:
   pull_request:
     branches: [main]
@@ -10,19 +10,15 @@ on:
       - "public/**"
       - "tests/offline-build-workflow-policy.test.mjs"
       - ".github/workflows/android-apk.yml"
-  push:
-    branches: [main]
-    paths:
-      - "capacitor.config.ts"
-      - "package.json"
-      - "package-lock.json"
-      - "src/**"
-      - "public/**"
-      - "tests/offline-build-workflow-policy.test.mjs"
-      - ".github/workflows/android-apk.yml"
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Attach the signed APK and SHA-256 file to pre-release offline-app-v1 (main branch only)"
+        required: true
+        type: boolean
+        default: false
 permissions:
-  contents: read
+  contents: write
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -44,12 +40,110 @@ jobs:
         run: npm run build
       - name: Create and synchronize native Android wrapper
         run: npx cap add android && npx cap sync android
-      - name: Build debug APK only (no deployment or publishing)
+      - name: Configure stable Android identity and supported SDK range
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f android/app/build.gradle
+          sed -i 's/minSdkVersion = .*/minSdkVersion = 23/' android/variables.gradle
+          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='android/app/build.gradle';
+          let s=fs.readFileSync(p,'utf8');
+          s=s.replace(/versionCode\s+\d+/, 'versionCode 2');
+          s=s.replace(/versionName\s+"[^"]+"/, 'versionName "1.0.1"');
+          if (!s.includes("applicationId")) throw new Error("Generated Android Gradle file has no applicationId");
+          s=s.replace(/applicationId\s+"[^"]+"/, 'applicationId "tz.or.irpa.governance"');
+          fs.writeFileSync(p,s);
+          NODE
+      - name: Build debug APK for pull-request verification
+        if: github.event_name == 'pull_request'
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
+      - name: Require encrypted release-signing secrets
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Missing GitHub Actions secret: $name"; exit 1; fi
+          done
+          mkdir -p "$RUNNER_TEMP/irpa-signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/irpa-signing/release.jks"
+          chmod 600 "$RUNNER_TEMP/irpa-signing/release.jks"
+          keytool -list -keystore "$RUNNER_TEMP/irpa-signing/release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
+      - name: Configure release signing
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/irpa-signing/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='android/app/build.gradle';
+          let s=fs.readFileSync(p,'utf8');
+          const signing='''';
+          const block = `signingConfigs {
+                  release {
+                      storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+          `;
+          s=s.replace(/android\\s*\\{/, m=>m+ '\\n    '+block);
+          s=s.replace(/buildTypes\\s*\\{\\s*release\\s*\\{/, m=>m+'\\n            signingConfig signingConfigs.release');
+          fs.writeFileSync(p,s);
+          NODE
+      - name: Build universal release APK
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Verify release APK signature and metadata; create checksum
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          mkdir -p release-assets
+          cp "$APK" release-assets/IRPA-DBGS-Android-1.0.1.apk
+          (cd release-assets && sha256sum IRPA-DBGS-Android-1.0.1.apk > SHA256SUMS.txt)
+          rm -rf "$RUNNER_TEMP/irpa-signing"
+      - name: Upload pull-request debug APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          name: IRPA-DBGS-Android-APK
+          name: IRPA-DBGS-Android-PR-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Upload signed release APK artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Android-Release
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Replace APK and checksum on offline-app-v1 pre-release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: offline-app-v1
+          name: offline-app-v1
+          prerelease: true
+          files: |
+            release-assets/IRPA-DBGS-Android-1.0.1.apk
+            release-assets/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
