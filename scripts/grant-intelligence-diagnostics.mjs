@@ -159,12 +159,21 @@ async function login(page, target) {
     throw new Error("Grant Intelligence page not visible after visible-nav click and irpa:navigate fallback: " + body);
   }
 }
+function isOptionalWeatherForecast(value) {
+  try {
+    const url = new URL(value);
+    return url.hostname === "api.open-meteo.com" && url.pathname === "/v1/forecast";
+  } catch {
+    return false;
+  }
+}
+
 async function browserSuite(target) {
   const credentialNames = target.name === "staging" ? ["STAGING_APP_URL","STAGING_TEST_EMAIL","STAGING_TEST_PASSWORD"] : ["PRODUCTION_TEST_EMAIL","PRODUCTION_TEST_PASSWORD"];
   if (!target.app || !target.email || !target.password) {
     for (const name of credentialNames) if (!process.env[name]) need(name);
     if (target.name === "production" && (!target.email || !target.password)) {
-      record(target.name, "Authenticated Playwright", "SKIPPED (no production test login)", "Production portal browser tests skipped because a production test email or password was not supplied. Read-only production Worker route checks continue independently.");
+      record(target.name, "Authenticated Playwright", "SKIP", "Production portal browser tests skipped because PRODUCTION_TEST_EMAIL or PRODUCTION_TEST_PASSWORD was not supplied. Read-only production Worker route checks continue independently.");
     } else {
       record(target.name, "Authenticated Playwright", "SKIP", "Missing app URL or staging login credentials; dependent browser tests not run.");
     }
@@ -184,6 +193,7 @@ async function browserSuite(target) {
         const source = location.url || "unknown";
         const line = message.text() + " [source=" + source + ":" + (location.lineNumber || 0) + "]";
         if (/\/api\/auth\/password-attempt-state(?:$|\?)/.test(source)) warnings.push("Optional dashboard password-security endpoint (not Grant Intelligence): " + line);
+        else if (isOptionalWeatherForecast(source)) warnings.push("Unrelated dashboard weather forecast service: " + line);
         else errors.push(line);
       });
       page.on("pageerror", error => errors.push(error.message));
@@ -191,6 +201,7 @@ async function browserSuite(target) {
         if (response.status() < 400) return;
         const url = response.url();
         if (response.status() === 404 && /\/api\/auth\/password-attempt-state(?:$|\?)/.test(url)) warnings.push("HTTP 404 from optional dashboard password-security endpoint (not Grant Intelligence): " + url);
+        else if (response.status() === 429 && isOptionalWeatherForecast(url)) warnings.push("HTTP 429 from unrelated dashboard weather forecast service: " + url);
         else httpErrors.push("HTTP " + response.status() + " " + url);
       });
       page.on("requestfailed", request => {
@@ -234,11 +245,22 @@ async function browserSuite(target) {
         const fieldGate = page.locator('[data-irpa-field-gate][role="dialog"]');
         const completeTrialFieldGate = async () => {
           if (!(await fieldGate.isVisible().catch(() => false))) return false;
-          await fieldGate.locator('input[name="irpa-data-type"][value="other"]').check();
-          await fieldGate.locator('input[name="irpa-data-environment"][value="TRIAL"]').check();
+          const dataTypeOption = fieldGate.locator('input[name="irpa-data-type"][value="other"]');
+          const trialOption = fieldGate.locator('input[name="irpa-data-environment"][value="TRIAL"]');
+          await dataTypeOption.check();
+          await trialOption.check();
+          if (!(await dataTypeOption.isChecked()) || !(await trialOption.isChecked())) {
+            throw new Error("Field-entry gate did not retain the selected Other + TRIAL options.");
+          }
           const confirmGate = fieldGate.getByRole("button", { name: "Confirm environment and continue" });
           await confirmGate.waitFor({ state: "visible", timeout: 10000 });
-          if (await confirmGate.isDisabled()) throw new Error("Field-entry gate remained disabled after selecting Other + TRIAL.");
+          await confirmGate.waitFor({ state: "attached", timeout: 10000 });
+          await page.waitForFunction(() => {
+            const dialog = document.querySelector('[data-irpa-field-gate][role="dialog"]');
+            const button = dialog?.querySelector('button[type="button"]');
+            return !!button && !button.disabled;
+          }, { timeout: 12000 }).catch(() => {});
+          if (await confirmGate.isDisabled()) throw new Error("Field-entry gate remained disabled after selecting Other + TRIAL; check actual-data status must not block trial entry.");
           await confirmGate.click();
           await fieldGate.waitFor({ state: "hidden", timeout: 10000 });
           return true;

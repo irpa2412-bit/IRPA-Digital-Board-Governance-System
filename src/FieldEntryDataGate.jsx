@@ -253,7 +253,7 @@ export default function FieldEntryDataGate({portal}){
   };
 
   if(!field)return null;
-  const disabled=actualDataAccessLoading||!dataType||!environment||(environment==="ACTUAL"&&!confirmed)||(environment==="ACTUAL"&&!actualOnly&&!actualDataAccessOpen)||(actualOnly&&environment!=="ACTUAL");
+  const disabled=!dataType||!environment||(environment==="ACTUAL"&&(actualDataAccessLoading||!confirmed||(!actualOnly&&!actualDataAccessOpen)))||(actualOnly&&environment!=="ACTUAL");
   return <div data-irpa-field-gate role="dialog" aria-modal="true" aria-labelledby="irpa-field-gate-title" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();close()}}} style={{position:"fixed",inset:0,zIndex:30000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(3,12,10,.78)",backdropFilter:"blur(5px)",overflowY:"auto"}}>
     <section style={{width:"min(100%,680px)",maxHeight:"92vh",overflowY:"auto",background:"var(--surface, #fff)",color:"var(--text, #14231f)",border:"1px solid var(--border, #cbd5d1)",borderRadius:18,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"}}>
       <div style={{fontSize:12,fontWeight:800,letterSpacing:1.4,textTransform:"uppercase",opacity:.75}}>IRPA · Data Control</div>
