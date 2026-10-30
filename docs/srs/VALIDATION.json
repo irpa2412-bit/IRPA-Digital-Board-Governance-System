@@ -69,5 +69,9 @@
     "F-08 DOCX/PDF exports stale; regenerate",
     "F-09 HTML bulk parse and Chromium renders not run",
     "F-10 external viewer opening not run"
-  ]
+  ],
+  "grantApprovalAuthority": "EXECUTIVE DIRECTOR ONLY",
+  "executiveDirectorRoleInCode": "PRESENT: GrantIntelligencePortal management allow-list; Communications Site editor allow-list; explicit grant approval server enforcement remains a GAP",
+  "governanceGrantWorkflowLinks": "ZERO POSITIVE LINKS IN REVISED SRS AND FUNDING WIREFRAMES",
+  "backupRetentionApproval": "TO BE APPROVED BY IRPA MANAGEMENT; proposed daily encrypted backup, 30-day retention, monthly tested restore, RPO 24h, RTO 48h"
 }
