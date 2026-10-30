@@ -124,19 +124,35 @@ async function login(page, target) {
     await page.waitForTimeout(9000);
   }
   const search = page.getByRole("textbox", { name: "Search opportunities" });
-  if (!(await search.count())) {
+  if (!(await search.isVisible().catch(() => false))) {
+    const heading = page.locator(".topbar-title-line h2").filter({ hasText: "Grant Intelligence & Funding Opportunities" });
+    let clickedVisibleNavigation = false;
     if (page.viewportSize().width < 700) {
-      await page.getByRole("button", { name: "Portals", exact: true }).click();
+      const portalsButton = page.getByRole("button", { name: "Portals", exact: true });
+      if (await portalsButton.isVisible().catch(() => false)) await portalsButton.click();
       const navigation = page.getByRole("dialog", { name: "Mobile navigation" });
-      await navigation.getByRole("button", { name: "Grant Intelligence & Funding Opportunities", exact: true }).click();
+      const targetButton = navigation.getByRole("button", { name: "Grant Intelligence & Funding Opportunities", exact: true }).first();
+      if (await targetButton.isVisible().catch(() => false)) {
+        await targetButton.click();
+        clickedVisibleNavigation = true;
+      }
     } else {
-      await page.getByRole("button", { name: "Grant Intelligence & Funding Opportunities", exact: true }).first().click();
+      const targetButton = page.getByRole("button", { name: "Grant Intelligence & Funding Opportunities", exact: true }).first();
+      if (await targetButton.isVisible().catch(() => false)) {
+        await targetButton.click();
+        clickedVisibleNavigation = true;
+      }
     }
+    if (clickedVisibleNavigation) await heading.waitFor({ state: "visible", timeout: 8000 }).catch(() => {});
+    if (!(await heading.isVisible().catch(() => false))) {
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("irpa:navigate", { detail: { module: "Grant Intelligence & Funding Opportunities" } })));
+    }
+    await heading.waitFor({ state: "visible", timeout: 25000 });
     await search.waitFor({ state: "visible", timeout: 25000 });
   }
-  if (!(await search.count())) {
+  if (!(await search.isVisible().catch(() => false))) {
     const body = (await page.locator("body").innerText()).slice(0, 1200);
-    throw new Error("Grant Intelligence page not visible after authenticated portal navigation: " + body);
+    throw new Error("Grant Intelligence page not visible after visible-nav click and irpa:navigate fallback: " + body);
   }
 }
 async function browserSuite(target) {
@@ -149,11 +165,13 @@ async function browserSuite(target) {
   const browser = await chromium.launch({ headless: true });
   const errors = [];
   const failed = [];
+  const httpErrors = [];
   try {
     for (const width of [1440, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
-      page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+      page.on("console", message => { if (message.type() === "error") { const location = message.location(); errors.push(message.text() + " [source=" + (location.url || "unknown") + ":" + (location.lineNumber || 0) + "]"); } });
       page.on("pageerror", error => errors.push(error.message));
+      page.on("response", response => { if (response.status() >= 400) httpErrors.push("HTTP " + response.status() + " " + response.url()); });
       page.on("requestfailed", request => failed.push(request.method() + " " + request.url() + " " + (request.failure()?.errorText || "")));
       try {
       await login(page, target);
@@ -200,6 +218,7 @@ async function browserSuite(target) {
   finally {
     record(target.name, "Browser console errors", errors.length ? "FAIL" : "PASS", errors.length ? errors.join(" | ").slice(0, 1800) : "No console errors.");
     record(target.name, "Failed network calls", failed.length ? "FAIL" : "PASS", failed.length ? failed.join(" | ").slice(0, 1800) : "No failed requests.");
+    record(target.name, "Browser HTTP error responses", httpErrors.length ? "FAIL" : "PASS", httpErrors.length ? httpErrors.join(" | ").slice(0, 2400) : "No HTTP responses >= 400.");
     await browser.close();
   }
 }
@@ -221,11 +240,17 @@ async function versions() {
   }
   record("build", "Diagnostic web commit", "PASS", process.env.DIAGNOSTIC_BUILD_COMMIT || "unknown");
 }
-for (const target of targets) {
-  try { await apiSuite(target); } catch (error) { record(target.name, "Worker API suite", "FAIL", error.message); }
-  try { await browserSuite(target); } catch (error) { record(target.name, "Browser suite", "FAIL", error.message); }
+if (process.env.DIAGNOSTIC_BROWSER_ONLY) {
+  const target = targets.find(item => item.name === process.env.DIAGNOSTIC_BROWSER_ONLY);
+  if (!target) throw new Error("Unknown DIAGNOSTIC_BROWSER_ONLY target: " + process.env.DIAGNOSTIC_BROWSER_ONLY);
+  await browserSuite(target);
+} else {
+  for (const target of targets) {
+    try { await apiSuite(target); } catch (error) { record(target.name, "Worker API suite", "FAIL", error.message); }
+    try { await browserSuite(target); } catch (error) { record(target.name, "Browser suite", "FAIL", error.message); }
+  }
+  await versions();
 }
-await versions();
 console.log("\nGRANT_INTELLIGENCE_DIAGNOSTIC_RESULTS");
 for (const row of results) console.log(JSON.stringify(row));
 console.log("\nMISSING_SECRETS_BY_NAME=" + [...new Set(missing)].join(","));
