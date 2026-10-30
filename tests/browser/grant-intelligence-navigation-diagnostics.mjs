@@ -19,9 +19,12 @@ async function runTarget(target) {
   if (!target.email) missing.push(target.name === "staging" ? "STAGING_TEST_EMAIL" : "PRODUCTION_TEST_EMAIL");
   if (!target.password) missing.push(target.name === "staging" ? "STAGING_TEST_PASSWORD" : "PRODUCTION_TEST_PASSWORD");
   if (missing.length) {
+    if (target.name === "production") {
+      console.log("SKIPPED (no production test login)");
+      return;
+    }
     console.log("SKIP " + target.name + " browser tests; missing secrets/variables: " + missing.join(", "));
-    if (target.name === "staging") throw new Error("Staging browser test prerequisites missing: " + missing.join(", "));
-    return;
+    throw new Error("Staging browser test prerequisites missing: " + missing.join(", "));
   }
 
   const browser = await chromium.launch({ headless: true });
