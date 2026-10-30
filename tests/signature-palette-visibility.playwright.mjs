@@ -115,6 +115,7 @@ try{
 }catch(error){
  console.error("FAIL signature palette Playwright:",error);
  if(activePage){
+  console.error("CANVAS_BOUNDING_BOX "+activeViewport+":",JSON.stringify(activeCanvasBox));
   try{await activePage.screenshot({path:"test-results/signature-palette-"+activeViewport+"-failure.png",fullPage:true});}catch{}
   try{writeFileSync("test-results/signature-palette-"+activeViewport+"-failure.html",await activePage.content());}catch{}
   try{console.error("VISIBLE_FAILURE_ALERTS:",await activePage.locator('[role="alert"]').allTextContents());}catch{}
