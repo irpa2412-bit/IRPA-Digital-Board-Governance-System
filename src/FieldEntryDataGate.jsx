@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useRef,useState}from"react";
 import{getActualDataAccessStatus}from"./firebase/systemControl";
+import{canConfirmFieldEntry,isFieldEntryConfirmationDisabled}from"./fieldEntryDataGatePolicy";
 
 const DATA_TYPES=[
   ["governance","Governance, meetings and resolutions"],
@@ -223,9 +224,7 @@ export default function FieldEntryDataGate({portal}){
 
   const close=()=>{setField(null);openRef.current=false;pending.current=null};
   const proceed=()=>{
-    if(!field||!dataType||!environment||(environment==="ACTUAL"&&!confirmed))return;
-    if(environment==="ACTUAL"&&!actualOnly&&!actualDataAccessOpen)return;
-    if(actualOnly&&environment!=="ACTUAL")return;
+    if(!field||!canConfirmFieldEntry({dataType,environment,actualOnly,actualDataAccessLoading,actualDataAccessOpen,confirmed}))return;
     const selectedEnvironment=actualOnly?"ACTUAL":environment;
     const record={dataType,environment:selectedEnvironment,portal:field.portal,verifiedAt:new Date().toISOString()};
     const existing=readMap();
@@ -253,7 +252,7 @@ export default function FieldEntryDataGate({portal}){
   };
 
   if(!field)return null;
-  const disabled=!dataType||!environment||(environment==="ACTUAL"&&(actualDataAccessLoading||!confirmed||(!actualOnly&&!actualDataAccessOpen)))||(actualOnly&&environment!=="ACTUAL");
+  const disabled=isFieldEntryConfirmationDisabled({dataType,environment,actualOnly,actualDataAccessLoading,actualDataAccessOpen,confirmed});
   return <div data-irpa-field-gate role="dialog" aria-modal="true" aria-labelledby="irpa-field-gate-title" onKeyDown={e=>{if(e.key==="Escape"){e.preventDefault();close()}}} style={{position:"fixed",inset:0,zIndex:30000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(3,12,10,.78)",backdropFilter:"blur(5px)",overflowY:"auto"}}>
     <section style={{width:"min(100%,680px)",maxHeight:"92vh",overflowY:"auto",background:"var(--surface, #fff)",color:"var(--text, #14231f)",border:"1px solid var(--border, #cbd5d1)",borderRadius:18,padding:24,boxShadow:"0 24px 80px rgba(0,0,0,.35)"}}>
       <div style={{fontSize:12,fontWeight:800,letterSpacing:1.4,textTransform:"uppercase",opacity:.75}}>IRPA · Data Control</div>
@@ -274,7 +273,7 @@ export default function FieldEntryDataGate({portal}){
       <fieldset style={{border:0,padding:0,margin:"0 0 16px"}}>
         <legend style={{fontWeight:750,marginBottom:10}}>2. Select the data environment (Required)</legend>
         {ENVIRONMENTS.map(([value,label])=><label key={value} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"10px 0",cursor:actualOnly&&value==="TRIAL"?"not-allowed":"pointer",opacity:actualOnly&&value==="TRIAL"?.5:1}}>
-          <input type="radio" name="irpa-data-environment" value={value} disabled={(actualOnly&&value==="TRIAL")||(value==="ACTUAL"&&!actualOnly&&(!actualDataAccessOpen||actualDataAccessLoading))} checked={environment===value} onChange={()=>{setEnvironment(value);setConfirmed(false)}} style={{marginTop:3}}/>
+          <input type="radio" name="irpa-data-environment" value={value} disabled={(actualOnly&&value==="TRIAL")||(value==="ACTUAL"&&(!actualDataAccessOpen||actualDataAccessLoading))} checked={environment===value} onChange={()=>{setEnvironment(value);setConfirmed(false)}} style={{marginTop:3}}/>
           <span>{label}{actualOnly&&value==="TRIAL"?" — unavailable for protected system-security records":""}</span>
         </label>)}
       </fieldset>
