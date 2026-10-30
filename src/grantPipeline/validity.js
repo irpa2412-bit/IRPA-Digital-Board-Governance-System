@@ -3,7 +3,7 @@ const millis = value => {
   if (value == null || value === "") return NaN;
   return (value instanceof Date ? value : new Date(value)).getTime();
 };
-const identity = call => clean(call.id) || clean(call.applicationUrl || call.url) || `${clean(call.donor || call.funder)}|${clean(call.title)}`;
+const identity = call => clean(call.applicationUrl || call.url) || clean(call.id) || `${clean(call.donor || call.funder)}|${clean(call.title)}`;
 
 export function filterValidCalls(calls = [], options = {}) {
   const now = options.now ? millis(options.now) : Date.now();
