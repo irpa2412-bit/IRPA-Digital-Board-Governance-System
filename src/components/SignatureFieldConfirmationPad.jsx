@@ -30,8 +30,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       await onConfirm(dataUrl);
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
   }
-  return <div role="dialog" aria-modal="true" aria-label={"Confirm "+label} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(15,23,42,.78)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-    <section className="panel" style={{width:"min(720px,96vw)",maxHeight:"92vh",overflow:"auto",background:"var(--surface)",color:"var(--text)"}}>
+  return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"relative",zIndex:10,width:"100%",maxWidth:720,margin:"16px auto",maxHeight:"min(70vh,620px)",overflowY:"auto",overflowX:"hidden",boxSizing:"border-box",border:"2px solid var(--border)",boxShadow:"0 8px 24px rgba(15,23,42,.18)",background:"var(--surface)",color:"var(--text)"}}>
       <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. Nothing is applied until you tap Confirm.</p>
       <div role="group" aria-label="Signature method" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
         {["Draw","Type","Use my saved signature"].map(item=><button key={item} type="button" className={mode===item?"":"secondary-button"} onClick={()=>setMode(item)}>{item}</button>)}
@@ -39,6 +38,5 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       {mode==="Draw"?<canvas ref={canvasRef} width={900} height={240} aria-label="Draw signature" onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{width:"100%",height:220,border:"2px solid var(--border)",borderRadius:8,background:"#fff",touchAction:"none",display:"block"}}/>:mode==="Type"?<label style={{display:"block"}}>Type your signature<input autoComplete="off" value={typed} onChange={e=>setTyped(e.target.value)} placeholder="Type the name you want to sign with" style={{display:"block",width:"100%",marginTop:8}}/><div aria-label="Typed signature preview" style={{fontFamily:"cursive",fontStyle:"italic",fontSize:36,minHeight:64,padding:12}}>{typed||"Signature preview"}</div></label>:<div className="stat-card">{(field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl)?"Your saved specimen is selected. Tap Confirm to apply it.":"No saved specimen is available; choose Draw or Type."}</div>}
       {error&&<p role="alert" className="error-message">{error}</p>}
       <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14,flexWrap:"wrap"}}><button type="button" className="secondary-button" onClick={clear}>Clear and redo</button><button type="button" className="secondary-button" onClick={onCancel}>Cancel</button><button type="button" onClick={confirm}>Confirm {field?.type||"Signature"}</button></div>
-    </section>
-  </div>
+  </section>
 }
