@@ -1,0 +1,122 @@
+name: Build signed IRPA Android release APK
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish the signed APK and SHA-256 checksum to the offline-app-v1 pre-release"
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: write
+jobs:
+  signed-apk:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install and build web assets
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Generate native Android project
+        run: npx cap add android && npx cap sync android
+      - name: Set stable app identity and SDK levels
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/minSdkVersion = .*/minSdkVersion = 23/' android/variables.gradle
+          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='android/app/build.gradle';
+          let s=fs.readFileSync(p,'utf8');
+          s=s.replace(/applicationId\s+"[^"]+"/, 'applicationId "tz.or.irpa.governance"');
+          s=s.replace(/versionCode\s+\d+/, 'versionCode 2');
+          s=s.replace(/versionName\s+"[^"]+"/, 'versionName "1.0.1"');
+          if (!s.includes('applicationId "tz.or.irpa.governance"')) throw new Error('Stable applicationId was not applied');
+          fs.writeFileSync(p,s);
+          NODE
+      - name: Validate release keystore secrets and decode to runner temp
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Missing required GitHub Actions secret: $name"; exit 1; fi
+          done
+          mkdir -p "$RUNNER_TEMP/irpa-signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/irpa-signing/release.jks"
+          chmod 600 "$RUNNER_TEMP/irpa-signing/release.jks"
+          keytool -list -keystore "$RUNNER_TEMP/irpa-signing/release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
+      - name: Configure Gradle release signing
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/irpa-signing/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='android/app/build.gradle';
+          let s=fs.readFileSync(p,'utf8');
+          s=s.replace(/android\s*\{/, `android {
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }`);
+          s=s.replace(/buildTypes\s*\{\s*release\s*\{/, m=>m+'\n            signingConfig signingConfigs.release');
+          fs.writeFileSync(p,s);
+          NODE
+      - name: Build universal release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Verify signature, package metadata and checksum
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/irpa-badging.txt"
+          grep -q "package: name='tz.or.irpa.governance' versionCode='2'" "$RUNNER_TEMP/irpa-badging.txt"
+          grep -q "sdkVersion:'23'" "$RUNNER_TEMP/irpa-badging.txt"
+          mkdir -p release-assets
+          cp "$APK" release-assets/IRPA-DBGS-Android-1.0.1.apk
+          (cd release-assets && sha256sum IRPA-DBGS-Android-1.0.1.apk > SHA256SUMS.txt)
+          rm -rf "$RUNNER_TEMP/irpa-signing"
+      - name: Upload signed APK and checksum as build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Android-Release
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish or replace offline-app-v1 pre-release assets
+        if: inputs.publish_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: offline-app-v1
+          name: offline-app-v1
+          prerelease: true
+          files: |
+            release-assets/IRPA-DBGS-Android-1.0.1.apk
+            release-assets/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
+      - name: Remove signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/irpa-signing"
