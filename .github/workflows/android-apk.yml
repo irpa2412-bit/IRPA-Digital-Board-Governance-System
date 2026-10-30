@@ -90,7 +90,6 @@ jobs:
           import fs from 'node:fs';
           const p='android/app/build.gradle';
           let s=fs.readFileSync(p,'utf8');
-          const signing='''';
           const block = `signingConfigs {
                   release {
                       storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
