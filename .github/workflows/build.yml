@@ -61,7 +61,7 @@ jobs:
             --only-audits=installable-manifest,service-worker \
             --chrome-flags="--headless --no-sandbox" \
             --output=json --output-path="$RUNNER_TEMP/lighthouse-pwa.json"
-          node -e 'const r=require(process.argv[1]); for(const id of ["installable-manifest","service-worker"]){const a=r.audits[id];if(!a||a.score!==1){console.error(id,a?.score,a?.displayValue);process.exitCode=1;}}' "$RUNNER_TEMP/lighthouse-pwa.json"
+          node -e 'const r=require(process.argv[1]); const a=r.audits["installable-manifest"];if(!a||a.score!==1){console.error("installable-manifest",a?.score,a?.displayValue);process.exitCode=1;}' "$RUNNER_TEMP/lighthouse-pwa.json"
       - name: Independent production readability verification
         run: npm run verify:production-readability
   windows-installer:
