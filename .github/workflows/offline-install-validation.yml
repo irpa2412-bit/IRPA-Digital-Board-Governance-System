@@ -10,6 +10,7 @@ on:
       - "package-lock.json"
       - "vite.config.js"
       - "tests/pwa-install-offline.test.mjs"
+      - "tests/offline-build-workflow-policy.test.mjs"
       - ".github/workflows/offline-install-validation.yml"
 permissions:
   contents: read

@@ -8,6 +8,7 @@ on:
       - "package-lock.json"
       - "src/**"
       - "public/**"
+      - "tests/offline-build-workflow-policy.test.mjs"
       - ".github/workflows/android-apk.yml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "package-lock.json"
       - "src/**"
       - "public/**"
+      - "tests/offline-build-workflow-policy.test.mjs"
       - ".github/workflows/android-apk.yml"
   workflow_dispatch:
 permissions:
