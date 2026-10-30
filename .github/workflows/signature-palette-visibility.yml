@@ -1,0 +1,66 @@
+name: Signature Palette Visibility and Full Regression
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/SignatureFieldConfirmationPad.jsx"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/pages/GatewaySigningPortal.jsx"
+      - "tests/fixtures/signature-palette-harness.*"
+      - "tests/signature-palette-visibility.playwright.mjs"
+      - ".github/workflows/signature-palette-visibility.yml"
+  push:
+    branches: ["fix/signature-palette-visibility-20261031"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signature-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install ephemeral Playwright runner without changing lockfiles
+        run: npm install --no-save --package-lock=false playwright
+      - name: Install Chromium for desktop and mobile viewport emulation
+        run: npx playwright install --with-deps chromium
+      - name: Run existing explicit-confirmation policy tests
+        run: node --test tests/signature-explicit-confirmation.test.mjs
+      - name: Run all existing npm test scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          import { spawnSync } from "node:child_process";
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          const scripts = Object.keys(pkg.scripts || {}).filter(name => name.startsWith("test:"));
+          if (!scripts.length) throw new Error("No existing test scripts were discovered.");
+          for (const name of scripts) {
+            console.log("\n=== npm run " + name + " ===");
+            const result = spawnSync("npm", ["run", name], { stdio: "inherit", shell: process.platform === "win32" });
+            if (result.status !== 0) process.exit(result.status || 1);
+          }
+          NODE
+      - name: Run desktop and mobile signature ceremony Playwright tests
+        run: node tests/signature-palette-visibility.playwright.mjs
+      - name: Run production readability and contrast checks
+        run: npm run check:production-readability
+      - name: Build application
+        env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
+          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
+        run: npm run build
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-palette-playwright-results
+          path: test-results/
+          if-no-files-found: ignore
