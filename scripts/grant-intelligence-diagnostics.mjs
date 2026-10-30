@@ -138,19 +138,25 @@ async function browserSuite(target) {
       const noOverflow = dimensions.scroll <= dimensions.width + 1 && dimensions.body <= dimensions.width + 1;
       record(target.name, "Page layout " + width + "px", noOverflow ? "PASS" : "FAIL", JSON.stringify(dimensions));
       const search = page.getByRole("textbox", { name: "Search opportunities" });
-      await search.fill("climate");
+      await search.fill("__IRPA_DIAGNOSTIC_NO_MATCH_20261030__");
       await page.waitForTimeout(700);
+      const emptySearchState = await page.getByText("No matching opportunities yet").count();
+      record(target.name, "Opportunity search " + width + "px", emptySearchState > 0 ? "PASS" : "FAIL", "Unique query produced " + emptySearchState + " no-match state(s).");
       await search.fill("");
       const selects = page.locator(".grant-intelligence-portal select");
       const count = await selects.count();
-      if (count > 0) {
-        for (let i = 0; i < count; i++) {
-          const select = selects.nth(i);
-          const values = await select.locator("option").evaluateAll(options => options.map(o => o.value));
-          if (values.includes("all")) await select.selectOption("all").catch(() => {});
+      let exercised = 0;
+      for (let i = 0; i < count; i++) {
+        const select = selects.nth(i);
+        const values = await select.locator("option").evaluateAll(options => options.map(o => o.value));
+        const candidate = values.find(value => value !== "all");
+        if (candidate) {
+          await select.selectOption(candidate);
+          if (await select.inputValue() === candidate) exercised++;
+          await select.selectOption("all").catch(() => {});
         }
       }
-      record(target.name, "Opportunity search and filters " + width + "px", count > 0 ? "PASS" : "FAIL", "Search textbox exercised; " + count + " portal select filters found.");
+      record(target.name, "Opportunity filters " + width + "px", count >= 3 && exercised >= 3 ? "PASS" : "FAIL", exercised + "/" + count + " pillar/theme/status filters accepted and reset.");
       if (target.name === "staging" && width === 1440) {
         const request = page.getByRole("textbox", { name: "AI Assistant request" });
         await request.fill("Draft a concise first-contact partnership request to the Climate Justice Resilience Fund (CJRF) about suitable funding pathways for IRPA's community-led climate resilience and regenerative rangeland work in Longido, Tanzania. Do not claim previous project delivery or secured funding.");
