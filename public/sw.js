@@ -1,5 +1,5 @@
 /* Versioned IRPA-DBGS shell. Never cache auth, API, signing or upload traffic. */
-const CACHE_PREFIX="irpa-dbgs-shell-",CACHE_NAME=CACHE_PREFIX+"20261030-1",OFFLINE_URL="/offline.html";
+const CACHE_PREFIX="irpa-dbgs-shell-",CACHE_NAME="irpa-dbgs-shell-20261030-1",OFFLINE_URL="/offline.html";
 const APP_SHELL=["/","/index.html","/manifest.webmanifest",OFFLINE_URL,"/icons/irpa-192.svg","/icons/irpa-512.svg","/icons/irpa-maskable.svg","/install.js"];
 function excluded(url){const p=url.pathname.toLowerCase();return p.startsWith("/api/")||p.includes("/worker/")||p.includes("auth")||p.includes("sign")||p.includes("signature")||p.includes("invitation")||p.endsWith(".pdf")||p.includes("/pdf/")||p.includes("token")||p.includes("upload")||p.includes("approval");}
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting())));
