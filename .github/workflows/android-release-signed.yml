@@ -27,6 +27,8 @@ jobs:
         run: npm ci --no-audit --no-fund && npm run build
       - name: Generate native Android project
         run: npx cap add android && npx cap sync android
+      - name: Install Android API 36 platform and build tools
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null && "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
       - name: Set stable app identity and SDK levels
         shell: bash
         run: |
