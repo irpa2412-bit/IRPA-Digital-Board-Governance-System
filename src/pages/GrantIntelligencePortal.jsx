@@ -79,6 +79,7 @@ const styles={
 const cleanArray=v=>Array.isArray(v)?v:[];
 const dateLabel=v=>{if(!v)return "Not specified";const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?"Not specified":d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Dar_es_Salaam"});};
 const text=v=>String(v||"").trim();
+const workerFailure=(error,route)=>{const reason=String(error?.message||"Unknown network error");if(error?.name==="TimeoutError"||error?.name==="AbortError")return route+" (HTTP status unavailable): request timed out. Check Worker availability and request duration.";if(error instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(reason))return route+" (HTTP status unavailable): network/CORS failure. The browser could not reach the Worker; verify the environment Worker URL, HTTPS, DNS and OPTIONS preflight.";return route+": "+reason;};
 const dateKeyInTanzania=value=>{
  if(value===undefined||value===null||value==="")return null;
  if(typeof value==="string"){
@@ -164,27 +165,28 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [pipelineEntry,setPipelineEntry]=useState({title:"",funder:"",status:"Submitted",submissionDate:"",awardDate:"",amount:"",url:"",project:"",notes:""});
  const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});
  const uid=auth.currentUser?.uid||"";
+ const grantWorkerUrl=String(import.meta.env.VITE_GRANT_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
  const canManage=isAdmin||roleList.some(r=>["administrator","executive director","director outreach","director finance & administration","director research","research director","research manager","fundraising officer","research officer"].includes(r));
  async function generateAssistantDraft(){
    const request=text(assistantInstructions);
    if(!request){setAssistantError("Describe what you want the AI Assistant to prepare.");return;}
-   // Keep AI drafting on its established assistant-capable Worker; crawler scans use the isolated production D1 Worker.
-   const workerUrl=String(import.meta.env.VITE_GRANT_ASSISTANT_WORKER_URL||"https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const token=await auth.currentUser?.getIdToken(true);
-   if(!token){setAssistantError("Your session has expired. Sign in again.");return;}
+   // All Grant Intelligence routes use the same environment-selected parallel crawler Worker.
+   const workerUrl=grantWorkerUrl;
    setAssistantBusy(true);setAssistantError("");setAssistantNotice("Preparing your requested format…");
    try{
+     const token=await auth.currentUser?.getIdToken(true);
+     if(!token)throw new Error("Your session has expired. Sign in again.");
      const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task:"draft_message",format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),organization:"Improvement of Rangeland in Pastoral Areas (IRPA)",strategicContext:"Tanzania-based NGO focused on sustainable rangeland management, livestock development and market development; early-stage organization with limited resources. Do not claim prior project implementation or secured funding unless supplied by the user."}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"The AI Assistant request failed ("+response.status+").");
      const generated=text(data.draft||data.message||data.assessment?.draft||data.assessment?.concept_note?.draft);
      if(!generated)throw new Error("The AI service returned no draft. Please retry.");
-     const documentPayload={title:request.slice(0,180),format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),draft:generated,createdByUid:uid,createdByEmail:auth.currentUser?.email||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp(),recordOrigin:"PRODUCTION"};
+     const documentPayload={title:request.slice(0,180),format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),draft:generated,createdByUid:uid,createdByEmail:auth.currentUser?.email||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp(),recordOrigin:import.meta.env.VITE_FIREBASE_PROJECT_ID||"irpa-digital-board-governance"};
      const saved=await addDoc(collection(db,"grantAssistantDocuments"),documentPayload);
      setAssistantDocumentId(saved.id);setAssistantDraft(generated);
      setAssistantNotice("Draft generated and saved to your private AI document history. It remains available after you sign out or turn off your computer.");
-   }catch(err){setAssistantError(err?.name==="TimeoutError"?"The AI Assistant took longer than 90 seconds. Please retry.":err?.message||"The AI Assistant could not generate a draft.");setAssistantNotice("");}
+   }catch(err){setAssistantError(workerFailure(err,"POST /assistant/analyze"));setAssistantNotice("");}
    finally{setAssistantBusy(false);}
  }
  function downloadAssistantDraft(){
@@ -194,8 +196,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  }
 
  async function loadCrawlerResults(showNotice=false){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const token=await auth.currentUser?.getIdToken();
+   const workerUrl=grantWorkerUrl;
+ const token=await auth.currentUser?.getIdToken();
    if(!token){if(showNotice)setError("Your session has expired. Sign in again to load crawler results.");return;}
    setCrawlerResultsBusy(true);
    try{
@@ -225,7 +227,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      })));
      if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.created??data.lastRun.items_changed,candidatesFound:data.lastRun.candidatesFound??data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.started_at,configuredSources:data.lastRun.configuredSources??data.sourceCount??data.feedsConfigured,healthySources:data.lastRun.healthySources??uniqueSources.length,failedSources:data.lastRun.failedSources??0});
      if(showNotice)setNotice("Refreshed "+String(data.count||0)+" grant records from the Cloudflare crawler. Eligibility remains unverified.");
-   }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(err?.message||"Unable to load crawler results.");}
+   }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(workerFailure(err,"GET /opportunities"));}
    finally{setCrawlerResultsBusy(false);}
  }
  useEffect(()=>{loadCrawlerResults(false)},[]);
@@ -309,8 +311,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  async function runFundraisingSearch(searchQuery=fundraisingQuery, searchMode=fundraisingMode){
    const query=text(searchQuery);
    if(query.length<2){setFundraisingSearchError("Enter at least two characters, such as rangeland restoration, livestock markets, women-led enterprises, CSR or digital governance.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const token=await auth.currentUser?.getIdToken(true);
+   const workerUrl=grantWorkerUrl;
+ const token=await auth.currentUser?.getIdToken(true);
    if(!token){setFundraisingSearchError("Sign in to search fundraising sources.");return;}
    setFundraisingSearchBusy(true);setFundraisingSearchError("");setFundraisingSearchMeta(null);
    try{
@@ -319,7 +321,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      if(!response.ok)throw new Error(data.error||"Fundraising research search failed ("+response.status+").");
      setFundraisingResults(Array.isArray(data.items)?data.items:[]);
      setFundraisingSearchMeta({providers:data.providers||[],resultCount:Number(data.resultCount||0),errors:Array.isArray(data.errors)?data.errors:[]});
-   }catch(err){setFundraisingSearchError(err?.name==="TimeoutError"?"The live search exceeded 35 seconds. Try a more specific query.":err?.message||"Fundraising search failed.");}
+   }catch(err){setFundraisingSearchError(workerFailure(err,"POST /fundraising/search"));}
    finally{setFundraisingSearchBusy(false);}
  }
  function useFundraisingLeadInAssistant(lead){
@@ -339,20 +341,20 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    if(!auth.currentUser){setError("Sign in to IRPA to start a grant scan.");return;}
    try{
      setCrawlerRunning(true);setError("");setNotice("Manual donor-source scan requested. This can take several minutes.");
-     const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/, "");
-     const idToken=await auth.currentUser?.getIdToken();
+     const workerUrl=grantWorkerUrl;
+ const idToken=await auth.currentUser?.getIdToken();
      if(!idToken) throw new Error("Your session has expired. Sign in again.");
      const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({mode:"full_catalog"}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
      setNotice("Authorised full-catalogue scan "+String(data.status||"finished")+". Search queries requested: "+String(data.searchCatalog?.webQueriesRequested||0)+"/"+String(data.searchCatalog?.webQueryCatalogSize||0)+" web and "+String(data.searchCatalog?.gdeltQueriesRequested||0)+"/"+String(data.searchCatalog?.gdeltQueryCatalogSize||0)+" GDELT. Sources checked: "+String(data.sourceCount||data.configuredSources||0)+", candidates found: "+String(data.candidatesFound||data.itemsSeen||0)+", records created or updated: "+String(Number(data.created||0)+Number(data.updated||0)||data.recordsChanged||0)+". Provider history limits apply; new leads remain pending official-call verification.");
      await loadCrawlerResults(false);
-   }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
+   }catch(err){console.error("Manual grant crawler scan failed",err);setError(workerFailure(err,"POST /run"));}
    finally{setCrawlerRunning(false);}
  }
  async function loadSavedDrafts(){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
+   const workerUrl=grantWorkerUrl;
+ const idToken=await auth.currentUser?.getIdToken();
    if(!idToken)return;
    setDraftsBusy(true);
    try{
@@ -360,7 +362,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Saved concept notes could not be loaded.");
      setSavedDrafts(Array.isArray(data.drafts)?data.drafts:[]);
-   }catch(err){setError(err?.message||"Saved concept notes could not be loaded.");}
+   }catch(err){setError(workerFailure(err,"GET /application/drafts"));}
    finally{setDraftsBusy(false);}
  }
  function openConceptWorkspace(record=null){
@@ -374,8 +376,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    setWorkspaceOpen(true);
  }
  async function loadDraftAuditEvents(id){
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
+   const workerUrl=grantWorkerUrl;
+ const idToken=await auth.currentUser?.getIdToken();
    if(!idToken||!id)return;
    setAuditBusy(true);
    try{
@@ -383,7 +385,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Draft audit trail could not be loaded.");
      setDraftAuditEvents(Array.isArray(data.events)?data.events:[]);
-   }catch(err){setError(err?.message||"Draft audit trail could not be loaded.");}
+   }catch(err){setError(workerFailure(err,"GET /application/drafts/:id/events"));}
    finally{setAuditBusy(false);}
  }
  function downloadConceptDraft(){
@@ -432,8 +434,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks opportunity analysis; show and assess all calls.
    if(!text(opportunityDescription)&&!text(donorRequirements)){setError("Provide the opportunity description or paste the official donor eligibility and application criteria.");return;}
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
+   const workerUrl=grantWorkerUrl;
+ const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
    setAnalysisBusy(true);setError("");setWorkspaceNotice(task==="concept_note"?(statusUnverified?"Preparing a review-only draft; current call status still needs verification…":"Checking eligibility and preparing the concept-note draft…"):"Checking geographic, organizational and donor eligibility criteria…");
    try{
@@ -452,7 +454,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      }else{
        setWorkspaceNotice("Eligibility screening completed. Geographic status: "+String(data.assessment?.geographic_eligibility?.status||"unclear")+"."+(statusUnverified?" Current call status is unverified; confirm it before submission.":" Review every requirement before drafting."));
      }
-   }catch(err){setError(err?.name==="TimeoutError"?"The AI analysis exceeded 90 seconds. Retry after checking production Worker health.":err?.message||"The AI eligibility analysis failed.");}
+   }catch(err){setError(workerFailure(err,"POST /assistant/analyze"));}
    finally{setAnalysisBusy(false);}
  }
  async function saveConceptDraft(){
@@ -464,8 +466,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    }
    const statusUnverified=currentStatusIssue==="unverified";
    // Geographic eligibility no longer blocks saving a reviewed draft.
-   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
-   const idToken=await auth.currentUser?.getIdToken();
+   const workerUrl=grantWorkerUrl;
+ const idToken=await auth.currentUser?.getIdToken();
    if(!idToken){setError("Your session has expired. Sign in again.");return;}
    const id=draftId||crypto.randomUUID();
    setDraftSaving(true);setError("");
@@ -528,7 +530,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <div style={{maxWidth:760}}>
     <div style={styles.eyebrow}>IRPA-DBGS · FUNDING INTELLIGENCE</div>
     <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-     <h1 style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
+     <h1 data-testid="grant-intelligence-portal-heading" style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
      <span role="status" aria-live="polite" title={crawlerRunning?"A grant-source scan is running.":crawlerRecords.length?"Crawler results are loaded.":"No crawler results are currently loaded."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
       <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:crawlerDiscoveryActive?"#54d6a4":"#ff8585",display:"inline-block"}}/>
       {crawlerRunning?"Scanning":crawlerRecords.length?"Results loaded":"Awaiting results"}

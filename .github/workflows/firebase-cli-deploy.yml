@@ -33,8 +33,7 @@ jobs:
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
           VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
-          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
-          VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
+          VITE_GRANT_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
         run: VITE_BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" npm run build
 
       - name: Verify grant crawler endpoint in the production bundle
@@ -45,11 +44,11 @@ jobs:
             echo 'Production bundle does not reference the production D1 crawler Worker.' >&2
             exit 1
           fi
-          if ! grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
-            echo 'Production bundle does not reference the dedicated AI assistant Worker.' >&2
+          if grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle still contains the obsolete split assistant Worker URL.' >&2
             exit 1
           fi
-          echo 'Production bundle separates crawler discovery from AI assistant drafting.'
+          echo 'Production bundle uses one Worker for discovery and AI drafting.'
 
       - name: Independent production readability verification
         run: npm run verify:production-readability

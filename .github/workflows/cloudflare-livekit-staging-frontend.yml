@@ -68,8 +68,7 @@ jobs:
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           # Keep disabled until the isolated staging Gateway runtime acceptance workflow passes.
           VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
-          VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
-          VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
+          VITE_GRANT_WORKER_URL: "https://irpa-grant-crawler-staging.irpa-governance.workers.dev"
         run: |
           set -euo pipefail
           test "$VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED" = "false"

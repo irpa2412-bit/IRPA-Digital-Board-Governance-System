@@ -1,0 +1,251 @@
+name: Grant Intelligence staging and production diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/grant-intelligence-20261030
+    paths:
+      - "src/pages/GrantIntelligencePortal.jsx"
+      - "src/styles/grant-intelligence-layout.css"
+      - "scripts/grant-intelligence-diagnostics.mjs"
+      - "tests/browser/grant-intelligence-navigation-diagnostics.mjs"
+      - "src/firebase/auth.js"
+      - "drive-gateway/**"
+      - ".github/workflows/grant-intelligence-diagnostics.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-google-drive-gateway:
+    name: Deploy and verify staging Google Drive Gateway only
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install and test gateway
+        working-directory: drive-gateway
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+      - name: Deploy staging Worker only
+        id: deploy_staging
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: drive-gateway
+          command: deploy --config ./wrangler.toml --env staging --var GIT_SHA:${{ github.sha }}
+      - name: Verify staging health and password-attempt route
+        if: always()
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          DEPLOY_OUTCOME: ${{ steps.deploy_staging.outcome }}
+        run: |
+          node --input-type=module <<'NODE'
+          const base = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
+          const healthResponse = await fetch(base + "/health", { signal: AbortSignal.timeout(15000) });
+          const health = await healthResponse.json().catch(() => ({}));
+          if (!healthResponse.ok || health.environment !== "staging" || health.authFunctionsEnabled !== true) {
+            throw new Error("Staging gateway health/feature-flag verification failed (HTTP " + healthResponse.status + ").");
+          }
+          if (process.env.DEPLOY_OUTCOME === "success" && health.commit !== process.env.EXPECTED_COMMIT) {
+            throw new Error("Staging gateway did not report the just-deployed commit.");
+          }
+          if (process.env.DEPLOY_OUTCOME !== "success") {
+            console.log("SKIPPED (reason: staging deploy step did not succeed); continuing live-route verification against the existing staging Worker.");
+          }
+          const email = "irpa-diagnostic-" + Date.now() + "-" + crypto.randomUUID() + "@example.invalid";
+          const response = await fetch(base + "/api/auth/password-attempt-state", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email }),
+            signal: AbortSignal.timeout(15000)
+          });
+          const state = await response.json().catch(() => ({}));
+          if (!response.ok || state.allowed !== true || state.status !== "FIRST") {
+            throw new Error("Staging password-attempt-state route failed (HTTP " + response.status + ").");
+          }
+          console.log("PASS staging gateway commit=" + health.commit + "; auth flag enabled; POST /api/auth/password-attempt-state HTTP " + response.status + ".");
+          NODE
+
+  grant-intelligence-diagnostics:
+    needs: staging-google-drive-gateway
+    if: always()
+    name: Read-only production / isolated staging diagnostics
+    runs-on: ubuntu-latest
+    environment: irpa-grant-crawler-production
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Report staging Worker deployment outcome
+        env:
+          DEPLOY_RESULT: ${{ needs.staging-google-drive-gateway.result }}
+        run: |
+          if [ "$DEPLOY_RESULT" = "success" ]; then
+            echo "Staging Worker deployment and verification job completed successfully."
+          else
+            echo "SKIPPED (reason: staging Worker deployment/verification job result=$DEPLOY_RESULT); diagnostics will continue against the existing staging Worker."
+          fi
+      - name: Install application dependencies
+        run: npm ci
+      - name: Build staging diagnostic bundle (no deployment)
+        env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
+          VITE_IRPA_ENVIRONMENT: "staging"
+          VITE_GRANT_WORKER_URL: https://irpa-grant-crawler-staging.irpa-governance.workers.dev
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_STORAGE_BUCKET: "irpa-dbg-staging-a73ec.firebasestorage.app"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+        run: npm run build
+      - name: Start isolated staging preview for browser tests
+        run: |
+          set -euo pipefail
+          npm run preview -- --host localhost --port 5173 > "$RUNNER_TEMP/grant-preview.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:5173/ -o /dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/grant-preview.log"
+          exit 1
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Test staging and production Worker APIs, CORS, auth, browser UI and versions
+        env:
+          STAGING_APP_URL: http://localhost:5173
+          STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
+          PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
+          CLOUDFLARE_GRANT_CRAWLER_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
+          DIAGNOSTIC_BUILD_COMMIT: ${{ github.sha }}
+        run: node scripts/grant-intelligence-diagnostics.mjs
+      - name: Deterministic Playwright portal navigation and HTTP diagnostics
+        if: always()
+        env:
+          STAGING_APP_URL: http://localhost:5173
+          STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
+          PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
+        run: node tests/browser/grant-intelligence-navigation-diagnostics.mjs
+      - name: Diagnose Worker deployment version and fall back to health stamp
+        if: always()
+        env:
+          CLOUDFLARE_GRANT_CRAWLER_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'NODE'
+          const token = process.env.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN || "";
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+          const workers = [
+            ["staging", "irpa-grant-crawler-staging", "https://irpa-grant-crawler-staging.irpa-governance.workers.dev"],
+            ["production", "irpa-grant-crawler-production", "https://irpa-grant-crawler-production.irpa-governance.workers.dev"]
+          ];
+          const json = async (url, headers = {}) => {
+            const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+            const body = await response.json().catch(() => ({}));
+            return { response, body };
+          };
+          for (const [environment, script, worker] of workers) {
+            if (!token || !account) {
+              console.log(environment + " deployment API unavailable: missing " + (!token ? "CLOUDFLARE_GRANT_CRAWLER_API_TOKEN" : "CLOUDFLARE_ACCOUNT_ID"));
+            } else {
+              const headers = { authorization: "Bearer " + token };
+              const url = "https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts/" + script + "/deployments";
+              const deployment = await json(url, headers);
+              const items = deployment.body.result?.deployments || [];
+              if (deployment.response.ok && items.length && items[0].versions?.length) {
+                console.log(environment + " deployment=" + (items[0].id || "present") + " versions=" + items[0].versions.map(v => v.version_id + "@" + v.percentage + "%").join(","));
+                continue;
+              }
+              let cause = "deployment endpoint returned no deployment metadata (HTTP " + deployment.response.status + ")";
+              if ([401, 403].includes(deployment.response.status)) {
+                cause = "Cloudflare token permission/authentication: deployment endpoint returned HTTP " + deployment.response.status;
+              } else {
+                const verify = await json("https://api.cloudflare.com/client/v4/user/tokens/verify", headers);
+                if (!verify.response.ok || verify.body.success !== true) {
+                  cause = "Cloudflare token invalid or missing required permissions (token verification HTTP " + verify.response.status + ")";
+                } else {
+                  const accountCheck = await json("https://api.cloudflare.com/client/v4/accounts/" + account, headers);
+                  if (!accountCheck.response.ok || accountCheck.body.success !== true) {
+                    cause = "CLOUDFLARE_ACCOUNT_ID incorrect or inaccessible (account lookup HTTP " + accountCheck.response.status + ")";
+                  } else {
+                    const scriptsCheck = await json("https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts", headers);
+                    const names = (scriptsCheck.body.result || []).map(item => item.id || item.script_name);
+                    if (scriptsCheck.response.ok && !names.includes(script)) cause = "wrong Worker script name: expected " + script + "; account scripts=" + names.join(",");
+                    else if (!scriptsCheck.response.ok) cause = "token lacks Workers Scripts read permission or scripts endpoint failed (HTTP " + scriptsCheck.response.status + ")";
+                  }
+                }
+              }
+              console.log(environment + " exact deployments API cause: " + cause);
+            }
+            try {
+              const health = await json(worker + "/health");
+              const data = health.body || {};
+              const stamp = data.commit || data.version || data.build || data.revision || data.gitCommit || data.deploymentVersion || "unavailable";
+              console.log(environment + " health fallback HTTP " + health.response.status + " commit/version stamp=" + stamp);
+            } catch (error) {
+              console.log(environment + " health fallback unavailable: " + error.message);
+            }
+          }
+          NODE
+      - name: Upload Playwright failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-intelligence-playwright-diagnostics
+          path: artifacts/grant-intelligence-diagnostics/
+          if-no-files-found: warn
+
+  production-portal-browser:
+    name: Read-only production portal browser verification
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Verify authenticated production portal at desktop and mobile widths
+        env:
+          PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
+          PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
+        run: node tests/browser/grant-intelligence-navigation-diagnostics.mjs
+      - name: Upload production browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-intelligence-production-browser-diagnostics
+          path: artifacts/grant-intelligence-diagnostics/
+          if-no-files-found: warn
