@@ -14,8 +14,21 @@
   "chromium390x844": "NOT RUN",
   "chromium1440x900": "NOT RUN",
   "horizontalOverflow": "UNVERIFIED",
-  "docx": "MISSING_FROM_PR",
-  "srsPdf": "MISSING_FROM_PR",
-  "wireframePdf": "MISSING_FROM_PR",
-  "liveApp": "NOT RUN"
+  "docx": "NOT VERIFIED IN THIS RUN",
+  "srsPdf": "NOT VERIFIED IN THIS RUN; prior report 23 pages",
+  "wireframePdf": "NOT VERIFIED IN THIS RUN; prior report 72 pages",
+  "liveApp": "NOT RUN",
+  "executiveDirectorGrantApproval": "DOCUMENTED; CODE ROLE STRING EXISTS; SERVER ENFORCEMENT GAP",
+  "grantBoardProximityScan": "PASS_ON_REVISED_SRS_AND_3_WORKFLOW_WIREFRAMES; REPOSITORY_WIDE_SCAN_NOT_RUN",
+  "grantApprovalAuthority": "EXECUTIVE_DIRECTOR",
+  "backupRetention": "TO BE APPROVED BY IRPA MANAGEMENT; proposed daily/30-day/tested restore",
+  "executiveDirectorCodeRole": "PRESENT in GrantIntelligencePortal management allow-list and Communications Site editor allow-list; separate explicit grant approval enforcement not confirmed",
+  "remainingOpenDecisions": [
+    "Management approval of backup/retention/DR policy",
+    "Formal role provisioning and server-side Executive Director-only grant approval enforcement",
+    "Standalone portal navigation and owners",
+    "Browser-enabled HTML parse/render/overflow run",
+    "Independent DOCX/PDF open and page-count verification",
+    "Execution of proposed acceptance tests"
+  ]
 }
