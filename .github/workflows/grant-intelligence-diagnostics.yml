@@ -69,3 +69,30 @@ jobs:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           DIAGNOSTIC_BUILD_COMMIT: ${{ github.sha }}
         run: node scripts/grant-intelligence-diagnostics.mjs
+
+
+  production-portal-browser:
+    name: Read-only production portal browser verification
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Verify authenticated production portal at desktop and mobile widths
+        env:
+          DIAGNOSTIC_BROWSER_ONLY: production
+          PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
+          PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
+        run: node scripts/grant-intelligence-diagnostics.mjs
