@@ -68,7 +68,7 @@ Source-derived navigation, portal components and Worker entrypoint paths are doc
 - Release Readiness — STD-03; separate top-level navigation is a proposed gap.
 
 ## Roles and authorization
-Source indicates administrator, board/member, employee, finance, procurement, HR, IT, auditor, signer and invitation/induction capacities. Approved role register and per-record permissions require Board/HR confirmation. UI hiding is not authorization; every protected read/write must be enforced server-side. Actual and Trial environments remain distinct; identity/security records remain in Actual Data as the source gate specifies.
+Source indicates administrator, board/member, employee, finance, procurement, HR, IT, auditor, signer and invitation/induction capacities. The role register and per-record permissions are specified in the role matrix below; management owner sign-off remains required. Board governance permissions are limited to governance records and workflows. UI hiding is not authorization; every protected read/write must be enforced server-side. Actual and Trial environments remain distinct; identity/security records remain in Actual Data as the source gate specifies.
 
 ## Functional requirements and Given/When/Then criteria
 All test IDs are PROPOSED until mapped to executable tests.
@@ -934,3 +934,70 @@ Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-P
 8. Confirm Actual/Trial gate and temporary gateway-disconnect flag owners.
 9. Complete delegated Gateway router enumeration, schemas, auth policy and executable tests.
 10. Schedule authenticated live-app and integration acceptance testing.
+
+
+## Owner decisions — normative corrections (31 October 2026)
+
+These decisions supersede any conflicting descriptive text, diagrams, or inferred role mappings elsewhere in this specification.
+
+### Governance boundary and grant workflow
+
+Grant Intelligence & Funding Opportunities (MOD-23), donor/funder research, concept-note preparation, funding opportunities, and the funding functions embedded in Communication & Media (MOD-24) are management/fundraising functions. They are not Board governance workflows. No Board role may prepare, review, approve, sign, submit, or otherwise authorise grant applications, concept notes, donor opportunities, or media funding requests. No grant or media-funding record may be routed to a Board meeting, resolution, vote, Board signature, or Board approval queue.
+
+**Grant workflow:** (1) authorised fundraising/management staff prepare and maintain opportunity analysis, eligibility evidence, donor alignment and concept-note drafts; (2) the Executive Director reviews and approves or returns the draft with reasons; (3) external submission is performed outside this system. The system is limited to discovery and analysis at this stage and must not submit applications or contact donors. The approval state shown in the UI is an internal management decision only.
+
+### Role and access matrix — grant and governance boundary
+
+| Role | Grant discovery and analysis | Prepare concept note / funding application draft | Approve / return grant or concept note | Communication & Media funding tools | Board governance |
+|---|---|---|---|---|---|
+| Administrator | Administrative configuration and authorised access provisioning; no grant approval authority | No approval authority; may have access only if separately assigned fundraising duties | **No** | Administrative configuration; no grant approval authority | System administration only; no Board decision authority |
+| Authorised Fundraising / Management Staff | **Yes** — discovery, eligibility evidence, donor alignment, analysis | **Yes** — prepare and revise internal drafts | **No** — submit to Executive Director | **Yes** — prepare funding-related records and drafts | No Board decision, vote or signature authority by virtue of this role |
+| Executive Director | Read/review management pipeline | Review submitted internal drafts; may request revisions | **Yes** — approve or return with recorded rationale and timestamp | **Yes** — approve or return funding-related records/drafts | Governance rights only where separately assigned under the governance role register |
+| Board Member / Board Chair / Board Secretary | **No grant workflow access or approval role** | **No** | **No** | **No grant/funding approval or workflow role** | Meetings, resolutions, voting, governance documents and authorisations within separately defined governance delegations |
+| Communications Officer | No grant approval; only access to assigned communication work | No grant application approval | **No** | Content/channel operations; funding records only if separately assigned as authorised management staff | No Board decision authority |
+| Auditor | Read-only evidence access where specifically authorised; no workflow action | No | **No** | Read-only audit evidence where specifically authorised | Read-only governance evidence within audit scope |
+
+Access is least-privilege and enforced server-side. A person holding multiple assigned roles receives only the union of explicitly assigned permissions; a Board role never implies fundraising access or vice versa. The Executive Director approval permission is explicit and cannot be inferred from Administrator status.
+
+### Grant requirements and acceptance criteria
+
+- **GR-01 — Staff preparation.** Given an authenticated user has an assigned Fundraising/Management Staff permission, when that user creates or edits an opportunity analysis or concept-note draft, then the system records the author, timestamp, version, source evidence and status and permits only internal preparation actions.
+- **GR-02 — Executive Director approval.** Given a complete internal grant/concept-note draft is submitted for approval, when the Executive Director opens the approval task and selects Approve or Return, then the system records the Executive Director identity, decision, rationale, timestamp and immutable history and changes the status to Approved or Returned.
+- **GR-03 — Awaiting Executive Director approval.** Given authorised staff submit a draft for review, when the submission is saved, then the status becomes “Awaiting Executive Director approval” and the task is visible only to the Executive Director and authorised management staff.
+- **GR-04 — No Administrator/Board approval.** Given an Administrator or Board-only account attempts to approve a grant, concept note, funding application or media funding record, when the request reaches the server, then it is rejected with HTTP 403, no status changes, and a security audit event is written.
+- **GR-05 — External submission excluded.** Given a grant draft is Approved, when any user requests donor dispatch, portal submission, external email or application submission from this system, then the operation is unavailable and no external request is sent.
+- **GR-06 — Read-only crawler boundary.** Given a crawler fetches an opportunity source, when the crawl executes, then it performs read-only source retrieval and writes only crawler-owned discovery/evidence records; it cannot modify governance records, Drive documents, application records or unrelated collections.
+- **GR-07 — AI analysis evidence.** Given an authorised analyst requests eligibility, geographic fit, IRPA strategic alignment or donor alignment, when the analyser completes, then it returns PASS/FAIL/UNKNOWN with cited source evidence, retrieval timestamp, confidence and explicit unknowns and never fabricates donor criteria.
+- **GR-08 — Concept note advisor.** Given authorised staff provide verified opportunity and IRPA project facts, when the advisor drafts guidance, then it produces an editable internal draft with assumptions, missing information, risks and fit rationale and does not submit or send it externally.
+- **GR-09 — Communication & Media funding.** Given a funding record is prepared in Communication & Media, when it is submitted for decision, then it follows the same Executive Director approval state machine and never enters Board governance workflows.
+
+### Cross-cutting requirements
+
+- **ROLE-01 — Executive Director role.** Given an account is assigned the Executive Director role, when its authenticated session requests grant approval functions, then the server authorises only the explicit Executive Director approval permissions and audits every decision.
+- **ROLE-02 — Separation of duties.** Given an account has only Administrator or Board Member permissions, when it calls any grant approval endpoint directly, then the server denies the request and leaves the grant record unchanged.
+- **OFF-01 — Installable/offline application.** Given a supported browser installs the application, when the user launches it without network connectivity, then the app shell and explicitly cache-approved static assets load, the UI marks cached data with its last-sync timestamp, and all server-authorised writes, approvals, signatures and permission changes remain disabled until connectivity and fresh authorisation are re-established.
+- **OFF-02 — Offline security boundary.** Given a user is offline or a session is expired/revoked, when protected data or a write action is requested, then no stale credential, cached role or queued command can grant access or execute a privileged action; pending non-sensitive drafts remain visibly unsent and require revalidation before sync.
+- **MOB-01 — Responsive mobile layout stack.** Given viewport width is 390 CSS pixels, when any portal is rendered, then the shell uses a single-column content stack, hides or collapses secondary navigation accessibly, wraps action controls, keeps cards and form controls within the viewport, and produces no horizontal page overflow.
+- **MOB-02 — Desktop layout.** Given viewport width is 1440 CSS pixels, when a portal is rendered, then primary navigation and content use a two-column layout with bounded content width and no horizontal page overflow.
+- **AI-05 — Explainability and human decision.** Given the Grant Intelligence AI produces a score, summary or recommendation, when the result is displayed, then each material conclusion is linked to evidence and confidence/unknowns and is labelled advisory; only the Executive Director can make the internal approval decision.
+- **AI-06 — No autonomous external action.** Given an AI analysis or draft is complete, when a model attempts to send, submit, sign, approve, or contact a donor, then the action is blocked and no external side effect occurs.
+- **DR-01 — Backup and recovery policy (proposed; not approved).** Given the backup service runs, when the daily scheduled backup completes, then a protected backup is created, retained for 30 days, and a restore test is recorded; policy status remains “TO BE APPROVED BY IRPA MANAGEMENT” until management approval is documented.
+
+### Backup, retention and disaster recovery decision
+
+**TO BE APPROVED BY IRPA MANAGEMENT.** Proposed default for management review: daily backup; 30-day retention; encrypted backup storage with restricted key custody; and a tested restore (at least monthly and after material infrastructure changes). RPO, RTO, legal hold, backup scope, encryption/key custody, off-site replication and disaster-recovery ownership remain open management decisions. These defaults are proposals, not approved policy.
+
+### Traceability additions
+
+| Requirement ID | Scope | Acceptance criteria | Wireframe / module | Verification |
+|---|---|---|---|---|
+| GR-01–GR-09 | Grant preparation, ED approval, non-submission and crawler boundary | GR-01–GR-09 | MOD-23, MOD-24; grant and communication wireframes | Proposed role/API integration tests |
+| ROLE-01–ROLE-02 | Explicit ED approval role and separation of duties | ROLE-01–ROLE-02 | Role matrix; MOD-23/MOD-24 | Proposed positive and negative permission tests |
+| OFF-01–OFF-02 | Installable/offline app and security boundary | OFF-01–OFF-02 | SHARED-03, SHARED-04 | Proposed install/offline/revocation tests |
+| MOB-01–MOB-02 | Mobile/desktop layout stack | MOB-01–MOB-02 | All 72 wireframes | Browser viewport and overflow tests |
+| AI-05–AI-06 | Explainable AI and no autonomous external action | AI-05–AI-06 | MOD-23 | Proposed AI safety and side-effect tests |
+| DR-01 | Backup, retention and restore | DR-01 | MOD-01 / IT Operations | Proposed scheduled backup and restore drill |
+
+### Module requirement coverage register
+
+The 31 source-baseline modules retain their existing MOD-01 through MOD-31 requirement headers and two or more Given/When/Then criteria each; the standalone portals retain STD-01 through STD-03, the nested portals retain SUB-01 through SUB-15, and the 59 enumerated route/path families retain API-01 through API-59. Grant-specific additional requirements are GR-01 through GR-09 and ROLE-01 through ROLE-02; shared offline/mobile requirements are OFF-01 through OFF-02 and MOB-01 through MOB-02; AI additions are AI-05 through AI-06; recovery is DR-01. Existing test IDs remain PROPOSED until executable tests are implemented and run.
