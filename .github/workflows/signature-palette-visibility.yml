@@ -49,7 +49,7 @@ jobs:
             echo "Syntax failures: $failures"
             exit 1
           fi
-          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' "${modules[@]}"
+          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --global window --global localStorage --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' "${modules[@]}"
       - name: Install ephemeral Playwright runner without changing lockfiles
         run: npm install --no-save --package-lock=false playwright
       - name: Install Chromium for desktop and mobile viewport emulation
