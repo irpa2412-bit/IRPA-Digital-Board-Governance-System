@@ -57,22 +57,41 @@ async function runViewport(name,viewport){
  await assertDockDoesNotCoverPdf(page);
  const canvas=page.getByLabel("Draw signature");
  await canvas.waitFor({state:"visible"});
+ // A visible element can still be below the viewport. Bring the actual canvas
+ // into the viewport before using page.mouse (whose coordinates are viewport-relative).
+ await canvas.scrollIntoViewIfNeeded();
  const rect=await canvas.boundingBox();
+ const viewport=page.viewportSize();
  assert.ok(rect&&rect.width>20&&rect.height>20,"drawing canvas must have a non-zero visible CSS box");
+ assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=viewport.width&&rect.y+rect.height<=viewport.height,
+   "drawing canvas must be inside the viewport before pointer input: "+JSON.stringify({rect,viewport}));
  activeCanvasBox=rect;
  console.log("CANVAS_BOUNDING_BOX "+name+": "+JSON.stringify(rect));
+ const pointerEvents=await canvas.evaluate(el=>{
+   const counts={down:0,move:0,up:0};
+   for(const [type,key] of [["pointerdown","down"],["pointermove","move"],["pointerup","up"]])
+     el.addEventListener(type,()=>counts[key]++,{once:false});
+   return counts;
+ });
  await page.mouse.move(rect.x+40,rect.y+50);
  await page.mouse.down();
  await page.mouse.move(rect.x+160,rect.y+95,{steps:12});
  await page.mouse.move(rect.x+260,rect.y+65,{steps:8});
  await page.mouse.up();
- const inkPixels=await canvas.evaluate(el=>{
+ const drawingEvidence=await canvas.evaluate(el=>{
    const ctx=el.getContext("2d"),{width,height}=el;
    const pixels=ctx.getImageData(0,0,width,height).data;
-   let ink=0;
-   for(let i=0;i<pixels.length;i+=4)if(pixels[i]<100&&pixels[i+1]<100&&pixels[i+2]<100)ink++;
-   return ink;
+   let opaqueDark=0,opaque=0;
+   for(let i=0;i<pixels.length;i+=4){
+     const alpha=pixels[i+3];
+     if(alpha>0)opaque++;
+     if(alpha>0&&pixels[i]<100&&pixels[i+1]<100&&pixels[i+2]<100)opaqueDark++;
+   }
+   return {opaquePixels:opaque,opaqueDarkPixels:opaqueDark};
  });
+ const inkPixels=drawingEvidence.opaqueDarkPixels;
+ console.log("DRAW_INK_PIXELS "+name+": "+JSON.stringify(drawingEvidence));
+ console.log("POINTER_EVENTS "+name+": "+JSON.stringify(await canvas.evaluate(el=>({pointerType:getComputedStyle(el).touchAction}))));
  console.log("DRAW_INK_PIXELS "+name+": "+inkPixels);
  assert.ok(inkPixels>10,"pointer stroke must leave visible ink before Confirm");
  await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-before-confirm.png",fullPage:true});
