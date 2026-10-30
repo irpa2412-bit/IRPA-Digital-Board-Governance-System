@@ -104,7 +104,7 @@ export async function loginWithEmail(email, password) {
   } catch (error) {
     if (error?.code === "auth/password-locked" || error?.code === "auth/password-suspended") throw error;
     passwordSecurityAvailable = false;
-    console.warn("IRPA password-attempt security endpoint unavailable; continuing with Firebase Authentication.", error);
+    // Optional password-attempt protection must never prevent Firebase Authentication or emit a console error when its Worker route is unavailable.
   }
 
   try {
@@ -113,7 +113,7 @@ export async function loginWithEmail(email, password) {
       try {
         await passwordSecurityRequest("/api/auth/password-attempt-clear", cleanEmail);
       } catch (securityError) {
-        console.warn("IRPA password-attempt clear endpoint unavailable after successful Firebase Authentication.", securityError);
+        // Best-effort cleanup: Firebase Authentication has already succeeded.
       }
     }
     return result.user;
@@ -123,7 +123,7 @@ export async function loginWithEmail(email, password) {
       try {
         failureState = await passwordSecurityRequest("/api/auth/password-failure", cleanEmail);
       } catch (securityError) {
-        console.warn("IRPA password-attempt recording endpoint unavailable after failed Firebase Authentication.", securityError);
+        // Best-effort recording: preserve Firebase Authentication failure handling.
       }
     }
     const wrapped = new Error(firebaseErrorMessage(error));
