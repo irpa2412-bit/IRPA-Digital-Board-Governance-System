@@ -7,8 +7,6 @@ import { chromium } from "playwright";
 mkdirSync("test-results",{recursive:true});
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4173","--strictPort"],{stdio:"ignore"});
 let browser,activePage=null,activeViewport="unknown";
-let activePage;
-let activeViewport="unknown";
 async function waitForServer(){
  for(let i=0;i<60;i++){try{const r=await fetch("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");if(r.ok)return}catch{}await delay(500)}
  throw new Error("Vite test server did not become ready");
@@ -36,7 +34,6 @@ async function assertDockDoesNotCoverPdf(page){
 async function runViewport(name,viewport){
  const context=await browser.newContext({viewport});
  const page=await context.newPage();activePage=page;activeViewport=name;
- activePage=page;activeViewport=name;
  page.on("pageerror",error=>console.error("PAGE_ERROR:",error.message));
  page.on("console",message=>{if(message.type()==="error")console.error("BROWSER_CONSOLE_ERROR:",message.text())});
  await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
