@@ -170,7 +170,7 @@ async function browserSuite(target) {
   }
 }
 async function versions() {
-  const token = need("CLOUDFLARE_API_TOKEN"), account = need("CLOUDFLARE_ACCOUNT_ID");
+  const token = need("CLOUDFLARE_GRANT_CRAWLER_API_TOKEN"), account = need("CLOUDFLARE_ACCOUNT_ID");
   if (!token || !account) { record("both", "Worker version metadata", "SKIP", "Missing Cloudflare API credentials; no version data retrieved."); return; }
   for (const target of targets) {
     const script = target.name === "staging" ? "irpa-grant-crawler-staging" : "irpa-grant-crawler-production";
