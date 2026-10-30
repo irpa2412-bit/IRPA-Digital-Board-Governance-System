@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 
 mkdirSync("test-results",{recursive:true});
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4173","--strictPort"],{stdio:"ignore"});
-let browser,activePage=null,activeViewport="unknown";
+let browser,activePage=null,activeViewport="unknown",activeCanvasBox=null;
 async function waitForServer(){
  for(let i=0;i<60;i++){try{const r=await fetch("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");if(r.ok)return}catch{}await delay(500)}
  throw new Error("Vite test server did not become ready");
@@ -45,23 +45,40 @@ async function runViewport(name,viewport){
  await page.getByRole("button",{name:"Cancel",exact:true}).click();
  assert.equal(await page.getByRole("dialog").count(),0,"Cancel closes the palette");
  assert.equal(await page.getByTestId("placed-sig-page-1").count(),0,"Cancel does not apply a signature");
- // Draw a signature on page 1.
+ // Type first: isolate confirmation from canvas input.
  await page.getByTestId("field-sig-page-1").click();
- await assertDockDoesNotCoverPdf(page);
- const canvas=page.getByLabel("Draw signature");
- const rect=await canvas.boundingBox();
- await page.mouse.move(rect.x+40,rect.y+50);await page.mouse.down();
- await page.mouse.move(rect.x+160,rect.y+95,{steps:8});await page.mouse.up();
+ await page.getByRole("button",{name:"Type",exact:true}).click();
+ await page.getByLabel("Type your signature").fill("IRPA Typed Signer");
  await page.getByRole("button",{name:"Confirm Signature"}).click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-sig-page-1");
- assert.match(await page.getByTestId("placed-sig-page-1").getAttribute("src"),/^data:image\/png;base64,/);
- assert.equal(await page.getByRole("dialog").count(),0,"Confirm closes the palette");
- // Type a second field on the same page.
+ console.log("PASS "+name+": Type + explicit Confirm");
+ // Draw on the initials field after verifying the canvas is visible and measurable.
  await page.getByTestId("field-initial-page-1").click();
- await page.getByRole("button",{name:"Type",exact:true}).click();
- await page.getByLabel("Type your signature").fill("IRPA Signer");
+ await assertDockDoesNotCoverPdf(page);
+ const canvas=page.getByLabel("Draw signature");
+ await canvas.waitFor({state:"visible"});
+ const rect=await canvas.boundingBox();
+ assert.ok(rect&&rect.width>20&&rect.height>20,"drawing canvas must have a non-zero visible CSS box");
+ activeCanvasBox=rect;
+ console.log("CANVAS_BOUNDING_BOX "+name+": "+JSON.stringify(rect));
+ await page.mouse.move(rect.x+40,rect.y+50);
+ await page.mouse.down();
+ await page.mouse.move(rect.x+160,rect.y+95,{steps:12});
+ await page.mouse.move(rect.x+260,rect.y+65,{steps:8});
+ await page.mouse.up();
+ const inkPixels=await canvas.evaluate(el=>{
+   const ctx=el.getContext("2d"),{width,height}=el;
+   const pixels=ctx.getImageData(0,0,width,height).data;
+   let ink=0;
+   for(let i=0;i<pixels.length;i+=4)if(pixels[i]<100&&pixels[i+1]<100&&pixels[i+2]<100)ink++;
+   return ink;
+ });
+ console.log("DRAW_INK_PIXELS "+name+": "+inkPixels);
+ assert.ok(inkPixels>10,"pointer stroke must leave visible ink before Confirm");
+ await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-before-confirm.png",fullPage:true});
  await page.getByRole("button",{name:"Confirm Initials"}).click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-initial-page-1");
+ console.log("PASS "+name+": Draw + explicit Confirm");
  // Navigate to page 2 and use the saved specimen.
  await page.getByRole("button",{name:"Next page"}).click();
  assert.equal(await page.getByTestId("page-number").innerText(),"2");
@@ -69,6 +86,7 @@ async function runViewport(name,viewport){
  await page.getByRole("button",{name:"Use my saved signature"}).click();
  await page.getByRole("button",{name:"Confirm Signature"}).click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-sig-page-2");
+ console.log("PASS "+name+": Saved specimen + explicit Confirm");
  // Page 1's two fields remain confirmed after page changes.
  await page.getByRole("button",{name:"Previous page"}).click();
  await page.getByTestId("placed-sig-page-1").waitFor({state:"visible"});
