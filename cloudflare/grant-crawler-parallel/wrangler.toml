@@ -27,6 +27,7 @@ workers_dev = true
 
 [env.staging.vars]
 IRPA_ENVIRONMENT = "staging"
+FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"
 GRANT_CRAWLER_ADMIN_EMAILS = "irpa2412@gmail.com"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
 GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news-centre\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/eeas/grants_en\",\"https://www.eeas.europa.eu/delegations/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\",\"https://www.mzv.sk/en/web/daressalaam-en/small-grants\",\"https://www.thefoundation.or.tz/what-we-do/grantmaking\",\"https://www.thefoundation.or.tz/our-platforms/smart-grants\",\"https://africanngos.org/\",\"https://jobs.ngoportal.africa/grants-funding/\",\"https://awdf.org/what-we-do/resourcing/\",\"https://www.uaf-africa.org/apply-for-a-grant/\",\"https://www.rufford.org/\",\"https://awhf.net/grants/\",\"https://globalfundcommunityfoundations.org/what-we-do/grants/\",\"https://www.speciesconservation.org/\",\"https://accf.afdb.org/\",\"https://globalebafund.org/small-size-grants/\"]"
@@ -49,6 +50,7 @@ workers_dev = true
 
 [env.production.vars]
 IRPA_ENVIRONMENT = "production"
+FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
 GRANT_CRAWLER_ADMIN_EMAILS = "irpa2412@gmail.com"
 GRANT_FEED_URLS = "[\"https://www.gov.uk/international-development-funding.atom?fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?location%5B%5D=tanzania&fund_state=open\",\"https://www.gov.uk/international-development-funding.atom?eligible_entities=organisations-lmic&fund_state=open\"]"
 GRANT_SOURCE_PAGE_URLS = "[\"https://www.undp.org/tanzania/news-centre\",\"https://www.undp.org/tanzania/press-releases\",\"https://www.thegef.org/what-we-do/topics/gef-small-grants-programme\",\"https://www.fao.org/partnerships/funding-opportunities/en\",\"https://www.eeas.europa.eu/eeas/grants_en\",\"https://www.eeas.europa.eu/delegations/tanzania_en\",\"https://www.mfukowamisitu.go.tz/download-center\",\"https://www.mzv.sk/en/web/daressalaam-en/small-grants\",\"https://www.thefoundation.or.tz/what-we-do/grantmaking\",\"https://www.thefoundation.or.tz/our-platforms/smart-grants\",\"https://africanngos.org/\",\"https://jobs.ngoportal.africa/grants-funding/\",\"https://awdf.org/what-we-do/resourcing/\",\"https://www.uaf-africa.org/apply-for-a-grant/\",\"https://www.rufford.org/\",\"https://awhf.net/grants/\",\"https://globalfundcommunityfoundations.org/what-we-do/grants/\",\"https://www.speciesconservation.org/\",\"https://accf.afdb.org/\",\"https://globalebafund.org/small-size-grants/\"]"
