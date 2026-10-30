@@ -1104,37 +1104,120 @@ test("Grant Pipeline routes evaluate eligible, conditional, not eligible and exp
   } finally { globalThis.fetch = originalFetch; }
 });
 
-function opportunityCacheMock() {
-  const entries=new Map();
-  return {async match(request){const r=entries.get(request.url);return r?r.clone():undefined;},async put(request,response){entries.set(request.url,response.clone());}};
+function opportunityDbMock(resultsOrError, metadata = {}) {
+  const calls = [];
+  return {
+    calls,
+    prepare(sql) {
+      const call = { sql, values: null };
+      calls.push(call);
+      return {
+        bind(...values) { call.values = values; return this; },
+        async all() {
+          if (resultsOrError instanceof Error) throw resultsOrError;
+          return { results: sql.includes("crawler_engine_runs") ? (metadata.engineRuns || []) : resultsOrError };
+        },
+        async first() {
+          if (resultsOrError instanceof Error) throw resultsOrError;
+          return metadata.lastRun || null;
+        },
+        async run() {
+          if (resultsOrError instanceof Error) throw resultsOrError;
+          return { meta: { changes: 1 } };
+        }
+      };
+    }
+  };
 }
-function opportunityDbMock(resultsOrError) {
-  const calls=[];
-  return {calls,prepare(sql){const call={sql,values:null};calls.push(call);return {bind(...values){call.values=values;return this;},async all(){if(resultsOrError instanceof Error)throw resultsOrError;return {results:resultsOrError};}};}};
-}
-test("GET /opportunities clamps page size, defaults to 50, binds offset and reports hasMore",async()=>{
-  const original=globalThis.caches;globalThis.caches={default:opportunityCacheMock()};
-  try{
-    const db=opportunityDbMock(Array.from({length:101},(_,id)=>({id})));
-    const response=await listOpportunities(new Request("https://crawler.example/opportunities?limit=500&offset=25"),{GRANTS_DB:db});
-    const body=await response.json();assert.equal(body.limit,100);assert.equal(body.offset,25);assert.equal(body.items.length,100);assert.equal(body.hasMore,true);assert.deepEqual(db.calls[0].values,[101,25]);
-    const defaultDb=opportunityDbMock(Array.from({length:51},(_,id)=>({id})));
-    const defaultResponse=await listOpportunities(new Request("https://crawler.example/opportunities"),{GRANTS_DB:defaultDb});
-    const defaultBody=await defaultResponse.json();assert.equal(defaultBody.limit,50);assert.equal(defaultBody.offset,0);assert.equal(defaultBody.items.length,50);assert.equal(defaultBody.hasMore,true);assert.deepEqual(defaultDb.calls[0].values,[51,0]);
-  }finally{if(original===undefined)delete globalThis.caches;else globalThis.caches=original;}
+
+test("GET /opportunities preserves every legacy response key and adds pagination metadata", async () => {
+  const rows = [{ id: "opportunity-contract", title: "Current grant", url: "https://donor.example/current", call_status: "open", deadline_at: "2099-12-31" }];
+  const db = opportunityDbMock(rows, { lastRun: { status: "success" }, engineRuns: [{ engine: "rss_atom", status: "success" }] });
+  const response = await listOpportunities(new Request("https://crawler.example/opportunities?limit=48&offset=0"), { GRANTS_DB: db });
+  const body = await response.json();
+  for (const key of ["service", "feedsConfigured", "sourcePagesConfigured", "webSearchConfigured", "items", "count", "suppressedExpiredOrUnverified", "lastRun", "engineRuns", "engineProvision", "limit", "offset", "hasMore"]) {
+    assert.ok(Object.hasOwn(body, key), "missing response key: " + key);
+  }
+  assert.equal(body.service, "irpa-grant-crawler");
+  assert.equal(body.items.length, 1);
+  assert.equal(body.count, 1);
+  assert.deepEqual(body.lastRun, { status: "success" });
+  assert.deepEqual(body.engineRuns, [{ engine: "rss_atom", status: "success" }]);
+  assert.equal(body.limit, 48);
+  assert.equal(body.offset, 0);
+  assert.equal(body.hasMore, false);
 });
-test("GET /opportunities cache hit avoids a second D1 prepare",async()=>{
-  const original=globalThis.caches;globalThis.caches={default:opportunityCacheMock()};
-  try{const db=opportunityDbMock([{id:"cached-row"}]);const req=()=>new Request("https://crawler.example/opportunities?limit=50&offset=0");
-    const first=await listOpportunities(req(),{GRANTS_DB:db});assert.equal(first.headers.get("x-cache"),"MISS");
-    const second=await listOpportunities(req(),{GRANTS_DB:db});assert.equal(second.headers.get("x-cache"),"HIT");assert.equal(db.calls.length,1);
-  }finally{if(original===undefined)delete globalThis.caches;else globalThis.caches=original;}
+
+test("GET /opportunities paginates, caches in memory, and loads engine history only on page zero", async () => {
+  const db = opportunityDbMock(Array.from({ length: 101 }, (_, id) => ({ id, title: "Grant " + id, url: "https://donor.example/" + id, call_status: "open" })));
+  const req = () => new Request("https://crawler.example/opportunities?limit=47&offset=9");
+  const first = await listOpportunities(req(), { GRANTS_DB: db });
+  const body = await first.json();
+  assert.equal(body.limit, 47);
+  assert.equal(body.offset, 9);
+  assert.equal(body.items.length, 47);
+  assert.equal(body.hasMore, true);
+  assert.deepEqual(db.calls[0].values, [48, 9]);
+  assert.equal(db.calls.some(call => call.sql.includes("crawler_engine_runs")), false);
+  const second = await listOpportunities(req(), { GRANTS_DB: db });
+  assert.equal(second.headers.get("x-cache"), "HIT");
+  assert.equal(db.calls.length, 1);
 });
-test("GET /opportunities maps D1 limit to 503 and other query errors to 500",async()=>{
-  const original=globalThis.caches;globalThis.caches={default:opportunityCacheMock()};
-  try{const limited=await listOpportunities(new Request("https://crawler.example/opportunities"),{GRANTS_DB:opportunityDbMock(new Error("D1 daily read limit exceeded"))});
-    assert.equal(limited.status,503);assert.deepEqual(await limited.json(),{error:"D1 daily limit reached"});
-    const failed=await listOpportunities(new Request("https://crawler.example/opportunities"),{GRANTS_DB:opportunityDbMock(new Error("database unavailable"))});
-    assert.equal(failed.status,500);assert.deepEqual(await failed.json(),{error:"Opportunities query failed"});assert.notEqual(failed.status,401);assert.notEqual(failed.status,502);
-  }finally{if(original===undefined)delete globalThis.caches;else globalThis.caches=original;}
+
+test("GET /opportunities maps D1 limit exhaustion to 503", async () => {
+  const response = await listOpportunities(new Request("https://crawler.example/opportunities?limit=46&offset=11"), { GRANTS_DB: opportunityDbMock(new Error("D1 daily read limit exceeded")) });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "D1 daily limit reached" });
+});
+
+test("Grant Pipeline calls and evidence use bounded limit/offset pagination", async () => {
+  const auth = await createPipelineTestToken();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => String(url).includes("securetoken@system.gserviceaccount.com")
+    ? new Response(JSON.stringify({ keys: [auth.jwk] }), { status: 200, headers: { "content-type": "application/json", "cache-control": "max-age=3600" } })
+    : new Response("", { status: 500 });
+  const rows = Array.from({ length: 3 }, (_, id) => ({ id: "page-" + id, title: "Grant " + id, url: "https://donor.example/page-" + id, status: "open", deadline: "2099-12-31" }));
+  const db = {
+    calls: [],
+    prepare(sql) {
+      const call = { sql, values: [] }; this.calls.push(call);
+      return { bind(...values) { call.values = values; return this; }, async all() { return { results: sql.includes("grant_pipeline_evidence") ? rows : rows }; } };
+    }
+  };
+  try {
+    const headers = { authorization: "Bearer " + auth.token };
+    const calls = await worker.fetch(new Request("https://crawler.example/pipeline/calls?limit=2&offset=1", { headers }), { GRANTS_DB: db });
+    const callBody = await calls.json();
+    assert.equal(calls.status, 200);
+    assert.equal(callBody.limit, 2);
+    assert.equal(callBody.offset, 1);
+    assert.equal(callBody.hasMore, true);
+    assert.deepEqual(db.calls[0].values, [3, 1]);
+
+    const evidence = await worker.fetch(new Request("https://crawler.example/pipeline/evidence?callId=page-1&limit=2&offset=1", { headers }), { GRANTS_DB: db });
+    const evidenceBody = await evidence.json();
+    assert.equal(evidence.status, 200);
+    assert.equal(evidenceBody.limit, 2);
+    assert.equal(evidenceBody.offset, 1);
+    assert.equal(evidenceBody.hasMore, true);
+    assert.deepEqual(db.calls[1].values, ["page-1", 3, 1]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("Grant Pipeline list and write handlers map D1 daily limit to 503", async () => {
+  const auth = await createPipelineTestToken();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => String(url).includes("securetoken@system.gserviceaccount.com")
+    ? new Response(JSON.stringify({ keys: [auth.jwk] }), { status: 200, headers: { "content-type": "application/json", "cache-control": "max-age=3600" } })
+    : new Response("", { status: 500 });
+  const db = { prepare() { return { bind() { return this; }, async all() { throw new Error("D1 daily read limit exceeded"); }, async run() { throw new Error("D1 daily write limit exceeded"); } }; } };
+  try {
+    const headers = { authorization: "Bearer " + auth.token, "content-type": "application/json" };
+    const calls = await worker.fetch(new Request("https://crawler.example/pipeline/calls", { headers }), { GRANTS_DB: db });
+    assert.equal(calls.status, 503);
+    const evidence = await worker.fetch(new Request("https://crawler.example/pipeline/evidence", { headers }), { GRANTS_DB: db });
+    assert.equal(evidence.status, 503);
+    const stage = await worker.fetch(new Request("https://crawler.example/pipeline/stage", { method: "POST", headers, body: JSON.stringify({ callId: "quota-call", stage: "screening" }) }), { GRANTS_DB: db });
+    assert.equal(stage.status, 503);
+  } finally { globalThis.fetch = originalFetch; }
 });

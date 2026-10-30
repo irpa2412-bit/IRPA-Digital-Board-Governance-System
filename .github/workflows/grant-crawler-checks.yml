@@ -75,7 +75,7 @@ jobs:
                  first_seen_at, last_seen_at
           FROM grant_opportunities
           WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired')
-            AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours'))
+            AND date(COALESCE(deadline_at, '9999-12-31')) >= date('now', '+3 hours')
           ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
                    COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE
           LIMIT 26 OFFSET 0;
@@ -103,7 +103,7 @@ jobs:
           LIMIT 1000;
           SQL
 
-          if ! grep -Eiq 'SEARCH grant_opportunities USING INDEX' <<< "$board_plan"; then
+          if ! grep -Eiq 'SEARCH grant_opportunities USING INDEX idx_grant_opps_board_seek' <<< "$board_plan"; then
             echo "::error::Board query plan did not use SEARCH grant_opportunities USING INDEX."
             exit 1
           fi
