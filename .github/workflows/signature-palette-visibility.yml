@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           node --check tests/signature-explicit-confirmation.test.mjs
           node --check tests/signature-palette-visibility.playwright.mjs
-          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' tests/signature-explicit-confirmation.test.mjs tests/signature-palette-visibility.playwright.mjs
+          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' tests/signature-explicit-confirmation.test.mjs tests/signature-palette-visibility.playwright.mjs
       - name: Install ephemeral Playwright runner without changing lockfiles
         run: npm install --no-save --package-lock=false playwright
       - name: Install Chromium for desktop and mobile viewport emulation
