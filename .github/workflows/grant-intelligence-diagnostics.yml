@@ -10,13 +10,64 @@ on:
       - "src/styles/grant-intelligence-layout.css"
       - "scripts/grant-intelligence-diagnostics.mjs"
       - "tests/browser/grant-intelligence-navigation-diagnostics.mjs"
+      - "src/firebase/auth.js"
+      - "drive-gateway/**"
       - ".github/workflows/grant-intelligence-diagnostics.yml"
 
 permissions:
   contents: read
 
 jobs:
+  staging-google-drive-gateway:
+    name: Deploy and verify staging Google Drive Gateway only
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install and test gateway
+        working-directory: drive-gateway
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+      - name: Deploy staging Worker only
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: drive-gateway
+          command: deploy --env staging --var GIT_SHA:${{ github.sha }}
+      - name: Verify staging health and password-attempt route
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          const base = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
+          const healthResponse = await fetch(base + "/health", { signal: AbortSignal.timeout(15000) });
+          const health = await healthResponse.json().catch(() => ({}));
+          if (!healthResponse.ok || health.environment !== "staging" || health.authFunctionsEnabled !== true || health.commit !== process.env.EXPECTED_COMMIT) {
+            throw new Error("Staging gateway health/version/feature-flag verification failed (HTTP " + healthResponse.status + ").");
+          }
+          const email = "irpa-diagnostic-" + Date.now() + "-" + crypto.randomUUID() + "@example.invalid";
+          const response = await fetch(base + "/api/auth/password-attempt-state", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email }),
+            signal: AbortSignal.timeout(15000)
+          });
+          const state = await response.json().catch(() => ({}));
+          if (!response.ok || state.allowed !== true || state.status !== "FIRST") {
+            throw new Error("Staging password-attempt-state route failed (HTTP " + response.status + ").");
+          }
+          console.log("PASS staging gateway commit=" + health.commit + "; auth flag enabled; POST /api/auth/password-attempt-state HTTP " + response.status + ".");
+          NODE
+
   grant-intelligence-diagnostics:
+    needs: staging-google-drive-gateway
     name: Read-only production / isolated staging diagnostics
     runs-on: ubuntu-latest
     environment: irpa-grant-crawler-production
