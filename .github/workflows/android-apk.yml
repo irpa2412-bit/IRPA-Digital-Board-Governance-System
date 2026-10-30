@@ -36,6 +36,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Verify build workflow isolation policy
+        run: node --test tests/offline-build-workflow-policy.test.mjs
       - name: Install locked root application and Capacitor dependencies
         run: npm ci --no-audit --no-fund
       - name: Build web assets for the bundled Android application

@@ -47,6 +47,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify clean desktop installation with npm ci
         run: npm ci --prefix desktop --no-audit --no-fund
+      - name: Verify build workflow isolation policy
+        run: node --test tests/offline-build-workflow-policy.test.mjs
       - name: Commit generated desktop lockfile to the PR branch
         if: github.event_name == 'pull_request'
         shell: pwsh

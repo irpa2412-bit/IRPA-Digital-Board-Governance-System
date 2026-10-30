@@ -25,8 +25,8 @@ jobs:
           cache: npm
       - name: Install exact root application dependencies
         run: npm ci --no-audit --no-fund
-      - name: Test PWA manifest, service worker, offline persistence and portal coverage
-        run: node --test tests/pwa-install-offline.test.mjs
+      - name: Test PWA and workflow isolation contracts
+        run: node --test tests/pwa-install-offline.test.mjs tests/offline-build-workflow-policy.test.mjs
       - name: Build web application
         run: npm run build
       - name: Verify packaged offline assets
