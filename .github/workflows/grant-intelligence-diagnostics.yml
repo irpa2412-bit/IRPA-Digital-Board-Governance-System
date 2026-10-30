@@ -32,7 +32,9 @@ jobs:
       - name: Build staging diagnostic bundle (no deployment)
         env:
           VITE_BUILD_COMMIT: ${{ github.sha }}
+          VITE_IRPA_ENVIRONMENT: "staging"
           VITE_GRANT_WORKER_URL: https://irpa-grant-crawler-staging.irpa-governance.workers.dev
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev
           VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
           VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
           VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
