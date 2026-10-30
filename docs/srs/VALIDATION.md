@@ -104,10 +104,42 @@ Date: 30 October 2026. Scope: documentation-only PR #585. No application code, F
 1. Confirm the 31-module baseline and 15 registered nested sub-portals.
 2. Confirm Dataset Registry, Research Data Collection and Release Readiness as standalone portals; approve navigation and assign owners.
 3. Approve role register and role × module × action permission matrix.
-4. **TO BE APPROVED BY THE BOARD:** retention/legal hold, backup frequency/scope, encryption/key custody, restore-test evidence, RPO/RTO and disaster recovery.
-5. Confirm Grant Intelligence discovery/analysis-only scope; prohibit donor contact and application submission in this scope.
+4. **TO BE APPROVED BY IRPA MANAGEMENT:** retention/legal hold, backup frequency/scope, encryption/key custody, restore-test evidence, RPO/RTO and disaster recovery. Proposed default: daily backup, 30-day retention and tested restore; not approved until management sign-off.
+5. Grant workflow: authorised fundraising/management staff prepare; the Executive Director approves or returns; external submission remains outside the system. No Board approval, signature or workflow.
 6. Approve offline cache classes, expiry, revocation and synchronization conflict policy.
 7. Approve WCAG 2.2 AA target and measurable performance/load targets.
 8. Confirm Actual/Trial gate and temporary gateway-disconnect flag ownership.
 9. Complete delegated Worker route/schema/auth inventory and executable tests.
 10. Run authenticated browser acceptance, integration, security, recovery and binary document validation.
+
+
+## Executive Director authority correction — 31 October 2026
+
+- Grant and Communication & Media funding approvals are assigned exclusively to the **Executive Director**. Fundraising/management staff prepare; the Executive Director approves or returns; external submission is outside this system.
+- Administrator is not the grant approver. Board roles have no grant, concept-note, funding-opportunity or media-funding workflow, approval or signature permission.
+- Grant Intelligence remains discovery and analysis only. Crawlers are read-only and isolated.
+- Backup/retention/DR policy is **TO BE APPROVED BY IRPA MANAGEMENT**; proposed default is daily backup, 30-day retention and tested restore.
+- Role/source inspection: Executive Director is already named in the Grant Intelligence page's management-role allow-list and in the Communications Site editor allow-list in application source. It is also present in Firestore meeting registrar/governance role checks. The SRS now defines an explicit grant approval permission and test requirement. Source presence does not prove that a distinct global access category or complete server-side grant approval endpoint is implemented; that remains a proposed access-control GAP requiring implementation/verification without changing code in this documentation task.
+
+## Validation run — corrections and limits
+
+| Check | Result | Evidence / limitation |
+|---|---|---|
+| Requirement coverage | PASS (document inventory) | 31 MOD, 15 SUB, 3 STD, 59 API families; new GR/ROLE/OFF/MOB/AI/DR requirements added |
+| Board terms near grant/funding terms | PASS for revised SRS and three revised workflow wireframes | Grant/funding wireframe states explicitly prohibit Board routing; full repository-wide text scan is not available through the current GitHub connector and must be rerun in CI |
+| Grant approval authority | PASS in revised SRS and two funding wireframes | All grant/funding approval states name Executive Director |
+| Backup authority | PASS | “TO BE APPROVED BY IRPA MANAGEMENT”; daily/30-day/tested-restore proposal |
+| HTML parse all 72 | NOT RUN | No HTML parser/browser execution tool available in this repository operation |
+| Chromium 390×844 / 1440×900 render | NOT RUN | No Chromium/browser automation available |
+| Horizontal overflow | UNVERIFIED | CSS inspection shows minmax(0,1fr), min-width:0, box-sizing:border-box and a 640px single-column breakpoint; actual render measurement unavailable |
+| DOCX/PDF open and page counts | NOT VERIFIED IN THIS RUN | No document-viewer/office runtime exposed by GitHub connector; previous PR report says SRS PDF 23 pages and wireframe PDF 72 pages, but this run cannot independently reopen those binaries |
+| Application code role inspection | PARTIAL PASS / GAP | Executive Director string and management allow-list exist in source; distinct grant approval entitlement and server enforcement need implementation/verification |
+| Code/deploy scope | PASS | Documentation files only; no application source, rules, secrets, production configuration or deployment changed |
+
+### Remaining open decisions
+1. Management to approve backup scope, daily frequency, 30-day retention, encryption/key custody, restore-test cadence, RPO/RTO, legal hold and DR ownership.
+2. Confirm formal role register and assign fundraising/management staff; provision the Executive Director grant-approval permission through the established identity/access process.
+3. Verify server-side enforcement of Executive Director-only grant approvals; source role-string presence alone is insufficient.
+4. Confirm standalone portal navigation and owners for Dataset Registry, Research Data Collection and Release Readiness.
+5. Execute complete 72-file HTML parsing, browser renders at both requested viewports, overflow checks, and independent DOCX/PDF opens in CI or a browser-enabled build environment.
+6. Implement and run proposed automated acceptance tests; they remain specifications, not passing test executions.
