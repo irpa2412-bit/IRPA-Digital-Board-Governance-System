@@ -5,6 +5,7 @@ on:
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/firebase/config.js"
+      - "public/install.js"
       - "src/App.jsx"
       - "src/pages/GrantIntelligencePortal.jsx"
       - "src/pages/grant-fundraising/**"
