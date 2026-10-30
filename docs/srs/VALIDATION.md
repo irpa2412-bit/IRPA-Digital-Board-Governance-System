@@ -106,7 +106,7 @@ Each top-level module has 1 requirement ID and 5 acceptance criteria. Each regis
 | Offline/installable requirements | PASS (DOCUMENT) | Installable shell, stale-cache labels, idempotent sync, revocation boundary |
 | Mobile layout stack | PASS (DOCUMENT) | 390×844 assertions specified |
 | Desktop layout stack | PASS (DOCUMENT) | 1440×900 assertions specified |
-| Backup/retention/DR Board gate | PASS (DOCUMENT) | TO BE APPROVED BY THE BOARD; defaults explicitly unapproved |
+| Backup/retention/DR management gate | PASS (DOCUMENT) | TO BE APPROVED BY IRPA MANAGEMENT; defaults explicitly unapproved |
 | Requirement→page→test→AC traceability | PASS (DOCUMENT) | Proposed test IDs; no test execution implied |
 | HTML index inventory | PASS (STATIC INVENTORY) | Index lists 72 page links |
 | HTML parse of all 72 files | NOT RUN | No bulk HTML5 parser/browser runner available |
@@ -137,11 +137,11 @@ Each top-level module has 1 requirement ID and 5 acceptance criteria. Each regis
 
 ## 5. Backup, retention and disaster recovery
 
-**TO BE APPROVED BY THE BOARD.** Proposed default only: daily encrypted backups, 30-day rolling retention, monthly isolated restore test, RPO 24 hours and RTO 48 hours. Legal hold, deletion exceptions, encryption/key custody, backup scope, off-site location and recovery authority require Board approval. This proposal is not production policy.
+**TO BE APPROVED BY IRPA MANAGEMENT.** Proposed default only: daily encrypted backups, 30-day rolling retention, monthly isolated restore test, RPO 24 hours and RTO 48 hours. Legal hold, deletion exceptions, encryption/key custody, backup scope, off-site location and recovery authority require management approval. This proposal is not production policy.
 
 ## 6. Remaining open decisions
 
-1. Board approval of backup scope/frequency, retention, legal hold, encryption/key custody, restore testing, RPO/RTO and disaster-recovery authority.
+1. IRPA Management approval of backup scope/frequency, retention, legal hold, encryption/key custody, restore testing, RPO/RTO and disaster-recovery authority.
 2. Product-owner approval of role × module × action permissions and workflow state machines.
 3. Confirm standalone portal navigation and accountable owners/stewards for all three standalone portals.
 4. Complete delegated/nested Worker route, method, schema, authentication and side-effect inventory; reconcile 59 documented families with the earlier 66-family estimate.
