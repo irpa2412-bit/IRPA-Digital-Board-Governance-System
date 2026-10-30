@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 
 mkdirSync("test-results",{recursive:true});
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4173","--strictPort"],{stdio:"ignore"});
-let browser;
+let browser;\nlet activePage;\nlet activeViewport="unknown";
 async function waitForServer(){
  for(let i=0;i<60;i++){try{const r=await fetch("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");if(r.ok)return}catch{}await delay(500)}
  throw new Error("Vite test server did not become ready");
@@ -23,7 +23,7 @@ async function assertDockDoesNotCoverPdf(page){
 }
 async function runViewport(name,viewport){
  const context=await browser.newContext({viewport});
- const page=await context.newPage();
+ const page=await context.newPage();\n activePage=page;activeViewport=name;\n page.on("pageerror",error=>console.error("PAGE_ERROR:",error.message));\n page.on("console",message=>{if(message.type()==="error")console.error("BROWSER_CONSOLE_ERROR:",message.text())});
  await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
  await page.getByRole("heading",{name:/Signing ceremony/}).waitFor();
  assert.equal(await page.getByTestId("page-number").innerText(),"1");
@@ -82,5 +82,5 @@ try{
  await runViewport("mobile",{width:390,height:844});
  console.log("PASS desktop: Draw, Type, saved signature, explicit Confirm, multi-page, multi-field, zoom, reload, no palette overlap");
  console.log("PASS mobile: Draw, Type, saved signature, explicit Confirm, multi-page, multi-field, zoom, reload, no palette overlap");
-}catch(error){console.error("FAIL signature palette Playwright:",error);process.exitCode=1}
+}catch(error){\n console.error("FAIL signature palette Playwright:",error);\n if(activePage){\n  try{await activePage.screenshot({path:"test-results/signature-palette-"+activeViewport+"-failure.png",fullPage:true});}catch{}\n  try{writeFileSync("test-results/signature-palette-"+activeViewport+"-failure.html",await activePage.content());}catch{}\n  try{console.error("VISIBLE_FAILURE_ALERTS:",await activePage.locator('[role="alert"]').allTextContents());}catch{}\n  try{console.error("ENVELOPE_STATE:",await activePage.getByTestId("envelope-state").innerText());}catch{}\n }\n process.exitCode=1\n}
 finally{await browser?.close();server.kill("SIGTERM")}
