@@ -28,16 +28,27 @@ jobs:
         run: npm ci
       - name: Check syntax and lint every JavaScript test module
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mapfile -t modules < <(find tests -type f -name '*.mjs' -print | sort)
           if [[ ${#modules[@]} -eq 0 ]]; then
             echo "No test .mjs modules were discovered." >&2
             exit 1
           fi
+          failures=0
           for file in "${modules[@]}"; do
             echo "=== node --check $file ==="
-            node --check "$file"
+            if output=$(node --check "$file" 2>&1); then
+              echo "PASS: $file"
+            else
+              echo "FAIL: $file"
+              printf '%s\n' "$output"
+              failures=$((failures + 1))
+            fi
           done
+          if [[ "$failures" -gt 0 ]]; then
+            echo "Syntax failures: $failures"
+            exit 1
+          fi
           npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' "${modules[@]}"
       - name: Install ephemeral Playwright runner without changing lockfiles
         run: npm install --no-save --package-lock=false playwright
