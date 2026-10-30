@@ -486,7 +486,7 @@ const PIPELINE_STAGES = new Set(["identified", "screening", "eligible", "conditi
 
 async function handleGrantPipelineRoute(request, env, url) {
   if (!env.GRANTS_DB) return json({ error: "The grant pipeline D1 binding is missing." }, 503);
-  const token = String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   try { await verifyFirebaseIdToken(token, env, false); }
   catch (error) { return json({ error: String(error.message || "A valid Firebase sign-in is required.").slice(0, 300) }, 401); }
 
