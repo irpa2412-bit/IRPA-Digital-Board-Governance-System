@@ -171,7 +171,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  async function generateAssistantDraft(){
    const request=text(assistantInstructions);
    if(!request){setAssistantError("Describe what you want the AI Assistant to prepare.");return;}
-   // Keep AI drafting on its established assistant-capable Worker; crawler scans use the isolated production D1 Worker.
+   // All Grant Intelligence routes use the same environment-selected parallel crawler Worker.
    const workerUrl=grantWorkerUrl;
  const token=await auth.currentUser?.getIdToken(true);
    if(!token){setAssistantError("Your session has expired. Sign in again.");return;}
