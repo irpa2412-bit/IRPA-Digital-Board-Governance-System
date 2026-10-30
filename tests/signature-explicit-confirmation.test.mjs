@@ -48,3 +48,14 @@ test("the signing view keeps server-side visibility filtering for later signers"
   assert.match(worker, /fields:\(env\.fields\|\|\)\.filter\(f=>f\.signerUid===signer\.uid\)/);
   assert.match(gatewayPortal, /const fields=opened\.fields\|\|\[\]/);
 });
+
+test("signature confirmation palette stays in document flow below the PDF and closes after explicit action", () => {
+  assert.match(pad, /position:"relative"/);
+  assert.doesNotMatch(pad, /position:"fixed"|inset:0|zIndex:1000|rgba\(15,23,42,\.78\)/);
+  assert.match(pad, /aria-modal="false"/);
+  assert.match(pad, /onClick=\{onCancel\}/);
+  assert.match(platform, /canvas\.style\.height="auto"/);
+  assert.match(platform, /zIndex:5/);
+  assert.match(gatewayPortal, /zIndex:5/);
+  assert.match(gatewayPortal, /zIndex:6/);
+});
