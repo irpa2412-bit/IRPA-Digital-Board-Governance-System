@@ -1,0 +1,29 @@
+name: Build IRPA-DBGS Windows installer
+on:
+  pull_request:
+    branches: [main]
+    paths: ["package.json","electron/**","electron-builder.yml","vite.config.js","index.html","src/**","public/**",".github/workflows/build-desktop.yml"]
+  push:
+    branches: [main]
+    paths: ["package.json","electron/**","electron-builder.yml","vite.config.js","index.html","src/**","public/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install isolated desktop packager
+        run: npm install --no-save electron@38.2.0 electron-builder@26.0.12
+      - name: Build Windows installer
+        run: npx electron-builder --config electron-builder.yml --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Windows-Installer
+          path: release/IRPA-DBGS-Setup-1.0.0.exe
+          if-no-files-found: error

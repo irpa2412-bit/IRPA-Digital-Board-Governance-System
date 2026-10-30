@@ -1,0 +1,15 @@
+appId: tz.or.irpa.dbgs
+productName: IRPA-DBGS
+extraMetadata:
+  main: electron/main.cjs
+directories:
+  output: release
+files:
+  - electron/**/*
+win:
+  target:
+    - nsis
+  artifactName: IRPA-DBGS-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

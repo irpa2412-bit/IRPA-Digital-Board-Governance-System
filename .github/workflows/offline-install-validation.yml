@@ -1,0 +1,57 @@
+name: IRPA offline installation validation
+on:
+  pull_request:
+    branches: [main]
+    paths: ["capacitor.config.ts","electron/**","electron-builder.yml","package.json","src/**","public/**","index.html","tests/pwa-install-offline.test.mjs",".github/workflows/offline-install-validation.yml"]
+permissions:
+  contents: read
+jobs:
+  web-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - run: npm ci
+      - run: node --test tests/pwa-install-offline.test.mjs
+      - run: npm run build
+      - name: Verify packaged offline assets
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/offline.html
+          test -f dist/manifest.webmanifest
+          test -f dist/install.js
+          test -f dist/icons/irpa-192.svg
+          test -f dist/icons/irpa-512.svg
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - run: npm ci
+      - run: npm install --no-save electron@38.2.0 electron-builder@26.0.12
+      - run: npx electron-builder --config electron-builder.yml --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Windows-Installer
+          path: release/IRPA-DBGS-Setup-1.0.0.exe
+          if-no-files-found: error
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "21"}
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap add android && npx cap sync android
+      - run: cd android && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

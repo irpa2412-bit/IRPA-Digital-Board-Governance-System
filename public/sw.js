@@ -1,79 +1,8 @@
-const CACHE_NAME="irpa-dbgs-app-shell-v45";
-const APP_SHELL=["/","/index.html","/manifest.webmanifest"];
-
-self.addEventListener("install",(event)=>{
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache=>cache.addAll(APP_SHELL))
-      .then(()=>self.skipWaiting())
-  );
-});
-
-self.addEventListener("activate",(event)=>{
-  event.waitUntil(
-    caches.keys().then(keys=>Promise.all(
-      keys.filter(key=>key.startsWith("irpa-dbgs-")&&key!==CACHE_NAME).map(key=>caches.delete(key))
-    )).then(()=>self.clients.claim())
-  );
-});
-
-function isAppAsset(request){
-  const url=new URL(request.url);
-  return url.origin===self.location.origin && (
-    url.pathname.startsWith("/assets/") ||
-    url.pathname==="/manifest.webmanifest" ||
-    url.pathname==="/favicon.ico"
-  );
-}
-
-// Cache writes are deliberately best-effort. A cache failure must never turn
-// a successful network response into an unhandled service-worker rejection.
-function cacheResponse(request,response){
-  if(!response || !response.ok || response.type==="opaque") return Promise.resolve();
-  try{
-    // Clone synchronously while the response is available. Do not call
-    // event.waitUntil here: this function runs inside an async fetch promise
-    // callback, after the ExtendableEvent dispatch may already have finished.
-    if(response.bodyUsed || response.body?.locked) return Promise.resolve();
-    const copy=response.clone();
-    // The fetch handler's respondWith promise keeps this best-effort cache
-    // operation alive. Cache failures never replace a successful response.
-    return caches.open(CACHE_NAME)
-      .then(cache=>cache.put(request,copy))
-      .catch(error=>console.warn("IRPA app-shell cache write skipped:",error));
-  }catch(error){
-    console.warn("IRPA app-shell response could not be cloned; returning network response unchanged:",error);
-    return Promise.resolve();
-  }
-}
-
-self.addEventListener("fetch",(event)=>{
-  const request=event.request;
-  if(request.method!=="GET") return;
-  const url=new URL(request.url);
-  if(url.origin!==self.location.origin) return;
-
-  if(request.mode==="navigate"){
-    event.respondWith(
-      fetch(request).then(response=>{
-        return cacheResponse("/",response).then(()=>response);
-      }).catch(()=>caches.match("/").then(cached=>cached||Response.error()))
-    );
-    return;
-  }
-
-  if(isAppAsset(request)){
-    event.respondWith(
-      caches.match(request).then(cached=>{
-        // Prefer the current deployment; cached assets are an offline fallback only.
-        return fetch(request).then(response=>{
-          return cacheResponse(request,response).then(()=>response);
-        }).catch(()=>cached||Response.error());
-      })
-    );
-  }
-});
-
-self.addEventListener("message", event => {
-  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
-});
+/* Versioned IRPA-DBGS shell. Never cache auth, API, signing or upload traffic. */
+const CACHE_PREFIX="irpa-dbgs-shell-",CACHE_NAME="irpa-dbgs-shell-20261030-1",OFFLINE_URL="/offline.html";
+const APP_SHELL=["/","/index.html","/manifest.webmanifest",OFFLINE_URL,"/icons/irpa-192.svg","/icons/irpa-512.svg","/icons/irpa-maskable.svg","/install.js"];
+function excluded(url){const p=url.pathname.toLowerCase();return p.startsWith("/api/")||p.includes("/worker/")||p.includes("auth")||p.includes("sign")||p.includes("signature")||p.includes("invitation")||p.endsWith(".pdf")||p.includes("/pdf/")||p.includes("token")||p.includes("upload")||p.includes("approval");}
+self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting())));
+self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith(CACHE_PREFIX)&&k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET")return;const u=new URL(r.url);if(u.origin!==self.location.origin||excluded(u))return;if(r.mode==="navigate"){e.respondWith(fetch(r).then(res=>{if(res.ok)caches.open(CACHE_NAME).then(c=>c.put("/",res.clone())).catch(()=>{});return res;}).catch(async()=>(await caches.match("/"))||(await caches.match(OFFLINE_URL))||Response.error()));return;}const p=u.pathname,asset=APP_SHELL.includes(p)||p.startsWith("/assets/")||/\.(?:js|css|woff2?|ttf|svg|png|webp|ico)$/.test(p);if(!asset)return;e.respondWith((async()=>{const cached=await caches.match(r);try{const res=await fetch(r);if(res.ok&&res.type!=="opaque")await caches.open(CACHE_NAME).then(c=>c.put(r,res.clone())).catch(()=>{});return res;}catch{return cached||Response.error();}})());});
+self.addEventListener("message",e=>{if(e.data?.type==="SKIP_WAITING")self.skipWaiting();});
