@@ -99,8 +99,8 @@ jobs:
                   }
               }
           `;
-          s=s.replace(/android\\s*\\{/, m=>m+ '\\n    '+block);
-          s=s.replace(/buildTypes\\s*\\{\\s*release\\s*\\{/, m=>m+'\\n            signingConfig signingConfigs.release');
+          s=s.replace(/android\s*\{/, m=>m+ '\n    '+block);
+          s=s.replace(/buildTypes\s*\{\s*release\s*\{/, m=>m+'\n            signingConfig signingConfigs.release');
           fs.writeFileSync(p,s);
           NODE
       - name: Build universal release APK
