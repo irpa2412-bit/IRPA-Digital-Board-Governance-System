@@ -78,7 +78,21 @@ async function apiSuite(target) {
   for (const [route, method] of [["/health","GET"],["/opportunities","GET"],["/fundraising/search","POST"],["/assistant/analyze","POST"],["/run","POST"]]) await corsCheck(target, route, method);
   if (!target.email || !target.password) {
     for (const name of credentialNames) if (!process.env[name]) need(name);
-    record(target.name, "Authenticated Worker suite", "SKIP", "Missing credentials; authenticated routes, assistant and refresh not run.");
+    const controlToken = process.env.GRANT_CRAWLER_CONTROL_TOKEN || "";
+    if (controlToken.length >= 32) {
+      await requestCheck(target, "/fundraising/search", "POST", controlToken, { query: "rangeland restoration", mode: "all" });
+      const assistant = await requestCheck(target, "/assistant/analyze", "POST", controlToken, {
+        task: "draft_message", format: "Partnership request message", tone: "Professional and persuasive", length: "Concise",
+        instructions: "Draft a first-contact partnership request to CJRF about suitable funding pathways for IRPA's community-led climate resilience and regenerative rangeland work in Longido, Tanzania. Do not claim implementation history or secured funding.",
+        context: "IRPA is an early-stage Tanzanian NGO with three pillars: Sustainable Rangeland Management, Livestock Development and Market Development."
+      });
+      if (assistant.parsed && typeof assistant.parsed.draft === "string" && assistant.parsed.draft.trim().length > 80) {
+        record(target.name, "CJRF AI draft content (crawler control auth)", "PASS", assistant.parsed.draft.length + " characters returned.");
+      } else if (assistant.response?.ok) {
+        record(target.name, "CJRF AI draft content (crawler control auth)", "FAIL", "Assistant returned HTTP success but no usable draft field.");
+      }
+    }
+    record(target.name, "Firebase-protected Worker routes", "SKIP", "Missing Firebase test credentials; Firebase-only routes and authenticated portal browser tests not run. Control-token-protected search and assistant checks are run independently when available.");
     return;
   }
   let token;
@@ -109,9 +123,20 @@ async function login(page, target) {
     await button.click({ timeout: 15000 });
     await page.waitForTimeout(9000);
   }
-  if (!(await page.getByRole("textbox", { name: "Search opportunities" }).count())) {
+  const search = page.getByRole("textbox", { name: "Search opportunities" });
+  if (!(await search.count())) {
+    if (page.viewportSize().width < 700) {
+      await page.getByRole("button", { name: "Portals", exact: true }).click();
+      const navigation = page.getByRole("dialog", { name: "Mobile navigation" });
+      await navigation.getByRole("button", { name: "Grant Intelligence & Funding Opportunities", exact: true }).click();
+    } else {
+      await page.getByRole("button", { name: "Grant Intelligence & Funding Opportunities", exact: true }).first().click();
+    }
+    await search.waitFor({ state: "visible", timeout: 25000 });
+  }
+  if (!(await search.count())) {
     const body = (await page.locator("body").innerText()).slice(0, 1200);
-    throw new Error("Grant Intelligence page not visible after authentication/navigation: " + body);
+    throw new Error("Grant Intelligence page not visible after authenticated portal navigation: " + body);
   }
 }
 async function browserSuite(target) {
@@ -186,9 +211,12 @@ async function versions() {
     try {
       const response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts/" + script + "/deployments", { headers: { authorization: "Bearer " + token }, signal: AbortSignal.timeout(15000) });
       const data = await response.json().catch(() => ({}));
-      const deployment = data.result?.[0];
+      const deployments = Array.isArray(data.result?.deployments) ? data.result.deployments : [];
+      const deployment = deployments[0];
       const version = deployment?.versions?.map(item => item.version_id + "@" + item.percentage + "%").join(", ") || "unavailable";
-      record(target.name, "Active Worker deployment version", response.ok && data.success && !!deployment ? "PASS" : "FAIL", "HTTP " + response.status + "; deployment=" + (deployment?.id || "unavailable") + "; versions=" + version);
+      const apiErrors = Array.isArray(data.errors) ? data.errors.map(item => item.message || item.code).join("; ") : "";
+      const valid = response.ok && data.success === true && !!deployment && Array.isArray(deployment.versions) && deployment.versions.length > 0;
+      record(target.name, "Active Worker deployment version", valid ? "PASS" : "FAIL", "HTTP " + response.status + "; success=" + String(data.success) + "; deployments=" + deployments.length + "; deployment=" + (deployment?.id || "unavailable") + "; versions=" + version + (apiErrors ? "; API errors=" + apiErrors : ""));
     } catch (error) { record(target.name, "Worker version", "FAIL", error.message); }
   }
   record("build", "Diagnostic web commit", "PASS", process.env.DIAGNOSTIC_BUILD_COMMIT || "unknown");

@@ -18,6 +18,7 @@ jobs:
   grant-intelligence-diagnostics:
     name: Read-only production / isolated staging diagnostics
     runs-on: ubuntu-latest
+    environment: irpa-grant-crawler-production
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -45,9 +46,9 @@ jobs:
       - name: Start isolated staging preview for browser tests
         run: |
           set -euo pipefail
-          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/grant-preview.log" 2>&1 &
+          npm run preview -- --host localhost --port 5173 > "$RUNNER_TEMP/grant-preview.log" 2>&1 &
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:4173/ -o /dev/null; then exit 0; fi
+            if curl --fail --silent http://localhost:5173/ -o /dev/null; then exit 0; fi
             sleep 2
           done
           cat "$RUNNER_TEMP/grant-preview.log"
@@ -58,12 +59,13 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Test staging and production Worker APIs, CORS, auth, browser UI and versions
         env:
-          STAGING_APP_URL: http://127.0.0.1:4173
+          STAGING_APP_URL: http://localhost:5173
           STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
           STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
           PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
           PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
           CLOUDFLARE_GRANT_CRAWLER_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           DIAGNOSTIC_BUILD_COMMIT: ${{ github.sha }}
         run: node scripts/grant-intelligence-diagnostics.mjs
