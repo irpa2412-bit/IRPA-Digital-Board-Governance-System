@@ -1,0 +1,114 @@
+name: Diagnose security-rules failures on main and PR 589
+
+on:
+  push:
+    branches: ["diagnose/rules-failures-20261031"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-rules-main:
+    name: Security rules on main
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - name: Run suite and print concise failure summary
+        shell: bash
+        run: |
+          set +e
+          npx --yes firebase-tools emulators:exec --only firestore --project irpa-digital-board-governance "npm run test:security-rules" > security-rules.log 2>&1
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const log = readFileSync("security-rules.log", "utf8").split(/\\r?\\n/);
+          const failures = [];
+          for (let i = 0; i < log.length; i++) {
+            const match = log[i].match(/^\\s*not ok \\d+ - (.+)$/);
+            if (!match) continue;
+            let error = "";
+            for (let j = i + 1; j < Math.min(log.length, i + 16); j++) {
+              if (/^\\s*error:/.test(log[j])) {
+                error = log[j].replace(/^\\s*error:\\s*/, "");
+                for (let k = j + 1; k < Math.min(log.length, j + 10); k++) {
+                  if (/^\\s*(code:|name:|operator:|stack:)/.test(log[k])) break;
+                  if (/^\\s{4,}\\S/.test(log[k])) error += " " + log[k].trim();
+                }
+                break;
+              }
+              if (/^\\s*not ok \\d+ - /.test(log[j])) break;
+            }
+            failures.push({ name: match[1], error: error || "No assertion error text found in TAP output." });
+          }
+          const last = log.slice().reverse();
+          const pass = Number((last.find(x => /^# pass \\d+/.test(x)) || "").match(/\\d+/)?.[0] || 0);
+          const fail = Number((last.find(x => /^# fail \\d+/.test(x)) || "").match(/\\d+/)?.[0] || failures.length);
+          console.log("SECURITY_RULES_SUMMARY");
+          for (const item of failures) console.log("not ok - " + item.name + " | " + item.error);
+          console.log("counts: pass=" + pass + " fail=" + fail);
+          NODE
+          exit 0
+
+  security-rules-pr589:
+    name: Security rules on PR 589 head
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b0c5c02b3a91dfe3e21e853b869e2f1f4555d23a
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - name: Run suite and print concise failure summary
+        shell: bash
+        run: |
+          set +e
+          npx --yes firebase-tools emulators:exec --only firestore --project irpa-digital-board-governance "npm run test:security-rules" > security-rules.log 2>&1
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const log = readFileSync("security-rules.log", "utf8").split(/\\r?\\n/);
+          const failures = [];
+          for (let i = 0; i < log.length; i++) {
+            const match = log[i].match(/^\\s*not ok \\d+ - (.+)$/);
+            if (!match) continue;
+            let error = "";
+            for (let j = i + 1; j < Math.min(log.length, i + 16); j++) {
+              if (/^\\s*error:/.test(log[j])) {
+                error = log[j].replace(/^\\s*error:\\s*/, "");
+                for (let k = j + 1; k < Math.min(log.length, j + 10); k++) {
+                  if (/^\\s*(code:|name:|operator:|stack:)/.test(log[k])) break;
+                  if (/^\\s{4,}\\S/.test(log[k])) error += " " + log[k].trim();
+                }
+                break;
+              }
+              if (/^\\s*not ok \\d+ - /.test(log[j])) break;
+            }
+            failures.push({ name: match[1], error: error || "No assertion error text found in TAP output." });
+          }
+          const last = log.slice().reverse();
+          const pass = Number((last.find(x => /^# pass \\d+/.test(x)) || "").match(/\\d+/)?.[0] || 0);
+          const fail = Number((last.find(x => /^# fail \\d+/.test(x)) || "").match(/\\d+/)?.[0] || failures.length);
+          console.log("SECURITY_RULES_SUMMARY");
+          for (const item of failures) console.log("not ok - " + item.name + " | " + item.error);
+          console.log("counts: pass=" + pass + " fail=" + fail);
+          NODE
+          exit 0
