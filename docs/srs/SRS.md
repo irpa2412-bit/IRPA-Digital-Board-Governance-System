@@ -664,13 +664,13 @@ Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-P
 - API-59-AC2: Given a request to scheduled cron is unauthorized, malformed, unsupported or outside scope, when the protected request is submitted directly to the server, then the handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized mutation.
 
 ## Backup, retention and disaster recovery
-**TO BE APPROVED BY THE BOARD.** Proposed default only: daily encrypted backup; 30-day rolling retention; monthly restore test; RPO 24 hours; RTO 48 hours. Board approval is required for retention, legal hold, backup scope/frequency, encryption/key custody, restore testing, RPO/RTO and DR location. No policy or production behavior is changed by this SRS.
+**TO BE APPROVED BY IRPA MANAGEMENT.** Proposed default only: daily encrypted backup; 30-day rolling retention; monthly restore test; RPO 24 hours; RTO 48 hours. Management approval is required for retention, legal hold, backup scope/frequency, encryption/key custody, restore testing, RPO/RTO and DR location. No policy or production behavior is changed by this SRS.
 
 ## Non-functional requirements
 - Security: least privilege, server-side authorization, secure token handling, no secrets in client output, auditable mutations and denials.
 - Integrity: idempotent offline retries; no duplicate votes, invitation redemptions or collection records.
 - Availability: partial failures are surfaced and never reported as success.
-- Accessibility: WCAG 2.2 AA proposed; Board approval required.
+- Accessibility: WCAG 2.2 AA proposed; IRPA Management approval required.
 - Performance: no approved p95/API/load target found; baseline and target remain open.
 - Privacy: classify records, minimize sensitive cache, apply consent/legal basis to research collection and preserve provenance.
 - Integrations: Firebase, Cloudflare Workers, Google Drive, WordPress/cPanel, SMTP, social and LiveKit are separate boundaries; no live health claim is made.
@@ -927,8 +927,7 @@ Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-P
 1. Approve 31 top-level modules and 15 nested sub-portals.
 2. Confirm three standalone portals and assign owners.
 3. Approve role register and role × module × action matrix.
-4. **TO BE APPROVED BY THE BOARD:** retention/legal hold, backup, encryption/key custody, RPO/RTO and DR; review proposed defaults.
-5. Confirm Grant Intelligence discovery/analysis-only scope.
+4. **TO BE APPROVED BY IRPA MANAGEMENT:** retention/legal hold, backup, encryption/key custody, RPO/RTO and DR; review proposed defaults.
 6. Approve offline cache classes, expiry, revocation and sync conflict policy.
 7. Approve WCAG 2.2 AA and performance/load targets.
 8. Confirm Actual/Trial gate and temporary gateway-disconnect flag owners.
