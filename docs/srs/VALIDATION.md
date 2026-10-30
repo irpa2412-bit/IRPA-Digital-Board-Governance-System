@@ -68,15 +68,22 @@ Date: 30 October 2026. Scope: documentation-only PR #585. No application code, F
 | HTML parser across 72 pages | NOT RUN | Repository content is accessible through GitHub connector, but no local bulk HTML parser/browser runner is available |
 | 390×844 Chromium render | NOT RUN | No browser automation runner available; no overflow result claimed |
 | 1440×900 Chromium render | NOT RUN | No browser automation runner available; no overflow result claimed |
-| DOCX open / page count | BLOCKED | DOCX binary is absent from the PR changed-file tree |
-| SRS PDF open / page count | BLOCKED | SRS PDF binary is absent from the PR changed-file tree |
-| Wireframe PDF open / page count | BLOCKED | Wireframe PDF binary is absent from the PR changed-file tree |
+| SRS DOCX generation / package structure | PASS (STRUCTURAL) | Generated from the current SRS.md source; OOXML package contains the required document, styles, relationships, content-types and document-properties parts. External Microsoft Word/LibreOffice open test was not available |
+| SRS PDF structure / page count | PASS (STRUCTURAL) | Generated PDF header/trailer and page tree verified; 23 pages. External PDF viewer open test was not available |
+| Wireframe PDF structure / page count | PASS (STRUCTURAL) | Generated from the 72 indexed page-specific wireframes; PDF header/trailer and page tree verified; 72 pages. External PDF viewer open test was not available |
 | Live authenticated app / integrations | NOT RUN | Outside documentation-only validation scope |
+
+## Downloadable exports added
+
+- `SRS.docx`: generated from `SRS.md` blob `d58ac2863329b25ec231e2f1ec87fd61a001ed8b`; 302,468 bytes; OOXML package contains 7 required package parts.
+- `SRS.pdf`: generated from the same SRS source; 157,334 bytes; 23 pages.
+- `WIRE_FRAMES.pdf`: generated from all 72 indexed wireframe pages; 142,590 bytes; 72 pages.
+- The Word package and both PDFs pass structural/signature checks performed during generation. They were not opened in Microsoft Word, LibreOffice or a desktop PDF viewer; external viewer compatibility remains unverified.
 
 ## Failures / limitations
 
 1. **Rendering validation incomplete:** all 72 pages still require real Chromium runs at both viewport sizes. Horizontal overflow is unverified.
-2. **Document binaries missing:** SRS DOCX, SRS PDF and wireframe PDF are not committed to PR #585, so package-open checks and page counts cannot be independently confirmed.
+2. **External document-viewer validation outstanding:** downloadable SRS DOCX, SRS PDF and wireframe PDF are now committed. Structural package/PDF checks and generated page counts pass, but opening in Microsoft Word/LibreOffice and an independent PDF viewer was not available.
 3. **Route coverage incomplete:** 59 top-level Worker paths/path families are assigned API requirement IDs. Delegated nested router handlers and the previously cited 66-route-family inventory still need exhaustive path/schema/auth extraction.
 4. **Executable test coverage incomplete:** 236 test IDs remain PROPOSED; no test implementation or execution is claimed.
 5. **Product-owner confirmation outstanding:** role × module × action permissions, exact workflow state machines, standalone navigation, risk thresholds and operational targets require approval.
