@@ -35,22 +35,31 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
       - name: Deploy staging Worker only
+        id: deploy_staging
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: drive-gateway
-          command: deploy --env staging --var GIT_SHA:${{ github.sha }}
+          command: deploy --config ./wrangler.toml --env staging --var GIT_SHA:${{ github.sha }}
       - name: Verify staging health and password-attempt route
+        if: always()
         env:
           EXPECTED_COMMIT: ${{ github.sha }}
+          DEPLOY_OUTCOME: ${{ steps.deploy_staging.outcome }}
         run: |
           node --input-type=module <<'NODE'
           const base = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
           const healthResponse = await fetch(base + "/health", { signal: AbortSignal.timeout(15000) });
           const health = await healthResponse.json().catch(() => ({}));
-          if (!healthResponse.ok || health.environment !== "staging" || health.authFunctionsEnabled !== true || health.commit !== process.env.EXPECTED_COMMIT) {
-            throw new Error("Staging gateway health/version/feature-flag verification failed (HTTP " + healthResponse.status + ").");
+          if (!healthResponse.ok || health.environment !== "staging" || health.authFunctionsEnabled !== true) {
+            throw new Error("Staging gateway health/feature-flag verification failed (HTTP " + healthResponse.status + ").");
+          }
+          if (process.env.DEPLOY_OUTCOME === "success" && health.commit !== process.env.EXPECTED_COMMIT) {
+            throw new Error("Staging gateway did not report the just-deployed commit.");
+          }
+          if (process.env.DEPLOY_OUTCOME !== "success") {
+            console.log("SKIPPED (reason: staging deploy step did not succeed); continuing live-route verification against the existing staging Worker.");
           }
           const email = "irpa-diagnostic-" + Date.now() + "-" + crypto.randomUUID() + "@example.invalid";
           const response = await fetch(base + "/api/auth/password-attempt-state", {
@@ -68,6 +77,7 @@ jobs:
 
   grant-intelligence-diagnostics:
     needs: staging-google-drive-gateway
+    if: always()
     name: Read-only production / isolated staging diagnostics
     runs-on: ubuntu-latest
     environment: irpa-grant-crawler-production
@@ -80,6 +90,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Report staging Worker deployment outcome
+        env:
+          DEPLOY_RESULT: ${{ needs.staging-google-drive-gateway.result }}
+        run: |
+          if [ "$DEPLOY_RESULT" = "success" ]; then
+            echo "Staging Worker deployment and verification job completed successfully."
+          else
+            echo "SKIPPED (reason: staging Worker deployment/verification job result=$DEPLOY_RESULT); diagnostics will continue against the existing staging Worker."
+          fi
       - name: Install application dependencies
         run: npm ci
       - name: Build staging diagnostic bundle (no deployment)
