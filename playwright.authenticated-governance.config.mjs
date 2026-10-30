@@ -14,7 +14,7 @@ export default defineConfig({
     screenshot: "only-on-failure"
   },
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4174",
+    command: "npm run dev -- --force --host 127.0.0.1 --port 4174",
     url: "http://127.0.0.1:4174/",
     env: { VITE_USE_FIREBASE_EMULATORS: "true" },
     reuseExistingServer: false,
