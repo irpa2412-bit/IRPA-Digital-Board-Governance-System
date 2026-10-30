@@ -32,6 +32,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run existing explicit-confirmation policy tests
         run: node --test tests/signature-explicit-confirmation.test.mjs
+      - name: Setup Java for Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Run all existing npm test scripts
         shell: bash
         run: |
@@ -44,7 +49,12 @@ jobs:
           if (!scripts.length) throw new Error("No existing test scripts were discovered.");
           for (const name of scripts) {
             console.log("\n=== npm run " + name + " ===");
-            const result = spawnSync("npm", ["run", name], { stdio: "inherit", shell: process.platform === "win32" });
+            const emulatorRequired = name === "test:meeting-category" || name === "test:security-rules";
+            const command = emulatorRequired
+              ? ["exec", "--yes", "firebase-tools", "--", "firebase", "emulators:exec", "--only", "firestore", "npm run " + name]
+              : ["run", name];
+            const executable = emulatorRequired ? "npx" : "npm";
+            const result = spawnSync(executable, command, { stdio: "inherit", shell: process.platform === "win32" });
             if (result.status !== 0) process.exit(result.status || 1);
           }
           NODE
