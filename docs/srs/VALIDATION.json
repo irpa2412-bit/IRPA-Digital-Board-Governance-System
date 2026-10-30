@@ -1,0 +1,21 @@
+{
+  "modules": 31,
+  "subportals": 15,
+  "standalone": 3,
+  "routePathFamilies": 59,
+  "crossCutting": 10,
+  "requirements": 118,
+  "acceptanceCriteria": 236,
+  "htmlPages": 72,
+  "indexLinks": 72,
+  "viewportChecks": 144,
+  "overflow": 0,
+  "htmlParseFailures": 0,
+  "missingLinks": 0,
+  "docx": "PASS",
+  "srsPdfPages": 17,
+  "wireframePdfPages": 72,
+  "liveApp": "NOT RUN",
+  "production": "NOT RUN",
+  "binaryExportsCommitted": false
+}
