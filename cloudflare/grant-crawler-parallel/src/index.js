@@ -1,6 +1,11 @@
 import { analyzeGrant } from "./assistant.js";
 import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, searchFundraisingSources, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
+import { irpaProfile } from "../../../src/grantPipeline/irpaProfile.js";
+import { checkEligibility } from "../../../src/grantPipeline/eligibility.js";
+import { scoreFit } from "../../../src/grantPipeline/fitScore.js";
+import { filterValidCalls } from "../../../src/grantPipeline/validity.js";
+
 
 
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
@@ -476,6 +481,97 @@ async function crawl(env, { fullCatalog = false } = {}) {
   };
 }
 
+
+const PIPELINE_STAGES = new Set(["identified", "screening", "eligible", "conditional", "not_eligible", "concept_note", "submitted", "awarded", "declined", "archived"]);
+
+async function handleGrantPipelineRoute(request, env, url) {
+  if (!env.GRANTS_DB) return json({ error: "The grant pipeline D1 binding is missing." }, 503);
+  const token = String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  try { await verifyFirebaseIdToken(token, env, false); }
+  catch (error) { return json({ error: String(error.message || "A valid Firebase sign-in is required.").slice(0, 300) }, 401); }
+
+  if (url.pathname === "/pipeline/calls") {
+    if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+    try {
+      const result = await env.GRANTS_DB.prepare(
+        "SELECT id, title, description, url, source_url, deadline_at AS deadline, call_status AS status, eligibility_status, fit_score, fit_assessment, fit_reasons FROM grant_opportunities ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE LIMIT 1000"
+      ).all();
+      const filtered = filterValidCalls(result.results || []);
+      return json({ calls: filtered.calls, closed: filtered.closed, duplicates: filtered.duplicates });
+    } catch (error) { return json({ error: String(error.message || "Unable to read grant pipeline calls.").slice(0, 300) }, 500); }
+  }
+
+  if (url.pathname === "/pipeline/evaluate") {
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+    const call = body?.call && typeof body.call === "object" ? body.call : body;
+    if (!call || typeof call !== "object" || !String(call.title || "").trim()) return json({ error: "A grant call with a title is required." }, 400);
+    const callId = String(body.callId || call.id || crypto.randomUUID()).slice(0, 160);
+    const eligibility = checkEligibility(call, irpaProfile);
+    const fit = scoreFit(call, irpaProfile);
+    const validity = filterValidCalls([{ ...call, status: call.status || "open" }]);
+    const validityStatus = validity.closed.length ? "CLOSED" : validity.calls.length ? "CURRENT" : "UNVERIFIED";
+    try {
+      await env.GRANTS_DB.prepare(
+        "INSERT INTO grant_pipeline_evaluations (id, call_id, eligibility_status, fit_score, fit_breakdown_json, eligibility_reasons_json, missing_json, validity_status, evaluated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET eligibility_status=excluded.eligibility_status, fit_score=excluded.fit_score, fit_breakdown_json=excluded.fit_breakdown_json, eligibility_reasons_json=excluded.eligibility_reasons_json, missing_json=excluded.missing_json, validity_status=excluded.validity_status, evaluated_by=excluded.evaluated_by, created_at=CURRENT_TIMESTAMP"
+      ).bind(crypto.randomUUID(), callId, eligibility.status, fit.score, JSON.stringify(fit.breakdown), JSON.stringify(eligibility.reasons), JSON.stringify(eligibility.missing), validityStatus, (await verifyFirebaseIdToken(token, env, false)).sub).run();
+      return json({ callId, eligibility, fit, validityStatus });
+    } catch (error) { return json({ error: String(error.message || "Unable to save grant evaluation.").slice(0, 300) }, 500); }
+  }
+
+  if (url.pathname === "/pipeline/stage") {
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+    const callId = String(body?.callId || "").trim();
+    const stage = String(body?.stage || "").trim().toLowerCase();
+    if (!callId || !PIPELINE_STAGES.has(stage)) return json({ error: "A callId and a valid pipeline stage are required." }, 400);
+    try {
+      const claims = await verifyFirebaseIdToken(token, env, false);
+      await env.GRANTS_DB.prepare(
+        "INSERT INTO grant_pipeline_stages (call_id, stage, notes, updated_by) VALUES (?, ?, ?, ?) ON CONFLICT(call_id) DO UPDATE SET stage=excluded.stage, notes=excluded.notes, updated_by=excluded.updated_by, updated_at=CURRENT_TIMESTAMP"
+      ).bind(callId, stage, String(body.notes || "").slice(0, 4000), claims.sub).run();
+      return json({ callId, stage, updated: true });
+    } catch (error) { return json({ error: String(error.message || "Unable to update pipeline stage.").slice(0, 300) }, 500); }
+  }
+
+  if (url.pathname === "/pipeline/evidence") {
+    if (request.method === "GET") {
+      try {
+        const callId = String(url.searchParams.get("callId") || "").trim();
+        const query = callId
+          ? env.GRANTS_DB.prepare("SELECT id, call_id, claim, evidence_text, source_label, source_url, verified, created_at FROM grant_pipeline_evidence WHERE call_id = ? ORDER BY created_at DESC LIMIT 500").bind(callId)
+          : env.GRANTS_DB.prepare("SELECT id, call_id, claim, evidence_text, source_label, source_url, verified, created_at FROM grant_pipeline_evidence ORDER BY created_at DESC LIMIT 500");
+        const result = await query.all();
+        return json({ evidence: result.results || [] });
+      } catch (error) { return json({ error: String(error.message || "Unable to read grant evidence.").slice(0, 300) }, 500); }
+    }
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+    const callId = String(body?.callId || "").trim();
+    const claim = String(body?.claim || "").trim();
+    const evidenceText = String(body?.evidenceText || "").trim();
+    const sourceLabel = String(body?.sourceLabel || "").trim();
+    if (!callId || !claim || !evidenceText || !sourceLabel) return json({ error: "callId, claim, evidenceText and sourceLabel are required." }, 400);
+    const sourceUrl = String(body.sourceUrl || "").trim();
+    if (sourceUrl) {
+      try { const parsed = new URL(sourceUrl); if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error(); }
+      catch { return json({ error: "sourceUrl must be a valid credential-free HTTP(S) URL." }, 400); }
+    }
+    try {
+      const claims = await verifyFirebaseIdToken(token, env, false);
+      const id = crypto.randomUUID();
+      await env.GRANTS_DB.prepare(
+        "INSERT INTO grant_pipeline_evidence (id, call_id, claim, evidence_text, source_label, source_url, verified, created_by) VALUES (?, ?, ?, ?, ?, ?, 0, ?)"
+      ).bind(id, callId, claim.slice(0, 2000), evidenceText.slice(0, 10000), sourceLabel.slice(0, 500), sourceUrl || null, claims.sub).run();
+      return json({ id, callId, verified: false, message: "Evidence saved for review; it has not been marked verified." }, 201);
+    } catch (error) { return json({ error: String(error.message || "Unable to save grant evidence.").slice(0, 300) }, 500); }
+  }
+  return json({ error: "Not found." }, 404);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -492,6 +588,9 @@ export default {
       } catch (error) {
         return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401);
       }
+    }
+    if (["/pipeline/calls", "/pipeline/evaluate", "/pipeline/stage", "/pipeline/evidence"].includes(url.pathname)) {
+      return handleGrantPipelineRoute(request, env, url);
     }
     if (request.method !== "POST" || !["/crawl", "/run", "/assistant/analyze", "/fundraising/search"].includes(url.pathname)) return json({ error: "Not found" }, 404);
     if (url.pathname === "/run") {

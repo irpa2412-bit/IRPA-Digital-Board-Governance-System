@@ -1,4 +1,5 @@
 import test from "node:test";
+import { webcrypto } from "node:crypto";
 import assert from "node:assert/strict";
 import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
@@ -1000,5 +1001,105 @@ test("fundraising search endpoint accepts control-token smoke auth and returns e
     assert.ok(Array.isArray(body.items));
     assert.ok(body.providers.includes("Google News RSS"));
     assert.ok(body.providers.includes("GDELT DOC API"));
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+async function createPipelineTestToken() {
+  const pair = await webcrypto.subtle.generateKey(
+    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: Uint8Array.of(1, 0, 1), hash: "SHA-256" },
+    true, ["sign", "verify"]
+  );
+  const jwk = await webcrypto.subtle.exportKey("jwk", pair.publicKey);
+  jwk.kid = "grant-pipeline-test-key";
+  jwk.alg = "RS256";
+  jwk.use = "sig";
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = encode({ alg: "RS256", typ: "JWT", kid: jwk.kid }) + "." + encode({
+    aud: "irpa-board-governance",
+    iss: "https://securetoken.google.com/irpa-board-governance",
+    sub: "grant-pipeline-test-user",
+    iat: now, auth_time: now, exp: now + 3600
+  });
+  const signature = await webcrypto.subtle.sign("RSASSA-PKCS1-v1_5", pair.privateKey, new TextEncoder().encode(unsigned));
+  return { token: unsigned + "." + Buffer.from(signature).toString("base64url"), jwk };
+}
+
+function pipelineTestDb(rows = []) {
+  return {
+    prepare(sql) {
+      const statement = {
+        all: async () => ({ results: sql.includes("grant_opportunities") ? rows : [] }),
+        first: async () => null,
+        run: async () => ({ meta: { changes: 1 } }),
+        bind: (..._values) => statement
+      };
+      return statement;
+    }
+  };
+}
+
+test("Grant Pipeline routes expose CORS preflight and reject missing Firebase tokens", async () => {
+  const routes = ["/pipeline/calls", "/pipeline/evaluate", "/pipeline/stage", "/pipeline/evidence"];
+  for (const path of routes) {
+    const preflight = await worker.fetch(new Request("https://crawler.example" + path, { method: "OPTIONS" }), {});
+    assert.equal(preflight.status, 204, path + " CORS preflight");
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+    const method = path === "/pipeline/calls" || path === "/pipeline/evidence" ? "GET" : "POST";
+    const rejected = await worker.fetch(new Request("https://crawler.example" + path, { method }), { GRANTS_DB: pipelineTestDb() });
+    assert.equal(rejected.status, 401, path + " auth rejection");
+    assert.equal(rejected.headers.get("access-control-allow-origin"), "*");
+  }
+});
+
+test("Grant Pipeline routes evaluate eligible, conditional, not eligible and expired fixtures and deduplicate calls", async () => {
+  const auth = await createPipelineTestToken();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (String(url).includes("securetoken@system.gserviceaccount.com")) {
+      return new Response(JSON.stringify({ keys: [auth.jwk] }), { status: 200, headers: { "content-type": "application/json", "cache-control": "max-age=3600" } });
+    }
+    throw new Error("Unexpected network request in grant pipeline route test.");
+  };
+  const rows = [
+    { id: "eligible-a", title: "Rangeland restoration", description: "Community rangeland restoration.", url: "https://donor.example/eligible", deadline: "2099-12-31", status: "open" },
+    { id: "duplicate-a", title: "Duplicate rangeland restoration", url: "https://donor.example/eligible", deadline: "2099-12-31", status: "open" },
+    { id: "expired-a", title: "Expired livestock grant", url: "https://donor.example/expired", deadline: "2020-01-01", status: "open" }
+  ];
+  const env = { GRANTS_DB: pipelineTestDb(rows) };
+  const headers = { authorization: "Bearer " + auth.token, "content-type": "application/json" };
+  try {
+    const listed = await worker.fetch(new Request("https://crawler.example/pipeline/calls", { headers }), env);
+    const listBody = await listed.json();
+    assert.equal(listed.status, 200);
+    assert.equal(listBody.calls.length, 1);
+    assert.equal(listBody.duplicates.length, 1);
+    assert.equal(listBody.closed.length, 1);
+
+    const fixtures = [
+      [{ title: "Tanzania rangeland grant", status: "open", deadline: "2099-12-31", eligibleCountries: ["Tanzania"], applicantTypes: ["NGO"], requiredApplicantTypes: ["NGO"] }, "ELIGIBLE", "CURRENT"],
+      [{ title: "Tanzania livestock grant", status: "open", deadline: "2099-12-31", eligibleCountries: ["Tanzania"], applicantTypes: ["NGO"], requiredApplicantTypes: ["NGO"], minimumYearsOperation: 4, minimumBudget: 50000 }, "CONDITIONAL", "CURRENT"],
+      [{ title: "Tanzania excluded grant", status: "open", deadline: "2099-12-31", eligibleCountries: ["Tanzania"], excludedCountries: ["Tanzania"] }, "NOT_ELIGIBLE", "CURRENT"],
+      [{ title: "Expired pastoral grant", status: "open", deadline: "2020-01-01", eligibleCountries: ["Tanzania"] }, "ELIGIBLE", "CLOSED"]
+    ];
+    for (const [call, expectedEligibility, expectedValidity] of fixtures) {
+      const response = await worker.fetch(new Request("https://crawler.example/pipeline/evaluate", { method: "POST", headers, body: JSON.stringify({ call }) }), env);
+      const body = await response.json();
+      assert.equal(response.status, 200, JSON.stringify(body));
+      assert.equal(body.eligibility.status, expectedEligibility);
+      assert.equal(body.validityStatus, expectedValidity);
+    }
+
+    const stage = await worker.fetch(new Request("https://crawler.example/pipeline/stage", {
+      method: "POST", headers, body: JSON.stringify({ callId: "eligible-a", stage: "screening", notes: "Initial review" })
+    }), env);
+    assert.equal(stage.status, 200);
+    assert.equal((await stage.json()).stage, "screening");
+
+    const evidence = await worker.fetch(new Request("https://crawler.example/pipeline/evidence", {
+      method: "POST", headers, body: JSON.stringify({ callId: "eligible-a", claim: "Registration evidence", evidenceText: "Registration certificate reference", sourceLabel: "IRPA registration record" })
+    }), env);
+    assert.equal(evidence.status, 201);
+    assert.equal((await evidence.json()).verified, false);
   } finally { globalThis.fetch = originalFetch; }
 });
