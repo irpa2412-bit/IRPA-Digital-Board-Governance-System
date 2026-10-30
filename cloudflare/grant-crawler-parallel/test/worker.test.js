@@ -1016,8 +1016,8 @@ async function createPipelineTestToken() {
   const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
   const unsigned = encode({ alg: "RS256", typ: "JWT", kid: jwk.kid }) + "." + encode({
-    aud: "irpa-board-governance",
-    iss: "https://securetoken.google.com/irpa-board-governance",
+    aud: "irpa-digital-board-governance",
+    iss: "https://securetoken.google.com/irpa-digital-board-governance",
     sub: "grant-pipeline-test-user",
     iat: now, auth_time: now, exp: now + 3600
   });
