@@ -1,5 +1,9 @@
 import { chromium } from "playwright";
 import fs from "node:fs";
+import path from "node:path";
+
+const artifactDir = "artifacts/grant-intelligence-diagnostics";
+fs.mkdirSync(artifactDir, { recursive: true });
 
 const results = [];
 const failures = [];
@@ -234,37 +238,51 @@ async function browserSuite(target) {
           await fieldGate.locator('input[name="irpa-data-environment"][value="TRIAL"]').check();
           const confirmGate = fieldGate.getByRole("button", { name: "Confirm environment and continue" });
           await confirmGate.waitFor({ state: "visible", timeout: 10000 });
+          if (await confirmGate.isDisabled()) throw new Error("Field-entry gate remained disabled after selecting Other + TRIAL.");
           await confirmGate.click();
           await fieldGate.waitFor({ state: "hidden", timeout: 10000 });
           return true;
         };
-        // Complete the required first-entry gate through its UI and retry any interrupted input.
+        const waitAndCompleteGate = async () => {
+          const appeared = await fieldGate.waitFor({ state: "visible", timeout: 1800 }).then(() => true).catch(() => false);
+          return appeared ? completeTrialFieldGate() : false;
+        };
+        const output = page.getByRole("textbox", { name: "Editable AI output" });
+        // The gate must be completed through its visible UI before the assistant action is retried.
         await completeTrialFieldGate();
-        try { await request.fill(draftRequest); }
-        catch (error) {
-          if (!(await fieldGate.isVisible().catch(() => false))) throw error;
-          await completeTrialFieldGate();
-          await request.fill(draftRequest);
-        }
-        if (await completeTrialFieldGate()) await request.fill(draftRequest);
-        const generate = page.getByRole("button", { name: "Generate requested output" });
-        try { await generate.click({ timeout: 15000 }); }
-        catch (error) {
-          if (!(await fieldGate.isVisible().catch(() => false))) throw error;
-          await completeTrialFieldGate();
+        await request.fill(draftRequest);
+        if (await waitAndCompleteGate()) await request.fill(draftRequest);
+        const generate = page.getByRole("button", { name: "Generate requested output", exact: true });
+        await generate.click({ timeout: 15000 });
+        if (await waitAndCompleteGate()) {
           await request.fill(draftRequest);
           await generate.click({ timeout: 15000 });
         }
-        if (await fieldGate.isVisible().catch(() => false)) {
-          await completeTrialFieldGate();
-          await generate.click({ timeout: 15000 });
-        }
-        await page.getByRole("textbox", { name: "Editable AI output" }).waitFor({ state: "visible", timeout: 100000 });
-        const draft = await page.getByRole("textbox", { name: "Editable AI output" }).inputValue();
+        await output.waitFor({ state: "visible", timeout: 100000 });
+        const draft = await output.inputValue();
+        if (draft.trim().length <= 80) throw new Error("AI assistant output appeared but was empty or too short (" + draft.trim().length + " characters).");
         record(target.name, "AI Assistant CJRF browser draft", draft.length > 80 ? "PASS" : "FAIL", draft.length + " characters returned.");
       }
       } catch (error) {
-        record(target.name, "Playwright viewport " + width + "px", "FAIL", error.message);
+        const stem = target.name + "-" + width + "px-ai";
+        const screenshot = path.join(artifactDir, stem + ".png");
+        const pageText = path.join(artifactDir, stem + ".txt");
+        const diagnosticsFile = path.join(artifactDir, stem + "-diagnostics.json");
+        await page.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
+        const body = await page.locator("body").innerText().catch(() => "Unable to retrieve page text: " + error.message);
+        const diagnostics = await page.evaluate(() => {
+          const visible = element => { const style=getComputedStyle(element); const rect=element.getBoundingClientRect(); return style.display!=="none"&&style.visibility!=="hidden"&&rect.width>0&&rect.height>0; };
+          return {
+            url: location.href,
+            headings: [...document.querySelectorAll("h1,h2,h3,h4,h5,h6")].filter(visible).map(el=>({tag:el.tagName.toLowerCase(),role:el.getAttribute("role")||"heading",text:(el.innerText||el.textContent||"").trim()})),
+            dialogs: [...document.querySelectorAll('[role="dialog"],dialog,[data-irpa-field-gate]')].filter(visible).map(el=>({selector:el.hasAttribute("data-irpa-field-gate")?"[data-irpa-field-gate]":el.tagName.toLowerCase(),text:(el.innerText||el.textContent||"").trim()}))
+          };
+        }).catch(() => ({url:page.url(),headings:[],dialogs:[],collectionError:"Unable to inspect DOM"}));
+        diagnostics.error = error.message;
+        diagnostics.pageText = body;
+        fs.writeFileSync(pageText, "URL: "+diagnostics.url+"\n\nVisible headings:\n"+diagnostics.headings.map(h=>h.tag+" ["+h.role+"] "+h.text).join("\n")+"\n\nOpen dialogs:\n"+diagnostics.dialogs.map(d=>d.selector+"\n"+d.text).join("\n\n")+"\n\nPage text:\n"+body, "utf8");
+        fs.writeFileSync(diagnosticsFile, JSON.stringify(diagnostics,null,2), "utf8");
+        record(target.name, "Playwright viewport " + width + "px", "FAIL", error.message + " | URL=" + diagnostics.url + " | dialogs=" + diagnostics.dialogs.map(d=>d.text).join(" || ").slice(0,1200));
       } finally {
         await page.close().catch(() => {});
       }
