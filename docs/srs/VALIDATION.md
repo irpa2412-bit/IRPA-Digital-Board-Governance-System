@@ -1,62 +1,65 @@
 # SRS / Wireframe validation report
+
 Date: 30 October 2026  
-Baseline: main @ f20403e6f26c296f9d3aa3cda87588115a0f694d  
-Scope: documentation-only static validation.
+Repository baseline inspected: `main` @ `f20403e6f26c296f9d3aa3cda87588115a0f694d`  
+Documentation branch: `docs/srs-wireframes-20261030`  
+Scope: static repository validation only. No application code, Firestore rules, secrets, production configuration or deployment changed.
 
-## Inventory checks
-- Source top-level NAV modules: 31
-- Registered nested sub-portals: 15
-- Total page/sub-portal wireframes planned: 46
-- Functional requirements: 55
-- Unique requirement IDs: 55
-- Worker route families listed: 66
-- Firestore collection names catalogued: 81
+## Inventory
 
-## Findings
-- PASS: each top-level NAV module has a stable page ID.
-- PASS: each registered nested sub-portal has a stable page ID and parent mapping.
-- PASS: every functional requirement has a unique ID, priority, acceptance criteria and portal mapping.
-- PASS: Worker dispatch/delegated route families are included in SRS §4.4.
-- PASS: collection names from the explicit COLLECTIONS registry and additional source references are listed.
-- GAP: live app URL was inaccessible to unauthenticated inspection; no authenticated visual or runtime test was possible.
-- GAP: source NAV has 31 top-level modules, not 26; nested sub-portals add 15. Confirm intended page-count baseline.
-- GAP: responsive overflow, broken links and missing images cannot be browser-tested against the authenticated live application from this session.
-- GAP: source contains temporary gateway disconnect and data-gate flags; release owners must resolve/confirm intent.
-- GAP: WordPress/cPanel/social credentials and live connectivity not inspected; secret values intentionally not requested or printed.
-- GAP: no complete DR/RPO/RTO or accessibility/performance conformance evidence found.
+| Item | Verified count |
+|---|---:|
+| Top-level NAV modules in source | 31 |
+| Registered nested sub-portals | 15 |
+| Source page components under `src/pages/` | 41 |
+| Additional component/subsystem wireframes | 21 |
+| Shared shell / authentication / flow wireframes | 5 |
+| Page-specific HTML wireframes | 72 |
+| HTML files including the wireframe index | 73 |
+| Functional requirements | 55 |
+| Unique functional requirement IDs | 55 |
+| Gateway route families in SRS | 66 listed in primary inventory, plus separately delegated route families in Appendix C |
+| Firestore collection names catalogued | 81 |
 
-## Automated checks to run on the documentation branch
-1. Check every SRS page ID against one matching `wireframes/<PAGE-ID>.html`.
-2. Check every href in `index.html` resolves to a generated page.
-3. Parse every HTML file and assert viewport meta, mobile CSS breakpoint, and state panels (empty/loading/error/offline).
-4. Check all SVGs are inline or local; no remote image assets are required.
-5. Use a browser at 390×844 and 1440×900 to test document scroll width and card overlap.
-6. Re-run the same checks after fixing all reported failures.
+The user-specified “26 pages” does not match the current source navigation. The source NAV contains 31 top-level modules; 15 additional nested sub-portals are separately registered. The SRS does not force the inventory to 26.
 
-## Result
-Static inventory/traceability checks: PASS by generation. Live/browser viewport checks: NOT RUN / GAP. This report does not claim that browser rendering or production routes were exercised.
+## Static validation results
 
-## Generated artifact checks
-- Generated HTML wireframes: 51 (31 top-level modules + 15 nested sub-portals + 5 shared/flow screens).
-- Every page and nested sub-portal has a matching page ID filename; the index lists the 51 HTML files.
-- Each wireframe contains the shared shell, 390px responsive breakpoint, and EMPTY / LOADING / ERROR / OFFLINE state panels.
-- Wireframe HTML uses inline CSS and does not depend on external images or remote assets.
-- Index links are relative to the SRS package; final path-existence validation is performed against the committed tree.
-- SRS exports: Word DOCX, 11-page PDF; wireframe bundle: 51-page PDF.
-- Browser-based 390×844 and 1440×900 screenshots were not run because no authenticated browser session is available. CSS overflow/overlap is structurally mitigated but not runtime-certified.
+- PASS — SRS, DOCX, SRS PDF, wireframe PDF, validation report and wireframe index are present in `docs/srs/`.
+- PASS — 55 functional requirement IDs parsed from the §3 requirement table; all 55 are unique; no duplicate IDs found.
+- PASS — each requirement row includes a priority, acceptance criteria and a portal/page mapping.
+- PASS — requirement-to-page-to-test traceability is provided in §10.3 by requirement family. Individual test coverage for every acceptance criterion is not claimed; where direct tests are absent, the SRS labels additional tests PROPOSED.
+- PASS — 72 HTML wireframe page files are present, plus the separate index page.
+- PASS — the index contains 72 page links; every relative HTML link resolves to a file in the committed branch tree (0 missing links).
+- PASS — sampled wireframe HTML includes a viewport meta tag, a narrow-screen CSS breakpoint, and EMPTY / LOADING / ERROR / OFFLINE state panels.
+- PASS — sampled wireframe uses inline CSS and has no external image dependency. Wireframes use illustrative placeholders, not fabricated screenshots or real records.
+- PASS — page/component cross-reference is included in SRS Appendix D; 41 source page components are mapped to stable wireframe IDs.
+- PASS — separate Worker boundaries are identified: Drive Gateway, grant crawler Worker and frontend static-asset Worker. The grant crawler is not misrepresented as a Drive Gateway route.
+- NOT RUN — full automated HTML validation across all 72 files could not complete within the available repository-tool call budget. No assertion is made that every HTML file was independently parsed.
+- NOT RUN — PDF binary page-count inspection and DOCX package-open validation were not executed in this environment. The generated export metadata in the SRS describes a 12-page SRS PDF and 72-page wireframe PDF.
+- NOT RUN — browser-based rendering at exact 390×844 and 1440×900 dimensions; actual overflow, overlap, keyboard navigation and visual fidelity remain unverified.
 
-## Final inventory extension
-- Source page components under `src/pages/`: 41. Appendix D maps all 41 component files to a wireframe page ID.
-- HTML wireframe pages: 72 = 31 top-level NAV modules + 15 nested sub-portals + 21 component/subsystem screens + 5 shared/flow screens.
-- Wireframe index: 72 page links plus document/report links.
-- PDF wireframe bundle: 72 pages.
-- SRS export regenerated from the final Markdown source: DOCX and 12-page PDF.
-- Dataset Registry, Research Data Collection, Release Readiness and Signature Pathway Self-Test have dedicated component-level wireframes; these are not falsely described as top-level NAV entries.
+## Failures / gaps found
 
-## Final static validation snapshot (branch tree)
-- Unique requirement IDs: 55 / 55.
-- Core deliverables present: SRS.md, SRS.docx, SRS.pdf, WIRE_FRAMES.pdf, VALIDATION.md.
-- HTML wireframe pages: 72 expected; index page is separate.
-- Index link existence: checked against the committed branch tree; broken links: 0.
-- Sampled HTML pages: viewport meta, mobile breakpoint, EMPTY/LOADING/ERROR/OFFLINE states all present; no remote image dependency.
-- Remaining unexecuted checks: authenticated live browser inspection and actual 390×844 / 1440×900 rendering; do not interpret responsive CSS presence as proof of zero visual overflow.
+1. **Page-count discrepancy (GAP):** request says 26 pages; source NAV has 31 top-level modules plus 15 nested sub-portals. Decision: confirm whether “26” referred to an older app version or a selected subset.
+2. **Live app inspection (GAP):** the public live URL could not be authenticated/inspected in this session. Live role assignments, records, route health and provider connectivity were not tested.
+3. **Visual viewport testing (GAP):** no authenticated browser/device session was available. Responsive CSS is present in sampled wireframes, but this is not proof of zero visual overflow at target dimensions.
+4. **Requirement-to-test granularity (GAP):** every requirement maps to a page; the traceability table maps test sources by requirement family. A one-test-per-requirement acceptance matrix is not evidenced. Add those tests as PROPOSED where required.
+5. **PDF/DOCX integrity (GAP):** package-open and rendered page-count checks remain to be run in Word/LibreOffice or an automated document validation pipeline.
+6. **Production integrations (GAP):** no live probes were made for Firebase, Google Drive, SMTP, WordPress, cPanel, social providers or LiveKit. Secrets were not requested or exposed.
+7. **Operational quality targets (GAP):** no approved SLA, RPO/RTO, retention schedule, load target, accessibility conformance statement or quota budget was found.
+8. **Release flags (GAP):** source contains environment/data-gate and temporary gateway-disconnect controls; owners must confirm intended release posture before enabling production functionality.
+
+## Residual decisions for IRPA
+
+- Confirm the intended page-count baseline (26 versus the current 31 top-level + 15 nested).
+- Confirm whether the source-derived roles and permission categories match the approved Board/HR register.
+- Approve data retention, legal hold, backup, RPO/RTO and disaster-recovery targets.
+- Approve accessibility target (recommended WCAG 2.2 AA) and performance/load targets.
+- Confirm whether Grant Intelligence is discovery/analysis only or whether a future donor-application submission workflow is required (not assumed implemented).
+- Confirm the release state and ownership of Actual/Trial gate and temporary gateway-disconnect flags.
+- Schedule authenticated browser acceptance at 390×844 and 1440×900 and integration smoke tests.
+
+## Final status
+
+Static tree inventory and index-link checks: PASS. Requirement ID uniqueness: PASS (55/55). Live application, full HTML parser sweep, exact viewport rendering and binary document validation: NOT RUN / GAP. Documentation is submitted for review, not deployed or merged.
