@@ -57,7 +57,7 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 2
           done
-          npx --yes lighthouse@12.8.2 http://127.0.0.1:4173/ \
+          npx --yes lighthouse@11.7.1 http://127.0.0.1:4173/ \
             --only-audits=installable-manifest,service-worker \
             --chrome-flags="--headless --no-sandbox" \
             --output=json --output-path="$RUNNER_TEMP/lighthouse-pwa.json"
