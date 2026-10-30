@@ -21,9 +21,10 @@ async function verifyFirebaseIdToken(token, env, requireAdmin = false) {
     header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
     claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
   } catch { throw new Error("Firebase sign-in token is malformed."); }
+  const firebaseProjectId = String(env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID);
   const now = Math.floor(Date.now() / 1000);
-  if (header.alg !== "RS256" || !header.kid || claims.aud !== FIREBASE_PROJECT_ID ||
-      claims.iss !== "https://securetoken.google.com/" + FIREBASE_PROJECT_ID ||
+  if (header.alg !== "RS256" || !header.kid || claims.aud !== firebaseProjectId ||
+      claims.iss !== "https://securetoken.google.com/" + firebaseProjectId ||
       !claims.sub || claims.sub.length > 128 || !claims.exp || claims.exp <= now ||
       !claims.iat || claims.iat > now + 60 || !claims.auth_time || claims.auth_time > now + 60) {
     throw new Error("Firebase sign-in token is invalid or expired.");
