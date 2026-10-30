@@ -530,7 +530,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    <div style={{maxWidth:760}}>
     <div style={styles.eyebrow}>IRPA-DBGS · FUNDING INTELLIGENCE</div>
     <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-     <h1 style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
+     <h1 data-testid="grant-intelligence-portal-heading" style={{...styles.title,margin:"7px 0"}}>Live Grants & Calls for Proposals</h1>
      <span role="status" aria-live="polite" title={crawlerRunning?"A grant-source scan is running.":crawlerRecords.length?"Crawler results are loaded.":"No crawler results are currently loaded."} style={{display:"inline-flex",alignItems:"center",gap:7,padding:"6px 10px",borderRadius:999,border:"1px solid "+(crawlerDiscoveryActive?"#32846d":"#b65c5c"),background:crawlerDiscoveryActive?"#123b32":"#3b2228",color:crawlerDiscoveryActive?"#8de0b7":"#ffb8b8",fontSize:12,fontWeight:800,whiteSpace:"nowrap"}}>
       <span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:crawlerDiscoveryActive?"#54d6a4":"#ff8585",display:"inline-block"}}/>
       {crawlerRunning?"Scanning":crawlerRecords.length?"Results loaded":"Awaiting results"}
