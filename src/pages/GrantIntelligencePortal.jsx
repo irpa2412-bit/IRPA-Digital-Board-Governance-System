@@ -109,7 +109,7 @@ const getOpportunityCurrentStatusIssue=record=>{
 const isNotCurrentOpportunity=record=>["closed","expired"].includes(getOpportunityCurrentStatusIssue(record));
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
- const [crawlerRecords,setCrawlerRecords]=useState([]);
+ const [crawlerRecords,setCrawlerRecords]=useState([]);\n const [crawlerHasMore,setCrawlerHasMore]=useState(false);
  const [crawlerResultsBusy,setCrawlerResultsBusy]=useState(false);
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
@@ -193,21 +193,21 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const href=URL.createObjectURL(blob);const a=document.createElement("a");a.href=href;a.download="irpa-ai-assistant-draft.txt";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(href);
  }
 
- async function loadCrawlerResults(showNotice=false){
+ async function loadCrawlerResults(showNotice=false,offset=0){
    const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
    const token=await auth.currentUser?.getIdToken();
    if(!token){if(showNotice)setError("Your session has expired. Sign in again to load crawler results.");return;}
    setCrawlerResultsBusy(true);
    try{
-     const response=await fetch(workerUrl+"/opportunities",{headers:{Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
+     const response=await fetch(workerUrl+"/opportunities?limit=50&offset="+Math.max(0,Number(offset)||0),{headers:{Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
-     const items=Array.isArray(data.items)?data.items:[];
+     const items=Array.isArray(data.items)?data.items:[];\n     setCrawlerHasMore(Boolean(data.hasMore));
      setCrawlerEngines(Array.isArray(data.engineRuns)?data.engineRuns:[]);
      setCrawlerProvision(Array.isArray(data.engineProvision)?data.engineProvision:[]);
      const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
-     setCrawlerRecords(items.map(item=>({
+     const mappedItems=items.map(item=>({
        id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
        funder:item.funder||item.source_name||(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Funder not verified"}})(),
        url:item.url||item.source_url||"",source_url:item.source_url||"",deadline:item.deadline_at||null,
@@ -601,7 +601,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
     <div><div style={styles.eyebrow}>AUTOMATED SOURCE MONITOR</div><h2 id="crawler-status-heading" style={{fontSize:18,margin:"5px 0"}}>Multi-donor web crawler</h2><p style={{...styles.muted,margin:0}}>Checks public RSS/Atom feeds, public APIs and selected donor opportunity hubs every six hours. New records are unverified leads, not confirmed eligible grants.</p></div>
-    {<div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={crawlerResultsBusy} style={{...styles.button,background:"transparent",opacity:crawlerResultsBusy?0.6:1}} onClick={()=>loadCrawlerResults(true)}>{crawlerResultsBusy?"Refreshing results…":"Refresh results"}</button><button type="button" disabled={crawlerRunning} title="Run a full-catalogue scan (available to authenticated IRPA-DBGS users)" style={{...styles.button,opacity:crawlerRunning?0.6:1}} onClick={startCrawlerScan}>{crawlerRunning?"Scanning sources…":"Run scan now"}</button></div>}
+    {<div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={crawlerResultsBusy} style={{...styles.button,background:"transparent",opacity:crawlerResultsBusy?0.6:1}} onClick={()=>loadCrawlerResults(true,0)}>{crawlerResultsBusy?"Refreshing results…":"Refresh results"}</button><button type="button" disabled={crawlerRunning} title="Run a full-catalogue scan (available to authenticated IRPA-DBGS users)" style={{...styles.button,opacity:crawlerRunning?0.6:1}} onClick={startCrawlerScan}>{crawlerRunning?"Scanning sources…":"Run scan now"}</button></div>}
    </div>
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:10}}>
     {[[ "Crawler state",crawlerStatus?.status||"Awaiting first scan"],[ "Sources with results",String(crawlerStatus?.healthySources??0)+" / "+String(crawlerStatus?.configuredSources??15)],[ "New records last run",String(crawlerStatus?.created??0)],[ "Candidates last run",String(crawlerStatus?.candidatesFound??0)]].map(([label,value])=><div key={label} style={{border:"1px solid #344255",borderRadius:10,padding:11}}><div style={styles.muted}>{label}</div><strong style={{display:"block",fontSize:17,marginTop:5}}>{value}</strong></div>)}
@@ -799,7 +799,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}{r.sourceUrl&&r.sourceUrl!==r.url?" · Discovery source recorded":""}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>{r.sourceType==="Cloudflare crawler"?"Open discovered call/source ↗":"Open official call ↗"}</a>{r.sourceUrl&&r.sourceUrl!==r.url&&<a href={r.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Discovery source ↗</a>}{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
    </div></details></article>)}
   </section>
-  <section style={styles.card}>
+  {crawlerHasMore&&<div style={{display:"flex",justifyContent:"center"}}><button type="button" style={styles.button} disabled={crawlerResultsBusy} onClick={()=>loadCrawlerResults(false,crawlerRecords.length)}>{crawlerResultsBusy?"Loading…":"Load more opportunities"}</button></div>}\n  <section style={styles.card}>
    <details><summary style={{cursor:"pointer",fontSize:17,fontWeight:800}}>Funding resource directory ({SOURCES.length} resources · click to expand)</summary>
     <p style={{...styles.muted,marginTop:9}}>Indicative discovery directory spanning African NGOs, foundations, UN and multilateral agencies, regional institutions, embassies and climate/conservation funders. The directory stays collapsed to preserve dashboard space. Click a source to open its original website and verify the actual call, deadline, geography and applicant requirements.</p>
     {Array.from(new Set(SOURCES.map(source=>source.category))).map(category=><div key={category} style={{marginTop:14}}>

@@ -1,7 +1,7 @@
 import test from "node:test";
 import { webcrypto } from "node:crypto";
 import assert from "node:assert/strict";
-import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl } from "../src/index.js";
+import worker, { assessFit, isCurrentOpportunity, parseFeed, safeUrl, listOpportunities } from "../src/index.js";
 import { assessGeographicEligibility } from "../src/assistant.js";
 import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, decodeHtml, normalizeOpportunityUrl, parseOfficialPage, parseSearchRss, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, searchFundraisingSources } from "../src/discovery-engines.js";
 
@@ -1102,4 +1102,39 @@ test("Grant Pipeline routes evaluate eligible, conditional, not eligible and exp
     assert.equal(evidence.status, 201);
     assert.equal((await evidence.json()).verified, false);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+function opportunityCacheMock() {
+  const entries=new Map();
+  return {async match(request){const r=entries.get(request.url);return r?r.clone():undefined;},async put(request,response){entries.set(request.url,response.clone());}};
+}
+function opportunityDbMock(resultsOrError) {
+  const calls=[];
+  return {calls,prepare(sql){const call={sql,values:null};calls.push(call);return {bind(...values){call.values=values;return this;},async all(){if(resultsOrError instanceof Error)throw resultsOrError;return {results:resultsOrError};}};}};
+}
+test("GET /opportunities clamps page size, defaults to 50, binds offset and reports hasMore",async()=>{
+  const original=globalThis.caches;globalThis.caches={default:opportunityCacheMock()};
+  try{
+    const db=opportunityDbMock(Array.from({length:101},(_,id)=>({id})));
+    const response=await listOpportunities(new Request("https://crawler.example/opportunities?limit=500&offset=25"),{GRANTS_DB:db});
+    const body=await response.json();assert.equal(body.limit,100);assert.equal(body.offset,25);assert.equal(body.items.length,100);assert.equal(body.hasMore,true);assert.deepEqual(db.calls[0].values,[101,25]);
+    const defaultDb=opportunityDbMock(Array.from({length:51},(_,id)=>({id})));
+    const defaultResponse=await listOpportunities(new Request("https://crawler.example/opportunities"),{GRANTS_DB:defaultDb});
+    const defaultBody=await defaultResponse.json();assert.equal(defaultBody.limit,50);assert.equal(defaultBody.offset,0);assert.equal(defaultBody.items.length,50);assert.equal(defaultBody.hasMore,true);assert.deepEqual(defaultDb.calls[0].values,[51,0]);
+  }finally{if(original===undefined)delete globalThis.caches;else globalThis.caches=original;}
+});
+test("GET /opportunities cache hit avoids a second D1 prepare",async()=>{
+  const original=globalThis.caches;globalThis.caches={default:opportunityCacheMock()};
+  try{const db=opportunityDbMock([{id:"cached-row"}]);const req=()=>new Request("https://crawler.example/opportunities?limit=50&offset=0");
+    const first=await listOpportunities(req(),{GRANTS_DB:db});assert.equal(first.headers.get("x-cache"),"MISS");
+    const second=await listOpportunities(req(),{GRANTS_DB:db});assert.equal(second.headers.get("x-cache"),"HIT");assert.equal(db.calls.length,1);
+  }finally{if(original===undefined)delete globalThis.caches;else globalThis.caches=original;}
+});
+test("GET /opportunities maps D1 limit to 503 and other query errors to 500",async()=>{
+  const original=globalThis.caches;globalThis.caches={default:opportunityCacheMock()};
+  try{const limited=await listOpportunities(new Request("https://crawler.example/opportunities"),{GRANTS_DB:opportunityDbMock(new Error("D1 daily read limit exceeded"))});
+    assert.equal(limited.status,503);assert.deepEqual(await limited.json(),{error:"D1 daily limit reached"});
+    const failed=await listOpportunities(new Request("https://crawler.example/opportunities"),{GRANTS_DB:opportunityDbMock(new Error("database unavailable"))});
+    assert.equal(failed.status,500);assert.deepEqual(await failed.json(),{error:"Opportunities query failed"});assert.notEqual(failed.status,401);assert.notEqual(failed.status,502);
+  }finally{if(original===undefined)delete globalThis.caches;else globalThis.caches=original;}
 });

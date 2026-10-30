@@ -74,42 +74,51 @@ function json(data, status = 200) {
   });
 }
 
-async function listOpportunities(env) {
-  if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
-  // Show discovered current calls regardless of geography or eligibility confidence; eligibility is advisory, not a discovery gate.
-  const rows = await env.GRANTS_DB.prepare(
-    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, discovery_engine, discovery_evidence, first_seen_at, last_seen_at FROM grant_opportunities WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired') AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours')) ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 500"
-  ).all();
-  const run = await env.GRANTS_DB.prepare(
-    "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
-  ).first();
-  let engineRuns = { results: [] };
+const OPP_DEFAULT_LIMIT = 50;
+const OPP_MAX_LIMIT = 100;
+function parsePaging(url) {
+  const rawLimit = parseInt(url.searchParams.get("limit") ?? "", 10);
+  const rawOffset = parseInt(url.searchParams.get("offset") ?? "", 10);
+  const limit = Math.min(OPP_MAX_LIMIT, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : OPP_DEFAULT_LIMIT));
+  const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+  return { limit, offset };
+}
+function isD1LimitError(error) {
+  const message = String(error?.message || error).toLowerCase();
+  return (message.includes("d1") && /(limit|quota|exceeded)/.test(message)) || message.includes("row read");
+}
+export async function listOpportunities(request, env) {
+  const url = new URL(request.url);
+  const { limit, offset } = parsePaging(url);
+  const cacheKey = new Request(`${url.origin}/opportunities?limit=${limit}&offset=${offset}`);
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey);
+  if (hit) return new Response(await hit.text(), { status: 200, headers: { ...corsHeaders(request, env), "content-type": "application/json", "x-cache": "HIT" } });
   try {
-    engineRuns = await env.GRANTS_DB.prepare(
-      "SELECT e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine"
-    ).all();
-  } catch {}
-  const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
-  const configuredList = value => { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? [...new Set(parsed.map(String))] : []; } catch { return []; } };
-  const feedUrls = configuredList(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS);
-  const pageUrls = configuredList(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS);
-  const engineProvision = [
-    { engine: "rss_atom", label: "RSS / Atom Feed Crawler", description: "Fetches public RSS and Atom feeds in parallel, extracts call metadata, then sends candidates through the shared deduplication, IRPA fit, deadline, geography and eligibility pipeline.", sources: feedUrls, configured: feedUrls.length },
-    { engine: "official_pages", label: "Official Funding Page Scanner", description: "Reads configured official donor pages, follows grant-related links on the same host, extracts public call details, and records HTTP failures without bypassing access controls.", sources: pageUrls, configured: pageUrls.length },
-    { engine: "web_search", label: "Web Search Discovery", description: "Rotates 12 targeted queries across Google News RSS, Bing RSS fallback, or Brave Search API when configured; searches rolling calls, deadline-based calls, and all IRPA strategic pillars and cross-cutting themes.", sources: ["Google News RSS", "Bing RSS fallback", "Brave Search API (optional)"], queries: SEARCH_QUERIES, configured: 1 },
-    { engine: "gdelt_search", label: "GDELT Global News and Web Index", description: "Runs rotating queries against the public GDELT DOC API for grant announcements, official calls, rolling opportunities, and deadline-based funding across pastoralism, rangelands, livestock, markets, climate, gender, youth and inclusion. Results are discovery leads and require official-call verification.", sources: ["GDELT DOC API"], queries: GDELT_QUERIES, configured: 1 },
-    { engine: "ai_eligibility", label: "AI Eligibility & Concept-Note Assistant", description: "Uses Cloudflare Workers AI for donor-requirement extraction, evidence-based eligibility analysis, compliance matrices and concept-note drafting. Deterministic deadline and known-applicant eligibility checks run first; AI output cannot override hard exclusions or invent IRPA track record. Inference availability depends on the Cloudflare AI account quota.", sources: ["POST /assistant/analyze", "Cloudflare Workers AI binding"], configured: 1, provisionStatus: "configured" },
-    ...DONOR_SCANNERS.map(scanner => ({
-      engine: scanner.name,
-      label: scanner.label,
-      description: /fundsforngos|africanngos|ngo_portal_africa/.test(scanner.name)
-        ? "Funding aggregator scanner: searches public listings and article pages, attempts to extract the original issuer/application URL, and does not use an aggregator article as the final apply target when an issuer link is found."
-        : "Dedicated donor scanner: checks the public funding page, extracts relevant calls, and records source HTTP failures. When the source blocks automated access, it tries a public search fallback and preserves the primary failure in telemetry.",
-      sources: [scanner.url],
-      configured: 1
-    }))
-  ];
-  return { service: "irpa-grant-crawler", feedsConfigured: feedUrls.length, sourcePagesConfigured: pageUrls.length, webSearchConfigured: true, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [], engineProvision };
+    const { results } = await env.GRANTS_DB.prepare(
+      `SELECT id, title, description, url, published_at, source_url,
+        fit_score, fit_assessment, fit_reasons, eligibility_status,
+        call_status, geography_assessment, triage_assessment,
+        deadline_at, discovery_engine, discovery_evidence,
+        first_seen_at, last_seen_at
+       FROM grant_opportunities
+       WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired')
+         AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours'))
+       ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
+         COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE
+       LIMIT ? OFFSET ?`
+    ).bind(limit + 1, offset).all();
+    const rows = results || [], hasMore = rows.length > limit;
+    const body = JSON.stringify({ items: rows.slice(0, limit), limit, offset, hasMore });
+    await cache.put(cacheKey, new Response(body, { headers: { "content-type": "application/json", "cache-control": "public, max-age=60" } }));
+    return new Response(body, { status: 200, headers: { ...corsHeaders(request, env), "content-type": "application/json", "x-cache": "MISS" } });
+  } catch (error) {
+    const limitReached = isD1LimitError(error);
+    return new Response(JSON.stringify({ error: limitReached ? "D1 daily limit reached" : "Opportunities query failed" }), {
+      status: limitReached ? 503 : 500,
+      headers: { ...corsHeaders(request, env), "content-type": "application/json", ...(limitReached ? { "retry-after": "3600" } : {}) }
+    });
+  }
 }
 
 const MAX_FEED_BYTES = 1_000_000;
@@ -581,13 +590,10 @@ export default {
       return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1" });
     }
     if (request.method === "GET" && url.pathname === "/opportunities") {
-      try {
-        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-        await verifyFirebaseIdToken(token, env, false);
-        return json(await listOpportunities(env));
-      } catch (error) {
-        return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401);
-      }
+      const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      try { await verifyFirebaseIdToken(token, env, false); }
+      catch (error) { return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401); }
+      return listOpportunities(request, env);
     }
     if (["/pipeline/calls", "/pipeline/evaluate", "/pipeline/stage", "/pipeline/evidence"].includes(url.pathname)) {
       return handleGrantPipelineRoute(request, env, url);
