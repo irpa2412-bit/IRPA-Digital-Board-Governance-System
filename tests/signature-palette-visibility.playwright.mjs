@@ -89,6 +89,9 @@ async function runViewport(name,viewport){
    return {opaquePixels:opaque,opaqueDarkPixels:opaqueDark,pointerEvents:el.__signaturePointerCounts};
  });
  const inkPixels=drawingEvidence.opaqueDarkPixels;
+ assert.equal(drawingEvidence.pointerEvents.down,1,"canvas must receive exactly one pointerdown");
+ assert.ok(drawingEvidence.pointerEvents.move>0,"canvas must receive pointermove events");
+ assert.equal(drawingEvidence.pointerEvents.up,1,"canvas must receive exactly one pointerup");
  console.log("DRAW_INK_PIXELS "+name+": "+JSON.stringify(drawingEvidence));
  console.log("DRAW_INK_PIXELS "+name+": "+inkPixels);
  assert.ok(inkPixels>10,"pointer stroke must leave visible ink before Confirm");
