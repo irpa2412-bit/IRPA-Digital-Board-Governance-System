@@ -79,7 +79,7 @@ const styles={
 const cleanArray=v=>Array.isArray(v)?v:[];
 const dateLabel=v=>{if(!v)return "Not specified";const d=v?.toDate?v.toDate():new Date(v);return Number.isNaN(d.getTime())?"Not specified":d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Dar_es_Salaam"});};
 const text=v=>String(v||"").trim();
-const workerFailure=(error,route)=>{const reason=String(error?.message||"Unknown network error");if(error?.name==="TimeoutError"||error?.name==="AbortError")return route+": request timed out. Check Worker availability and request duration.";if(error instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(reason))return route+": network/CORS failure. The browser could not reach the Worker; verify the environment Worker URL, HTTPS, DNS and OPTIONS preflight.";return route+": "+reason;};
+const workerFailure=(error,route)=>{const reason=String(error?.message||"Unknown network error");if(error?.name==="TimeoutError"||error?.name==="AbortError")return route+" (HTTP status unavailable): request timed out. Check Worker availability and request duration.";if(error instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(reason))return route+" (HTTP status unavailable): network/CORS failure. The browser could not reach the Worker; verify the environment Worker URL, HTTPS, DNS and OPTIONS preflight.";return route+": "+reason;};
 const dateKeyInTanzania=value=>{
  if(value===undefined||value===null||value==="")return null;
  if(typeof value==="string"){
