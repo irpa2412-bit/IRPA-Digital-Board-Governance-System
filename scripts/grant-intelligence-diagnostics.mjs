@@ -39,7 +39,13 @@ async function requestCheck(target, route, method, token, body) {
   const headers = { accept: "application/json" };
   if (token) headers.authorization = "Bearer " + token;
   if (body !== undefined) headers["content-type"] = "application/json";
-  const response = await fetch(target.worker + route, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
+  let response;
+  try {
+    response = await fetch(target.worker + route, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
+  } catch (error) {
+    record(target.name, method + " " + route, "FAIL", "Network/timeout: " + error.message);
+    return { response: null, parsed: null, raw: "" };
+  }
   const raw = await response.text();
   let parsed = null;
   try { parsed = JSON.parse(raw); } catch {}
@@ -83,7 +89,7 @@ async function apiSuite(target) {
   });
   if (assistant.parsed && typeof assistant.parsed.draft === "string" && assistant.parsed.draft.trim().length > 80) {
     record(target.name, "CJRF AI draft content", "PASS", "Non-empty draft returned; " + assistant.parsed.draft.length + " characters.");
-  } else if (assistant.response.ok) {
+  } else if (assistant.response?.ok) {
     record(target.name, "CJRF AI draft content", "FAIL", "Assistant returned HTTP success but no usable draft field.");
   }
   if (target.name === "staging") await requestCheck(target, "/run", "POST", token, { mode: "scheduled" });
@@ -121,6 +127,7 @@ async function browserSuite(target) {
       page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
       page.on("pageerror", error => errors.push(error.message));
       page.on("requestfailed", request => failed.push(request.method() + " " + request.url() + " " + (request.failure()?.errorText || "")));
+      try {
       await login(page, target);
       const webCommit = await page.locator('meta[name=irpa-build-version]').getAttribute('content').catch(() => 'unavailable');
       record(target.name, 'Live web build commit ' + width + 'px', webCommit && webCommit !== 'unavailable' ? 'PASS' : 'FAIL', webCommit || 'Build stamp unavailable.');
@@ -149,9 +156,13 @@ async function browserSuite(target) {
         const draft = await page.getByRole("textbox", { name: "Editable AI output" }).inputValue();
         record(target.name, "AI Assistant CJRF browser draft", draft.length > 80 ? "PASS" : "FAIL", draft.length + " characters returned.");
       }
-      await page.close();
+      } catch (error) {
+        record(target.name, "Playwright viewport " + width + "px", "FAIL", error.message);
+      } finally {
+        await page.close().catch(() => {});
+      }
     }
-  } catch (error) { record(target.name, "Authenticated Playwright", "FAIL", error.message); }
+  } catch (error) { record(target.name, "Playwright browser launch", "FAIL", error.message); }
   finally {
     record(target.name, "Browser console errors", errors.length ? "FAIL" : "PASS", errors.length ? errors.join(" | ").slice(0, 1800) : "No console errors.");
     record(target.name, "Failed network calls", failed.length ? "FAIL" : "PASS", failed.length ? failed.join(" | ").slice(0, 1800) : "No failed requests.");
