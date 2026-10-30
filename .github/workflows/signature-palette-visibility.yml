@@ -26,12 +26,19 @@ jobs:
           cache: npm
       - name: Install locked application dependencies
         run: npm ci
-      - name: Check syntax and lint every PR-touched JavaScript test module
+      - name: Check syntax and lint every JavaScript test module
         run: |
           set -euo pipefail
-          node --check tests/signature-explicit-confirmation.test.mjs
-          node --check tests/signature-palette-visibility.playwright.mjs
-          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' tests/signature-explicit-confirmation.test.mjs tests/signature-palette-visibility.playwright.mjs
+          mapfile -t modules < <(find tests -type f -name '*.mjs' -print | sort)
+          if [[ ${#modules[@]} -eq 0 ]]; then
+            echo "No test .mjs modules were discovered." >&2
+            exit 1
+          fi
+          for file in "${modules[@]}"; do
+            echo "=== node --check $file ==="
+            node --check "$file"
+          done
+          npx --yes eslint@8.57.1 --no-eslintrc --env es2022,node --global fetch --global HTMLImageElement --global document --global getComputedStyle --parser-options '{"ecmaVersion":"latest","sourceType":"module"}' --rule 'no-redeclare:error' --rule 'no-undef:error' "${modules[@]}"
       - name: Install ephemeral Playwright runner without changing lockfiles
         run: npm install --no-save --package-lock=false playwright
       - name: Install Chromium for desktop and mobile viewport emulation
