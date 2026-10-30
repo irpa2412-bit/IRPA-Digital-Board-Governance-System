@@ -513,8 +513,8 @@ async function crawl(env, { fullCatalog = false } = {}) {
   const historyStatements = [
     env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)").bind(overallStatus, items.length, changed),
     ...settled.map(engine => env.GRANTS_DB.prepare("INSERT INTO crawler_engine_runs (engine, status, configured, items_seen, error_message, finished_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(engine.name, engine.stats.status, engine.stats.configured, engine.items.length, engine.stats.error || null)),
-    env.GRANTS_DB.prepare("DELETE FROM crawler_runs WHERE id NOT IN (SELECT id FROM crawler_runs ORDER BY id DESC LIMIT 100)"),
-    env.GRANTS_DB.prepare("DELETE FROM crawler_engine_runs WHERE id NOT IN (SELECT id FROM crawler_engine_runs ORDER BY id DESC LIMIT 500)")
+    env.GRANTS_DB.prepare("DELETE FROM crawler_runs WHERE id < (SELECT MAX(id) - 100 FROM crawler_runs)"),
+    env.GRANTS_DB.prepare("DELETE FROM crawler_engine_runs WHERE id < (SELECT MAX(id) - 500 FROM crawler_engine_runs)")
   ];
   await env.GRANTS_DB.batch(historyStatements);
   const topMatches = assessedItems

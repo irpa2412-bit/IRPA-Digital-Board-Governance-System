@@ -1004,15 +1004,21 @@ test("fundraising search endpoint accepts control-token smoke auth and returns e
   } finally { globalThis.fetch = originalFetch; }
 });
 
+let pipelineTestKeyPair;
+let pipelineTestJwk;
 async function createPipelineTestToken() {
-  const pair = await webcrypto.subtle.generateKey(
-    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: Uint8Array.of(1, 0, 1), hash: "SHA-256" },
-    true, ["sign", "verify"]
-  );
-  const jwk = await webcrypto.subtle.exportKey("jwk", pair.publicKey);
-  jwk.kid = "grant-pipeline-test-key";
-  jwk.alg = "RS256";
-  jwk.use = "sig";
+  if (!pipelineTestKeyPair) {
+    pipelineTestKeyPair = await webcrypto.subtle.generateKey(
+      { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: Uint8Array.of(1, 0, 1), hash: "SHA-256" },
+      true, ["sign", "verify"]
+    );
+    pipelineTestJwk = await webcrypto.subtle.exportKey("jwk", pipelineTestKeyPair.publicKey);
+    pipelineTestJwk.kid = "grant-pipeline-test-key";
+    pipelineTestJwk.alg = "RS256";
+    pipelineTestJwk.use = "sig";
+  }
+  const pair = pipelineTestKeyPair;
+  const jwk = pipelineTestJwk;
   const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
   const unsigned = encode({ alg: "RS256", typ: "JWT", kid: jwk.kid }) + "." + encode({
