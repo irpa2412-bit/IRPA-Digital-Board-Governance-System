@@ -9,6 +9,7 @@ on:
       - "src/pages/GrantIntelligencePortal.jsx"
       - "src/styles/grant-intelligence-layout.css"
       - "scripts/grant-intelligence-diagnostics.mjs"
+      - "tests/browser/grant-intelligence-navigation-diagnostics.mjs"
       - ".github/workflows/grant-intelligence-diagnostics.yml"
 
 permissions:
@@ -69,7 +70,83 @@ jobs:
           GRANT_CRAWLER_CONTROL_TOKEN: ${{ secrets.GRANT_CRAWLER_CONTROL_TOKEN }}
           DIAGNOSTIC_BUILD_COMMIT: ${{ github.sha }}
         run: node scripts/grant-intelligence-diagnostics.mjs
-
+      - name: Deterministic Playwright portal navigation and HTTP diagnostics
+        if: always()
+        env:
+          STAGING_APP_URL: http://localhost:5173
+          STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
+          PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
+        run: node tests/browser/grant-intelligence-navigation-diagnostics.mjs
+      - name: Diagnose Worker deployment version and fall back to health stamp
+        if: always()
+        env:
+          CLOUDFLARE_GRANT_CRAWLER_API_TOKEN: ${{ secrets.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'NODE'
+          const token = process.env.CLOUDFLARE_GRANT_CRAWLER_API_TOKEN || "";
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+          const workers = [
+            ["staging", "irpa-grant-crawler-staging", "https://irpa-grant-crawler-staging.irpa-governance.workers.dev"],
+            ["production", "irpa-grant-crawler-production", "https://irpa-grant-crawler-production.irpa-governance.workers.dev"]
+          ];
+          const json = async (url, headers = {}) => {
+            const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+            const body = await response.json().catch(() => ({}));
+            return { response, body };
+          };
+          for (const [environment, script, worker] of workers) {
+            if (!token || !account) {
+              console.log(environment + " deployment API unavailable: missing " + (!token ? "CLOUDFLARE_GRANT_CRAWLER_API_TOKEN" : "CLOUDFLARE_ACCOUNT_ID"));
+            } else {
+              const headers = { authorization: "Bearer " + token };
+              const url = "https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts/" + script + "/deployments";
+              const deployment = await json(url, headers);
+              const items = deployment.body.result?.deployments || [];
+              if (deployment.response.ok && items.length && items[0].versions?.length) {
+                console.log(environment + " deployment=" + (items[0].id || "present") + " versions=" + items[0].versions.map(v => v.version_id + "@" + v.percentage + "%").join(","));
+                continue;
+              }
+              let cause = "deployment endpoint returned no deployment metadata (HTTP " + deployment.response.status + ")";
+              if ([401, 403].includes(deployment.response.status)) {
+                cause = "Cloudflare token permission/authentication: deployment endpoint returned HTTP " + deployment.response.status;
+              } else {
+                const verify = await json("https://api.cloudflare.com/client/v4/user/tokens/verify", headers);
+                if (!verify.response.ok || verify.body.success !== true) {
+                  cause = "Cloudflare token invalid or missing required permissions (token verification HTTP " + verify.response.status + ")";
+                } else {
+                  const accountCheck = await json("https://api.cloudflare.com/client/v4/accounts/" + account, headers);
+                  if (!accountCheck.response.ok || accountCheck.body.success !== true) {
+                    cause = "CLOUDFLARE_ACCOUNT_ID incorrect or inaccessible (account lookup HTTP " + accountCheck.response.status + ")";
+                  } else {
+                    const scriptsCheck = await json("https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts", headers);
+                    const names = (scriptsCheck.body.result || []).map(item => item.id || item.script_name);
+                    if (scriptsCheck.response.ok && !names.includes(script)) cause = "wrong Worker script name: expected " + script + "; account scripts=" + names.join(",");
+                    else if (!scriptsCheck.response.ok) cause = "token lacks Workers Scripts read permission or scripts endpoint failed (HTTP " + scriptsCheck.response.status + ")";
+                  }
+                }
+              }
+              console.log(environment + " exact deployments API cause: " + cause);
+            }
+            try {
+              const health = await json(worker + "/health");
+              const data = health.body || {};
+              const stamp = data.commit || data.version || data.build || data.revision || data.gitCommit || data.deploymentVersion || "unavailable";
+              console.log(environment + " health fallback HTTP " + health.response.status + " commit/version stamp=" + stamp);
+            } catch (error) {
+              console.log(environment + " health fallback unavailable: " + error.message);
+            }
+          }
+          NODE
+      - name: Upload Playwright failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-intelligence-playwright-diagnostics
+          path: artifacts/grant-intelligence-diagnostics/
+          if-no-files-found: warn
 
   production-portal-browser:
     name: Read-only production portal browser verification
@@ -92,7 +169,13 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Verify authenticated production portal at desktop and mobile widths
         env:
-          DIAGNOSTIC_BROWSER_ONLY: production
           PRODUCTION_TEST_EMAIL: ${{ secrets.PRODUCTION_TEST_EMAIL }}
           PRODUCTION_TEST_PASSWORD: ${{ secrets.PRODUCTION_TEST_PASSWORD }}
-        run: node scripts/grant-intelligence-diagnostics.mjs
+        run: node tests/browser/grant-intelligence-navigation-diagnostics.mjs
+      - name: Upload production browser failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-intelligence-production-browser-diagnostics
+          path: artifacts/grant-intelligence-diagnostics/
+          if-no-files-found: warn
