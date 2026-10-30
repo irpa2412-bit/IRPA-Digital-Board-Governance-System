@@ -33,12 +33,13 @@ jobs:
           npx --yes firebase-tools emulators:exec --only firestore --project irpa-digital-board-governance "npm run test:security-rules" > security-rules.log 2>&1
           node --input-type=module <<'NODE'
           import { readFileSync } from "node:fs";
-          const log = readFileSync("security-rules.log", "utf8").split("\n");
+          const log = readFileSync("security-rules.log", "utf8").split(String.fromCharCode(10));
           const failures = [];
           for (let i = 0; i < log.length; i++) {
             const line = log[i].trimStart();
             if (!line.startsWith("not ok ")) continue;
-            const name = line.replace(/^not ok \\d+ - /, "");
+            const separator = line.indexOf(" - ");
+            const name = separator >= 0 ? line.slice(separator + 3) : line;
             let error = "";
             for (let j = i + 1; j < Math.min(log.length, i + 16); j++) {
               const detail = log[j].trimStart();
@@ -46,7 +47,7 @@ jobs:
                 error = detail.slice(6).trim();
                 for (let k = j + 1; k < Math.min(log.length, j + 10); k++) {
                   const next = log[k].trimStart();
-                  if (["code:", "name:", "operator:", "stack:"].some(key => next.startsWith(key))) break;
+                  if (next.startsWith("code:") || next.startsWith("name:") || next.startsWith("operator:") || next.startsWith("stack:")) break;
                   if (next) error += " " + next;
                 }
                 break;
@@ -57,30 +58,8 @@ jobs:
           }
           const passLine = log.find(x => x.trim().startsWith("# pass "));
           const failLine = log.find(x => x.trim().startsWith("# fail "));
-          const pass = Number(passLine?.trim().split(/\\s+/).at(-1) || 0);
-          const fail = Number(failLine?.trim().split(/\\s+/).at(-1) || failures.length);
-
-          const failures = [];
-          for (let i = 0; i < log.length; i++) {
-            const match = log[i].match(/^\\s*not ok \\d+ - (.+)$/);
-            if (!match) continue;
-            let error = "";
-            for (let j = i + 1; j < Math.min(log.length, i + 16); j++) {
-              if (/^\\s*error:/.test(log[j])) {
-                error = log[j].replace(/^\\s*error:\\s*/, "");
-                for (let k = j + 1; k < Math.min(log.length, j + 10); k++) {
-                  if (/^\\s*(code:|name:|operator:|stack:)/.test(log[k])) break;
-                  if (/^\\s{4,}\\S/.test(log[k])) error += " " + log[k].trim();
-                }
-                break;
-              }
-              if (/^\\s*not ok \\d+ - /.test(log[j])) break;
-            }
-            failures.push({ name: match[1], error: error || "No assertion error text found in TAP output." });
-          }
-          const last = log.slice().reverse();
-          const pass = Number((last.find(x => /^# pass \\d+/.test(x)) || "").match(/\\d+/)?.[0] || 0);
-          const fail = Number((last.find(x => /^# fail \\d+/.test(x)) || "").match(/\\d+/)?.[0] || failures.length);
+          const pass = Number(passLine?.trim().split(" ").at(-1) || 0);
+          const fail = Number(failLine?.trim().split(" ").at(-1) || failures.length);
           console.log("SECURITY_RULES_SUMMARY");
           for (const item of failures) console.log("not ok - " + item.name + " | " + item.error);
           console.log("counts: pass=" + pass + " fail=" + fail);
