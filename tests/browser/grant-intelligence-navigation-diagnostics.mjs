@@ -23,6 +23,10 @@ async function runTarget(target) {
       console.log("SKIPPED (no production test login)");
       return;
     }
+    if (target.name === "staging" && !target.app) {
+      console.log("SKIPPED (staging not configured in production-only browser job)");
+      return;
+    }
     console.log("SKIP " + target.name + " browser tests; missing secrets/variables: " + missing.join(", "));
     throw new Error("Staging browser test prerequisites missing: " + missing.join(", "));
   }
