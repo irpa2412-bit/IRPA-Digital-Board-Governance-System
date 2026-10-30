@@ -229,6 +229,43 @@
 - **MOD-31-AC4** — Given the user has the module's create/update permission and supplies valid data, when the user performs the operation to issue, amend or revoke special invite, then the server persists one record, returns its stable ID, displays the saved state after reload, and writes an audit event with actor UID, action, target ID and UTC timestamp. **Test:** `TEST-MOD-31-04`.
 - **MOD-31-AC5** — Given the request violates a required field, workflow state, uniqueness rule or permission as applicable, when the user submits expired, revoked or out-of-scope invite denied and logged, then the server returns a controlled validation/authorization error, no record or linked state is changed, and the response identifies the failed field or denied permission without exposing protected data. **Test:** `TEST-MOD-31-05`.
 
+
+## Module-level requirement count
+
+| Module | Requirement IDs | Acceptance criteria after addendum |
+|---|---:|---:|
+| IT Operations (MOD-01) | 1 | 5 |
+| Dashboard (MOD-02) | 1 | 5 |
+| Induction and Orientation (MOD-03) | 1 | 5 |
+| Induction Applications (MOD-04) | 1 | 5 |
+| Board Members Registration (MOD-05) | 1 | 5 |
+| Members & Personnel (MOD-06) | 1 | 5 |
+| Invitations (MOD-07) | 1 | 5 |
+| Meetings (MOD-08) | 1 | 5 |
+| Resolutions (MOD-09) | 1 | 5 |
+| Voting (MOD-10) | 1 | 5 |
+| Actions (MOD-11) | 1 | 5 |
+| Documents (MOD-12) | 1 | 5 |
+| Signature Platform (MOD-13) | 1 | 5 |
+| Decisions (MOD-14) | 1 | 5 |
+| Risk Register (MOD-15) | 1 | 5 |
+| Authorization & Approvals (MOD-16) | 1 | 5 |
+| Employee Payments (MOD-17) | 1 | 5 |
+| Research, Statistics and Knowledge (MOD-18) | 1 | 5 |
+| Finance Portfolio (MOD-19) | 1 | 5 |
+| Procurement (MOD-20) | 1 | 5 |
+| Reports (MOD-21) | 1 | 5 |
+| Audit Trail (MOD-22) | 1 | 5 |
+| Grant Intelligence & Funding Opportunities (MOD-23) | 1 | 5 |
+| Communication & Media (MOD-24) | 1 | 5 |
+| Downloads (MOD-25) | 1 | 5 |
+| Settings (MOD-26) | 1 | 5 |
+| Add Administrator (MOD-27) | 1 | 5 |
+| Department and Archive Registry (MOD-28) | 1 | 5 |
+| Department Portal Builder (MOD-29) | 1 | 5 |
+| External Auditor Portal (MOD-30) | 1 | 5 |
+| Auditors & Special Invitees (MOD-31) | 1 | 5 |
+
 ## 15 registered nested sub-portals
 
 ### SUB-01 — Meeting Room
@@ -428,9 +465,9 @@ The current SRS assigns `API-01` through `API-59` to the 59 documented Worker ro
 | 15 nested sub-portals | 15 | 30 | 45 | 75 |
 | 3 standalone portals | 3 | 6 | 12 | 18 |
 | 4 Grant Intelligence AI requirements | 4 | 8 | 8 | 16 |
-| Offline/mobile and governance requirements | 5 | 10 | 14 | 24 |
+| Offline/mobile and governance requirements | 5 | 10 | 11 | 21 |
 | 59 Worker route families | 59 | 118 | 0 | 118 |
 | Cross-cutting traceability | 1 | 2 | 0 | 2 |
-| **Total** | **118** | **236** | **172** | **408** |
+| **Total** | **118** | **236** | **169** | **405** |
 
-**Count correction:** 93 + 45 + 12 + 8 + 14 = 172 additional criteria; total 408 acceptance criteria. The cross-cutting count in the prior validation summary describes 10 concern areas, not 10 separate requirement IDs. This addendum does not convert proposed tests into executed tests.
+**Count:** 93 + 45 + 12 + 8 + 11 = 169 additional criteria; total 405 acceptance criteria. The 10 cross-cutting requirement IDs are AI-01…AI-04, OFF-01…OFF-02, MOB-01…MOB-02, GOV-01 and TRC-01. This addendum does not convert proposed tests into executed tests.
