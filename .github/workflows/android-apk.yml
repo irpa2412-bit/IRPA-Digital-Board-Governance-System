@@ -2,9 +2,24 @@ name: Build IRPA Android APK
 on:
   pull_request:
     branches: [main]
-    paths: ["capacitor.config.ts","package.json","package-lock.json","src/**","public/**",".github/workflows/android-apk.yml"]
+    paths:
+      - "capacitor.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "public/**"
+      - "tests/offline-build-workflow-policy.test.mjs"
+      - ".github/workflows/android-apk.yml"
   push:
     branches: [main]
+    paths:
+      - "capacitor.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "public/**"
+      - "tests/offline-build-workflow-policy.test.mjs"
+      - ".github/workflows/android-apk.yml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,18 +29,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: {node-version: 22, cache: npm}
+        with:
+          node-version: 22
+          cache: npm
       - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: "21"}
-      - run: npm install
-      - run: npm run build
-      - name: Create and synchronize native Android project
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify build workflow isolation policy
+        run: node --test tests/offline-build-workflow-policy.test.mjs
+      - name: Install locked root application and Capacitor dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build web assets for the bundled Android application
+        run: npm run build
+      - name: Create and synchronize native Android wrapper
         run: npx cap add android && npx cap sync android
-      - name: Build debug APK
+      - name: Build debug APK only (no deployment or publishing)
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: IRPA-Digital-Governance-APK
+          name: IRPA-DBGS-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
