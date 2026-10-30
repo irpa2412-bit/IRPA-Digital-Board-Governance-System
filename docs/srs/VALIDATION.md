@@ -156,3 +156,8 @@ Each top-level module has 1 requirement ID and 5 acceptance criteria. Each regis
 ## 7. Change boundary
 
 Documentation only. No application code, Firestore rules, secrets, production configuration or deployment changed. PR #585 remains open and unmerged.
+
+
+## Final Executive Director decision checks
+
+The final source-text review confirms that the Executive Director is the only role named with positive grant/funding approval authority. Administrator and Communications Officer entries expressly state that approval authority belongs exclusively to the Executive Director. Funding-related wireframes show the “Awaiting Executive Director approval” state. Governance records are not included in the management funding approval route.
