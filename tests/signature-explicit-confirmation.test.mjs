@@ -17,7 +17,8 @@ test("page load, Add signer, Save and Create Draft never insert a signature imag
   assert.doesNotMatch(gatewayPortal, /nextValues\[field\.fieldId\]=sig/);
   assert.doesNotMatch(gatewayPortal, /nextValues\[field\.fieldId\]=initials/);
   assert.match(platform, /async function addSigner\([\s\S]*?setFields\(nextFields\)/);
-  assert.match(service, /fields:\(fields\|\|\[\]\)\.map\(field=>\{/);\n  assert.match(service, /delete prepared\.value;delete prepared\.signatureData;delete prepared\.signatureUrl;delete prepared\.signatureValue/);
+  assert.match(service, /fields:\(fields\|\|\[\]\)\.map\(field=>\{/);
+  assert.match(service, /delete prepared\.value;delete prepared\.signatureData;delete prepared\.signatureUrl;delete prepared\.signatureValue/);
   assert.doesNotMatch(pdf, /if\(field\.type==="Signature"&&!value\)value=signer\.signatureValue/);
 });
 
