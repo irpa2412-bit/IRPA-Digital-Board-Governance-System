@@ -3,6 +3,8 @@
 **Status:** Reverse-engineered; owner validation required. **Baseline:** main @ f20403e6f26c296f9d3aa3cda87588115a0f694d.
 
 ## Scope and evidence
+
+**Detailed acceptance specification:** See [ACCEPTANCE-CRITERIA-ADDENDUM.md](ACCEPTANCE-CRITERIA-ADDENDUM.md) for additional module-, sub-portal-, standalone-portal-, AI-, offline-, mobile- and governance-specific Given/When/Then criteria, proposed test IDs and requirement→page→test→criterion traceability. The addendum extends (does not replace) the baseline inventory and explicitly distinguishes proposed tests from executed tests.
 Source-derived navigation, portal components and Worker entrypoint paths are documented here. Source presence is not proof of live production operation. Dataset Registry, Research Data Collection and Release Readiness are normative standalone portal requirements; their separate top-level navigation is a proposed gap. Grant Intelligence is discovery/analysis only; concept-note advice is internal drafting, not donor submission.
 
 ## Inventory
