@@ -20,10 +20,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
-
+      - name: PWA install/offline contract tests
+        run: node --test tests/pwa-install-offline.test.mjs
       - name: Upload runtime regression test
         run: node --test tests/upload-circular-import-runtime.test.mjs
-
       - name: Upload dependency circular-import gate
         shell: bash
         run: |
@@ -33,13 +33,53 @@ jobs:
             echo "Circular import remains in the Controlled Document Upload dependency graph." >&2
             exit 1
           fi
-
       - name: Mandatory full-source readability and contrast check
         run: npm run check:production-readability
       - name: Production build
         run: npm run build
-
+      - name: Verify Firebase Hosting and offline assets
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/offline.html
+          test -f dist/manifest.webmanifest
+          test -f dist/install.js
+          test -f dist/icons/irpa-192.svg
+          test -f dist/icons/irpa-512.svg
+      - name: Install Chrome for Lighthouse
+        uses: browser-actions/setup-chrome@v1
+      - name: Run Lighthouse PWA installability audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/vite-preview.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 2
+          done
+          npx --yes lighthouse@12.8.2 http://127.0.0.1:4173/ \
+            --only-audits=installable-manifest,service-worker \
+            --chrome-flags="--headless --no-sandbox" \
+            --output=json --output-path="$RUNNER_TEMP/lighthouse-pwa.json"
+          node -e 'const r=require(process.argv[1]); for(const id of ["installable-manifest","service-worker"]){const a=r.audits[id];if(!a||a.score!==1){console.error(id,a?.score,a?.displayValue);process.exitCode=1;}}' "$RUNNER_TEMP/lighthouse-pwa.json"
       - name: Independent production readability verification
         run: npm run verify:production-readability
-      - name: Verify Firebase Hosting output
-        run: test -f dist/index.html
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install isolated desktop packager
+        run: npm install --no-save electron@38.2.0 electron-builder@26.0.12
+      - name: Build Windows installer
+        run: npx electron-builder --config electron-builder.yml --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IRPA-DBGS-Windows-Installer
+          path: release/IRPA-DBGS-Setup-1.0.0.exe
+          if-no-files-found: error
