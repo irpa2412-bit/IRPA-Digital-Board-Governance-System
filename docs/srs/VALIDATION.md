@@ -44,3 +44,19 @@ Static inventory/traceability checks: PASS by generation. Live/browser viewport 
 - Index links are relative to the SRS package; final path-existence validation is performed against the committed tree.
 - SRS exports: Word DOCX, 11-page PDF; wireframe bundle: 51-page PDF.
 - Browser-based 390×844 and 1440×900 screenshots were not run because no authenticated browser session is available. CSS overflow/overlap is structurally mitigated but not runtime-certified.
+
+## Final inventory extension
+- Source page components under `src/pages/`: 41. Appendix D maps all 41 component files to a wireframe page ID.
+- HTML wireframe pages: 72 = 31 top-level NAV modules + 15 nested sub-portals + 21 component/subsystem screens + 5 shared/flow screens.
+- Wireframe index: 72 page links plus document/report links.
+- PDF wireframe bundle: 72 pages.
+- SRS export regenerated from the final Markdown source: DOCX and 12-page PDF.
+- Dataset Registry, Research Data Collection, Release Readiness and Signature Pathway Self-Test have dedicated component-level wireframes; these are not falsely described as top-level NAV entries.
+
+## Final static validation snapshot (branch tree)
+- Unique requirement IDs: 55 / 55.
+- Core deliverables present: SRS.md, SRS.docx, SRS.pdf, WIRE_FRAMES.pdf, VALIDATION.md.
+- HTML wireframe pages: 72 expected; index page is separate.
+- Index link existence: checked against the committed branch tree; broken links: 0.
+- Sampled HTML pages: viewport meta, mobile breakpoint, EMPTY/LOADING/ERROR/OFFLINE states all present; no remote image dependency.
+- Remaining unexecuted checks: authenticated live browser inspection and actual 390×844 / 1440×900 rendering; do not interpret responsive CSS presence as proof of zero visual overflow.

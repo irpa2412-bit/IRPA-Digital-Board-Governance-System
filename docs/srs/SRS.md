@@ -548,3 +548,70 @@ The gateway also delegates the following exact route groups. These are included 
 
 ### C.4 Route inventory qualification
 The Drive Gateway also dispatches the e-signature sub-router for `/api/documents`, `/api/envelopes`, and `/api/sign/*` when `ESIGN_MODULE_ENABLED=true`; the route family includes authenticated envelope creation/status/void/retry/resync, signer open/status/evidence/PDF/verify/submit/decline operations. The grant crawler is a separate Worker and must not be represented as a Drive Gateway route. The frontend health endpoint is also a separate Worker. HTTP methods for wildcard/delegated routes must be confirmed against their handler implementation and tests before generating a formal OpenAPI contract.
+
+
+## Appendix D — Source page-component to wireframe traceability
+The repository contains **41 JSX page components** under `src/pages/` (including the fundraising subfolder). Components that share a top-level portal intentionally reuse its portal wireframe; distinct operational/activation screens have a dedicated `M-*` wireframe. This avoids inventing additional top-level navigation entries while ensuring every source page component is traceable.
+
+| Source page component | Wireframe page ID |
+|---|---|
+| `src/pages/AddAdministratorPortal.jsx` | P-ADD-ADMINISTRATOR |
+| `src/pages/AuditorsSpecialInvitees.jsx` | P-AUDITORS-AND-SPECIAL-INVITEES |
+| `src/pages/AuthorizationApprovals.jsx` | P-AUTHORIZATION-AND-APPROVALS |
+| `src/pages/AuthorizationWorkflow.jsx` | M-AUTHORIZATION-WORKFLOW |
+| `src/pages/BoardMembers.jsx` | P-BOARD-MEMBERS-REGISTRATION |
+| `src/pages/CommunicationMediaOperations.jsx` | M-COMMUNICATION-MEDIA-OPERATIONS |
+| `src/pages/CommunicationMediaPortal.jsx` | P-COMMUNICATION-AND-MEDIA |
+| `src/pages/CommunicationMediaStudio.jsx` | M-COMMUNICATION-MEDIA-STUDIO |
+| `src/pages/CommunicationsConnectionsFunding.jsx` | M-COMMUNICATIONS-CONNECTIONS-FUNDING |
+| `src/pages/CommunicationsSocialStudio.jsx` | M-COMMUNICATIONS-SOCIAL-STUDIO |
+| `src/pages/CommunicationsWebsiteStudio.jsx` | M-COMMUNICATIONS-WEBSITE-STUDIO |
+| `src/pages/CredentialInterview.jsx` | M-CREDENTIAL-INTERVIEW |
+| `src/pages/DocumentLifecycleModule.jsx` | P-DOCUMENTS |
+| `src/pages/EmployeePayments.jsx` | P-EMPLOYEE-PAYMENTS |
+| `src/pages/Employees.jsx` | P-MEMBERS-AND-PERSONNEL |
+| `src/pages/ExternalAuditorPortal.jsx` | P-EXTERNAL-AUDITOR-PORTAL |
+| `src/pages/FinancePortfolio.jsx` | P-FINANCE-PORTFOLIO |
+| `src/pages/GatewaySigningPortal.jsx` | M-GATEWAY-SIGNING-PORTAL |
+| `src/pages/GovernanceWorkspaces.jsx` | P-DASHBOARD |
+| `src/pages/GrantIntelligencePortal.jsx` | P-GRANT-INTELLIGENCE-AND-FUNDING-OPPORTUNITIES |
+| `src/pages/ITOperationsPortal.jsx` | P-IT-OPERATIONS |
+| `src/pages/InductionAdmin.jsx` | P-INDUCTION-APPLICATIONS |
+| `src/pages/InductionOrientation.jsx` | P-INDUCTION-AND-ORIENTATION |
+| `src/pages/InvitationActivation.jsx` | M-INVITATION-ACTIVATION |
+| `src/pages/Invitations.jsx` | P-INVITATIONS |
+| `src/pages/MeetingEntryGateway.jsx` | M-MEETING-ENTRY-GATEWAY |
+| `src/pages/MeetingRoom.jsx` | SP-MEETINGS-MEETING-ROOM |
+| `src/pages/Meetings.jsx` | P-MEETINGS |
+| `src/pages/Members.jsx` | P-MEMBERS-AND-PERSONNEL |
+| `src/pages/OperationalGateways.jsx` | M-OPERATIONAL-GATEWAYS |
+| `src/pages/OperationalGatewaysParticipants.jsx` | M-OPERATIONAL-GATEWAYS-PARTICIPANTS |
+| `src/pages/ProcurementPortal.jsx` | P-PROCUREMENT |
+| `src/pages/ResearchStatisticsKnowledgePortal.jsx` | P-RESEARCH-STATISTICS-AND-KNOWLEDGE |
+| `src/pages/Resolutions.jsx` | P-RESOLUTIONS |
+| `src/pages/Settings.jsx` | P-SETTINGS |
+| `src/pages/SignaturePlatform.jsx` | P-SIGNATURE-PLATFORM |
+| `src/pages/SignaturePlatformWithUpload.jsx` | P-SIGNATURE-PLATFORM |
+| `src/pages/SocialMediaAccounts.jsx` | M-SOCIAL-MEDIA-ACCOUNTS |
+| `src/pages/Voting.jsx` | P-VOTING |
+| `src/pages/WorkflowEngines.jsx` | M-WORKFLOW-ENGINES |
+| `src/pages/grant-fundraising/FundraisingSourceRegistry.jsx` | M-FUNDRAISING-SOURCE-REGISTRY |
+
+### D.1 Additional subsystem component screens
+The following component-level capabilities are represented by dedicated wireframes in addition to the 41 source page components:
+- `M-RESEARCH-DATA-COLLECTION` — Research Data Collection Studio.
+- `M-DATASET-REGISTRY` — Dataset Registry (subsystem screen; distinct page identity is not a top-level NAV item).
+- `M-RELEASE-READINESS` — Release Readiness component.
+- `M-SIGNATURE-PATHWAY-SELF-TEST` — Signature Pathway Self-Test.
+- `M-STATISTICAL-ANALYSIS-WORKBENCH` — Statistical Analysis Workbench.
+- `M-RESEARCH-EVIDENCE-EXCHANGE` — Research Evidence Exchange.
+- `X-SIGNATURE-PAD` — Signature field confirmation pad.
+- `X-UPLOAD-FLOW` — Controlled upload workflow.
+- `X-INVITATION-FLOW` — Invitation and account activation workflow.
+
+### D.2 Wireframe package counts
+- 31 top-level NAV modules.
+- 15 registered nested sub-portals.
+- 21 additional source-component/subsystem wireframes.
+- 5 shared shell/authentication/workflow wireframes.
+- **72 HTML wireframes**, plus this index; one PDF bundle contains 72 page-specific wireframe summaries.

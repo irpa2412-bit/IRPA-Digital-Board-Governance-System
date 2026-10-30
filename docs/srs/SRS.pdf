@@ -1,6 +1,6 @@
 %PDF-1.4
 1 0 obj
-<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R] /Count 11 >>
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R] /Count 12 >>
 endobj
 2 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
@@ -619,7 +619,7 @@ endobj
 << /Type /Page /Parent 1 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 2 0 R >> >> /Contents 24 0 R >>
 endobj
 24 0 obj
-<< /Length 836 >>
+<< /Length 3986 >>
 stream
 BT
 /F1 9 Tf
@@ -629,42 +629,119 @@ BT
 T* (- GET /__irpa_health   static frontend service health metadata; all other requests pass to the ASSETS binding.) Tj
 T* (C.4 Route inventory qualification) Tj
 T* (The Drive Gateway also dispatches the e-signature sub-router for /api/documents , /api/envelopes , and /api/sign/ when ESIGN_MODULE_ENABLED=true ; the route family includes authenticated envelope creation/status/void/retry/resync, signer open/status/evidence/PDF/verify/submit/decline operations. The grant crawler is a separate Worker and must not be represented as a Drive Gateway route. The frontend health endpoint is also a separate Worker. HTTP methods for wildcard/delegated routes must be confirmed against their handler implementation and tests before generating a formal OpenAPI contract.) Tj
+T* (Appendix D   Source page-component to wireframe traceability) Tj
+T* (The repository contains 41 JSX page components under src/pages/ \(including the fundraising subfolder\). Components that share a top-level portal intentionally reuse its portal wireframe; distinct operational/activation screens have a dedicated M- wireframe. This avoids inventing additional top-level navigation entries while ensuring every source page component is traceable.) Tj
+T* (Source page component Wireframe page ID) Tj
+T* (--- ---) Tj
+T* (src/pages/AddAdministratorPortal.jsx P-ADD-ADMINISTRATOR) Tj
+T* (src/pages/AuditorsSpecialInvitees.jsx P-AUDITORS-AND-SPECIAL-INVITEES) Tj
+T* (src/pages/AuthorizationApprovals.jsx P-AUTHORIZATION-AND-APPROVALS) Tj
+T* (src/pages/AuthorizationWorkflow.jsx M-AUTHORIZATION-WORKFLOW) Tj
+T* (src/pages/BoardMembers.jsx P-BOARD-MEMBERS-REGISTRATION) Tj
+T* (src/pages/CommunicationMediaOperations.jsx M-COMMUNICATION-MEDIA-OPERATIONS) Tj
+T* (src/pages/CommunicationMediaPortal.jsx P-COMMUNICATION-AND-MEDIA) Tj
+T* (src/pages/CommunicationMediaStudio.jsx M-COMMUNICATION-MEDIA-STUDIO) Tj
+T* (src/pages/CommunicationsConnectionsFunding.jsx M-COMMUNICATIONS-CONNECTIONS-FUNDING) Tj
+T* (src/pages/CommunicationsSocialStudio.jsx M-COMMUNICATIONS-SOCIAL-STUDIO) Tj
+T* (src/pages/CommunicationsWebsiteStudio.jsx M-COMMUNICATIONS-WEBSITE-STUDIO) Tj
+T* (src/pages/CredentialInterview.jsx M-CREDENTIAL-INTERVIEW) Tj
+T* (src/pages/DocumentLifecycleModule.jsx P-DOCUMENTS) Tj
+T* (src/pages/EmployeePayments.jsx P-EMPLOYEE-PAYMENTS) Tj
+T* (src/pages/Employees.jsx P-MEMBERS-AND-PERSONNEL) Tj
+T* (src/pages/ExternalAuditorPortal.jsx P-EXTERNAL-AUDITOR-PORTAL) Tj
+T* (src/pages/FinancePortfolio.jsx P-FINANCE-PORTFOLIO) Tj
+T* (src/pages/GatewaySigningPortal.jsx M-GATEWAY-SIGNING-PORTAL) Tj
+T* (src/pages/GovernanceWorkspaces.jsx P-DASHBOARD) Tj
+T* (src/pages/GrantIntelligencePortal.jsx P-GRANT-INTELLIGENCE-AND-FUNDING-OPPORTUNITIES) Tj
+T* (src/pages/ITOperationsPortal.jsx P-IT-OPERATIONS) Tj
+T* (src/pages/InductionAdmin.jsx P-INDUCTION-APPLICATIONS) Tj
+T* (src/pages/InductionOrientation.jsx P-INDUCTION-AND-ORIENTATION) Tj
+T* (src/pages/InvitationActivation.jsx M-INVITATION-ACTIVATION) Tj
+T* (src/pages/Invitations.jsx P-INVITATIONS) Tj
+T* (src/pages/MeetingEntryGateway.jsx M-MEETING-ENTRY-GATEWAY) Tj
+T* (src/pages/MeetingRoom.jsx SP-MEETINGS-MEETING-ROOM) Tj
+T* (src/pages/Meetings.jsx P-MEETINGS) Tj
+T* (src/pages/Members.jsx P-MEMBERS-AND-PERSONNEL) Tj
+T* (src/pages/OperationalGateways.jsx M-OPERATIONAL-GATEWAYS) Tj
+T* (src/pages/OperationalGatewaysParticipants.jsx M-OPERATIONAL-GATEWAYS-PARTICIPANTS) Tj
+T* (src/pages/ProcurementPortal.jsx P-PROCUREMENT) Tj
+T* (src/pages/ResearchStatisticsKnowledgePortal.jsx P-RESEARCH-STATISTICS-AND-KNOWLEDGE) Tj
+T* (src/pages/Resolutions.jsx P-RESOLUTIONS) Tj
+T* (src/pages/Settings.jsx P-SETTINGS) Tj
+T* (src/pages/SignaturePlatform.jsx P-SIGNATURE-PLATFORM) Tj
+T* (src/pages/SignaturePlatformWithUpload.jsx P-SIGNATURE-PLATFORM) Tj
+T* (src/pages/SocialMediaAccounts.jsx M-SOCIAL-MEDIA-ACCOUNTS) Tj
+T* (src/pages/Voting.jsx P-VOTING) Tj
+T* (src/pages/WorkflowEngines.jsx M-WORKFLOW-ENGINES) Tj
 ET
 endstream
 endobj
 25 0 obj
+<< /Type /Page /Parent 1 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 2 0 R >> >> /Contents 26 0 R >>
+endobj
+26 0 obj
+<< /Length 1324 >>
+stream
+BT
+/F1 9 Tf
+45 790 Td
+13 TL
+(src/pages/grant-fundraising/FundraisingSourceRegistry.jsx M-FUNDRAISING-SOURCE-REGISTRY) Tj
+T* (D.1 Additional subsystem component screens) Tj
+T* (The following component-level capabilities are represented by dedicated wireframes in addition to the 41 source page components:) Tj
+T* (- M-RESEARCH-DATA-COLLECTION   Research Data Collection Studio.) Tj
+T* (- M-DATASET-REGISTRY   Dataset Registry \(subsystem screen; distinct page identity is not a top-level NAV item\).) Tj
+T* (- M-RELEASE-READINESS   Release Readiness component.) Tj
+T* (- M-SIGNATURE-PATHWAY-SELF-TEST   Signature Pathway Self-Test.) Tj
+T* (- M-STATISTICAL-ANALYSIS-WORKBENCH   Statistical Analysis Workbench.) Tj
+T* (- M-RESEARCH-EVIDENCE-EXCHANGE   Research Evidence Exchange.) Tj
+T* (- X-SIGNATURE-PAD   Signature field confirmation pad.) Tj
+T* (- X-UPLOAD-FLOW   Controlled upload workflow.) Tj
+T* (- X-INVITATION-FLOW   Invitation and account activation workflow.) Tj
+T* (D.2 Wireframe package counts) Tj
+T* (- 31 top-level NAV modules.) Tj
+T* (- 15 registered nested sub-portals.) Tj
+T* (- 21 additional source-component/subsystem wireframes.) Tj
+T* (- 5 shared shell/authentication/workflow wireframes.) Tj
+T* (- 72 HTML wireframes , plus this index; one PDF bundle contains 72 page-specific wireframe summaries.) Tj
+ET
+endstream
+endobj
+27 0 obj
 << /Type /Catalog /Pages 1 0 R >>
 endobj
 xref
-0 26
+0 28
 0000000000 65535 f 
 0000000009 00000 n 
-0000000134 00000 n 
-0000000204 00000 n 
-0000000330 00000 n 
-0000005450 00000 n 
-0000005576 00000 n 
-0000011819 00000 n 
-0000011945 00000 n 
-0000023723 00000 n 
-0000023850 00000 n 
-0000029234 00000 n 
-0000029362 00000 n 
-0000032603 00000 n 
-0000032731 00000 n 
-0000040108 00000 n 
-0000040236 00000 n 
-0000045376 00000 n 
-0000045504 00000 n 
-0000051007 00000 n 
-0000051135 00000 n 
-0000054865 00000 n 
-0000054993 00000 n 
-0000060511 00000 n 
-0000060639 00000 n 
-0000061527 00000 n 
+0000000141 00000 n 
+0000000211 00000 n 
+0000000337 00000 n 
+0000005457 00000 n 
+0000005583 00000 n 
+0000011826 00000 n 
+0000011952 00000 n 
+0000023730 00000 n 
+0000023857 00000 n 
+0000029241 00000 n 
+0000029369 00000 n 
+0000032610 00000 n 
+0000032738 00000 n 
+0000040115 00000 n 
+0000040243 00000 n 
+0000045383 00000 n 
+0000045511 00000 n 
+0000051014 00000 n 
+0000051142 00000 n 
+0000054872 00000 n 
+0000055000 00000 n 
+0000060518 00000 n 
+0000060646 00000 n 
+0000064685 00000 n 
+0000064813 00000 n 
+0000066190 00000 n 
 trailer
-<< /Size 26 /Root 25 0 R >>
+<< /Size 28 /Root 27 0 R >>
 startxref
-61577
+66240
 %%EOF
