@@ -122,6 +122,8 @@ async function browserSuite(target) {
       page.on("pageerror", error => errors.push(error.message));
       page.on("requestfailed", request => failed.push(request.method() + " " + request.url() + " " + (request.failure()?.errorText || "")));
       await login(page, target);
+      const webCommit = await page.locator('meta[name=irpa-build-version]').getAttribute('content').catch(() => 'unavailable');
+      record(target.name, 'Live web build commit ' + width + 'px', webCommit && webCommit !== 'unavailable' ? 'PASS' : 'FAIL', webCommit || 'Build stamp unavailable.');
       const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
       const noOverflow = dimensions.scroll <= dimensions.width + 1 && dimensions.body <= dimensions.width + 1;
       record(target.name, "Page layout " + width + "px", noOverflow ? "PASS" : "FAIL", JSON.stringify(dimensions));
