@@ -161,3 +161,6 @@ Documentation only. No application code, Firestore rules, secrets, production co
 ## Final Executive Director decision checks
 
 The final source-text review confirms that the Executive Director is the only role named with positive grant/funding approval authority. Administrator and Communications Officer entries expressly state that approval authority belongs exclusively to the Executive Director. Funding-related wireframes show the “Awaiting Executive Director approval” state. Governance records are not included in the management funding approval route.
+
+
+Final text scan: zero Board/board terms occur within the checked grant/funding/concept-note/donor contexts in the revised SRS, validation report and funding wireframes. All affirmative grant/funding approval authority is assigned to the Executive Director; non-Executive-Director roles are explicitly denied that authority. This is a source-text check, not a browser or runtime authorisation test.
