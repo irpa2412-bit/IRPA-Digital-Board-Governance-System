@@ -1,34 +1,73 @@
 {
-  "requirementHeaders": 118,
-  "acceptanceCriteria": 236,
-  "criteriaWithoutWhen": 0,
-  "criteriaUpdated": 236,
-  "flaggedVagueCriteriaFixed": 5,
+  "date": "2026-10-31",
+  "scope": "documentation-only",
+  "requirementIds": 118,
   "topLevelModules": 31,
   "nestedSubportals": 15,
   "standalonePortals": 3,
   "routePathFamilies": 59,
-  "crossCutting": 10,
+  "crossCuttingRequirementIds": 10,
+  "missingRequirementIds": {
+    "modules": 0,
+    "subportals": 0,
+    "standalonePortals": 0,
+    "documentedRouteFamilies": 0
+  },
+  "acceptanceCriteria": {
+    "baseline": 236,
+    "added": 169,
+    "total": 405
+  },
+  "perModule": {
+    "requirementsEach": 1,
+    "acceptanceCriteriaEach": 5
+  },
+  "perSubportal": {
+    "requirementsEach": 1,
+    "acceptanceCriteriaEach": 5
+  },
+  "perStandalonePortal": {
+    "requirementsEach": 1,
+    "acceptanceCriteriaEach": 6
+  },
+  "grantIntelligenceAI": {
+    "requirements": 4,
+    "acceptanceCriteria": 16,
+    "scope": "discovery and analysis only"
+  },
+  "offlineMobileGovernance": {
+    "requirements": 5,
+    "acceptanceCriteria": 21
+  },
   "htmlIndexLinks": 72,
   "htmlBulkParse": "NOT RUN",
   "chromium390x844": "NOT RUN",
   "chromium1440x900": "NOT RUN",
   "horizontalOverflow": "UNVERIFIED",
-  "docx": "NOT VERIFIED IN THIS RUN",
-  "srsPdf": "NOT VERIFIED IN THIS RUN; prior report 23 pages",
-  "wireframePdf": "NOT VERIFIED IN THIS RUN; prior report 72 pages",
+  "docx": {
+    "signature": "PASS_STRUCTURAL_ONLY",
+    "bytes": 302468,
+    "currentSource": "STALE",
+    "externalViewer": "NOT RUN"
+  },
+  "srsPdf": {
+    "signature": "PASS_STRUCTURAL_ONLY",
+    "pages": 23,
+    "currentSource": "STALE",
+    "externalViewer": "NOT RUN"
+  },
+  "wireframePdf": {
+    "signature": "PASS_STRUCTURAL_ONLY",
+    "pages": 72,
+    "currentSource": "STALE",
+    "externalViewer": "NOT RUN"
+  },
+  "routeSchemaSpecificity": "OPEN_BLOCKER",
   "liveApp": "NOT RUN",
-  "executiveDirectorGrantApproval": "DOCUMENTED; CODE ROLE STRING EXISTS; SERVER ENFORCEMENT GAP",
-  "grantBoardProximityScan": "PASS_ON_REVISED_SRS_AND_3_WORKFLOW_WIREFRAMES; REPOSITORY_WIDE_SCAN_NOT_RUN",
-  "grantApprovalAuthority": "EXECUTIVE_DIRECTOR",
-  "backupRetention": "TO BE APPROVED BY IRPA MANAGEMENT; proposed daily/30-day/tested restore",
-  "executiveDirectorCodeRole": "PRESENT in GrantIntelligencePortal management allow-list and Communications Site editor allow-list; separate explicit grant approval enforcement not confirmed",
-  "remainingOpenDecisions": [
-    "Management approval of backup/retention/DR policy",
-    "Formal role provisioning and server-side Executive Director-only grant approval enforcement",
-    "Standalone portal navigation and owners",
-    "Browser-enabled HTML parse/render/overflow run",
-    "Independent DOCX/PDF open and page-count verification",
-    "Execution of proposed acceptance tests"
+  "failures": [
+    "F-07 route-specific API schemas and side effects not fully extracted",
+    "F-08 DOCX/PDF exports stale; regenerate",
+    "F-09 HTML bulk parse and Chromium renders not run",
+    "F-10 external viewer opening not run"
   ]
 }
