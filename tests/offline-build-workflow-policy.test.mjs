@@ -33,7 +33,7 @@ test("Android wrapper uses the locked root Capacitor dependencies", () => {
   assert.match(android, /npx cap add android && npx cap sync android/);
   assert.match(android, /assembleDebug/);
   assert.match(android, /upload-artifact/);
-  assert.doesNotMatch(android, /(?:firebase|wrangler)\\s+deploy|--publish\\b/i);
+  assert.doesNotMatch(android, /(?:firebase|wrangler)\s+deploy|--publish\b/i);
   assert.equal(existsSync("android/package.json"), false);
 });
 
