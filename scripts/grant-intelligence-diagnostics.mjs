@@ -71,6 +71,8 @@ async function corsCheck(target, route, method) {
 }
 async function apiSuite(target) {
   const credentialNames = target.name === "staging" ? ["STAGING_TEST_EMAIL", "STAGING_TEST_PASSWORD"] : ["PRODUCTION_TEST_EMAIL", "PRODUCTION_TEST_PASSWORD"];
+  await requestCheck(target, "/health", "GET");
+  for (const [route, method] of [["/health","GET"],["/opportunities","GET"],["/fundraising/search","POST"],["/assistant/analyze","POST"],["/run","POST"]]) await corsCheck(target, route, method);
   if (!target.email || !target.password) {
     for (const name of credentialNames) if (!process.env[name]) need(name);
     record(target.name, "Authenticated Worker suite", "SKIP", "Missing credentials; authenticated routes, assistant and refresh not run.");
@@ -79,7 +81,6 @@ async function apiSuite(target) {
   let token;
   try { token = await signIn(target); record(target.name, "Firebase authentication", "PASS", "Firebase ID token issued; token value withheld."); }
   catch (error) { record(target.name, "Firebase authentication", "FAIL", error.message); return; }
-  await requestCheck(target, "/health", "GET");
   await requestCheck(target, "/opportunities", "GET", token);
   await requestCheck(target, "/fundraising/search", "POST", token, { query: "rangeland restoration", mode: "all" });
   const assistant = await requestCheck(target, "/assistant/analyze", "POST", token, {
@@ -94,7 +95,6 @@ async function apiSuite(target) {
   }
   if (target.name === "staging") await requestCheck(target, "/run", "POST", token, { mode: "scheduled" });
   else record(target.name, "POST /run", "SKIP", "Production crawler refresh intentionally not executed (read-only production rule).");
-  for (const [route, method] of [["/health","GET"],["/opportunities","GET"],["/fundraising/search","POST"],["/assistant/analyze","POST"],["/run","POST"]]) await corsCheck(target, route, method);
 }
 async function login(page, target) {
   await page.goto(target.app, { waitUntil: "domcontentloaded", timeout: 45000 });
