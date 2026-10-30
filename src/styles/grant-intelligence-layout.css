@@ -127,3 +127,34 @@
     max-width: 100% !important;
   }
 }
+
+
+/* Final viewport guard for nested grid/flex content and long donor metadata. */
+.grant-intelligence-portal {
+  overflow-x: clip;
+  contain: inline-size;
+}
+.grant-intelligence-portal :is(table, pre, code, textarea, input, select) {
+  max-width: 100%;
+}
+.grant-intelligence-portal table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.grant-intelligence-portal :is(summary, strong, p, a, span, label) {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+@media (max-width: 760px) {
+  .grant-intelligence-portal {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .grant-intelligence-portal :is(article, section, details, form, summary) {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
