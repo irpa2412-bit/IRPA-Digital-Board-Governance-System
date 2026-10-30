@@ -173,16 +173,16 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    if(!request){setAssistantError("Describe what you want the AI Assistant to prepare.");return;}
    // All Grant Intelligence routes use the same environment-selected parallel crawler Worker.
    const workerUrl=grantWorkerUrl;
- const token=await auth.currentUser?.getIdToken(true);
-   if(!token){setAssistantError("Your session has expired. Sign in again.");return;}
    setAssistantBusy(true);setAssistantError("");setAssistantNotice("Preparing your requested format…");
    try{
+     const token=await auth.currentUser?.getIdToken(true);
+     if(!token)throw new Error("Your session has expired. Sign in again.");
      const response=await fetch(workerUrl+"/assistant/analyze",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({task:"draft_message",format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),organization:"Improvement of Rangeland in Pastoral Areas (IRPA)",strategicContext:"Tanzania-based NGO focused on sustainable rangeland management, livestock development and market development; early-stage organization with limited resources. Do not claim prior project implementation or secured funding unless supplied by the user."}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"The AI Assistant request failed ("+response.status+").");
      const generated=text(data.draft||data.message||data.assessment?.draft||data.assessment?.concept_note?.draft);
      if(!generated)throw new Error("The AI service returned no draft. Please retry.");
-     const documentPayload={title:request.slice(0,180),format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),draft:generated,createdByUid:uid,createdByEmail:auth.currentUser?.email||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp(),recordOrigin:"PRODUCTION"};
+     const documentPayload={title:request.slice(0,180),format:assistantFormat,tone:assistantTone,length:assistantLength,instructions:request,context:text(assistantContext),draft:generated,createdByUid:uid,createdByEmail:auth.currentUser?.email||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp(),recordOrigin:import.meta.env.VITE_FIREBASE_PROJECT_ID||"irpa-digital-board-governance"};
      const saved=await addDoc(collection(db,"grantAssistantDocuments"),documentPayload);
      setAssistantDocumentId(saved.id);setAssistantDraft(generated);
      setAssistantNotice("Draft generated and saved to your private AI document history. It remains available after you sign out or turn off your computer.");
