@@ -24,6 +24,19 @@ jobs:
           node-version: 22
       - name: Run Worker syntax, isolation and regression tests
         run: npm run check
+      - name: Syntax-check branch diagnostic runner
+        run: node --check ../../scripts/grant-intelligence-diagnostics.mjs
+      - name: Verify environment-specific Firebase token audiences
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const worker = fs.readFileSync('src/index.js', 'utf8');
+          const config = fs.readFileSync('wrangler.toml', 'utf8');
+          if (!worker.includes('env.FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID')) throw new Error('Worker does not validate Firebase tokens against environment configuration.');
+          if (!config.includes('FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"')) throw new Error('Staging Firebase project audience is missing.');
+          if (!config.includes('FIREBASE_PROJECT_ID = "irpa-digital-board-governance"')) throw new Error('Production Firebase project audience is missing.');
+          console.log('Environment-specific Firebase token audiences are configured.');
+          NODE
       - name: Validate production Worker bundle without deploying
         run: npx --yes wrangler@4 deploy --config wrangler.toml --dry-run --env production
       - name: Verify production smoke test reports fallback as degraded operation
