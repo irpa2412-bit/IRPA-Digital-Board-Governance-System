@@ -41,23 +41,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-          import { spawnSync } from "node:child_process";
-          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-          const scripts = Object.keys(pkg.scripts || {}).filter(name => name.startsWith("test:"));
-          if (!scripts.length) throw new Error("No existing test scripts were discovered.");
-          for (const name of scripts) {
-            console.log("\n=== npm run " + name + " ===");
-            const emulatorRequired = name === "test:meeting-category" || name === "test:finance-policy" || name === "test:security-rules";
-            const command = emulatorRequired
-              ? ["--yes", "firebase-tools", "emulators:exec", "--only", "firestore", "npm run " + name]
-              : ["run", name];
-            const executable = emulatorRequired ? "npx" : "npm";
-            const result = spawnSync(executable, command, { stdio: "inherit", shell: process.platform === "win32" });
-            if (result.status !== 0) process.exit(result.status || 1);
-          }
-          NODE
+          mapfile -t scripts < <(node -e 'const p=require("./package.json"); for (const n of Object.keys(p.scripts||{})) if (n.startsWith("test:")) console.log(n)')
+          if [[ ${#scripts[@]} -eq 0 ]]; then
+            echo "No existing test scripts were discovered." >&2
+            exit 1
+          fi
+          for name in "${scripts[@]}"; do
+            echo
+            echo "=== npm run $name ==="
+            case "$name" in
+              test:meeting-category|test:finance-policy|test:security-rules)
+                npx --yes firebase-tools emulators:exec --only firestore "npm run $name"
+                ;;
+              *)
+                npm run "$name"
+                ;;
+            esac
+          done
       - name: Run desktop and mobile signature ceremony Playwright tests
         run: node tests/signature-palette-visibility.playwright.mjs
       - name: Run production readability and contrast checks
