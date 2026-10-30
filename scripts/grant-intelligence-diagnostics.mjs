@@ -71,7 +71,10 @@ async function corsCheck(target, route, method) {
 }
 async function apiSuite(target) {
   const credentialNames = target.name === "staging" ? ["STAGING_TEST_EMAIL", "STAGING_TEST_PASSWORD"] : ["PRODUCTION_TEST_EMAIL", "PRODUCTION_TEST_PASSWORD"];
-  await requestCheck(target, "/health", "GET");
+  const health = await requestCheck(target, "/health", "GET");
+  const expectedEnvironment = target.name === "staging" ? "staging" : "production";
+  const healthOk = health.parsed?.service === "irpa-grant-crawler" && health.parsed?.environment === expectedEnvironment && health.parsed?.storage === "configured" && health.parsed?.ai === "configured";
+  record(target.name, "Worker environment and bindings", healthOk ? "PASS" : "FAIL", JSON.stringify({ service: health.parsed?.service, environment: health.parsed?.environment, storage: health.parsed?.storage, ai: health.parsed?.ai }));
   for (const [route, method] of [["/health","GET"],["/opportunities","GET"],["/fundraising/search","POST"],["/assistant/analyze","POST"],["/run","POST"]]) await corsCheck(target, route, method);
   if (!target.email || !target.password) {
     for (const name of credentialNames) if (!process.env[name]) need(name);
@@ -175,10 +178,11 @@ async function versions() {
   for (const target of targets) {
     const script = target.name === "staging" ? "irpa-grant-crawler-staging" : "irpa-grant-crawler-production";
     try {
-      const response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts/" + script + "/versions", { headers: { authorization: "Bearer " + token }, signal: AbortSignal.timeout(15000) });
+      const response = await fetch("https://api.cloudflare.com/client/v4/accounts/" + account + "/workers/scripts/" + script + "/deployments", { headers: { authorization: "Bearer " + token }, signal: AbortSignal.timeout(15000) });
       const data = await response.json().catch(() => ({}));
-      const version = data.result?.[0]?.id || data.result?.[0]?.number || "unavailable";
-      record(target.name, "Worker version", response.ok && data.success ? "PASS" : "FAIL", "HTTP " + response.status + "; latest version=" + version);
+      const deployment = data.result?.[0];
+      const version = deployment?.versions?.map(item => item.version_id + "@" + item.percentage + "%").join(", ") || "unavailable";
+      record(target.name, "Active Worker deployment version", response.ok && data.success && !!deployment ? "PASS" : "FAIL", "HTTP " + response.status + "; deployment=" + (deployment?.id || "unavailable") + "; versions=" + version);
     } catch (error) { record(target.name, "Worker version", "FAIL", error.message); }
   }
   record("build", "Diagnostic web commit", "PASS", process.env.DIAGNOSTIC_BUILD_COMMIT || "unknown");
