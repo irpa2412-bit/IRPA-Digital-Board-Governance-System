@@ -192,7 +192,9 @@ async function browserSuite(target) {
       page.on("requestfailed", request => {
         const url = request.url();
         const reason = request.failure()?.errorText || "";
-        if (/firestore\.googleapis\.com\/google\.firestore\.v1\.Firestore\/Listen\/channel/.test(url) && reason === "net::ERR_ABORTED") warnings.push("Firestore realtime listener cancelled during page teardown: " + url.split("?")[0]);
+        const parsedUrl = (() => { try { return new URL(url); } catch { return null; } })();
+        const abortedFirestoreListen = parsedUrl?.hostname === "firestore.googleapis.com" && parsedUrl.pathname.includes("/google.firestore.v1.Firestore/Listen/channel") && /ERR_ABORTED/i.test(reason);
+        if (abortedFirestoreListen) warnings.push("Ignored aborted Firestore Listen/channel request: " + parsedUrl.origin + parsedUrl.pathname);
         else failed.push(request.method() + " " + url + " " + reason);
       });
       try {
