@@ -17,7 +17,7 @@ test("page load, Add signer, Save and Create Draft never insert a signature imag
   assert.doesNotMatch(gatewayPortal, /nextValues\[field\.fieldId\]=sig/);
   assert.doesNotMatch(gatewayPortal, /nextValues\[field\.fieldId\]=initials/);
   assert.match(platform, /async function addSigner\([\s\S]*?setFields\(nextFields\)/);
-  assert.match(service, /fields:fields\|\|\[\]/);
+  assert.match(service, /fields:\(fields\|\|\[\]\)\.map\(field=>\{/);\n  assert.match(service, /delete prepared\.value;delete prepared\.signatureData;delete prepared\.signatureUrl;delete prepared\.signatureValue/);
   assert.doesNotMatch(pdf, /if\(field\.type==="Signature"&&!value\)value=signer\.signatureValue/);
 });
 
@@ -45,7 +45,7 @@ test("the Worker refuses unconfirmed and non-assigned signature field applicatio
 });
 
 test("the signing view keeps server-side visibility filtering for later signers", () => {
-  assert.match(worker, /fields:\(env\.fields\|\|\)\.filter\(f=>f\.signerUid===signer\.uid\)/);
+  assert.match(worker, /fields:\(env\.fields\|\|\[\]\)\.filter\(f=>f\.signerUid===signer\.uid\)/);
   assert.match(gatewayPortal, /const fields=opened\.fields\|\|\[\]/);
 });
 
