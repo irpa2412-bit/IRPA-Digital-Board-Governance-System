@@ -947,7 +947,7 @@ Grant Intelligence & Funding Opportunities (MOD-23), donor/funder research, conc
 
 ### Role and access matrix — grant and governance boundary
 
-| Role | Grant discovery and analysis | Prepare concept note / funding application draft | Approve / return grant or concept note | Communication & Media funding tools | Separate governance scope |
+| Role | Grant discovery and analysis | Prepare concept note / funding application draft | Executive Director approval / return authority for grant or concept note | Communication & Media funding tools | Separate governance scope |
 |---|---|---|---|---|---|
 | Administrator | Administrative configuration and authorised access provisioning; no grant approval authority; approval authority belongs exclusively to the Executive Director | No approval authority; may have access only if separately assigned fundraising duties | **No** | Administrative configuration; no grant approval authority | System administration only |
 | Authorised Fundraising / Management Staff | **Yes** — discovery, eligibility evidence, donor alignment, analysis | **Yes** — prepare and revise internal drafts | **No** — submit to Executive Director | **Yes** — prepare funding-related records and drafts | No governance decision, vote or signature authority by virtue of this role |
@@ -990,7 +990,7 @@ Access is least-privilege and enforced server-side. A person holding multiple as
 
 | Requirement ID | Scope | Acceptance criteria | Wireframe / module | Verification |
 |---|---|---|---|---|
-| GR-01–GR-09 | Grant preparation, ED approval, non-submission and crawler boundary | GR-01–GR-09 | MOD-23, MOD-24; grant and communication wireframes | Proposed role/API integration tests |
+| GR-01–GR-09 | Grant preparation, Executive Director approval, non-submission and crawler boundary | GR-01–GR-09 | MOD-23, MOD-24; grant and communication wireframes | Proposed role/API integration tests |
 | ROLE-01–ROLE-02 | Explicit ED approval role and separation of duties | ROLE-01–ROLE-02 | Role matrix; MOD-23/MOD-24 | Proposed positive and negative permission tests |
 | OFF-01–OFF-02 | Installable/offline app and security boundary | OFF-01–OFF-02 | SHARED-03, SHARED-04 | Proposed install/offline/revocation tests |
 | MOB-01–MOB-02 | Mobile/desktop layout stack | MOB-01–MOB-02 | All 72 wireframes | Browser viewport and overflow tests |
