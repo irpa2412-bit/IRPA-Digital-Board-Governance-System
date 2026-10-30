@@ -12,6 +12,7 @@ import "./styles/shared-header-hero.css";
 import "./styles/mobile-app-enhancement.css";
 import "./styles/page-back-next-navigation.css";
 import "./styles/grant-intelligence-layout.css";
+import "./styles/mobile-layout-stack.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
