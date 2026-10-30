@@ -1,5 +1,6 @@
 appId: tz.or.irpa.dbgs
 productName: IRPA-DBGS
+electronVersion: 38.2.0
 extraMetadata:
   main: electron/main.cjs
 directories:

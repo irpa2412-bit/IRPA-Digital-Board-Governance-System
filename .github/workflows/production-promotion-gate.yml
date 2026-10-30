@@ -4,6 +4,23 @@ on:
   pull_request:
     branches: ["main"]
     types: [opened, synchronize, reopened]
+    # Promotion proof covers the application and gateway only. Desktop and
+    # generated Android wrapper paths are intentionally excluded.
+    paths:
+      - "drive-gateway/**"
+      - "functions/**"
+      - "src/**"
+      - "public/**"
+      - "scripts/**"
+      - "tests/**"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "index.html"
+      - ".github/workflows/production-promotion-gate.yml"
 
 permissions:
   contents: read
