@@ -51,7 +51,7 @@ jobs:
             console.log("\n=== npm run " + name + " ===");
             const emulatorRequired = name === "test:meeting-category" || name === "test:security-rules";
             const command = emulatorRequired
-              ? ["exec", "--yes", "firebase-tools", "--", "firebase", "emulators:exec", "--only", "firestore", "npm run " + name]
+              ? ["--yes", "firebase-tools", "emulators:exec", "--only", "firestore", "npm run " + name]
               : ["run", name];
             const executable = emulatorRequired ? "npx" : "npm";
             const result = spawnSync(executable, command, { stdio: "inherit", shell: process.platform === "win32" });
