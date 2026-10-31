@@ -22,6 +22,10 @@ try{
  await page.waitForFunction(()=>document.querySelector("[data-testid=pdf-page] canvas")?.dataset.rendered==="true");
  await page.waitForFunction(()=>JSON.parse(document.querySelector('[data-testid="text-after"]').textContent||"[]").length===3);
  const after=JSON.parse(await page.getByTestId("text-after").textContent());
+ const beforeHash=await page.getByTestId("hash-before").textContent();
+ const afterHash=await page.getByTestId("hash-after").textContent();
+ assert.match(beforeHash,/^[a-f0-9]{64}$/);
+ assert.equal(afterHash,beforeHash,"source PDF bytes must remain byte-for-byte identical across envelope creation");
  assert.equal(after.length,3);
  for(let i=0;i<3;i++)assert.ok(after[i].length>=before[i].length,"page "+(i+1)+" lost extracted PDF text during envelope transition");
  assert.ok(after[2].includes("PAGE 3 BODY CONTENT LINE 1"),"page 3 body text must survive the assigned signature field");
