@@ -43,8 +43,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install locked application dependencies
         run: npm ci
+      - name: Install Firebase Admin SDK for emulator-only fixture seeding
+        run: npm --prefix functions install --omit=dev
       - name: Test grant crawler board mapping and pagination regression
         run: node --test tests/grant-crawler-board-data.test.mjs
       - name: Install Playwright test runner without changing lockfile
@@ -53,3 +60,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run desktop and mobile fundraising registry smoke tests
         run: npx playwright test --config=playwright.fundraising.config.mjs
+      - name: Run authenticated Analyse mock at mobile and desktop sizes (emulators only)
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.grant-analyse.config.mjs"
+      - name: Upload post-Analyse diagnostics (screenshots, page text, request record)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-analyse-post-click-diagnostics
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
