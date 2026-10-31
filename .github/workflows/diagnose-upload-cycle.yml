@@ -60,10 +60,10 @@ jobs:
           node --input-type=module <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           import fs from 'node:fs';
           const lines=fs.readFileSync('/tmp/madge-cycles.txt','utf8').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-          const cycles=lines.filter(x=>/^\\d+\\)/.test(x)).map(x=>x.replace(/^\\d+\\)\\s*/, '').replace(/\\s+>\\s+/g,' → '));
+          const cycles=lines.filter(x=>/^\d+\)/.test(x)).map(x=>x.replace(/^\d+\)\s*/, '').replace(/\s+>\s+/g,' → '));
           if(!cycles.length) console.log('No circular dependency found');
           else { console.log('### Cycles (arrow notation)'); for(const cycle of cycles) console.log('- '+String.fromCharCode(96)+cycle+String.fromCharCode(96)); }
-          fs.writeFileSync('/tmp/upload-cycle-formatted-cycles.txt',cycles.length?cycles.join('\\n'):'No circular dependency found');
+          fs.writeFileSync('/tmp/upload-cycle-formatted-cycles.txt',cycles.length?cycles.join('\n'):'No circular dependency found');
           NODE
           while IFS= read -r cycle; do
             [ -n "$cycle" ] && echo "::error title=Upload dependency cycle::$cycle"
@@ -71,6 +71,22 @@ jobs:
           cp /tmp/madge-cycles.txt /tmp/upload-cycle-report.txt
           cat /tmp/upload-import-graph.json >> /tmp/upload-cycle-report.txt
           echo "MADGE_EXIT_CODE=$madge_status" >> /tmp/upload-cycle-report.txt
+
+      - name: Enforce madge circular dependency check
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -s /tmp/upload-cycle-formatted-cycles.txt ]; then
+            echo "Madge cycle report was not produced."
+            exit 1
+          fi
+          if grep -q "^No circular dependency found$" /tmp/upload-cycle-formatted-cycles.txt; then
+            echo "PASS: madge --circular found no dependency cycles."
+          else
+            echo "FAIL: madge --circular found dependency cycles:"
+            cat /tmp/upload-cycle-formatted-cycles.txt
+            exit 1
+          fi
 
       - name: Build with source maps and readable output
         shell: bash
