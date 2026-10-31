@@ -1,14 +1,14 @@
 # Upload initialization cycle diagnostic report
 
-- Workflow run: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/41235396563
-- Commit: 4b90919ea8315dd6c89e58347b91d496c5c6be91
+- Workflow run: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/41237577706
+- Commit: 4cb19b3c0730fb2475b99b7a2f0d76889891aa16
 - Conclusion at report capture: failure
 
 ## GitHub Actions job summary
 
 ## Madge circular dependency output
 - Finding files
-Processed 156 files (1.6s) (3 warnings)
+Processed 157 files (1s) (3 warnings)
 
 ✔ No circular dependency found!
 
@@ -25,7 +25,8 @@ Processed 156 files (1.6s) (3 warnings)
   ],
   "components/DocumentReader.jsx": [
     "firebase/config.js",
-    "firebase/signatureStorage.js"
+    "firebase/signatureStorage.js",
+    "utils/documentIntegrity.mjs"
   ],
   "components/SignatureFieldConfirmationPad.jsx": [],
   "components/SignaturePathwaySelfTest.jsx": [
@@ -110,8 +111,10 @@ Processed 156 files (1.6s) (3 warnings)
     "firebase/signaturePlatform.js",
     "firebase/signatureStorage.js",
     "firebase/signerIdentity.js",
-    "firebase/workflowLinks.js"
-  ]
+    "firebase/workflowLinks.js",
+    "utils/documentIntegrity.mjs"
+  ],
+  "utils/documentIntegrity.mjs": []
 }
 
 ## Vite build output
@@ -127,7 +130,7 @@ transforming...
 11 |  
 12 |  export default function SystemResetControl(){
 [39m
-[32m✓[39m 1000 modules transformed.
+[32m✓[39m 1001 modules transformed.
 rendering chunks...
 [33m[plugin vite:reporter] 
 (!) /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/node_modules/firebase/firestore/dist/esm/index.esm.js is dynamically imported by /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/invitationWorkflow.js but also statically imported by /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/App.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/components/ControlledDocumentUpload.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/components/DepartmentArchiveRegistry.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/components/DepartmentPortalBuilder.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/components/DocumentTranslationWorkspace.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/components/GrantOpportunityNotifications.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/components/SignaturePathwaySelfTest.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/auth.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/authorizationWorkflow.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/config.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/data.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/employeeRegistrationEmail.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/functions.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/invitationWorkflow.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/messaging.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/procurement.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/signaturePlatform.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/signerIdentity.js, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/CommunicationMediaOperations.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/CommunicationMediaStudio.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/DocumentLifecycleModule.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/ExternalAuditorPortal.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/GovernanceWorkspaces.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/GrantIntelligencePortal.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/MeetingRoom.jsx, /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/pages/SocialMediaAccounts.jsx, dynamic import will not move module into another chunk.
@@ -155,46 +158,154 @@ computing gzip size...
 [2mdist/[22m[2massets/[22m[32mpdf.worker.min-iDqQPrd3.mjs                    [39m[1m[2m1,232.30 kB[22m[1m[22m
 [2mdist/[22m[2massets/[22m[32mpdf.worker-B1D2UnXD.mjs                        [39m[1m[2m2,161.15 kB[22m[1m[22m
 [2mdist/[22m[2massets/[22m[35mindex-YGdapERl.css                             [39m[1m[2m  757.19 kB[22m[1m[22m[2m │ gzip:   104.95 kB[22m
-[2mdist/[22m[2massets/[22m[36mDocumentLifecycleModule-CI9MrgVU.js            [39m[1m[2m   77.74 kB[22m[1m[22m[2m │ gzip:    16.51 kB[22m[2m │ map:    101.22 kB[22m
-[2mdist/[22m[2massets/[22m[36mGrantIntelligencePortal-1Hh1pkL4.js            [39m[1m[2m  171.34 kB[22m[1m[22m[2m │ gzip:    32.27 kB[22m[2m │ map:    227.02 kB[22m
-[2mdist/[22m[2massets/[22m[36mResearchStatisticsKnowledgePortal-BDmLjgpN.js  [39m[1m[2m  235.74 kB[22m[1m[22m[2m │ gzip:    44.37 kB[22m[2m │ map:    397.45 kB[22m
-[2mdist/[22m[2massets/[22m[36mindex-CY3R4CZg.js                              [39m[1m[33m8,070.56 kB[39m[22m[2m │ gzip: 1,696.59 kB[22m[2m │ map: 14,364.51 kB[22m
-[32m✓ built in 16.21s[39m
+[2mdist/[22m[2massets/[22m[36mDocumentLifecycleModule-spHKV_t8.js            [39m[1m[2m   77.74 kB[22m[1m[22m[2m │ gzip:    16.51 kB[22m[2m │ map:    101.22 kB[22m
+[2mdist/[22m[2massets/[22m[36mGrantIntelligencePortal-CnQgO7dg.js            [39m[1m[2m  171.34 kB[22m[1m[22m[2m │ gzip:    32.27 kB[22m[2m │ map:    227.02 kB[22m
+[2mdist/[22m[2massets/[22m[36mResearchStatisticsKnowledgePortal-DV50ZA52.js  [39m[1m[2m  235.74 kB[22m[1m[22m[2m │ gzip:    44.37 kB[22m[2m │ map:    397.45 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-nv57pjxL.js                              [39m[1m[33m8,073.62 kB[39m[22m[2m │ gzip: 1,697.29 kB[22m[2m │ map: 14,369.64 kB[22m
+[32m✓ built in 11.78s[39m
 
 ## Create Drive file runtime result
-node:internal/modules/package_json_reader:314
-  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
-        ^
+[36mvite v7.3.6 [32mbuilding ssr environment for production...[36m[39m
+transforming...
+[32m✓[39m 4 modules transformed.
+rendering chunks...
+[2m../../../../../tmp/upload-cycle-runtime/bundle/[22m[36msignatureStorage.js  [39m[1m[2m28.90 kB[22m[1m[22m[2m │ map: 46.23 kB[22m
+[32m✓ built in 109ms[39m
+/tmp/upload-cycle-runtime/bundle/firebase-messaging-sw.js:2
+importScripts("https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js");
+^
 
-Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /tmp/upload-cycle-runtime/run.mjs
-    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
-    at packageResolve (node:internal/modules/esm/resolve:772:81)
-    at moduleResolve (node:internal/modules/esm/resolve:859:18)
-    at defaultResolve (node:internal/modules/esm/resolve:989:11)
-    at #cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
-    at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
-  code: 'ERR_MODULE_NOT_FOUND'
-}
+ReferenceError: importScripts is not defined
+    at Object.<anonymous> (/tmp/upload-cycle-runtime/bundle/firebase-messaging-sw.js:2:1)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Object..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Function._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:335:3)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:235:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
 
 Node.js v22.23.4
 
 ## Workflow diagnostic console
-node:internal/modules/package_json_reader:314
-  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
-        ^
+[36mvite v7.3.6 [32mbuilding ssr environment for production...[36m[39m
+transforming...
+[32m✓[39m 4 modules transformed.
+rendering chunks...
+[2m../../../../../tmp/upload-cycle-runtime/bundle/[22m[36msignatureStorage.js  [39m[1m[2m28.90 kB[22m[1m[22m[2m │ map: 46.23 kB[22m
+[32m✓ built in 109ms[39m
+/tmp/upload-cycle-runtime/bundle/firebase-messaging-sw.js:2
+importScripts("https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js");
+^
 
-Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite' imported from /tmp/upload-cycle-runtime/run.mjs
-    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
-    at packageResolve (node:internal/modules/esm/resolve:772:81)
-    at moduleResolve (node:internal/modules/esm/resolve:859:18)
-    at defaultResolve (node:internal/modules/esm/resolve:989:11)
-    at #cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
-    at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
-  code: 'ERR_MODULE_NOT_FOUND'
-}
+ReferenceError: importScripts is not defined
+    at Object.<anonymous> (/tmp/upload-cycle-runtime/bundle/firebase-messaging-sw.js:2:1)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Object..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Function._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:335:3)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:235:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
 
 Node.js v22.23.4
+
+## Regression test output
+TAP version 13
+# Subtest: legacy envelope with no envelope or source metadata is allowed
+ok 1 - legacy envelope with no envelope or source metadata is allowed
+  ---
+  duration_ms: 0.928457
+  type: 'test'
+  ...
+# Subtest: matching envelope hash and size are accepted
+ok 2 - matching envelope hash and size are accepted
+  ---
+  duration_ms: 0.106188
+  type: 'test'
+  ...
+# Subtest: mismatching hash or size is blocked
+ok 3 - mismatching hash or size is blocked
+  ---
+  duration_ms: 0.091496
+  type: 'test'
+  ...
+# Subtest: source document values are fallback when envelope values are absent
+ok 4 - source document values are fallback when envelope values are absent
+  ---
+  duration_ms: 0.104515
+  type: 'test'
+  ...
+# Subtest: envelope values take precedence over source document values
+ok 5 - envelope values take precedence over source document values
+  ---
+  duration_ms: 0.988505
+  type: 'test'
+  ...
+# file:///home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/drive-gateway/src/signing.mjs:16
+# export async function verifySourceDocumentIntegrity(bytes,envelope={},sourceDocument={}){const rawHash=envelope.sha256||envelope.documentHash||envelope.originalHash||sourceDocument.sha256||sourceDocument.hash||null;const rawSize=envelope.byteLength??envelope.documentSize??envelope.fileSize??sourceDocument.fileSize??sourceDocument.byteLength??sourceDocument.size??null;const expectedHash=rawHash==null||String(rawHash).trim()===""?null:String(rawHash).trim().toLowerCase();const expectedSize=rawSize==null||rawSize===""||!Number.isFinite(Number(rawSize))?null:Number(rawSize);if((expectedHash&&expectedHash!==await sha256Hex(bytes))||(expectedSize!=null&&expectedSize!==bytes.byteLength))throw new HttpError(409,"The document failed its integrity check.");return{expectedHash,expectedSize}}\\nasync function original(ctx,e){const d=await ctx.meta.get("documents",e.documentId),b=d&&await ctx.storage.get(d.primaryStorageId);if(!b)throw new HttpError(409,"The source document is unavailable.");await verifySourceDocumentIntegrity(b,e,d);return{doc:d,bytes:b}}
+#                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ^
+# SyntaxError: Invalid or unexpected token
+#     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+#     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+#     at \#translate (node:internal/modules/esm/loader:559:20)
+#     at afterLoad (node:internal/modules/esm/loader:612:29)
+#     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+#     at \#createModuleJob (node:internal/modules/esm/loader:640:36)
+#     at \#getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+# Node.js v22.23.4
+# Subtest: tests/gateway-signing-integrity.test.mjs
+not ok 2 - tests/gateway-signing-integrity.test.mjs
+  ---
+  duration_ms: 32.910416
+  type: 'test'
+  location: '/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/tests/gateway-signing-integrity.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# file:///home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/tests/upload-circular-import-runtime.test.mjs:63
+#       assert.match(String(url), /\\\\/api\\\\/upload-controlled-document$/);
+#                                 ^
+# SyntaxError: Invalid regular expression flags
+#     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+#     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+#     at \#translate (node:internal/modules/esm/loader:559:20)
+#     at afterLoad (node:internal/modules/esm/loader:612:29)
+#     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+#     at \#createModuleJob (node:internal/modules/esm/loader:640:36)
+#     at \#getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+#     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:680:25)
+# Node.js v22.23.4
+# Subtest: tests/upload-circular-import-runtime.test.mjs
+not ok 3 - tests/upload-circular-import-runtime.test.mjs
+  ---
+  duration_ms: 30.007021
+  type: 'test'
+  location: '/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/tests/upload-circular-import-runtime.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 5
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 43.232179
+
+## Madge exit code
+0
