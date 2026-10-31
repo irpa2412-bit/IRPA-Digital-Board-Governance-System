@@ -7,11 +7,11 @@ test("production minified bundle completes authenticated Create Drive file with 
   await page.setViewportSize({ width: 1440, height: 900 });
   const pageErrors = [];
   const gatewayCalls = [];
-  page.on("pageerror", error => pageErrors.push({
-    name: error.name,
-    message: error.message,
-    stack: error.stack || ""
-  }));
+  page.on("pageerror", error => {
+    const captured = { name: error.name, message: error.message, stack: error.stack || "" };
+    pageErrors.push(captured);
+    console.error("UPLOAD_PAGEERROR", JSON.stringify(captured));
+  });
 
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
