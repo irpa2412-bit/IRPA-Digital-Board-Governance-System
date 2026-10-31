@@ -90,6 +90,11 @@ jobs:
             echo '~~~text'
             if [ -s /tmp/rollup-circular-warnings.txt ]; then cat /tmp/rollup-circular-warnings.txt; else echo "No Rollup CIRCULAR_DEPENDENCY warnings captured."; fi
             echo '~~~'
+            echo
+            echo "## Rollup mixed static/dynamic import warnings"
+            echo '~~~text'
+            if [ -s /tmp/rollup-mixed-import-warnings.txt ]; then cat /tmp/rollup-mixed-import-warnings.txt; else echo "No mixed static/dynamic import warnings captured."; fi
+            echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Map production build 52af3f5 line 92 column 5466
@@ -392,7 +397,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs tests/gateway-signing-integrity.test.mjs > /tmp/regression-tests.txt 2>&1
+          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs tests/gateway-signing-integrity.test.mjs tests/invitation-workflow-static-import.test.mjs > /tmp/regression-tests.txt 2>&1
           status=$?
           set -e
           cat /tmp/regression-tests.txt
