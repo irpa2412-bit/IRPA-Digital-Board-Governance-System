@@ -109,7 +109,8 @@ const getOpportunityCurrentStatusIssue=record=>{
 const isNotCurrentOpportunity=record=>["closed","expired"].includes(getOpportunityCurrentStatusIssue(record));
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
- const [crawlerRecords,setCrawlerRecords]=useState([]);\n const [crawlerHasMore,setCrawlerHasMore]=useState(false);
+ const [crawlerRecords,setCrawlerRecords]=useState([]);
+ const [crawlerHasMore,setCrawlerHasMore]=useState(false);
  const [crawlerResultsBusy,setCrawlerResultsBusy]=useState(false);
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
