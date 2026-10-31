@@ -1,0 +1,49 @@
+name: Diagnose Upload Initialization Cycle
+
+on:
+  push:
+    branches:
+      - fix/upload-and-legacy-signature-integrity-20261031
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Print every circular dependency
+        shell: bash
+        run: |
+          set +e
+          npx --yes madge --circular --extensions js,jsx,mjs src drive-gateway/src 2>&1 | tee /tmp/madge-cycles.txt
+          madge_status=${PIPESTATUS[0]}
+          echo "MADGE_EXIT_CODE=$madge_status"
+          echo "===== CYCLE SUMMARY ====="
+          cat /tmp/madge-cycles.txt
+          echo "===== END CYCLE SUMMARY ====="
+      - name: Build with source maps and readable output
+        run: npx vite build --sourcemap --minify false
+      - name: Locate initialization identifier and source modules
+        shell: bash
+        run: |
+          echo "===== BUILT ASSETS CONTAINING IDENTIFIER Ne ====="
+          grep -R -n -E '\\bNe\\b' dist/assets --include='*.js' | head -80 || true
+          echo "===== SOURCE MAP SOURCES ====="
+          find dist/assets -name '*.js.map' -print -exec node -e '
+            const fs = require("fs");
+            const p = process.argv[1];
+            const m = JSON.parse(fs.readFileSync(p, "utf8"));
+            console.log(p + ":");
+            for (const s of (m.sources || [])) console.log("  " + s);
+          ' {} \;
+          echo "===== SOURCE OCCURRENCES OF HASH / INTEGRITY HELPERS ====="
+          grep -R -n -E 'sha256|byteLength|integrity|hash' src drive-gateway/src --include='*.js' --include='*.jsx' --include='*.mjs' | head -200 || true
