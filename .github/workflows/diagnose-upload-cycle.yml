@@ -201,7 +201,8 @@ jobs:
           npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1"
 
       - name: Run full Node test suite
-        if: always()
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
         shell: bash
         run: |
           set +e
