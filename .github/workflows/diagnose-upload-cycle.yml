@@ -16,10 +16,194 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install isolated authenticated browser fixture
+        run: |
+          npm --prefix functions install --omit=dev
+          npm install --no-save --package-lock=false @playwright/test
+          npx playwright install --with-deps chromium
+
+      - name: DPDM graph and top-level initialization audit
+        shell: bash
+        run: |
+          set +e
+          npx --yes dpdm --no-warning --no-tree --transform src/main.jsx > /tmp/dpdm-report.txt 2>&1
+          dpdm_status=$?
+          set -e
+          cat /tmp/dpdm-report.txt
+          {
+            echo "## DPDM dependency analysis"
+            echo '~~~text'
+            cat /tmp/dpdm-report.txt
+            echo '~~~'
+            echo "DPDM exit code: $dpdm_status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat > /tmp/scan-top-level-tdz.mjs <<'NODE'
+          import fs from 'node:fs';
+          import parser from '@babel/parser';
+          import traverseModule from '@babel/traverse';
+          const traverse=traverseModule.default||traverseModule;
+          const files=['src/utils/documentIntegrity.mjs','src/components/DocumentReader.jsx','src/pages/SignaturePlatform.jsx','src/firebase/signaturePlatform.js','src/firebase/signatureStorage.js','src/components/ControlledDocumentUpload.jsx','src/components/controlledDocumentUploadValidation.mjs','src/components/uploadRuntimeDiagnostics.mjs'];
+          const findings=[];
+          for(const file of files){
+            if(!fs.existsSync(file))continue;
+            const ast=parser.parse(fs.readFileSync(file,'utf8'),{sourceType:'module',plugins:['jsx','importMeta','topLevelAwait']});
+            const declarations=new Map();
+            for(const statement of ast.program.body){
+              if(statement.type==='VariableDeclaration'){
+                for(const decl of statement.declarations)if(['const','let'].includes(statement.kind)&&decl.id.type==='Identifier')declarations.set(decl.id.name,decl.id.start);
+              }else if(statement.type==='ClassDeclaration'&&statement.id)declarations.set(statement.id.name,statement.start);
+            }
+            traverse(ast,{ReferencedIdentifier(p){const at=declarations.get(p.node.name);if(at!==undefined&&p.node.start<at&&!p.getFunctionParent())findings.push(file+':'+p.node.loc.start.line+' reads '+p.node.name+' before declaration');},Function(p){p.skip();}});
+          }
+          fs.writeFileSync('/tmp/top-level-tdz-candidates.txt',findings.length?findings.join('\n'):'No top-level const/class TDZ candidates found in the reviewed upload/signature modules.');
+          console.log(fs.readFileSync('/tmp/top-level-tdz-candidates.txt','utf8'));
+          NODE
+          node /tmp/scan-top-level-tdz.mjs > /tmp/top-level-tdz-console.txt 2>&1 || true
+          cat /tmp/top-level-tdz-console.txt
+          {
+            echo
+            echo "## Top-level const/class initialization audit"
+            echo '~~~text'
+            cat /tmp/top-level-tdz-candidates.txt 2>/dev/null || cat /tmp/top-level-tdz-console.txt
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Capture production Rollup circular dependency warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/current-production-build.txt
+          grep -n -C 2 'CIRCULAR_DEPENDENCY\|Circular dependency' /tmp/current-production-build.txt > /tmp/rollup-circular-warnings.txt || true
+          {
+            echo
+            echo "## Rollup circular dependency warnings"
+            echo '~~~text'
+            if [ -s /tmp/rollup-circular-warnings.txt ]; then cat /tmp/rollup-circular-warnings.txt; else echo "No Rollup CIRCULAR_DEPENDENCY warnings captured."; fi
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Map production build 52af3f5 line 92 column 5466
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/upload-map-worktree 52af3f50b833fb3e100a30bb2c1faf8e6324ec68
+          cd /tmp/upload-map-worktree
+          npm install
+          npm run build > /tmp/production-52af3f5-build.txt 2>&1
+          target="index-rYhbyEXn.js"
+          built="$(find dist/assets -maxdepth 1 -type f -name 'index-*.js' | head -n 1)"
+          if [ -n "$built" ] && [ "$(basename "$built")" = "$target" ]; then
+            echo "Production asset filename matches: $(basename "$built")"
+            npm run build -- --sourcemap > /tmp/production-52af3f5-sourcemap-build.txt 2>&1
+            built="dist/assets/$target"
+            map="$built.map"
+          else
+            echo "Build asset filename differs ($(basename "$built" 2>/dev/null || echo missing)); downloading live production asset."
+            curl -fsSL "https://irpa-digital-board-governance.web.app/assets/$target" -o "/tmp/$target"
+            built="/tmp/$target"
+            map="/tmp/$target.map"
+            curl -fsSL "https://irpa-digital-board-governance.web.app/assets/$target.map" -o "$map" || true
+          fi
+          BUNDLE_PATH="$built" MAP_PATH="$map" node --input-type=module <<'NODE' | tee /tmp/production-52af3f5-diagnostics.txt
+          import fs from 'node:fs';
+          const bundlePath=process.env.BUNDLE_PATH,mapPath=process.env.MAP_PATH;
+          const code=fs.readFileSync(bundlePath,'utf8'),line=92,column=5466;
+          const start=code.split('\n').slice(0,line-1).reduce((n,s)=>n+s.length+1,0),offset=start+column-1;
+          console.log('ASSET='+bundlePath);
+          console.log('LINE='+line+' COLUMN='+column+' OFFSET='+offset);
+          console.log('MINIFIED_CONTEXT_300_CHARS=');
+          console.log(code.slice(Math.max(0,offset-150),Math.min(code.length,offset+150)));
+          if(!fs.existsSync(mapPath)){console.log('SOURCE_MAP=unavailable');process.exit(0);}
+          const map=JSON.parse(fs.readFileSync(mapPath,'utf8')),alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+          function vlq(segment){let out=[],value=0,shift=0;for(const ch of segment){let digit=alphabet.indexOf(ch);if(digit<0)continue;const cont=digit&32;digit&=31;value+=(digit<<shift);if(cont){shift+=5;continue;}out.push(value&1?-(value>>1):(value>>1));value=0;shift=0;}return out;}
+          const segments=(map.mappings.split(';')[line-1]||'').split(',');
+          let source=0,originalLine=0,originalColumn=0,name=0,chosen=null,generatedColumn=0;
+          for(const seg of segments){if(!seg)continue;const v=vlq(seg);generatedColumn+=v[0];if(v.length>=4){source+=v[1];originalLine+=v[2];originalColumn+=v[3];if(v.length>=5)name+=v[4];if(generatedColumn<=column-1)chosen={source,originalLine,originalColumn};else break;}}
+          if(!chosen){console.log('SOURCE_MAP_POSITION=unmapped');process.exit(0);}
+          const sourceName=map.sources[chosen.source],sourceText=map.sourcesContent?.[chosen.source]||'';
+          console.log('MAPPED_SOURCE='+sourceName+':'+(chosen.originalLine+1)+':'+(chosen.originalColumn+1));
+          console.log('SOURCE_LINE='+(sourceText.split('\n')[chosen.originalLine]||''));
+          NODE
+          cd "$GITHUB_WORKSPACE"
+          {
+            echo
+            echo "## Production minified asset mapping (52af3f5)"
+            echo '~~~text'
+            cat /tmp/production-52af3f5-diagnostics.txt
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bisect authenticated minified upload across 52af3f5, a23df7b and fe4e3de
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/upload-bisect
+          cp tests/browser/upload-production-bundle.spec.mjs /tmp/upload-bisect/
+          cp playwright.authenticated-governance.config.mjs /tmp/upload-bisect/
+          printf '%s\n' 'COMMIT,RESULT' > /tmp/upload-bisect-results.csv
+          for short in 52af3f5 a23df7b fe4e3de; do
+            sha="$(git rev-parse "$short^{commit}")"
+            worktree="/tmp/upload-bisect/$short"
+            git worktree add --detach "$worktree" "$sha"
+            mkdir -p "$worktree/tests/browser"
+            cp /tmp/upload-bisect/upload-production-bundle.spec.mjs "$worktree/tests/browser/"
+            cp /tmp/upload-bisect/playwright.authenticated-governance.config.mjs "$worktree/"
+            (
+              cd "$worktree"
+              npm install
+              npm --prefix functions install --omit=dev
+              npm install --no-save --package-lock=false @playwright/test
+              set +e
+              npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1" > "/tmp/upload-bisect/$short.log" 2>&1
+              status=$?
+              set -e
+              cat "/tmp/upload-bisect/$short.log"
+              if [ "$status" -eq 0 ]; then result=PASS; else result=FAIL; fi
+              echo "$short,$result" >> /tmp/upload-bisect-results.csv
+              echo "$short=$result" >> "$GITHUB_STEP_SUMMARY"
+            )
+          done
+          first_failure="$(awk -F, 'NR>1&&$2=="FAIL"{print $1;exit}' /tmp/upload-bisect-results.csv)"
+          echo "FIRST_FAILING_COMMIT=$first_failure" > /tmp/upload-bisect-first-failure.txt
+          {
+            echo
+            echo "## Authenticated production-bundle bisect"
+            echo '~~~text'
+            cat /tmp/upload-bisect-results.csv
+            cat /tmp/upload-bisect-first-failure.txt
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+          test -z "$first_failure"
+
+      - name: Reproduce authenticated production upload on PR head
+        shell: bash
+        env:
+          GCLOUD_PROJECT: demo-irpa-dgbs
+        run: |
+          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1"
+
+      - name: Run full Node test suite
+        shell: bash
+        run: |
+          set +e
+          node --test > /tmp/full-node-test-suite.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/full-node-test-suite.txt
+          {
+            echo
+            echo "## Full Node test suite"
+            echo '~~~text'
+            cat /tmp/full-node-test-suite.txt
+            echo '~~~'
+            echo "Full Node test exit code: $status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
 
       - name: Capture cycles and upload import chains
         shell: bash
@@ -224,6 +408,17 @@ jobs:
             /tmp/upload-cycle-formatted-cycles.txt
             /tmp/madge-exit-code.txt
             /tmp/regression-tests.txt
+            /tmp/dpdm-report.txt
+            /tmp/top-level-tdz-candidates.txt
+            /tmp/rollup-circular-warnings.txt
+            /tmp/current-production-build.txt
+            /tmp/production-52af3f5-build.txt
+            /tmp/production-52af3f5-sourcemap-build.txt
+            /tmp/production-52af3f5-diagnostics.txt
+            /tmp/upload-bisect-results.csv
+            /tmp/upload-bisect-first-failure.txt
+            /tmp/upload-bisect/*.log
+            /tmp/full-node-test-suite.txt
           if-no-files-found: warn
           retention-days: 14
 
