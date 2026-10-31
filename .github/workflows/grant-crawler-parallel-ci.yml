@@ -1,6 +1,7 @@
 name: Grant Crawler Parallel CI
 
 on:
+  push:
   pull_request:
     branches: [main]
     paths:
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run Worker syntax, isolation and regression tests
+      - name: Run Worker syntax, mocked-D1 and local regression tests
         run: npm run check
       - name: Validate production Worker bundle without deploying
         run: npx --yes wrangler@4 deploy --config wrangler.toml --dry-run --env production
