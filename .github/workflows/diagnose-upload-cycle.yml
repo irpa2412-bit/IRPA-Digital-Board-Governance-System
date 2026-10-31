@@ -187,7 +187,7 @@ jobs:
       - name: Run upload and integrity regression tests
         shell: bash
         run: |
-          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs
+          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs tests/gateway-signing-integrity.test.mjs
 
       - name: Upload complete diagnostic report
         if: always()
