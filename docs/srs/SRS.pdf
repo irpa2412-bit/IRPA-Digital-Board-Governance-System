@@ -1,0 +1,1664 @@
+%PDF-1.4
+%IRPA-DBGS SRS
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R 27 0 R 29 0 R 31 0 R 33 0 R 35 0 R 37 0 R 39 0 R 41 0 R 43 0 R 45 0 R 47 0 R 49 0 R] /Count 23 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 4165 >>
+stream
+BT
+/F1 15 Tf 1 0 0 1 42 794 Tm (IRPA Digital Board Governance System - Software Requirements Specification) Tj
+/F1 9 Tf 1 0 0 1 42 764 Tm (Status: Reverse-engineered; owner validation required. Baseline: main @) Tj
+/F1 9 Tf 1 0 0 1 42 752 Tm (f20403e6f26c296f9d3aa3cda87588115a0f694d.) Tj
+/F1 12 Tf 1 0 0 1 42 728 Tm (Scope and evidence) Tj
+/F1 9 Tf 1 0 0 1 42 713 Tm (Source-derived navigation, portal components and Worker entrypoint paths are documented here. Source) Tj
+/F1 9 Tf 1 0 0 1 42 701 Tm (presence is not proof of live production operation. Dataset Registry, Research Data Collection and) Tj
+/F1 9 Tf 1 0 0 1 42 689 Tm (Release Readiness are normative standalone portal requirements; their separate top-level navigation is a) Tj
+/F1 9 Tf 1 0 0 1 42 677 Tm (proposed gap. Grant Intelligence is discovery/analysis only; concept-note advice is internal drafting,) Tj
+/F1 9 Tf 1 0 0 1 42 665 Tm (not donor submission.) Tj
+/F1 12 Tf 1 0 0 1 42 641 Tm (Inventory) Tj
+/F1 8.5 Tf 1 0 0 1 42 626 Tm (- 31 top-level modules; 15 registered sub-portals \(6 Meetings, 8 Documents, 1 Induction\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 614.5 Tm (- 41 source page components; 3 standalone portal requirements; 21 component/subsystem screens; 5) Tj
+/F1 8.5 Tf 1 0 0 1 42 603 Tm (shared/workflow screens.) Tj
+/F1 8.5 Tf 1 0 0 1 42 591.5 Tm (- 72 page-specific wireframes.) Tj
+/F1 10 Tf 1 0 0 1 42 568 Tm (Top-level modules) Tj
+/F1 9 Tf 1 0 0 1 42 555 Tm (1. IT Operations - MOD-01) Tj
+/F1 9 Tf 1 0 0 1 42 543 Tm (2. Dashboard - MOD-02) Tj
+/F1 9 Tf 1 0 0 1 42 531 Tm (3. Induction and Orientation - MOD-03) Tj
+/F1 9 Tf 1 0 0 1 42 519 Tm (4. Induction Applications - MOD-04) Tj
+/F1 9 Tf 1 0 0 1 42 507 Tm (5. Board Members Registration - MOD-05) Tj
+/F1 9 Tf 1 0 0 1 42 495 Tm (6. Members & Personnel - MOD-06) Tj
+/F1 9 Tf 1 0 0 1 42 483 Tm (7. Invitations - MOD-07) Tj
+/F1 9 Tf 1 0 0 1 42 471 Tm (8. Meetings - MOD-08) Tj
+/F1 9 Tf 1 0 0 1 42 459 Tm (9. Resolutions - MOD-09) Tj
+/F1 9 Tf 1 0 0 1 42 447 Tm (10. Voting - MOD-10) Tj
+/F1 9 Tf 1 0 0 1 42 435 Tm (11. Actions - MOD-11) Tj
+/F1 9 Tf 1 0 0 1 42 423 Tm (12. Documents - MOD-12) Tj
+/F1 9 Tf 1 0 0 1 42 411 Tm (13. Signature Platform - MOD-13) Tj
+/F1 9 Tf 1 0 0 1 42 399 Tm (14. Decisions - MOD-14) Tj
+/F1 9 Tf 1 0 0 1 42 387 Tm (15. Risk Register - MOD-15) Tj
+/F1 9 Tf 1 0 0 1 42 375 Tm (16. Authorization & Approvals - MOD-16) Tj
+/F1 9 Tf 1 0 0 1 42 363 Tm (17. Employee Payments - MOD-17) Tj
+/F1 9 Tf 1 0 0 1 42 351 Tm (18. Research, Statistics and Knowledge - MOD-18) Tj
+/F1 9 Tf 1 0 0 1 42 339 Tm (19. Finance Portfolio - MOD-19) Tj
+/F1 9 Tf 1 0 0 1 42 327 Tm (20. Procurement - MOD-20) Tj
+/F1 9 Tf 1 0 0 1 42 315 Tm (21. Reports - MOD-21) Tj
+/F1 9 Tf 1 0 0 1 42 303 Tm (22. Audit Trail - MOD-22) Tj
+/F1 9 Tf 1 0 0 1 42 291 Tm (23. Grant Intelligence & Funding Opportunities - MOD-23) Tj
+/F1 9 Tf 1 0 0 1 42 279 Tm (24. Communication & Media - MOD-24) Tj
+/F1 9 Tf 1 0 0 1 42 267 Tm (25. Downloads - MOD-25) Tj
+/F1 9 Tf 1 0 0 1 42 255 Tm (26. Settings - MOD-26) Tj
+/F1 9 Tf 1 0 0 1 42 243 Tm (27. Add Administrator - MOD-27) Tj
+/F1 9 Tf 1 0 0 1 42 231 Tm (28. Department and Archive Registry - MOD-28) Tj
+/F1 9 Tf 1 0 0 1 42 219 Tm (29. Department Portal Builder - MOD-29) Tj
+/F1 9 Tf 1 0 0 1 42 207 Tm (30. External Auditor Portal - MOD-30) Tj
+/F1 9 Tf 1 0 0 1 42 195 Tm (31. Auditors & Special Invitees - MOD-31) Tj
+/F1 10 Tf 1 0 0 1 42 171 Tm (Registered sub-portals) Tj
+/F1 8.5 Tf 1 0 0 1 42 158 Tm (- Meetings -> Meeting Room - SUB-01) Tj
+/F1 8.5 Tf 1 0 0 1 42 146.5 Tm (- Meetings -> Participants - SUB-02) Tj
+/F1 8.5 Tf 1 0 0 1 42 135 Tm (- Meetings -> Resolutions - SUB-03) Tj
+/F1 8.5 Tf 1 0 0 1 42 123.5 Tm (- Meetings -> Voting - SUB-04) Tj
+/F1 8.5 Tf 1 0 0 1 42 112 Tm (- Meetings -> Actions - SUB-05) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (- Meetings -> Decisions - SUB-06) Tj
+/F1 8.5 Tf 1 0 0 1 42 89 Tm (- Documents -> My Documents - SUB-07) Tj
+/F1 8.5 Tf 1 0 0 1 42 77.5 Tm (- Documents -> Department Documents - SUB-08) Tj
+/F1 8.5 Tf 1 0 0 1 42 66 Tm (- Documents -> Shared With Me - SUB-09) Tj
+/F1 8.5 Tf 1 0 0 1 42 54.5 Tm (- Documents -> Signing Workspace - SUB-10) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (1 / 23) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 5756 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (- Documents -> Post-Signature Work - SUB-11) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (- Documents -> Final Archive - SUB-12) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (- Documents -> Upload Document - SUB-13) Tj
+/F1 8.5 Tf 1 0 0 1 42 759.5 Tm (- Documents -> Retrieve Archived Documents - SUB-14) Tj
+/F1 8.5 Tf 1 0 0 1 42 748 Tm (- Induction and Orientation -> Induction Applications - SUB-15) Tj
+/F1 10 Tf 1 0 0 1 42 724.5 Tm (Standalone portals) Tj
+/F1 8.5 Tf 1 0 0 1 42 711.5 Tm (- Dataset Registry - STD-01; separate top-level navigation is a proposed gap.) Tj
+/F1 8.5 Tf 1 0 0 1 42 700 Tm (- Research Data Collection - STD-02; separate top-level navigation is a proposed gap.) Tj
+/F1 8.5 Tf 1 0 0 1 42 688.5 Tm (- Release Readiness - STD-03; separate top-level navigation is a proposed gap.) Tj
+/F1 12 Tf 1 0 0 1 42 665 Tm (Roles and authorization) Tj
+/F1 9 Tf 1 0 0 1 42 650 Tm (Source indicates administrator, board/member, employee, finance, procurement, HR, IT, auditor, signer and) Tj
+/F1 9 Tf 1 0 0 1 42 638 Tm (invitation/induction capacities. Approved role register and per-record permissions require Board/HR) Tj
+/F1 9 Tf 1 0 0 1 42 626 Tm (confirmation. UI hiding is not authorization; every protected read/write must be enforced server-side.) Tj
+/F1 9 Tf 1 0 0 1 42 614 Tm (Actual and Trial environments remain distinct; identity/security records remain in Actual Data as the) Tj
+/F1 9 Tf 1 0 0 1 42 602 Tm (source gate specifies.) Tj
+/F1 12 Tf 1 0 0 1 42 578 Tm (Functional requirements and Given/When/Then criteria) Tj
+/F1 9 Tf 1 0 0 1 42 563 Tm (All test IDs are PROPOSED until mapped to executable tests.) Tj
+/F1 10 Tf 1 0 0 1 42 539 Tm (MOD-01 - IT Operations) Tj
+/F1 9 Tf 1 0 0 1 42 526 Tm (Priority: MUST. Page: it-operations. Test: TEST-PROPOSED-MOD-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 514 Tm (- MOD-01-AC1: Given the caller has the IT Operations role, when the diagnostics view is requested, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 502.5 Tm (the response lists each configured service name, health state and last-checked timestamp, and omits) Tj
+/F1 8.5 Tf 1 0 0 1 42 491 Tm (credentials, tokens and secret configuration values.) Tj
+/F1 8.5 Tf 1 0 0 1 42 479.5 Tm (- MOD-01-AC2: Given a non-IT user calls an IT operation directly, when the protected request is submitted) Tj
+/F1 8.5 Tf 1 0 0 1 42 468 Tm (directly to the server, then server-side authorization denies it and records the denial.) Tj
+/F1 10 Tf 1 0 0 1 42 444.5 Tm (MOD-02 - Dashboard) Tj
+/F1 9 Tf 1 0 0 1 42 431.5 Tm (Priority: MUST. Page: dashboard. Test: TEST-PROPOSED-MOD-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 419.5 Tm (- MOD-02-AC1: Given an authorized user loads the dashboard, when the dashboard page is loaded, then cards) Tj
+/F1 8.5 Tf 1 0 0 1 42 408 Tm (contain only role- and environment-scoped data.) Tj
+/F1 8.5 Tf 1 0 0 1 42 396.5 Tm (- MOD-02-AC2: Given one data source fails, when the dashboard requests data from the unavailable source,) Tj
+/F1 8.5 Tf 1 0 0 1 42 385 Tm (then its card shows an error/retry without blocking other cards.) Tj
+/F1 10 Tf 1 0 0 1 42 361.5 Tm (MOD-03 - Induction and Orientation) Tj
+/F1 9 Tf 1 0 0 1 42 348.5 Tm (Priority: MUST. Page: induction-and-orientation. Test: TEST-PROPOSED-MOD-03 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 336.5 Tm (- MOD-03-AC1: Given an invited user has an induction record, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 325 Tm (described in this scenario, then required steps and current status appear in sequence.) Tj
+/F1 8.5 Tf 1 0 0 1 42 313.5 Tm (- MOD-03-AC2: Given all required steps are complete, when the user submits the induction completion) Tj
+/F1 8.5 Tf 1 0 0 1 42 302 Tm (request, then server validation is required before status becomes Completed.) Tj
+/F1 10 Tf 1 0 0 1 42 278.5 Tm (MOD-04 - Induction Applications) Tj
+/F1 9 Tf 1 0 0 1 42 265.5 Tm (Priority: MUST. Page: induction-applications. Test: TEST-PROPOSED-MOD-04 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 253.5 Tm (- MOD-04-AC1: Given an authorized reviewer opens an application, when the application detail view is) Tj
+/F1 8.5 Tf 1 0 0 1 42 242 Tm (requested, then applicant fields, status and review history appear.) Tj
+/F1 8.5 Tf 1 0 0 1 42 230.5 Tm (- MOD-04-AC2: Given a reviewer approves/rejects, when the reviewer submits the decision, then decision,) Tj
+/F1 8.5 Tf 1 0 0 1 42 219 Tm (reviewer, timestamp and required reason are stored.) Tj
+/F1 10 Tf 1 0 0 1 42 195.5 Tm (MOD-05 - Board Members Registration) Tj
+/F1 9 Tf 1 0 0 1 42 182.5 Tm (Priority: MUST. Page: board-members-registration. Test: TEST-PROPOSED-MOD-05 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 170.5 Tm (- MOD-05-AC1: Given an authorized administrator submits complete identity/appointment fields, when the) Tj
+/F1 8.5 Tf 1 0 0 1 42 159 Tm (create or registration request is submitted, then a unique registration is saved.) Tj
+/F1 8.5 Tf 1 0 0 1 42 147.5 Tm (- MOD-05-AC2: Given required fields are missing or identity is duplicated, when the invalid form is) Tj
+/F1 8.5 Tf 1 0 0 1 42 136 Tm (submitted, then save is blocked with field-level errors.) Tj
+/F1 10 Tf 1 0 0 1 42 112.5 Tm (MOD-06 - Members & Personnel) Tj
+/F1 9 Tf 1 0 0 1 42 99.5 Tm (Priority: MUST. Page: members-and-personnel. Test: TEST-PROPOSED-MOD-06 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 87.5 Tm (- MOD-06-AC1: Given HR opens the register, when the user submits the register search, then search returns) Tj
+/F1 8.5 Tf 1 0 0 1 42 76 Tm (only personnel records within assigned scope.) Tj
+/F1 8.5 Tf 1 0 0 1 42 64.5 Tm (- MOD-06-AC2: Given a personnel record changes, when the record update is saved, then actor, timestamp,) Tj
+/F1 8.5 Tf 1 0 0 1 42 53 Tm (changed fields and resulting status are audited.) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (2 / 23) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 5784 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 42 782 Tm (MOD-07 - Invitations) Tj
+/F1 9 Tf 1 0 0 1 42 769 Tm (Priority: MUST. Page: invitations. Test: TEST-PROPOSED-MOD-07 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 757 Tm (- MOD-07-AC1: Given an authorized issuer creates an invitation, when the create or registration request) Tj
+/F1 8.5 Tf 1 0 0 1 42 745.5 Tm (is submitted, then a unique recipient-bound token and expiry are stored.) Tj
+/F1 8.5 Tf 1 0 0 1 42 734 Tm (- MOD-07-AC2: Given a token is expired, revoked, redeemed or mismatched, when the user attempts to) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (activate or use the invitation, then activation is rejected and no identity is provisioned.) Tj
+/F1 10 Tf 1 0 0 1 42 699 Tm (MOD-08 - Meetings) Tj
+/F1 9 Tf 1 0 0 1 42 686 Tm (Priority: MUST. Page: meetings. Test: TEST-PROPOSED-MOD-08 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 674 Tm (- MOD-08-AC1: Given a user opens Meetings, when the corresponding portal or register is opened, then only) Tj
+/F1 8.5 Tf 1 0 0 1 42 662.5 Tm (in-scope meetings appear with date, status and participation.) Tj
+/F1 8.5 Tf 1 0 0 1 42 651 Tm (- MOD-08-AC2: Given a secretary supplies meeting title, date/time, agenda and participant list, when the) Tj
+/F1 8.5 Tf 1 0 0 1 42 639.5 Tm (meeting save request is submitted, then the server returns the saved meeting ID and stores the creator) Tj
+/F1 8.5 Tf 1 0 0 1 42 628 Tm (UID and creation timestamp in the meeting audit history; missing title, date/time or agenda returns) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (field-level validation errors.) Tj
+/F1 10 Tf 1 0 0 1 42 593 Tm (MOD-09 - Resolutions) Tj
+/F1 9 Tf 1 0 0 1 42 580 Tm (Priority: MUST. Page: resolutions. Test: TEST-PROPOSED-MOD-09 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 568 Tm (- MOD-09-AC1: Given a meeting has resolutions, when the user performs the corresponding portal action,) Tj
+/F1 8.5 Tf 1 0 0 1 42 556.5 Tm (then each record shows ID, text, status, owner and source meeting.) Tj
+/F1 8.5 Tf 1 0 0 1 42 545 Tm (- MOD-09-AC2: Given a resolution status changes, when the record update is saved, then previous/new) Tj
+/F1 8.5 Tf 1 0 0 1 42 533.5 Tm (state, actor and timestamp are retained.) Tj
+/F1 10 Tf 1 0 0 1 42 510 Tm (MOD-10 - Voting) Tj
+/F1 9 Tf 1 0 0 1 42 497 Tm (Priority: MUST. Page: voting. Test: TEST-PROPOSED-MOD-10 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 485 Tm (- MOD-10-AC1: Given voting is open and a user is eligible, when the user performs the corresponding) Tj
+/F1 8.5 Tf 1 0 0 1 42 473.5 Tm (portal action, then one valid vote is recorded once for that voter/item.) Tj
+/F1 8.5 Tf 1 0 0 1 42 462 Tm (- MOD-10-AC2: Given voting is closed, voter ineligible or vote already exists, when the user submits the) Tj
+/F1 8.5 Tf 1 0 0 1 42 450.5 Tm (vote, then submission is rejected and tally unchanged.) Tj
+/F1 10 Tf 1 0 0 1 42 427 Tm (MOD-11 - Actions) Tj
+/F1 9 Tf 1 0 0 1 42 414 Tm (Priority: MUST. Page: actions. Test: TEST-PROPOSED-MOD-11 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 402 Tm (- MOD-11-AC1: Given an action list opens, when the corresponding portal or register is opened, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 390.5 Tm (owner, due date, status, source decision and overdue state appear.) Tj
+/F1 8.5 Tf 1 0 0 1 42 379 Tm (- MOD-11-AC2: Given an assignee updates progress, when the record update is saved, then prior/new state,) Tj
+/F1 8.5 Tf 1 0 0 1 42 367.5 Tm (actor and timestamp are retained.) Tj
+/F1 10 Tf 1 0 0 1 42 344 Tm (MOD-12 - Documents) Tj
+/F1 9 Tf 1 0 0 1 42 331 Tm (Priority: MUST. Page: documents. Test: TEST-PROPOSED-MOD-12 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 319 Tm (- MOD-12-AC1: Given a document list is requested, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 307.5 Tm (scenario, then role, department, ownership and sharing rules filter results server-side.) Tj
+/F1 8.5 Tf 1 0 0 1 42 296 Tm (- MOD-12-AC2: Given an upload passes validation, when the upload is submitted for storage, then metadata,) Tj
+/F1 8.5 Tf 1 0 0 1 42 284.5 Tm (version, uploader and classification are stored.) Tj
+/F1 10 Tf 1 0 0 1 42 261 Tm (MOD-13 - Signature Platform) Tj
+/F1 9 Tf 1 0 0 1 42 248 Tm (Priority: MUST. Page: signature-platform. Test: TEST-PROPOSED-MOD-13 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 236 Tm (- MOD-13-AC1: Given a named signer opens a valid envelope, when the signature action is submitted, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 224.5 Tm (only the assigned document and required fields are accessible.) Tj
+/F1 8.5 Tf 1 0 0 1 42 213 Tm (- MOD-13-AC2: Given signing succeeds, when the signature action is submitted, then signer identity,) Tj
+/F1 8.5 Tf 1 0 0 1 42 201.5 Tm (timestamps, evidence and audit events are stored; failure never marks completion.) Tj
+/F1 10 Tf 1 0 0 1 42 178 Tm (MOD-14 - Decisions) Tj
+/F1 9 Tf 1 0 0 1 42 165 Tm (Priority: MUST. Page: decisions. Test: TEST-PROPOSED-MOD-14 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 153 Tm (- MOD-14-AC1: Given the decisions register opens, when the reviewer submits the decision, then source) Tj
+/F1 8.5 Tf 1 0 0 1 42 141.5 Tm (meeting, text, owner, date and implementation status appear.) Tj
+/F1 8.5 Tf 1 0 0 1 42 130 Tm (- MOD-14-AC2: Given implementation status changes, when the record update is saved, then decision history) Tj
+/F1 8.5 Tf 1 0 0 1 42 118.5 Tm (and linked action state update consistently.) Tj
+/F1 10 Tf 1 0 0 1 42 95 Tm (MOD-15 - Risk Register) Tj
+/F1 9 Tf 1 0 0 1 42 82 Tm (Priority: MUST. Page: risk-register. Test: TEST-PROPOSED-MOD-15 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 70 Tm (- MOD-15-AC1: Given a risk has likelihood, impact, owner and mitigation, when the user performs the) Tj
+/F1 8.5 Tf 1 0 0 1 42 58.5 Tm (operation described in this scenario, then its rating is calculated/displayed by the documented scale.) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (3 / 23) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 6142 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (- MOD-15-AC2: Given a risk is reassessed, when the record update is saved, then previous/current rating,) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (mitigation and reviewer are retained.) Tj
+/F1 10 Tf 1 0 0 1 42 759 Tm (MOD-16 - Authorization & Approvals) Tj
+/F1 9 Tf 1 0 0 1 42 746 Tm (Priority: MUST. Page: authorization-and-approvals. Test: TEST-PROPOSED-MOD-16 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 734 Tm (- MOD-16-AC1: Given a request is submitted, when the corresponding save or submit action is sent, then it) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (routes only to an approver authorized for type and amount/scope.) Tj
+/F1 8.5 Tf 1 0 0 1 42 711 Tm (- MOD-16-AC2: Given an unauthorized user attempts approval directly, when the protected request is) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (submitted directly to the server, then server-side authorization denies and audits it.) Tj
+/F1 10 Tf 1 0 0 1 42 676 Tm (MOD-17 - Employee Payments) Tj
+/F1 9 Tf 1 0 0 1 42 663 Tm (Priority: MUST. Page: employee-payments. Test: TEST-PROPOSED-MOD-17 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 651 Tm (- MOD-17-AC1: Given finance opens a payment batch, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 639.5 Tm (scenario, then employee, period, amount, approval and payment state appear per line.) Tj
+/F1 8.5 Tf 1 0 0 1 42 628 Tm (- MOD-17-AC2: Given a batch is submitted, when the corresponding save or submit action is sent, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (validation/approvals pass before it locks for processing; transitions are audited.) Tj
+/F1 10 Tf 1 0 0 1 42 593 Tm (MOD-18 - Research, Statistics and Knowledge) Tj
+/F1 9 Tf 1 0 0 1 42 580 Tm (Priority: MUST. Page: research-statistics-and-knowledge. Test: TEST-PROPOSED-MOD-18 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 568 Tm (- MOD-18-AC1: Given a research user lists datasets/outputs, when the search filters are submitted, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 556.5 Tm (title, owner, classification, version and access are displayed.) Tj
+/F1 8.5 Tf 1 0 0 1 42 545 Tm (- MOD-18-AC2: Given an output is published, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 533.5 Tm (scenario, then metadata/approval checks pass and source records retain their classification.) Tj
+/F1 10 Tf 1 0 0 1 42 510 Tm (MOD-19 - Finance Portfolio) Tj
+/F1 9 Tf 1 0 0 1 42 497 Tm (Priority: MUST. Page: finance-portfolio. Test: TEST-PROPOSED-MOD-19 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 485 Tm (- MOD-19-AC1: Given finance requests a summary, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 473.5 Tm (scenario, then totals reflect selected actual/trial environment, period and currency.) Tj
+/F1 8.5 Tf 1 0 0 1 42 462 Tm (- MOD-19-AC2: Given a non-finance user requests a finance endpoint directly, when the protected request) Tj
+/F1 8.5 Tf 1 0 0 1 42 450.5 Tm (is submitted directly to the server, then the server denies access.) Tj
+/F1 10 Tf 1 0 0 1 42 427 Tm (MOD-20 - Procurement) Tj
+/F1 9 Tf 1 0 0 1 42 414 Tm (Priority: MUST. Page: procurement. Test: TEST-PROPOSED-MOD-20 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 402 Tm (- MOD-20-AC1: Given a request has valid specifications, budget and requester, when the user performs the) Tj
+/F1 8.5 Tf 1 0 0 1 42 390.5 Tm (operation described in this scenario, then it receives a unique reference and workflow state.) Tj
+/F1 8.5 Tf 1 0 0 1 42 379 Tm (- MOD-20-AC2: Given an approver decides, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 367.5 Tm (then decision, justification, approver and timestamp are stored; only valid next states are allowed.) Tj
+/F1 10 Tf 1 0 0 1 42 344 Tm (MOD-21 - Reports) Tj
+/F1 9 Tf 1 0 0 1 42 331 Tm (Priority: MUST. Page: reports. Test: TEST-PROPOSED-MOD-21 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 319 Tm (- MOD-21-AC1: Given a user selects report/date filters, when the user performs the operation described in) Tj
+/F1 8.5 Tf 1 0 0 1 42 307.5 Tm (this scenario, then output contains only authorized records matching filters.) Tj
+/F1 8.5 Tf 1 0 0 1 42 296 Tm (- MOD-21-AC2: Given export completes, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 284.5 Tm (then report title, generation time, filter scope and classification label are included.) Tj
+/F1 10 Tf 1 0 0 1 42 261 Tm (MOD-22 - Audit Trail) Tj
+/F1 9 Tf 1 0 0 1 42 248 Tm (Priority: MUST. Page: audit-trail. Test: TEST-PROPOSED-MOD-22 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 236 Tm (- MOD-22-AC1: Given an authorized auditor searches a period, when the search filters are submitted, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 224.5 Tm (events show actor, action, target, timestamp and outcome.) Tj
+/F1 8.5 Tf 1 0 0 1 42 213 Tm (- MOD-22-AC2: Given the authenticated user lacks the Audit Trail read permission, when the user requests) Tj
+/F1 8.5 Tf 1 0 0 1 42 201.5 Tm (the audit query endpoint directly, then the server returns HTTP 403, returns no audit-event payload and) Tj
+/F1 8.5 Tf 1 0 0 1 42 190 Tm (writes a security-denial event containing actor UID, requested action, target and timestamp.) Tj
+/F1 10 Tf 1 0 0 1 42 166.5 Tm (MOD-23 - Grant Intelligence & Funding Opportunities) Tj
+/F1 9 Tf 1 0 0 1 42 153.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-MOD-23) Tj
+/F1 9 Tf 1 0 0 1 42 141.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 129.5 Tm (- MOD-23-AC1: Given crawler discovery is ingested, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 118 Tm (scenario, then source URL, timestamp, provenance and Pending Verification state are retained.) Tj
+/F1 8.5 Tf 1 0 0 1 42 106.5 Tm (- MOD-23-AC2: Given an analyst requests eligibility/alignment, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 95 Tm (described in this scenario, then criterion evidence, IRPA fit, confidence and unknowns appear; no donor) Tj
+/F1 8.5 Tf 1 0 0 1 42 83.5 Tm (contact or application submission occurs.) Tj
+/F1 10 Tf 1 0 0 1 42 60 Tm (MOD-24 - Communication & Media) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (4 / 23) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 6142 >>
+stream
+BT
+/F1 9 Tf 1 0 0 1 42 794 Tm (Priority: MUST. Page: communication-and-media. Test: TEST-PROPOSED-MOD-24 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 782 Tm (- MOD-24-AC1: Given an authorized communications user opens channels/content, when the user performs the) Tj
+/F1 8.5 Tf 1 0 0 1 42 770.5 Tm (operation described in this scenario, then connection status, state and ownership appear without) Tj
+/F1 8.5 Tf 1 0 0 1 42 759 Tm (credentials.) Tj
+/F1 8.5 Tf 1 0 0 1 42 747.5 Tm (- MOD-24-AC2: Given approved content is published, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 736 Tm (scenario, then version, destination, actor, time and provider result are audited; drafts remain) Tj
+/F1 8.5 Tf 1 0 0 1 42 724.5 Tm (unpublished.) Tj
+/F1 10 Tf 1 0 0 1 42 701 Tm (MOD-25 - Downloads) Tj
+/F1 9 Tf 1 0 0 1 42 688 Tm (Priority: MUST. Page: downloads. Test: TEST-PROPOSED-MOD-25 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 676 Tm (- MOD-25-AC1: Given Downloads loads, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 664.5 Tm (then each resource shows title, type, version and classification.) Tj
+/F1 8.5 Tf 1 0 0 1 42 653 Tm (- MOD-25-AC2: Given protected download is unauthorized, when the protected request is submitted directly) Tj
+/F1 8.5 Tf 1 0 0 1 42 641.5 Tm (to the server, then no bytes are returned and denial is recorded.) Tj
+/F1 10 Tf 1 0 0 1 42 618 Tm (MOD-26 - Settings) Tj
+/F1 9 Tf 1 0 0 1 42 605 Tm (Priority: MUST. Page: settings. Test: TEST-PROPOSED-MOD-26 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 593 Tm (- MOD-26-AC1: Given an administrator opens settings, when the user performs the operation described in) Tj
+/F1 8.5 Tf 1 0 0 1 42 581.5 Tm (this scenario, then value, scope and role editability are displayed.) Tj
+/F1 8.5 Tf 1 0 0 1 42 570 Tm (- MOD-26-AC2: Given a setting change passes validation/authorization, when the user performs the) Tj
+/F1 8.5 Tf 1 0 0 1 42 558.5 Tm (operation described in this scenario, then it persists with before/after audit; unauthorized changes) Tj
+/F1 8.5 Tf 1 0 0 1 42 547 Tm (fail.) Tj
+/F1 10 Tf 1 0 0 1 42 523.5 Tm (MOD-27 - Add Administrator) Tj
+/F1 9 Tf 1 0 0 1 42 510.5 Tm (Priority: MUST. Page: add-administrator. Test: TEST-PROPOSED-MOD-27 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 498.5 Tm (- MOD-27-AC1: Given an authorized administrator provisions an account, when the create or registration) Tj
+/F1 8.5 Tf 1 0 0 1 42 487 Tm (request is submitted, then a least-privilege invitation is created after identity/approval checks.) Tj
+/F1 8.5 Tf 1 0 0 1 42 475.5 Tm (- MOD-27-AC2: Given a non-admin attempts provisioning, when the user performs the operation described in) Tj
+/F1 8.5 Tf 1 0 0 1 42 464 Tm (this scenario, then server denies and creates no administrator record.) Tj
+/F1 10 Tf 1 0 0 1 42 440.5 Tm (MOD-28 - Department and Archive Registry) Tj
+/F1 9 Tf 1 0 0 1 42 427.5 Tm (Priority: MUST. Page: department-and-archive-registry. Test: TEST-PROPOSED-MOD-28 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 415.5 Tm (- MOD-28-AC1: Given an authorized registry user creates a valid identifier/owner/classification, when the) Tj
+/F1 8.5 Tf 1 0 0 1 42 404 Tm (create or registration request is submitted, then a unique registry entry is saved.) Tj
+/F1 8.5 Tf 1 0 0 1 42 392.5 Tm (- MOD-28-AC2: Given archive search filters are applied, when the search filters are submitted, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 381 Tm (lifecycle, retention class and authorized retrieval route are returned.) Tj
+/F1 10 Tf 1 0 0 1 42 357.5 Tm (MOD-29 - Department Portal Builder) Tj
+/F1 9 Tf 1 0 0 1 42 344.5 Tm (Priority: MUST. Page: department-portal-builder. Test: TEST-PROPOSED-MOD-29 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 332.5 Tm (- MOD-29-AC1: Given a builder submits unique key, parent, label and access policy, when the corresponding) Tj
+/F1 8.5 Tf 1 0 0 1 42 321 Tm (save or submit action is sent, then a portal definition is saved.) Tj
+/F1 8.5 Tf 1 0 0 1 42 309.5 Tm (- MOD-29-AC2: Given a definition is activated, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 298 Tm (scenario, then only matching users see it and previous configuration is recoverable.) Tj
+/F1 10 Tf 1 0 0 1 42 274.5 Tm (MOD-30 - External Auditor Portal) Tj
+/F1 9 Tf 1 0 0 1 42 261.5 Tm (Priority: MUST. Page: external-auditor-portal. Test: TEST-PROPOSED-MOD-30 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 249.5 Tm (- MOD-30-AC1: Given an active auditor invitation is verified, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 238 Tm (described in this scenario, then only assigned audit material and time-bounded access appear.) Tj
+/F1 8.5 Tf 1 0 0 1 42 226.5 Tm (- MOD-30-AC2: Given access expires/revokes, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 215 Tm (scenario, then every protected request is denied immediately.) Tj
+/F1 10 Tf 1 0 0 1 42 191.5 Tm (MOD-31 - Auditors & Special Invitees) Tj
+/F1 9 Tf 1 0 0 1 42 178.5 Tm (Priority: MUST. Page: auditors-and-special-invitees. Test: TEST-PROPOSED-MOD-31 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 166.5 Tm (- MOD-31-AC1: Given an authorized administrator supplies identity, purpose, scope and expiry, when the) Tj
+/F1 8.5 Tf 1 0 0 1 42 155 Tm (user performs the operation described in this scenario, then a time-bounded invite is created.) Tj
+/F1 8.5 Tf 1 0 0 1 42 143.5 Tm (- MOD-31-AC2: Given invite is invalid, expired or out of scope, when the user attempts to activate or use) Tj
+/F1 8.5 Tf 1 0 0 1 42 132 Tm (the invitation, then access is denied and logged.) Tj
+/F1 10 Tf 1 0 0 1 42 108.5 Tm (SUB-01 - Meeting Room) Tj
+/F1 9 Tf 1 0 0 1 42 95.5 Tm (Priority: MUST. Page: meetings-meeting-room. Test: TEST-PROPOSED-SUB-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 83.5 Tm (- SUB-01-AC1: Given a user has access to Meetings and the required child permission, when Meeting Room is) Tj
+/F1 8.5 Tf 1 0 0 1 42 72 Tm (selected, when the user performs the operation described in this scenario, then only in-scope records are) Tj
+/F1 8.5 Tf 1 0 0 1 42 60.5 Tm (displayed in the child view.) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (5 / 23) Tj
+ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 6244 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (- SUB-01-AC2: Given child permission is absent or the parent portal is unavailable, when Meeting Room is) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 747.5 Tm (SUB-02 - Participants) Tj
+/F1 9 Tf 1 0 0 1 42 734.5 Tm (Priority: MUST. Page: meetings-participants. Test: TEST-PROPOSED-SUB-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (- SUB-02-AC1: Given a user has access to Meetings and the required child permission, when Participants is) Tj
+/F1 8.5 Tf 1 0 0 1 42 711 Tm (selected, when the user performs the operation described in this scenario, then only in-scope records are) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (- SUB-02-AC2: Given child permission is absent or the parent portal is unavailable, when Participants is) Tj
+/F1 8.5 Tf 1 0 0 1 42 676.5 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 665 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 641.5 Tm (SUB-03 - Resolutions) Tj
+/F1 9 Tf 1 0 0 1 42 628.5 Tm (Priority: MUST. Page: meetings-resolutions. Test: TEST-PROPOSED-SUB-03 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (- SUB-03-AC1: Given a user has access to Meetings and the required child permission, when Resolutions is) Tj
+/F1 8.5 Tf 1 0 0 1 42 605 Tm (selected, when the user performs the operation described in this scenario, then only in-scope records are) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 582 Tm (- SUB-03-AC2: Given child permission is absent or the parent portal is unavailable, when Resolutions is) Tj
+/F1 8.5 Tf 1 0 0 1 42 570.5 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 559 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 535.5 Tm (SUB-04 - Voting) Tj
+/F1 9 Tf 1 0 0 1 42 522.5 Tm (Priority: MUST. Page: meetings-voting. Test: TEST-PROPOSED-SUB-04 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 510.5 Tm (- SUB-04-AC1: Given a user has access to Meetings and the required child permission, when Voting is) Tj
+/F1 8.5 Tf 1 0 0 1 42 499 Tm (selected, when the user performs the operation described in this scenario, then only in-scope records are) Tj
+/F1 8.5 Tf 1 0 0 1 42 487.5 Tm (displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 476 Tm (- SUB-04-AC2: Given child permission is absent or the parent portal is unavailable, when Voting is) Tj
+/F1 8.5 Tf 1 0 0 1 42 464.5 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 453 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 429.5 Tm (SUB-05 - Actions) Tj
+/F1 9 Tf 1 0 0 1 42 416.5 Tm (Priority: MUST. Page: meetings-actions. Test: TEST-PROPOSED-SUB-05 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 404.5 Tm (- SUB-05-AC1: Given a user has access to Meetings and the required child permission, when Actions is) Tj
+/F1 8.5 Tf 1 0 0 1 42 393 Tm (selected, when the user performs the operation described in this scenario, then only in-scope records are) Tj
+/F1 8.5 Tf 1 0 0 1 42 381.5 Tm (displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 370 Tm (- SUB-05-AC2: Given child permission is absent or the parent portal is unavailable, when Actions is) Tj
+/F1 8.5 Tf 1 0 0 1 42 358.5 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 347 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 323.5 Tm (SUB-06 - Decisions) Tj
+/F1 9 Tf 1 0 0 1 42 310.5 Tm (Priority: MUST. Page: meetings-decisions. Test: TEST-PROPOSED-SUB-06 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 298.5 Tm (- SUB-06-AC1: Given a user has access to Meetings and the required child permission, when Decisions is) Tj
+/F1 8.5 Tf 1 0 0 1 42 287 Tm (selected, when the reviewer submits the decision, then only in-scope records are displayed in the child) Tj
+/F1 8.5 Tf 1 0 0 1 42 275.5 Tm (view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 264 Tm (- SUB-06-AC2: Given child permission is absent or the parent portal is unavailable, when Decisions is) Tj
+/F1 8.5 Tf 1 0 0 1 42 252.5 Tm (requested directly, when the reviewer submits the decision, then access is denied and protected content) Tj
+/F1 8.5 Tf 1 0 0 1 42 241 Tm (is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 217.5 Tm (SUB-07 - My Documents) Tj
+/F1 9 Tf 1 0 0 1 42 204.5 Tm (Priority: MUST. Page: documents-my-documents. Test: TEST-PROPOSED-SUB-07 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 192.5 Tm (- SUB-07-AC1: Given a user has access to Documents and the required child permission, when My Documents) Tj
+/F1 8.5 Tf 1 0 0 1 42 181 Tm (is selected, when the user performs the operation described in this scenario, then only in-scope records) Tj
+/F1 8.5 Tf 1 0 0 1 42 169.5 Tm (are displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 158 Tm (- SUB-07-AC2: Given child permission is absent or the parent portal is unavailable, when My Documents is) Tj
+/F1 8.5 Tf 1 0 0 1 42 146.5 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 135 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 111.5 Tm (SUB-08 - Department Documents) Tj
+/F1 9 Tf 1 0 0 1 42 98.5 Tm (Priority: MUST. Page: documents-department-documents. Test: TEST-PROPOSED-SUB-08 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 86.5 Tm (- SUB-08-AC1: Given a user has access to Documents and the required child permission, when Department) Tj
+/F1 8.5 Tf 1 0 0 1 42 75 Tm (Documents is selected, when the user performs the operation described in this scenario, then only) Tj
+/F1 8.5 Tf 1 0 0 1 42 63.5 Tm (in-scope records are displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 52 Tm (- SUB-08-AC2: Given child permission is absent or the parent portal is unavailable, when Department) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (6 / 23) Tj
+ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 6265 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (Documents is requested directly, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (access is denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 759 Tm (SUB-09 - Shared With Me) Tj
+/F1 9 Tf 1 0 0 1 42 746 Tm (Priority: MUST. Page: documents-shared-with-me. Test: TEST-PROPOSED-SUB-09 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 734 Tm (- SUB-09-AC1: Given a user has access to Documents and the required child permission, when Shared With Me) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (is selected, when the user performs the operation described in this scenario, then only in-scope records) Tj
+/F1 8.5 Tf 1 0 0 1 42 711 Tm (are displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (- SUB-09-AC2: Given child permission is absent or the parent portal is unavailable, when Shared With Me) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (is requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 676.5 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 653 Tm (SUB-10 - Signing Workspace) Tj
+/F1 9 Tf 1 0 0 1 42 640 Tm (Priority: MUST. Page: documents-signing-workspace. Test: TEST-PROPOSED-SUB-10 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 628 Tm (- SUB-10-AC1: Given a user has access to Documents and the required child permission, when Signing) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (Workspace is selected, when the signature action is submitted, then only in-scope records are displayed) Tj
+/F1 8.5 Tf 1 0 0 1 42 605 Tm (in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (- SUB-10-AC2: Given child permission is absent or the parent portal is unavailable, when Signing) Tj
+/F1 8.5 Tf 1 0 0 1 42 582 Tm (Workspace is requested directly, when the signature action is submitted, then access is denied and) Tj
+/F1 8.5 Tf 1 0 0 1 42 570.5 Tm (protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 547 Tm (SUB-11 - Post-Signature Work) Tj
+/F1 9 Tf 1 0 0 1 42 534 Tm (Priority: MUST. Page: documents-post-signature-work. Test: TEST-PROPOSED-SUB-11 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 522 Tm (- SUB-11-AC1: Given a user has access to Documents and the required child permission, when Post-Signature) Tj
+/F1 8.5 Tf 1 0 0 1 42 510.5 Tm (Work is selected, when the signature action is submitted, then only in-scope records are displayed in the) Tj
+/F1 8.5 Tf 1 0 0 1 42 499 Tm (child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 487.5 Tm (- SUB-11-AC2: Given child permission is absent or the parent portal is unavailable, when Post-Signature) Tj
+/F1 8.5 Tf 1 0 0 1 42 476 Tm (Work is requested directly, when the signature action is submitted, then access is denied and protected) Tj
+/F1 8.5 Tf 1 0 0 1 42 464.5 Tm (content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 441 Tm (SUB-12 - Final Archive) Tj
+/F1 9 Tf 1 0 0 1 42 428 Tm (Priority: MUST. Page: documents-final-archive. Test: TEST-PROPOSED-SUB-12 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 416 Tm (- SUB-12-AC1: Given a user has access to Documents and the required child permission, when Final Archive) Tj
+/F1 8.5 Tf 1 0 0 1 42 404.5 Tm (is selected, when the user performs the operation described in this scenario, then only in-scope records) Tj
+/F1 8.5 Tf 1 0 0 1 42 393 Tm (are displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 381.5 Tm (- SUB-12-AC2: Given child permission is absent or the parent portal is unavailable, when Final Archive is) Tj
+/F1 8.5 Tf 1 0 0 1 42 370 Tm (requested directly, when the user performs the operation described in this scenario, then access is) Tj
+/F1 8.5 Tf 1 0 0 1 42 358.5 Tm (denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 335 Tm (SUB-13 - Upload Document) Tj
+/F1 9 Tf 1 0 0 1 42 322 Tm (Priority: MUST. Page: documents-upload-document. Test: TEST-PROPOSED-SUB-13 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 310 Tm (- SUB-13-AC1: Given a user has access to Documents and the required child permission, when Upload) Tj
+/F1 8.5 Tf 1 0 0 1 42 298.5 Tm (Document is selected, when the upload is submitted for storage, then only in-scope records are displayed) Tj
+/F1 8.5 Tf 1 0 0 1 42 287 Tm (in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 275.5 Tm (- SUB-13-AC2: Given child permission is absent or the parent portal is unavailable, when Upload Document) Tj
+/F1 8.5 Tf 1 0 0 1 42 264 Tm (is requested directly, when the upload is submitted for storage, then access is denied and protected) Tj
+/F1 8.5 Tf 1 0 0 1 42 252.5 Tm (content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 229 Tm (SUB-14 - Retrieve Archived Documents) Tj
+/F1 9 Tf 1 0 0 1 42 216 Tm (Priority: MUST. Page: documents-retrieve-archived-documents. Test: TEST-PROPOSED-SUB-14 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 204 Tm (- SUB-14-AC1: Given a user has access to Documents and the required child permission, when Retrieve) Tj
+/F1 8.5 Tf 1 0 0 1 42 192.5 Tm (Archived Documents is selected, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 181 Tm (only in-scope records are displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 169.5 Tm (- SUB-14-AC2: Given child permission is absent or the parent portal is unavailable, when Retrieve) Tj
+/F1 8.5 Tf 1 0 0 1 42 158 Tm (Archived Documents is requested directly, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 146.5 Tm (scenario, then access is denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 123 Tm (SUB-15 - Induction Applications) Tj
+/F1 9 Tf 1 0 0 1 42 110 Tm (Priority: MUST. Page: induction-and-orientation-induction-applications. Test: TEST-PROPOSED-SUB-15) Tj
+/F1 9 Tf 1 0 0 1 42 98 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 86 Tm (- SUB-15-AC1: Given a user has access to Induction and Orientation and the required child permission,) Tj
+/F1 8.5 Tf 1 0 0 1 42 74.5 Tm (when Induction Applications is selected, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 63 Tm (then only in-scope records are displayed in the child view.) Tj
+/F1 8.5 Tf 1 0 0 1 42 51.5 Tm (- SUB-15-AC2: Given child permission is absent or the parent portal is unavailable, when Induction) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (7 / 23) Tj
+ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 6193 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (Applications is requested directly, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (access is denied and protected content is not returned.) Tj
+/F1 10 Tf 1 0 0 1 42 759 Tm (STD-01 - Dataset Registry) Tj
+/F1 9 Tf 1 0 0 1 42 746 Tm (Priority: MUST. Page: dataset-registry. Test: TEST-PROPOSED-STD-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 734 Tm (- STD-01-AC1: Given a steward supplies title, owner, source, schema/version, classification,) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (consent/legal basis and access policy, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 711 Tm (then a versioned metadata record is saved without copying restricted source data.) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (- STD-01-AC2: Given a user searches datasets, when the search filters are submitted, then only permitted) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (metadata appears with version, steward and lifecycle status.) Tj
+/F1 10 Tf 1 0 0 1 42 664.5 Tm (STD-02 - Research Data Collection) Tj
+/F1 9 Tf 1 0 0 1 42 651.5 Tm (Priority: MUST. Page: research-data-collection. Test: TEST-PROPOSED-STD-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 639.5 Tm (- STD-02-AC1: Given a collection form has missing required fields or invalid types/ranges, when the user) Tj
+/F1 8.5 Tf 1 0 0 1 42 628 Tm (attempts to activate or use the invitation, then submission is blocked with field-level errors.) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (- STD-02-AC2: Given valid data synchronizes, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 605 Tm (scenario, then collector, time, location precision policy, consent, instrument version and sync state are) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (stored idempotently.) Tj
+/F1 10 Tf 1 0 0 1 42 570 Tm (STD-03 - Release Readiness) Tj
+/F1 9 Tf 1 0 0 1 42 557 Tm (Priority: MUST. Page: release-readiness. Test: TEST-PROPOSED-STD-03 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 545 Tm (- STD-03-AC1: Given a release is assessed, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 533.5 Tm (scenario, then build, tests, security, migration, rollback, support and approval gates show PASS/FAIL/NOT) Tj
+/F1 8.5 Tf 1 0 0 1 42 522 Tm (RUN with evidence.) Tj
+/F1 8.5 Tf 1 0 0 1 42 510.5 Tm (- STD-03-AC2: Given any mandatory gate is FAIL or NOT RUN, when the user performs the operation described) Tj
+/F1 8.5 Tf 1 0 0 1 42 499 Tm (in this scenario, then release approval is blocked and unresolved gate IDs are shown.) Tj
+/F1 10 Tf 1 0 0 1 42 475.5 Tm (AI-01 - Crawler isolation) Tj
+/F1 9 Tf 1 0 0 1 42 462.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-AI-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 450.5 Tm (- AI-01-AC1: Given a crawl runs, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 439 Tm (source fetch and writes remain inside the grant-crawler Worker and declared grant datasets, never Drive) Tj
+/F1 8.5 Tf 1 0 0 1 42 427.5 Tm (Gateway or unrelated collections.) Tj
+/F1 8.5 Tf 1 0 0 1 42 416 Tm (- AI-01-AC2: Given a source fails/times out, when the dashboard requests data from the unavailable) Tj
+/F1 8.5 Tf 1 0 0 1 42 404.5 Tm (source, then its failure is recorded, other sources continue within concurrency limits and failed data is) Tj
+/F1 8.5 Tf 1 0 0 1 42 393 Tm (not marked verified.) Tj
+/F1 10 Tf 1 0 0 1 42 369.5 Tm (AI-02 - Eligibility) Tj
+/F1 9 Tf 1 0 0 1 42 356.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-AI-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 344.5 Tm (- AI-02-AC1: Given an official call is available, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 333 Tm (scenario, then applicant/geography/sector/registration/co-funding criteria show PASS/FAIL/UNKNOWN with) Tj
+/F1 8.5 Tf 1 0 0 1 42 321.5 Tm (evidence and timestamp.) Tj
+/F1 8.5 Tf 1 0 0 1 42 310 Tm (- AI-02-AC2: Given a mandatory criterion is UNKNOWN, when the user performs the operation described in) Tj
+/F1 8.5 Tf 1 0 0 1 42 298.5 Tm (this scenario, then eligibility is UNVERIFIED and is not represented as eligible.) Tj
+/F1 10 Tf 1 0 0 1 42 275 Tm (AI-03 - Donor alignment) Tj
+/F1 9 Tf 1 0 0 1 42 262 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-AI-03 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 250 Tm (- AI-03-AC1: Given official donor objectives and approved IRPA profile are selected, when the user) Tj
+/F1 8.5 Tf 1 0 0 1 42 238.5 Tm (performs the operation described in this scenario, then objectives map to IRPA objectives with evidence,) Tj
+/F1 8.5 Tf 1 0 0 1 42 227 Tm (mismatch and confidence.) Tj
+/F1 8.5 Tf 1 0 0 1 42 215.5 Tm (- AI-03-AC2: Given authoritative donor evidence is absent, when the user performs the operation described) Tj
+/F1 8.5 Tf 1 0 0 1 42 204 Tm (in this scenario, then alignment is UNKNOWN and no donor priority/score is invented.) Tj
+/F1 10 Tf 1 0 0 1 42 180.5 Tm (AI-04 - Concept note advisor - analysis only) Tj
+/F1 9 Tf 1 0 0 1 42 167.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-AI-04 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 155.5 Tm (- AI-04-AC1: Given an analyst supplies verified opportunity and project facts, when the user performs the) Tj
+/F1 8.5 Tf 1 0 0 1 42 144 Tm (operation described in this scenario, then an editable draft includes evidence-linked assumptions,) Tj
+/F1 8.5 Tf 1 0 0 1 42 132.5 Tm (missing questions, risks and fit rationale.) Tj
+/F1 8.5 Tf 1 0 0 1 42 121 Tm (- AI-04-AC2: Given a draft is saved, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 109.5 Tm (then it remains owner-scoped with audit events; no donor email, portal login, application submission or) Tj
+/F1 8.5 Tf 1 0 0 1 42 98 Tm (dispatch occurs.) Tj
+/F1 10 Tf 1 0 0 1 42 74.5 Tm (OFF-01 - Offline/installable app) Tj
+/F1 9 Tf 1 0 0 1 42 61.5 Tm (Priority: MUST. Page: loading-error-empty-and-offline-states. Test: TEST-PROPOSED-OFF-01 \(PROPOSED\).) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (8 / 23) Tj
+ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 6667 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (- OFF-01-AC1: Given the app shell was cached online, when the user performs the operation described in) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (this scenario, then loss of connectivity opens the installable offline shell and labels cached data) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (stale.) Tj
+/F1 8.5 Tf 1 0 0 1 42 759.5 Tm (- OFF-01-AC2: Given an offline-eligible draft reconnects, when the user performs the operation described) Tj
+/F1 8.5 Tf 1 0 0 1 42 748 Tm (in this scenario, then idempotent sync reports success/conflict/failure without silent overwrite.) Tj
+/F1 10 Tf 1 0 0 1 42 724.5 Tm (OFF-02 - Offline security) Tj
+/F1 9 Tf 1 0 0 1 42 711.5 Tm (Priority: MUST. Page: loading-error-empty-and-offline-states. Test: TEST-PROPOSED-OFF-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (- OFF-02-AC1: Given a protected action requires server authorization/signature while offline, when the) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (signature action is submitted, then the action is blocked with a connectivity explanation.) Tj
+/F1 8.5 Tf 1 0 0 1 42 676.5 Tm (- OFF-02-AC2: Given identity is revoked/signed out or cache expiry passes, when the user attempts to) Tj
+/F1 8.5 Tf 1 0 0 1 42 665 Tm (activate or use the invitation, then protected cached content is inaccessible or cleared.) Tj
+/F1 10 Tf 1 0 0 1 42 641.5 Tm (MOB-01 - Mobile layout stack) Tj
+/F1 9 Tf 1 0 0 1 42 628.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-MOB-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (- MOB-01-AC1: Given viewport is 390x844, when the user performs the operation described in this scenario,) Tj
+/F1 8.5 Tf 1 0 0 1 42 605 Tm (then fixed/sticky bars occupy non-overlapping slots, content starts below the stack and primary actions) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (remain visible.) Tj
+/F1 8.5 Tf 1 0 0 1 42 582 Tm (- MOB-01-AC2: Given orientation/browser viewport changes or overlays open, when the record update is) Tj
+/F1 8.5 Tf 1 0 0 1 42 570.5 Tm (saved, then layout recalculates with no horizontal overflow and reachable controls.) Tj
+/F1 10 Tf 1 0 0 1 42 547 Tm (MOB-02 - Desktop layout stack) Tj
+/F1 9 Tf 1 0 0 1 42 534 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-MOB-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 522 Tm (- MOB-02-AC1: Given viewport is 1440x900, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 510.5 Tm (scenario, then fixed/sticky elements do not overlap header, navigation, cards or action controls.) Tj
+/F1 8.5 Tf 1 0 0 1 42 499 Tm (- MOB-02-AC2: Given long tables/cards are shown and viewport resizes, when the user performs the) Tj
+/F1 8.5 Tf 1 0 0 1 42 487.5 Tm (operation described in this scenario, then content remains reachable and focus indicators visible.) Tj
+/F1 10 Tf 1 0 0 1 42 464 Tm (GOV-01 - Backup/retention/DR) Tj
+/F1 9 Tf 1 0 0 1 42 451 Tm (Priority: MUST. Page: release-readiness. Test: TEST-PROPOSED-GOV-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 439 Tm (- GOV-01-AC1: Given a backup runs, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 427.5 Tm (encrypted integrity-checked metadata records timestamp, scope, expiry and restore-test status. Proposed) Tj
+/F1 8.5 Tf 1 0 0 1 42 416 Tm (default: daily backup, 30-day rolling retention, monthly restore test, RPO 24h, RTO 48h.) Tj
+/F1 8.5 Tf 1 0 0 1 42 404.5 Tm (- GOV-01-AC2: Given restore/deletion is requested, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 393 Tm (scenario, then the Board-approved retention/legal-hold policy and documented authorization govern the) Tj
+/F1 8.5 Tf 1 0 0 1 42 381.5 Tm (action and audit.) Tj
+/F1 10 Tf 1 0 0 1 42 358 Tm (TRC-01 - AC traceability) Tj
+/F1 9 Tf 1 0 0 1 42 345 Tm (Priority: MUST. Page: release-readiness. Test: TEST-PROPOSED-TRC-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 333 Tm (- TRC-01-AC1: Given a requirement is published, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 321.5 Tm (scenario, then every AC has a unique ID, page/wireframe ID and test ID or explicit PROPOSED status.) Tj
+/F1 8.5 Tf 1 0 0 1 42 310 Tm (- TRC-01-AC2: Given a module/route/page has no requirement, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 298.5 Tm (described in this scenario, then traceability audit lists it and release readiness fails until) Tj
+/F1 8.5 Tf 1 0 0 1 42 287 Tm (disposition.) Tj
+/F1 10 Tf 1 0 0 1 42 263.5 Tm (API-01 - Drive Gateway Worker: GET /health) Tj
+/F1 9 Tf 1 0 0 1 42 250.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-01 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 238.5 Tm (- API-01-AC1: Given a caller invokes GET /health on Drive Gateway Worker with valid method, input and) Tj
+/F1 8.5 Tf 1 0 0 1 42 227 Tm (required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 215.5 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 204 Tm (- API-01-AC2: Given a request to GET /health is unauthorized, malformed, unsupported or outside scope,) Tj
+/F1 8.5 Tf 1 0 0 1 42 192.5 Tm (when the protected request is submitted directly to the server, then the handler returns a controlled 4xx) Tj
+/F1 8.5 Tf 1 0 0 1 42 181 Tm (response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 157.5 Tm (API-02 - Drive Gateway Worker: POST /oauth/start) Tj
+/F1 9 Tf 1 0 0 1 42 144.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-02 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 132.5 Tm (- API-02-AC1: Given a caller invokes POST /oauth/start on Drive Gateway Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 121 Tm (and required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 109.5 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 98 Tm (- API-02-AC2: Given a request to POST /oauth/start is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 86.5 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 75 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 51.5 Tm (API-03 - Drive Gateway Worker: GET /oauth/callback) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (9 / 23) Tj
+ET
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 7124 >>
+stream
+BT
+/F1 9 Tf 1 0 0 1 42 794 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-03 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 782 Tm (- API-03-AC1: Given a caller invokes GET /oauth/callback on Drive Gateway Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 770.5 Tm (and required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 759 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 747.5 Tm (- API-03-AC2: Given a request to GET /oauth/callback is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 736 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 724.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 701 Tm (API-04 - Drive Gateway Worker: GET/POST /api/system/release-readiness) Tj
+/F1 9 Tf 1 0 0 1 42 688 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-04 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 676 Tm (- API-04-AC1: Given a caller invokes GET/POST /api/system/release-readiness on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 664.5 Tm (valid method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 653 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 641.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 630 Tm (- API-04-AC2: Given a request to GET/POST /api/system/release-readiness is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 618.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 607 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 595.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 572 Tm (API-05 - Drive Gateway Worker: /api/communications/meta/*) Tj
+/F1 9 Tf 1 0 0 1 42 559 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-05 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 547 Tm (- API-05-AC1: Given a caller invokes /api/communications/meta/* on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 535.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 524 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 512.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 501 Tm (- API-05-AC2: Given a request to /api/communications/meta/* is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 489.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 478 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 454.5 Tm (API-06 - Drive Gateway Worker: /api/communications/*) Tj
+/F1 9 Tf 1 0 0 1 42 441.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-06 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 429.5 Tm (- API-06-AC1: Given a caller invokes /api/communications/* on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 418 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 406.5 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 395 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 383.5 Tm (- API-06-AC2: Given a request to /api/communications/* is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 372 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 360.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 337 Tm (API-07 - Drive Gateway Worker: /api/document-lifecycle/*) Tj
+/F1 9 Tf 1 0 0 1 42 324 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-07 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 312 Tm (- API-07-AC1: Given a caller invokes /api/document-lifecycle/* on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 300.5 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 289 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 277.5 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 266 Tm (- API-07-AC2: Given a request to /api/document-lifecycle/* is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 254.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 243 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 219.5 Tm (API-08 - Drive Gateway Worker: POST /api/communication-media-archive/provision) Tj
+/F1 9 Tf 1 0 0 1 42 206.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-08 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 194.5 Tm (- API-08-AC1: Given a caller invokes POST /api/communication-media-archive/provision on Drive Gateway) Tj
+/F1 8.5 Tf 1 0 0 1 42 183 Tm (Worker with valid method, input and required authentication, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 171.5 Tm (described in this scenario, then the handler returns its documented success response and performs only) Tj
+/F1 8.5 Tf 1 0 0 1 42 160 Tm (the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 148.5 Tm (- API-08-AC2: Given a request to POST /api/communication-media-archive/provision is unauthorized,) Tj
+/F1 8.5 Tf 1 0 0 1 42 137 Tm (malformed, unsupported or outside scope, when the protected request is submitted directly to the server,) Tj
+/F1 8.5 Tf 1 0 0 1 42 125.5 Tm (then the handler returns a controlled 4xx response, exposes no protected data and performs no) Tj
+/F1 8.5 Tf 1 0 0 1 42 114 Tm (unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 90.5 Tm (API-09 - Drive Gateway Worker: POST /api/research-archive/provision) Tj
+/F1 9 Tf 1 0 0 1 42 77.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-09 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 65.5 Tm (- API-09-AC1: Given a caller invokes POST /api/research-archive/provision on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 54 Tm (valid method, input and required authentication, when the search filters are submitted, then the handler) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (10 / 23) Tj
+ET
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 22 0 R >>
+endobj
+24 0 obj
+<< /Length 7087 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (- API-09-AC2: Given a request to POST /api/research-archive/provision is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 759.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 748 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 724.5 Tm (API-10 - Drive Gateway Worker: POST /api/upload) Tj
+/F1 9 Tf 1 0 0 1 42 711.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-10 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (- API-10-AC1: Given a caller invokes POST /api/upload on Drive Gateway Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (and required authentication, when the upload is submitted for storage, then the handler returns its) Tj
+/F1 8.5 Tf 1 0 0 1 42 676.5 Tm (documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 665 Tm (- API-10-AC2: Given a request to POST /api/upload is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 653.5 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 642 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 618.5 Tm (API-11 - Drive Gateway Worker: POST /api/upload-controlled-document/policy-check) Tj
+/F1 9 Tf 1 0 0 1 42 605.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-11 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (- API-11-AC1: Given a caller invokes POST /api/upload-controlled-document/policy-check on Drive Gateway) Tj
+/F1 8.5 Tf 1 0 0 1 42 582 Tm (Worker with valid method, input and required authentication, when the upload is submitted for storage,) Tj
+/F1 8.5 Tf 1 0 0 1 42 570.5 Tm (then the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 559 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 547.5 Tm (- API-11-AC2: Given a request to POST /api/upload-controlled-document/policy-check is unauthorized,) Tj
+/F1 8.5 Tf 1 0 0 1 42 536 Tm (malformed, unsupported or outside scope, when the protected request is submitted directly to the server,) Tj
+/F1 8.5 Tf 1 0 0 1 42 524.5 Tm (then the handler returns a controlled 4xx response, exposes no protected data and performs no) Tj
+/F1 8.5 Tf 1 0 0 1 42 513 Tm (unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 489.5 Tm (API-12 - Drive Gateway Worker: POST /api/upload-controlled-document/register) Tj
+/F1 9 Tf 1 0 0 1 42 476.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-12 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 464.5 Tm (- API-12-AC1: Given a caller invokes POST /api/upload-controlled-document/register on Drive Gateway) Tj
+/F1 8.5 Tf 1 0 0 1 42 453 Tm (Worker with valid method, input and required authentication, when the upload is submitted for storage,) Tj
+/F1 8.5 Tf 1 0 0 1 42 441.5 Tm (then the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 430 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 418.5 Tm (- API-12-AC2: Given a request to POST /api/upload-controlled-document/register is unauthorized,) Tj
+/F1 8.5 Tf 1 0 0 1 42 407 Tm (malformed, unsupported or outside scope, when the protected request is submitted directly to the server,) Tj
+/F1 8.5 Tf 1 0 0 1 42 395.5 Tm (then the handler returns a controlled 4xx response, exposes no protected data and performs no) Tj
+/F1 8.5 Tf 1 0 0 1 42 384 Tm (unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 360.5 Tm (API-13 - Drive Gateway Worker: POST /api/upload-controlled-document) Tj
+/F1 9 Tf 1 0 0 1 42 347.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-13 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 335.5 Tm (- API-13-AC1: Given a caller invokes POST /api/upload-controlled-document on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 324 Tm (valid method, input and required authentication, when the upload is submitted for storage, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 312.5 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 301 Tm (- API-13-AC2: Given a request to POST /api/upload-controlled-document is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 289.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 278 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 266.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 243 Tm (API-14 - Drive Gateway Worker: POST /api/signature-pathway/reconcile) Tj
+/F1 9 Tf 1 0 0 1 42 230 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-14 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 218 Tm (- API-14-AC1: Given a caller invokes POST /api/signature-pathway/reconcile on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 206.5 Tm (valid method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 195 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 183.5 Tm (- API-14-AC2: Given a request to POST /api/signature-pathway/reconcile is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 172 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 160.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 149 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 125.5 Tm (API-15 - Drive Gateway Worker: GET /api/signature-workflow/list) Tj
+/F1 9 Tf 1 0 0 1 42 112.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-15 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (- API-15-AC1: Given a caller invokes GET /api/signature-workflow/list on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 89 Tm (method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 77.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 66 Tm (- API-15-AC2: Given a request to GET /api/signature-workflow/list is unauthorized, malformed, unsupported) Tj
+/F1 8.5 Tf 1 0 0 1 42 54.5 Tm (or outside scope, when the protected request is submitted directly to the server, then the handler) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (11 / 23) Tj
+ET
+endstream
+endobj
+25 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 24 0 R >>
+endobj
+26 0 obj
+<< /Length 6962 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (returns a controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 770.5 Tm (API-16 - Drive Gateway Worker: GET /api/signature-workflow/view) Tj
+/F1 9 Tf 1 0 0 1 42 757.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-16 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 745.5 Tm (- API-16-AC1: Given a caller invokes GET /api/signature-workflow/view on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 734 Tm (method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 711 Tm (- API-16-AC2: Given a request to GET /api/signature-workflow/view is unauthorized, malformed, unsupported) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (or outside scope, when the protected request is submitted directly to the server, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (returns a controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 664.5 Tm (API-17 - Drive Gateway Worker: POST /api/signature-workflow/add-signer-dry-run) Tj
+/F1 9 Tf 1 0 0 1 42 651.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-17 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 639.5 Tm (- API-17-AC1: Given a caller invokes POST /api/signature-workflow/add-signer-dry-run on Drive Gateway) Tj
+/F1 8.5 Tf 1 0 0 1 42 628 Tm (Worker with valid method, input and required authentication, when the signature action is submitted, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 605 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (- API-17-AC2: Given a request to POST /api/signature-workflow/add-signer-dry-run is unauthorized,) Tj
+/F1 8.5 Tf 1 0 0 1 42 582 Tm (malformed, unsupported or outside scope, when the protected request is submitted directly to the server,) Tj
+/F1 8.5 Tf 1 0 0 1 42 570.5 Tm (then the handler returns a controlled 4xx response, exposes no protected data and performs no) Tj
+/F1 8.5 Tf 1 0 0 1 42 559 Tm (unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 535.5 Tm (API-18 - Drive Gateway Worker: POST /api/signature-workflow/draft) Tj
+/F1 9 Tf 1 0 0 1 42 522.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-18 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 510.5 Tm (- API-18-AC1: Given a caller invokes POST /api/signature-workflow/draft on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 499 Tm (valid method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 487.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 476 Tm (- API-18-AC2: Given a request to POST /api/signature-workflow/draft is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 464.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 453 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 441.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 418 Tm (API-19 - Drive Gateway Worker: GET /api/system/diagnostics) Tj
+/F1 9 Tf 1 0 0 1 42 405 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-19 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 393 Tm (- API-19-AC1: Given a caller invokes GET /api/system/diagnostics on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 381.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 370 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 358.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 347 Tm (- API-19-AC2: Given a request to GET /api/system/diagnostics is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 335.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 324 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 300.5 Tm (API-20 - Drive Gateway Worker: GET/POST /api/system/actual-data-access) Tj
+/F1 9 Tf 1 0 0 1 42 287.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-20 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 275.5 Tm (- API-20-AC1: Given a caller invokes GET/POST /api/system/actual-data-access on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 264 Tm (valid method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 252.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 241 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 229.5 Tm (- API-20-AC2: Given a request to GET/POST /api/system/actual-data-access is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 218 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 206.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 195 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 171.5 Tm (API-21 - Drive Gateway Worker: POST /api/members/reconcile-registered-identity-uids) Tj
+/F1 9 Tf 1 0 0 1 42 158.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-21 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 146.5 Tm (- API-21-AC1: Given a caller invokes POST /api/members/reconcile-registered-identity-uids on Drive) Tj
+/F1 8.5 Tf 1 0 0 1 42 135 Tm (Gateway Worker with valid method, input and required authentication, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 123.5 Tm (described in this scenario, then the handler returns its documented success response and performs only) Tj
+/F1 8.5 Tf 1 0 0 1 42 112 Tm (the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (- API-21-AC2: Given a request to POST /api/members/reconcile-registered-identity-uids is unauthorized,) Tj
+/F1 8.5 Tf 1 0 0 1 42 89 Tm (malformed, unsupported or outside scope, when the protected request is submitted directly to the server,) Tj
+/F1 8.5 Tf 1 0 0 1 42 77.5 Tm (then the handler returns a controlled 4xx response, exposes no protected data and performs no) Tj
+/F1 8.5 Tf 1 0 0 1 42 66 Tm (unauthorized mutation.) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (12 / 23) Tj
+ET
+endstream
+endobj
+27 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 26 0 R >>
+endobj
+28 0 obj
+<< /Length 6958 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 42 794 Tm (API-22 - Drive Gateway Worker: POST /api/signature/authority) Tj
+/F1 9 Tf 1 0 0 1 42 781 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-22 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 769 Tm (- API-22-AC1: Given a caller invokes POST /api/signature/authority on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 757.5 Tm (method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 746 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 734.5 Tm (- API-22-AC2: Given a request to POST /api/signature/authority is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 723 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 711.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 688 Tm (API-23 - Drive Gateway Worker: POST /api/signature-profile/folder) Tj
+/F1 9 Tf 1 0 0 1 42 675 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-23 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 663 Tm (- API-23-AC1: Given a caller invokes POST /api/signature-profile/folder on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 651.5 Tm (valid method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 640 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 628.5 Tm (- API-23-AC2: Given a request to POST /api/signature-profile/folder is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 617 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 605.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 594 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 570.5 Tm (API-24 - Drive Gateway Worker: POST /api/signature-profile/finalize) Tj
+/F1 9 Tf 1 0 0 1 42 557.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-24 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 545.5 Tm (- API-24-AC1: Given a caller invokes POST /api/signature-profile/finalize on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 534 Tm (valid method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 522.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 511 Tm (- API-24-AC2: Given a request to POST /api/signature-profile/finalize is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 499.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 488 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 476.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 453 Tm (API-25 - Drive Gateway Worker: POST /api/document-archive/folder) Tj
+/F1 9 Tf 1 0 0 1 42 440 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-25 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 428 Tm (- API-25-AC1: Given a caller invokes POST /api/document-archive/folder on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 416.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 405 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 393.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 382 Tm (- API-25-AC2: Given a request to POST /api/document-archive/folder is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 370.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 359 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 347.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 324 Tm (API-26 - Drive Gateway Worker: POST /api/document-archive/provision) Tj
+/F1 9 Tf 1 0 0 1 42 311 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-26 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 299 Tm (- API-26-AC1: Given a caller invokes POST /api/document-archive/provision on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 287.5 Tm (valid method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 276 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 264.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 253 Tm (- API-26-AC2: Given a request to POST /api/document-archive/provision is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 241.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 230 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 218.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 195 Tm (API-27 - Drive Gateway Worker: POST /api/meeting-archive/provision) Tj
+/F1 9 Tf 1 0 0 1 42 182 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-27 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 170 Tm (- API-27-AC1: Given a caller invokes POST /api/meeting-archive/provision on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 158.5 Tm (valid method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 147 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 135.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 124 Tm (- API-27-AC2: Given a request to POST /api/meeting-archive/provision is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 112.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 101 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 89.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 66 Tm (API-28 - Drive Gateway Worker: POST /api/meeting-archive/get) Tj
+/F1 9 Tf 1 0 0 1 42 53 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-28 \(PROPOSED\).) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (13 / 23) Tj
+ET
+endstream
+endobj
+29 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 28 0 R >>
+endobj
+30 0 obj
+<< /Length 7216 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (- API-28-AC1: Given a caller invokes POST /api/meeting-archive/get on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 759.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 748 Tm (- API-28-AC2: Given a request to POST /api/meeting-archive/get is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 736.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 725 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 701.5 Tm (API-29 - Drive Gateway Worker: POST /api/signed-document/archive) Tj
+/F1 9 Tf 1 0 0 1 42 688.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-29 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 676.5 Tm (- API-29-AC1: Given a caller invokes POST /api/signed-document/archive on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 665 Tm (method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 653.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 642 Tm (- API-29-AC2: Given a request to POST /api/signed-document/archive is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 630.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 619 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 607.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 584 Tm (API-30 - Drive Gateway Worker: POST /api/signature-workflow/folder) Tj
+/F1 9 Tf 1 0 0 1 42 571 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-30 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 559 Tm (- API-30-AC1: Given a caller invokes POST /api/signature-workflow/folder on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 547.5 Tm (valid method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 536 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 524.5 Tm (- API-30-AC2: Given a request to POST /api/signature-workflow/folder is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 513 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 501.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 490 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 466.5 Tm (API-31 - Drive Gateway Worker: POST /api/signature-file/download) Tj
+/F1 9 Tf 1 0 0 1 42 453.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-31 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 441.5 Tm (- API-31-AC1: Given a caller invokes POST /api/signature-file/download on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 430 Tm (method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 418.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 407 Tm (- API-31-AC2: Given a request to POST /api/signature-file/download is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 395.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 384 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 372.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 349 Tm (API-32 - Drive Gateway Worker: POST /api/download) Tj
+/F1 9 Tf 1 0 0 1 42 336 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-32 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 324 Tm (- API-32-AC1: Given a caller invokes POST /api/download on Drive Gateway Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 312.5 Tm (and required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 301 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 289.5 Tm (- API-32-AC2: Given a request to POST /api/download is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 278 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 266.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 243 Tm (API-33 - Drive Gateway Worker: POST /api/delete) Tj
+/F1 9 Tf 1 0 0 1 42 230 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-33 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 218 Tm (- API-33-AC1: Given a caller invokes POST /api/delete on Drive Gateway Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 206.5 Tm (and required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 195 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 183.5 Tm (- API-33-AC2: Given a request to POST /api/delete is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 172 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 160.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 137 Tm (API-34 - Drive Gateway Worker: POST /api/invitations/redeem) Tj
+/F1 9 Tf 1 0 0 1 42 124 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-34 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 112 Tm (- API-34-AC1: Given a caller invokes POST /api/invitations/redeem on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 89 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 77.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 66 Tm (- API-34-AC2: Given a request to POST /api/invitations/redeem is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 54.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (14 / 23) Tj
+ET
+endstream
+endobj
+31 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 30 0 R >>
+endobj
+32 0 obj
+<< /Length 6869 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 770.5 Tm (API-35 - Drive Gateway Worker: POST /api/invitations/session-state) Tj
+/F1 9 Tf 1 0 0 1 42 757.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-35 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 745.5 Tm (- API-35-AC1: Given a caller invokes POST /api/invitations/session-state on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 734 Tm (valid method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 722.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 711 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 699.5 Tm (- API-35-AC2: Given a request to POST /api/invitations/session-state is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 688 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 676.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 665 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 641.5 Tm (API-36 - Drive Gateway Worker: POST /api/invitations/password-set) Tj
+/F1 9 Tf 1 0 0 1 42 628.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-36 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 616.5 Tm (- API-36-AC1: Given a caller invokes POST /api/invitations/password-set on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 605 Tm (valid method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 593.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 582 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 570.5 Tm (- API-36-AC2: Given a request to POST /api/invitations/password-set is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 559 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 547.5 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 536 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 512.5 Tm (API-37 - Drive Gateway Worker: POST /api/send-invitation-email) Tj
+/F1 9 Tf 1 0 0 1 42 499.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-37 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 487.5 Tm (- API-37-AC1: Given a caller invokes POST /api/send-invitation-email on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 476 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 464.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 453 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 441.5 Tm (- API-37-AC2: Given a request to POST /api/send-invitation-email is unauthorized, malformed, unsupported) Tj
+/F1 8.5 Tf 1 0 0 1 42 430 Tm (or outside scope, when the protected request is submitted directly to the server, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 418.5 Tm (returns a controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 395 Tm (API-38 - Drive Gateway Worker: POST /api/invitations/send) Tj
+/F1 9 Tf 1 0 0 1 42 382 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-38 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 370 Tm (- API-38-AC1: Given a caller invokes POST /api/invitations/send on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 358.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 347 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 335.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 324 Tm (- API-38-AC2: Given a request to POST /api/invitations/send is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 312.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 301 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 277.5 Tm (API-39 - Drive Gateway Worker: POST /api/signature-invitations/send) Tj
+/F1 9 Tf 1 0 0 1 42 264.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-39 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 252.5 Tm (- API-39-AC1: Given a caller invokes POST /api/signature-invitations/send on Drive Gateway Worker with) Tj
+/F1 8.5 Tf 1 0 0 1 42 241 Tm (valid method, input and required authentication, when the signature action is submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 229.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 218 Tm (- API-39-AC2: Given a request to POST /api/signature-invitations/send is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 206.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 195 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 183.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 160 Tm (API-40 - Drive Gateway Worker: POST /api/induction/lookup) Tj
+/F1 9 Tf 1 0 0 1 42 147 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-40 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 135 Tm (- API-40-AC1: Given a caller invokes POST /api/induction/lookup on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 123.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 112 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 89 Tm (- API-40-AC2: Given a request to POST /api/induction/lookup is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 77.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 66 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (15 / 23) Tj
+ET
+endstream
+endobj
+33 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 32 0 R >>
+endobj
+34 0 obj
+<< /Length 7039 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 42 794 Tm (API-41 - Drive Gateway Worker: POST /api/session/profile) Tj
+/F1 9 Tf 1 0 0 1 42 781 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-41 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 769 Tm (- API-41-AC1: Given a caller invokes POST /api/session/profile on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 757.5 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 746 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 734.5 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 723 Tm (- API-41-AC2: Given a request to POST /api/session/profile is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 711.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 700 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 676.5 Tm (API-42 - Drive Gateway Worker: POST /api/esign/cleanup) Tj
+/F1 9 Tf 1 0 0 1 42 663.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-42 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 651.5 Tm (- API-42-AC1: Given a caller invokes POST /api/esign/cleanup on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 640 Tm (input and required authentication, when the signature action is submitted, then the handler returns its) Tj
+/F1 8.5 Tf 1 0 0 1 42 628.5 Tm (documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 617 Tm (- API-42-AC2: Given a request to POST /api/esign/cleanup is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 605.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 594 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 570.5 Tm (API-43 - Drive Gateway Worker: GET/POST /api/documents/*) Tj
+/F1 9 Tf 1 0 0 1 42 557.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-43 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 545.5 Tm (- API-43-AC1: Given a caller invokes GET/POST /api/documents/* on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 534 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 522.5 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 511 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 499.5 Tm (- API-43-AC2: Given a request to GET/POST /api/documents/* is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 488 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 476.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 453 Tm (API-44 - Drive Gateway Worker: GET/POST /api/envelopes/{id}[/{status|resync|retry|retry-completion|void}]) Tj
+/F1 9 Tf 1 0 0 1 42 440 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-44 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 428 Tm (- API-44-AC1: Given a caller invokes GET/POST) Tj
+/F1 8.5 Tf 1 0 0 1 42 416.5 Tm (/api/envelopes/{id}[/{status|resync|retry|retry-completion|void}] on Drive Gateway Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 405 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 393.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 382 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 370.5 Tm (- API-44-AC2: Given a request to GET/POST) Tj
+/F1 8.5 Tf 1 0 0 1 42 359 Tm (/api/envelopes/{id}[/{status|resync|retry|retry-completion|void}] is unauthorized, malformed, unsupported) Tj
+/F1 8.5 Tf 1 0 0 1 42 347.5 Tm (or outside scope, when the protected request is submitted directly to the server, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 336 Tm (returns a controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 312.5 Tm (API-45 - Drive Gateway Worker: GET/POST /api/sign/*) Tj
+/F1 9 Tf 1 0 0 1 42 299.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-45 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 287.5 Tm (- API-45-AC1: Given a caller invokes GET/POST /api/sign/* on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 276 Tm (input and required authentication, when the signature action is submitted, then the handler returns its) Tj
+/F1 8.5 Tf 1 0 0 1 42 264.5 Tm (documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 253 Tm (- API-45-AC2: Given a request to GET/POST /api/sign/* is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 241.5 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 230 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 206.5 Tm (API-46 - Drive Gateway Worker: GET/POST /api/auth/*) Tj
+/F1 9 Tf 1 0 0 1 42 193.5 Tm (Priority: MUST. Page: application-shell-and-global-navigation. Test: TEST-PROPOSED-API-46 \(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 181.5 Tm (- API-46-AC1: Given a caller invokes GET/POST /api/auth/* on Drive Gateway Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 170 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 158.5 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 147 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 135.5 Tm (- API-46-AC2: Given a request to GET/POST /api/auth/* is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 124 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 112.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 89 Tm (API-47 - Grant crawler parallel Worker: GET /health) Tj
+/F1 9 Tf 1 0 0 1 42 76 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-47) Tj
+/F1 9 Tf 1 0 0 1 42 64 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 52 Tm (- API-47-AC1: Given a caller invokes GET /health on Grant crawler parallel Worker with valid method,) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (16 / 23) Tj
+ET
+endstream
+endobj
+35 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 34 0 R >>
+endobj
+36 0 obj
+<< /Length 6645 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 759.5 Tm (- API-47-AC2: Given a request to GET /health is unauthorized, malformed, unsupported or outside scope,) Tj
+/F1 8.5 Tf 1 0 0 1 42 748 Tm (when the protected request is submitted directly to the server, then the handler returns a controlled 4xx) Tj
+/F1 8.5 Tf 1 0 0 1 42 736.5 Tm (response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 713 Tm (API-48 - Grant crawler parallel Worker: GET /opportunities) Tj
+/F1 9 Tf 1 0 0 1 42 700 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-48) Tj
+/F1 9 Tf 1 0 0 1 42 688 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 676 Tm (- API-48-AC1: Given a caller invokes GET /opportunities on Grant crawler parallel Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 664.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 653 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 641.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 630 Tm (- API-48-AC2: Given a request to GET /opportunities is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 618.5 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 607 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 583.5 Tm (API-49 - Grant crawler parallel Worker: POST /run) Tj
+/F1 9 Tf 1 0 0 1 42 570.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-49) Tj
+/F1 9 Tf 1 0 0 1 42 558.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 546.5 Tm (- API-49-AC1: Given a caller invokes POST /run on Grant crawler parallel Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 535 Tm (and required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 523.5 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 512 Tm (- API-49-AC2: Given a request to POST /run is unauthorized, malformed, unsupported or outside scope, when) Tj
+/F1 8.5 Tf 1 0 0 1 42 500.5 Tm (the protected request is submitted directly to the server, then the handler returns a controlled 4xx) Tj
+/F1 8.5 Tf 1 0 0 1 42 489 Tm (response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 465.5 Tm (API-50 - Grant crawler parallel Worker: POST /assistant/analyze) Tj
+/F1 9 Tf 1 0 0 1 42 452.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-50) Tj
+/F1 9 Tf 1 0 0 1 42 440.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 428.5 Tm (- API-50-AC1: Given a caller invokes POST /assistant/analyze on Grant crawler parallel Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 417 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 405.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 394 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 382.5 Tm (- API-50-AC2: Given a request to POST /assistant/analyze is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 371 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 359.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 336 Tm (API-51 - Grant crawler parallel Worker: GET /application/drafts) Tj
+/F1 9 Tf 1 0 0 1 42 323 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-51) Tj
+/F1 9 Tf 1 0 0 1 42 311 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 299 Tm (- API-51-AC1: Given a caller invokes GET /application/drafts on Grant crawler parallel Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 287.5 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 276 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 264.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 253 Tm (- API-51-AC2: Given a request to GET /application/drafts is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 241.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 230 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 206.5 Tm (API-52 - Grant crawler parallel Worker: POST /application/drafts) Tj
+/F1 9 Tf 1 0 0 1 42 193.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-52) Tj
+/F1 9 Tf 1 0 0 1 42 181.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 169.5 Tm (- API-52-AC1: Given a caller invokes POST /application/drafts on Grant crawler parallel Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 158 Tm (method, input and required authentication, when the user performs the operation described in this) Tj
+/F1 8.5 Tf 1 0 0 1 42 146.5 Tm (scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 135 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 123.5 Tm (- API-52-AC2: Given a request to POST /application/drafts is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 112 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 77 Tm (API-53 - Grant crawler parallel Worker: GET /application/drafts/{id}/events) Tj
+/F1 9 Tf 1 0 0 1 42 64 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-53) Tj
+/F1 9 Tf 1 0 0 1 42 52 Tm (\(PROPOSED\).) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (17 / 23) Tj
+ET
+endstream
+endobj
+37 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 36 0 R >>
+endobj
+38 0 obj
+<< /Length 6721 >>
+stream
+BT
+/F1 8.5 Tf 1 0 0 1 42 794 Tm (- API-53-AC1: Given a caller invokes GET /application/drafts/{id}/events on Grant crawler parallel Worker) Tj
+/F1 8.5 Tf 1 0 0 1 42 782.5 Tm (with valid method, input and required authentication, when the user performs the operation described in) Tj
+/F1 8.5 Tf 1 0 0 1 42 771 Tm (this scenario, then the handler returns its documented success response and performs only the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 759.5 Tm (assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 748 Tm (- API-53-AC2: Given a request to GET /application/drafts/{id}/events is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 736.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 725 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 713.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 690 Tm (API-54 - Grant crawler parallel Worker: GET /, /application, /application/drafts/*) Tj
+/F1 9 Tf 1 0 0 1 42 677 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-54) Tj
+/F1 9 Tf 1 0 0 1 42 665 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 653 Tm (- API-54-AC1: Given a caller invokes GET /, /application, /application/drafts/* on Grant crawler parallel) Tj
+/F1 8.5 Tf 1 0 0 1 42 641.5 Tm (Worker with valid method, input and required authentication, when the user performs the operation) Tj
+/F1 8.5 Tf 1 0 0 1 42 630 Tm (described in this scenario, then the handler returns its documented success response and performs only) Tj
+/F1 8.5 Tf 1 0 0 1 42 618.5 Tm (the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 607 Tm (- API-54-AC2: Given a request to GET /, /application, /application/drafts/* is unauthorized, malformed,) Tj
+/F1 8.5 Tf 1 0 0 1 42 595.5 Tm (unsupported or outside scope, when the protected request is submitted directly to the server, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 584 Tm (handler returns a controlled 4xx response, exposes no protected data and performs no unauthorized) Tj
+/F1 8.5 Tf 1 0 0 1 42 572.5 Tm (mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 549 Tm (API-55 - Grant crawler parallel Worker: POST /crawl) Tj
+/F1 9 Tf 1 0 0 1 42 536 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-55) Tj
+/F1 9 Tf 1 0 0 1 42 524 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 512 Tm (- API-55-AC1: Given a caller invokes POST /crawl on Grant crawler parallel Worker with valid method,) Tj
+/F1 8.5 Tf 1 0 0 1 42 500.5 Tm (input and required authentication, when the user performs the operation described in this scenario, then) Tj
+/F1 8.5 Tf 1 0 0 1 42 489 Tm (the handler returns its documented success response and performs only the operation assigned to this) Tj
+/F1 8.5 Tf 1 0 0 1 42 477.5 Tm (route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 466 Tm (- API-55-AC2: Given a request to POST /crawl is unauthorized, malformed, unsupported or outside scope,) Tj
+/F1 8.5 Tf 1 0 0 1 42 454.5 Tm (when the protected request is submitted directly to the server, then the handler returns a controlled 4xx) Tj
+/F1 8.5 Tf 1 0 0 1 42 443 Tm (response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 419.5 Tm (API-56 - Grant crawler parallel Worker: POST /fundraising/search) Tj
+/F1 9 Tf 1 0 0 1 42 406.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-56) Tj
+/F1 9 Tf 1 0 0 1 42 394.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 382.5 Tm (- API-56-AC1: Given a caller invokes POST /fundraising/search on Grant crawler parallel Worker with valid) Tj
+/F1 8.5 Tf 1 0 0 1 42 371 Tm (method, input and required authentication, when the search filters are submitted, then the handler) Tj
+/F1 8.5 Tf 1 0 0 1 42 359.5 Tm (returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 348 Tm (- API-56-AC2: Given a request to POST /fundraising/search is unauthorized, malformed, unsupported or) Tj
+/F1 8.5 Tf 1 0 0 1 42 336.5 Tm (outside scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 325 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 301.5 Tm (API-57 - Grant crawler Worker: GET /health) Tj
+/F1 9 Tf 1 0 0 1 42 288.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-57) Tj
+/F1 9 Tf 1 0 0 1 42 276.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 264.5 Tm (- API-57-AC1: Given a caller invokes GET /health on Grant crawler Worker with valid method, input and) Tj
+/F1 8.5 Tf 1 0 0 1 42 253 Tm (required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 241.5 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 230 Tm (- API-57-AC2: Given a request to GET /health is unauthorized, malformed, unsupported or outside scope,) Tj
+/F1 8.5 Tf 1 0 0 1 42 218.5 Tm (when the protected request is submitted directly to the server, then the handler returns a controlled 4xx) Tj
+/F1 8.5 Tf 1 0 0 1 42 207 Tm (response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 183.5 Tm (API-58 - Grant crawler Worker: GET /opportunities) Tj
+/F1 9 Tf 1 0 0 1 42 170.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-58) Tj
+/F1 9 Tf 1 0 0 1 42 158.5 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 146.5 Tm (- API-58-AC1: Given a caller invokes GET /opportunities on Grant crawler Worker with valid method, input) Tj
+/F1 8.5 Tf 1 0 0 1 42 135 Tm (and required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 123.5 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 112 Tm (- API-58-AC2: Given a request to GET /opportunities is unauthorized, malformed, unsupported or outside) Tj
+/F1 8.5 Tf 1 0 0 1 42 100.5 Tm (scope, when the protected request is submitted directly to the server, then the handler returns a) Tj
+/F1 8.5 Tf 1 0 0 1 42 89 Tm (controlled 4xx response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 10 Tf 1 0 0 1 42 65.5 Tm (API-59 - Grant crawler Worker: scheduled cron) Tj
+/F1 9 Tf 1 0 0 1 42 52.5 Tm (Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-PROPOSED-API-59) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (18 / 23) Tj
+ET
+endstream
+endobj
+39 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 38 0 R >>
+endobj
+40 0 obj
+<< /Length 6952 >>
+stream
+BT
+/F1 9 Tf 1 0 0 1 42 794 Tm (\(PROPOSED\).) Tj
+/F1 8.5 Tf 1 0 0 1 42 782 Tm (- API-59-AC1: Given a caller invokes scheduled cron on Grant crawler Worker with valid method, input and) Tj
+/F1 8.5 Tf 1 0 0 1 42 770.5 Tm (required authentication, when the user performs the operation described in this scenario, then the) Tj
+/F1 8.5 Tf 1 0 0 1 42 759 Tm (handler returns its documented success response and performs only the operation assigned to this route.) Tj
+/F1 8.5 Tf 1 0 0 1 42 747.5 Tm (- API-59-AC2: Given a request to scheduled cron is unauthorized, malformed, unsupported or outside scope,) Tj
+/F1 8.5 Tf 1 0 0 1 42 736 Tm (when the protected request is submitted directly to the server, then the handler returns a controlled 4xx) Tj
+/F1 8.5 Tf 1 0 0 1 42 724.5 Tm (response, exposes no protected data and performs no unauthorized mutation.) Tj
+/F1 12 Tf 1 0 0 1 42 701 Tm (Backup, retention and disaster recovery) Tj
+/F1 9 Tf 1 0 0 1 42 686 Tm (TO BE APPROVED BY THE BOARD. Proposed default only: daily encrypted backup; 30-day rolling retention;) Tj
+/F1 9 Tf 1 0 0 1 42 674 Tm (monthly restore test; RPO 24 hours; RTO 48 hours. Board approval is required for retention, legal hold,) Tj
+/F1 9 Tf 1 0 0 1 42 662 Tm (backup scope/frequency, encryption/key custody, restore testing, RPO/RTO and DR location. No policy or) Tj
+/F1 9 Tf 1 0 0 1 42 650 Tm (production behavior is changed by this SRS.) Tj
+/F1 12 Tf 1 0 0 1 42 626 Tm (Non-functional requirements) Tj
+/F1 8.5 Tf 1 0 0 1 42 611 Tm (- Security: least privilege, server-side authorization, secure token handling, no secrets in client) Tj
+/F1 8.5 Tf 1 0 0 1 42 599.5 Tm (output, auditable mutations and denials.) Tj
+/F1 8.5 Tf 1 0 0 1 42 588 Tm (- Integrity: idempotent offline retries; no duplicate votes, invitation redemptions or collection) Tj
+/F1 8.5 Tf 1 0 0 1 42 576.5 Tm (records.) Tj
+/F1 8.5 Tf 1 0 0 1 42 565 Tm (- Availability: partial failures are surfaced and never reported as success.) Tj
+/F1 8.5 Tf 1 0 0 1 42 553.5 Tm (- Accessibility: WCAG 2.2 AA proposed; Board approval required.) Tj
+/F1 8.5 Tf 1 0 0 1 42 542 Tm (- Performance: no approved p95/API/load target found; baseline and target remain open.) Tj
+/F1 8.5 Tf 1 0 0 1 42 530.5 Tm (- Privacy: classify records, minimize sensitive cache, apply consent/legal basis to research collection) Tj
+/F1 8.5 Tf 1 0 0 1 42 519 Tm (and preserve provenance.) Tj
+/F1 8.5 Tf 1 0 0 1 42 507.5 Tm (- Integrations: Firebase, Cloudflare Workers, Google Drive, WordPress/cPanel, SMTP, social and LiveKit) Tj
+/F1 8.5 Tf 1 0 0 1 42 496 Tm (are separate boundaries; no live health claim is made.) Tj
+/F1 12 Tf 1 0 0 1 42 472.5 Tm (Traceability: requirement -> page -> test -> acceptance criterion) Tj
+/F1 7.5 Tf 1 0 0 1 42 457.5 Tm (Requirement | Page | Test ID | Acceptance criterion | Status) Tj
+/F1 7.5 Tf 1 0 0 1 42 447 Tm (MOD-01 | it-operations | TEST-PROPOSED-MOD-01 | MOD-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 436.5 Tm (MOD-01 | it-operations | TEST-PROPOSED-MOD-01 | MOD-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 426 Tm (MOD-02 | dashboard | TEST-PROPOSED-MOD-02 | MOD-02-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 415.5 Tm (MOD-02 | dashboard | TEST-PROPOSED-MOD-02 | MOD-02-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 405 Tm (MOD-03 | induction-and-orientation | TEST-PROPOSED-MOD-03 | MOD-03-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 394.5 Tm (MOD-03 | induction-and-orientation | TEST-PROPOSED-MOD-03 | MOD-03-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 384 Tm (MOD-04 | induction-applications | TEST-PROPOSED-MOD-04 | MOD-04-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 373.5 Tm (MOD-04 | induction-applications | TEST-PROPOSED-MOD-04 | MOD-04-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 363 Tm (MOD-05 | board-members-registration | TEST-PROPOSED-MOD-05 | MOD-05-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 352.5 Tm (MOD-05 | board-members-registration | TEST-PROPOSED-MOD-05 | MOD-05-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 342 Tm (MOD-06 | members-and-personnel | TEST-PROPOSED-MOD-06 | MOD-06-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 331.5 Tm (MOD-06 | members-and-personnel | TEST-PROPOSED-MOD-06 | MOD-06-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 321 Tm (MOD-07 | invitations | TEST-PROPOSED-MOD-07 | MOD-07-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 310.5 Tm (MOD-07 | invitations | TEST-PROPOSED-MOD-07 | MOD-07-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 300 Tm (MOD-08 | meetings | TEST-PROPOSED-MOD-08 | MOD-08-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 289.5 Tm (MOD-08 | meetings | TEST-PROPOSED-MOD-08 | MOD-08-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 279 Tm (MOD-09 | resolutions | TEST-PROPOSED-MOD-09 | MOD-09-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 268.5 Tm (MOD-09 | resolutions | TEST-PROPOSED-MOD-09 | MOD-09-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 258 Tm (MOD-10 | voting | TEST-PROPOSED-MOD-10 | MOD-10-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 247.5 Tm (MOD-10 | voting | TEST-PROPOSED-MOD-10 | MOD-10-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 237 Tm (MOD-11 | actions | TEST-PROPOSED-MOD-11 | MOD-11-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 226.5 Tm (MOD-11 | actions | TEST-PROPOSED-MOD-11 | MOD-11-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 216 Tm (MOD-12 | documents | TEST-PROPOSED-MOD-12 | MOD-12-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 205.5 Tm (MOD-12 | documents | TEST-PROPOSED-MOD-12 | MOD-12-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 195 Tm (MOD-13 | signature-platform | TEST-PROPOSED-MOD-13 | MOD-13-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 184.5 Tm (MOD-13 | signature-platform | TEST-PROPOSED-MOD-13 | MOD-13-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 174 Tm (MOD-14 | decisions | TEST-PROPOSED-MOD-14 | MOD-14-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 163.5 Tm (MOD-14 | decisions | TEST-PROPOSED-MOD-14 | MOD-14-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 153 Tm (MOD-15 | risk-register | TEST-PROPOSED-MOD-15 | MOD-15-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 142.5 Tm (MOD-15 | risk-register | TEST-PROPOSED-MOD-15 | MOD-15-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 132 Tm (MOD-16 | authorization-and-approvals | TEST-PROPOSED-MOD-16 | MOD-16-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 121.5 Tm (MOD-16 | authorization-and-approvals | TEST-PROPOSED-MOD-16 | MOD-16-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 111 Tm (MOD-17 | employee-payments | TEST-PROPOSED-MOD-17 | MOD-17-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 100.5 Tm (MOD-17 | employee-payments | TEST-PROPOSED-MOD-17 | MOD-17-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 90 Tm (MOD-18 | research-statistics-and-knowledge | TEST-PROPOSED-MOD-18 | MOD-18-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 79.5 Tm (MOD-18 | research-statistics-and-knowledge | TEST-PROPOSED-MOD-18 | MOD-18-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 69 Tm (MOD-19 | finance-portfolio | TEST-PROPOSED-MOD-19 | MOD-19-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 58.5 Tm (MOD-19 | finance-portfolio | TEST-PROPOSED-MOD-19 | MOD-19-AC2 | PROPOSED) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (19 / 23) Tj
+ET
+endstream
+endobj
+41 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 40 0 R >>
+endobj
+42 0 obj
+<< /Length 7670 >>
+stream
+BT
+/F1 7.5 Tf 1 0 0 1 42 794 Tm (MOD-20 | procurement | TEST-PROPOSED-MOD-20 | MOD-20-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 783.5 Tm (MOD-20 | procurement | TEST-PROPOSED-MOD-20 | MOD-20-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 773 Tm (MOD-21 | reports | TEST-PROPOSED-MOD-21 | MOD-21-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 762.5 Tm (MOD-21 | reports | TEST-PROPOSED-MOD-21 | MOD-21-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 752 Tm (MOD-22 | audit-trail | TEST-PROPOSED-MOD-22 | MOD-22-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 741.5 Tm (MOD-22 | audit-trail | TEST-PROPOSED-MOD-22 | MOD-22-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 731 Tm (MOD-23 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-MOD-23 | MOD-23-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 720.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 710 Tm (MOD-23 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-MOD-23 | MOD-23-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 699.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 689 Tm (MOD-24 | communication-and-media | TEST-PROPOSED-MOD-24 | MOD-24-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 678.5 Tm (MOD-24 | communication-and-media | TEST-PROPOSED-MOD-24 | MOD-24-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 668 Tm (MOD-25 | downloads | TEST-PROPOSED-MOD-25 | MOD-25-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 657.5 Tm (MOD-25 | downloads | TEST-PROPOSED-MOD-25 | MOD-25-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 647 Tm (MOD-26 | settings | TEST-PROPOSED-MOD-26 | MOD-26-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 636.5 Tm (MOD-26 | settings | TEST-PROPOSED-MOD-26 | MOD-26-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 626 Tm (MOD-27 | add-administrator | TEST-PROPOSED-MOD-27 | MOD-27-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 615.5 Tm (MOD-27 | add-administrator | TEST-PROPOSED-MOD-27 | MOD-27-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 605 Tm (MOD-28 | department-and-archive-registry | TEST-PROPOSED-MOD-28 | MOD-28-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 594.5 Tm (MOD-28 | department-and-archive-registry | TEST-PROPOSED-MOD-28 | MOD-28-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 584 Tm (MOD-29 | department-portal-builder | TEST-PROPOSED-MOD-29 | MOD-29-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 573.5 Tm (MOD-29 | department-portal-builder | TEST-PROPOSED-MOD-29 | MOD-29-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 563 Tm (MOD-30 | external-auditor-portal | TEST-PROPOSED-MOD-30 | MOD-30-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 552.5 Tm (MOD-30 | external-auditor-portal | TEST-PROPOSED-MOD-30 | MOD-30-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 542 Tm (MOD-31 | auditors-and-special-invitees | TEST-PROPOSED-MOD-31 | MOD-31-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 531.5 Tm (MOD-31 | auditors-and-special-invitees | TEST-PROPOSED-MOD-31 | MOD-31-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 521 Tm (SUB-01 | meetings-meeting-room | TEST-PROPOSED-SUB-01 | SUB-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 510.5 Tm (SUB-01 | meetings-meeting-room | TEST-PROPOSED-SUB-01 | SUB-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 500 Tm (SUB-02 | meetings-participants | TEST-PROPOSED-SUB-02 | SUB-02-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 489.5 Tm (SUB-02 | meetings-participants | TEST-PROPOSED-SUB-02 | SUB-02-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 479 Tm (SUB-03 | meetings-resolutions | TEST-PROPOSED-SUB-03 | SUB-03-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 468.5 Tm (SUB-03 | meetings-resolutions | TEST-PROPOSED-SUB-03 | SUB-03-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 458 Tm (SUB-04 | meetings-voting | TEST-PROPOSED-SUB-04 | SUB-04-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 447.5 Tm (SUB-04 | meetings-voting | TEST-PROPOSED-SUB-04 | SUB-04-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 437 Tm (SUB-05 | meetings-actions | TEST-PROPOSED-SUB-05 | SUB-05-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 426.5 Tm (SUB-05 | meetings-actions | TEST-PROPOSED-SUB-05 | SUB-05-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 416 Tm (SUB-06 | meetings-decisions | TEST-PROPOSED-SUB-06 | SUB-06-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 405.5 Tm (SUB-06 | meetings-decisions | TEST-PROPOSED-SUB-06 | SUB-06-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 395 Tm (SUB-07 | documents-my-documents | TEST-PROPOSED-SUB-07 | SUB-07-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 384.5 Tm (SUB-07 | documents-my-documents | TEST-PROPOSED-SUB-07 | SUB-07-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 374 Tm (SUB-08 | documents-department-documents | TEST-PROPOSED-SUB-08 | SUB-08-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 363.5 Tm (SUB-08 | documents-department-documents | TEST-PROPOSED-SUB-08 | SUB-08-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 353 Tm (SUB-09 | documents-shared-with-me | TEST-PROPOSED-SUB-09 | SUB-09-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 342.5 Tm (SUB-09 | documents-shared-with-me | TEST-PROPOSED-SUB-09 | SUB-09-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 332 Tm (SUB-10 | documents-signing-workspace | TEST-PROPOSED-SUB-10 | SUB-10-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 321.5 Tm (SUB-10 | documents-signing-workspace | TEST-PROPOSED-SUB-10 | SUB-10-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 311 Tm (SUB-11 | documents-post-signature-work | TEST-PROPOSED-SUB-11 | SUB-11-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 300.5 Tm (SUB-11 | documents-post-signature-work | TEST-PROPOSED-SUB-11 | SUB-11-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 290 Tm (SUB-12 | documents-final-archive | TEST-PROPOSED-SUB-12 | SUB-12-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 279.5 Tm (SUB-12 | documents-final-archive | TEST-PROPOSED-SUB-12 | SUB-12-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 269 Tm (SUB-13 | documents-upload-document | TEST-PROPOSED-SUB-13 | SUB-13-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 258.5 Tm (SUB-13 | documents-upload-document | TEST-PROPOSED-SUB-13 | SUB-13-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 248 Tm (SUB-14 | documents-retrieve-archived-documents | TEST-PROPOSED-SUB-14 | SUB-14-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 237.5 Tm (SUB-14 | documents-retrieve-archived-documents | TEST-PROPOSED-SUB-14 | SUB-14-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 227 Tm (SUB-15 | induction-and-orientation-induction-applications | TEST-PROPOSED-SUB-15 | SUB-15-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 216.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 206 Tm (SUB-15 | induction-and-orientation-induction-applications | TEST-PROPOSED-SUB-15 | SUB-15-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 195.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 185 Tm (STD-01 | dataset-registry | TEST-PROPOSED-STD-01 | STD-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 174.5 Tm (STD-01 | dataset-registry | TEST-PROPOSED-STD-01 | STD-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 164 Tm (STD-02 | research-data-collection | TEST-PROPOSED-STD-02 | STD-02-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 153.5 Tm (STD-02 | research-data-collection | TEST-PROPOSED-STD-02 | STD-02-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 143 Tm (STD-03 | release-readiness | TEST-PROPOSED-STD-03 | STD-03-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 132.5 Tm (STD-03 | release-readiness | TEST-PROPOSED-STD-03 | STD-03-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 122 Tm (AI-01 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-01 | AI-01-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 111.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 101 Tm (AI-01 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-01 | AI-01-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 90.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 80 Tm (AI-02 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-02 | AI-02-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 69.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 59 Tm (AI-02 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-02 | AI-02-AC2 |) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (20 / 23) Tj
+ET
+endstream
+endobj
+43 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 42 0 R >>
+endobj
+44 0 obj
+<< /Length 8786 >>
+stream
+BT
+/F1 7.5 Tf 1 0 0 1 42 794 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 783.5 Tm (AI-03 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-03 | AI-03-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 773 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 762.5 Tm (AI-03 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-03 | AI-03-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 752 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 741.5 Tm (AI-04 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-04 | AI-04-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 731 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 720.5 Tm (AI-04 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-AI-04 | AI-04-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 710 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 699.5 Tm (OFF-01 | loading-error-empty-and-offline-states | TEST-PROPOSED-OFF-01 | OFF-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 689 Tm (OFF-01 | loading-error-empty-and-offline-states | TEST-PROPOSED-OFF-01 | OFF-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 678.5 Tm (OFF-02 | loading-error-empty-and-offline-states | TEST-PROPOSED-OFF-02 | OFF-02-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 668 Tm (OFF-02 | loading-error-empty-and-offline-states | TEST-PROPOSED-OFF-02 | OFF-02-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 657.5 Tm (MOB-01 | application-shell-and-global-navigation | TEST-PROPOSED-MOB-01 | MOB-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 647 Tm (MOB-01 | application-shell-and-global-navigation | TEST-PROPOSED-MOB-01 | MOB-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 636.5 Tm (MOB-02 | application-shell-and-global-navigation | TEST-PROPOSED-MOB-02 | MOB-02-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 626 Tm (MOB-02 | application-shell-and-global-navigation | TEST-PROPOSED-MOB-02 | MOB-02-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 615.5 Tm (GOV-01 | release-readiness | TEST-PROPOSED-GOV-01 | GOV-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 605 Tm (GOV-01 | release-readiness | TEST-PROPOSED-GOV-01 | GOV-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 594.5 Tm (TRC-01 | release-readiness | TEST-PROPOSED-TRC-01 | TRC-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 584 Tm (TRC-01 | release-readiness | TEST-PROPOSED-TRC-01 | TRC-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 573.5 Tm (API-01 | application-shell-and-global-navigation | TEST-PROPOSED-API-01 | API-01-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 563 Tm (API-01 | application-shell-and-global-navigation | TEST-PROPOSED-API-01 | API-01-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 552.5 Tm (API-02 | application-shell-and-global-navigation | TEST-PROPOSED-API-02 | API-02-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 542 Tm (API-02 | application-shell-and-global-navigation | TEST-PROPOSED-API-02 | API-02-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 531.5 Tm (API-03 | application-shell-and-global-navigation | TEST-PROPOSED-API-03 | API-03-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 521 Tm (API-03 | application-shell-and-global-navigation | TEST-PROPOSED-API-03 | API-03-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 510.5 Tm (API-04 | application-shell-and-global-navigation | TEST-PROPOSED-API-04 | API-04-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 500 Tm (API-04 | application-shell-and-global-navigation | TEST-PROPOSED-API-04 | API-04-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 489.5 Tm (API-05 | application-shell-and-global-navigation | TEST-PROPOSED-API-05 | API-05-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 479 Tm (API-05 | application-shell-and-global-navigation | TEST-PROPOSED-API-05 | API-05-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 468.5 Tm (API-06 | application-shell-and-global-navigation | TEST-PROPOSED-API-06 | API-06-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 458 Tm (API-06 | application-shell-and-global-navigation | TEST-PROPOSED-API-06 | API-06-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 447.5 Tm (API-07 | application-shell-and-global-navigation | TEST-PROPOSED-API-07 | API-07-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 437 Tm (API-07 | application-shell-and-global-navigation | TEST-PROPOSED-API-07 | API-07-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 426.5 Tm (API-08 | application-shell-and-global-navigation | TEST-PROPOSED-API-08 | API-08-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 416 Tm (API-08 | application-shell-and-global-navigation | TEST-PROPOSED-API-08 | API-08-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 405.5 Tm (API-09 | application-shell-and-global-navigation | TEST-PROPOSED-API-09 | API-09-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 395 Tm (API-09 | application-shell-and-global-navigation | TEST-PROPOSED-API-09 | API-09-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 384.5 Tm (API-10 | application-shell-and-global-navigation | TEST-PROPOSED-API-10 | API-10-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 374 Tm (API-10 | application-shell-and-global-navigation | TEST-PROPOSED-API-10 | API-10-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 363.5 Tm (API-11 | application-shell-and-global-navigation | TEST-PROPOSED-API-11 | API-11-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 353 Tm (API-11 | application-shell-and-global-navigation | TEST-PROPOSED-API-11 | API-11-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 342.5 Tm (API-12 | application-shell-and-global-navigation | TEST-PROPOSED-API-12 | API-12-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 332 Tm (API-12 | application-shell-and-global-navigation | TEST-PROPOSED-API-12 | API-12-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 321.5 Tm (API-13 | application-shell-and-global-navigation | TEST-PROPOSED-API-13 | API-13-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 311 Tm (API-13 | application-shell-and-global-navigation | TEST-PROPOSED-API-13 | API-13-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 300.5 Tm (API-14 | application-shell-and-global-navigation | TEST-PROPOSED-API-14 | API-14-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 290 Tm (API-14 | application-shell-and-global-navigation | TEST-PROPOSED-API-14 | API-14-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 279.5 Tm (API-15 | application-shell-and-global-navigation | TEST-PROPOSED-API-15 | API-15-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 269 Tm (API-15 | application-shell-and-global-navigation | TEST-PROPOSED-API-15 | API-15-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 258.5 Tm (API-16 | application-shell-and-global-navigation | TEST-PROPOSED-API-16 | API-16-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 248 Tm (API-16 | application-shell-and-global-navigation | TEST-PROPOSED-API-16 | API-16-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 237.5 Tm (API-17 | application-shell-and-global-navigation | TEST-PROPOSED-API-17 | API-17-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 227 Tm (API-17 | application-shell-and-global-navigation | TEST-PROPOSED-API-17 | API-17-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 216.5 Tm (API-18 | application-shell-and-global-navigation | TEST-PROPOSED-API-18 | API-18-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 206 Tm (API-18 | application-shell-and-global-navigation | TEST-PROPOSED-API-18 | API-18-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 195.5 Tm (API-19 | application-shell-and-global-navigation | TEST-PROPOSED-API-19 | API-19-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 185 Tm (API-19 | application-shell-and-global-navigation | TEST-PROPOSED-API-19 | API-19-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 174.5 Tm (API-20 | application-shell-and-global-navigation | TEST-PROPOSED-API-20 | API-20-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 164 Tm (API-20 | application-shell-and-global-navigation | TEST-PROPOSED-API-20 | API-20-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 153.5 Tm (API-21 | application-shell-and-global-navigation | TEST-PROPOSED-API-21 | API-21-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 143 Tm (API-21 | application-shell-and-global-navigation | TEST-PROPOSED-API-21 | API-21-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 132.5 Tm (API-22 | application-shell-and-global-navigation | TEST-PROPOSED-API-22 | API-22-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 122 Tm (API-22 | application-shell-and-global-navigation | TEST-PROPOSED-API-22 | API-22-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 111.5 Tm (API-23 | application-shell-and-global-navigation | TEST-PROPOSED-API-23 | API-23-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 101 Tm (API-23 | application-shell-and-global-navigation | TEST-PROPOSED-API-23 | API-23-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 90.5 Tm (API-24 | application-shell-and-global-navigation | TEST-PROPOSED-API-24 | API-24-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 80 Tm (API-24 | application-shell-and-global-navigation | TEST-PROPOSED-API-24 | API-24-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 69.5 Tm (API-25 | application-shell-and-global-navigation | TEST-PROPOSED-API-25 | API-25-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 59 Tm (API-25 | application-shell-and-global-navigation | TEST-PROPOSED-API-25 | API-25-AC2 | PROPOSED) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (21 / 23) Tj
+ET
+endstream
+endobj
+45 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 44 0 R >>
+endobj
+46 0 obj
+<< /Length 8063 >>
+stream
+BT
+/F1 7.5 Tf 1 0 0 1 42 794 Tm (API-26 | application-shell-and-global-navigation | TEST-PROPOSED-API-26 | API-26-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 783.5 Tm (API-26 | application-shell-and-global-navigation | TEST-PROPOSED-API-26 | API-26-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 773 Tm (API-27 | application-shell-and-global-navigation | TEST-PROPOSED-API-27 | API-27-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 762.5 Tm (API-27 | application-shell-and-global-navigation | TEST-PROPOSED-API-27 | API-27-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 752 Tm (API-28 | application-shell-and-global-navigation | TEST-PROPOSED-API-28 | API-28-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 741.5 Tm (API-28 | application-shell-and-global-navigation | TEST-PROPOSED-API-28 | API-28-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 731 Tm (API-29 | application-shell-and-global-navigation | TEST-PROPOSED-API-29 | API-29-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 720.5 Tm (API-29 | application-shell-and-global-navigation | TEST-PROPOSED-API-29 | API-29-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 710 Tm (API-30 | application-shell-and-global-navigation | TEST-PROPOSED-API-30 | API-30-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 699.5 Tm (API-30 | application-shell-and-global-navigation | TEST-PROPOSED-API-30 | API-30-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 689 Tm (API-31 | application-shell-and-global-navigation | TEST-PROPOSED-API-31 | API-31-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 678.5 Tm (API-31 | application-shell-and-global-navigation | TEST-PROPOSED-API-31 | API-31-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 668 Tm (API-32 | application-shell-and-global-navigation | TEST-PROPOSED-API-32 | API-32-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 657.5 Tm (API-32 | application-shell-and-global-navigation | TEST-PROPOSED-API-32 | API-32-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 647 Tm (API-33 | application-shell-and-global-navigation | TEST-PROPOSED-API-33 | API-33-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 636.5 Tm (API-33 | application-shell-and-global-navigation | TEST-PROPOSED-API-33 | API-33-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 626 Tm (API-34 | application-shell-and-global-navigation | TEST-PROPOSED-API-34 | API-34-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 615.5 Tm (API-34 | application-shell-and-global-navigation | TEST-PROPOSED-API-34 | API-34-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 605 Tm (API-35 | application-shell-and-global-navigation | TEST-PROPOSED-API-35 | API-35-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 594.5 Tm (API-35 | application-shell-and-global-navigation | TEST-PROPOSED-API-35 | API-35-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 584 Tm (API-36 | application-shell-and-global-navigation | TEST-PROPOSED-API-36 | API-36-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 573.5 Tm (API-36 | application-shell-and-global-navigation | TEST-PROPOSED-API-36 | API-36-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 563 Tm (API-37 | application-shell-and-global-navigation | TEST-PROPOSED-API-37 | API-37-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 552.5 Tm (API-37 | application-shell-and-global-navigation | TEST-PROPOSED-API-37 | API-37-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 542 Tm (API-38 | application-shell-and-global-navigation | TEST-PROPOSED-API-38 | API-38-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 531.5 Tm (API-38 | application-shell-and-global-navigation | TEST-PROPOSED-API-38 | API-38-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 521 Tm (API-39 | application-shell-and-global-navigation | TEST-PROPOSED-API-39 | API-39-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 510.5 Tm (API-39 | application-shell-and-global-navigation | TEST-PROPOSED-API-39 | API-39-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 500 Tm (API-40 | application-shell-and-global-navigation | TEST-PROPOSED-API-40 | API-40-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 489.5 Tm (API-40 | application-shell-and-global-navigation | TEST-PROPOSED-API-40 | API-40-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 479 Tm (API-41 | application-shell-and-global-navigation | TEST-PROPOSED-API-41 | API-41-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 468.5 Tm (API-41 | application-shell-and-global-navigation | TEST-PROPOSED-API-41 | API-41-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 458 Tm (API-42 | application-shell-and-global-navigation | TEST-PROPOSED-API-42 | API-42-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 447.5 Tm (API-42 | application-shell-and-global-navigation | TEST-PROPOSED-API-42 | API-42-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 437 Tm (API-43 | application-shell-and-global-navigation | TEST-PROPOSED-API-43 | API-43-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 426.5 Tm (API-43 | application-shell-and-global-navigation | TEST-PROPOSED-API-43 | API-43-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 416 Tm (API-44 | application-shell-and-global-navigation | TEST-PROPOSED-API-44 | API-44-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 405.5 Tm (API-44 | application-shell-and-global-navigation | TEST-PROPOSED-API-44 | API-44-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 395 Tm (API-45 | application-shell-and-global-navigation | TEST-PROPOSED-API-45 | API-45-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 384.5 Tm (API-45 | application-shell-and-global-navigation | TEST-PROPOSED-API-45 | API-45-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 374 Tm (API-46 | application-shell-and-global-navigation | TEST-PROPOSED-API-46 | API-46-AC1 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 363.5 Tm (API-46 | application-shell-and-global-navigation | TEST-PROPOSED-API-46 | API-46-AC2 | PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 353 Tm (API-47 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-47 | API-47-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 342.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 332 Tm (API-47 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-47 | API-47-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 321.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 311 Tm (API-48 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-48 | API-48-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 300.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 290 Tm (API-48 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-48 | API-48-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 279.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 269 Tm (API-49 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-49 | API-49-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 258.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 248 Tm (API-49 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-49 | API-49-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 237.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 227 Tm (API-50 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-50 | API-50-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 216.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 206 Tm (API-50 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-50 | API-50-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 195.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 185 Tm (API-51 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-51 | API-51-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 174.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 164 Tm (API-51 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-51 | API-51-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 153.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 143 Tm (API-52 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-52 | API-52-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 132.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 122 Tm (API-52 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-52 | API-52-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 111.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 101 Tm (API-53 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-53 | API-53-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 90.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 80 Tm (API-53 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-53 | API-53-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 69.5 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 59 Tm (API-54 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-54 | API-54-AC1 |) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (22 / 23) Tj
+ET
+endstream
+endobj
+47 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 46 0 R >>
+endobj
+48 0 obj
+<< /Length 4310 >>
+stream
+BT
+/F1 7.5 Tf 1 0 0 1 42 794 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 783.5 Tm (API-54 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-54 | API-54-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 773 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 762.5 Tm (API-55 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-55 | API-55-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 752 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 741.5 Tm (API-55 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-55 | API-55-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 731 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 720.5 Tm (API-56 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-56 | API-56-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 710 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 699.5 Tm (API-56 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-56 | API-56-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 689 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 678.5 Tm (API-57 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-57 | API-57-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 668 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 657.5 Tm (API-57 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-57 | API-57-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 647 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 636.5 Tm (API-58 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-58 | API-58-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 626 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 615.5 Tm (API-58 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-58 | API-58-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 605 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 594.5 Tm (API-59 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-59 | API-59-AC1 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 584 Tm (PROPOSED) Tj
+/F1 7.5 Tf 1 0 0 1 42 573.5 Tm (API-59 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-59 | API-59-AC2 |) Tj
+/F1 7.5 Tf 1 0 0 1 42 563 Tm (PROPOSED) Tj
+/F1 12 Tf 1 0 0 1 42 540.5 Tm (Inspection gaps) Tj
+/F1 8.5 Tf 1 0 0 1 42 525.5 Tm (- Initial PR head contained only VALIDATION.md; SRS, exports and wireframes described in its PR body were) Tj
+/F1 8.5 Tf 1 0 0 1 42 514 Tm (absent.) Tj
+/F1 8.5 Tf 1 0 0 1 42 502.5 Tm (- All 31 modules, 15 sub-portals and 59 explicit Worker paths/families lacked requirement IDs in PR) Tj
+/F1 8.5 Tf 1 0 0 1 42 491 Tm (artifacts.) Tj
+/F1 8.5 Tf 1 0 0 1 42 479.5 Tm (- No existing acceptance-criteria corpus was available to assess for vagueness; the earlier claim of 55) Tj
+/F1 8.5 Tf 1 0 0 1 42 468 Tm (requirements lacked an SRS artifact on PR head.) Tj
+/F1 8.5 Tf 1 0 0 1 42 456.5 Tm (- 59 top-level route/path families now have API IDs; delegated nested router modules and historic) Tj
+/F1 8.5 Tf 1 0 0 1 42 445 Tm (66-route count require exhaustive path/schema/auth extraction.) Tj
+/F1 8.5 Tf 1 0 0 1 42 433.5 Tm (- Standalone portal navigation is proposed, not asserted as source-implemented.) Tj
+/F1 8.5 Tf 1 0 0 1 42 422 Tm (- Tests are proposed, not claimed implemented or passing; role/action matrix, offline cache expiry,) Tj
+/F1 8.5 Tf 1 0 0 1 42 410.5 Tm (integration health and live app remain unverified.) Tj
+/F1 12 Tf 1 0 0 1 42 387 Tm (Open decisions) Tj
+/F1 9 Tf 1 0 0 1 42 372 Tm (1. Approve 31 top-level modules and 15 nested sub-portals.) Tj
+/F1 9 Tf 1 0 0 1 42 360 Tm (2. Confirm three standalone portals and assign owners.) Tj
+/F1 9 Tf 1 0 0 1 42 348 Tm (3. Approve role register and role x module x action matrix.) Tj
+/F1 9 Tf 1 0 0 1 42 336 Tm (4. TO BE APPROVED BY THE BOARD: retention/legal hold, backup, encryption/key custody, RPO/RTO and DR;) Tj
+/F1 9 Tf 1 0 0 1 42 324 Tm (review proposed defaults.) Tj
+/F1 9 Tf 1 0 0 1 42 312 Tm (5. Confirm Grant Intelligence discovery/analysis-only scope.) Tj
+/F1 9 Tf 1 0 0 1 42 300 Tm (6. Approve offline cache classes, expiry, revocation and sync conflict policy.) Tj
+/F1 9 Tf 1 0 0 1 42 288 Tm (7. Approve WCAG 2.2 AA and performance/load targets.) Tj
+/F1 9 Tf 1 0 0 1 42 276 Tm (8. Confirm Actual/Trial gate and temporary gateway-disconnect flag owners.) Tj
+/F1 9 Tf 1 0 0 1 42 264 Tm (9. Complete delegated Gateway router enumeration, schemas, auth policy and executable tests.) Tj
+/F1 9 Tf 1 0 0 1 42 252 Tm (10. Schedule authenticated live-app and integration acceptance testing.) Tj
+/F1 8 Tf 1 0 0 1 520 25 Tm (23 / 23) Tj
+ET
+endstream
+endobj
+49 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 48 0 R >>
+endobj
+xref
+0 50
+0000000000 65535 f 
+0000000024 00000 n 
+0000000073 00000 n 
+0000000283 00000 n 
+0000000353 00000 n 
+0000004570 00000 n 
+0000004696 00000 n 
+0000010504 00000 n 
+0000010630 00000 n 
+0000016466 00000 n 
+0000016592 00000 n 
+0000022787 00000 n 
+0000022915 00000 n 
+0000029110 00000 n 
+0000029238 00000 n 
+0000035535 00000 n 
+0000035663 00000 n 
+0000041981 00000 n 
+0000042109 00000 n 
+0000048355 00000 n 
+0000048483 00000 n 
+0000055203 00000 n 
+0000055331 00000 n 
+0000062508 00000 n 
+0000062636 00000 n 
+0000069776 00000 n 
+0000069904 00000 n 
+0000076919 00000 n 
+0000077047 00000 n 
+0000084058 00000 n 
+0000084186 00000 n 
+0000091455 00000 n 
+0000091583 00000 n 
+0000098505 00000 n 
+0000098633 00000 n 
+0000105725 00000 n 
+0000105853 00000 n 
+0000112551 00000 n 
+0000112679 00000 n 
+0000119453 00000 n 
+0000119581 00000 n 
+0000126586 00000 n 
+0000126714 00000 n 
+0000134437 00000 n 
+0000134565 00000 n 
+0000143404 00000 n 
+0000143532 00000 n 
+0000151648 00000 n 
+0000151776 00000 n 
+0000156139 00000 n 
+trailer
+<< /Size 50 /Root 1 0 R >>
+startxref
+156267
+%%EOF

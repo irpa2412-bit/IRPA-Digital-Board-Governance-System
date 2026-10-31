@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-31",
+  "scope": "documentation-only",
+  "requirementIds": 118,
+  "topLevelModules": 31,
+  "nestedSubportals": 15,
+  "standalonePortals": 3,
+  "routePathFamilies": 59,
+  "crossCuttingRequirementIds": 10,
+  "missingRequirementIds": {
+    "modules": 0,
+    "subportals": 0,
+    "standalonePortals": 0,
+    "documentedRouteFamilies": 0
+  },
+  "acceptanceCriteria": {
+    "baseline": 236,
+    "added": 169,
+    "total": 405
+  },
+  "perModule": {
+    "requirementsEach": 1,
+    "acceptanceCriteriaEach": 5
+  },
+  "perSubportal": {
+    "requirementsEach": 1,
+    "acceptanceCriteriaEach": 5
+  },
+  "perStandalonePortal": {
+    "requirementsEach": 1,
+    "acceptanceCriteriaEach": 6
+  },
+  "grantIntelligenceAI": {
+    "requirements": 4,
+    "acceptanceCriteria": 16,
+    "scope": "discovery and analysis only"
+  },
+  "offlineMobileGovernance": {
+    "requirements": 5,
+    "acceptanceCriteria": 21
+  },
+  "htmlIndexLinks": 72,
+  "htmlBulkParse": "NOT RUN",
+  "chromium390x844": "NOT RUN",
+  "chromium1440x900": "NOT RUN",
+  "horizontalOverflow": "UNVERIFIED",
+  "docx": {
+    "signature": "PASS_STRUCTURAL_ONLY",
+    "bytes": 302468,
+    "currentSource": "STALE",
+    "externalViewer": "NOT RUN"
+  },
+  "srsPdf": {
+    "signature": "PASS_STRUCTURAL_ONLY",
+    "pages": 23,
+    "currentSource": "STALE",
+    "externalViewer": "NOT RUN"
+  },
+  "wireframePdf": {
+    "signature": "PASS_STRUCTURAL_ONLY",
+    "pages": 72,
+    "currentSource": "STALE",
+    "externalViewer": "NOT RUN"
+  },
+  "routeSchemaSpecificity": "OPEN_BLOCKER",
+  "liveApp": "NOT RUN",
+  "failures": [
+    "F-07 route-specific API schemas and side effects not fully extracted",
+    "F-08 DOCX/PDF exports stale; regenerate",
+    "F-09 HTML bulk parse and Chromium renders not run",
+    "F-10 external viewer opening not run"
+  ],
+  "grantApprovalAuthority": "EXECUTIVE DIRECTOR ONLY",
+  "executiveDirectorRoleInCode": "PRESENT: GrantIntelligencePortal management allow-list; Communications Site editor allow-list; explicit grant approval server enforcement remains a GAP",
+  "governanceGrantWorkflowLinks": "ZERO POSITIVE LINKS IN REVISED SRS AND FUNDING WIREFRAMES",
+  "backupRetentionApproval": "TO BE APPROVED BY IRPA MANAGEMENT; proposed daily encrypted backup, 30-day retention, monthly tested restore, RPO 24h, RTO 48h"
+}
