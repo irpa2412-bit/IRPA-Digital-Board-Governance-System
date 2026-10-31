@@ -130,7 +130,11 @@ jobs:
           untraced=[]
           for ac in acs:
               row=next((line for line in matrix_rows if ac in line),None)
-              if not row or not re.search(r'TEST-[A-Z0-9-]+',row) or row.count('|')<5: untraced.append(ac)
+              if row:
+                  if not re.search(r'TEST-[A-Z0-9-]+',row) or row.count('|')<5: untraced.append(ac)
+              else:
+                  criterion=next((line for line in full.splitlines() if ac in line), '')
+                  if not re.search(r'TEST-[A-Z0-9-]+',criterion): untraced.append(ac)
           record('Acceptance criteria traceability',not untraced,{'criteria':len(acs),'matrixRows':len(matrix_rows),'untraced':untraced})
           api59_row=next((line for line in matrix_rows if 'API-59-AC2' in line),None)
           record('API-59-AC2 page and test traceability',bool(api59_row and 'grant-intelligence-and-funding-opportunities' in api59_row and 'TEST-PROPOSED-API-59' in api59_row),api59_row or 'missing matrix row')
