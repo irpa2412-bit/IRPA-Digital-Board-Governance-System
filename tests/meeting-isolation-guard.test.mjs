@@ -16,7 +16,7 @@ test("isolation guard runs after fetching main and receives the GitHub event nam
   assert.match(step, /env:\s*\n\s+EVENT_NAME:\s*\$\{\{\s*github\.event_name\s*\}\}/);
   assert.match(step, /run:\s*\|[\s\S]*?node scripts\/ci\/meeting-fixture-isolation\.mjs/);
   assert.doesNotMatch(step, /continue-on-error:\s*true/);
-  assert.doesNotMatch(step, /if:\s*false|if:\s*\$\{\{\s*false/);
+  assert.doesNotMatch(step, /\n\s+if:/);
 });
 
 test("extracted isolation script retains baseline, allowlist, and all isolation policy checks", () => {
