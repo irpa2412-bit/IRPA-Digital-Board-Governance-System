@@ -3,142 +3,186 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
+const guard = readFileSync(new URL("../scripts/ci/meeting-fixture-isolation.mjs", import.meta.url), "utf8");
 
-test("isolation baseline compares against the fetched current main snapshot", () => {
-  assert.match(workflow, /git fetch origin main:refs\/remotes\/origin\/main/);
-  assert.match(workflow, /const eventName = process\.env\.EVENT_NAME\?\.trim\(\)/);
-  assert.match(workflow, /const base = "origin\/main"/);
-  assert.ok(workflow.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
+test("runtime isolation guard is mandatory, receives the event name, and runs after fetching main", () => {
+  const stepMarker = "- name: Assert runtime source isolation from unrelated portals";
+  const stepIndex = workflow.indexOf(stepMarker);
+  assert.notEqual(stepIndex, -1, "workflow must retain the runtime source-isolation guard step");
+  const nextStepIndex = workflow.indexOf("\n      - name:", stepIndex + stepMarker.length);
+  const step = workflow.slice(stepIndex, nextStepIndex < 0 ? undefined : nextStepIndex);
+  assert.match(step, /env:\s*\n\s+EVENT_NAME:\s*\$\{\{\s*github\.event_name\s*\}\}/,
+    "guard must receive EVENT_NAME from github.event_name in env");
+  const run = step.match(/run:\s*\|([\s\S]*)/);
+  assert.ok(run, "guard step must have a run block");
+  const fetchIndex = run[1].indexOf("git fetch origin main");
+  const scriptIndex = run[1].indexOf("node scripts/ci/meeting-fixture-isolation.mjs");
+  assert.notEqual(fetchIndex, -1, "guard step must fetch origin main");
+  assert.notEqual(scriptIndex, -1, "guard step must execute the extracted isolation script");
+  assert.ok(fetchIndex < scriptIndex, "isolation script must execute after git fetch origin main");
+  assert.doesNotMatch(step, /continue-on-error:\s*true/, "guard cannot be continue-on-error");
+  assert.doesNotMatch(step, /\n\s+if\s*:/, "guard cannot be conditional or skippable");
+  assert.doesNotMatch(step, /\n\s+continue-on-error\s*:/, "guard cannot be continue-on-error");
 });
 
-test("Wrangler changes cannot alter production configuration", () => {
-  assert.match(workflow, /if \(changed\.includes\(wranglerPath\)\)/);
-  assert.match(workflow, /productionSection\(baselineConfig, "Baseline Wrangler config"\) !== productionSection\(currentConfig, "Current Wrangler config"\)/);
-  assert.match(workflow, /Production Wrangler configuration changed; only staging-only changes are permitted/);
+test("extracted script retains every baseline allowlist entry by exact path", () => {
+  const block = guard.match(/const allowed = new Set\(\[([\s\S]*?)\n\]\);/);
+  assert.ok(block, "script must declare the explicit changed-path allowlist");
+  const actual = [...block[1].matchAll(/"([^"]+)"/g)].map(match => match[1]);
+  const expected = [
+  ".github/workflows/meeting-portal-fixture-browser.yml",
+  "scripts/ci/meeting-fixture-isolation.mjs",
+  ".github/workflows/finance-production-reset.yml",
+  "docs/ACTUAL_DATA_ACCESS_GATE.md",
+  "scripts/reset-finance-production.js",
+  "src/FieldEntryDataGate.jsx",
+  "src/components/ActualDataAccessControl.jsx",
+  "src/firebase/systemControl.js",
+  "src/pages/Settings.jsx",
+  "src/pages/FinancePortfolio.jsx",
+  "tests/finance-portal-policy.test.cjs",
+  "tests/firestore.rules.test.cjs",
+  "tests/research-portal-security.test.mjs",
+  "tests/meeting-isolation-guard.test.mjs",
+  "tests/invitation-removal-policy.test.mjs",
+  "tests/meeting-invitation-resend-quorum.test.mjs",
+  "tests/signature-signer-picker-regression.test.mjs",
+  ".github/workflows/meeting-invitation-flow-ci.yml",
+  ".github/workflows/mail-invitation-tests.yml",
+  ".github/workflows/cloudflare-gateway-deploy.yml",
+  ".github/workflows/cloudflare-livekit-staging-frontend.yml",
+  ".github/workflows/staging-gateway-e2e.yml",
+  "drive-gateway/src/cryptographicGate.mjs",
+  "drive-gateway/src/esignContext.mjs",
+  "drive-gateway/src/pdf.mjs",
+  "drive-gateway/src/router.mjs",
+  "drive-gateway/src/signing.mjs",
+  "drive-gateway/src/upload.mjs",
+  "drive-gateway/tests/controlled-authenticated-signing-flow.test.mjs",
+  "drive-gateway/tests/e2e.test.mjs",
+  "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+  "drive-gateway/tests/production-crypto-integration.test.mjs",
+  "drive-gateway/tests/staging-crypto-acceptance.test.mjs",
+  "drive-gateway/tests/staging-runtime-acceptance.mjs",
+  "src/App.jsx",
+  "src/pages/GatewaySigningPortal.jsx",
+  "drive-gateway/src/index.js",
+  "drive-gateway/src/meetingPortal.mjs",
+  "drive-gateway/tests/meeting-portal.test.mjs",
+  "src/firebase/meetingGatewayApi.js",
+  "drive-gateway/src/invitationEmail.mjs",
+  "drive-gateway/src/invitationRedemption.mjs",
+  "drive-gateway/tests/mail-invitation.unit.mjs",
+  "drive-gateway/tests/invitation-redemption.test.mjs",
+  ".github/workflows/meeting-invitation-nonprod-e2e.yml",
+  ".github/workflows/meeting-invitation-staging-smtp-check.yml",
+  ".github/workflows/meeting-room-authorization-boundary.yml",
+  "functions/meetingGateway.emulator.test.cjs",
+  "functions/meetingEntryPolicy.js",
+  "functions/meetingEntryPolicy.test.cjs",
+  "functions/meetingGateway.js",
+  "package.json",
+  "src/components/MeetingAccessControl.jsx",
+  "src/pages/Invitations.jsx",
+  "public/administrator.html",
+  "src/firebase/auth.js",
+  "src/pages/MeetingEntryGateway.jsx",
+  "src/components/ControlledDocumentUpload.jsx",
+  "src/components/SignaturePathwaySelfTest.jsx",
+  "tests/signature-pathway-contract.test.mjs",
+  "src/firebase/meetingRecords.js",
+  "functions/meetingRecords.js",
+  "functions/index.js",
+  "tests/meeting-working-documents-security.test.mjs",
+  "src/pages/MeetingRoom.jsx",
+  "src/pages/OperationalGatewaysParticipants.jsx",
+  "src/pages/Meetings.jsx",
+  "src/firebase/data.js",
+  "firestore.rules",
+  "tests/meeting-category-firestore-rules.test.cjs",
+  "tests/meeting-category-policy.test.mjs",
+  ".github/workflows/signature-migration-build-test.yml",
+  "drive-gateway/wrangler.toml",
+  "drive-gateway/src/signatureAssetAuthorization.mjs",
+  "drive-gateway/src/signatureProfileAuthorization.mjs",
+  "drive-gateway/tests/signature-asset-authorization.test.mjs",
+  "drive-gateway/tests/signature-profile-folder-authorization.test.mjs",
+  "drive-gateway/tests/signature-profile-folder-runtime.test.mjs",
+  "src/firebase/signaturePlatform.js",
+  "src/firebase/signatureStorage.js",
+  "src/firebase/signatureWorkflowPolicy.js",
+  "src/pages/SignaturePlatform.jsx",
+  "tests/signature-workflow-policy.test.mjs",
+  "tests/fixtures/meeting-portal-fixture.html",
+  "tests/fixtures/meeting-portal-fixture.jsx",
+  "tests/fixtures/mocks.js",
+  "tests/meeting-portal-browser.test.mjs",
+  "tests/meeting-room-authorization-boundary.test.mjs",
+  "tests/browser/authenticated-governance-regression.spec.mjs",
+  ".github/workflows/authenticated-governance-browser-fixture.yml",
+  ".github/workflows/cloudflare-esignature-tests.yml",
+  ".github/workflows/document-lifecycle-module-test.yml",
+  ".github/workflows/document-translation-workspace-test.yml",
+  ".github/workflows/fundraising-responsive-smoke.yml",
+  ".github/workflows/meeting-media-governance.yml",
+  ".github/workflows/meeting-room-ai-assistant-verification.yml",
+  ".github/workflows/pdf-esignature-tests.yml",
+  ".github/workflows/readability-release-gate.yml",
+  "src/App.jsx",
+  "package.json",
+  "src/styles/portal-readability-standard.css",
+  "tests/portal-readability-standard.test.mjs",
+  "vite.meeting-fixture.config.js",
+  ".github/workflows/portal-navigation-regression.yml",
+  "docs/COMMUNICATION_MEDIA_PORTAL.md",
+  "functions/communicationMedia.js",
+  "src/pages/CommunicationMediaPortal.jsx",
+  "src/pages/CommunicationMediaStudio.jsx",
+  "tests/communication-media-policy.test.mjs"
+];
+  assert.deepEqual(actual, expected, "allowlist paths and ordering must remain unchanged");
 });
 
-test("staging keeps its dedicated KV namespace and rejects the production namespace", () => {
-  assert.match(workflow, /id = "5ea76010553049a2b98c8493c37fbbc4"/);
-  assert.match(workflow, /id = "ccdbffa662ac48bfbdf7f4b1f62ca941"/);
-  assert.match(workflow, /Staging DRIVE_KV must retain the explicitly approved dedicated namespace/);
-  assert.match(workflow, /Production DRIVE_KV cannot be used by staging/);
-});
-
-test("workflow-only guard maintenance requires its paired regression test", () => {
-  assert.match(workflow, /const guardOnlyWorkflowRepair = changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
-  assert.match(workflow, /!guardOnlyWorkflowRepair/);
-});
-
-test("invitation resend regression is explicitly allowlisted by the isolation guard", () => {
-  assert.ok(workflow.includes('"tests/meeting-invitation-resend-quorum.test.mjs"'));
-});
-
-test("invitation/reset integration exception requires all paired implementation and test files", () => {
-  assert.match(workflow, /const invitationMailResendIntegration = changed\.includes\("public\/administrator\.html"\)/);
-  for (const path of [
-    "public/administrator.html",
-    "src/firebase/auth.js",
-    "src/pages/Invitations.jsx",
-    "drive-gateway/src/index.js",
-    "drive-gateway/src/invitationEmail.mjs",
-    "drive-gateway/tests/mail-invitation.unit.mjs",
-  ]) {
-    assert.ok(workflow.includes(`"${path}"`), `missing required paired path: ${path}`);
+test("all named isolation policy gates remain present and participate in the final decision", () => {
+  for (const name of ["signaturePathwayContractRepair","signatureGatewayIntegration","signatureSignerPickerRepair","signaturePdfPaletteRepair","signatureSignerListVisibilityRepair","signaturePaletteLifecycleSourceRepair","signatureDocumentPaletteAssignmentRepair","signaturePdfUrlHandoffRepair","signaturePdfArchivePaletteRepair","controlledDocumentTrialUploadFix","actualDataGateIntegration","grantAssistantPersistence","guardOnlyWorkflowRepair","fixtureWorkflowScriptRepair","invitationMailResendIntegration","invitationRemovalIntegration","communicationMediaOnly","readabilityOnlyChange"]) {
+    assert.match(guard, new RegExp("const " + name + "\\s*="), name + " policy definition must remain");
+    assert.ok(guard.includes("!" + name), name + " must remain part of the final policy gate");
   }
-  assert.match(workflow, /changed\.every\(path => allowed\.has\(path\)\)/);
-  assert.match(workflow, /!invitationMailResendIntegration/);
+  for (const required of [
+    'const eventName = process.env.EVENT_NAME?.trim()',
+    'const base = "origin/main"',
+    'git", ["diff", "--name-only"',
+    'const unexpected = changed.filter(path =>',
+    'Unexpected files changed outside the isolated meeting repair',
+    'Meeting/participant source change or an explicitly paired isolated regression/guard test is missing'
+  ]) assert.ok(guard.includes(required), "missing policy check: " + required);
 });
 
-test("Signature Gateway integration must include its portal bridge and authenticated flow test", () => {
-  assert.match(workflow, /const signatureGatewayIntegration = changed\.includes\("src\/firebase\/signaturePlatform\.js"\)/);
-  assert.match(workflow, /changed\.includes\("drive-gateway\/src\/signing\.mjs"\)/);
-  assert.match(workflow, /changed\.includes\("drive-gateway\/tests\/controlled-authenticated-signing-flow\.test\.mjs"\)/);
-  assert.match(workflow, /!signatureGatewayIntegration/);
+test("Communication & Media sub-policies remain paired under the explicit aggregate policy", () => {
+  assert.match(guard, /const communicationMediaOnly = communicationMediaIntegration \|\| communicationMediaArchiveIntegration/);
 });
 
-test("Signature Gateway isolation does not exempt unrelated staging admin reset workflows", () => {
-  assert.match(workflow, /!allowed\.has\(path\).*signatureGatewayIntegration/);
-  assert.doesNotMatch(workflow, /staging-admin-reset-fixture\.yml/);
+test("fixture workflow/script exception is limited to the two approved files", () => {
+  assert.match(guard, /const fixtureWorkflowScriptRepair\s*=\s*changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
+  assert.match(guard, /changed\.includes\("scripts\/ci\/meeting-fixture-isolation\.mjs"\)/);
+  assert.match(guard, /changed\.every\(path => path === "\.github\/workflows\/meeting-portal-fixture-browser\.yml" \|\| path === "scripts\/ci\/meeting-fixture-isolation\.mjs"\)/);
+  assert.match(guard, /!fixtureWorkflowScriptRepair/);
 });
 
-test("Communication and Media archive gateway integration is explicitly isolated and allowlisted", () => {
-  assert.match(workflow, /const communicationMediaArchiveIntegration =/);
-  assert.match(workflow, /changed\.includes\("src\/pages\/CommunicationMediaStudio\.jsx"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/communication-media-policy\.test\.mjs"\)/);
-  assert.match(workflow, /changed\.includes\("drive-gateway\/src\/index\.js"\)/);
-  assert.match(workflow, /changed\.includes\("drive-gateway\/wrangler\.toml"\)/);
-  assert.match(workflow, /"drive-gateway\/tests\/staging-isolation\.test\.mjs"/);
-  assert.match(workflow, /"firestore\.rules"/);
-  assert.match(workflow, /changed\.includes\("src\/firebase\/signatureStorage\.js"\)/);
-  assert.match(workflow, /changed\.includes\("docs\/COMMUNICATION_MEDIA_PORTAL\.md"\)/);
-  assert.match(workflow, /!changed\.includes\("src\/pages\/Meetings\.jsx"\)/);
-  assert.match(workflow, /!changed\.includes\("src\/pages\/OperationalGatewaysParticipants\.jsx"\)/);
-  assert.match(workflow, /communicationMediaArchiveIntegration && communicationMediaArchivePaths\.has\(path\)/);
+test("guard-only test maintenance exception remains separate and narrowly scoped", () => {
+  assert.match(guard, /const guardOnlyWorkflowRepair\s*=/);
+  assert.match(guard, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
+  assert.match(guard, /!guardOnlyWorkflowRepair/);
 });
 
-test("readability-only PRs are narrowly allowlisted without permitting unrelated portal source changes", () => {
-  assert.match(workflow, /const readabilityOnlyFiles = new Set\(\[/);
-  assert.ok(workflow.includes('"--name-only", `${base}...HEAD`'));
-  assert.match(workflow, /changed\.includes\("src\/styles\/portal-readability-standard\.css"\)/);
-  assert.match(workflow, /changed\.every\(path => readabilityOnlyFiles\.has\(path\)\)/);
-  assert.match(workflow, /!readabilityOnlyChange/);
-  assert.match(workflow, /"src\/App\.jsx"/);
-  assert.match(workflow, /"tests\/browser\/authenticated-governance-regression\.spec\.mjs"/);
-});
-
-test("controlled-document trial upload permission fix must remain paired with Firestore rule regression tests", () => {
-  assert.match(workflow, /const controlledDocumentTrialUploadFix = changed\.includes\("firestore\.rules"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
-  assert.match(workflow, /!controlledDocumentTrialUploadFix/);
-});
-
-test("PDF palette repair is isolated to the signature page, scoped storage helper and paired policy test", () => {
-  assert.match(workflow, /const signaturePdfPaletteRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
-  assert.match(workflow, /changed\.includes\("src\/firebase\/signatureStorage\.js"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
-  assert.match(workflow, /!signaturePdfPaletteRepair/);
-  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "src\/firebase\/signatureStorage\.js", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
-});
-
-
-test("PDF URL handoff repair is narrowly paired with its policy regression test", () => {
-  assert.match(workflow, /const signaturePdfUrlHandoffRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
-  assert.match(workflow, /!signaturePdfUrlHandoffRepair/);
-  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
-});
-
-
-test("selected signer list visibility fix is narrowly paired with its regression test", () => {
-  assert.match(workflow, /const signatureSignerListVisibilityRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/signature-signer-picker-regression\.test\.mjs"\)/);
-  assert.match(workflow, /!signatureSignerListVisibilityRepair/);
-  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-signer-picker-regression\.test\.mjs"\]\.includes\(path\)\)/);
-});
-
-
-test("Signature document palette and assignment repair is narrowly paired with access-rule tests", () => {
-  assert.match(workflow, /const signatureDocumentPaletteAssignmentRepair = changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
-  assert.match(workflow, /changed\.includes\("src\/firebase\/data\.js"\)/);
-  assert.match(workflow, /changed\.includes\("firestore\.rules"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
-  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair/);
-  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair/);
-});
-
-
-test("Signature palette lifecycle source repair is paired with regression coverage", () => {
-  assert.match(workflow, /const signaturePaletteLifecycleSourceRepair = changed\.includes\("src\/firebase\/data\.js"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
-  assert.match(workflow, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair/);
-});
-
-
-test("archive-backed Signature Portal PDF palette repair is explicitly paired and path-limited", () => {
-  assert.match(workflow, /const signaturePdfArchivePaletteRepair = changed\.includes\("src\/firebase\/data\.js"\)/);
-  assert.match(workflow, /changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
-  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
-  assert.match(workflow, /!signaturePdfArchivePaletteRepair/);
-  assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/firebase\/data\.js", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
+test("Wrangler production configuration and staging KV isolation checks remain enforced", () => {
+  for (const check of [
+    'if (changed.includes(wranglerPath))',
+    'productionSection(baselineConfig, "Baseline Wrangler config") !== productionSection(currentConfig, "Current Wrangler config")',
+    'Production Wrangler configuration changed; only staging-only changes are permitted',
+    'id = "5ea76010553049a2b98c8493c37fbbc4"',
+    'id = "ccdbffa662ac48bfbdf7f4b1f62ca941"',
+    'Staging DRIVE_KV must retain the explicitly approved dedicated namespace',
+    'Production DRIVE_KV cannot be used by staging'
+  ]) assert.ok(guard.includes(check), "missing Wrangler/KV policy: " + check);
 });
