@@ -119,9 +119,13 @@ jobs:
               q=d/name; info=subprocess.run(['pdfinfo',str(q)],capture_output=True,text=True); txt=subprocess.run(['pdftotext',str(q),'-'],capture_output=True,text=True)
               m=re.search(r'^Pages:\s+(\d+)',info.stdout,re.M); counts[name]=int(m.group(1)) if m else 0
               record(name+' independently opens and extracts text',info.returncode==0 and txt.returncode==0 and counts[name]>0,counts[name])
-          continuations=[{'file':q.stem,'pages':len(PdfReader(str(q)).pages)} for q in pdfs if len(PdfReader(str(q)).pages)>1]
-          expected_continuations=['communication-and-media','grant-intelligence-and-funding-opportunities']
-          record('Wireframe PDF has 72 wireframes plus 2 documented continuation pages',len(pdfs)==72 and counts['WIRE_FRAMES.pdf']==74 and [x['file'] for x in continuations]==expected_continuations,{'wireframeFiles':len(pdfs),'totalPdfPages':counts['WIRE_FRAMES.pdf'],'continuationPages':continuations})
+          try:
+              pdfs=sorted(out.glob('*.pdf'))
+              continuations=[{'file':q.stem,'pages':len(PdfReader(str(q)).pages)} for q in pdfs if len(PdfReader(str(q)).pages)>1]
+              expected_continuations=['communication-and-media','grant-intelligence-and-funding-opportunities']
+              record('Wireframe PDF has 72 wireframes plus 2 documented continuation pages',len(pdfs)==72 and counts['WIRE_FRAMES.pdf']==74 and [x['file'] for x in continuations]==expected_continuations,{'wireframeFiles':len(pdfs),'totalPdfPages':counts['WIRE_FRAMES.pdf'],'continuationPages':continuations})
+          except Exception as e:
+              failures.append('Wireframe PDF continuation-page check: '+repr(e))
           # Requirement heading uniqueness and traceability.
           ids=re.findall(r'^###\s+((?:MOD|SUB|STD|API|GR|ROLE|OFF|MOB|AI|DR|GOV|TRC)-\d+)\b',srs,re.M)
           dup=sorted({x for x in ids if ids.count(x)>1}); record('Requirement heading IDs unique',not dup,{'count':len(ids),'duplicates':dup})
