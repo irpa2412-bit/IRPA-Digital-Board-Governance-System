@@ -1,14 +1,14 @@
 # Upload initialization cycle diagnostic report
 
-- Workflow run: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/41238674278
-- Commit: b743b81f9b87797164922474fa5427adec84f6af
-- Conclusion at report capture: cancelled
+- Workflow run: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/41238862847
+- Commit: c3962b313875e3eb8e746fc22d4c545662f11793
+- Conclusion at report capture: failure
 
 ## GitHub Actions job summary
 
 ## Madge circular dependency output
 - Finding files
-Processed 157 files (1.5s) (3 warnings)
+Processed 157 files (935ms) (3 warnings)
 
 ✔ No circular dependency found!
 
@@ -126,23 +126,23 @@ Runtime result unavailable.
 ## Workflow diagnostic console
 
 ## Regression test output
-✔ legacy envelope with no envelope or source metadata is allowed (2.5544ms)
-✔ matching envelope hash and size are accepted (0.249075ms)
-✔ mismatching hash or size is blocked (0.226694ms)
-✔ source document values are fallback when envelope values are absent (1.731242ms)
-✔ envelope values take precedence over source document values (0.285493ms)
-✔ Gateway accepts a legacy envelope when neither envelope nor source has expected metadata (1.83668ms)
-✔ Gateway accepts a matching envelope hash and size (10.800911ms)
-✔ Gateway blocks a mismatching expected hash or size (2.148241ms)
-✔ upload runtime report preserves the first five stack lines for a thrown error (1.590901ms)
-✔ upload dependency path no longer imports auth through the data module (5.629843ms)
+✔ legacy envelope with no envelope or source metadata is allowed (1.349572ms)
+✔ matching envelope hash and size are accepted (0.171657ms)
+✔ mismatching hash or size is blocked (0.115844ms)
+✔ source document values are fallback when envelope values are absent (1.202903ms)
+✔ envelope values take precedence over source document values (0.145308ms)
+✔ Gateway accepts a legacy envelope when neither envelope nor source has expected metadata (0.926469ms)
+✔ Gateway accepts a matching envelope hash and size (5.961856ms)
+✔ Gateway blocks a mismatching expected hash or size (0.997786ms)
+✔ upload runtime report preserves the first five stack lines for a thrown error (0.69388ms)
+✔ upload dependency path no longer imports auth through the data module (3.295971ms)
 [36mvite v7.3.7 [32mbuilding ssr environment for production...[36m[39m
 transforming...
 [32m✓[39m 4 modules transformed.
 rendering chunks...
-[2m../../../../../tmp/irpa-upload-runtime-FlCF10/bundle/[22m[36msignatureStorage.js  [39m[1m[2m28.88 kB[22m[1m[22m[2m │ map: 46.95 kB[22m
-[32m✓ built in 170ms[39m
-✔ real built upload module completes Create Drive file against a mocked Gateway (238.313191ms)
+[2m../../../../../tmp/irpa-upload-runtime-FgwyB6/bundle/[22m[36msignatureStorage.js  [39m[1m[2m28.88 kB[22m[1m[22m[2m │ map: 46.95 kB[22m
+[32m✓ built in 96ms[39m
+✔ real built upload module completes Create Drive file against a mocked Gateway (148.538435ms)
 ℹ tests 11
 ℹ suites 0
 ℹ pass 11
@@ -150,7 +150,7 @@ rendering chunks...
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 462.988292
+ℹ duration_ms 284.445381
 
 ## Madge exit code
 0
