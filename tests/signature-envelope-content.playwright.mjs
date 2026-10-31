@@ -19,6 +19,7 @@ try{
  await page.screenshot({path:"test-results/signature-envelope-content-before.png",fullPage:true});
  await page.getByRole("button",{name:"Create envelope"}).click();
  await page.getByTestId("signature-field-overlay").waitFor({state:"visible"});
+ await page.waitForFunction(()=>document.querySelector("[data-testid=pdf-page] canvas")?.dataset.rendered==="true");
  await page.waitForFunction(()=>JSON.parse(document.querySelector('[data-testid="text-after"]').textContent||"[]").length===3);
  const after=JSON.parse(await page.getByTestId("text-after").textContent());
  assert.equal(after.length,3);
