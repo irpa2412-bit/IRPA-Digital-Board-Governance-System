@@ -20,6 +20,8 @@ jobs:
         working-directory: cloudflare/grant-crawler-parallel
     steps:
       - uses: actions/checkout@v4
+      - name: Lint GitHub Actions workflow definitions
+        uses: rhysd/actionlint@v1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
