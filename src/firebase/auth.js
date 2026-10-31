@@ -25,6 +25,7 @@ import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { auth, db, firebaseConfig, googleProvider, applicantAuth } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+import { provisionCurrentMemberFromInvitationV2 } from "./invitationWorkflow";
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { sendEmployeeRegistrationEmail, sendMemberInvitationEmail } from "./employeeRegistrationEmail";
@@ -469,7 +470,6 @@ export async function completeMagicLink(email, url = window.location.href) {
   }
 
   if (memberInvitationId) {
-    const { provisionCurrentMemberFromInvitationV2 } = await import("./invitationWorkflow");
     await provisionCurrentMemberFromInvitationV2(memberInvitationId);
     window.localStorage.removeItem("irpaMemberEmailForSignIn");
     window.localStorage.removeItem("irpaEmailForSignIn");
