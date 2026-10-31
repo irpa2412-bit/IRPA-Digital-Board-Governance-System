@@ -33,7 +33,7 @@ for(const viewport of [
     page.on("request",request=>{
       let url;
       try{url=new URL(request.url());}catch{return;}
-      if(!url.pathname.endsWith("/pipeline/evaluate"))return;
+      if(url.pathname!=="/pipeline/evaluate")return;
       const record={url:url.href,method:request.method(),requestBody:request.postData(),responseStatus:null,responseBody:null,failure:null};
       pipelineRequests.push(record);
       requestRecords.set(request,record);
@@ -54,7 +54,7 @@ for(const viewport of [
     await page.route("**/*",async route=>{
       const request=route.request();
       const url=new URL(request.url());
-      if(url.pathname.endsWith("/pipeline/evaluate")&&request.method()==="POST"){
+      if(url.pathname==="/pipeline/evaluate"&&request.method()==="POST"){
         evaluationCalls+=1;
         if(responseMode==="timeout"){
           await page.waitForTimeout(31000).catch(()=>{});
@@ -81,7 +81,7 @@ for(const viewport of [
 
     const opportunityCard=title=>page.locator("article").filter({
       has:page.getByRole("heading",{name:title,exact:true})
-    }).first();
+    });
 
     const captureFailureEvidence=async()=>{
       const dir="test-results/analyse-diagnostics/"+viewport.name;
