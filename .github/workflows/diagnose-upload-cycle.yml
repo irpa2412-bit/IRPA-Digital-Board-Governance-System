@@ -1,0 +1,504 @@
+name: Diagnose Upload Initialization Cycle
+
+on:
+  push:
+    branches:
+      - fix/upload-and-legacy-signature-integrity-20261031
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install isolated authenticated browser fixture
+        run: |
+          npm --prefix functions install --omit=dev
+          npm install --no-save --package-lock=false @playwright/test @babel/parser @babel/traverse
+          npx playwright install --with-deps chromium
+
+      - name: DPDM graph and top-level initialization audit
+        shell: bash
+        run: |
+          set +e
+          npx --yes dpdm --no-warning --no-tree --transform src/main.jsx > /tmp/dpdm-report.txt 2>&1
+          dpdm_status=$?
+          set -e
+          cat /tmp/dpdm-report.txt
+          {
+            echo "## DPDM dependency analysis"
+            echo '~~~text'
+            cat /tmp/dpdm-report.txt
+            echo '~~~'
+            echo "DPDM exit code: $dpdm_status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat > .scan-top-level-tdz.mjs <<'NODE'
+          import fs from 'node:fs';
+          import { createRequire } from 'node:module';
+          const require=createRequire(import.meta.url);
+          const parser=require('@babel/parser');
+          const traverse=require('@babel/traverse').default;
+          const files=['src/utils/documentIntegrity.mjs','src/components/DocumentReader.jsx','src/pages/SignaturePlatform.jsx','src/firebase/signaturePlatform.js','src/firebase/signatureStorage.js','src/components/ControlledDocumentUpload.jsx','src/components/controlledDocumentUploadValidation.mjs','src/components/uploadRuntimeDiagnostics.mjs','src/firebase/auth.js','src/firebase/invitationWorkflow.js','src/firebase/data.js','src/firebase/config.js'];
+          const findings=[];
+          for(const file of files){
+            if(!fs.existsSync(file))continue;
+            const ast=parser.parse(fs.readFileSync(file,'utf8'),{sourceType:'module',plugins:['jsx','importMeta','topLevelAwait']});
+            const declarations=new Map();
+            for(const statement of ast.program.body){
+              if(statement.type==='VariableDeclaration'){
+                for(const decl of statement.declarations)if(['const','let'].includes(statement.kind)&&decl.id.type==='Identifier')declarations.set(decl.id.name,decl.id.start);
+              }else if(statement.type==='ClassDeclaration'&&statement.id)declarations.set(statement.id.name,statement.start);
+            }
+            traverse(ast,{ReferencedIdentifier(p){const at=declarations.get(p.node.name);if(at!==undefined&&p.node.start<at&&!p.getFunctionParent())findings.push(file+':'+p.node.loc.start.line+' reads '+p.node.name+' before declaration');},Function(p){p.skip();}});
+          }
+          fs.writeFileSync('/tmp/top-level-tdz-candidates.txt',findings.length?findings.join('\n'):'No top-level const/class TDZ candidates found in the reviewed upload/signature modules.');
+          console.log(fs.readFileSync('/tmp/top-level-tdz-candidates.txt','utf8'));
+          NODE
+          node ./.scan-top-level-tdz.mjs > /tmp/top-level-tdz-console.txt 2>&1 || true
+          cat /tmp/top-level-tdz-console.txt
+          {
+            echo
+            echo "## Top-level const/class initialization audit"
+            echo '~~~text'
+            cat /tmp/top-level-tdz-candidates.txt 2>/dev/null || cat /tmp/top-level-tdz-console.txt
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Capture production Rollup circular dependency warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/current-production-build.txt
+          grep -n -C 2 'CIRCULAR_DEPENDENCY\|Circular dependency' /tmp/current-production-build.txt > /tmp/rollup-circular-warnings.txt || true
+          {
+            echo
+            echo "## Rollup circular dependency warnings"
+            echo '~~~text'
+            if [ -s /tmp/rollup-circular-warnings.txt ]; then cat /tmp/rollup-circular-warnings.txt; else echo "No Rollup CIRCULAR_DEPENDENCY warnings captured."; fi
+            echo '~~~'
+            echo
+            echo "## Rollup mixed static/dynamic import warnings"
+            echo '~~~text'
+            if [ -s /tmp/rollup-mixed-import-warnings.txt ]; then cat /tmp/rollup-mixed-import-warnings.txt; else echo "No mixed static/dynamic import warnings captured."; fi
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Map production build 52af3f5 line 92 column 5466
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 52af3f50b833fb3e100a30bb2c1faf8e6324ec68
+          git fetch --no-tags origin a23df7bb52f49961a25c135947825d6cb6fafa7d
+          git fetch --no-tags origin fe4e3de45c718e5c0aa7df8cb46a6f800a9c873f
+          git worktree add --detach /tmp/upload-map-worktree 52af3f50b833fb3e100a30bb2c1faf8e6324ec68
+          cd /tmp/upload-map-worktree
+          npm install
+          npm run build > /tmp/production-52af3f5-build.txt 2>&1
+          target="index-rYhbyEXn.js"
+          built="$(find dist/assets -maxdepth 1 -type f -name 'index-*.js' | head -n 1)"
+          if [ -n "$built" ] && [ "$(basename "$built")" = "$target" ]; then
+            echo "Production asset filename matches: $(basename "$built")"
+            npm run build -- --sourcemap > /tmp/production-52af3f5-sourcemap-build.txt 2>&1
+            built="dist/assets/$target"
+            map="$built.map"
+          else
+            echo "Build asset filename differs ($(basename "$built" 2>/dev/null || echo missing)); downloading live production asset."
+            curl -fsSL "https://irpa-digital-board-governance.web.app/assets/$target" -o "/tmp/$target"
+            built="/tmp/$target"
+            map="/tmp/no-production-source-map"
+          fi
+          BUNDLE_PATH="$built" MAP_PATH="$map" node --input-type=module <<'NODE' | tee /tmp/production-52af3f5-diagnostics.txt
+          import fs from 'node:fs';
+          const bundlePath=process.env.BUNDLE_PATH,mapPath=process.env.MAP_PATH;
+          const code=fs.readFileSync(bundlePath,'utf8'),line=92,column=5466;
+          const start=code.split('\n').slice(0,line-1).reduce((n,s)=>n+s.length+1,0),offset=start+column-1;
+          console.log('ASSET='+bundlePath);
+          console.log('LINE='+line+' COLUMN='+column+' OFFSET='+offset);
+          console.log('MINIFIED_CONTEXT_300_CHARS=');
+          console.log(code.slice(Math.max(0,offset-150),Math.min(code.length,offset+150)));
+          console.log('MAPPED_SOURCE_BY_EXACT_SOURCE_EXPRESSION=src/components/ControlledDocumentUpload.jsx:149 (doc(collection(db, COLLECTIONS.documents)).id)');
+          if(!fs.existsSync(mapPath)){console.log('SOURCE_MAP=unavailable');process.exit(0);}
+          const map=JSON.parse(fs.readFileSync(mapPath,'utf8')),alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+          function vlq(segment){let out=[],value=0,shift=0;for(const ch of segment){let digit=alphabet.indexOf(ch);if(digit<0)continue;const cont=digit&32;digit&=31;value+=(digit<<shift);if(cont){shift+=5;continue;}out.push(value&1?-(value>>1):(value>>1));value=0;shift=0;}return out;}
+          const segments=(map.mappings.split(';')[line-1]||'').split(',');
+          let source=0,originalLine=0,originalColumn=0,name=0,chosen=null,generatedColumn=0;
+          for(const seg of segments){if(!seg)continue;const v=vlq(seg);generatedColumn+=v[0];if(v.length>=4){source+=v[1];originalLine+=v[2];originalColumn+=v[3];if(v.length>=5)name+=v[4];if(generatedColumn<=column-1)chosen={source,originalLine,originalColumn};else break;}}
+          if(!chosen){console.log('SOURCE_MAP_POSITION=unmapped');process.exit(0);}
+          const sourceName=map.sources[chosen.source],sourceText=map.sourcesContent?.[chosen.source]||'';
+          console.log('MAPPED_SOURCE='+sourceName+':'+(chosen.originalLine+1)+':'+(chosen.originalColumn+1));
+          console.log('SOURCE_LINE='+(sourceText.split('\n')[chosen.originalLine]||''));
+          NODE
+          cd "$GITHUB_WORKSPACE"
+          {
+            echo
+            echo "## Production minified asset mapping (52af3f5)"
+            echo '~~~text'
+            cat /tmp/production-52af3f5-diagnostics.txt
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bisect authenticated minified upload across 52af3f5, a23df7b and fe4e3de
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/upload-bisect
+          cp tests/browser/upload-production-bundle.spec.mjs /tmp/upload-bisect/
+          cp playwright.authenticated-governance.config.mjs /tmp/upload-bisect/
+          printf '%s\n' 'COMMIT,RESULT' > /tmp/upload-bisect-results.csv
+          for short in fe4e3de a23df7b 52af3f5; do
+            sha="$(git rev-parse "$short^{commit}")"
+            worktree="/tmp/upload-bisect/$short"
+            git worktree add --detach "$worktree" "$sha"
+            mkdir -p "$worktree/tests/browser"
+            cp /tmp/upload-bisect/upload-production-bundle.spec.mjs "$worktree/tests/browser/"
+            cp /tmp/upload-bisect/playwright.authenticated-governance.config.mjs "$worktree/"
+            (
+              cd "$worktree"
+              npm install
+              npm --prefix functions install --omit=dev
+              npm install --no-save --package-lock=false @playwright/test
+              set +e
+              npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1 --retries=0 --timeout=90000" > "/tmp/upload-bisect/$short.log" 2>&1
+              status=$?
+              set -e
+              cat "/tmp/upload-bisect/$short.log"
+              if [ "$status" -eq 0 ]; then result=PASS; else result=FAIL; fi
+              echo "$short,$result" >> /tmp/upload-bisect-results.csv
+              echo "$short=$result" >> "$GITHUB_STEP_SUMMARY"
+            )
+          done
+          first_failure="$(awk -F, 'NR>1&&$2=="FAIL"{print $1;exit}' /tmp/upload-bisect-results.csv)"
+          echo "FIRST_FAILING_COMMIT=$first_failure" > /tmp/upload-bisect-first-failure.txt
+          {
+            echo
+            echo "## Authenticated production-bundle bisect"
+            echo '~~~text'
+            cat /tmp/upload-bisect-results.csv
+            cat /tmp/upload-bisect-first-failure.txt
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Historical bisection outcomes are diagnostic; continue to PR-head reproduction and full suite."
+
+      - name: Reproduce authenticated production upload on PR head
+        shell: bash
+        env:
+          GCLOUD_PROJECT: demo-irpa-dgbs
+        run: |
+          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1 --retries=0 --timeout=90000"
+
+      - name: Run full Node test suite
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set +e
+          mapfile -t node_test_files < <(find . -type f \( -name '*.test.js' -o -name '*.test.cjs' -o -name '*.test.mjs' -o -name '*-test.js' -o -name '*-test.cjs' -o -name '*-test.mjs' -o -name '*_test.js' -o -name '*_test.cjs' -o -name '*_test.mjs' \) -not -path '*/node_modules/*' -not -path '*/tests/browser/*' | sort)
+          if [ "${#node_test_files[@]}" -eq 0 ]; then echo "No Node test files discovered."; exit 1; fi
+          printf 'Node test files (%s):\n' "${#node_test_files[@]}" | tee /tmp/full-node-test-files.txt
+          printf '%s\n' "${node_test_files[@]}" | tee -a /tmp/full-node-test-files.txt
+          test_command="node --test --test-concurrency=1 --test-timeout=60000 ${node_test_files[*]}"
+          timeout 900s npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "$test_command" > /tmp/full-node-test-suite.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/full-node-test-suite.txt
+          {
+            echo
+            echo "## Full Node test suite"
+            echo '~~~text'
+            cat /tmp/full-node-test-suite.txt
+            echo '~~~'
+            echo "Full Node test exit code: $status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+
+      - name: Capture cycles and upload import chains
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          npx --yes madge --circular --extensions js,jsx,mjs src drive-gateway/src > /tmp/madge-cycles.txt 2>&1
+          madge_status=$?
+          echo "$madge_status" > /tmp/madge-exit-code.txt
+          set -e
+          {
+            echo "## Circular dependency report"
+            echo '~~~text'
+            cat /tmp/madge-cycles.txt
+            echo '~~~'
+            echo
+            echo "## Ten longest import chains involving upload/signature modules"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          npx --yes madge --json --extensions js,jsx,mjs src/components/ControlledDocumentUpload.jsx src/components/DocumentReader.jsx src/pages/SignaturePlatform.jsx src/firebase/signaturePlatform.js src/firebase/signatureStorage.js src/firebase/auth.js src/firebase/data.js > /tmp/upload-import-graph.json 2>/tmp/madge-graph-stderr.txt
+          node --input-type=module <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          import fs from 'node:fs';
+          const graph=JSON.parse(fs.readFileSync('/tmp/upload-import-graph.json','utf8'));
+          const nodes=new Set(Object.keys(graph)), chains=[];
+          const relevant=/ControlledDocumentUpload|DocumentReader|SignaturePlatform|signaturePlatform|signatureStorage|integrity|hash|auth|data/i;
+          function walk(node,path,seen){
+            const next=(graph[node]||[]).filter(x=>nodes.has(x));
+            if(!next.length||path.length>=18){if(path.some(x=>relevant.test(x)))chains.push(path);return;}
+            for(const child of next){
+              if(seen.has(child)){if(path.some(x=>relevant.test(x)))chains.push([...path,child+' [cycle]']);continue;}
+              walk(child,[...path,child],new Set([...seen,child]));
+            }
+          }
+          for(const root of nodes)walk(root,[root],new Set([root]));
+          const unique=new Map(chains.map(x=>[x.join(' -> '),x]));
+          const ranked=[...unique.values()].sort((a,b)=>b.length-a.length||a.join().localeCompare(b.join())).slice(0,10);
+          if(!ranked.length)console.log('_No upload-related import chains returned by madge._');
+          ranked.forEach((x,i)=>{console.log((i+1)+'. **'+x.length+' modules**');console.log('   `'+x.join(' → ')+'`');});
+          NODE
+          node --input-type=module <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          import fs from 'node:fs';
+          const lines=fs.readFileSync('/tmp/madge-cycles.txt','utf8').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+          const cycles=lines.filter(x=>/^\d+\)/.test(x)).map(x=>x.replace(/^\d+\)\s*/, '').replace(/\s+>\s+/g,' → '));
+          if(!cycles.length) console.log('No circular dependency found');
+          else { console.log('### Cycles (arrow notation)'); for(const cycle of cycles) console.log('- '+String.fromCharCode(96)+cycle+String.fromCharCode(96)); }
+          fs.writeFileSync('/tmp/upload-cycle-formatted-cycles.txt',cycles.length?cycles.join('\n'):'No circular dependency found');
+          NODE
+          while IFS= read -r cycle; do
+            [ -n "$cycle" ] && echo "::error title=Upload dependency cycle::$cycle"
+          done < /tmp/upload-cycle-formatted-cycles.txt
+          cp /tmp/madge-cycles.txt /tmp/upload-cycle-report.txt
+          cat /tmp/upload-import-graph.json >> /tmp/upload-cycle-report.txt
+          echo "MADGE_EXIT_CODE=$madge_status" >> /tmp/upload-cycle-report.txt
+
+      - name: Enforce madge circular dependency check
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -s /tmp/upload-cycle-formatted-cycles.txt ]; then
+            echo "Madge cycle report was not produced."
+            exit 1
+          fi
+          if [ ! -s /tmp/madge-exit-code.txt ] || [ "$(cat /tmp/madge-exit-code.txt)" -ne 0 ]; then
+            echo "madge --circular failed to execute successfully."
+            cat /tmp/madge-cycles.txt 2>/dev/null || true
+            exit 1
+          fi
+          if grep -q "^No circular dependency found$" /tmp/upload-cycle-formatted-cycles.txt; then
+            echo "PASS: madge --circular found no dependency cycles."
+          else
+            echo "FAIL: madge --circular found dependency cycles:"
+            cat /tmp/upload-cycle-formatted-cycles.txt
+            exit 1
+          fi
+
+      - name: Build with source maps and readable output
+        shell: bash
+        run: |
+          set +e
+          npx vite build --sourcemap --minify false > /tmp/vite-build.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/vite-build.txt
+          {
+            echo
+            echo "## Vite build"
+            echo '~~~text'
+            cat /tmp/vite-build.txt
+            echo '~~~'
+            echo "Build exit code: $status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Execute Create Drive file against built upload module with mocked Gateway
+        shell: bash
+        run: |
+          mkdir -p /tmp/upload-cycle-runtime
+          cat > /tmp/upload-cycle-runtime/run.mjs <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { pathToFileURL } from 'node:url';
+          const root=process.cwd();
+          const { build } = await import(pathToFileURL(path.join(root,'node_modules/vite/dist/node/index.js')).href);
+          const authStub='\0upload-cycle-auth-stub',configStub='\0upload-cycle-config-stub',gatewayStub='\0upload-cycle-gateway-stub';
+          const plugin={
+            name:'upload-cycle-runtime-mocks',enforce:'pre',
+            resolveId(source,importer){
+              if(source==='firebase/auth')return authStub;
+              if(importer===path.join(root,'src/firebase/signatureStorage.js')&&source==='./config')return configStub;
+              if(importer===path.join(root,'src/firebase/signatureStorage.js')&&source==='./gatewayUrl')return gatewayStub;
+              return null;
+            },
+            load(id){
+              if(id===authStub)return 'export async function getIdToken(){return "mock-firebase-id-token";}';
+              if(id===configStub)return 'export const auth={currentUser:{uid:"upload-cycle-test-user",email:"test@irpa.invalid"}};';
+              if(id===gatewayStub)return 'export function getGoogleDriveGatewayUrl(){return "https://mock-gateway.invalid";}';
+              return null;
+            }
+          };
+          const outDir='/tmp/upload-cycle-runtime/bundle';
+          await build({configFile:false,root,plugins:[plugin],build:{ssr:'src/firebase/signatureStorage.js',outDir,emptyOutDir:true,minify:false,sourcemap:true,rollupOptions:{output:{format:'es'}}}});
+          globalThis.fetch=async(url,init)=>{
+            if(!String(url).includes('/api/upload-controlled-document'))throw new Error('Unexpected mocked Gateway route: '+url);
+            const payload=JSON.parse(init.body);
+            if(!payload.base64||!payload.fileName)throw new Error('Mock Gateway received incomplete upload payload.');
+            return new Response(JSON.stringify({ok:true,categoryArchive:{folderId:'mock-folder',file:{fileId:'mock-drive-file',name:payload.fileName}},archivePath:payload.destinationKey}),{status:200,headers:{'content-type':'application/json'}});
+          };
+          const bundle=fs.readdirSync(outDir).find(x=>x.endsWith('.js'));
+          if(!bundle)throw new Error('Vite did not emit the upload module bundle.');
+          const mod=await import(pathToFileURL(path.join(outDir,bundle)).href);
+          try{
+            const result=await mod.uploadControlledDocumentRouted({
+              documentId:'mock-document-id',title:'Upload-cycle diagnostic fixture',reference:'IRPA-DIAG-001',
+              documentType:'Governance',archiveCategory:'Governance Documents',classification:'Public',
+              uploadedAt:'2026-10-31T00:00:00.000Z',
+              file:{name:'upload-cycle-fixture.pdf',type:'application/pdf',async arrayBuffer(){return Uint8Array.from([37,80,68,70,45,49,46,55]).buffer;}}
+            });
+            if(result?.categoryArchive?.file?.fileId!=='mock-drive-file')throw new Error('Create Drive file did not receive mocked Drive file ID.');
+            fs.writeFileSync('/tmp/upload-cycle-runtime/result.txt','PASS: Create Drive file returned mock-drive-file; route='+result.archivePath);
+          }catch(error){
+            const stack=String(error?.stack||error),message=error?.message||String(error),name=error?.name||'Error';
+            const match=message.match(/\b([A-Za-z_$][\w$]*) is not defined\b/);
+            const identifier=match?match[1]:'unresolved';
+            let declarations='';
+            if(identifier!=='unresolved'){
+              const {execFileSync}=await import('node:child_process');
+              for(const dir of ['src','drive-gateway/src']){
+                try{declarations+=execFileSync('rg',['-n','--glob','*.js','--glob','*.jsx','--glob','*.mjs','(?:const|let|var|function|class)\\s+'+identifier+'\\b',dir],{encoding:'utf8'});}catch{}
+              }
+            }
+            const report='FAIL: '+name+': '+message+'\n\nUNMINIFIED STACK:\n'+stack+'\n\nMODULE DECLARING '+identifier+':\n'+(declarations||'No declaration found in src/ or drive-gateway/src.');
+            fs.writeFileSync('/tmp/upload-cycle-runtime/result.txt',report);
+            process.exitCode=1;
+          }
+          NODE
+          set +e
+          node --enable-source-maps /tmp/upload-cycle-runtime/run.mjs > /tmp/upload-runtime-console.txt 2>&1
+          runtime_status=$?
+          set -e
+          {
+            echo
+            echo "## Create Drive file runtime reproduction"
+            echo '~~~text'
+            cat /tmp/upload-cycle-runtime/result.txt 2>/dev/null || cat /tmp/upload-runtime-console.txt
+            echo
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/upload-cycle-runtime/result.txt >> /tmp/upload-cycle-report.txt 2>/dev/null || true
+          cat /tmp/upload-runtime-console.txt >> /tmp/upload-cycle-report.txt
+          test "$runtime_status" -eq 0
+
+      - name: Run upload and integrity regression tests
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs tests/gateway-signing-integrity.test.mjs tests/invitation-workflow-static-import.test.mjs > /tmp/regression-tests.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/regression-tests.txt
+          {
+            echo
+            echo "## Upload and integrity regression tests"
+            echo '~~~text'
+            cat /tmp/regression-tests.txt
+            echo '~~~'
+            echo "Regression test exit code: $status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload complete diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-cycle-report
+          path: |
+            /tmp/upload-cycle-report.txt
+            /tmp/madge-cycles.txt
+            /tmp/upload-import-graph.json
+            /tmp/vite-build.txt
+            /tmp/upload-runtime-console.txt
+            /tmp/upload-cycle-runtime/result.txt
+            /tmp/upload-cycle-formatted-cycles.txt
+            /tmp/madge-exit-code.txt
+            /tmp/regression-tests.txt
+            /tmp/dpdm-report.txt
+            /tmp/top-level-tdz-candidates.txt
+            /tmp/rollup-circular-warnings.txt
+            /tmp/current-production-build.txt
+            /tmp/production-52af3f5-build.txt
+            /tmp/production-52af3f5-sourcemap-build.txt
+            /tmp/production-52af3f5-diagnostics.txt
+            /tmp/upload-bisect-results.csv
+            /tmp/upload-bisect-first-failure.txt
+            /tmp/upload-bisect/*.log
+            /tmp/full-node-test-suite.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit complete upload-cycle diagnostic report
+        if: always() && !contains(github.event.head_commit.message, '[upload-report]')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p docs/diagnostics
+          {
+            echo "# Upload initialization cycle diagnostic report"
+            echo
+            echo "- Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Conclusion at report capture: ${{ job.status }}"
+            echo
+            echo "## GitHub Actions job summary"
+            cat "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            echo
+            echo "## Madge circular dependency output"
+            cat /tmp/madge-cycles.txt 2>/dev/null || echo "Madge output unavailable."
+            echo
+            echo "## Import graph"
+            cat /tmp/upload-import-graph.json 2>/dev/null || echo "Import graph unavailable."
+            echo
+            echo "## Vite build output"
+            cat /tmp/vite-build.txt 2>/dev/null || echo "Build output unavailable."
+            echo
+            echo "## Create Drive file runtime result"
+            cat /tmp/upload-cycle-runtime/result.txt 2>/dev/null || cat /tmp/upload-runtime-console.txt 2>/dev/null || echo "Runtime result unavailable."
+            echo
+            echo "## Workflow diagnostic console"
+            cat /tmp/upload-runtime-console.txt 2>/dev/null || true
+            echo
+            echo "## Regression test output"
+            cat /tmp/regression-tests.txt 2>/dev/null || echo "Regression tests did not run."
+            echo
+            echo "## Madge exit code"
+            cat /tmp/madge-exit-code.txt 2>/dev/null || echo "Madge exit code unavailable."
+          } > docs/diagnostics/upload-cycle-report.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/diagnostics/upload-cycle-report.md
+          if git diff --cached --quiet; then
+            echo "Diagnostic report is unchanged; no commit required."
+            exit 0
+          fi
+          cp docs/diagnostics/upload-cycle-report.md /tmp/upload-cycle-final-report.md
+          for attempt in 1 2 3; do
+            git fetch origin "$GITHUB_REF_NAME"
+            git reset --hard "origin/$GITHUB_REF_NAME"
+            cp /tmp/upload-cycle-final-report.md docs/diagnostics/upload-cycle-report.md
+            git add docs/diagnostics/upload-cycle-report.md
+            git commit -m "docs: preserve upload cycle diagnostic report [upload-report]" || exit 0
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then exit 0; fi
+            echo "Report push raced with another branch update; retrying ($attempt/3)."
+          done
+          echo "Unable to publish the diagnostic report after three fast-forward retries."
+          exit 1
