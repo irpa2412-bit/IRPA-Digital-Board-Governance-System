@@ -1075,7 +1075,7 @@ test("Grant Pipeline routes evaluate eligible, conditional, not eligible and exp
   const env = { GRANTS_DB: pipelineTestDb(rows) };
   const headers = { authorization: "Bearer " + auth.token, "content-type": "application/json" };
   try {
-    const listed = await worker.fetch(new Request("https://crawler.example/pipeline/calls", { headers }), env);
+    const listed = await worker.fetch(new Request("https://crawler.example/pipeline/calls?limit=97&offset=99", { headers }), env);
     const listBody = await listed.json();
     assert.equal(listed.status, 200);
     assert.equal(listBody.calls.length, 1);
@@ -1173,7 +1173,18 @@ test("GET /opportunities paginates, caches in memory, and loads engine history o
 test("GET /opportunities maps D1 limit exhaustion to 503", async () => {
   const response = await listOpportunities(new Request("https://crawler.example/opportunities?limit=46&offset=11"), { GRANTS_DB: opportunityDbMock(new Error("D1 daily read limit exceeded")) });
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "D1 daily limit reached" });
+  assert.deepEqual(await response.json(), { error: "degraded: D1 daily read limit reached", degraded: true, items: [], count: 0 });
+});
+
+test("D1 error code 7500 is explicitly reported as degraded", async () => {
+  const error = new Error("D1 daily read quota reached"); error.code = 7500;
+  const response = await listOpportunities(new Request("https://crawler.example/opportunities?limit=97&offset=99"), {
+    GRANTS_DB: { prepare() { return { bind() { return this; }, async all() { throw error; }, async first() { throw error; } }; } }
+  });
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.error, "degraded: D1 daily read limit reached");
+  assert.equal(body.degraded, true);
 });
 
 test("Grant Pipeline calls and evidence use bounded limit/offset pagination", async () => {
