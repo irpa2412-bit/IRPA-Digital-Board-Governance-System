@@ -165,7 +165,7 @@ jobs:
             }
             const report='FAIL: '+name+': '+message+'\n\nUNMINIFIED STACK:\n'+stack+'\n\nMODULE DECLARING '+identifier+':\n'+(declarations||'No declaration found in src/ or drive-gateway/src.');
             fs.writeFileSync('/tmp/upload-cycle-runtime/result.txt',report);
-            if(!(error instanceof ReferenceError))process.exitCode=1;
+            process.exitCode=1;
           }
           NODE
           set +e
