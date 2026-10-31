@@ -90,6 +90,7 @@ test("production minified bundle completes authenticated Create Drive file with 
     { timeout: 30000, message: "production bundle should reach the mocked Create Drive file Gateway route" }
   ).toBe(1);
   await expect(page.getByText(/Drive file ID: fixture-drive-file-id/)).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText(/PASS — Create Drive file/)).toBeVisible({ timeout: 30000 });
   await expect(page.getByText(/Document uploaded successfully to Google Drive/)).toBeVisible({ timeout: 30000 });
 
   const referenceErrors = pageErrors.filter(error => error.name === "ReferenceError");
