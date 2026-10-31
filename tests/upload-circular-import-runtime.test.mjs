@@ -60,7 +60,7 @@ test("real built upload module completes Create Drive file against a mocked Gate
       build: { ssr: "src/firebase/signatureStorage.js", outDir, emptyOutDir: true, minify: false, sourcemap: true, rollupOptions: { output: { format: "es" } } }
     });
     globalThis.fetch = async (url, init) => {
-      assert.match(String(url), /\\/api\\/upload-controlled-document$/);
+      assert.match(String(url), /\/api\/upload-controlled-document$/);
       const payload = JSON.parse(init.body);
       assert.ok(payload.base64);
       assert.equal(payload.fileSize, 8);
