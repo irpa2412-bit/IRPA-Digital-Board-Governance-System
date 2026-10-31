@@ -144,7 +144,7 @@ test("extracted script retains every baseline allowlist entry by exact path", ()
 });
 
 test("all named isolation policy gates remain present and participate in the final decision", () => {
-  for (const name of ["signaturePathwayContractRepair","signatureGatewayIntegration","signatureSignerPickerRepair","signaturePdfPaletteRepair","signatureSignerListVisibilityRepair","signaturePaletteLifecycleSourceRepair","signatureDocumentPaletteAssignmentRepair","signaturePdfUrlHandoffRepair","signaturePdfArchivePaletteRepair","controlledDocumentTrialUploadFix","actualDataGateIntegration","grantAssistantPersistence","communicationMediaIntegration","communicationMediaArchiveIntegration","guardOnlyWorkflowRepair","fixtureWorkflowScriptRepair","invitationMailResendIntegration","invitationRemovalIntegration","communicationMediaOnly","readabilityOnlyChange"]) {
+  for (const name of ["signaturePathwayContractRepair","signatureGatewayIntegration","signatureSignerPickerRepair","signaturePdfPaletteRepair","signatureSignerListVisibilityRepair","signaturePaletteLifecycleSourceRepair","signatureDocumentPaletteAssignmentRepair","signaturePdfUrlHandoffRepair","signaturePdfArchivePaletteRepair","controlledDocumentTrialUploadFix","actualDataGateIntegration","grantAssistantPersistence","guardOnlyWorkflowRepair","fixtureWorkflowScriptRepair","invitationMailResendIntegration","invitationRemovalIntegration","communicationMediaOnly","readabilityOnlyChange"]) {
     assert.match(guard, new RegExp("const " + name + "\\s*="), name + " policy definition must remain");
     assert.ok(guard.includes("!" + name), name + " must remain part of the final policy gate");
   }
@@ -156,6 +156,10 @@ test("all named isolation policy gates remain present and participate in the fin
     'Unexpected files changed outside the isolated meeting repair',
     'Meeting/participant source change or an explicitly paired isolated regression/guard test is missing'
   ]) assert.ok(guard.includes(required), "missing policy check: " + required);
+});
+
+test("Communication & Media sub-policies remain paired under the explicit aggregate policy", () => {
+  assert.match(guard, /const communicationMediaOnly = communicationMediaIntegration \|\| communicationMediaArchiveIntegration/);
 });
 
 test("fixture workflow/script exception is limited to the two approved files", () => {
