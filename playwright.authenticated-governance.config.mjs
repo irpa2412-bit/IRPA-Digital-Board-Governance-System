@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/browser",
-  testMatch: "authenticated-governance-regression.spec.mjs",
+  testMatch: ["authenticated-governance-regression.spec.mjs", "upload-production-bundle.spec.mjs"],
   timeout: 120000,
   expect: { timeout: 30000 },
   reporter: "list",
