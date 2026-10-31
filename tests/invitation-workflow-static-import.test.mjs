@@ -8,4 +8,7 @@ test("invitation workflow reuses its static Firestore and config imports", async
   assert.match(source, /import \{ doc, getDocs, query, collection, serverTimestamp, setDoc, where \} from "firebase\/firestore";/);
   assert.doesNotMatch(source, /await import\(["']firebase\/firestore["']\)/);
   assert.doesNotMatch(source, /await import\(["']\.\/config["']\)/);
+  const authSource = await readFile(new URL("../src/firebase/auth.js", import.meta.url), "utf8");
+  assert.match(authSource, /import \{ provisionCurrentMemberFromInvitationV2 \} from "\.\/invitationWorkflow";/);
+  assert.doesNotMatch(authSource, /await import\(["']\.\/invitationWorkflow["']\)/);
 });
