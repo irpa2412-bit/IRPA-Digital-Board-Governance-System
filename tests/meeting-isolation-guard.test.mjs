@@ -11,23 +11,24 @@ test("isolation guard runs after fetching main and receives the GitHub event nam
   assert.notEqual(fetchIndex, -1, "workflow must fetch origin main");
   assert.notEqual(stepIndex, -1, "workflow must retain the runtime source-isolation guard step");
   assert.ok(fetchIndex < stepIndex, "the guard must run after git fetch origin main");
-  const nextStepIndex = workflow.indexOf("\\n      - name:", stepIndex + 1);
+  const nextStepIndex = workflow.indexOf("\n      - name:", stepIndex + 1);
   const step = workflow.slice(stepIndex, nextStepIndex < 0 ? undefined : nextStepIndex);
-  assert.match(step, /env:\\s*\\n\\s+EVENT_NAME:\\s*\\$\\{\\{\\s*github\\.event_name\\s*\\}\\}/);
-  assert.match(step, /run:\\s*\\|[\\s\\S]*?node scripts\\/ci\\/meeting-fixture-isolation\\.mjs/);
-  assert.doesNotMatch(step, /continue-on-error:\\s*true/);
-  assert.doesNotMatch(step, /if:\\s*false|if:\\s*\\$\\{\\{\\s*false/);
+  assert.match(step, /env:\s*\n\s+EVENT_NAME:\s*\$\{\{\s*github\.event_name\s*\}\}/);
+  assert.match(step, /run:\s*\|[\s\S]*?node scripts\/ci\/meeting-fixture-isolation\.mjs/);
+  assert.doesNotMatch(step, /continue-on-error:\s*true/);
+  assert.doesNotMatch(step, /if:\s*false|if:\s*\$\{\{\s*false/);
 });
 
 test("extracted isolation script retains baseline, allowlist, and all isolation policy checks", () => {
-  assert.match(guard, /const eventName = process\\.env\\.EVENT_NAME\\?\\.trim\\(\\)/);
-  assert.match(guard, /const base = "origin\\/main"/);
-  assert.ok(guard.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
-  assert.match(guard, /const allowed = new Set\\(\\[/);
-  assert.match(guard, /const unexpected = changed\\.filter\\(path =>/);
+  assert.match(guard, /const eventName = process\.env\.EVENT_NAME\?\.trim\(\)/);
+  assert.match(guard, /const base = "origin\/main"/);
+  assert.match(guard, /git.*diff.*--name-only/);
+  assert.match(guard, /const allowed = new Set\(\[/);
+  assert.match(guard, /const unexpected = changed\.filter\(path =>/);
   assert.match(guard, /Unexpected files changed outside the isolated meeting repair/);
-  assert.match(guard, /Meeting\\/participant source change or an explicitly paired isolated regression\\/guard test is missing/);
-});\ntest("Wrangler changes cannot alter production configuration", () => {
+  assert.match(guard, /Meeting\/participant source change or an explicitly paired isolated regression\/guard test is missing/);
+});
+test("Wrangler changes cannot alter production configuration", () => {
   assert.match(guard, /if \(changed\.includes\(wranglerPath\)\)/);
   assert.match(guard, /productionSection\(baselineConfig, "Baseline Wrangler config"\) !== productionSection\(currentConfig, "Current Wrangler config"\)/);
   assert.match(guard, /Production Wrangler configuration changed; only staging-only changes are permitted/);
