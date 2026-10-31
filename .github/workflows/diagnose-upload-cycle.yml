@@ -211,8 +211,8 @@ jobs:
           if [ "${#node_test_files[@]}" -eq 0 ]; then echo "No Node test files discovered."; exit 1; fi
           printf 'Node test files (%s):\n' "${#node_test_files[@]}" | tee /tmp/full-node-test-files.txt
           printf '%s\n' "${node_test_files[@]}" | tee -a /tmp/full-node-test-files.txt
-          test_command="node --test --test-concurrency=1 ${node_test_files[*]}"
-          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "$test_command" > /tmp/full-node-test-suite.txt 2>&1
+          test_command="node --test --test-concurrency=1 --test-timeout=60000 ${node_test_files[*]}"
+          timeout 900s npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "$test_command" > /tmp/full-node-test-suite.txt 2>&1
           status=$?
           set -e
           cat /tmp/full-node-test-suite.txt
