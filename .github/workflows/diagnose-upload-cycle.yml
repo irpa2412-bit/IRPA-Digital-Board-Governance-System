@@ -173,7 +173,7 @@ jobs:
               npm --prefix functions install --omit=dev
               npm install --no-save --package-lock=false @playwright/test
               set +e
-              npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1" > "/tmp/upload-bisect/$short.log" 2>&1
+              npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1 --retries=0 --timeout=90000" > "/tmp/upload-bisect/$short.log" 2>&1
               status=$?
               set -e
               cat "/tmp/upload-bisect/$short.log"
@@ -199,7 +199,7 @@ jobs:
         env:
           GCLOUD_PROJECT: demo-irpa-dgbs
         run: |
-          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1"
+          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1 --retries=0 --timeout=90000"
 
       - name: Run full Node test suite
         if: ${{ !cancelled() }}
