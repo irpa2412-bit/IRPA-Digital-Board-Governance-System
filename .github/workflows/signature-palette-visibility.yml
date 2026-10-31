@@ -7,6 +7,9 @@ on:
       - "src/pages/SignaturePlatform.jsx"
       - "src/pages/GatewaySigningPortal.jsx"
       - "tests/fixtures/signature-palette-harness.*"
+      - "tests/fixtures/signature-envelope-content-harness.*"
+      - "tests/signature-envelope-content.playwright.mjs"
+      - "tests/signature-explicit-confirmation.test.mjs"
       - "tests/signature-palette-visibility.playwright.mjs"
       - ".github/workflows/signature-palette-visibility.yml"
   push:
@@ -54,6 +57,10 @@ jobs:
         run: npm install --no-save --package-lock=false playwright
       - name: Install Chromium for desktop and mobile viewport emulation
         run: npx playwright install --with-deps chromium
+      - name: Install Poppler for PDF text extraction
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes poppler-utils
       - name: Run existing explicit-confirmation policy tests
         run: node --test tests/signature-explicit-confirmation.test.mjs
       - name: Setup Java for Firestore Emulator
@@ -84,6 +91,8 @@ jobs:
           done
       - name: Run desktop and mobile signature ceremony Playwright tests
         run: node tests/signature-palette-visibility.playwright.mjs
+      - name: Run three-page envelope PDF content regression
+        run: node tests/signature-envelope-content.playwright.mjs
       - name: Run production readability and contrast checks
         run: npm run check:production-readability
       - name: Build application
