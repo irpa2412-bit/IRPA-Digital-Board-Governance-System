@@ -151,6 +151,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Bisect authenticated minified upload across 52af3f5, a23df7b and fe4e3de
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -158,7 +159,7 @@ jobs:
           cp tests/browser/upload-production-bundle.spec.mjs /tmp/upload-bisect/
           cp playwright.authenticated-governance.config.mjs /tmp/upload-bisect/
           printf '%s\n' 'COMMIT,RESULT' > /tmp/upload-bisect-results.csv
-          for short in 52af3f5 a23df7b fe4e3de; do
+          for short in fe4e3de a23df7b 52af3f5; do
             sha="$(git rev-parse "$short^{commit}")"
             worktree="/tmp/upload-bisect/$short"
             git worktree add --detach "$worktree" "$sha"
@@ -180,7 +181,7 @@ jobs:
               echo "$short=$result" >> "$GITHUB_STEP_SUMMARY"
             )
           done
-          first_failure="$(awk -F, 'NR>1&&$2=="FAIL"{print $1;exit}' /tmp/upload-bisect-results.csv)"
+          first_failure="$(awk -F, 'NR>1&&$2=="FAIL"{candidate=$1} END{print candidate}' /tmp/upload-bisect-results.csv)"
           echo "FIRST_FAILING_COMMIT=$first_failure" > /tmp/upload-bisect-first-failure.txt
           {
             echo
@@ -190,7 +191,7 @@ jobs:
             cat /tmp/upload-bisect-first-failure.txt
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
-          test -z "$first_failure"
+          echo "Historical bisection outcomes are diagnostic; continue to PR-head reproduction and full suite."
 
       - name: Reproduce authenticated production upload on PR head
         shell: bash
@@ -200,6 +201,7 @@ jobs:
           npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --grep 'production minified bundle' --workers=1"
 
       - name: Run full Node test suite
+        if: always()
         shell: bash
         run: |
           set +e
