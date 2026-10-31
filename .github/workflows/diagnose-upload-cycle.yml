@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: upload-cycle-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   diagnose:
     runs-on: ubuntu-latest
@@ -23,7 +27,7 @@ jobs:
       - name: Install isolated authenticated browser fixture
         run: |
           npm --prefix functions install --omit=dev
-          npm install --no-save --package-lock=false @playwright/test
+          npm install --no-save --package-lock=false @playwright/test @babel/parser @babel/traverse
           npx playwright install --with-deps chromium
 
       - name: DPDM graph and top-level initialization audit
@@ -41,7 +45,7 @@ jobs:
             echo '~~~'
             echo "DPDM exit code: $dpdm_status"
           } >> "$GITHUB_STEP_SUMMARY"
-          cat > /tmp/scan-top-level-tdz.mjs <<'NODE'
+          cat > .scan-top-level-tdz.mjs <<'NODE'
           import fs from 'node:fs';
           import parser from '@babel/parser';
           import traverseModule from '@babel/traverse';
@@ -62,7 +66,7 @@ jobs:
           fs.writeFileSync('/tmp/top-level-tdz-candidates.txt',findings.length?findings.join('\n'):'No top-level const/class TDZ candidates found in the reviewed upload/signature modules.');
           console.log(fs.readFileSync('/tmp/top-level-tdz-candidates.txt','utf8'));
           NODE
-          node /tmp/scan-top-level-tdz.mjs > /tmp/top-level-tdz-console.txt 2>&1 || true
+          node ./.scan-top-level-tdz.mjs > /tmp/top-level-tdz-console.txt 2>&1 || true
           cat /tmp/top-level-tdz-console.txt
           {
             echo
@@ -90,6 +94,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git fetch --no-tags origin 52af3f50b833fb3e100a30bb2c1faf8e6324ec68
+          git fetch --no-tags origin a23df7bb52f49961a25c135947825d6cb6fafa7d
+          git fetch --no-tags origin fe4e3de45c718e5c0aa7df8cb46a6f800a9c873f
           git worktree add --detach /tmp/upload-map-worktree 52af3f50b833fb3e100a30bb2c1faf8e6324ec68
           cd /tmp/upload-map-worktree
           npm install
@@ -206,6 +213,7 @@ jobs:
 
 
       - name: Capture cycles and upload import chains
+        if: always()
         shell: bash
         run: |
           set +e
@@ -467,5 +475,15 @@ jobs:
             echo "Diagnostic report is unchanged; no commit required."
             exit 0
           fi
-          git commit -m "docs: preserve upload cycle diagnostic report [upload-report]"
-          git push origin "HEAD:$GITHUB_REF_NAME"
+          cp docs/diagnostics/upload-cycle-report.md /tmp/upload-cycle-final-report.md
+          for attempt in 1 2 3; do
+            git fetch origin "$GITHUB_REF_NAME"
+            git reset --hard "origin/$GITHUB_REF_NAME"
+            cp /tmp/upload-cycle-final-report.md docs/diagnostics/upload-cycle-report.md
+            git add docs/diagnostics/upload-cycle-report.md
+            git commit -m "docs: preserve upload cycle diagnostic report [upload-report]" || exit 0
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then exit 0; fi
+            echo "Report push raced with another branch update; retrying ($attempt/3)."
+          done
+          echo "Unable to publish the diagnostic report after three fast-forward retries."
+          exit 1
