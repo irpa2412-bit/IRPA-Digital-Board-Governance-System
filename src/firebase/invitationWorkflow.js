@@ -76,8 +76,6 @@ export async function provisionCurrentMemberFromInvitationV2(invitationId) {
     // institutional record by the authenticated invitation email using a constrained
     // query; never scan the members collection because recipient reads are restricted.
     if (!boardMember) {
-      const { getDocs, query, collection, where } = await import("firebase/firestore");
-      const { db } = await import("./config");
       const snap = await getDocs(query(collection(db, COLLECTIONS.members), where("email", "==", email)));
       const matches = snap.docs.map(x => ({id:x.id,...x.data()}));
       boardMember = matches.find(x =>
