@@ -181,7 +181,7 @@ jobs:
               echo "$short=$result" >> "$GITHUB_STEP_SUMMARY"
             )
           done
-          first_failure="$(awk -F, 'NR>1&&$2=="FAIL"{candidate=$1} END{print candidate}' /tmp/upload-bisect-results.csv)"
+          first_failure="$(awk -F, 'NR>1&&$2=="FAIL"{print $1;exit}' /tmp/upload-bisect-results.csv)"
           echo "FIRST_FAILING_COMMIT=$first_failure" > /tmp/upload-bisect-first-failure.txt
           {
             echo
