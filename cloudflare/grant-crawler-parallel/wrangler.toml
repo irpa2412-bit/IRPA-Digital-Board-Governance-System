@@ -41,7 +41,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
 [env.staging.triggers]
-crons = ["0 */6 * * *"]
+crons = ["0 */6 * * *", "0 2 * * *"]
 
 [env.production]
 name = "irpa-grant-crawler-production"

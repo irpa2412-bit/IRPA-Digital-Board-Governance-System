@@ -6,6 +6,10 @@ async function main() {
   const raw = readFileSync(0, "utf8");
   const crawlResult = JSON.parse(raw);
   lastCrawlResult = crawlResult;
+  if (crawlResult.status === 503 || crawlResult.error === "D1 daily limit reached") {
+    console.log(JSON.stringify({ diagnostics: "skipped", reason: "D1 daily limit reached", secretsPrinted: false }));
+    return;
+  }
   const workerUrl = String(process.env.PRODUCTION_WORKER_URL || process.env.STAGING_WORKER_URL || "").replace(/\/+$/, "");
   const token = String(process.env.GRANT_CRAWLER_CONTROL_TOKEN || "");
   if (!/^https:\/\//i.test(workerUrl)) throw new Error("Crawler worker URL must be HTTPS.");

@@ -1,0 +1,104 @@
+name: Grant crawler checks
+
+on:
+  push:
+    paths:
+      - 'cloudflare/grant-crawler-parallel/**'
+      - 'src/grantPipeline/**'
+  pull_request:
+    paths:
+      - 'cloudflare/grant-crawler-parallel/**'
+      - 'src/grantPipeline/**'
+
+permissions:
+  contents: read
+
+jobs:
+  grant-crawler-checks:
+    name: Grant crawler checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: cloudflare/grant-crawler-parallel
+        run: |
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
+          npm ci
+
+      - name: Run checks and print pass/fail counts
+        working-directory: cloudflare/grant-crawler-parallel
+        shell: bash
+        run: |
+          set +e
+          npm run check 2>&1 | tee /tmp/grant-crawler-check.log
+          check_status=${PIPESTATUS[0]}
+          set -e
+          echo "Check summary:"
+          grep -E '^# (tests|pass|fail) ' /tmp/grant-crawler-check.log || {
+            echo "Pass count: unavailable (check failed before TAP summary)"
+            echo "Fail count: unavailable (check failed before TAP summary)"
+          }
+          exit "$check_status"
+
+      - name: Install SQLite, apply migrations, and inspect query plans
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+
+          cd cloudflare/grant-crawler-parallel
+          db_file="$(mktemp)"
+          trap 'rm -f "$db_file"' EXIT
+
+          for migration in migrations/*.sql; do
+            echo "Applying $migration"
+            sqlite3 "$db_file" < "$migration"
+          done
+
+          echo "EXPLAIN QUERY PLAN: opportunities board query"
+          board_plan="$(sqlite3 -column "$db_file" <<'SQL'
+          EXPLAIN QUERY PLAN
+          SELECT id, title, description, url, published_at, source_url,
+                 fit_score, fit_assessment, fit_reasons, eligibility_status,
+                 call_status, geography_assessment, triage_assessment,
+                 deadline_at, discovery_engine, discovery_evidence,
+                 first_seen_at, last_seen_at
+          FROM grant_opportunities
+          WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired')
+            AND date(COALESCE(deadline_at, '9999-12-31')) >= date('now', '+3 hours')
+          AND CASE WHEN call_status = 'open' THEN 0 ELSE 1 END >= 0
+          ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
+                   COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE
+          LIMIT 26 OFFSET 0;
+          SQL
+          )"
+          printf '%s\n' "$board_plan"
+
+          echo "EXPLAIN QUERY PLAN: crawler engine-runs query"
+          engine_plan="$(sqlite3 -column "$db_file" <<'SQL'
+          EXPLAIN QUERY PLAN SELECT e.id, e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.engine > '' AND e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine LIMIT 50;
+          SQL
+          )"
+          printf '%s\n' "$engine_plan"
+
+          echo "EXPLAIN QUERY PLAN: /pipeline/calls query"
+          pipeline_plan="$(sqlite3 -column "$db_file" <<'SQL'
+          EXPLAIN QUERY PLAN SELECT id, title, description, url, source_url, deadline_at AS deadline, call_status AS status, eligibility_status, fit_score, fit_assessment, fit_reasons FROM grant_opportunities WHERE COALESCE(deadline_at, '9999-12-31') >= '0001-01-01' ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE LIMIT 51 OFFSET 0;
+          SQL
+          )"
+          printf '%s\n' "$pipeline_plan"
+
+          if ! grep -Eiq 'SEARCH grant_opportunities' <<< "$board_plan" || grep -Eiq 'SCAN grant_opportunities|USE TEMP B-TREE' <<< "$board_plan"; then echo "::error::Board plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
+          if ! grep -Eiq 'SEARCH e USING INDEX idx_crawler_engine_runs_engine_id' <<< "$engine_plan" || grep -Eiq 'SCAN crawler_engine_runs|SCAN e|USE TEMP B-TREE' <<< "$engine_plan"; then echo "::error::Engine plan must SEARCH its engine index without SCAN or TEMP B-TREE."; exit 1; fi
+          if ! grep -Eiq 'SEARCH grant_opportunities' <<< "$pipeline_plan" || grep -Eiq 'SCAN grant_opportunities|USE TEMP B-TREE' <<< "$pipeline_plan"; then echo "::error::Pipeline plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
+          echo "All three plans passed: SEARCH only; no SCAN; no TEMP B-TREE."

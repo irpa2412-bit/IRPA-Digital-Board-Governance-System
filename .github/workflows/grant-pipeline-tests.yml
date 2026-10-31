@@ -1,0 +1,29 @@
+name: Grant Pipeline Phase 1 Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/grantPipeline/**"
+      - "tests/grant-pipeline-core.test.mjs"
+      - ".github/workflows/grant-pipeline-tests.yml"
+  push:
+    branches: [feat/grant-pipeline-20261030]
+    paths:
+      - "src/grantPipeline/**"
+      - "tests/grant-pipeline-core.test.mjs"
+      - ".github/workflows/grant-pipeline-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  grant-pipeline-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run Grant Pipeline unit tests
+        run: node --test tests/grant-pipeline-core.test.mjs

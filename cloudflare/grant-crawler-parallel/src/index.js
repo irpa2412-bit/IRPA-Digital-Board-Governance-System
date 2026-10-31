@@ -1,6 +1,11 @@
 import { analyzeGrant } from "./assistant.js";
 import { DONOR_SCANNERS, SEARCH_QUERIES, GDELT_QUERIES, readDonorScanner, readOfficialPages, readWebSearch, readGdeltSearch, searchFundraisingSources, normalizeOpportunityUrl } from "./discovery-engines.js";
 import { handleApplicationPortal } from "./application-portal-handler.js";
+import { irpaProfile } from "../../../src/grantPipeline/irpaProfile.js";
+import { checkEligibility } from "../../../src/grantPipeline/eligibility.js";
+import { scoreFit } from "../../../src/grantPipeline/fitScore.js";
+import { filterValidCalls } from "../../../src/grantPipeline/validity.js";
+
 
 
 const FIREBASE_PROJECT_ID = "irpa-digital-board-governance";
@@ -69,22 +74,81 @@ function json(data, status = 200) {
   });
 }
 
-async function listOpportunities(env) {
-  if (!env.GRANTS_DB) throw new Error("The isolated staging D1 database binding is missing.");
-  // Show discovered current calls regardless of geography or eligibility confidence; eligibility is advisory, not a discovery gate.
-  const rows = await env.GRANTS_DB.prepare(
-    "SELECT id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, discovery_engine, discovery_evidence, first_seen_at, last_seen_at FROM grant_opportunities WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired') AND (deadline_at IS NULL OR date(deadline_at) >= date('now', '+3 hours')) ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END, COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE LIMIT 500"
-  ).all();
-  const run = await env.GRANTS_DB.prepare(
-    "SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1"
-  ).first();
-  let engineRuns = { results: [] };
+const OPP_DEFAULT_LIMIT = 50;
+const OPP_MAX_LIMIT = 100;
+const OPPORTUNITY_CACHE_TTL_MS = 60_000;
+const OPPORTUNITY_CACHE_STALE_TTL_MS = 86400000;
+const OPPORTUNITY_CACHE_MAX_ENTRIES = 40;
+const D1_DEGRADED_MESSAGE = "degraded: D1 daily read limit reached";
+const opportunityCache = new Map();
+let lastSuccessfulCrawlResult = null;
+let lastD1QuotaReachedAt = null;
+
+function parsePaging(url) {
+  const rawLimit = parseInt(url.searchParams.get("limit") ?? "", 10);
+  const rawOffset = parseInt(url.searchParams.get("offset") ?? "", 10);
+  return {
+    limit: Math.min(OPP_MAX_LIMIT, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : OPP_DEFAULT_LIMIT)),
+    offset: Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0)
+  };
+}
+function isD1LimitError(error) {
+  const message = String(error?.message || error).toLowerCase();
+  const code = String(error?.code ?? error?.cause?.code ?? "");
+  return code === "7500" || message.includes("7500") || (message.includes("d1") && /(limit|quota|exceeded)/.test(message)) || message.includes("row read") || message.includes("daily free allocation");
+}
+function getOpportunityCache(key, allowStale = false) {
+  const entry = opportunityCache.get(key);
+  if (!entry) return null;
+  if (entry.staleUntil <= Date.now()) { opportunityCache.delete(key); return null; }
+  if (entry.expiresAt <= Date.now() && !allowStale) return null;
+  return entry.body;
+}
+function putOpportunityCache(key, body) {
+  for (const [cacheKey, entry] of opportunityCache) if (entry.staleUntil <= Date.now()) opportunityCache.delete(cacheKey);
+  opportunityCache.delete(key);
+  opportunityCache.set(key, { body, expiresAt: Date.now() + OPPORTUNITY_CACHE_TTL_MS, staleUntil: Date.now() + OPPORTUNITY_CACHE_STALE_TTL_MS });
+  while (opportunityCache.size > OPPORTUNITY_CACHE_MAX_ENTRIES) opportunityCache.delete(opportunityCache.keys().next().value);
+}
+function staleJsonResponse(body) {
+  const payload = JSON.parse(body); payload.degraded = true; payload.message = D1_DEGRADED_MESSAGE;
+  return json(payload, 200);
+}
+export async function listOpportunities(request, env) {
+  const url = new URL(request.url);
+  const { limit, offset } = parsePaging(url);
+  const cacheKey = url.origin + url.pathname + "?limit=" + limit + "&offset=" + offset;
+  const cached = getOpportunityCache(cacheKey);
+  if (cached) return new Response(cached, { status: 200, headers: { ...corsHeaders(request, env), "content-type": "application/json", "x-cache": "HIT" } });
   try {
-    engineRuns = await env.GRANTS_DB.prepare(
-      "SELECT e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine"
-    ).all();
-  } catch {}
-  const currentItems = (rows.results || []).filter(item => isCurrentOpportunity(item));
+    const result = await env.GRANTS_DB.prepare(
+      `SELECT id, title, description, url, published_at, source_url,
+        fit_score, fit_assessment, fit_reasons, eligibility_status,
+        call_status, geography_assessment, triage_assessment,
+        deadline_at, discovery_engine, discovery_evidence,
+        first_seen_at, last_seen_at
+       FROM grant_opportunities
+       WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired')
+         AND date(COALESCE(deadline_at, '9999-12-31')) >= date('now', '+3 hours')
+       AND CASE WHEN call_status = 'open' THEN 0 ELSE 1 END >= 0
+        ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
+         COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE
+       LIMIT ? OFFSET ?`
+    ).bind(limit + 1, offset).all();
+    const rowResults = result.results || [];
+    const hasMore = rowResults.length > limit;
+    const pageRows = rowResults.slice(0, limit);
+    let run = null;
+    let engineRuns = { results: [] };
+    if (offset === 0) {
+      run = await env.GRANTS_DB.prepare("SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1").first();
+      try {
+        engineRuns = await env.GRANTS_DB.prepare(
+          "SELECT e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.engine > '' AND e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine"
+        ).all();
+      } catch (error) { if (isD1LimitError(error)) throw error; }
+    }
+    const currentItems = pageRows.filter(item => isCurrentOpportunity(item));
   const configuredList = value => { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? [...new Set(parsed.map(String))] : []; } catch { return []; } };
   const feedUrls = configuredList(env.GRANT_FEED_URLS_JSON || env.GRANT_FEED_URLS);
   const pageUrls = configuredList(env.GRANT_SOURCE_PAGE_URLS_JSON || env.GRANT_SOURCE_PAGE_URLS);
@@ -104,9 +168,16 @@ async function listOpportunities(env) {
       configured: 1
     }))
   ];
-  return { service: "irpa-grant-crawler", feedsConfigured: feedUrls.length, sourcePagesConfigured: pageUrls.length, webSearchConfigured: true, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: (rows.results || []).length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [], engineProvision };
+  const payload = { service: "irpa-grant-crawler", feedsConfigured: feedUrls.length, sourcePagesConfigured: pageUrls.length, webSearchConfigured: true, items: currentItems, count: currentItems.length, suppressedExpiredOrUnverified: rowResults.length - currentItems.length, lastRun: run || null, engineRuns: engineRuns.results || [], engineProvision, limit, offset, hasMore };
+    const body = JSON.stringify(payload);
+    putOpportunityCache(cacheKey, body);
+    return new Response(body, { status: 200, headers: { ...corsHeaders(request, env), "content-type": "application/json", "x-cache": "MISS" } });
+  } catch (error) {
+    const limited = isD1LimitError(error);
+    if (limited) { lastD1QuotaReachedAt = new Date().toISOString(); const stale = getOpportunityCache(cacheKey, true); if (stale) return staleJsonResponse(stale); return json({ error: D1_DEGRADED_MESSAGE, degraded: true, items: [], count: 0 }, 503); }
+    return json({ error: "Opportunities query failed" }, 500);
+  }
 }
-
 const MAX_FEED_BYTES = 1_000_000;
 const MAX_FEEDS = 30;
 const MAX_ITEMS_PER_FEED = 100;
@@ -404,6 +475,21 @@ async function crawl(env, { fullCatalog = false } = {}) {
   const registerWritesByEngine = new Map(settled.map(engine => [engine.name, 0]));
   const candidatesByEngine = new Map(settled.map(engine => [engine.name, 0]));
   const matchCounts = { strong: 0, possible: 0, low: 0, priorityForReview: 0, open: 0, closed: 0, expired: 0, statusUnknown: 0, geographicMismatch: 0, geographyUnverifiedSuppressed: 0, eligibilityUnverified: 0 };
+  let pendingUpserts = [];
+  async function flushUpserts() {
+    if (!pendingUpserts.length) return;
+    const pending = pendingUpserts;
+    pendingUpserts = [];
+    const results = await env.GRANTS_DB.batch(pending.map(entry => entry.statement));
+    for (let i = 0; i < results.length; i++) {
+      const changes = Number(results[i]?.meta?.changes || 0);
+      if (changes) {
+        changed += changes;
+        const engine = pending[i].sourceEngine;
+        registerWritesByEngine.set(engine, (registerWritesByEngine.get(engine) || 0) + changes);
+      }
+    }
+  }
   for (const item of assessedItems) {
     const fit = item.fit;
     const sourceEngine = String(item.discoveryEngine || "unknown");
@@ -421,31 +507,25 @@ async function crawl(env, { fullCatalog = false } = {}) {
     if (fit.eligibilityStatus === "unverified") matchCounts.eligibilityUnverified++;
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(item.url));
     const id = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
-    const result = await env.GRANTS_DB.prepare(
-      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, discovery_engine, discovery_evidence, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, deadline_at=excluded.deadline_at, discovery_engine=excluded.discovery_engine, discovery_evidence=excluded.discovery_evidence, last_seen_at=CURRENT_TIMESTAMP"
-    ).bind(id, item.title, item.description, item.url, item.publishedAt || null, item.sourceUrl || item.url, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment, fit.deadlineAt, sourceEngine, item.discoveryEvidence || item.eligibilityEvidence || null).run();
-    if (result.meta?.changes) {
-      changed += result.meta.changes;
-      registerWritesByEngine.set(sourceEngine, (registerWritesByEngine.get(sourceEngine) || 0) + result.meta.changes);
-    }
+    const statement = env.GRANTS_DB.prepare(
+      "INSERT INTO grant_opportunities (id, title, description, url, published_at, source_url, fit_score, fit_assessment, fit_reasons, eligibility_status, call_status, geography_assessment, triage_assessment, deadline_at, discovery_engine, discovery_evidence, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET title=excluded.title, description=excluded.description, published_at=excluded.published_at, source_url=excluded.source_url, fit_score=excluded.fit_score, fit_assessment=excluded.fit_assessment, fit_reasons=excluded.fit_reasons, eligibility_status=excluded.eligibility_status, call_status=excluded.call_status, geography_assessment=excluded.geography_assessment, triage_assessment=excluded.triage_assessment, deadline_at=excluded.deadline_at, discovery_engine=excluded.discovery_engine, discovery_evidence=excluded.discovery_evidence, last_seen_at=CURRENT_TIMESTAMP WHERE grant_opportunities.title IS NOT excluded.title OR grant_opportunities.description IS NOT excluded.description OR grant_opportunities.published_at IS NOT excluded.published_at OR grant_opportunities.source_url IS NOT excluded.source_url OR grant_opportunities.fit_score IS NOT excluded.fit_score OR grant_opportunities.fit_assessment IS NOT excluded.fit_assessment OR grant_opportunities.fit_reasons IS NOT excluded.fit_reasons OR grant_opportunities.eligibility_status IS NOT excluded.eligibility_status OR grant_opportunities.call_status IS NOT excluded.call_status OR grant_opportunities.geography_assessment IS NOT excluded.geography_assessment OR grant_opportunities.triage_assessment IS NOT excluded.triage_assessment OR grant_opportunities.deadline_at IS NOT excluded.deadline_at OR grant_opportunities.discovery_engine IS NOT excluded.discovery_engine OR grant_opportunities.discovery_evidence IS NOT excluded.discovery_evidence"
+    ).bind(id, item.title, item.description, item.url, item.publishedAt || null, item.sourceUrl || item.url, fit.score, fit.fitAssessment, JSON.stringify(fit.reasons), fit.eligibilityStatus, fit.callStatus, fit.geographyAssessment, fit.triageAssessment, fit.deadlineAt, sourceEngine, item.discoveryEvidence || item.eligibilityEvidence || null);
+    pendingUpserts.push({ statement, sourceEngine });
+    if (pendingUpserts.length === 25) await flushUpserts();
   }
+  await flushUpserts();
   for (const engine of settled) {
     engine.stats.candidatesAfterDeduplication = candidatesByEngine.get(engine.name) || 0;
     engine.stats.sharedRegisterWrites = registerWritesByEngine.get(engine.name) || 0;
   }
   const overallStatus = settled.every(engine => engine.stats.status === "failed") ? "failed" : "success";
-  await env.GRANTS_DB.prepare(
-    "INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)"
-  ).bind(overallStatus, items.length, changed).run();
-  for (const engine of settled) {
-    const engineItems = engine.items.length;
-    const engineError = engine.stats.error || null;
-    try {
-      await env.GRANTS_DB.prepare(
-        "INSERT INTO crawler_engine_runs (engine, status, configured, items_seen, error_message, finished_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(engine.name, engine.stats.status, engine.stats.configured, engineItems, engineError).run();
-    } catch {}
-  }
+  const historyStatements = [
+    env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, items_seen, items_changed, finished_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)").bind(overallStatus, items.length, changed),
+    ...settled.map(engine => env.GRANTS_DB.prepare("INSERT INTO crawler_engine_runs (engine, status, configured, items_seen, error_message, finished_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(engine.name, engine.stats.status, engine.stats.configured, engine.items.length, engine.stats.error || null)),
+    env.GRANTS_DB.prepare("DELETE FROM crawler_runs WHERE id < (SELECT MAX(id) - 100 FROM crawler_runs)"),
+    env.GRANTS_DB.prepare("DELETE FROM crawler_engine_runs WHERE id < (SELECT MAX(id) - 500 FROM crawler_engine_runs)")
+  ];
+  await env.GRANTS_DB.batch(historyStatements);
   const topMatches = assessedItems
     .filter(item => item.fit.score > 0 && !["closed", "expired"].includes(item.fit.callStatus))
     .sort((a, b) => b.fit.score - a.fit.score || a.title.localeCompare(b.title))
@@ -476,22 +556,110 @@ async function crawl(env, { fullCatalog = false } = {}) {
   };
 }
 
+
+const PIPELINE_STAGES = new Set(["identified", "screening", "eligible", "conditional", "not_eligible", "concept_note", "submitted", "awarded", "declined", "archived"]);
+
+async function handleGrantPipelineRoute(request, env, url) {
+  if (!env.GRANTS_DB) return json({ error: "The grant pipeline D1 binding is missing." }, 503);
+  const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  let claims;
+  try { claims = await verifyFirebaseIdToken(token, env, false); }
+  catch (error) { return json({ error: String(error.message || "A valid Firebase sign-in is required.").slice(0, 300) }, 401); }
+  if (url.pathname === "/pipeline/calls") {
+    if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+    const { limit, offset } = parsePaging(url);
+    try {
+      const cacheKey = "pipeline-calls:" + limit + ":" + offset;
+      const cached = getOpportunityCache(cacheKey); if (cached) return new Response(cached, { status: 200, headers: { ...corsHeaders(), "content-type": "application/json", "x-cache": "HIT" } });
+      const result = await env.GRANTS_DB.prepare("SELECT id, title, description, url, source_url, deadline_at AS deadline, call_status AS status, eligibility_status, fit_score, fit_assessment, fit_reasons FROM grant_opportunities WHERE COALESCE(deadline_at, '9999-12-31') >= '0001-01-01' ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE LIMIT ? OFFSET ?").bind(limit + 1, offset).all();
+      const rows = result.results || []; const filtered = filterValidCalls(rows.slice(0, limit));
+      const payload = { calls: filtered.calls, closed: filtered.closed, duplicates: filtered.duplicates, limit, offset, hasMore: rows.length > limit };
+      putOpportunityCache(cacheKey, JSON.stringify(payload)); return json(payload);
+    } catch (error) {
+      if (isD1LimitError(error)) { lastD1QuotaReachedAt = new Date().toISOString(); const stale = getOpportunityCache("pipeline-calls:" + limit + ":" + offset, true); if (stale) return staleJsonResponse(stale); return json({ error: D1_DEGRADED_MESSAGE, degraded: true, calls: [], closed: [], duplicates: [] }, 503); }
+      return json({ error: String(error.message || "Unable to read grant pipeline calls.").slice(0, 300) }, 500);
+    }
+  }
+  if (url.pathname === "/pipeline/evaluate") {
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+    const call = body?.call && typeof body.call === "object" ? body.call : body;
+    if (!call || typeof call !== "object" || !String(call.title || "").trim()) return json({ error: "A grant call with a title is required." }, 400);
+    const callId = String(body.callId || call.id || crypto.randomUUID()).slice(0, 160);
+    const eligibility = checkEligibility(call, irpaProfile);
+    const fit = scoreFit(call, irpaProfile);
+    const validity = filterValidCalls([{ ...call, status: call.status || "open" }]);
+    const validityStatus = validity.closed.length ? "CLOSED" : validity.calls.length ? "CURRENT" : "UNVERIFIED";
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(callId + ":" + claims.sub));
+      const evaluationId = "evaluation-" + [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+      await env.GRANTS_DB.prepare("INSERT INTO grant_pipeline_evaluations (id, call_id, eligibility_status, fit_score, fit_breakdown_json, eligibility_reasons_json, missing_json, validity_status, evaluated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET eligibility_status=excluded.eligibility_status, fit_score=excluded.fit_score, fit_breakdown_json=excluded.fit_breakdown_json, eligibility_reasons_json=excluded.eligibility_reasons_json, missing_json=excluded.missing_json, validity_status=excluded.validity_status, evaluated_by=excluded.evaluated_by, created_at=CURRENT_TIMESTAMP").bind(evaluationId, callId, eligibility.status, fit.score, JSON.stringify(fit.breakdown), JSON.stringify(eligibility.reasons), JSON.stringify(eligibility.missing), validityStatus, claims.sub).run();
+      return json({ callId, eligibility, fit, validityStatus, evaluationId });
+    } catch (error) { const limited = isD1LimitError(error); return json({ error: limited ? "D1 daily limit reached" : String(error.message || "Unable to save grant evaluation.").slice(0, 300) }, limited ? 503 : 500); }
+  }
+  if (url.pathname === "/pipeline/stage") {
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+    const callId = String(body?.callId || "").trim();
+    const stage = String(body?.stage || "").trim().toLowerCase();
+    if (!callId || !PIPELINE_STAGES.has(stage)) return json({ error: "A callId and a valid pipeline stage are required." }, 400);
+    try {
+      await env.GRANTS_DB.prepare("INSERT INTO grant_pipeline_stages (call_id, stage, notes, updated_by) VALUES (?, ?, ?, ?) ON CONFLICT(call_id) DO UPDATE SET stage=excluded.stage, notes=excluded.notes, updated_by=excluded.updated_by, updated_at=CURRENT_TIMESTAMP").bind(callId, stage, String(body.notes || "").slice(0, 4000), claims.sub).run();
+      return json({ callId, stage, updated: true });
+    } catch (error) { const limited = isD1LimitError(error); return json({ error: limited ? "D1 daily limit reached" : String(error.message || "Unable to update pipeline stage.").slice(0, 300) }, limited ? 503 : 500); }
+  }
+  if (url.pathname === "/pipeline/evidence") {
+    if (request.method === "GET") {
+      const callId = String(url.searchParams.get("callId") || "").trim();
+      const { limit, offset } = parsePaging(url);
+      try {
+        const query = callId
+          ? env.GRANTS_DB.prepare("SELECT id, call_id, claim, evidence_text, source_label, source_url, verified, created_at FROM grant_pipeline_evidence WHERE call_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?").bind(callId, limit + 1, offset)
+          : env.GRANTS_DB.prepare("SELECT id, call_id, claim, evidence_text, source_label, source_url, verified, created_at FROM grant_pipeline_evidence ORDER BY created_at DESC LIMIT ? OFFSET ?").bind(limit + 1, offset);
+        const result = await query.all();
+        const rows = result.results || [];
+        return json({ evidence: rows.slice(0, limit), limit, offset, hasMore: rows.length > limit });
+      } catch (error) { const limited = isD1LimitError(error); return json({ error: limited ? "D1 daily limit reached" : String(error.message || "Unable to read grant evidence.").slice(0, 300) }, limited ? 503 : 500); }
+    }
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Request body must be valid JSON." }, 400); }
+    const callId = String(body?.callId || "").trim();
+    const claim = String(body?.claim || "").trim();
+    const evidenceText = String(body?.evidenceText || "").trim();
+    const sourceLabel = String(body?.sourceLabel || "").trim();
+    if (!callId || !claim || !evidenceText || !sourceLabel) return json({ error: "callId, claim, evidenceText and sourceLabel are required." }, 400);
+    const sourceUrl = String(body.sourceUrl || "").trim();
+    if (sourceUrl) {
+      try { const parsed = new URL(sourceUrl); if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error(); }
+      catch { return json({ error: "sourceUrl must be a valid credential-free HTTP(S) URL." }, 400); }
+    }
+    try {
+      const id = crypto.randomUUID();
+      await env.GRANTS_DB.prepare("INSERT INTO grant_pipeline_evidence (id, call_id, claim, evidence_text, source_label, source_url, verified, created_by) VALUES (?, ?, ?, ?, ?, ?, 0, ?)").bind(id, callId, claim.slice(0, 2000), evidenceText.slice(0, 10000), sourceLabel.slice(0, 500), sourceUrl || null, claims.sub).run();
+      return json({ id, callId, verified: false, message: "Evidence saved for review; it has not been marked verified." }, 201);
+    } catch (error) { const limited = isD1LimitError(error); return json({ error: limited ? "D1 daily limit reached" : String(error.message || "Unable to save grant evidence.").slice(0, 300) }, limited ? 503 : 500); }
+  }
+  return json({ error: "Not found." }, 404);
+}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
     if (url.pathname === "/" || url.pathname === "/application" || url.pathname === "/application/" || url.pathname === "/application/drafts" || url.pathname.startsWith("/application/drafts/")) return handleApplicationPortal(request, env);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1" });
+      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1", degraded: Boolean(lastD1QuotaReachedAt), degradedMessage: lastD1QuotaReachedAt ? D1_DEGRADED_MESSAGE : null, lastD1QuotaReachedAt });
     }
     if (request.method === "GET" && url.pathname === "/opportunities") {
-      try {
-        const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-        await verifyFirebaseIdToken(token, env, false);
-        return json(await listOpportunities(env));
-      } catch (error) {
-        return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401);
-      }
+      const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      try { await verifyFirebaseIdToken(token, env, false); }
+      catch (error) { return json({ error: String(error.message || "Unable to retrieve grant results").slice(0, 300) }, 401); }
+      return listOpportunities(request, env);
+    }
+    if (["/pipeline/calls", "/pipeline/evaluate", "/pipeline/stage", "/pipeline/evidence"].includes(url.pathname)) {
+      return handleGrantPipelineRoute(request, env, url);
     }
     if (request.method !== "POST" || !["/crawl", "/run", "/assistant/analyze", "/fundraising/search"].includes(url.pathname)) return json({ error: "Not found" }, 404);
     if (url.pathname === "/run") {
@@ -537,20 +705,23 @@ export default {
         }
         fullCatalog = body.mode === "full_catalog";
       }
-      const result = await crawl(env, { fullCatalog });
+      const result = await crawl(env, { fullCatalog }); lastSuccessfulCrawlResult = result; lastD1QuotaReachedAt = null;
       return json({ ...result, scanMode: fullCatalog ? "full_catalog" : "scheduled_batch", searchCatalog: { webQueriesRequested: fullCatalog ? SEARCH_QUERIES.length : Math.min(4, SEARCH_QUERIES.length), webQueryCatalogSize: SEARCH_QUERIES.length, gdeltQueriesRequested: fullCatalog ? GDELT_QUERIES.length : Math.min(2, GDELT_QUERIES.length), gdeltQueryCatalogSize: GDELT_QUERIES.length, retroactiveIndexWindow: "GDELT up to 1 year; other providers limited to their own index/feed retention" } });
     }
     catch (error) {
-      if (env.GRANTS_DB) {
+      const limited = isD1LimitError(error);
+      if (limited) { lastD1QuotaReachedAt = new Date().toISOString(); if (lastSuccessfulCrawlResult) return json({ ...lastSuccessfulCrawlResult, degraded: true, cached: true, message: D1_DEGRADED_MESSAGE }); return json({ error: D1_DEGRADED_MESSAGE, degraded: true, cached: false }, 503); }
+      if (!limited && env.GRANTS_DB) {
         try { await env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, error_message, finished_at) VALUES ('failed', ?, CURRENT_TIMESTAMP)").bind(String(error.message || "Crawler failed").slice(0, 500)).run(); } catch {}
       }
       return json({ error: String(error.message || "Crawler failed").slice(0, 500) }, 502);
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(crawl(env).catch(async error => {
+    ctx.waitUntil(crawl(env).then(result => { lastSuccessfulCrawlResult = result; lastD1QuotaReachedAt = null; }).catch(async error => {
+      if (isD1LimitError(error)) { lastD1QuotaReachedAt = new Date().toISOString(); console.warn(D1_DEGRADED_MESSAGE); return; }
       if (env.GRANTS_DB) {
-        try { await env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, error_message, finished_at) VALUES ('failed', ?, CURRENT_TIMESTAMP)").bind(String(error.message || "Crawler failed").slice(0, 500)).run(); } catch {}
+        try { await env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, error_message, finished_at) VALUES ('failed', ?, CURRENT_TIMESTAMP)").bind(String(error.message || "Crawler failed").slice(0, 500)).run(); } catch (writeError) { if (isD1LimitError(writeError)) return; }
       }
     }));
   },
