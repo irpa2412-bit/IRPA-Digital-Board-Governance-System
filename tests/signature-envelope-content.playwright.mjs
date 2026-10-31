@@ -18,6 +18,9 @@ try{
  for(let i=0;i<3;i++)assert.match(before[i],new RegExp("PAGE "+(i+1)+" BODY CONTENT LINE"),"body text must exist on every source page");
  await page.screenshot({path:"test-results/signature-envelope-content-before.png",fullPage:true});
  await page.getByRole("button",{name:"Create envelope"}).click();
+ await page.waitForFunction(()=>document.querySelector("[data-testid=stage]")?.textContent.includes("ENVELOPE")||document.querySelector("[role=alert]"));
+ const stageText=await page.getByTestId("stage").textContent();
+ assert.match(stageText,/ENVELOPE/,"envelope creation must complete: "+(await page.locator("[role=alert]").textContent().catch(()=> "")));
  await page.getByTestId("signature-field-overlay").waitFor({state:"visible"});
  await page.waitForFunction(()=>document.querySelector("[data-testid=pdf-page] canvas")?.dataset.rendered==="true");
  await page.waitForFunction(()=>JSON.parse(document.querySelector('[data-testid="text-after"]').textContent||"[]").length===3);
