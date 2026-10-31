@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 mkdirSync("test-results",{recursive:true});
 const signatureAppSource=readFileSync("src/pages/SignaturePlatform.jsx","utf8");
-assert.match(signatureAppSource,/const mine=\(fields\|\|\)\.filter\(f=>Number\(f\.page\|\|1\)===pageNum&&f\.signerUid===auth\.currentUser\?\.uid\)/,"real signer view must filter fields by current signer and selected page");
+assert.match(signatureAppSource,/const mine=\\(fields\\|\\|\\[\\]\\)\\.filter\(f=>Number\(f\.page\|\|1\)===pageNum&&f\.signerUid===auth\.currentUser\?\.uid\)/,"real signer view must filter fields by current signer and selected page");
 assert.match(signatureAppSource,/mine\.map\(f=>\{const value=fieldValues\[f\.fieldId\]\|\|\"\";const common=\{position:\"absolute\"[^}]*background:\"transparent\"[^}]*zIndex:5\}/,"real signer view must render transparent page-positioned field overlays");
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4175","--strictPort"],{stdio:"ignore"});
 let browser,page;
