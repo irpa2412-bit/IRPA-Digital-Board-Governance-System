@@ -45,6 +45,8 @@ jobs:
           cache: npm
       - name: Install locked application dependencies
         run: npm ci
+      - name: Test grant crawler board mapping and pagination regression
+        run: node --test tests/grant-crawler-board-data.test.mjs
       - name: Install Playwright test runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test
       - name: Install Chromium
