@@ -20,7 +20,7 @@ test("production minified bundle completes authenticated Create Drive file with 
     }
     if (url.pathname === "/api/documents/next-reference") {
       gatewayCalls.push({ path: url.pathname, body: route.request().postDataJSON() });
-      expect(route.request().headers()["authorization"]).toMatch(/^Bearer\\s+/);
+      expect(route.request().headers()["authorization"]).toMatch(/^Bearer\s+/);
       return route.fulfill({
         status: 200,
         contentType: "application/json",
