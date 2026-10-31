@@ -22,6 +22,13 @@ test("page load, Add signer, Save and Create Draft never insert a signature imag
   assert.doesNotMatch(pdf, /if\(field\.type==="Signature"&&!value\)value=signer\.signatureValue/);
 });
 
+test("unfilled signature placeholders remain transparent overlays and are not drawn into PDF bytes", () => {
+  assert.match(platform, /background:"transparent",borderRadius:5,zIndex:5/);
+  assert.match(service, /else if\(field\.type==="Signature"\|\|field\.type==="Initials"\)\{\/\* Keep the unfilled field in envelope metadata; never paint an opaque placeholder into the PDF\. \*\/\}/);
+  assert.doesNotMatch(service, /SIGNATURE REQUIRED/);
+  assert.match(service, /fields:\(fields\|\|\[\]\)\.map\(field=>\{/);
+});
+ 
 test("tapping an assigned signature field opens Draw, Type and saved-signature choices; Confirm applies it", () => {
   assert.match(platform, /onClick=\{\(\)=>setInkField\(f\)\}/);
   assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
