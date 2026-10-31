@@ -57,12 +57,17 @@ jobs:
           if(!ranked.length)console.log('_No upload-related import chains returned by madge._');
           ranked.forEach((x,i)=>{console.log((i+1)+'. **'+x.length+' modules**');console.log('   `'+x.join(' → ')+'`');});
           NODE
-          node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           import fs from 'node:fs';
           const lines=fs.readFileSync('/tmp/madge-cycles.txt','utf8').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-          const cycles=lines.filter(x=>x.includes(' -> '));
-          for(const cycle of cycles)console.log('::error title=Upload dependency cycle::'+cycle.replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A'));
+          const cycles=lines.filter(x=>/^\\d+\\)/.test(x)).map(x=>x.replace(/^\\d+\\)\\s*/, '').replace(/\\s+>\\s+/g,' → '));
+          if(!cycles.length) console.log('No circular dependency found');
+          else { console.log('### Cycles (arrow notation)'); for(const cycle of cycles) console.log('- '+String.fromCharCode(96)+cycle+String.fromCharCode(96)); }
+          fs.writeFileSync('/tmp/upload-cycle-formatted-cycles.txt',cycles.length?cycles.join('\\n'):'No circular dependency found');
           NODE
+          while IFS= read -r cycle; do
+            [ -n "$cycle" ] && echo "::error title=Upload dependency cycle::$cycle"
+          done < /tmp/upload-cycle-formatted-cycles.txt
           cp /tmp/madge-cycles.txt /tmp/upload-cycle-report.txt
           cat /tmp/upload-import-graph.json >> /tmp/upload-cycle-report.txt
           echo "MADGE_EXIT_CODE=$madge_status" >> /tmp/upload-cycle-report.txt
@@ -70,8 +75,10 @@ jobs:
       - name: Build with source maps and readable output
         shell: bash
         run: |
+          set +e
           npx vite build --sourcemap --minify false > /tmp/vite-build.txt 2>&1
           status=$?
+          set -e
           cat /tmp/vite-build.txt
           {
             echo
@@ -146,7 +153,7 @@ jobs:
           }
           NODE
           set +e
-          node /tmp/upload-cycle-runtime/run.mjs > /tmp/upload-runtime-console.txt 2>&1
+          node --enable-source-maps /tmp/upload-cycle-runtime/run.mjs > /tmp/upload-runtime-console.txt 2>&1
           runtime_status=$?
           set -e
           {
@@ -173,5 +180,6 @@ jobs:
             /tmp/vite-build.txt
             /tmp/upload-runtime-console.txt
             /tmp/upload-cycle-runtime/result.txt
+            /tmp/upload-cycle-formatted-cycles.txt
           if-no-files-found: warn
           retention-days: 14
