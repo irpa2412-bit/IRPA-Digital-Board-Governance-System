@@ -76,9 +76,10 @@ for(const viewport of [
       return route.abort("blockedbyclient");
     });
 
-    const opportunityCard=title=>page.locator("article").filter({
-      has:page.getByRole("heading",{name:title,exact:true})
+    const register=page.locator("section").filter({
+      has:page.getByRole("heading",{name:"Opportunity register",exact:true})
     });
+    const opportunityCard=title=>register.locator("article").filter({hasText:title});
 
     const captureFailureEvidence=async()=>{
       const dir="test-results/analyse-diagnostics/"+viewport.name;
@@ -110,6 +111,8 @@ for(const viewport of [
 
     try{
       await signInToGrantIntelligenceFixture(page);
+      await expect(register.getByRole("heading",{name:"Opportunity register",exact:true})).toBeVisible({timeout:30000});
+      await expect(register.locator("article")).toHaveCount(3,{timeout:30000});
       const tanzania=opportunityCard("Tanzania Pastoral Rangeland Resilience Grant");
       const outsideTanzania=opportunityCard("East Africa Regional Biodiversity Fund");
       const missingDetails=opportunityCard("Pastoral Community Innovation Opportunity");
