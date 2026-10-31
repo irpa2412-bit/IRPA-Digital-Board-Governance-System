@@ -57,6 +57,10 @@ jobs:
         run: npm install --no-save --package-lock=false playwright
       - name: Install Chromium for desktop and mobile viewport emulation
         run: npx playwright install --with-deps chromium
+      - name: Install Poppler for PDF text extraction
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes poppler-utils
       - name: Run existing explicit-confirmation policy tests
         run: node --test tests/signature-explicit-confirmation.test.mjs
       - name: Setup Java for Firestore Emulator
