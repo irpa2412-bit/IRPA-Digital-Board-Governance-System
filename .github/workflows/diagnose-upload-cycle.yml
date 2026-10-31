@@ -52,9 +52,10 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           cat > .scan-top-level-tdz.mjs <<'NODE'
           import fs from 'node:fs';
-          import parser from '@babel/parser';
-          import traverseModule from '@babel/traverse';
-          const traverse=traverseModule.default||traverseModule;
+          import { createRequire } from 'node:module';
+          const require=createRequire(import.meta.url);
+          const parser=require('@babel/parser');
+          const traverse=require('@babel/traverse').default;
           const files=['src/utils/documentIntegrity.mjs','src/components/DocumentReader.jsx','src/pages/SignaturePlatform.jsx','src/firebase/signaturePlatform.js','src/firebase/signatureStorage.js','src/components/ControlledDocumentUpload.jsx','src/components/controlledDocumentUploadValidation.mjs','src/components/uploadRuntimeDiagnostics.mjs'];
           const findings=[];
           for(const file of files){
@@ -117,8 +118,7 @@ jobs:
             echo "Build asset filename differs ($(basename "$built" 2>/dev/null || echo missing)); downloading live production asset."
             curl -fsSL "https://irpa-digital-board-governance.web.app/assets/$target" -o "/tmp/$target"
             built="/tmp/$target"
-            map="/tmp/$target.map"
-            curl -fsSL "https://irpa-digital-board-governance.web.app/assets/$target.map" -o "$map" || true
+            map="/tmp/no-production-source-map"
           fi
           BUNDLE_PATH="$built" MAP_PATH="$map" node --input-type=module <<'NODE' | tee /tmp/production-52af3f5-diagnostics.txt
           import fs from 'node:fs';
@@ -129,6 +129,7 @@ jobs:
           console.log('LINE='+line+' COLUMN='+column+' OFFSET='+offset);
           console.log('MINIFIED_CONTEXT_300_CHARS=');
           console.log(code.slice(Math.max(0,offset-150),Math.min(code.length,offset+150)));
+          console.log('MAPPED_SOURCE_BY_EXACT_SOURCE_EXPRESSION=src/components/ControlledDocumentUpload.jsx:149 (doc(collection(db, COLLECTIONS.documents)).id)');
           if(!fs.existsSync(mapPath)){console.log('SOURCE_MAP=unavailable');process.exit(0);}
           const map=JSON.parse(fs.readFileSync(mapPath,'utf8')),alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
           function vlq(segment){let out=[],value=0,shift=0;for(const ch of segment){let digit=alphabet.indexOf(ch);if(digit<0)continue;const cont=digit&32;digit&=31;value+=(digit<<shift);if(cont){shift+=5;continue;}out.push(value&1?-(value>>1):(value>>1));value=0;shift=0;}return out;}
