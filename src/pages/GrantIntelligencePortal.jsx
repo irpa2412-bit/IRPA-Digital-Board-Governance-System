@@ -124,6 +124,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [donorRequirements,setDonorRequirements]=useState("");
  const [analysisBusy,setAnalysisBusy]=useState(false);
  const [analysisResult,setAnalysisResult]=useState(null);
+ const [pipelineEvaluationByOpportunity,setPipelineEvaluationByOpportunity]=useState({});
+ const [pipelineEvaluationBusyId,setPipelineEvaluationBusyId]=useState("");
+ const [pipelineEvaluationErrors,setPipelineEvaluationErrors]=useState({});
  const [conceptDraft,setConceptDraft]=useState("");
  const [draftId,setDraftId]=useState("");
  const [savedDrafts,setSavedDrafts]=useState([]);
@@ -443,6 +446,39 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      }
    }catch(err){setError(err?.name==="TimeoutError"?"The AI analysis exceeded 90 seconds. Retry after checking production Worker health.":err?.message||"The AI eligibility analysis failed.");}
    finally{setAnalysisBusy(false);}
+ }
+ async function evaluateOpportunityWithPipeline(record){
+   const opportunityId=text(record?.id);
+   if(!record?.title||!opportunityId){setPipelineEvaluationErrors(current=>({...current,[opportunityId||"unknown"]:"This opportunity has no stable record ID and cannot be evaluated."}));return;}
+   const idToken=await auth.currentUser?.getIdToken();
+   if(!idToken){setPipelineEvaluationErrors(current=>({...current,[opportunityId]:"Your session has expired. Sign in again."}));return;}
+   const workerUrl=String(import.meta.env.VITE_GRANT_CRAWLER_WORKER_URL||"https://irpa-grant-crawler-production.irpa-governance.workers.dev").replace(/\/+$/,"");
+   setPipelineEvaluationBusyId(opportunityId);
+   setPipelineEvaluationErrors(current=>({...current,[opportunityId]:""}));
+   try{
+     const call={
+       id:opportunityId,title:text(record.title),description:text(record.description||record.summary),
+       sourceText:text(record.sourceText||record.description||record.summary),
+       eligibilityText:text(record.eligibilityText||record.applicationRequirements||record.donorRequirements),
+       requirements:text(record.requirements||record.applicationRequirements||record.donorRequirements),
+       url:text(record.url),deadline:dateKeyInTanzania(record.deadline||record.deadline_at)||"",
+       status:text(record.callStatus||record.call_status||record.status||"open").toLowerCase(),
+       eligibleCountries:cleanArray(record.eligibleCountries),excludedCountries:cleanArray(record.excludedCountries),
+       applicantTypes:cleanArray(record.applicantTypes),requiredApplicantTypes:cleanArray(record.requiredApplicantTypes),
+       minimumYearsOperation:record.minimumYearsOperation,minimumBudget:record.minimumBudget,maximumBudget:record.maximumBudget,
+       requiredDocuments:cleanArray(record.requiredDocuments),pillars:cleanArray(record.pillars),
+       primaryPillar:text(record.primaryPillar),donorCriteria:cleanArray(record.donorCriteria),
+       competitionRisk:text(record.competitionRisk)
+     };
+     const response=await fetch(workerUrl+"/pipeline/evaluate",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({callId:opportunityId,call}),signal:AbortSignal.timeout(30000)});
+     const data=await response.json().catch(()=>({}));
+     if(!response.ok)throw new Error(data.error||"Pipeline evaluation failed ("+response.status+").");
+     if(!data.eligibility||!data.fit)throw new Error("The grant pipeline returned an incomplete evaluation. Retry or contact the administrator.");
+     setPipelineEvaluationByOpportunity(current=>({...current,[opportunityId]:data}));
+   }catch(err){
+     const message=err?.name==="TimeoutError"?"The grant pipeline timed out after 30 seconds. Retry the analysis.":err?.name==="AbortError"?"The grant pipeline request was interrupted. Retry the analysis.":err?.message||"The grant pipeline could not complete this analysis.";
+     setPipelineEvaluationErrors(current=>({...current,[opportunityId]:message}));
+   }finally{setPipelineEvaluationBusyId("");}
  }
  async function saveConceptDraft(){
    if(!selectedOpportunity?.title||!text(conceptDraft)){setError("Select an opportunity and enter a concept-note draft before saving.");return;}
@@ -765,7 +801,22 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
       <button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen call with AI Assistant</button>
       {r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>Open original call ↗</a>}
      </div>
-    </div></details></article>)}
+    </div>
+    <section aria-label={"Analysis tools for "+r.title} style={{display:"grid",gap:8,borderTop:"1px solid var(--border-color, #344255)",paddingTop:10}}>
+     <h4 style={{fontSize:14,margin:0}}>Analysis tools</h4>
+     <div style={styles.muted}>Run the existing IRPA grant pipeline evaluation. AI-generated, verify before use.</div>
+     {pipelineEvaluationBusyId===r.id&&<div role="status" aria-live="polite" style={styles.muted}>Evaluating eligibility, IRPA fit and call validity…</div>}
+     {pipelineEvaluationErrors[r.id]&&<div role="alert" style={{...styles.muted,color:"#f0b6a8"}}>{pipelineEvaluationErrors[r.id]} <button type="button" style={{...styles.button,marginLeft:6}} onClick={()=>evaluateOpportunityWithPipeline(r)}>Retry</button></div>}
+     {pipelineEvaluationByOpportunity[r.id]&&<div style={{...styles.card,display:"grid",gap:8}}>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><strong>Pipeline evaluation</strong><span style={styles.tag}>{pipelineEvaluationByOpportunity[r.id].eligibility.status}</span><span style={styles.tag}>Fit {pipelineEvaluationByOpportunity[r.id].fit.score}/100</span><span style={styles.tag}>Validity {pipelineEvaluationByOpportunity[r.id].validityStatus}</span></div>
+      <div style={styles.muted}>AI-generated, verify before use. Evaluation ID: {pipelineEvaluationByOpportunity[r.id].evaluationId}</div>
+      <div><strong style={{fontSize:13}}>Eligibility findings</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{cleanArray(pipelineEvaluationByOpportunity[r.id].eligibility.reasons).map((item,i)=><li key={i}><strong>{item.criterion}: {item.status}</strong> — {item.reason}</li>)}</ul></div>
+      {cleanArray(pipelineEvaluationByOpportunity[r.id].eligibility.missing).length>0&&<div><strong style={{fontSize:13}}>Missing information</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{pipelineEvaluationByOpportunity[r.id].eligibility.missing.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
+      <div><strong style={{fontSize:13}}>IRPA fit breakdown</strong><div style={{display:"grid",gap:5,marginTop:5}}>{Object.entries(pipelineEvaluationByOpportunity[r.id].fit.breakdown||{}).map(([key,item])=><div key={key} style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><span style={styles.muted}>{key.replace(/([A-Z])/g," $1")}: {item.reason}</span><strong>{item.score}/{item.max}</strong></div>)}</div></div>
+      <div style={styles.muted}>The pipeline response does not provide donor-call quotations or a source-backed document checklist; these are not inferred here.</div>
+     </div>}
+    </section>
+   </div></details></article>)}
    </div>}
   </section>
   <section style={{...styles.card,display:"grid",gap:12}}>
@@ -785,7 +836,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
     </div>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>
-    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}{r.sourceUrl&&r.sourceUrl!==r.url?" · Discovery source recorded":""}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>{r.sourceType==="Cloudflare crawler"?"Open discovered call/source ↗":"Open official call ↗"}</a>{r.sourceUrl&&r.sourceUrl!==r.url&&<a href={r.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Discovery source ↗</a>}{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
+    <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}><span style={styles.muted}>Geography: {r.country||"Not specified"} · Funding: {r.amount||"Not specified"} · Updated: {dateLabel(r.updatedAt||r.createdAt)}{r.sourceUrl&&r.sourceUrl!==r.url?" · Discovery source recorded":""}</span><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" disabled={pipelineEvaluationBusyId===r.id} style={{...styles.button,opacity:pipelineEvaluationBusyId===r.id?0.65:1}} onClick={()=>evaluateOpportunityWithPipeline(r)}>{pipelineEvaluationBusyId===r.id?"Analysing…":"Analyse"}</button><button type="button" style={{...styles.button,background:"transparent"}} onClick={()=>openConceptWorkspace(r)}>Screen eligibility / draft</button><a href={r.url} target="_blank" rel="noreferrer" style={{...styles.button,textDecoration:"none",display:"inline-block"}}>{r.sourceType==="Cloudflare crawler"?"Open discovered call/source ↗":"Open official call ↗"}</a>{r.sourceUrl&&r.sourceUrl!==r.url&&<a href={r.sourceUrl} target="_blank" rel="noreferrer" style={{...styles.button,background:"transparent",textDecoration:"none",display:"inline-block"}}>Discovery source ↗</a>}{canManage&&r.sourceType!=="Cloudflare crawler"&&<select aria-label={"Update status for "+r.title} style={{...styles.input,width:"auto"}} value={r.status||"Open"} onChange={e=>changeStatus(r,e.target.value)}>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>}</div></div>
    </div></details></article>)}
   </section>
   {crawlerHasMore&&<div style={{display:"flex",justifyContent:"center"}}><button type="button" style={styles.button} disabled={crawlerResultsBusy} onClick={()=>loadCrawlerResults(false,crawlerRecords.length)}>{crawlerResultsBusy?"Loading…":"Load more opportunities"}</button></div>}
