@@ -184,6 +184,11 @@ jobs:
           cat /tmp/upload-runtime-console.txt >> /tmp/upload-cycle-report.txt
           test "$runtime_status" -eq 0
 
+      - name: Run upload and integrity regression tests
+        shell: bash
+        run: |
+          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs
+
       - name: Upload complete diagnostic report
         if: always()
         uses: actions/upload-artifact@v4
