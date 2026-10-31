@@ -99,6 +99,6 @@ jobs:
           printf '%s\n' "$pipeline_plan"
 
           if ! grep -Eiq 'SEARCH grant_opportunities' <<< "$board_plan" || grep -Eiq 'SCAN grant_opportunities|USE TEMP B-TREE' <<< "$board_plan"; then echo "::error::Board plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
-          if ! grep -Eiq 'SEARCH crawler_engine_runs' <<< "$engine_plan" || grep -Eiq 'SCAN crawler_engine_runs|USE TEMP B-TREE' <<< "$engine_plan"; then echo "::error::Engine plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
+          if ! grep -Eiq 'SEARCH e USING INDEX idx_crawler_engine_runs_engine_id' <<< "$engine_plan" || grep -Eiq 'SCAN crawler_engine_runs|SCAN e|USE TEMP B-TREE' <<< "$engine_plan"; then echo "::error::Engine plan must SEARCH its engine index without SCAN or TEMP B-TREE."; exit 1; fi
           if ! grep -Eiq 'SEARCH grant_opportunities' <<< "$pipeline_plan" || grep -Eiq 'SCAN grant_opportunities|USE TEMP B-TREE' <<< "$pipeline_plan"; then echo "::error::Pipeline plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
           echo "All three plans passed: SEARCH only; no SCAN; no TEMP B-TREE."
