@@ -202,7 +202,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          node --test > /tmp/full-node-test-suite.txt 2>&1
+          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node --test --test-concurrency=1" > /tmp/full-node-test-suite.txt 2>&1
           status=$?
           set -e
           cat /tmp/full-node-test-suite.txt
