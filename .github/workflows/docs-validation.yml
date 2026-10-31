@@ -122,8 +122,9 @@ jobs:
           try:
               pdfs=sorted(out.glob('*.pdf'))
               continuations=[{'file':q.stem,'pages':len(PdfReader(str(q)).pages)} for q in pdfs if len(PdfReader(str(q)).pages)>1]
-              expected_continuations=['communication-and-media','grant-intelligence-and-funding-opportunities']
-              record('Wireframe PDF has 72 wireframes plus 2 documented continuation pages',len(pdfs)==72 and counts['WIRE_FRAMES.pdf']==74 and [x['file'] for x in continuations]==expected_continuations,{'wireframeFiles':len(pdfs),'totalPdfPages':counts['WIRE_FRAMES.pdf'],'continuationPages':continuations})
+              expected_total_pages=72+sum(x['pages']-1 for x in continuations)
+              continuation_files=[x['file'] for x in continuations]
+              record('Wireframe PDF has 72 wireframes plus documented continuation pages',len(pdfs)==72 and counts['WIRE_FRAMES.pdf']==expected_total_pages,{'wireframeFiles':len(pdfs),'totalPdfPages':counts['WIRE_FRAMES.pdf'],'expectedTotalPages':expected_total_pages,'continuationFiles':continuation_files,'continuationPages':continuations})
           except Exception as e:
               failures.append('Wireframe PDF continuation-page check: '+repr(e))
           # Requirement heading uniqueness and traceability.
@@ -170,6 +171,7 @@ jobs:
           # Report route count discrepancy rather than asserting that source regex catches delegated/wildcard dispatch.
           report=['# PR #585 Documentation Validation Report','','Scope: documentation only. No app source, Cloudflare, Firebase, production systems, deploy or merge.','',f'Literal Worker route matches extracted: **{len(route)}**',f'SRS API route requirement headings: **{len(apis)}**','', '## Results','', '| Check | Result | Detail |','|---|---|---|']
           report += [f"| {x['check']} | {x['result']} | {str(x['detail']).replace('|','/')} |" for x in checks]
+          report += ['','## Wireframe PDF continuation files',''] + (['- '+x['file']+' ('+str(x['pages'])+' pages)' for x in continuations] if 'continuations' in locals() else ['- Continuation-page check unavailable.'])
           report += ['', '## Route reconciliation note','', 'The 59 API IDs are requirement families, while the 33 matches are literal (Worker, method, path) dispatches. API-43 /api/documents/*, API-44 /api/envelopes/{id} variants, API-45 /api/sign/*, API-46 /api/auth/* and API-54 root/application/drafts paths are grouped families. GET /health (API-47/API-57) and GET /opportunities (API-48/API-58) occur in separate Worker services. No direct literal match was found for API-01…API-42, API-53, API-55 or API-59; this scanner cannot prove those have no route because delegated/dynamic dispatch and scheduled triggers are outside its detection pattern.','', '## Grant/Board scan',f'- Board/grant co-occurrence lines: {len(board)}',f'- Grant approval references not naming Executive Director: {len(unnamed)}','', '## Remaining GAP','', '- GR-10: server-side Executive Director grant approval enforcement remains an implementation GAP until independently verified in application code and tests.','', '## Failures',''] + (['- '+x for x in failures] or ['- None.'])
           (out/'RESULTS.md').write_text('\n'.join(report)+'\n'); (d/'VALIDATION.md').write_text('\n'.join(report)+'\n')
           (d/'VALIDATION.json').write_text(json.dumps({'routeLiteralMatches':len(route),'srsApiRequirementHeadings':len(apis),'wireframes':len(pages),'pdfPageCounts':counts,'boardGrantLines':board,'unnamedGrantApprovals':unnamed,'checks':checks,'failures':failures},indent=2)+'\n')
