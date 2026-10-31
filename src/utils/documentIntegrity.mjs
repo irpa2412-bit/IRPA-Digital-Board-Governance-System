@@ -5,7 +5,7 @@
 export function resolveExpectedIntegrity(envelope = {}, sourceDocument = {}) {
   const hash = envelope.sha256 || envelope.documentHash || envelope.signedDocumentHash || envelope.originalHash ||
     envelope.hash || sourceDocument.sha256 || sourceDocument.documentHash ||
-    sourceDocument.originalHash || sourceDocument.hash || null;
+    sourceDocument.originalHash || sourceDocument.fileHash || sourceDocument.contentHash || sourceDocument.hash || null;
   const size = envelope.byteLength ?? envelope.signedDocumentSize ?? envelope.documentSize ?? envelope.originalSize ??
     envelope.fileSize ?? envelope.size ?? sourceDocument.byteLength ??
     sourceDocument.fileSize ?? sourceDocument.size ?? null;
