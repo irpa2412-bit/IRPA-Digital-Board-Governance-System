@@ -27,6 +27,7 @@ jobs:
           set +e
           npx --yes madge --circular --extensions js,jsx,mjs src drive-gateway/src > /tmp/madge-cycles.txt 2>&1
           madge_status=$?
+          echo "$madge_status" > /tmp/madge-exit-code.txt
           set -e
           {
             echo "## Circular dependency report"
@@ -78,6 +79,11 @@ jobs:
         run: |
           if [ ! -s /tmp/upload-cycle-formatted-cycles.txt ]; then
             echo "Madge cycle report was not produced."
+            exit 1
+          fi
+          if [ ! -s /tmp/madge-exit-code.txt ] || [ "$(cat /tmp/madge-exit-code.txt)" -ne 0 ]; then
+            echo "madge --circular failed to execute successfully."
+            cat /tmp/madge-cycles.txt 2>/dev/null || true
             exit 1
           fi
           if grep -q "^No circular dependency found$" /tmp/upload-cycle-formatted-cycles.txt; then
@@ -185,9 +191,23 @@ jobs:
           test "$runtime_status" -eq 0
 
       - name: Run upload and integrity regression tests
+        if: always()
         shell: bash
         run: |
-          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs tests/gateway-signing-integrity.test.mjs
+          set +e
+          node --test tests/upload-circular-import-runtime.test.mjs tests/document-integrity.test.mjs tests/gateway-signing-integrity.test.mjs > /tmp/regression-tests.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/regression-tests.txt
+          {
+            echo
+            echo "## Upload and integrity regression tests"
+            echo '~~~text'
+            cat /tmp/regression-tests.txt
+            echo '~~~'
+            echo "Regression test exit code: $status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       - name: Upload complete diagnostic report
         if: always()
@@ -202,6 +222,8 @@ jobs:
             /tmp/upload-runtime-console.txt
             /tmp/upload-cycle-runtime/result.txt
             /tmp/upload-cycle-formatted-cycles.txt
+            /tmp/madge-exit-code.txt
+            /tmp/regression-tests.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -236,6 +258,12 @@ jobs:
             echo
             echo "## Workflow diagnostic console"
             cat /tmp/upload-runtime-console.txt 2>/dev/null || true
+            echo
+            echo "## Regression test output"
+            cat /tmp/regression-tests.txt 2>/dev/null || echo "Regression tests did not run."
+            echo
+            echo "## Madge exit code"
+            cat /tmp/madge-exit-code.txt 2>/dev/null || echo "Madge exit code unavailable."
           } > docs/diagnostics/upload-cycle-report.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
