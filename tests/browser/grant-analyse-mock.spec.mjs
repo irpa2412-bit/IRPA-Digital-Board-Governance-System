@@ -25,38 +25,42 @@ for(const viewport of [
     const pageErrors=[];
     page.on("pageerror",error=>pageErrors.push(error.message));
 
-    // Only the pipeline evaluation endpoint is mocked. Every non-local host is
-    // blocked and recorded, so a production Worker/Firebase request fails the test.
+    // Use one routing dispatcher: the catch-all security guard must not
+    // consume the request before the endpoint mock. Only this exact pathname
+    // is fulfilled; all other local requests continue and all external hosts
+    // are blocked. No real Worker/backend request can leave the browser.
+    const pipelineRequests=[];
+    let responseMode="success";
+    let evaluationCalls=0;
     await page.route("**/*",async route=>{
-      const url=new URL(route.request().url());
+      const request=route.request();
+      const url=new URL(request.url());
+      if(url.pathname==="/pipeline/evaluate"&&request.method()==="POST"){
+        evaluationCalls+=1;
+        pipelineRequests.push({url:url.href,method:request.method(),body:request.postData()});
+        if(responseMode==="timeout"){
+          // Keep the mocked request pending while the application's native
+          // AbortSignal.timeout(30000) expires under Playwright's fake clock.
+          await page.waitForTimeout(31000).catch(()=>{});
+          await route.abort("timedout").catch(()=>{});
+          return;
+        }
+        if(responseMode==="server-error"){
+          return route.fulfill({
+            status:503,
+            contentType:"application/json",
+            body:JSON.stringify({error:"Mock pipeline service unavailable."})
+          });
+        }
+        return route.fulfill({
+          status:200,
+          contentType:"application/json",
+          body:JSON.stringify(successPayload)
+        });
+      }
       if(localHosts.has(url.hostname))return route.continue();
       externalRequests.push(url.href);
       return route.abort("blockedbyclient");
-    });
-
-    let responseMode="success";
-    let evaluationCalls=0;
-    await page.route("**/pipeline/evaluate",async route=>{
-      evaluationCalls+=1;
-      if(responseMode==="timeout"){
-        // Leave the request pending until the browser's real 30-second
-        // AbortSignal timeout fires under Playwright's controllable clock.
-        await page.waitForTimeout(31000).catch(()=>{});
-        await route.abort("timedout").catch(()=>{});
-        return;
-      }
-      if(responseMode==="server-error"){
-        return route.fulfill({
-          status:503,
-          contentType:"application/json",
-          body:JSON.stringify({error:"Mock pipeline service unavailable."})
-        });
-      }
-      return route.fulfill({
-        status:200,
-        contentType:"application/json",
-        body:JSON.stringify(successPayload)
-      });
     });
 
     page.on("requestfinished",request=>{
@@ -77,6 +81,7 @@ for(const viewport of [
     // 1. Successful evaluation renders the returned eligibility and fit data.
     await tanzania.locator("details > summary").click();
     await tanzania.getByRole("button",{name:"Analyse",exact:true}).click();
+    await expect.poll(()=>evaluationCalls,{message:"Analyse must issue the mocked POST /pipeline/evaluate request"}).toBe(1);
     await expect(tanzania.getByText("Conditionally eligible",{exact:true})).toBeVisible();
     await expect(tanzania.getByText(/Geographic eligibility: Pass/)).toBeVisible();
     await expect(tanzania.getByText("Confirm applicant registration requirements.",{exact:true})).toBeVisible();
@@ -108,6 +113,7 @@ for(const viewport of [
     await expect(outsideTanzania.getByText("Fit 84/100",{exact:true})).toBeVisible();
 
     expect(evaluationCalls,"expected success, timeout, server error and retry requests").toBe(4);
+    expect(pipelineRequests.every(request=>new URL(request.url).pathname==="/pipeline/evaluate"&&request.method==="POST")).toBe(true);
     expect(externalRequests,"no request may target a real backend host").toEqual([]);
     expect(completedExternalRequests,"no request to a real backend host may complete").toEqual([]);
     expect(pageErrors,"no uncaught browser errors").toEqual([]);
