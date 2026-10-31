@@ -88,7 +88,7 @@ jobs:
                   b=await p.chromium.launch()
                   for f in pages:
                       page=await b.new_page(viewport={'width':390,'height':844})
-                      page.on('pageerror',lambda e: errors.append(str(e)))
+                      page.on('pageerror',lambda e, filename=f.name: errors.append({'file':filename,'error':str(e)}))
                       await page.goto(f.resolve().as_uri(),wait_until='networkidle')
                       for label,width,height,folder in [('mobile',390,844,'mobile'),('desktop',1440,900,'desktop')]:
                           await page.set_viewport_size({'width':width,'height':height})
@@ -114,16 +114,21 @@ jobs:
               q=d/name; info=subprocess.run(['pdfinfo',str(q)],capture_output=True,text=True); txt=subprocess.run(['pdftotext',str(q),'-'],capture_output=True,text=True)
               m=re.search(r'^Pages:\s+(\d+)',info.stdout,re.M); counts[name]=int(m.group(1)) if m else 0
               record(name+' independently opens and extracts text',info.returncode==0 and txt.returncode==0 and counts[name]>0,counts[name])
-          record('Wireframe PDF page count equals 72',counts['WIRE_FRAMES.pdf']==72,counts['WIRE_FRAMES.pdf'])
+          continuations=[{'file':q.stem,'pages':len(PdfReader(str(q)).pages)} for q in pdfs if len(PdfReader(str(q)).pages)>1]
+          expected_continuations=['communication-and-media','grant-intelligence-and-funding-opportunities']
+          record('Wireframe PDF has 72 wireframes plus 2 documented continuation pages',len(pdfs)==72 and counts['WIRE_FRAMES.pdf']==74 and [x['file'] for x in continuations]==expected_continuations,{'wireframeFiles':len(pdfs),'totalPdfPages':counts['WIRE_FRAMES.pdf'],'continuationPages':continuations})
           # Requirement heading uniqueness and traceability.
           ids=re.findall(r'^###\s+((?:MOD|SUB|STD|API|GR|ROLE|OFF|MOB|AI|DR|GOV|TRC)-\d+)\b',srs,re.M)
           dup=sorted({x for x in ids if ids.count(x)>1}); record('Requirement heading IDs unique',not dup,{'count':len(ids),'duplicates':dup})
           full=srs+'\n'+add; acs=sorted(set(re.findall(r'\b(?:MOD|SUB|STD|API|GR|ROLE|OFF|MOB|AI|DR|GOV|TRC)-\d+-AC\d+\b',full)))
+          matrix_rows=[line for line in srs.splitlines() if line.strip().startswith('|') and re.search(r'\b(?:MOD|SUB|STD|API|GR|ROLE|OFF|MOB|AI|DR|GOV|TRC)-\d+-AC\d+\b',line)]
           untraced=[]
           for ac in acs:
-              i=full.find(ac); window=full[max(0,i-300):i+800]
-              if not re.search(r'TEST-[A-Z0-9-]+|PROPOSED',window): untraced.append(ac)
-          record('Acceptance criteria traceability',not untraced,{'criteria':len(acs),'untraced':untraced})
+              row=next((line for line in matrix_rows if ac in line),None)
+              if not row or not re.search(r'TEST-[A-Z0-9-]+',row) or row.count('|')<5: untraced.append(ac)
+          record('Acceptance criteria traceability',not untraced,{'criteria':len(acs),'matrixRows':len(matrix_rows),'untraced':untraced})
+          api59_row=next((line for line in matrix_rows if 'API-59-AC2' in line),None)
+          record('API-59-AC2 page and test traceability',bool(api59_row and 'grant-intelligence-and-funding-opportunities' in api59_row and 'TEST-PROPOSED-API-59' in api59_row),api59_row or 'missing matrix row')
           # Scan every repository documentation file for Board/grant proximity and unnamed grant approvals.
           docfiles=[]
           for pat in ['**/*.md','**/*.mdx','**/*.txt','**/*.rst','**/*.html']:
@@ -152,7 +157,7 @@ jobs:
           # Report route count discrepancy rather than asserting that source regex catches delegated/wildcard dispatch.
           report=['# PR #585 Documentation Validation Report','','Scope: documentation only. No app source, Cloudflare, Firebase, production systems, deploy or merge.','',f'Literal Worker route matches extracted: **{len(route)}**',f'SRS API route requirement headings: **{len(apis)}**','', '## Results','', '| Check | Result | Detail |','|---|---|---|']
           report += [f"| {x['check']} | {x['result']} | {str(x['detail']).replace('|','/')} |" for x in checks]
-          report += ['', '## Route reconciliation note','', 'The literal-dispatch inventory is a source scan, not a definitive route count: delegated routers, method switches, regex/wildcard matchers and dynamically constructed paths require explicit review. The report preserves both counts and the per-file evidence; do not treat 59 or 66 as verified solely by a regex scan.','', '## Grant/Board scan',f'- Board/grant co-occurrence lines: {len(board)}',f'- Grant approval references not naming Executive Director: {len(unnamed)}','', '## Remaining GAP','', '- GR-10: server-side Executive Director grant approval enforcement remains an implementation GAP until independently verified in application code and tests.','', '## Failures',''] + (['- '+x for x in failures] or ['- None.'])
+          report += ['', '## Route reconciliation note','', 'The 59 API IDs are requirement families, while the 33 matches are literal (Worker, method, path) dispatches. API-43 /api/documents/*, API-44 /api/envelopes/{id} variants, API-45 /api/sign/*, API-46 /api/auth/* and API-54 root/application/drafts paths are grouped families. GET /health (API-47/API-57) and GET /opportunities (API-48/API-58) occur in separate Worker services. No direct literal match was found for API-01…API-42, API-53, API-55 or API-59; this scanner cannot prove those have no route because delegated/dynamic dispatch and scheduled triggers are outside its detection pattern.','', '## Grant/Board scan',f'- Board/grant co-occurrence lines: {len(board)}',f'- Grant approval references not naming Executive Director: {len(unnamed)}','', '## Remaining GAP','', '- GR-10: server-side Executive Director grant approval enforcement remains an implementation GAP until independently verified in application code and tests.','', '## Failures',''] + (['- '+x for x in failures] or ['- None.'])
           (out/'RESULTS.md').write_text('\n'.join(report)+'\n'); (d/'VALIDATION.md').write_text('\n'.join(report)+'\n')
           (d/'VALIDATION.json').write_text(json.dumps({'routeLiteralMatches':len(route),'srsApiRequirementHeadings':len(apis),'wireframes':len(pages),'pdfPageCounts':counts,'boardGrantLines':board,'unnamedGrantApprovals':unnamed,'checks':checks,'failures':failures},indent=2)+'\n')
           print(json.dumps({'routes':len(route),'apiRequirements':len(apis),'pdfPages':counts,'failures':failures},indent=2))
