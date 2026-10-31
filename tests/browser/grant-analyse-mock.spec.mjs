@@ -1,4 +1,5 @@
 import {test,expect} from "@playwright/test";
+import {mkdirSync,writeFileSync} from "node:fs";
 import {signInToGrantIntelligenceFixture} from "./grant-analyse-fixture.mjs";
 
 const localHosts=new Set(["localhost","127.0.0.1"]);
@@ -81,6 +82,22 @@ for(const viewport of [
     // 1. Successful evaluation renders the returned eligibility and fit data.
     await tanzania.locator("details > summary").click();
     await tanzania.getByRole("button",{name:"Analyse",exact:true}).click();
+
+    // Persist the exact post-click UI and interception evidence before any
+    // assertion can fail. The workflow uploads this directory with if: always().
+    const diagnosticDir="test-results/analyse-diagnostics/"+viewport.name;
+    mkdirSync(diagnosticDir,{recursive:true});
+    const pageText=await page.locator("body").innerText().catch(error=>"<body text capture failed: "+error.message+">");
+    await page.screenshot({path:diagnosticDir+"/after-analyse.png",fullPage:true});
+    writeFileSync(diagnosticDir+"/after-analyse.txt",pageText);
+    writeFileSync(diagnosticDir+"/after-analyse.json",JSON.stringify({
+      viewport,
+      evaluationCalls,
+      pipelineRequests,
+      pageUrl:page.url(),
+      capturedAt:new Date().toISOString()
+    },null,2));
+
     await expect.poll(()=>evaluationCalls,{message:"Analyse must issue the mocked POST /pipeline/evaluate request"}).toBe(1);
     await expect(tanzania.getByText("Conditionally eligible",{exact:true})).toBeVisible();
     await expect(tanzania.getByText(/Geographic eligibility: Pass/)).toBeVisible();
