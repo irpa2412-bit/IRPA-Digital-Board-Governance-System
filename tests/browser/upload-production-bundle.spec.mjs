@@ -18,6 +18,15 @@ test("production minified bundle completes authenticated Create Drive file with 
     if (["localhost", "127.0.0.1"].includes(url.hostname)) {
       return route.continue();
     }
+    if (url.pathname === "/api/documents/next-reference") {
+      gatewayCalls.push({ path: url.pathname, body: route.request().postDataJSON() });
+      expect(route.request().headers()["authorization"]).toMatch(/^Bearer\\s+/);
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, reference: "IRPA-DIAG-2026-000001" })
+      });
+    }
     if (url.pathname === "/api/upload-controlled-document") {
       const body = route.request().postDataJSON();
       gatewayCalls.push({ path: url.pathname, body });
@@ -87,6 +96,7 @@ test("production minified bundle completes authenticated Create Drive file with 
   expect(referenceErrors, "any ReferenceError in the minified production bundle must fail the browser regression").toEqual([]);
   expect(pageErrors, "capture and reject uncaught browser errors during the real upload transaction").toEqual([]);
   expect(gatewayCalls.map(call => call.path)).toEqual([
+    "/api/documents/next-reference",
     "/api/upload-controlled-document",
     "/api/upload-controlled-document/register"
   ]);
