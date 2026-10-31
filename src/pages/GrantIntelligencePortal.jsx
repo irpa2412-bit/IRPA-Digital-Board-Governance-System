@@ -816,7 +816,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
       <div style={styles.muted}>The pipeline response does not provide donor-call quotations or a source-backed document checklist; these are not inferred here.</div>
      </div>}
     </section>
-   </div></details></article>)}
+   </details></article>)}
    </div>}
   </section>
   <section style={{...styles.card,display:"grid",gap:12}}>
