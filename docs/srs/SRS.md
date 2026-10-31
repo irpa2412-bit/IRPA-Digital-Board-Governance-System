@@ -913,7 +913,7 @@ Priority: MUST. Page: grant-intelligence-and-funding-opportunities. Test: TEST-P
 | API-58 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-58 | API-58-AC1 | PROPOSED |
 | API-58 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-58 | API-58-AC2 | PROPOSED |
 | API-59 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-59 | API-59-AC1 | PROPOSED |
-| API-59 | grant-intelligence-and-funding-opportunities | TEST-PROPOSED-API-59 | API-59-AC2 | PROPOSED |
+| API-59 | grant-intelligence-and-funding-opportunities (scheduled cron) | TEST-PROPOSED-API-59 | API-59-AC2 | PROPOSED |
 
 ## Inspection gaps
 - Initial PR head contained only VALIDATION.md; SRS, exports and wireframes described in its PR body were absent.
@@ -983,7 +983,13 @@ Access is least-privilege and enforced server-side. A person holding multiple as
 - **AI-06 — No autonomous external action.** Given an AI analysis or draft is complete, when a model attempts to send, submit, sign, approve, or contact a donor, then the action is blocked and no external side effect occurs.
 - **DR-01 — Backup and recovery policy (proposed; not approved).** Given the backup service runs, when the daily scheduled backup completes, then a protected backup is created, retained for 30 days, and a restore test is recorded; policy status remains “TO BE APPROVED BY IRPA MANAGEMENT” until management approval is documented.
 
-### Backup, retention and disaster recovery decision
+### Route-count reconciliation (literal source inventory)
+
+The SRS defines 59 API requirement families; the independent source scan found 33 literal (Worker, method, path) dispatch matches. These are different counting units, not a 1:1 ratio. A single family handler groups multiple operations: API-43 covers `/api/documents/*`; API-44 covers the `/api/envelopes/{id}` status/resync/retry/void variants; API-45 covers `/api/sign/*`; API-46 covers `/api/auth/*`; and API-54 groups GET `/`, `/application` and `/application/drafts/*`. The same path text `GET /health` is used by separate Grant crawler Workers (API-47 and API-57), as is `GET /opportunities` (API-48 and API-58); these are separate service handlers, not one shared route.
+
+The 33-match scan did not produce a direct literal match for API-01…API-42, API-53, API-55 or API-59. This is **not evidence that those requirements have no implementation route**: the scanner only recognizes selected literal pathname comparisons, and misses delegated routers, method switches, wildcard/dynamic dispatch and scheduled triggers. API-59 is a scheduled cron event rather than an HTTP path. Keep these items marked for source-level route verification; do not treat the 33-match scan as a complete route inventory.
+
+## Backup, retention and disaster recovery decision
 
 **TO BE APPROVED BY IRPA MANAGEMENT.** Proposed default for management review: daily backup; 30-day retention; encrypted backup storage with restricted key custody; and a tested restore (at least monthly and after material infrastructure changes). RPO, RTO, legal hold, backup scope, encryption/key custody, off-site replication and disaster-recovery ownership remain open management decisions. These defaults are proposals, not approved policy.
 
