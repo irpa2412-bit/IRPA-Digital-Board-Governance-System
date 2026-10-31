@@ -5,7 +5,7 @@ export function mapCrawlerOpportunity(item) {
     catch { return []; }
   };
   let fallbackFunder = "Funder not verified";
-  try { fallbackFunder = new URL(item.source_url || item.url).hostname.replace(/^www\\./, ""); } catch {}
+  try { fallbackFunder = new URL(item.source_url || item.url).hostname.replace(/^www\./, ""); } catch {}
   const callStatus = String(item.call_status || "").toLowerCase();
   return {
     id: "crawler-" + item.id,
