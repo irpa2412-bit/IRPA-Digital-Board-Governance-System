@@ -29,3 +29,9 @@ export function hasIntegrityMismatch({ expectedHash, expectedSize, actualHash, a
   return (expectedHash != null && String(expectedHash).toLowerCase() !== String(actualHash).toLowerCase()) ||
     (expectedSize != null && Number(expectedSize) !== Number(actualSize));
 }
+
+export async function sha256Hex(bytes) {
+  const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const digest = await crypto.subtle.digest("SHA-256", source);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
