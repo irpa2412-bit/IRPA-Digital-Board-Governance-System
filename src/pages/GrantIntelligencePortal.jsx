@@ -224,7 +224,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
        fitScore:Number(item.fit_score||0),fitReasons:item.fit_reasons||"[]",
        eligibilityStatus:item.eligibility_status||"unverified",triageAssessment:item.triage_assessment||"manual_eligibility_review",
        createdAt:item.first_seen_at||null
-     })));
+     }));
      if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.created??data.lastRun.items_changed,candidatesFound:data.lastRun.candidatesFound??data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.started_at,configuredSources:data.lastRun.configuredSources??data.sourceCount??data.feedsConfigured,healthySources:data.lastRun.healthySources??uniqueSources.length,failedSources:data.lastRun.failedSources??0});
      if(showNotice)setNotice("Refreshed "+String(data.count||0)+" grant records from the Cloudflare crawler. Eligibility remains unverified.");
    }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(err?.message||"Unable to load crawler results.");}

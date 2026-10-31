@@ -77,8 +77,12 @@ function json(data, status = 200) {
 const OPP_DEFAULT_LIMIT = 50;
 const OPP_MAX_LIMIT = 100;
 const OPPORTUNITY_CACHE_TTL_MS = 60_000;
-const OPPORTUNITY_CACHE_MAX_ENTRIES = 20;
+const OPPORTUNITY_CACHE_STALE_TTL_MS = 86400000;
+const OPPORTUNITY_CACHE_MAX_ENTRIES = 40;
+const D1_DEGRADED_MESSAGE = "degraded: D1 daily read limit reached";
 const opportunityCache = new Map();
+let lastSuccessfulCrawlResult = null;
+let lastD1QuotaReachedAt = null;
 
 function parsePaging(url) {
   const rawLimit = parseInt(url.searchParams.get("limit") ?? "", 10);
@@ -90,22 +94,25 @@ function parsePaging(url) {
 }
 function isD1LimitError(error) {
   const message = String(error?.message || error).toLowerCase();
-  return (message.includes("d1") && /(limit|quota|exceeded)/.test(message)) ||
-    message.includes("row read") || message.includes("daily free allocation");
+  const code = String(error?.code ?? error?.cause?.code ?? "");
+  return code === "7500" || message.includes("7500") || (message.includes("d1") && /(limit|quota|exceeded)/.test(message)) || message.includes("row read") || message.includes("daily free allocation");
 }
-function getOpportunityCache(key) {
+function getOpportunityCache(key, allowStale = false) {
   const entry = opportunityCache.get(key);
   if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) { opportunityCache.delete(key); return null; }
-  opportunityCache.delete(key);
-  opportunityCache.set(key, entry);
+  if (entry.staleUntil <= Date.now()) { opportunityCache.delete(key); return null; }
+  if (entry.expiresAt <= Date.now() && !allowStale) return null;
   return entry.body;
 }
 function putOpportunityCache(key, body) {
-  for (const [cacheKey, entry] of opportunityCache) if (entry.expiresAt <= Date.now()) opportunityCache.delete(cacheKey);
+  for (const [cacheKey, entry] of opportunityCache) if (entry.staleUntil <= Date.now()) opportunityCache.delete(cacheKey);
   opportunityCache.delete(key);
-  opportunityCache.set(key, { body, expiresAt: Date.now() + OPPORTUNITY_CACHE_TTL_MS });
+  opportunityCache.set(key, { body, expiresAt: Date.now() + OPPORTUNITY_CACHE_TTL_MS, staleUntil: Date.now() + OPPORTUNITY_CACHE_STALE_TTL_MS });
   while (opportunityCache.size > OPPORTUNITY_CACHE_MAX_ENTRIES) opportunityCache.delete(opportunityCache.keys().next().value);
+}
+function staleJsonResponse(body) {
+  const payload = JSON.parse(body); payload.degraded = true; payload.message = D1_DEGRADED_MESSAGE;
+  return json(payload, 200);
 }
 export async function listOpportunities(request, env) {
   const url = new URL(request.url);
@@ -123,7 +130,8 @@ export async function listOpportunities(request, env) {
        FROM grant_opportunities
        WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired')
          AND date(COALESCE(deadline_at, '9999-12-31')) >= date('now', '+3 hours')
-       ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
+       AND CASE WHEN call_status = 'open' THEN 0 ELSE 1 END >= 0
+        ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
          COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE
        LIMIT ? OFFSET ?`
     ).bind(limit + 1, offset).all();
@@ -136,7 +144,7 @@ export async function listOpportunities(request, env) {
       run = await env.GRANTS_DB.prepare("SELECT status, items_seen, items_changed, error_message, finished_at FROM crawler_runs ORDER BY id DESC LIMIT 1").first();
       try {
         engineRuns = await env.GRANTS_DB.prepare(
-          "SELECT e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e JOIN (SELECT engine, MAX(id) AS latest_id FROM crawler_engine_runs GROUP BY engine) latest ON latest.latest_id = e.id ORDER BY e.engine"
+          "SELECT e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.engine > '' AND e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine"
         ).all();
       } catch (error) { if (isD1LimitError(error)) throw error; }
     }
@@ -166,7 +174,8 @@ export async function listOpportunities(request, env) {
     return new Response(body, { status: 200, headers: { ...corsHeaders(request, env), "content-type": "application/json", "x-cache": "MISS" } });
   } catch (error) {
     const limited = isD1LimitError(error);
-    return json({ error: limited ? "D1 daily limit reached" : "Opportunities query failed" }, limited ? 503 : 500);
+    if (limited) { lastD1QuotaReachedAt = new Date().toISOString(); const stale = getOpportunityCache(cacheKey, true); if (stale) return staleJsonResponse(stale); return json({ error: D1_DEGRADED_MESSAGE, degraded: true, items: [], count: 0 }, 503); }
+    return json({ error: "Opportunities query failed" }, 500);
   }
 }
 const MAX_FEED_BYTES = 1_000_000;
@@ -560,11 +569,16 @@ async function handleGrantPipelineRoute(request, env, url) {
     if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
     const { limit, offset } = parsePaging(url);
     try {
-      const result = await env.GRANTS_DB.prepare("SELECT id, title, description, url, source_url, deadline_at AS deadline, call_status AS status, eligibility_status, fit_score, fit_assessment, fit_reasons FROM grant_opportunities ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE LIMIT ? OFFSET ?").bind(limit + 1, offset).all();
-      const rows = result.results || [];
-      const filtered = filterValidCalls(rows.slice(0, limit));
-      return json({ calls: filtered.calls, closed: filtered.closed, duplicates: filtered.duplicates, limit, offset, hasMore: rows.length > limit });
-    } catch (error) { const limited = isD1LimitError(error); return json({ error: limited ? "D1 daily limit reached" : String(error.message || "Unable to read grant pipeline calls.").slice(0, 300) }, limited ? 503 : 500); }
+      const cacheKey = "pipeline-calls:" + limit + ":" + offset;
+      const cached = getOpportunityCache(cacheKey); if (cached) return new Response(cached, { status: 200, headers: { ...corsHeaders(), "content-type": "application/json", "x-cache": "HIT" } });
+      const result = await env.GRANTS_DB.prepare("SELECT id, title, description, url, source_url, deadline_at AS deadline, call_status AS status, eligibility_status, fit_score, fit_assessment, fit_reasons FROM grant_opportunities WHERE COALESCE(deadline_at, '9999-12-31') >= '0001-01-01' ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE LIMIT ? OFFSET ?").bind(limit + 1, offset).all();
+      const rows = result.results || []; const filtered = filterValidCalls(rows.slice(0, limit));
+      const payload = { calls: filtered.calls, closed: filtered.closed, duplicates: filtered.duplicates, limit, offset, hasMore: rows.length > limit };
+      putOpportunityCache(cacheKey, JSON.stringify(payload)); return json(payload);
+    } catch (error) {
+      if (isD1LimitError(error)) { lastD1QuotaReachedAt = new Date().toISOString(); const stale = getOpportunityCache("pipeline-calls:" + limit + ":" + offset, true); if (stale) return staleJsonResponse(stale); return json({ error: D1_DEGRADED_MESSAGE, degraded: true, calls: [], closed: [], duplicates: [] }, 503); }
+      return json({ error: String(error.message || "Unable to read grant pipeline calls.").slice(0, 300) }, 500);
+    }
   }
   if (url.pathname === "/pipeline/evaluate") {
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
@@ -636,7 +650,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
     if (url.pathname === "/" || url.pathname === "/application" || url.pathname === "/application/" || url.pathname === "/application/drafts" || url.pathname.startsWith("/application/drafts/")) return handleApplicationPortal(request, env);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1" });
+      return json({ service: "irpa-grant-crawler", environment: env.IRPA_ENVIRONMENT || "local", storage: env.GRANTS_DB ? "configured" : "missing", ai: env.AI ? "configured" : "missing", identity: "firebase-id-token-verification-only", draftStorage: "cloudflare-d1", degraded: Boolean(lastD1QuotaReachedAt), degradedMessage: lastD1QuotaReachedAt ? D1_DEGRADED_MESSAGE : null, lastD1QuotaReachedAt });
     }
     if (request.method === "GET" && url.pathname === "/opportunities") {
       const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -691,20 +705,21 @@ export default {
         }
         fullCatalog = body.mode === "full_catalog";
       }
-      const result = await crawl(env, { fullCatalog });
+      const result = await crawl(env, { fullCatalog }); lastSuccessfulCrawlResult = result; lastD1QuotaReachedAt = null;
       return json({ ...result, scanMode: fullCatalog ? "full_catalog" : "scheduled_batch", searchCatalog: { webQueriesRequested: fullCatalog ? SEARCH_QUERIES.length : Math.min(4, SEARCH_QUERIES.length), webQueryCatalogSize: SEARCH_QUERIES.length, gdeltQueriesRequested: fullCatalog ? GDELT_QUERIES.length : Math.min(2, GDELT_QUERIES.length), gdeltQueryCatalogSize: GDELT_QUERIES.length, retroactiveIndexWindow: "GDELT up to 1 year; other providers limited to their own index/feed retention" } });
     }
     catch (error) {
       const limited = isD1LimitError(error);
+      if (limited) { lastD1QuotaReachedAt = new Date().toISOString(); if (lastSuccessfulCrawlResult) return json({ ...lastSuccessfulCrawlResult, degraded: true, cached: true, message: D1_DEGRADED_MESSAGE }); return json({ error: D1_DEGRADED_MESSAGE, degraded: true, cached: false }, 503); }
       if (!limited && env.GRANTS_DB) {
         try { await env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, error_message, finished_at) VALUES ('failed', ?, CURRENT_TIMESTAMP)").bind(String(error.message || "Crawler failed").slice(0, 500)).run(); } catch {}
       }
-      return json({ error: limited ? "D1 daily limit reached" : String(error.message || "Crawler failed").slice(0, 500) }, limited ? 503 : 502);
+      return json({ error: String(error.message || "Crawler failed").slice(0, 500) }, 502);
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(crawl(env).catch(async error => {
-      if (isD1LimitError(error)) return;
+    ctx.waitUntil(crawl(env).then(result => { lastSuccessfulCrawlResult = result; lastD1QuotaReachedAt = null; }).catch(async error => {
+      if (isD1LimitError(error)) { lastD1QuotaReachedAt = new Date().toISOString(); console.warn(D1_DEGRADED_MESSAGE); return; }
       if (env.GRANTS_DB) {
         try { await env.GRANTS_DB.prepare("INSERT INTO crawler_runs (status, error_message, finished_at) VALUES ('failed', ?, CURRENT_TIMESTAMP)").bind(String(error.message || "Crawler failed").slice(0, 500)).run(); } catch (writeError) { if (isD1LimitError(writeError)) return; }
       }

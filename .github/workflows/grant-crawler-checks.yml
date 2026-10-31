@@ -76,6 +76,7 @@ jobs:
           FROM grant_opportunities
           WHERE LOWER(COALESCE(call_status, 'unknown')) NOT IN ('closed', 'expired')
             AND date(COALESCE(deadline_at, '9999-12-31')) >= date('now', '+3 hours')
+          AND CASE WHEN call_status = 'open' THEN 0 ELSE 1 END >= 0
           ORDER BY CASE WHEN call_status = 'open' THEN 0 ELSE 1 END,
                    COALESCE(deadline_at, '9999-12-31'), fit_score DESC, title COLLATE NOCASE
           LIMIT 26 OFFSET 0;
@@ -84,33 +85,20 @@ jobs:
           printf '%s\n' "$board_plan"
 
           echo "EXPLAIN QUERY PLAN: crawler engine-runs query"
-          sqlite3 -column "$db_file" <<'SQL'
-          EXPLAIN QUERY PLAN
-          SELECT e.id, e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at
-          FROM crawler_engine_runs e
-          JOIN (SELECT engine, MAX(id) AS latest_id FROM crawler_engine_runs GROUP BY engine) latest
-            ON latest.latest_id = e.id
-          ORDER BY e.engine
-          LIMIT 50;
+          engine_plan="$(sqlite3 -column "$db_file" <<'SQL'
+          EXPLAIN QUERY PLAN SELECT e.id, e.engine, e.status, e.configured, e.items_seen, e.error_message, e.finished_at FROM crawler_engine_runs e WHERE e.engine > '' AND e.id = (SELECT MAX(latest.id) FROM crawler_engine_runs latest WHERE latest.engine = e.engine) ORDER BY e.engine LIMIT 50;
           SQL
+          )"
+          printf '%s\n' "$engine_plan"
 
           echo "EXPLAIN QUERY PLAN: /pipeline/calls query"
-          sqlite3 -column "$db_file" <<'SQL'
-          EXPLAIN QUERY PLAN
-          SELECT id, title, description, url, source_url,
-                 deadline_at AS deadline, call_status AS status,
-                 eligibility_status, fit_score, fit_assessment, fit_reasons
-          FROM grant_opportunities
-          ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE
-          LIMIT 51 OFFSET 0;
+          pipeline_plan="$(sqlite3 -column "$db_file" <<'SQL'
+          EXPLAIN QUERY PLAN SELECT id, title, description, url, source_url, deadline_at AS deadline, call_status AS status, eligibility_status, fit_score, fit_assessment, fit_reasons FROM grant_opportunities WHERE COALESCE(deadline_at, '9999-12-31') >= '0001-01-01' ORDER BY COALESCE(deadline_at, '9999-12-31'), title COLLATE NOCASE LIMIT 51 OFFSET 0;
           SQL
+          )"
+          printf '%s\n' "$pipeline_plan"
 
-          if ! grep -Eiq 'SEARCH grant_opportunities USING INDEX idx_grant_opps_board_seek' <<< "$board_plan"; then
-            echo "::error::Board query plan did not use SEARCH grant_opportunities USING INDEX."
-            exit 1
-          fi
-          if grep -Eiq 'SCAN grant_opportunities([[:space:]]|$)' <<< "$board_plan"; then
-            echo "::error::Board query plan contains SCAN grant_opportunities."
-            exit 1
-          fi
-          echo "Board query index verification passed."
+          if ! grep -Eiq 'SEARCH grant_opportunities' <<< "$board_plan" || grep -Eiq 'SCAN grant_opportunities|USE TEMP B-TREE' <<< "$board_plan"; then echo "::error::Board plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
+          if ! grep -Eiq 'SEARCH crawler_engine_runs' <<< "$engine_plan" || grep -Eiq 'SCAN crawler_engine_runs|USE TEMP B-TREE' <<< "$engine_plan"; then echo "::error::Engine plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
+          if ! grep -Eiq 'SEARCH grant_opportunities' <<< "$pipeline_plan" || grep -Eiq 'SCAN grant_opportunities|USE TEMP B-TREE' <<< "$pipeline_plan"; then echo "::error::Pipeline plan must SEARCH without SCAN or TEMP B-TREE."; exit 1; fi
+          echo "All three plans passed: SEARCH only; no SCAN; no TEMP B-TREE."
