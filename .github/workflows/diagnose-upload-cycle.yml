@@ -52,7 +52,7 @@ jobs:
           const require=createRequire(import.meta.url);
           const parser=require('@babel/parser');
           const traverse=require('@babel/traverse').default;
-          const files=['src/utils/documentIntegrity.mjs','src/components/DocumentReader.jsx','src/pages/SignaturePlatform.jsx','src/firebase/signaturePlatform.js','src/firebase/signatureStorage.js','src/components/ControlledDocumentUpload.jsx','src/components/controlledDocumentUploadValidation.mjs','src/components/uploadRuntimeDiagnostics.mjs'];
+          const files=['src/utils/documentIntegrity.mjs','src/components/DocumentReader.jsx','src/pages/SignaturePlatform.jsx','src/firebase/signaturePlatform.js','src/firebase/signatureStorage.js','src/components/ControlledDocumentUpload.jsx','src/components/controlledDocumentUploadValidation.mjs','src/components/uploadRuntimeDiagnostics.mjs','src/firebase/auth.js','src/firebase/invitationWorkflow.js','src/firebase/data.js','src/firebase/config.js'];
           const findings=[];
           for(const file of files){
             if(!fs.existsSync(file))continue;
