@@ -9,10 +9,10 @@ on:
       - '.github/workflows/docs-validation.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: docs-validation-\${{ github.event.pull_request.number || github.ref }}
+  group: docs-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -23,8 +23,8 @@ jobs:
       - name: Check out PR documentation branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
-          repository: \${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           fetch-depth: 0
       - name: Install independent document and browser tools
         run: |
@@ -37,18 +37,6 @@ jobs:
         id: validation
         continue-on-error: true
         run: python docs/srs/validate_docs.py
-      - name: Commit regenerated documentation to the PR branch
-        if: always()
-        env:
-          GH_TOKEN: \${{ github.token }}
-          TARGET_BRANCH: \${{ github.event.pull_request.head.ref || github.ref_name }}
-          TARGET_REPOSITORY: \${{ github.event.pull_request.head.repo.full_name || github.repository }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/srs/SRS.docx docs/srs/SRS.pdf docs/srs/WIRE_FRAMES.pdf docs/srs/wireframes/index.html docs/srs/VALIDATION.json docs/srs/VALIDATION.md
-          git diff --cached --quiet || git commit -m "docs(srs): regenerate exports and validation evidence"
-          git push "https://x-access-token:\${GH_TOKEN}@github.com/\${TARGET_REPOSITORY}.git" "HEAD:\${TARGET_BRANCH}"
       - name: Upload single validation report and screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -63,7 +51,7 @@ jobs:
       - name: Enforce validation result
         if: always()
         run: |
-          if [ "\${{ steps.validation.outcome }}" != "success" ]; then
+          if [ "${{ steps.validation.outcome }}" != "success" ]; then
             echo "Documentation validation failed. See RESULTS.md in the artifact."
             exit 1
           fi
