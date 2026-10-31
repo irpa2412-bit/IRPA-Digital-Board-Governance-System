@@ -20,30 +20,158 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Print every circular dependency
+
+      - name: Capture cycles and upload import chains
         shell: bash
         run: |
           set +e
-          npx --yes madge --circular --extensions js,jsx,mjs src drive-gateway/src 2>&1 | tee /tmp/madge-cycles.txt
-          madge_status=${PIPESTATUS[0]}
-          echo "MADGE_EXIT_CODE=$madge_status"
-          echo "===== CYCLE SUMMARY ====="
-          cat /tmp/madge-cycles.txt
-          echo "===== END CYCLE SUMMARY ====="
+          npx --yes madge --circular --extensions js,jsx,mjs src drive-gateway/src > /tmp/madge-cycles.txt 2>&1
+          madge_status=$?
+          set -e
+          {
+            echo "## Circular dependency report"
+            echo '~~~text'
+            cat /tmp/madge-cycles.txt
+            echo '~~~'
+            echo
+            echo "## Ten longest import chains involving upload/signature modules"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          npx --yes madge --json --extensions js,jsx,mjs src/components/ControlledDocumentUpload.jsx src/components/DocumentReader.jsx src/pages/SignaturePlatform.jsx src/firebase/signaturePlatform.js src/firebase/signatureStorage.js src/firebase/auth.js src/firebase/data.js > /tmp/upload-import-graph.json 2>/tmp/madge-graph-stderr.txt
+          node --input-type=module <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          import fs from 'node:fs';
+          const graph=JSON.parse(fs.readFileSync('/tmp/upload-import-graph.json','utf8'));
+          const nodes=new Set(Object.keys(graph)), chains=[];
+          const relevant=/ControlledDocumentUpload|DocumentReader|SignaturePlatform|signaturePlatform|signatureStorage|integrity|hash|auth|data/i;
+          function walk(node,path,seen){
+            const next=(graph[node]||[]).filter(x=>nodes.has(x));
+            if(!next.length||path.length>=18){if(path.some(x=>relevant.test(x)))chains.push(path);return;}
+            for(const child of next){
+              if(seen.has(child)){if(path.some(x=>relevant.test(x)))chains.push([...path,child+' [cycle]']);continue;}
+              walk(child,[...path,child],new Set([...seen,child]));
+            }
+          }
+          for(const root of nodes)walk(root,[root],new Set([root]));
+          const unique=new Map(chains.map(x=>[x.join(' -> '),x]));
+          const ranked=[...unique.values()].sort((a,b)=>b.length-a.length||a.join().localeCompare(b.join())).slice(0,10);
+          if(!ranked.length)console.log('_No upload-related import chains returned by madge._');
+          ranked.forEach((x,i)=>{console.log((i+1)+'. **'+x.length+' modules**');console.log('   `'+x.join(' → ')+'`');});
+          NODE
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const lines=fs.readFileSync('/tmp/madge-cycles.txt','utf8').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+          const cycles=lines.filter(x=>x.includes(' -> '));
+          for(const cycle of cycles)console.log('::error title=Upload dependency cycle::'+cycle.replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A'));
+          NODE
+          cp /tmp/madge-cycles.txt /tmp/upload-cycle-report.txt
+          cat /tmp/upload-import-graph.json >> /tmp/upload-cycle-report.txt
+          echo "MADGE_EXIT_CODE=$madge_status" >> /tmp/upload-cycle-report.txt
+
       - name: Build with source maps and readable output
-        run: npx vite build --sourcemap --minify false
-      - name: Locate initialization identifier and source modules
         shell: bash
         run: |
-          echo "===== BUILT ASSETS CONTAINING IDENTIFIER Ne ====="
-          grep -R -n -E '\\bNe\\b' dist/assets --include='*.js' | head -80 || true
-          echo "===== SOURCE MAP SOURCES ====="
-          find dist/assets -name '*.js.map' -print -exec node -e '
-            const fs = require("fs");
-            const p = process.argv[1];
-            const m = JSON.parse(fs.readFileSync(p, "utf8"));
-            console.log(p + ":");
-            for (const s of (m.sources || [])) console.log("  " + s);
-          ' {} \;
-          echo "===== SOURCE OCCURRENCES OF HASH / INTEGRITY HELPERS ====="
-          grep -R -n -E 'sha256|byteLength|integrity|hash' src drive-gateway/src --include='*.js' --include='*.jsx' --include='*.mjs' | head -200 || true
+          npx vite build --sourcemap --minify false > /tmp/vite-build.txt 2>&1
+          status=$?
+          cat /tmp/vite-build.txt
+          {
+            echo
+            echo "## Vite build"
+            echo '~~~text'
+            cat /tmp/vite-build.txt
+            echo '~~~'
+            echo "Build exit code: $status"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Execute Create Drive file against built upload module with mocked Gateway
+        shell: bash
+        run: |
+          mkdir -p /tmp/upload-cycle-runtime
+          cat > /tmp/upload-cycle-runtime/run.mjs <<'NODE'
+          import { build } from 'vite';
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { pathToFileURL } from 'node:url';
+          const root=process.cwd();
+          const authStub='\0upload-cycle-auth-stub',configStub='\0upload-cycle-config-stub',gatewayStub='\0upload-cycle-gateway-stub';
+          const plugin={
+            name:'upload-cycle-runtime-mocks',enforce:'pre',
+            resolveId(source,importer){
+              if(source==='firebase/auth')return authStub;
+              if(importer===path.join(root,'src/firebase/signatureStorage.js')&&source==='./config')return configStub;
+              if(importer===path.join(root,'src/firebase/signatureStorage.js')&&source==='./gatewayUrl')return gatewayStub;
+              return null;
+            },
+            load(id){
+              if(id===authStub)return 'export async function getIdToken(){return "mock-firebase-id-token";}';
+              if(id===configStub)return 'export const auth={currentUser:{uid:"upload-cycle-test-user",email:"test@irpa.invalid"}};';
+              if(id===gatewayStub)return 'export function getGoogleDriveGatewayUrl(){return "https://mock-gateway.invalid";}';
+              return null;
+            }
+          };
+          const outDir='/tmp/upload-cycle-runtime/bundle';
+          await build({configFile:false,root,plugins:[plugin],build:{ssr:'src/firebase/signatureStorage.js',outDir,emptyOutDir:true,minify:false,sourcemap:true,rollupOptions:{output:{format:'es'}}}});
+          globalThis.fetch=async(url,init)=>{
+            if(!String(url).includes('/api/upload-controlled-document'))throw new Error('Unexpected mocked Gateway route: '+url);
+            const payload=JSON.parse(init.body);
+            if(!payload.base64||!payload.fileName)throw new Error('Mock Gateway received incomplete upload payload.');
+            return new Response(JSON.stringify({ok:true,categoryArchive:{folderId:'mock-folder',file:{fileId:'mock-drive-file',name:payload.fileName}},archivePath:payload.destinationKey}),{status:200,headers:{'content-type':'application/json'}});
+          };
+          const bundle=fs.readdirSync(outDir).find(x=>x.endsWith('.js'));
+          if(!bundle)throw new Error('Vite did not emit the upload module bundle.');
+          const mod=await import(pathToFileURL(path.join(outDir,bundle)).href);
+          try{
+            const result=await mod.uploadControlledDocumentRouted({
+              documentId:'mock-document-id',title:'Upload-cycle diagnostic fixture',reference:'IRPA-DIAG-001',
+              documentType:'Governance',archiveCategory:'Governance Documents',classification:'Public',
+              uploadedAt:'2026-10-31T00:00:00.000Z',
+              file:{name:'upload-cycle-fixture.pdf',type:'application/pdf',async arrayBuffer(){return Uint8Array.from([37,80,68,70,45,49,46,55]).buffer;}}
+            });
+            if(result?.categoryArchive?.file?.fileId!=='mock-drive-file')throw new Error('Create Drive file did not receive mocked Drive file ID.');
+            fs.writeFileSync('/tmp/upload-cycle-runtime/result.txt','PASS: Create Drive file returned mock-drive-file; route='+result.archivePath);
+          }catch(error){
+            const stack=String(error?.stack||error),message=error?.message||String(error),name=error?.name||'Error';
+            const match=message.match(/\b([A-Za-z_$][\w$]*) is not defined\b/);
+            const identifier=match?match[1]:'unresolved';
+            let declarations='';
+            if(identifier!=='unresolved'){
+              const {execFileSync}=await import('node:child_process');
+              for(const dir of ['src','drive-gateway/src']){
+                try{declarations+=execFileSync('rg',['-n','--glob','*.js','--glob','*.jsx','--glob','*.mjs','(?:const|let|var|function|class)\\s+'+identifier+'\\b',dir],{encoding:'utf8'});}catch{}
+              }
+            }
+            const report='FAIL: '+name+': '+message+'\n\nUNMINIFIED STACK:\n'+stack+'\n\nMODULE DECLARING '+identifier+':\n'+(declarations||'No declaration found in src/ or drive-gateway/src.');
+            fs.writeFileSync('/tmp/upload-cycle-runtime/result.txt',report);
+            if(!(error instanceof ReferenceError))process.exitCode=1;
+          }
+          NODE
+          set +e
+          node /tmp/upload-cycle-runtime/run.mjs > /tmp/upload-runtime-console.txt 2>&1
+          runtime_status=$?
+          set -e
+          {
+            echo
+            echo "## Create Drive file runtime reproduction"
+            echo '~~~text'
+            cat /tmp/upload-cycle-runtime/result.txt 2>/dev/null || cat /tmp/upload-runtime-console.txt
+            echo
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/upload-cycle-runtime/result.txt >> /tmp/upload-cycle-report.txt 2>/dev/null || true
+          cat /tmp/upload-runtime-console.txt >> /tmp/upload-cycle-report.txt
+          test "$runtime_status" -eq 0
+
+      - name: Upload complete diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-cycle-report
+          path: |
+            /tmp/upload-cycle-report.txt
+            /tmp/madge-cycles.txt
+            /tmp/upload-import-graph.json
+            /tmp/vite-build.txt
+            /tmp/upload-runtime-console.txt
+            /tmp/upload-cycle-runtime/result.txt
+          if-no-files-found: warn
+          retention-days: 14
