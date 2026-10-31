@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc,query,where} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
 import FundraisingSourceRegistry from "./grant-fundraising/FundraisingSourceRegistry.jsx";
+import { mapCrawlerOpportunity, mergeCrawlerOpportunityPage, summarizeCrawlerSources } from "./grant-crawler-board-data.js";
 
 const PILLARS=[
  {id:"rangeland",label:"Sustainable Rangeland Management",short:"Rangeland"},
@@ -209,25 +210,11 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      setCrawlerProvision(Array.isArray(data.engineProvision)?data.engineProvision:[]);
      const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
      setCrawlerSources(uniqueSources.map(sourceUrl=>({id:sourceUrl,name:(()=>{try{return new URL(sourceUrl).hostname}catch{return sourceUrl}})(),url:sourceUrl,status:"Fetched",candidateCount:items.filter(item=>item.source_url===sourceUrl).length})));
-     const mappedItems=items.map(item=>({
-       id:"crawler-"+item.id,title:item.title||"Untitled opportunity",
-       funder:item.funder||item.source_name||(()=>{try{return new URL(item.source_url||item.url).hostname.replace(/^www\./,"")}catch{return "Funder not verified"}})(),
-       url:item.url||item.source_url||"",source_url:item.source_url||"",deadline:item.deadline_at||null,
-       country:item.country||(item.geography_assessment==="tanzania_mentioned"?"Tanzania":item.geography_assessment==="regional_or_lmic_scope"?"Regional / LMIC":"Not verified"),
-       amount:item.amount||"Not stated",summary:item.description||"No description supplied by source.",
-       status:["closed","expired","closed_do_not_prioritize"].includes(String(item.call_status||"").toLowerCase())?"Closed":String(item.call_status||"").toLowerCase()==="open"?"Open":"Under review",
-       callStatus:item.call_status||"unknown",
-       pillars:Array.isArray(item.pillars)?item.pillars:(()=>{try{return JSON.parse(item.pillars||"[]")}catch{return []}})(),
-       themes:Array.isArray(item.themes)?item.themes:(()=>{try{return JSON.parse(item.themes||"[]")}catch{return []}})(),
-       verificationStatus:item.verification_status||"Pending official-call verification",sourceType:"Cloudflare crawler",
-       discoveryEngine:item.discovery_engine||"unknown",sourceUrl:item.source_url||"",discoveryEvidence:item.discovery_evidence||"",
-       fitScore:Number(item.fit_score||0),fitReasons:item.fit_reasons||"[]",
-       eligibilityStatus:item.eligibility_status||"unverified",triageAssessment:item.triage_assessment||"manual_eligibility_review",
-       createdAt:item.first_seen_at||null
-     }));
-     if(data.lastRun)setCrawlerStatus({status:data.lastRun.status,created:data.lastRun.created??data.lastRun.items_changed,candidatesFound:data.lastRun.candidatesFound??data.lastRun.items_seen,lastCompletedAt:data.lastRun.finished_at,lastStartedAt:data.lastRun.started_at,configuredSources:data.lastRun.configuredSources??data.sourceCount??data.feedsConfigured,healthySources:data.lastRun.healthySources??uniqueSources.length,failedSources:data.lastRun.failedSources??0});
+     const mappedItems=items.map(mapCrawlerOpportunity);
+     setCrawlerRecords(current=>mergeCrawlerOpportunityPage(current,mappedItems,offset));
+     if(data.lastRun||Array.isArray(data.engineRuns)){const sourceSummary=summarizeCrawlerSources(data);setCrawlerStatus({status:data.lastRun?.status,created:data.lastRun?.created??data.lastRun?.items_changed,candidatesFound:data.lastRun?.candidatesFound??data.lastRun?.items_seen,lastCompletedAt:data.lastRun?.finished_at,lastStartedAt:data.lastRun?.started_at,configuredSources:sourceSummary.checked,healthySources:sourceSummary.healthy,failedSources:sourceSummary.failed});}
      if(showNotice)setNotice("Refreshed "+String(data.count||0)+" grant records from the Cloudflare crawler. Eligibility remains unverified.");
-   }catch(err){console.error("Crawler result retrieval failed",err);if(showNotice)setError(err?.message||"Unable to load crawler results.");}
+   }catch(err){console.error("Crawler result retrieval failed",err);setError(err?.message||"Unable to load crawler results.");}
    finally{setCrawlerResultsBusy(false);}
  }
  useEffect(()=>{loadCrawlerResults(false)},[]);
@@ -347,7 +334,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const response=await fetch(workerUrl+"/run",{method:"POST",headers:{"Authorization":"Bearer "+idToken,"Content-Type":"application/json"},body:JSON.stringify({mode:"full_catalog"}),signal:AbortSignal.timeout(90000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok) throw new Error(data.error||"Cloudflare grant crawler request failed ("+response.status+").");
-     setNotice("Authorised full-catalogue scan "+String(data.status||"finished")+". Search queries requested: "+String(data.searchCatalog?.webQueriesRequested||0)+"/"+String(data.searchCatalog?.webQueryCatalogSize||0)+" web and "+String(data.searchCatalog?.gdeltQueriesRequested||0)+"/"+String(data.searchCatalog?.gdeltQueryCatalogSize||0)+" GDELT. Sources checked: "+String(data.sourceCount||data.configuredSources||0)+", candidates found: "+String(data.candidatesFound||data.itemsSeen||0)+", records created or updated: "+String(Number(data.created||0)+Number(data.updated||0)||data.recordsChanged||0)+". Provider history limits apply; new leads remain pending official-call verification.");
+     setNotice("Authorised full-catalogue scan "+String(data.status||"finished")+". Search queries requested: "+String(data.searchCatalog?.webQueriesRequested||0)+"/"+String(data.searchCatalog?.webQueryCatalogSize||0)+" web and "+String(data.searchCatalog?.gdeltQueriesRequested||0)+"/"+String(data.searchCatalog?.gdeltQueryCatalogSize||0)+" GDELT. Sources checked: "+String(summarizeCrawlerSources(data).checked)+", candidates found: "+String(data.candidatesFound||data.itemsSeen||0)+", records created or updated: "+String(Number(data.created||0)+Number(data.updated||0)||data.recordsChanged||0)+". Provider history limits apply; new leads remain pending official-call verification.");
      await loadCrawlerResults(false);
    }catch(err){console.error("Manual grant crawler scan failed",err);setError(err?.name==="TimeoutError"?"The scan exceeded 90 seconds. Refresh results and inspect crawler health before retrying.":err?.message||"Manual scan failed. Check crawler authorization and Worker health.");}
    finally{setCrawlerRunning(false);}

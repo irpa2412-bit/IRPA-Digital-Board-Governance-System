@@ -27,7 +27,7 @@ concurrency:
 jobs:
   authenticated-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       GCLOUD_PROJECT: demo-irpa-dgbs
     steps:
@@ -47,12 +47,12 @@ jobs:
         run: npm ci
       - name: Install Firebase Admin SDK for emulator-only fixture seeding
         run: npm --prefix functions install --omit=dev
-      - name: Install Playwright runner without changing lockfile
+      - name: Install Playwright test runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Authenticate against isolated Firebase Auth and Firestore emulators; test mobile and desktop
-        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs"
+      - name: Authenticate against isolated Firebase Auth and Firestore emulators; run full suite three times at mobile, tablet and desktop sizes
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --repeat-each=3 --workers=1"
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@v4
