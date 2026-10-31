@@ -84,7 +84,7 @@ test("production minified bundle completes authenticated Create Drive file with 
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.7\n")
   });
-  await page.getByRole("button", { name: "Upload Document", exact: true }).click();
+  await page.locator(".controlled-document-upload-panel").getByRole("button", { name: "Upload Document", exact: true }).click();
 
   await expect.poll(() => gatewayCalls.filter(call => call.path === "/api/upload-controlled-document").length,
     { timeout: 30000, message: "production bundle should reach the mocked Create Drive file Gateway route" }
