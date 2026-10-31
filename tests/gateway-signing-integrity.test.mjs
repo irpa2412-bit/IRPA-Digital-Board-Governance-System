@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { verifySourceDocumentIntegrity } from "../drive-gateway/src/signing.mjs";
 
 const bytes = new TextEncoder().encode("%PDF-1.7");
-const hash = "a4f4e2d1"; // replaced below with the real digest for the fixture
 
 async function sha256(value) {
   const digest = await crypto.subtle.digest("SHA-256", value);
