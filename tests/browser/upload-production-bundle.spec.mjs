@@ -77,7 +77,7 @@ test("production minified bundle completes authenticated Create Drive file with 
   await expect(page.locator(".topbar h2")).toContainText("Authorization", { timeout: 45000 });
   await expect(page.getByText("CONTROLLED DOCUMENT UPLOAD")).toBeVisible({ timeout: 30000 });
 
-  await page.getByLabel("Document Title").fill("Upload Runtime Browser Fixture");
+  await page.getByPlaceholder("Enter document title").fill("Upload Runtime Browser Fixture");
   await page.getByLabel("Document Type").selectOption("Governance");
   await page.getByLabel("Select document file").setInputFiles({
     name: "irpa-upload-runtime-fixture.pdf",
