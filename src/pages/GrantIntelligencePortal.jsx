@@ -109,7 +109,8 @@ const getOpportunityCurrentStatusIssue=record=>{
 const isNotCurrentOpportunity=record=>["closed","expired"].includes(getOpportunityCurrentStatusIssue(record));
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
- const [crawlerRecords,setCrawlerRecords]=useState([]);\n const [crawlerHasMore,setCrawlerHasMore]=useState(false);
+ const [crawlerRecords,setCrawlerRecords]=useState([]);
+ const [crawlerHasMore,setCrawlerHasMore]=useState(false);
  const [crawlerResultsBusy,setCrawlerResultsBusy]=useState(false);
  const [crawlerStatus,setCrawlerStatus]=useState(null);
  const [crawlerSources,setCrawlerSources]=useState([]);
@@ -202,7 +203,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      const response=await fetch(workerUrl+"/opportunities?limit=50&offset="+Math.max(0,Number(offset)||0),{headers:{Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(15000)});
      const data=await response.json().catch(()=>({}));
      if(!response.ok)throw new Error(data.error||"Crawler results request failed ("+response.status+").");
-     const items=Array.isArray(data.items)?data.items:[];\n     setCrawlerHasMore(Boolean(data.hasMore));
+     const items=Array.isArray(data.items)?data.items:[];
+     setCrawlerHasMore(Boolean(data.hasMore));
      setCrawlerEngines(Array.isArray(data.engineRuns)?data.engineRuns:[]);
      setCrawlerProvision(Array.isArray(data.engineProvision)?data.engineProvision:[]);
      const uniqueSources=[...new Set(items.map(item=>item.source_url).filter(Boolean))];
