@@ -1,0 +1,86 @@
+name: Upload TDZ Mainline Regression Bisect
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/ControlledDocumentUpload.jsx"
+      - "src/firebase/signatureStorage.js"
+      - "tests/browser/upload-production-bundle.spec.mjs"
+      - ".github/workflows/upload-tdz-mainline-bisect.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      commits: ${{ steps.commits.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 50
+      - id: commits
+        shell: bash
+        run: |
+          matrix="$(git rev-list -40 origin/main | jq -R -s -c 'split("\n")[:-1] | reverse | to_entries | map({index: .key, sha: .value})')"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  bisect:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        commit: ${{ fromJson(needs.prepare.outputs.commits) }}
+    env:
+      GCLOUD_PROJECT: demo-irpa-dgbs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit.sha }}
+          fetch-depth: 1
+      - name: Overlay the current authenticated upload regression spec
+        env:
+          SPEC_BRANCH: ${{ github.head_ref || 'fix/upload-tdz-20261101' }}
+        run: |
+          git fetch origin "$SPEC_BRANCH" --depth=1
+          git show "FETCH_HEAD:tests/browser/upload-production-bundle.spec.mjs" > tests/browser/upload-production-bundle.spec.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npm --prefix functions install --omit=dev
+      - run: npm install --no-save --package-lock=false @playwright/test
+      - run: npx playwright install --with-deps chromium
+      - name: Build minified bundle and run the authenticated Gateway upload spec
+        id: regression
+        continue-on-error: true
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/upload-production-bundle.spec.mjs --workers=1"
+      - name: Report commit and associated PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ matrix.commit.sha }}
+          RESULT: ${{ steps.regression.outcome }}
+          INDEX: ${{ matrix.commit.index }}
+        run: |
+          prs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" --jq 'map("#" + (.number|tostring) + " " + .html_url) | join(", ")' 2>/dev/null || true)"
+          [ -n "$prs" ] || prs="No associated PR returned"
+          echo "| ${INDEX} | ${SHA} | ${RESULT} | ${prs} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "${INDEX} ${SHA} ${RESULT} ${prs}" > "bisect-${INDEX}.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upload-tdz-bisect-${{ matrix.commit.index }}
+          path: bisect-${{ matrix.commit.index }}.txt
