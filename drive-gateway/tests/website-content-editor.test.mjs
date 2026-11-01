@@ -144,6 +144,7 @@ test.beforeEach(() => {
     }
     if (url.pathname === "/wp-json/wp/v2/categories") return response([{ id: 3, name: "News" }]);
     if (url.pathname === "/wp-json/wp/v2/tags") return response([{ id: 9, name: "Rangelands" }]);
+    if (url.pathname === "/wp-json/wp/v2/posts" && method === "OPTIONS") return response({ schema: { properties: { meta: { properties: {} } } } });
     if (url.pathname === "/wp-json/wp/v2/posts" && method === "POST") {
       postCreateCount++;
       createdPost = JSON.parse(init.body || "{}");
@@ -439,6 +440,27 @@ test("new website updates are created as draft posts with selected taxonomy and 
   assert.equal(createdPost.slug, "irpa-test-editorial-en");
   assert.equal(postCreateCount, 1);
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_POST_DRAFT_CREATED"));
+});
+
+test("Yoast REST capability check reports fields unavailable when WordPress does not expose writable meta", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/seo-capabilities");
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.source, "WordPress REST OPTIONS schema");
+  assert.deepEqual(data.yoast, { metaDescription: false, focusKeyphrase: false });
+  assert.equal(data.writable, false);
+});
+
+test("new post creation refuses Yoast metadata when WordPress REST does not expose the fields", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/posts", {
+    method: "POST",
+    body: { title: "SEO test", content: "<p>Draft body</p>", slug: "seo-test", seoMetaDescription: "Description" }
+  });
+  assert.equal(result.status, 422);
+  assert.match((await result.json()).error, /not exposed as writable/);
+  assert.equal(postCreateCount, 0);
 });
 
 test("new website update API rejects a caller-supplied published status", async () => {
