@@ -12,6 +12,8 @@ let requestCount;
 let wpRoles;
 let wpItemLink;
 let lastMediaUpload;
+let createdPost;
+let postCreateCount;
 let consoleMessages;
 let originalFetch;
 let originalConsole;
@@ -118,6 +120,8 @@ test.beforeEach(() => {
   wpRoles = ["editor"];
   wpItemLink = "https://staging.irpa.or.tz/test-page/";
   lastMediaUpload = null;
+  createdPost = null;
+  postCreateCount = 0;
   consoleMessages = [];
   originalFetch = globalThis.fetch;
   originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
@@ -133,6 +137,20 @@ test.beforeEach(() => {
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
       lastMediaUpload = { contentType: new Headers(init.headers).get("Content-Type"), disposition: new Headers(init.headers).get("Content-Disposition"), bytes: new Uint8Array(init.body) };
       return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: "" }, 201);
+    }
+    if (url.pathname === "/wp-json/wp/v2/media/88" && method === "POST") {
+      const metadata = JSON.parse(init.body || "{}");
+      return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: metadata.alt_text, caption: { raw: metadata.caption } });
+    }
+    if (url.pathname === "/wp-json/wp/v2/categories") return response([{ id: 3, name: "News" }]);
+    if (url.pathname === "/wp-json/wp/v2/tags") return response([{ id: 9, name: "Rangelands" }]);
+    if (url.pathname === "/wp-json/wp/v2/posts" && method === "POST") {
+      postCreateCount++;
+      createdPost = JSON.parse(init.body || "{}");
+      return response({ id: 321, title: { raw: createdPost.title }, content: { raw: createdPost.content }, excerpt: { raw: createdPost.excerpt }, featured_media: createdPost.featured_media, status: createdPost.status, link: "https://staging.irpa.or.tz/new-update/" }, 201);
+    }
+    if (url.pathname === "/wp-json/wp/v2/posts/321" && method === "GET") {
+      return response({ id: 321, title: { raw: createdPost.title }, content: { raw: createdPost.content }, excerpt: { raw: createdPost.excerpt }, featured_media: createdPost.featured_media, status: createdPost.status, link: "https://staging.irpa.or.tz/new-update/" });
     }
     if (url.pathname === "/wp-json/wp/v2/users/me") {
       return response({ id: 7, name: "Staging Editor", roles: wpRoles, capabilities: { edit_posts: true, edit_pages: true } });
@@ -371,7 +389,7 @@ test("authenticated staging image upload accepts safe image types and records an
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST",
-    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==" }
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
   });
   assert.equal(result.status, 200);
   const data = await result.json();
@@ -389,7 +407,56 @@ test("image upload rejects unsupported formats and oversized payloads before Wor
   });
   assert.equal(unsupported.status, 400);
   const oversized = await call(router, makeEnv(), "/api/communications/website/media", {
-    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(12 * 1024 * 1024) }
+    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(8 * 1024 * 1024), altText: "Large image" }
   });
   assert.equal(oversized.status, 413);
+});
+
+
+test("new website updates are created as draft posts with selected taxonomy and media", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/posts", {
+    method: "POST",
+    body: { title: "Pastoralist update", content: "<h2>Community action</h2><p>Update text.</p>", excerpt: "A short update", categories: [3], tags: [9], featuredMedia: 88 }
+  });
+  assert.equal(result.status, 201);
+  const data = await result.json();
+  assert.equal(data.item.id, 321);
+  assert.equal(data.item.status, "draft");
+  assert.equal(createdPost.status, "draft");
+  assert.deepEqual(createdPost.categories, [3]);
+  assert.deepEqual(createdPost.tags, [9]);
+  assert.equal(postCreateCount, 1);
+  assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_POST_DRAFT_CREATED"));
+});
+
+test("new website update API rejects a caller-supplied published status", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/posts", {
+    method: "POST",
+    body: { title: "Must remain draft", content: "<p>Body</p>", categories: [], tags: [], featuredMedia: 0, status: "publish" }
+  });
+  assert.equal(result.status, 400);
+  assert.equal(postCreateCount, 0);
+});
+
+test("image upload rejects MIME spoofing before any WordPress media write", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "spoofed.jpg", contentType: "image/jpeg", dataBase64: "PHN2Zz48L3N2Zz4=", altText: "Not an image" }
+  });
+  assert.equal(result.status, 415);
+  assert.equal(lastMediaUpload, null);
+});
+
+test("production website editor still rejects direct publishing through the existing approval gate", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv({ IRPA_ENVIRONMENT: "production", WORDPRESS_BASE_URL: "https://irpa.or.tz" }), "/api/communications/website/content", {
+    method: "PUT",
+    body: { type: "posts", id: 123, title: "Direct publish blocked", content: "<p>Body</p>", excerpt: "", featuredMedia: 0, status: "publish" }
+  });
+  assert.equal(result.status, 403);
+  assert.equal(state.title, "Original test page");
+  assert.equal(kvStore.size, 0);
 });
