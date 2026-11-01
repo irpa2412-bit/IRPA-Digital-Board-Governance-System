@@ -355,6 +355,7 @@ export function createCommunicationsSiteRouter(deps) {
         " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category + "."),
         { diagnosticCode, httpStatus: status, uapiStatus, errorCount });
     }
+    Object.defineProperty(data, "__httpStatus", { value: response.status, enumerable: false });
     return data;
   }
 
@@ -996,6 +997,113 @@ export function createCommunicationsSiteRouter(deps) {
         }
       }
       return json({ success: true, draftOnly: true, liveMenuChanged: false, result }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/production-acceptance" && request.method === "POST") {
+      const { claims } = await authorised(request, env, true);
+      const wp = websiteWordPressConfig(env);
+      const report = [];
+      const add = (label, status, httpStatus, error = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null });
+      const wpRequest = async (endpoint, method = "GET", payload, headers = {}) => {
+        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
+          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
+          ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
+          signal: AbortSignal.timeout(30000)
+        });
+        const data = await response.json().catch(() => null);
+        return { response, data };
+      };
+      const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
+      let testPageId = 0, testPostId = 0, uploadAllowed = false;
+      try {
+        const user = await wpRequest("users/me?context=edit");
+        uploadAllowed = !!user.response.ok && user.data?.capabilities?.upload_files === true;
+        add("WordPress authenticated user read", user.response.ok ? "PASS" : "FAIL", user.response.status, user.response.ok ? "" : user.data?.message || "WordPress user endpoint failed.");
+        add("WordPress upload_files capability", uploadAllowed ? "PASS" : "FAIL", user.response.status, uploadAllowed ? "" : "Missing or unverified upload_files capability; TEST media uploads are blocked.");
+      } catch (error) { add("WordPress authenticated user read", "FAIL", 0, error.message); add("WordPress upload_files capability", "FAIL", 0, "Capability could not be verified; uploads were not attempted."); }
+      for (const type of ["pages", "posts"]) {
+        const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
+        const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
+        try {
+          const created = await wpRequest(type, "POST", { title, slug, status: "draft", content: "<p>TEST ONLY — IRPA production acceptance. This draft is intentionally retained and will not be published.</p>" });
+          const id = Number(created.data?.id);
+          const ok = created.response.ok && Number.isSafeInteger(id) && created.data?.status === "draft" && isAllowedWordPressLink(created.data?.link, wp);
+          if (type === "pages") testPageId = ok ? id : 0; else testPostId = ok ? id : 0;
+          add(type + " draft create", ok ? "PASS" : "FAIL", created.response.status, ok ? "" : created.data?.message || "WordPress did not confirm a same-host draft.");
+          if (!ok) continue;
+          await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_TEST_DRAFT_CREATED", type, id, { title, slug, status: "draft", test: true });
+          const edited = await wpRequest(type + "/" + id, "POST", { title: title + " — EDITED TEST", content: "<p>TEST ONLY — edited and revised by the production acceptance check. Retain as draft.</p>", status: "draft" });
+          const editOk = edited.response.ok && Number(edited.data?.id) === id && edited.data?.status === "draft";
+          add(type + " draft edit", editOk ? "PASS" : "FAIL", edited.response.status, editOk ? "" : edited.data?.message || "WordPress did not confirm the edited draft.");
+          const revisions = await wpRequest(type + "/" + id + "/revisions?context=edit&per_page=20");
+          const revisionRows = Array.isArray(revisions.data) ? revisions.data : [];
+          const revisionOk = revisions.response.ok && revisionRows.length > 0;
+          add(type + " revision history", revisionOk ? "PASS" : "FAIL", revisions.response.status, revisionOk ? "" : revisions.data?.message || "No WordPress revision was returned; the draft remains unchanged and retained.");
+        } catch (error) { add(type + " draft lifecycle", "FAIL", 0, error.message); }
+      }
+      const mediaTests = [
+        { name: "image", filename: "png", mime: "image/png", b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/k8sAAAAASUVORK5CYII=" },
+        { name: "video", filename: "mp4", mime: "video/mp4", b64: "AAAAGGZ0eXBpc29tAAAAAGlzb20=" },
+        { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKJUVPRgo=" },
+        { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBA==" }
+      ];
+      if (uploadAllowed && testPageId) {
+        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) {
+          const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
+          try {
+            const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
+            validateWebsiteMedia({ filename, contentType: file.mime, bytes });
+            const upload = await wpRequest("media", "POST", bytes, {
+              "Content-Type": file.mime,
+              "Content-Disposition": 'attachment; filename="' + filename + '"'
+            });
+            const mediaId = Number(upload.data?.id);
+            if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(upload.data?.source_url, wp)) {
+              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, upload.data?.message || "WordPress did not return a same-host media URL.");
+              continue;
+            }
+            const meta = await wpRequest("media/" + mediaId, "POST", { title: "TEST " + file.name + " " + destination, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) });
+            if (!meta.response.ok || Number(meta.data?.id) !== mediaId) {
+              add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, meta.data?.message || "Media metadata/attachment failed.");
+              continue;
+            }
+            if (destination === "featured") {
+              const featured = await wpRequest("pages/" + testPageId, "POST", { featured_media: mediaId, status: "draft" });
+              if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, featured.data?.message || "Featured image assignment failed."); continue; }
+            }
+            const opened = await wordpressEditorFetch(wp, upload.data.source_url, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
+            add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
+          } catch (error) { add(file.name + " upload to WordPress " + destination, "FAIL", error.httpStatus || 0, error.message); }
+        }
+      } else {
+        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) add(file.name + " upload to WordPress " + destination, "FAIL", null, "Skipped because upload_files capability or TEST page creation was not confirmed.");
+      }
+      try {
+        const cp = cpanelConfig(env);
+        const directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
+        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
+        add("cPanel upload directory read", "PASS", listing.__httpStatus, "");
+        for (const file of mediaTests) {
+          const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "." + file.filename;
+          try {
+            const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
+            validateWebsiteMedia({ filename, contentType: file.mime, bytes });
+            const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
+            const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(60000) });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
+            const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+            const opened = await wordpressEditorFetch(wp, publicUrl, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
+            add(file.name + " upload to cPanel folder URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded cPanel URL did not open successfully.");
+          } catch (error) { add(file.name + " upload to cPanel folder", "FAIL", error.httpStatus || 0, error.message); }
+        }
+      } catch (error) {
+        add("cPanel upload directory read", "FAIL", error.httpStatus || 0, error.message);
+        for (const file of mediaTests) add(file.name + " upload to cPanel folder", "FAIL", null, "Skipped because the existing cPanel uploads directory could not be read.");
+      }
+      const passCount = report.filter(row => row.status === "PASS").length;
+      const failCount = report.filter(row => row.status === "FAIL").length;
+      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
