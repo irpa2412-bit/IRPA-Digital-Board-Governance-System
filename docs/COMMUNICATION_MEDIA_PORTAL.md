@@ -51,9 +51,9 @@ The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social
 WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. The Worker permits only `staging.irpa.or.tz` in staging and only `irpa.or.tz` or `www.irpa.or.tz` in production. The production allowlist is intentional; a `/staging` path does not make a production hostname a staging host.
 The portal calls the existing Cloudflare Worker routes:
 - `GET /api/communications/site/status` — verifies the WordPress connection for the serving Worker environment without returning credentials.
-- `GET /api/communications/website/content?type=posts|pages` — lists up to 50 staging pages or posts.
-- `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one staging item with edit-context fields.
-- `PUT /api/communications/website/content` — updates only title, content, excerpt, featured image ID and status (`draft` or `publish`).
+- `GET /api/communications/website/content?type=posts|pages` — lists up to 50 pages or posts from the configured WordPress environment.
+- `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one item from the configured WordPress environment with edit-context fields.
+- `PUT /api/communications/website/content` — updates allowlisted title, content, excerpt, featured image and draft fields; public publication remains restricted to the independent approved communications workflow.
 - `GET /api/communications/website/revisions?type=pages|posts&id={id}` — lists native WordPress revisions and complete pre-edit snapshots.
 - `POST /api/communications/website/restore` — restores a saved snapshot or WordPress revision; a pre-restore snapshot is saved first.
 - `POST /api/communications/website/publish` — retains the existing approved article/press-release workflow and deterministic-slug reconciliation.
