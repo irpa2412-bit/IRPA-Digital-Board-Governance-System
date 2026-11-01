@@ -69,6 +69,7 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
     diagnostic.trashed = Boolean(metadata.trashed);
     diagnostic.parents = Array.isArray(metadata.parents) ? metadata.parents : [];
     diagnostic.createdTime = metadata.createdTime || null;
+    diagnostic.driveDescription = metadata.description || "";
     if (metadata.trashed) return { ...diagnostic, classification: "FILE_MISSING", step: "Drive metadata call", driveErrorReason: "trashed", reason: "Drive metadata reports trashed=true." };
   } catch (error) {
     const failure = classifyFailure("Drive metadata call", error);
