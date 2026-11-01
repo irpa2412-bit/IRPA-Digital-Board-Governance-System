@@ -28,13 +28,13 @@ jobs:
           set +e
           {
             echo '## git log --all -S"firestore-emergency"'
-            git log --all --oneline -S'firestore-emergency'
+            git log --all --oneline -S"firestore-emergency"
             echo
             echo '## git log --all -S"IRPA-EMG-DOC"'
-            git log --all --oneline -S'IRPA-EMG-DOC'
+            git log --all --oneline -S"IRPA-EMG-DOC"
             echo
             echo '## git log --all -S"emergency" -- src drive-gateway functions'
-            git log --all --oneline -S'emergency' -- src drive-gateway functions
+            git log --all --oneline -S"emergency" -- src drive-gateway functions
             echo
             echo '## Upload fallback commits and deleted paths (2026-09-20 through 2026-09-28)'
             git log --all --since='2026-09-20 00:00:00 +0000' --until='2026-09-29 00:00:00 +0000' --date=iso-strict --name-status --format='COMMIT %H%nDATE %ad%nSUBJECT %s' -- src drive-gateway functions
