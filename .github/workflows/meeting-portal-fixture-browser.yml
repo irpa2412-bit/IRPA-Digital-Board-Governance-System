@@ -3,7 +3,7 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [main, feature/production-acceptance-20261101, feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
+    branches: [feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
@@ -12,13 +12,6 @@ on:
       - "functions/meetingGateway.emulator.test.cjs"
       - "tests/meeting-isolation-guard.test.mjs"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
-      - "drive-gateway/src/communicationsSite.mjs"
-      - "drive-gateway/tests/production-acceptance.test.mjs"
-      - "drive-gateway/tests/website-content-editor.test.mjs"
-      - "drive-gateway/tests/website-structure-creator.test.mjs"
-      - "drive-gateway/tests/wordpress-auth-diagnostics.test.mjs"
-      - "src/pages/CommunicationsWebsiteStudio.jsx"
-      - "tests/meeting-isolation-guard.test.mjs"
   pull_request:
     branches: [main]
     paths:
@@ -51,12 +44,6 @@ on:
       - "vite.meeting-fixture.config.js"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
       - "tests/meeting-isolation-guard.test.mjs"
-      - "drive-gateway/src/communicationsSite.mjs"
-      - "drive-gateway/tests/production-acceptance.test.mjs"
-      - "drive-gateway/tests/website-content-editor.test.mjs"
-      - "drive-gateway/tests/website-structure-creator.test.mjs"
-      - "drive-gateway/tests/wordpress-auth-diagnostics.test.mjs"
-      - "src/pages/CommunicationsWebsiteStudio.jsx"
   workflow_dispatch:
 permissions:
   contents: read
@@ -336,7 +323,6 @@ jobs:
             !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
             !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
             !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
-            !(websiteStudioAcceptanceOnly && websiteStudioAcceptancePaths.has(path)) &&
             !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
             !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
           );
@@ -370,27 +356,6 @@ jobs:
               throw new Error("Production DRIVE_KV cannot be used by staging.");
             }
           }
-          // Website Studio production-acceptance work is unrelated to meeting source.
-          // Permit only this exact paired UI/Gateway/test set while still running the
-          // isolated browser regression and rejecting any meeting-portal source changes.
-          const websiteStudioAcceptancePaths = new Set([
-            ".github/workflows/meeting-portal-fixture-browser.yml",
-            "drive-gateway/src/communicationsSite.mjs",
-            "drive-gateway/tests/production-acceptance.test.mjs",
-            "drive-gateway/tests/website-content-editor.test.mjs",
-            "drive-gateway/tests/website-structure-creator.test.mjs",
-            "drive-gateway/tests/wordpress-auth-diagnostics.test.mjs",
-            "src/pages/CommunicationsWebsiteStudio.jsx",
-            "tests/meeting-isolation-guard.test.mjs",
-          ]);
-          const websiteStudioAcceptanceOnly =
-            changed.includes("src/pages/CommunicationsWebsiteStudio.jsx") &&
-            changed.includes("drive-gateway/src/communicationsSite.mjs") &&
-            changed.includes("drive-gateway/tests/production-acceptance.test.mjs") &&
-            changed.includes("drive-gateway/tests/website-structure-creator.test.mjs") &&
-            changed.includes("drive-gateway/tests/wordpress-auth-diagnostics.test.mjs") &&
-            changed.includes("tests/meeting-isolation-guard.test.mjs") &&
-            changed.every(path => websiteStudioAcceptancePaths.has(path));
           const guardOnlyWorkflowRepair = changed.includes(".github/workflows/meeting-portal-fixture-browser.yml") &&
             changed.includes("tests/meeting-isolation-guard.test.mjs") &&
             changed.every(path => path === ".github/workflows/meeting-portal-fixture-browser.yml" || path === "tests/meeting-isolation-guard.test.mjs");
@@ -469,7 +434,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !websiteStudioAcceptanceOnly) {
+              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
