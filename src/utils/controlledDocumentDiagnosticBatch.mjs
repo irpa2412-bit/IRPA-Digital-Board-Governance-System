@@ -1,13 +1,14 @@
 export async function runControlledDocumentDiagnosticBatch(rows, requestDocument, {
   concurrency = 3,
-  maxAttempts = 3,
+  maxRetries = 3,
   retryDelay = attempt => 350 * attempt,
   onProgress = () => {}
 } = {}) {
   if (!Array.isArray(rows)) throw new Error("Diagnostic rows must be an array.");
   if (typeof requestDocument !== "function") throw new Error("A Worker request function is required.");
   const limit = Math.max(1, Math.min(3, Number(concurrency) || 3));
-  const attemptsLimit = Math.max(1, Math.min(3, Number(maxAttempts) || 3));
+  const retriesLimit = Math.max(0, Math.min(3, Number(maxRetries) || 0));
+  const attemptsLimit = retriesLimit + 1;
   const output = new Array(rows.length);
   let nextIndex = 0;
   let active = 0;
@@ -46,7 +47,7 @@ export async function runControlledDocumentDiagnosticBatch(rows, requestDocument
           classification: "REQUEST_FAILED",
           step: "Worker request",
           attempts: attemptsLimit,
-          reason: "Worker request failed after " + attemptsLimit + " attempts: " + (lastError?.message || "Unknown gateway error")
+          reason: "Worker request failed after " + retriesLimit + " retries (" + attemptsLimit + " attempts): " + (lastError?.message || "Unknown gateway error")
         };
       }
       output[index] = result;
