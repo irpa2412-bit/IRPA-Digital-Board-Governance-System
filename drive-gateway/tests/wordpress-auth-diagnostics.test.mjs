@@ -9,9 +9,9 @@ function makeResponse(body, status = 200, headers = { "Content-Type": "applicati
   return new Response(typeof body === "string" ? body : JSON.stringify(body), { status, headers });
 }
 
-function makeRouter() {
+function makeRouter(role = "Communications Officer") {
   return createCommunicationsSiteRouter({
-    authenticateFirebaseRequest: async () => ({ user_id: "diag-user", email: "diag@example.test", token: "firebase-token", role: "Communications Officer" }),
+    authenticateFirebaseRequest: async () => ({ user_id: "diag-user", email: "diag@example.test", token: "firebase-token", role }),
     getFirestoreDocument: async () => ({ active: false }),
     getInstitutionalProfileForUser: async () => ({ memberRecord: { role: "Communications Officer", status: "Active" }, employeeRecord: null }),
     firestoreDocumentToPlain: value => value,
@@ -72,6 +72,78 @@ test("WordPress diagnostics probes authenticated users/me and unauthenticated RE
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("WordPress diagnostics report upload_files capability as granted, missing, or unknown", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") return makeResponse({ id: 42, name: "Integration Editor", roles: ["editor"], capabilities: { edit_posts: true, edit_pages: true, upload_files: false } });
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging", routes: {} });
+    throw new Error("Unexpected WordPress request: " + url.pathname);
+  };
+  try {
+    const response = await status(router, env());
+    const data = (await response.json()).connections;
+    assert.equal(data.websiteAccount.canUploadFiles, false);
+    assert.equal(data.websiteAccount.uploadFilesCapability, "missing");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("media upload is blocked with a clear error when WordPress upload_files is missing", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    calls.push(url.pathname);
+    if (url.pathname === "/wp-json/wp/v2/users/me") return makeResponse({ id: 42, roles: ["editor"], capabilities: { edit_posts: true, edit_pages: true, upload_files: false } });
+    throw new Error("Media endpoint must not be called when upload_files is missing.");
+  };
+  try {
+    const response = await router(new Request("https://gateway.test/api/communications/website/media", {
+      method: "POST", headers: { Authorization: "Bearer firebase-token", "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: "test.jpg", title: "TEST image", contentType: "image/jpeg", altText: "TEST image", dataBase64: "/9j/4QAHRXhpZgD/2Q==" })
+    }), env());
+    const data = await response.json();
+    assert.equal(response.status, 403);
+    assert.equal(data.code, "wordpress_upload_files_capability_missing");
+    assert.match(data.error, /missing the upload_files capability/);
+    assert.deepEqual(calls, ["/wp-json/wp/v2/users/me"]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without writes", async () => {
+  const router = makeRouter("Executive Director");
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    calls.push(url.pathname);
+    const payload = url.pathname.endsWith("/Email/list_pops")
+      ? { status: 1, data: [{ email: "info@staging.irpa.or.tz" }, { email: "contact@staging.irpa.or.tz" }] }
+      : url.pathname.endsWith("/SSL/installed_hosts")
+        ? { status: 1, data: [{ domain: "staging.irpa.or.tz", status: "valid", issuer: "TEST CA" }] }
+        : url.pathname.endsWith("/LangPHP/php_ini_get_user_content")
+          ? { status: 1, data: [{ content: "upload_max_filesize = 32M\npost_max_size = 40M\n" }] }
+          : null;
+    if (!payload) throw new Error("Unexpected cPanel operation: " + url.pathname);
+    return makeResponse(payload);
+  };
+  try {
+    const response = await router(new Request("https://gateway.test/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { headers: { Authorization: "Bearer firebase-token" } }), env({
+      CPANEL_BASE_URL: "https://cpanel.example.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token", CPANEL_DOCUMENT_ROOT: "public_html/staging"
+    }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.readOnly, true);
+    assert.deepEqual(data.emailAccounts.accounts, ["info@staging.irpa.or.tz", "contact@staging.irpa.or.tz"]);
+    assert.equal(data.ssl.hosts[0].status, "valid");
+    assert.equal(data.phpLimits.upload_max_filesize, "32M");
+    assert.equal(data.phpLimits.post_max_size, "40M");
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/LangPHP/php_ini_get_user_content"]);
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test("401 WordPress JSON codes produce a specific credential finding and sanitized raw response", async () => {

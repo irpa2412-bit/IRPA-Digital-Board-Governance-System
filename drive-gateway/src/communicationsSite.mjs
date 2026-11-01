@@ -355,6 +355,7 @@ export function createCommunicationsSiteRouter(deps) {
         " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category + "."),
         { diagnosticCode, httpStatus: status, uapiStatus, errorCount });
     }
+    Object.defineProperty(data, "__httpStatus", { value: response.status, enumerable: false });
     return data;
   }
 
@@ -733,7 +734,8 @@ export function createCommunicationsSiteRouter(deps) {
                 name: cleanText(user.name, 100), role: isDedicatedEditor ? "editor" : "unverified",
                 canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined,
                 canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined,
-                canUploadFiles: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.upload_files : undefined
+                canUploadFiles: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.upload_files : undefined,
+                uploadFilesCapability: user.capabilities && typeof user.capabilities === "object" ? (user.capabilities.upload_files === true ? "granted" : user.capabilities.upload_files === false ? "missing" : "unknown") : "unknown"
               };
               if (!isDedicatedEditor) result.websiteDiagnosticCode = "wrong_account_role";
             }
@@ -840,6 +842,7 @@ export function createCommunicationsSiteRouter(deps) {
       if(destination!=="media-library"&&!Number.isSafeInteger(Number(input.parentId||input.postId)) )return json({error:"A valid existing page/post ID is required for attachment or featured image."},400,corsHeaders(request));
       if(["image/jpeg","image/png","image/webp","image/gif"].includes(contentType)&&!altText)return json({error:"Descriptive alt text is required for raster images."},400,corsHeaders(request));
       const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
+      if (user?.capabilities?.upload_files !== true) return json({ error: "WordPress media upload is blocked: the configured integration account is missing the upload_files capability. Ask the WordPress administrator to grant upload_files to the dedicated Editor account, then run diagnostics again.", code: "wordpress_upload_files_capability_missing", capability: "upload_files" }, 403, corsHeaders(request));
       const endpoint=wp.root+"/wp-json/wp/v2/media";
       const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+meta.filename.replace(/["\\\r\n]/g,"-")+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
       const uploaded=await response.json().catch(()=>null);
@@ -918,6 +921,189 @@ export function createCommunicationsSiteRouter(deps) {
       };
       const [categories, tags] = await Promise.all([readTerms("categories"), readTerms("tags")]);
       return json({ categories, tags }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/structure" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const pages = [
+        ["Home", "home"], ["About IRPA", "about-irpa"], ["Programmes", "programmes"],
+        ["Rangeland and Livestock", "rangeland-and-livestock"], ["Projects", "projects"],
+        ["News", "news"], ["Resources", "resources"], ["Partners", "partners"],
+        ["Contact", "contact"], ["Donate and Funding", "donate-and-funding"]
+      ];
+      const categoryTerms = [
+        ["News", "news"], ["Events", "events"], ["Programmes", "programmes"],
+        ["Projects", "projects"], ["Publications", "publications"], ["Resources", "resources"],
+        ["Partnerships", "partnerships"], ["Funding Opportunities", "funding-opportunities"]
+      ];
+      const tagTerms = [
+        ["IRPA", "irpa"], ["Rangeland Management", "rangeland-management"],
+        ["Pastoral Communities", "pastoral-communities"], ["Livestock Development", "livestock-development"],
+        ["Market Development", "market-development"], ["Climate Resilience", "climate-resilience"],
+        ["Women and Youth", "women-and-youth"], ["Longido", "longido"]
+      ];
+      const result = { pages: [], categories: [], tags: [], menu: { status: "not_started" }, created: 0, skipped: 0 };
+      const wpJson = async (endpoint, method = "GET", payload) => {
+        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
+          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...(payload ? { "Content-Type": "application/json" } : {}) }),
+          ...(payload ? { body: JSON.stringify(payload) } : {}), signal: AbortSignal.timeout(20000)
+        });
+        const data = await response.json().catch(() => null);
+        return { response, data };
+      };
+      for (const [title, slug] of pages) {
+        const existing = await wpJson("pages?slug=" + encodeURIComponent(slug) + "&context=edit&per_page=10");
+        if (!existing.response.ok || !Array.isArray(existing.data)) throw new Error("Could not check whether the WordPress page slug '" + slug + "' already exists; no replacement was attempted.");
+        if (existing.data.length) { result.pages.push({ title, slug, status: "SKIPPED_EXISTS", id: Number(existing.data[0].id) || null }); result.skipped++; continue; }
+        const created = await wpJson("pages", "POST", { title, slug, status: "draft", content: "<p>DRAFT — IRPA website page structure placeholder. Replace this content through the approved editorial workflow.</p>" });
+        if (!created.response.ok || !Number.isSafeInteger(created.data?.id) || created.data.status !== "draft" || !isAllowedWordPressLink(created.data.link, wp)) {
+          throw new Error("WordPress did not confirm creation of page '" + title + "' as a draft. No page was published or overwritten.");
+        }
+        result.pages.push({ title, slug, status: "CREATED_DRAFT", id: created.data.id }); result.created++;
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_STRUCTURE_PAGE_DRAFT_CREATED", "pages", created.data.id, { title, slug, status: "draft" });
+      }
+      const createTerms = async (taxonomy, terms, output) => {
+        for (const [name, slug] of terms) {
+          const existing = await wpJson(taxonomy + "?slug=" + encodeURIComponent(slug) + "&context=edit&per_page=10");
+          if (!existing.response.ok || !Array.isArray(existing.data)) throw new Error("Could not check existing WordPress " + taxonomy + " term '" + slug + "'; no replacement was attempted.");
+          if (existing.data.length) { output.push({ name, slug, status: "SKIPPED_EXISTS", id: Number(existing.data[0].id) || null }); result.skipped++; continue; }
+          const created = await wpJson(taxonomy, "POST", { name, slug });
+          if (!created.response.ok || !Number.isSafeInteger(created.data?.id)) throw new Error("WordPress could not create " + taxonomy + " term '" + name + "'.");
+          output.push({ name, slug, status: "CREATED", id: created.data.id }); result.created++;
+          await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_STRUCTURE_TERM_CREATED", taxonomy, created.data.id, { name, slug });
+        }
+      };
+      await createTerms("categories", categoryTerms, result.categories);
+      await createTerms("tags", tagTerms, result.tags);
+      const menuSlug = "irpa-primary-navigation-draft";
+      const existingMenu = await wpJson("navigation?slug=" + menuSlug + "&context=edit&per_page=10");
+      if (existingMenu.response.status === 404) {
+        result.menu = { status: "UNAVAILABLE", message: "This WordPress site does not expose the core navigation REST endpoint. No live menu was changed." };
+      } else if (!existingMenu.response.ok || !Array.isArray(existingMenu.data)) {
+        result.menu = { status: "FAILED_READ", message: "Could not safely inspect existing draft navigation; no menu was changed." };
+      } else if (existingMenu.data.length) {
+        result.menu = { status: "SKIPPED_EXISTS", id: Number(existingMenu.data[0].id) || null };
+        result.skipped++;
+      } else {
+        const navigationContent = pages.map(([label, slug]) => '<!-- wp:navigation-link {"label":' + JSON.stringify(label) + ',"type":"custom","url":' + JSON.stringify(slug === "home" ? "/" : "/" + slug + "/") + ',"kind":"custom"} /-->').join("\n");
+        const created = await wpJson("navigation", "POST", { title: "IRPA Primary Navigation — DRAFT", slug: menuSlug, status: "draft", content: navigationContent });
+        if (!created.response.ok || !Number.isSafeInteger(created.data?.id) || created.data.status !== "draft") {
+          result.menu = { status: "FAILED_CREATE", httpStatus: created.response.status, message: "WordPress did not confirm a draft navigation record. The live menu was not touched." };
+        } else {
+          result.menu = { status: "CREATED_DRAFT", id: created.data.id }; result.created++;
+          await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_STRUCTURE_MENU_DRAFT_CREATED", "navigation", created.data.id, { slug: menuSlug, status: "draft" });
+        }
+      }
+      return json({ success: true, draftOnly: true, liveMenuChanged: false, result }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/production-acceptance" && request.method === "POST") {
+      const { claims } = await authorised(request, env, true);
+      const wp = websiteWordPressConfig(env);
+      const report = [];
+      const add = (label, status, httpStatus, error = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null });
+      const wpRequest = async (endpoint, method = "GET", payload, headers = {}) => {
+        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
+          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
+          ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
+          signal: AbortSignal.timeout(30000)
+        });
+        const data = await response.json().catch(() => null);
+        return { response, data };
+      };
+      const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
+      let testPageId = 0, testPostId = 0, uploadAllowed = false;
+      try {
+        const user = await wpRequest("users/me?context=edit");
+        uploadAllowed = !!user.response.ok && user.data?.capabilities?.upload_files === true;
+        add("WordPress authenticated user read", user.response.ok ? "PASS" : "FAIL", user.response.status, user.response.ok ? "" : user.data?.message || "WordPress user endpoint failed.");
+        add("WordPress upload_files capability", uploadAllowed ? "PASS" : "FAIL", user.response.status, uploadAllowed ? "" : "Missing or unverified upload_files capability; TEST media uploads are blocked.");
+      } catch (error) { add("WordPress authenticated user read", "FAIL", 0, error.message); add("WordPress upload_files capability", "FAIL", 0, "Capability could not be verified; uploads were not attempted."); }
+      for (const type of ["pages", "posts"]) {
+        const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
+        const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
+        try {
+          const created = await wpRequest(type, "POST", { title, slug, status: "draft", content: "<p>TEST ONLY — IRPA production acceptance. This draft is intentionally retained and will not be published.</p>" });
+          const id = Number(created.data?.id);
+          const ok = created.response.ok && Number.isSafeInteger(id) && created.data?.status === "draft" && isAllowedWordPressLink(created.data?.link, wp);
+          if (type === "pages") testPageId = ok ? id : 0; else testPostId = ok ? id : 0;
+          add(type + " draft create", ok ? "PASS" : "FAIL", created.response.status, ok ? "" : created.data?.message || "WordPress did not confirm a same-host draft.");
+          if (!ok) continue;
+          await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_TEST_DRAFT_CREATED", type, id, { title, slug, status: "draft", test: true });
+          const edited = await wpRequest(type + "/" + id, "POST", { title: title + " — EDITED TEST", content: "<p>TEST ONLY — edited and revised by the production acceptance check. Retain as draft.</p>", status: "draft" });
+          const editOk = edited.response.ok && Number(edited.data?.id) === id && edited.data?.status === "draft";
+          add(type + " draft edit", editOk ? "PASS" : "FAIL", edited.response.status, editOk ? "" : edited.data?.message || "WordPress did not confirm the edited draft.");
+          const revisions = await wpRequest(type + "/" + id + "/revisions?context=edit&per_page=20");
+          const revisionRows = Array.isArray(revisions.data) ? revisions.data : [];
+          const revisionOk = revisions.response.ok && revisionRows.length > 0;
+          add(type + " revision history", revisionOk ? "PASS" : "FAIL", revisions.response.status, revisionOk ? "" : revisions.data?.message || "No WordPress revision was returned; the draft remains unchanged and retained.");
+        } catch (error) { add(type + " draft lifecycle", "FAIL", 0, error.message); }
+      }
+      const mediaTests = [
+        { name: "image", filename: "png", mime: "image/png", b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/k8sAAAAASUVORK5CYII=" },
+        { name: "video", filename: "mp4", mime: "video/mp4", b64: "AAAAGGZ0eXBpc29tAAAAAGlzb20=" },
+        { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKJUVPRgo=" },
+        { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBA==" }
+      ];
+      if (uploadAllowed && testPageId) {
+        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) {
+          const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
+          try {
+            const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
+            validateWebsiteMedia({ filename, contentType: file.mime, bytes });
+            const upload = await wpRequest("media", "POST", bytes, {
+              "Content-Type": file.mime,
+              "Content-Disposition": 'attachment; filename="' + filename + '"'
+            });
+            const mediaId = Number(upload.data?.id);
+            if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(upload.data?.source_url, wp)) {
+              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, upload.data?.message || "WordPress did not return a same-host media URL.");
+              continue;
+            }
+            const meta = await wpRequest("media/" + mediaId, "POST", { title: "TEST " + file.name + " " + destination, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) });
+            if (!meta.response.ok || Number(meta.data?.id) !== mediaId) {
+              add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, meta.data?.message || "Media metadata/attachment failed.");
+              continue;
+            }
+            if (destination === "featured") {
+              const featured = await wpRequest("pages/" + testPageId, "POST", { featured_media: mediaId, status: "draft" });
+              if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, featured.data?.message || "Featured image assignment failed."); continue; }
+            }
+            const opened = await wordpressEditorFetch(wp, upload.data.source_url, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
+            add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
+          } catch (error) { add(file.name + " upload to WordPress " + destination, "FAIL", error.httpStatus || 0, error.message); }
+        }
+      } else {
+        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) add(file.name + " upload to WordPress " + destination, "FAIL", null, "Skipped because upload_files capability or TEST page creation was not confirmed.");
+      }
+      try {
+        const cp = cpanelConfig(env);
+        const directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
+        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
+        add("cPanel upload directory read", "PASS", listing.__httpStatus, "");
+        for (const file of mediaTests) {
+          const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "." + file.filename;
+          try {
+            const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
+            validateWebsiteMedia({ filename, contentType: file.mime, bytes });
+            const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
+            const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(60000) });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
+            const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+            const opened = await wordpressEditorFetch(wp, publicUrl, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
+            add(file.name + " upload to cPanel folder URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded cPanel URL did not open successfully.");
+          } catch (error) { add(file.name + " upload to cPanel folder", "FAIL", error.httpStatus || 0, error.message); }
+        }
+      } catch (error) {
+        add("cPanel upload directory read", "FAIL", error.httpStatus || 0, error.message);
+        for (const file of mediaTests) add(file.name + " upload to cPanel folder", "FAIL", null, "Skipped because the existing cPanel uploads directory could not be read.");
+      }
+      const passCount = report.filter(row => row.status === "PASS").length;
+      const failCount = report.filter(row => row.status === "FAIL").length;
+      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
@@ -1277,6 +1463,48 @@ export function createCommunicationsSiteRouter(deps) {
       const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, language: item.language || null, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
       await commitDocumentAndAudit(env, itemId, claims.token, documentFields, Object.keys(documentFields), auditFields, { collectionName: "communicationMediaItems" });
       return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/diagnostics" && request.method === "GET") {
+      await authorised(request, env, true);
+      const cp = cpanelConfig(env);
+      const domain = String(url.searchParams.get("domain") || "").toLowerCase();
+      if (!/^[a-z0-9.-]{1,253}$/.test(domain) || domain.startsWith(".") || domain.endsWith(".")) {
+        return json({ error: "A valid website domain is required for cPanel read-only diagnostics." }, 400, corsHeaders(request));
+      }
+      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null } };
+      const extractRows = value => {
+        const data = value?.data;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.[0]?.data)) return data[0].data;
+        if (Array.isArray(data?.data)) return data.data;
+        return [];
+      };
+      try {
+        const response = await cpanelCall(cp, "Email/list_pops", { domain });
+        result.emailAccounts = { status: "PASS", httpStatus: response.__httpStatus, count: extractRows(response).length, accounts: extractRows(response).map(row => cleanText(row.email || row.login || "", 254)).filter(Boolean) };
+      } catch (error) {
+        result.emailAccounts = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+      }
+      try {
+        const response = await cpanelCall(cp, "SSL/installed_hosts");
+        result.ssl = { status: "PASS", httpStatus: response.__httpStatus, hosts: extractRows(response).filter(row => String(row.domain || row.host || "").toLowerCase() === domain).map(row => ({ domain: cleanText(row.domain || row.host, 253), status: cleanText(row.status || row.certificate_status || "installed", 80), issuer: cleanText(row.issuer || "", 120), expiry: cleanText(row.expiry || row.not_after || "", 80) })) };
+        if (!result.ssl.hosts.length) result.ssl.status = "NO_MATCH";
+      } catch (error) {
+        result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+      }
+      try {
+        const response = await cpanelCall(cp, "LangPHP/php_ini_get_user_content", { type: "vhost", vhost: domain });
+        const data = response?.[0] || response?.data?.[0] || response?.data || response || {};
+        const iniContent = typeof data === "string" ? data : String(data.content || data.ini || data.php_ini || "");
+        const directive = name => iniContent.match(new RegExp("^\\s*" + name + "\\s*=\\s*([^\\s;#]+)", "im"))?.[1] || null;
+        const upload = directive("upload_max_filesize");
+        const post = directive("post_max_size");
+        result.phpLimits = { status: upload && post ? "PASS" : "UNAVAILABLE", httpStatus: response.__httpStatus, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload && post ? null : "The cPanel UAPI response did not expose both upload_max_filesize and post_max_size." };
+      } catch (error) {
+        result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), error: cleanText(error.message, 240) };
+      }
+      return json(result, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/files" && request.method === "GET") {
