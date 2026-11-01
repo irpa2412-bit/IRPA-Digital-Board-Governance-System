@@ -1,0 +1,68 @@
+name: Authenticated Portal WCAG Contrast Audit
+
+on:
+  pull_request:
+    paths:
+      - "src/styles/**"
+      - "src/App.jsx"
+      - "src/main.jsx"
+      - "tests/browser/portal-contrast-audit.spec.mjs"
+      - "playwright.contrast.config.mjs"
+      - "scripts/seed-authenticated-browser-fixture.cjs"
+      - "firebase.emulator.test.json"
+      - ".github/workflows/portal-contrast-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-contrast-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portal-contrast-audit:
+    name: Portal Contrast Audit (WCAG AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GCLOUD_PROJECT: demo-irpa-dgbs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install Firebase Admin SDK for emulator-only fixture seeding
+        run: npm --prefix functions install --omit=dev
+      - name: Install Playwright and axe-core without changing the lockfile
+        run: npm install --no-save --package-lock=false @playwright/test axe-core
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Seed isolated administrator and scan every portal/page
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.contrast.config.mjs"
+      - name: Publish contrast report to workflow summary
+        if: always()
+        run: |
+          if [ -f docs/diagnostics/contrast-report.md ]; then
+            cat docs/diagnostics/contrast-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Contrast report was not generated; inspect the failed emulator/browser step." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload contrast report and browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-portal-contrast-report
+          path: |
+            docs/diagnostics/contrast-report.md
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 30
