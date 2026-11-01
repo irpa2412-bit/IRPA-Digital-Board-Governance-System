@@ -1492,21 +1492,35 @@ export function createCommunicationsSiteRouter(deps) {
       }
       try {
         const response = await cpanelCall(cp, "SSL/installed_hosts");
-        result.ssl = { status: "PASS", httpStatus: response.__httpStatus, hosts: extractRows(response).filter(row => String(row.domain || row.host || "").toLowerCase() === domain).map(row => ({ domain: cleanText(row.domain || row.host, 253), status: cleanText(row.status || row.certificate_status || "installed", 80), issuer: cleanText(row.issuer || "", 120), expiry: cleanText(row.expiry || row.not_after || "", 80) })) };
-        if (!result.ssl.hosts.length) result.ssl.status = "NO_MATCH";
+        const rawRows = Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : Array.isArray(response?.data?.certificates) ? response.data.certificates : Array.isArray(response?.certificates) ? response.certificates : extractRows(response);
+        const normal = value => String(value || "").toLowerCase().replace(/^\\*\\./, "");
+        const match = rawRows.find(row => [row.domain, row.host, row.servername, row.subject].some(value => normal(value).includes(normal(domain))));
+        const expiry = match && (match.not_after || match.expiry || match.expires || match.notAfter || "");
+        result.ssl = { status: match && expiry ? "PASS" : "FAIL", httpStatus: response.__httpStatus, hosts: match ? [{ domain: cleanText(match.domain || match.host || match.servername || match.subject || domain, 253), status: cleanText(match.status || match.certificate_status || "installed", 80), issuer: cleanText(match.issuer || "", 120), expiry: cleanText(expiry, 80) }] : [], error: match ? (!expiry ? "Matching certificate has no readable expiry field." : "") : "No matching SSL certificate was returned.", detail: match ? "" : cleanText(typeof response === "string" ? response : JSON.stringify(response), 200) };
       } catch (error) {
         result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
       }
       try {
-        const response = await cpanelCall(cp, "LangPHP/php_ini_get_user_content", { type: "vhost", vhost: domain });
-        const data = response?.[0] || response?.data?.[0] || response?.data || response || {};
-        const iniContent = typeof data === "string" ? data : String(data.content || data.ini || data.php_ini || "");
-        const directive = name => iniContent.match(new RegExp("^\\s*" + name + "\\s*=\\s*([^\\s;#]+)", "im"))?.[1] || null;
-        const upload = directive("upload_max_filesize");
-        const post = directive("post_max_size");
-        result.phpLimits = { status: upload && post ? "PASS" : "UNAVAILABLE", httpStatus: response.__httpStatus, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload && post ? null : "The cPanel UAPI response did not expose both upload_max_filesize and post_max_size." };
+        const sources = [
+          [".user.ini", () => cpanelCall(cp, "Fileman/get_file_content", { dir: cp.documentRoot, file: ".user.ini" })],
+          ["php.ini", () => cpanelCall(cp, "Fileman/get_file_content", { dir: cp.documentRoot, file: "php.ini" })],
+          ["MultiPHP INI", () => cpanelCall(cp, "LangPHP/php_ini_get_user_content", { type: "vhost", vhost: domain })]
+        ];
+        let upload = null, post = null, source = "", lastResponse = null;
+        for (const [name, read] of sources) {
+          try {
+            const response = await read(); lastResponse = response;
+            const data = response?.data?.content ?? response?.data?.[0]?.content ?? response?.content ?? response?.[0]?.content ?? response?.data?.data?.content ?? response;
+            const iniContent = typeof data === "string" ? data : String(data?.ini || data?.php_ini || data?.content || "");
+            const directive = key => iniContent.match(new RegExp("^\\s*" + key + "\\s*=\\s*([^\\s;#]+)", "im"))?.[1] || null;
+            const foundUpload = directive("upload_max_filesize"), foundPost = directive("post_max_size");
+            if (foundUpload || foundPost) { upload = foundUpload; post = foundPost; source = name; }
+            if (upload && post) break;
+          } catch {}
+        }
+        result.phpLimits = { status: upload && post ? "PASS" : "INFO", httpStatus: lastResponse?.__httpStatus ?? null, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, source, diagnostic: upload && post ? null : "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor" };
       } catch (error) {
-        result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), error: cleanText(error.message, 240) };
+        result.phpLimits = { status: "INFO", upload_max_filesize: null, post_max_size: null, diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), diagnostic: "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor" };
       }
       return json(result, 200, corsHeaders(request));
     }
