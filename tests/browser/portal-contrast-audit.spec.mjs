@@ -81,6 +81,16 @@ test("WCAG contrast audit: every administrator portal at desktop/mobile in light
         await page.goto(url);
         await expect(page.locator(".topbar h2")).toContainText(displayLabels[module] || module,{timeout:30000});
         await expect(page.locator(".content-area:visible").first(), "authenticated workspace should be visible for " + module).toBeVisible({timeout:30000});
+        if (module === "Documents") {
+          const entryGate = page.locator("[data-irpa-field-gate]");
+          if (await entryGate.count()) {
+            await expect(entryGate).toBeVisible({timeout:15000});
+            await entryGate.getByRole("radio", {name:/Documents, correspondence and files/}).check();
+            await entryGate.getByRole("radio", {name:/Trial data/}).check();
+            await entryGate.getByRole("button", {name:"Confirm environment and continue"}).click();
+            await expect(entryGate).toHaveCount(0);
+          }
+        }
         await page.addScriptTag({content:axe.source});
         const pageLabel = module + " · " + viewport.name + " · " + scheme;
         const before = await page.evaluate(async () => {
