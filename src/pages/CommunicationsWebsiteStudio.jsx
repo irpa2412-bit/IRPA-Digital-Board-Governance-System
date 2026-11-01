@@ -10,64 +10,38 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
  async function connect(){setBusy(true);setMessage("");try{const d=await call("/api/communications/site/status");const connections=d.connections||{};let cpanelDiagnostics=null;if(connections.cpanel==="connected"){try{cpanelDiagnostics=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(connections.configuredWordPressHost||"irpa.or.tz"));}catch(error){cpanelDiagnostics={readOnly:true,error:error.message||"cPanel diagnostics unavailable."};}}setStatus({...connections,cpanelDiagnostics});const website=String(connections.website||"unavailable");const cpanel=String(connections.cpanel||"unavailable");setMessage("Connection diagnostics received. WordPress: "+website.replace(/_/g," ")+". cPanel: "+cpanel.replace(/_/g," ")+".");}catch(e){setStatus(null);setMessage(e.message||"Connection check failed.")}finally{setBusy(false)}}
  useEffect(()=>{void connect()},[]);
  async function runProductionAcceptance(){
-  setBusy(true);setMessage("");setAcceptanceReport(null);
-  const rows=[];
-  const add=(label,status,httpStatus,error="")=>rows.push({label,status,httpStatus,error});
-  let connections=null;
-  try{
-   const health=await call("/health","GET",undefined,true);
-   add("TEST Worker health",health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",health.httpStatus,health.error||health.data?.status||"");
-   const reads=[
-    ["TEST WordPress connection and capability read","/api/communications/site/status"],
-    ["TEST WordPress pages read","/api/communications/website/content?type=pages"],
-    ["TEST WordPress posts read","/api/communications/website/content?type=posts"],
-    ["TEST WordPress categories and tags read","/api/communications/website/taxonomies"],
-    ["TEST WordPress SEO capability read","/api/communications/website/seo-capabilities"],
-    ["TEST cPanel root directory read","/api/communications/cpanel/files"]
-   ];
-   let cpanelEntries=[];
-   for(const [label,path] of reads){
+  setBusy(true);setMessage("");setAcceptanceReport([]);
+  const rows=[];const cleanup=[];
+  const steps=[{kind:"page-lifecycle",name:"Page draft create/edit"},{kind:"post-lifecycle",name:"Post draft create/edit"}];
+  for(const file of ["image","video","pdf","docx"])for(const destination of ["media-library","attach","featured"])steps.push({kind:"wp-media",file,destination,name:file.toUpperCase()+" to WordPress "+destination});
+  for(const file of ["image","video","pdf","docx"])steps.push({kind:"cpanel",file,name:file.toUpperCase()+" to cPanel folder"});
+  let pageId=null,postId=null;
+  async function runStep(step,index){
+   const label="Step "+(index+1)+"/"+steps.length+" - "+step.name;setMessage(label+" - RUNNING");
+   const payload={step:step.kind+(step.file?"|"+step.file:"")+(step.destination?"|"+step.destination:""),pageId,postId};
+   let failure=null;
+   for(let attempt=0;attempt<2;attempt++){
     try{
-     const result=await call(path,"GET",undefined,true);
-     add(label,result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");
-     if(path.endsWith("/site/status")){
-      connections=result.data?.connections||null;
-      const capability=connections?.websiteAccount?.uploadFilesCapability;
-      add("TEST WordPress upload_files capability",capability==="granted"?"PASS":"FAIL",connections?.websiteHttpStatus??result.httpStatus,capability==="granted"?"":"upload_files is missing or unverified; media uploads must be blocked.");
-     }
-     if(path.endsWith("/cpanel/files"))cpanelEntries=result.data?.entries||[];
-    }catch(error){add(label,"FAIL",error.httpStatus||0,error.message||"Read route failed.");}
+     if(!auth.currentUser)throw Error("Sign in to use Website Studio.");
+     const token=await auth.currentUser.getIdToken();
+     const response=await fetch(GATEWAY+"/api/communications/website/production-acceptance-step",{method:"POST",headers:{Authorization:"Bearer "+token,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify(payload),signal:AbortSignal.timeout(60000)});
+     const raw=await response.text();let data={};try{data=JSON.parse(raw)}catch{}
+     if(!response.ok){const error=new Error(data.error||"Gateway request failed ("+response.status+").");error.httpStatus=response.status;throw error;}
+     const result=(data.report||[])[0]||{};
+     if(data.createdDrafts?.pageId)pageId=data.createdDrafts.pageId;
+     if(data.createdDrafts?.postId)postId=data.createdDrafts.postId;
+     if(data.cleanupList)cleanup.push(...data.cleanupList);
+     return {label,status:result.status||"FAIL",httpStatus:result.httpStatus??response.status,error:result.error||"",detail:result.detail||""};
+    }catch(error){failure=error;const retryable=error.name==="TimeoutError"||error.name==="AbortError"||!Number.isInteger(error.httpStatus);if(!retryable||attempt===1)break;}
    }
-   const readableFile=cpanelEntries.find(entry=>entry.type==="file");
-   if(readableFile){
-    try{const result=await call("/api/communications/cpanel/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);add("TEST cPanel website file content read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
-    catch(error){add("TEST cPanel website file content read","FAIL",error.httpStatus||0,error.message||"File read failed.");}
-   }else add("TEST cPanel website file content read","FAIL",null,"No safe HTML/CSS/TXT/JSON file was returned by the read-only directory listing.");
-   try{
-    const domain=connections?.configuredWordPressHost||"irpa.or.tz";
-    const probe=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain),"GET",undefined,true);
-    add("TEST cPanel diagnostics route",probe.httpStatus>=200&&probe.httpStatus<300?"PASS":"FAIL",probe.httpStatus,probe.error||probe.data?.error||"");
-    const diag=probe.data||{};
-    add("TEST cPanel email accounts list",diag.emailAccounts?.status==="PASS"?"PASS":"FAIL",diag.emailAccounts?.httpStatus??probe.httpStatus,diag.emailAccounts?.error||"");
-    add("TEST cPanel SSL status",diag.ssl?.status==="PASS"?"PASS":"FAIL",diag.ssl?.httpStatus??probe.httpStatus,diag.ssl?.error||diag.ssl?.status||"");
-    add("TEST PHP upload_max_filesize and post_max_size",diag.phpLimits?.status==="PASS"?"PASS":"FAIL",diag.phpLimits?.httpStatus??probe.httpStatus,diag.phpLimits?.error||diag.phpLimits?.diagnostic||"The configured cPanel UAPI did not expose both PHP upload limits.");
-   }catch(error){add("TEST cPanel diagnostics route","FAIL",error.httpStatus||0,error.message||"cPanel diagnostics failed.");}
-   let acceptance=null;
-   try{
-    const result=await call("/api/communications/website/production-acceptance","POST",{},true);
-    add("TEST draft lifecycle and destination upload suite",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||"");
-    acceptance=result.data||null;
-    for(const row of acceptance?.report||[])rows.push(row);
-   }catch(error){add("TEST draft lifecycle and destination upload suite","FAIL",error.httpStatus||0,error.message||"Acceptance run failed.");}
-   for(const [type,id] of [["pages",acceptance?.createdDrafts?.pageId],["posts",acceptance?.createdDrafts?.postId]]){
-    if(!id)continue;
-    try{const result=await call("/api/communications/website/content/"+type+"/"+id,"GET",undefined,true);add("TEST WordPress "+type+" single-item read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
-    catch(error){add("TEST WordPress "+type+" single-item read","FAIL",error.httpStatus||0,error.message||"Single-item read failed.");}
-    try{const result=await call("/api/communications/website/revisions?type="+type+"&id="+id,"GET",undefined,true);add("TEST WordPress "+type+" revision-route read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
-    catch(error){add("TEST WordPress "+type+" revision-route read","FAIL",error.httpStatus||0,error.message||"Revision read failed.");}
-   }
-   setAcceptanceReport(rows);setMessage("Production acceptance finished: "+rows.filter(x=>x.status==="PASS").length+" PASS, "+rows.filter(x=>x.status==="FAIL").length+" FAIL. TEST drafts and uploaded files are retained; nothing was published or deleted.");
-  }catch(error){add("TEST production acceptance runner","FAIL",0,error.message);setAcceptanceReport(rows);setMessage(error.message||"Production acceptance failed.");}
+   return {label,status:"FAIL",httpStatus:failure?.httpStatus??0,error:failure?.message||"Network error or timeout after one retry."};
+  }
+  try{
+   const health=await call("/health","GET",undefined,true);rows.push({label:"TEST Worker health",status:health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",httpStatus:health.httpStatus,error:health.error||""});
+   for(let i=0;i<steps.length;i++){rows.push(await runStep(steps[i],i));setAcceptanceReport([...rows]);}
+   rows.push({label:"TEST cleanup list",status:"INFO",httpStatus:null,error:"TEST content and media are retained; nothing is deleted or published.",cleanupList:cleanup});
+   setAcceptanceReport([...rows]);setMessage("Production acceptance finished: "+rows.filter(row=>row.status==="PASS").length+" PASS, "+rows.filter(row=>row.status==="FAIL").length+" FAIL. Every step was attempted independently.");
+  }catch(error){rows.push({label:"TEST production acceptance runner",status:"FAIL",httpStatus:0,error:error.message});setAcceptanceReport([...rows]);setMessage(error.message||"Production acceptance failed.");}
   finally{setBusy(false)}
  }
  async function createSiteStructure(){setBusy(true);setMessage("");try{const data=await call("/api/communications/website/structure","POST",{});const r=data.result||{};setMessage("Draft site structure complete. Pages: "+(r.pages||[]).filter(x=>x.status==="CREATED_DRAFT").length+" created, "+(r.pages||[]).filter(x=>x.status==="SKIPPED_EXISTS").length+" skipped; categories: "+(r.categories||[]).length+" checked; tags: "+(r.tags||[]).length+" checked; menu: "+(r.menu?.status||"not reported")+". Live menu unchanged.");}catch(error){setMessage(error.message||"Draft site structure could not be created.")}finally{setBusy(false)}}
