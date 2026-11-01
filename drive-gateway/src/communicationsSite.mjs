@@ -1300,7 +1300,7 @@ export function createCommunicationsSiteRouter(deps) {
         const response = await cpanelCall(cp, "Email/list_pops", { domain });
         result.emailAccounts = { status: "PASS", count: extractRows(response).length, accounts: extractRows(response).map(row => cleanText(row.email || row.login || "", 254)).filter(Boolean) };
       } catch (error) {
-        result.emailAccounts = { status: "FAIL", diagnosticCode: safeCode(error.diagnosticCode), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+        result.emailAccounts = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
       }
       try {
         const response = await cpanelCall(cp, "SSL/installed_hosts");

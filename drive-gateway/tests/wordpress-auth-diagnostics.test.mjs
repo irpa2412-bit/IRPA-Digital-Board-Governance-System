@@ -91,6 +91,29 @@ test("WordPress diagnostics report upload_files capability as granted, missing, 
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test("media upload is blocked with a clear error when WordPress upload_files is missing", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    calls.push(url.pathname);
+    if (url.pathname === "/wp-json/wp/v2/users/me") return makeResponse({ id: 42, roles: ["editor"], capabilities: { edit_posts: true, edit_pages: true, upload_files: false } });
+    throw new Error("Media endpoint must not be called when upload_files is missing.");
+  };
+  try {
+    const response = await router(new Request("https://gateway.test/api/communications/website/media", {
+      method: "POST", headers: { Authorization: "Bearer firebase-token", "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: "test.png", title: "TEST image", contentType: "image/png", dataBase64: "iVBORw0KGgo=" })
+    }), env());
+    const data = await response.json();
+    assert.equal(response.status, 403);
+    assert.equal(data.code, "wordpress_upload_files_capability_missing");
+    assert.match(data.error, /missing the upload_files capability/);
+    assert.deepEqual(calls, ["/wp-json/wp/v2/users/me"]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("401 WordPress JSON codes produce a specific credential finding and sanitized raw response", async () => {
   const router = makeRouter();
   const originalFetch = globalThis.fetch;
