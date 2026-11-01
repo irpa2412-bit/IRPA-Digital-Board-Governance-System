@@ -826,7 +826,9 @@ export function createCommunicationsSiteRouter(deps) {
         return json({ error: "Choose a JPEG, PNG or WebP image and provide descriptive alt text." }, 400, corsHeaders(request));
       }
       const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
-      if (estimatedBytes < 1 || estimatedBytes > 5 * 1024 * 1024) return json({ error: "Images must be no larger than 5 MiB." }, 413, corsHeaders(request));
+      const configuredLimit = Number(env.WORDPRESS_MEDIA_MAX_BYTES || 5 * 1024 * 1024);
+      const maxImageBytes = Number.isSafeInteger(configuredLimit) && configuredLimit >= 1024 * 1024 && configuredLimit <= 20 * 1024 * 1024 ? configuredLimit : 5 * 1024 * 1024;
+      if (estimatedBytes < 1 || estimatedBytes > maxImageBytes) return json({ error: "Images must be no larger than " + (maxImageBytes / 1024 / 1024) + " MiB." }, 413, corsHeaders(request));
       const binary = atob(encoded);
       const originalBytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
       let bytes;
