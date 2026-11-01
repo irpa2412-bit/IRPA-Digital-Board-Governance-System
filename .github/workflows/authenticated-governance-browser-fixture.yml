@@ -59,6 +59,10 @@ jobs:
         run: npm install --no-save --package-lock=false @playwright/test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Reproduce upload pathway against unminified bundle and source maps
+        env:
+          VITE_DIAGNOSTIC_UNMINIFIED: "true"
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/upload-production-bundle.spec.mjs --workers=1"
       - name: Authenticate against isolated Firebase Auth and Firestore emulators; run full suite three times at mobile, tablet and desktop sizes
         run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --repeat-each=3 --workers=1"
       - name: Upload browser evidence on failure
