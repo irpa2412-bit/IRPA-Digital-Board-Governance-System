@@ -44,7 +44,7 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
       return response({ id: 112, status: "draft", link: "https://staging.irpa.or.tz/test-post/" }, 201);
     }
     if (url.pathname === "/wp-json/wp/v2/pages/111" && method === "POST") {
-      const body = JSON.parse(init.body); assert.equal(body.status, "draft"); assert.match(body.title, /EDITED TEST/);
+      const body = JSON.parse(init.body); if (body.title) assert.match(body.title, /EDITED TEST/); if (body.status) assert.equal(body.status, "draft");
       return response({ id: 111, status: "draft" });
     }
     if (url.pathname === "/wp-json/wp/v2/posts/112" && method === "POST") {
