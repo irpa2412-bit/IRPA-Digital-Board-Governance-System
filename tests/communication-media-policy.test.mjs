@@ -61,6 +61,9 @@ test("website studio supports authenticated WordPress article photo uploads with
  assert.ok(websiteStudio.includes("/api/communications/website/media"));
  assert.ok(websiteStudio.includes('multiple accept="image/jpeg,image/png,image/webp,image/gif"'));
  assert.ok(websiteStudio.includes("uploadSelectedImages"));
+ assert.ok(websiteStudio.includes("xhr.upload.onprogress"));
+ assert.ok(websiteStudio.includes("row.status===\"complete\""));
+ assert.ok(websiteStudio.includes("status:\"error\""));
  assert.ok(websiteStudio.includes("Alternative text is required"));
  assert.ok(websiteStudio.includes("caption"));
  assert.ok(websiteStudio.includes("New update"));
@@ -69,6 +72,8 @@ test("website studio supports authenticated WordPress article photo uploads with
  assert.ok(websiteStudio.includes("Vimeo"));
  assert.ok(websiteStudio.includes("inserted"));
  assert.ok(site.includes("Alternative text is required for every uploaded image."));
+ assert.ok(site.includes("signatureValid"));
+ assert.ok(site.includes("extensionTypes"));
  assert.ok(websiteStudio.includes("Save as draft"));
 });
 

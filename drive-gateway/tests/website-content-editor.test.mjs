@@ -306,6 +306,19 @@ test("image upload requires alternative text and refuses unsupported file types"
   assert.equal(lastMediaUpload, null);
 });
 
+test("image upload rejects spoofed extensions and mismatched image signatures", async () => {
+  const router = makeRouter();
+  const wrongExtension = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "image.svg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Image" }
+  });
+  assert.equal(wrongExtension.status, 400);
+  const wrongSignature = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "image.jpg", contentType: "image/jpeg", dataBase64: "SGVsbG8=", altText: "Image" }
+  });
+  assert.equal(wrongSignature.status, 400);
+  assert.equal(lastMediaUpload, null);
+});
+
 test("Yoast fields are not sent when WordPress does not expose writable REST meta properties", async () => {
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/content", {
@@ -315,6 +328,25 @@ test("Yoast fields are not sent when WordPress does not expose writable REST met
   assert.equal(createdPostPayload.meta, undefined);
   const data = await result.json();
   assert.deepEqual(data.yoast.writable, []);
+});
+
+test("Yoast meta is sent only for writable properties advertised by the WordPress REST schema", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/wp-json/wp/v2/posts" && init.method === "OPTIONS") return response({ schema: { properties: { meta: { properties: { _yoast_wpseo_metadesc: {}, _yoast_wpseo_focuskw: {} } } } } });
+    return originalFetch(input, init);
+  };
+  try {
+    const result = await call(router, makeEnv(), "/api/communications/website/content", {
+      method: "POST", body: { type: "posts", title: "Yoast writable test", content: "Body", yoastDescription: "Pastoral rangeland update", yoastFocusKeyphrase: "rangeland management" }
+    });
+    assert.equal(result.status, 201);
+    assert.deepEqual(createdPostPayload.meta, { _yoast_wpseo_metadesc: "Pastoral rangeland update", _yoast_wpseo_focuskw: "rangeland management" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("the registered Communication & Media authority can access the website connection check", async () => {
@@ -391,6 +423,18 @@ test("audit records and application logs never contain the Worker credential", a
   assert.equal(auditText.includes(TEST_PASSWORD), false);
   assert.equal(auditText.includes("Authorization"), false);
   assert.equal(JSON.stringify(consoleMessages).includes(TEST_PASSWORD), false);
+});
+
+
+test("WordPress HTML sanitizer remains applied to draft content", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/content", {
+    method: "PUT", body: { type: "pages", id: 123, title: "Sanitizer test", content: '<p>Safe</p><script>alert(1)</script><a href="javascript:alert(1)">bad</a>', excerpt: "", featuredMedia: 0, status: "draft" }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(state.content.includes("<script>"), false);
+  assert.equal(state.content.includes("javascript:"), false);
+  assert.ok(state.content.includes("<p>Safe</p>"));
 });
 
 test("editing is refused when WordPress has no current revision ID", async () => {
