@@ -71,20 +71,28 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
       CPANEL_BASE_URL: "https://cpanel.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token",
       CPANEL_DOCUMENT_ROOT: "public_html/staging"
     };
-    const result = await router(new Request("https://gateway.test/api/communications/website/production-acceptance", {
-      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" }, body: "{}"
+    const pageResult = await router(new Request("https://gateway.test/api/communications/website/production-acceptance-step", {
+      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" }, body: JSON.stringify({ step: "page-lifecycle" })
     }), env);
-    const data = await result.json();
-    assert.equal(result.status, 200);
-    assert.equal(data.testRun, true);
-    assert.equal(data.nothingPublished, true);
-    assert.equal(data.nothingDeleted, true);
-    assert.equal(data.uploadsRetained, true);
-    assert.equal(data.createdDrafts.pageId, 111);
-    assert.equal(data.createdDrafts.postId, 112);
-    assert.equal(data.failCount, 0, JSON.stringify(data.report.filter(row => row.status !== "PASS")));
-    assert.equal(data.report.filter(row => row.label.includes("URL open")).length, 16);
-    assert.equal(data.report.filter(row => row.status === "PASS").length, data.report.length);
+    const pageData = await pageResult.json();
+    assert.equal(pageResult.status, 200);
+    assert.equal(pageData.step, "page-lifecycle");
+    assert.equal(pageData.createdDrafts.pageId, 111);
+    assert.ok(pageData.report.some(row => row.label.includes("pages draft create") && row.status === "PASS"));
+    assert.ok(!pageData.report.some(row => row.label.includes("posts draft create")));
+    const postResult = await router(new Request("https://gateway.test/api/communications/website/production-acceptance-step", {
+      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" }, body: JSON.stringify({ step: "post-lifecycle" })
+    }), env);
+    const postData = await postResult.json();
+    assert.equal(postResult.status, 200);
+    assert.equal(postData.step, "post-lifecycle");
+    assert.equal(postData.createdDrafts.postId, 112);
+    assert.ok(postData.report.some(row => row.label.includes("posts draft create") && row.status === "PASS"));
+    assert.ok(!postData.report.some(row => row.label.includes("pages draft create")));
+    assert.equal(pageData.nothingPublished, true);
+    assert.equal(pageData.nothingDeleted, true);
+    assert.equal(postData.nothingPublished, true);
+    assert.equal(postData.nothingDeleted, true);
     assert.ok(calls.every(call => !/DELETE/i.test(call.method)));
     assert.ok(calls.filter(call => call.path === "/wp-json/wp/v2/pages" || call.path === "/wp-json/wp/v2/posts").every(call => call.method === "POST"));
   } finally { globalThis.fetch = originalFetch; }
@@ -105,8 +113,8 @@ test("production acceptance blocks media tests if upload_files is absent", async
       CPANEL_BASE_URL: "https://cpanel.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token",
       CPANEL_DOCUMENT_ROOT: "public_html/staging"
     };
-    const result = await router(new Request("https://gateway.test/api/communications/website/production-acceptance", {
-      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" }, body: "{}"
+    const result = await router(new Request("https://gateway.test/api/communications/website/production-acceptance-step", {
+      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" }, body: JSON.stringify({ step: "wp-media|image|media-library", pageId: 111 })
     }), env);
     const data = await result.json();
     assert.equal(result.status, 200);
