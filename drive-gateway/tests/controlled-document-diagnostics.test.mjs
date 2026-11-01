@@ -39,7 +39,7 @@ test("NOT_A_PDF reports actual MIME type and reason", async () => {
  assert.equal(r.classification, "NOT_A_PDF"); assert.match(r.reason, /text\/plain/);
 });
 test("PDF_PARSE_FAILED reports parser failure", async () => {
- const r = await run({ getMetadata: async () => ({ mimeType: "application/pdf", size: 15 }), downloadBytes: async () => new Uint8Array([37,80,68,70,45,49,46,55,10]) });
+ const r = await run({ record:{size:9}, getMetadata: async () => ({ mimeType: "application/pdf", size: 9 }), downloadBytes: async () => new Uint8Array([37,80,68,70,45,49,46,55,10]) });
  assert.equal(r.classification, "PDF_PARSE_FAILED"); assert.match(r.reason, /PDF parsing failed/);
 });
 test("TRANSIENT retries three times before final classification", async () => {
