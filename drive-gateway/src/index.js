@@ -37,6 +37,7 @@ import { createReleaseReadinessRoute } from "./releaseReadinessRoutes.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
+import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -1178,17 +1179,13 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
   } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
 }
 async function reconcileSignatureDocumentIds(request, env) {
-  // Legacy contract tests refer to status = "failed"; the current per-document taxonomy intentionally reports unreadable instead.
   const claims = await authenticateFirebaseRequest(request, env);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
-  if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") {
-    return json({ok:false,error:"Administrator authorization is required for signature-pathway reconciliation."},403,corsHeaders(request));
-  }
+  if (!adminRecord?.fields?.active?.booleanValue && String(claims.email || "").trim().toLowerCase() !== "irpa2412@gmail.com") return json({ok:false,error:"Administrator authorization is required for signature-pathway diagnostics."},403,corsHeaders(request));
   const body = await request.json().catch(() => ({}));
-  const dryRun = body?.dryRun === true;
+  if (body?.repairMismatches === true) return json({ok:false,error:"This diagnostic endpoint is read-only. Document and Drive metadata repair is not permitted."},400,corsHeaders(request));
+  const dryRun = true;
   const autoDiscover = body?.autoDiscover === true || !Array.isArray(body.documents) || body.documents.length === 0;
-  if (!dryRun && body?.repairMismatches !== true && autoDiscover) return json({ok:false,error:"Set dryRun:true to inspect all controlled documents, or repairMismatches:true to repair confirmed mismatches."},400,corsHeaders(request));
-  if (!dryRun && !autoDiscover && body?.repairMismatches !== true) return json({ok:false,error:"Repair requires explicit repairMismatches:true confirmation."},400,corsHeaders(request));
   const firestoreToken = await getFirestoreAdminAccessToken(env);
   let items = Array.isArray(body.documents) ? body.documents : [];
   if (autoDiscover) {
@@ -1197,65 +1194,81 @@ async function reconcileSignatureDocumentIds(request, env) {
       const data = firestoreDocumentToPlain(record) || {};
       const documentId = String(record.name || "").split("/").pop();
       const fileId = String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim();
-      return { documentId, fileId, title: String(data.title || data.fileName || data.reference || documentId) };
+      return { documentId, fileId, title: String(data.title || data.fileName || data.reference || documentId), ...data };
     });
     const requiredId = "wiAfPSIxHLTd6MdeM04q";
     if (!items.some(item => item.documentId === requiredId)) {
       const known = await getFirestoreDocument(env, "documents/" + requiredId, firestoreToken);
       if (known?.fields) {
         const data = firestoreDocumentToPlain(known) || {};
-        items.push({ documentId: requiredId, fileId: String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim(), title: String(data.title || data.fileName || data.reference || requiredId) });
-      } else {
-        items.push({ documentId: requiredId, fileId: "", title: requiredId });
-      }
+        items.push({ documentId: requiredId, fileId: String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim(), title: String(data.title || data.fileName || data.reference || requiredId), ...data });
+      } else items.push({ documentId: requiredId, fileId: "", title: requiredId });
     }
   }
-  if (!items.length) return json({ok:true,dryRun,autoDiscover,results:[],summary:{total:0,repaired:0,wouldRepair:0,alreadyCorrect:0,unreadable:0,failed:0},writesPerformed:false,driveMutationsPerformed:false,note:"No Firestore controlled-document records were found."},200,corsHeaders(request));
-  if (items.length > 250) return json({ok:false,error:"Reconciliation is limited to 250 documents per request."},400,corsHeaders(request));
+  if (!items.length) return json({ok:true,dryRun,autoDiscover,results:[],summary:{total:0,repaired:0,mismatch:0,match:0,alreadyCorrect:0,unreadable:0},writesPerformed:false,driveMutationsPerformed:false,note:"No Firestore controlled-document records were found."},200,corsHeaders(request));
+  if (items.length > 250) return json({ok:false,error:"Diagnostics are limited to 250 documents per request."},400,corsHeaders(request));
   const accessToken = await getDriveAccessToken(env);
+  const diagnosticFetch = async (path, options = {}) => {
+    const response = await fetch("https://www.googleapis.com" + path, { ...options, headers:{Authorization:"Bearer " + accessToken, ...(options.headers || {})} });
+    const raw = await response.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch { data = {raw}; }
+    if (!response.ok) {
+      const error = new Error(String(data?.error?.message || "Google Drive API request failed."));
+      error.httpStatus = response.status;
+      error.driveReason = String(data?.error?.errors?.[0]?.reason || data?.error?.status || "");
+      throw error;
+    }
+    return data;
+  };
   const results = [];
   for (const item of items) {
     const documentId = String(item?.documentId || "").trim();
-    const fileId = String(item?.fileId || "").trim();
-    const line = {documentId:documentId || "(missing Firestore ID)",fileId:fileId || "(missing Drive file ID)",title:String(item?.title||documentId||"Untitled"),status:"unreadable",reason:""};
+    const fileId = String(item?.fileId || item?.driveFileId || item?.archiveFileId || item?.governanceArchiveFileId || item?.sourceFileId || item?.primaryArchiveFileId || "").trim();
+    const title = String(item?.title || item?.fileName || item?.reference || documentId || "Untitled");
+    const line = {documentId:documentId || "(missing Firestore ID)",fileId:fileId || "(missing Drive file ID)",title,status:"unreadable",reason:"",classification:"UNKNOWN"};
     try {
       if (!documentId) throw new Error("Firestore document ID is missing.");
-      if (!fileId) throw new Error("No registered Drive file ID exists on this Firestore record.");
       const record = await getFirestoreDocument(env, `documents/${cleanId(documentId)}`, firestoreToken);
       if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
-      const recordFields = record.fields;
-      const registeredIds = [recordFields.fileId?.stringValue,recordFields.driveFileId?.stringValue,recordFields.archiveFileId?.stringValue,recordFields.governanceArchiveFileId?.stringValue,recordFields.sourceFileId?.stringValue,recordFields.primaryArchiveFileId?.stringValue].filter(Boolean).map(String);
-      if (!registeredIds.includes(fileId)) throw new Error("Drive file ID is not registered on this Firestore document.");
-      const metadata = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,description,createdTime`);
-      line.driveCreatedTime = metadata.createdTime || "(not reported)";
-      const description = parseDescription(metadata.description);
-      if (!description?.irpaGovernance) throw new Error("Drive file is not marked as an IRPA governance document.");
-      const previousDocumentId = String(description.documentId || "");
-      line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
-      if (previousDocumentId === documentId) {
-        line.status = "match";
-        line.reason = "Drive description.documentId is already correct and matches Firestore ID " + documentId + ".";
-      } else if (dryRun) {
-        line.status = "mismatch";
-        line.reason = "Drive description.documentId is " + (previousDocumentId || "(missing)") + "; expected Firestore ID " + documentId + ". No changes made.";
+      const data = firestoreDocumentToPlain(record) || {};
+      const registeredIds = [data.fileId,data.driveFileId,data.archiveFileId,data.governanceArchiveFileId,data.sourceFileId,data.primaryArchiveFileId].filter(Boolean).map(String);
+      if (!fileId) {
+        line.classification="FILE_MISSING"; line.step="Drive metadata call"; line.driveErrorReason="notFound"; line.reason="FILE_MISSING at Drive metadata call: No registered Drive file ID exists on this Firestore document.";
+      } else if (!registeredIds.includes(fileId)) {
+        line.classification="UNKNOWN"; line.step="Firestore document lookup"; line.driveErrorReason="(not applicable)"; line.reason="UNKNOWN at Firestore document lookup: Drive file ID " + fileId + " is not registered on Firestore document " + documentId + ".";
       } else {
-        const repairedDescription = {...description,documentId,documentUid:documentId};
-        await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`, {method:"PATCH",body:JSON.stringify({description:JSON.stringify(repairedDescription)})});
-        const verified = await driveFetch(env, accessToken, `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`);
-        const verifiedDescription = parseDescription(verified.description);
-        if (String(verifiedDescription.documentId || "") !== documentId) throw new Error("Drive description verification failed after repair; expected " + documentId + " but found " + String(verifiedDescription.documentId || "(missing)") + ".");
-        line.status = "repaired";
-        line.previousDescriptionDocumentId = previousDocumentId || "(missing)";
-        line.reason = "Mismatch repaired and verified: Drive description.documentId now equals Firestore ID " + documentId + ".";
+        const diagnostic = await diagnoseControlledDocument({
+          item:{documentId,fileId,title}, record:data,
+          getMetadata:id=>diagnosticFetch(`/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,size,description,trashed,parents,createdTime,owners,webViewLink`),
+          downloadBytes:async id=>{
+            const response=await fetch("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(id)+"?alt=media",{headers:{Authorization:"Bearer "+accessToken}});
+            if(!response.ok){let body={};try{body=await response.clone().json();}catch{}const error=new Error(String(body?.error?.message||"Google Drive content download failed."));error.httpStatus=response.status;error.driveReason=String(body?.error?.errors?.[0]?.reason||body?.error?.status||"");throw error;}
+            return new Uint8Array(await response.arrayBuffer());
+          }
+        });
+        Object.assign(line,diagnostic);
+        if(diagnostic.classification!=="OK"){line.status="unreadable";line.reason=diagnostic.classification+" at "+diagnostic.step+": "+diagnostic.reason;}
+        else {
+          const metadata=await diagnosticFetch(`/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`);
+          const description=parseDescription(metadata.description);
+          if(!description?.irpaGovernance){line.status="unreadable";line.classification="UNKNOWN";line.step="Drive metadata validation";line.reason="UNKNOWN at Drive metadata validation: Drive file is not marked as an IRPA governance document.";}
+          else {
+            const previousDocumentId=String(description.documentId||"");line.previousDescriptionDocumentId=previousDocumentId||"(missing)";
+            if(previousDocumentId===documentId){line.status="match";line.classification="OK";line.reason="Drive description.documentId matches Firestore ID "+documentId+"; "+diagnostic.reason;}
+            else {line.status="mismatch";line.classification="OK";line.reason="Drive description.documentId is "+(previousDocumentId||"(missing)")+"; expected Firestore ID "+documentId+". No changes made.";}
+          }
+        }
       }
-    } catch (error) {
-      line.status = "unreadable";
-      line.reason = String(error?.message || "Unknown reconciliation failure.").slice(0,300);
+    } catch(error) {
+      line.status="unreadable";line.classification=line.classification||"UNKNOWN";line.step=line.step||"Firestore document lookup";
+      line.httpStatus=Number(error?.httpStatus||error?.status)||null;line.driveErrorReason=String(error?.driveReason||error?.code||"unknown");
+      line.reason=line.classification+" at "+line.step+": "+String(error?.message||"Unknown diagnostic failure.");
     }
     results.push(line);
   }
-  const summary = {total:results.length,repaired:results.filter(x=>x.status==="repaired").length,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
-  return json({ok:true,dryRun,autoDiscover,results,summary,writesPerformed:false,driveMutationsPerformed:!dryRun&&summary.repaired>0},200,corsHeaders(request));
+  const summary={total:results.length,repaired:0,mismatch:results.filter(x=>x.status==="mismatch").length,match:results.filter(x=>x.status==="match").length,alreadyCorrect:results.filter(x=>x.status==="match").length,unreadable:results.filter(x=>x.status==="unreadable").length};
+  return json({ok:true,dryRun,autoDiscover,results,summary,writesPerformed:false,driveMutationsPerformed:false,note:"Read-only diagnostic: no Firestore or Drive documents were modified."},200,corsHeaders(request));
 }
 
 async function controlledDocumentUploadPolicyCheck(request, env) {
