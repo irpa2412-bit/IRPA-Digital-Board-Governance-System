@@ -9,18 +9,18 @@ const authEnd = workerSource.indexOf("async function assertActivatedPortalUser",
 const authSource = workerSource.slice(authStart, authEnd);
 
 test("18-document mocked Worker batch sends one document per request, caps concurrency at 3, retries at most 3 times, and stays within 8 subrequests", async () => {
-  assert.match(authSource, /getFirebaseJwks\\(\\)/, "Firebase ID-token signature verification uses one cold JWKS fetch");
-  assert.match(authSource, /assertActivatedPortalUser\\(claims, env\\)/, "authentication performs the activation-profile Firestore read");
+  assert.match(authSource, /getFirebaseJwks\(\)/, "Firebase ID-token signature verification uses one cold JWKS fetch");
+  assert.match(authSource, /assertActivatedPortalUser\(claims, env\)/, "authentication performs the activation-profile Firestore read");
   const reconcileStart = workerSource.indexOf("async function reconcileSignatureDocumentIds");
   const reconcileEnd = workerSource.indexOf("async function controlledDocumentUploadPolicyCheck", reconcileStart);
   const reconcileSource = workerSource.slice(reconcileStart, reconcileEnd);
-  assert.match(reconcileSource, /getFirestoreAdminAccessToken\\(env\\)/);
-  assert.match(reconcileSource, /getFirestoreDocument\\(env,.*adminProfiles/);
-  assert.match(reconcileSource, /getFirestoreDocument\\(env,.*documents/);
-  assert.match(reconcileSource, /getDriveAccessToken\\(env\\)/);
-  assert.match(reconcileSource, /diagnosticFetch\\(/);
+  assert.match(reconcileSource, /getFirestoreAdminAccessToken\(env\)/);
+  assert.match(reconcileSource, /getFirestoreDocument\(env,.*adminProfiles/);
+  assert.match(reconcileSource, /getFirestoreDocument\(env,.*documents/);
+  assert.match(reconcileSource, /getDriveAccessToken\(env\)/);
+  assert.match(reconcileSource, /diagnosticFetch\(/);
   assert.match(reconcileSource, /alt=media/);
-  assert.match(reconcileSource, /diagnostic\\.driveDescription/);
+  assert.match(reconcileSource, /diagnostic\.driveDescription/);
   const rows = Array.from({ length: 18 }, (_, index) => ({ documentId: "doc-" + String(index + 1).padStart(2, "0"), title: "Document " + (index + 1), fileId: "drive-" + (index + 1) }));
   const attempts = new Map();
   const perAttemptSubrequests = [];
