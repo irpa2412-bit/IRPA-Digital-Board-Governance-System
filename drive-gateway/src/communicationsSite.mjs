@@ -1011,6 +1011,7 @@ export function createCommunicationsSiteRouter(deps) {
       const [stepKind, stepFile, stepDestination] = step.split("|");
       if (!["page-lifecycle", "post-lifecycle", "wp-media", "cpanel"].includes(stepKind)) return json({ error: "A supported independent acceptance step is required." }, 400, corsHeaders(request));
       const report = [];
+      const cleanupList = [];
       const add = (label, status, httpStatus, error = "", detail = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail: cleanText(detail, 1200) || null });
       const wpRequest = async (endpoint, method = "GET", payload, headers = {}) => {
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
@@ -1039,6 +1040,7 @@ export function createCommunicationsSiteRouter(deps) {
           if (type === "pages") testPageId = ok ? id : 0; else testPostId = ok ? id : 0;
           add(type + " draft create", ok ? "PASS" : "FAIL", created.response.status, ok ? "" : created.data?.message || "WordPress did not confirm a same-host draft.");
           if (!ok) continue;
+          cleanupList.push({ type, id, url: created.data.link });
           await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_TEST_DRAFT_CREATED", type, id, { title, slug, status: "draft", test: true });
           const edited = await wpRequest(type + "/" + id, "POST", { title: title + " — EDITED TEST", content: "<p>TEST ONLY — edited and revised by the production acceptance check. Retain as draft.</p>", status: "draft" });
           const editOk = edited.response.ok && Number(edited.data?.id) === id && edited.data?.status === "draft";
@@ -1109,6 +1111,7 @@ export function createCommunicationsSiteRouter(deps) {
               const featured = await wpRequest("pages/" + testPageId, "POST", { featured_media: mediaId, status: "draft" });
               if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, "WordPress featured-media assignment failed.", JSON.stringify(featured.diagnostics)); continue; }
             }
+            cleanupList.push({ type: "media", id: mediaId, url: upload.data.source_url });
             const opened = await wordpressEditorFetch(wp, upload.data.source_url, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
             add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
           } catch (error) { add(file.name + " upload to WordPress " + destination, "FAIL", error.httpStatus || 0, error.message); }
@@ -1131,6 +1134,10 @@ export function createCommunicationsSiteRouter(deps) {
             const data = await response.json().catch(() => null);
             if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
             const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+            const registerId = crypto.randomUUID(), now = new Date().toISOString(), sha256 = await websiteMediaSha256(bytes);
+            const mediaRow = { file: filename, title: "TEST " + file.name + " cPanel acceptance", altText: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", category: "Acceptance Test", tags: ["TEST"], destination: "cpanel-folder", url: publicUrl, uploader: claims.user_id, uploaderEmail: claims.email || "", date: now, size: bytes.byteLength, sha256, status: "Available" };
+            await commitDocumentAndAudit(env, "communicationMediaAssets/" + registerId, claims.token, fields(mediaRow), Object.keys(mediaRow), fields({ action: "COMMUNICATION_WEBSITE_MEDIA_REGISTERED", category: "COMMUNICATIONS", collection: "communicationMediaAssets", recordId: registerId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { file: filename, destination: "cpanel-folder", url: publicUrl, size: bytes.byteLength, sha256 }, createdAt: now }), { createOnly: true, collectionName: "communicationMediaAssets" });
+            cleanupList.push({ type: "media", id: registerId, url: publicUrl });
             const opened = await wordpressEditorFetch(wp, publicUrl, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
             add(file.name + " upload to cPanel folder URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded cPanel URL did not open successfully.");
           } catch (error) { add(file.name + " upload to cPanel folder", "FAIL", error.httpStatus || 0, error.message); }
@@ -1141,7 +1148,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, step, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupList: [], uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      return json({ testRun: true, step, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupList, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
