@@ -160,3 +160,28 @@ The initial Meta integration uses the existing Cloudflare gateway and its isolat
 6. Verify the response from the authenticated `/api/communications/meta/status` route. Expected acceptance: the returned Meta identity and managed Page/Instagram metadata are correct; required permissions are visible; no token fields appear; posting remains disabled. Verify invalid/expired state, role denial, production environment rejection and secret redaction as part of the security suite.
 
 The API code and automated tests do not establish that Meta has approved the app, that the actual IRPA account has consented, that the required GitHub Actions variable/secrets are configured, or that the live staging connection succeeds. The workflow logs only redacted configuration-state markers and must be inspected for `META_OAUTH_DEPLOYMENT_STATE=enabled` and `META_OAUTH_SECRETS_CONFIGURED=true`. Those remain external setup and live-acceptance requirements. Do not merge or deploy to production. Keep posting disabled until authorization, security checks and staging acceptance all pass.
+
+
+## WordPress authentication diagnostics and cPanel remediation
+
+Website Studio's connection check performs two independent probes: authenticated `GET /wp-json/wp/v2/users/me?context=edit` and unauthenticated `GET /wp-json/`. Authentication redirects are not followed. The diagnostics show the Worker environment, secret presence/length/format only, response status, canonicalized URL, redirect target/count, MIME type, WordPress REST error code/message, WWW-Authenticate presence, Cloudflare Ray ID/auth-bridge diagnostic, and a sanitized response body truncated to 1 KiB. Secret values must never be copied into logs, tickets, browser output, or diagnostic payloads.
+
+For an empty HTTP 401 response, the WordPress/cPanel administrator should inspect Authorization forwarding before rotating credentials. Add these directives above the WordPress rewrite block in the site's `.htaccess`:
+
+```apache
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+```
+
+On LiteSpeed/CGI installations, also test:
+
+```apache
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+```
+
+Then verify the dedicated integration user in WordPress Users → Profile. Revoke its old Application Password and create a replacement named `IRPA Portal`; assign the Editor role (not Administrator). Confirm Application Passwords are enabled, HTTPS is canonical, and security plugins do not block REST authentication. Review Cloudflare WAF/Bot Fight/Super Bot Fight events for the Worker egress and `/wp-json/`; apply a narrowly scoped skip only when the event confirms a false positive.
+
+Set `WORDPRESS_BASE_URL` to the exact canonical HTTPS origin (for example, `https://www.irpa.or.tz` or `https://irpa.or.tz`, whichever does not redirect). The editor's environment hostname restrictions remain mandatory: production may use only the two production hostnames; staging may use only `staging.irpa.or.tz`. Bind all three WordPress secrets to the same Worker environment that serves the portal. For example, use `wrangler secret put WORDPRESS_USERNAME --env production` and `wrangler secret put WORDPRESS_APPLICATION_PASSWORD --env production` only when the serving Worker is production; use `--env staging` for the staging Worker. Never put secret values in GitHub, issue comments, logs, or the portal.
+
+Acceptance requires authenticated `users/me` HTTP 200 with the expected integration account and Editor role, public REST discovery, page/post listing, draft-only editing, and independent approval before any public publication. No production data or documents should be changed during diagnosis.
