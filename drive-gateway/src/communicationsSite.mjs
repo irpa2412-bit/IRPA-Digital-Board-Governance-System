@@ -403,13 +403,17 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   async function readYoastWritableFields(wp) {
-    const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
-      method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
-    });
-    const schema = await response.json().catch(() => null);
-    if (!response.ok) return { fields: [] };
-    const properties = schema?.schema?.properties?.meta?.properties || schema?.endpoints?.[0]?.args?.meta?.properties || {};
-    return { fields: ["_yoast_wpseo_metadesc", "wpseo_metadesc", "_yoast_wpseo_focuskw", "wpseo_focuskw"].filter(name => Object.prototype.hasOwnProperty.call(properties, name)) };
+    try {
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+        method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
+      });
+      const schema = await response.json().catch(() => null);
+      if (!response.ok) return { fields: [] };
+      const properties = schema?.schema?.properties?.meta?.properties || schema?.endpoints?.[0]?.args?.meta?.properties || {};
+      return { fields: ["_yoast_wpseo_metadesc", "wpseo_metadesc", "_yoast_wpseo_focuskw", "wpseo_focuskw"].filter(name => Object.prototype.hasOwnProperty.call(properties, name)) };
+    } catch {
+      return { fields: [] };
+    }
   }
 
   function websiteSnapshotKey(type, id, snapshotId) {
