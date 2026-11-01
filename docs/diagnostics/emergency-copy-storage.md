@@ -32,7 +32,7 @@ The date-bounded path history shows the following upload implementation lineage:
 
 | Commit | Date (repository log) | File | Finding |
 |---|---|---|---|
-| `5b33e8dd09d5d42cb47124139321582d5fb0e351` | 2026-09-21 | `src/firebase/signatureStorage.js` | “Fix controlled document upload gateway fallback” changes only the default Cloudflare Gateway URL. It does not write a Firestore byte copy. |
+| `5b33e8dd09d5b42cb47124139321582d5fb0e351` | 2026-09-21 | `src/firebase/signatureStorage.js` | “Fix controlled document upload gateway fallback” changes only the default Cloudflare Gateway URL. It does not write a Firestore byte copy. |
 | `44d61175d34e7c8a8e70356ba6981fd16ca84db8` | 2026-09-24 | `src/components/ControlledDocumentUpload.jsx` | Rebuilds controlled upload to call `uploadControlledDocumentRouted`; stores Drive file IDs and Drive links in the document record. |
 | `b236ea09f563f03037ad8f68486ac9f94e26dc6f` | 2026-09-24 | `drive-gateway/src/index.js` | Adds `uploadControlledDocument`; uploads the bytes to two Google Drive archive channels (category and governance) and returns Drive file IDs. No Firestore byte/chunk fallback. |
 | `27eed39b565dbb5b5e6f2c210f713a994bcc8773` | 2026-09-26 | `drive-gateway/src/index.js` | Allows a trailing slash on the controlled upload route only. |
