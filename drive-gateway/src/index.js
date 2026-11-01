@@ -1227,7 +1227,7 @@ async function reconcileSignatureDocumentIds(request, env) {
   const results = [];
   for (const item of items) {
     const documentId = String(item?.documentId || "").trim();
-    const fileId = String(item?.fileId || item?.driveFileId || item?.archiveFileId || item?.governanceArchiveFileId || item?.sourceFileId || item?.primaryArchiveFileId || "").trim();
+    let fileId = String(item?.fileId || item?.driveFileId || item?.archiveFileId || item?.governanceArchiveFileId || item?.sourceFileId || item?.primaryArchiveFileId || "").trim();
     const title = String(item?.title || item?.fileName || item?.reference || documentId || "Untitled");
     const line = {documentId:documentId || "(missing Firestore ID)",fileId:fileId || "(missing Drive file ID)",title,status:"unreadable",reason:"",classification:"UNKNOWN"};
     try {
@@ -1236,6 +1236,8 @@ async function reconcileSignatureDocumentIds(request, env) {
       if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
       const data = firestoreDocumentToPlain(record) || {};
       const registeredIds = [data.fileId,data.driveFileId,data.archiveFileId,data.governanceArchiveFileId,data.sourceFileId,data.primaryArchiveFileId].filter(Boolean).map(String);
+      fileId = fileId || String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim();
+      line.fileId = fileId || "(missing Drive file ID)";
       if (!fileId) {
         line.classification="FILE_MISSING"; line.step="Drive metadata call"; line.driveErrorReason="notFound"; line.reason="FILE_MISSING at Drive metadata call: No registered Drive file ID exists on this Firestore document.";
       } else if (!registeredIds.includes(fileId)) {
