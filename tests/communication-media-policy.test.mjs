@@ -52,15 +52,24 @@ test("publishing, website content edits and cPanel file edits route through Clou
  assert.ok(!existsSync(new URL("../functions/communicationMedia.js",import.meta.url)));
 });
 
-test("website studio supports authenticated WordPress article photo uploads without publishing",()=>{
+test("Website Studio creates draft-only posts and securely uploads multiple WordPress article images",()=>{
+ assert.ok(site.includes('path === "/api/communications/website/posts" && request.method === "POST"'));
  assert.ok(site.includes('path === "/api/communications/website/media" && request.method === "POST"'));
- for(const type of ['"image/jpeg"','"image/png"','"image/webp"','"image/gif"']) assert.ok(site.includes(type));
- assert.ok(site.includes("8 * 1024 * 1024"));
+ assert.ok(site.includes('new Set(["image/jpeg", "image/png", "image/webp"])'));
+ assert.ok(site.includes("5 * 1024 * 1024"));
+ assert.ok(site.includes("stripImageMetadata(contentType, originalBytes)"));
  assert.ok(site.includes("COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_POST_DRAFT_CREATED"));
+ assert.ok(site.includes('status: "draft"'));
+ assert.ok(site.includes("publication status is controlled by the server"));
+ assert.ok(site.includes('path === "/api/communications/website/taxonomies" && request.method === "GET"'));
+ assert.ok(websiteStudio.includes('call("/api/communications/website/posts","POST"'));
  assert.ok(websiteStudio.includes('call("/api/communications/website/media","POST"'));
- assert.ok(websiteStudio.includes('type="file" accept="image/jpeg,image/png,image/webp,image/gif"'));
- assert.ok(websiteStudio.includes("inserted into the article"));
- assert.ok(websiteStudio.includes("Save as draft"));
+ assert.ok(websiteStudio.includes("multiple accept=\"image/jpeg,image/png,image/webp\""));
+ assert.ok(websiteStudio.includes("Required descriptive alt text"));
+ assert.ok(websiteStudio.includes("Optional image caption"));
+ assert.ok(websiteStudio.includes("Phone preview"));
+ assert.ok(websiteStudio.includes("Create WordPress draft"));
 });
 
 test("WordPress and cPanel status badges automatically check and fail visibly without stale neutral status",()=>{
@@ -377,4 +386,13 @@ test("public HTML and Settings show the exact web and Worker build stamps",()=>{
  assert.ok(settings.includes('String(workerHealth?.commit || workerHealth?.version || "unavailable")'));
  assert.ok(firebaseDeploy.includes("VITE_BUILD_COMMIT: ${{ github.sha }}"));
  assert.ok(pagesDeploy.includes('grep -Fq "content=\\"$GITHUB_SHA\\"" dist/index.html'));
+});
+
+
+test("new Website Studio post creation preserves the independent production approval gate and host allowlist",()=>{
+ assert.ok(site.includes('environment === "production" && !["irpa.or.tz", "www.irpa.or.tz"].includes(host)'));
+ assert.ok(site.includes('Production publishing requires the approved communication-media workflow'));
+ assert.ok(site.includes('if (String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase() === "production" && status === "publish")'));
+ assert.ok(site.includes('await authorised(request, env, true)'));
+ assert.ok(portal.includes('gatewayRequest("/api/communications/website/publish"'));
 });
