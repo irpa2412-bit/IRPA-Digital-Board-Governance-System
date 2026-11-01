@@ -10,7 +10,7 @@ const starts=(b,...s)=>s.every((v,i)=>b[i]===v);
 export function sanitizeWebsiteSvg(input) {
   const raw=String(input||"");
   if(raw.length>2*1024*1024||!/^\s*<svg\b/i.test(raw)||/<\s*(script|foreignObject|iframe|object|embed|audio|video)\b/i.test(raw)) throw new Error("SVG contains unsafe or unsupported content.");
-  if(/(?:javascript:|data:|https?:|file:|@import|url\s*\()/i.test(raw)||/\bon[a-z]+\s*=/i.test(raw)||/<!DOCTYPE|<!ENTITY/i.test(raw)) throw new Error("SVG external references, entities and event handlers are prohibited.");
+  if(/(?:javascript:|data:|file:|@import|url\s*\()/i.test(raw)||/\bon[a-z]+\s*=/i.test(raw)||/<!DOCTYPE|<!ENTITY/i.test(raw)) throw new Error("SVG external references, entities and event handlers are prohibited.");
   const allowed=new Set(["svg","g","path","rect","circle","ellipse","line","polyline","polygon","text","tspan","defs","linearGradient","radialGradient","stop","clipPath","mask","title","desc"]);
   const cleaned=raw.replace(/<\/?([A-Za-z][\w:-]*)\b([^>]*)>/g,(whole,name,attrs)=>{
     if(!allowed.has(name)) return "";
@@ -50,6 +50,6 @@ export async function websiteMediaSha256(bytes) {
   return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 export function validateMediaChunk({uploadId,index,total,dataBase64}) {
-  if(!/^[a-f0-9-]{36}$/i.test(String(uploadId||""))||!Number.isInteger(index)||!Number.isInteger(total)||total<1||total>512||index<0||index>=total||!/^[A-Za-z0-9+/]+={0,2}$/.test(String(dataBase64||""))||dataBase64.length>360000) throw new Error("Invalid media upload chunk.");
+  if(!/^[a-f0-9-]{36}$/i.test(String(uploadId||""))||!Number.isInteger(index)||!Number.isInteger(total)||total<1||total>512||index<0||index>=total||!/^[A-Za-z0-9+/]+={0,2}$/.test(String(dataBase64||""))||String(dataBase64||'').length>360000) throw new Error("Invalid media upload chunk.");
   return true;
 }
