@@ -126,3 +126,24 @@ test("auth redirects are not followed and are surfaced as a canonical-host findi
     globalThis.fetch = originalFetch;
   }
 });
+
+test("empty non-WordPress 401 response is classified as likely Authorization stripping or WAF interception", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") return new Response(null, { status: 401, headers: { "Content-Type": "text/html" } });
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging" });
+    throw new Error("Unexpected request");
+  };
+  try {
+    const response = await status(router, env());
+    const data = (await response.json()).connections;
+    assert.equal(data.websiteDiagnosticCode, "authentication_rejected_empty_body");
+    assert.match(data.websiteDiagnosticMessage, /Authorization header may be stripped/);
+    assert.equal(data.websiteRawResponse, "(empty response body)");
+    assert.equal(data.websiteResponseType, "text/html");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
