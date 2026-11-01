@@ -281,7 +281,7 @@ export function createCommunicationsSiteRouter(deps) {
   async function wordpressResponseDetail(response, wp, step) {
     const headers = response.headers;
     const headerDetails = {};
-    for ( (constName of ["server", "cf-ray", "x-powered-by"]) ) {
+    for (const constName of ["server", "cf-ray", "x-powered-by"]) {
       const value = headers.get(constName);
       if (value) headerDetails[constName] = cleanText(value, 200);
     }
