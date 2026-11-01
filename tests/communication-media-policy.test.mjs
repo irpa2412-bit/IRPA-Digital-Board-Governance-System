@@ -489,3 +489,21 @@ test("administrator Communication & Media tab bar clearly separates Website Stud
  assert.ok(portal.includes("Upload media, choose pages and run Production Acceptance in Website Studio"));
  assert.ok(portal.includes('onClick={()=>setTab("Website Studio")}>Open Website Studio</button>'));
 });
+
+
+test("administrator Website Studio exposes all four tabs, runs acceptance and reports the live status response",()=>{
+ assert.ok(portal.includes('const authorized=isAdmin||roles.some'),"existing administrator authorization remains");
+ assert.ok(portal.includes('if(!authorized)return'),"existing portal authorization gate remains");
+ for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance"])assert.ok(websiteStudio.includes(label),label+" tab is present");
+ assert.ok(websiteStudio.includes('onClick={runProductionAcceptance}'),"Production Acceptance run button is wired");
+ assert.ok(websiteStudio.includes('call("/api/communications/site/status")'),"status is read from the required route");
+ assert.ok(websiteStudio.includes("const connections=d.connections||{}"),"the route's connections payload is consumed");
+ assert.ok(websiteStudio.includes('status?.website==="connected"?"Connected"'),"connected status renders as Connected");
+ assert.ok(websiteStudio.includes('useEffect(()=>{void connect()},[])'),"status is checked automatically on mount");
+ assert.ok(!portal.includes("Page Drafts (EN/SW)")&&!portal.includes("saveWebsitePageDraft"),"the duplicate legacy page-draft editor is removed");
+});
+
+test("Website Studio Upload Media retains the full requested media set and destination selector",()=>{
+ for(const ext of [".jpg",".jpeg",".png",".webp",".gif",".svg",".mp4",".mov",".webm",".mp3",".pdf",".docx",".xlsx",".pptx"])assert.ok(websiteStudio.includes(ext),"Upload Media accepts "+ext);
+ for(const destination of ["media-library","attach","featured","cpanel-folder"])assert.ok(websiteStudio.includes('value="'+destination+'"'),"destination "+destination+" is available");
+});
