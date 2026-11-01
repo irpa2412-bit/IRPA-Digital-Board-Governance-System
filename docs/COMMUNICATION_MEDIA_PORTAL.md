@@ -129,6 +129,20 @@ The Media Asset Studio uploads through the authenticated Google Drive gateway; i
 
 This is the supported list, not a claim that every proprietary, encrypted, damaged, or future file format is supported. MIME type is checked against the allowlist; unknown types are rejected. Files are stored as originals in the existing Drive pathway and registered as metadata in Firestore. Authenticated download is by Drive file ID. Image adjustments and browser-native audio/video trimming export a new local derivative and never overwrite the original. The current upload route accepts one file per submission; upload additional files as separate submissions.
 
+## Website Studio: new updates and WordPress media
+
+Website Studio now provides a dedicated **New update** flow in addition to editing existing pages and posts.
+
+- New updates are created through `POST /api/communications/website/posts`. The Worker constructs the WordPress REST payload with `status: "draft"`; callers cannot provide a publication status. The route verifies the returned post is still a draft, re-reads it, and records `COMMUNICATION_WEBSITE_POST_DRAFT_CREATED`. Authors must submit the corresponding editorial item for the existing independent review and approval process before publication.
+- `GET /api/communications/website/taxonomies` loads existing WordPress categories and tags for selection. The post payload includes selected category/tag IDs, excerpt and featured-media ID.
+- `POST /api/communications/website/media` uploads JPEG, PNG or WebP images to the configured WordPress REST media endpoint. Each file is limited to 5 MiB; alt text is mandatory and caption optional. Multiple selections are uploaded as separate authenticated requests. The Worker validates file signatures and strips JPEG EXIF/IPTC/comment segments, PNG EXIF/text chunks, and WebP EXIF/XMP chunks before upload. It then writes alt text/caption to the WordPress media record and records the uploader, filename, type, size and media ID in the existing communications website audit trail.
+- Uploaded images are inserted into the article body as figures; the first image becomes the featured image unless the author changes the attachment selection.
+- New updates include an unsaved narrow-phone preview. HTTPS YouTube/Vimeo URLs can be inserted as standalone paragraphs for WordPress oEmbed rendering. Large video files are not uploaded to WordPress; no MP4 upload is implemented.
+- Categories and tags are selected from the configured WordPress taxonomy endpoints. SEO plugin fields are not part of this feature.
+- Upload and post creation retain the existing Firebase authentication, active registered Communication & Media role check, dedicated WordPress Editor verification, server-side host restriction and secret custody. No WordPress credential is sent to the browser or written to logs.
+
+The production WordPress host allowlist remains exactly `irpa.or.tz` and `www.irpa.or.tz`; staging remains restricted to `staging.irpa.or.tz`. This feature does not alter the allowlist, Worker secrets, WordPress configuration or deployment settings.
+
 ## Live website editor and preview
 
 The Publishing Setup workspace loads existing WordPress pages or posts, lets an authorised reviewer edit the title and content, and saves through the authenticated Cloudflare Worker. The editor provides an **unsaved, sandboxed live preview** that updates from the current form contents when preview is open. The preview iframe has an empty sandbox (no script execution), sends no referrer, and is explicitly a visual approximation rather than the live theme. It does not publish or save content by opening preview.
