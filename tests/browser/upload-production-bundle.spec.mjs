@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 
 const fixtureEmail = "irpa-browser-fixture-admin@example.test";
 const fixturePassword = "FixtureOnly-Password-2026!";
@@ -7,6 +8,10 @@ test("production minified bundle completes authenticated Create Drive file with 
   await page.setViewportSize({ width: 1440, height: 900 });
   const pageErrors = [];
   const gatewayCalls = [];
+  const consoleErrors = [];
+  const failedRequests = [];
+  page.on("console", message => { if (message.type() === "error") consoleErrors.push(message.text()); });
+  page.on("requestfailed", request => failedRequests.push({ url: request.url(), method: request.method(), failure: request.failure()?.errorText || "unknown" }));
   page.on("pageerror", error => {
     const captured = { name: error.name, message: error.message, stack: error.stack || "" };
     pageErrors.push(captured);
@@ -91,9 +96,37 @@ test("production minified bundle completes authenticated Create Drive file with 
   });
   await page.locator(".controlled-document-upload-panel").getByRole("button", { name: "Upload Document", exact: true }).click();
 
-  await expect.poll(() => gatewayCalls.filter(call => call.path === "/api/upload-controlled-document").length,
-    { timeout: 30000, message: "production bundle should reach the mocked Create Drive file Gateway route" }
-  ).toBe(1);
+  try {
+    await expect.poll(() => gatewayCalls.filter(call => call.path === "/api/upload-controlled-document").length,
+      { timeout: 30000, message: "production bundle should reach the mocked Create Drive file Gateway route" }
+    ).toBe(1);
+  } catch (failure) {
+    const visibleText = async selector => page.locator(selector).evaluateAll(nodes => nodes
+      .filter(node => { const style = getComputedStyle(node); const rect = node.getBoundingClientRect(); return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0; })
+      .map(node => (node.innerText || node.textContent || "").trim()).filter(Boolean));
+    const diagnostics = {
+      url: page.url(),
+      pageErrors,
+      consoleErrors,
+      failedRequests,
+      visibleAlerts: await visibleText('[role="alert"], .error-message, .success-message, .auth-message'),
+      uploadButtonEnabled: await page.locator(".controlled-document-upload-panel").getByRole("button", { name: "Upload Document", exact: true }).isEnabled().catch(() => false),
+      fields: {
+        title: await page.getByPlaceholder("Enter document title").inputValue().catch(() => null),
+        documentType: await page.getByLabel("Document Type").inputValue().catch(() => null),
+        classification: await page.locator('.controlled-document-upload-panel select').nth(0).inputValue().catch(() => null),
+        archive: await page.locator(".archive-routing-panel").innerText().catch(() => null),
+        fileInput: await page.getByLabel("Select document file").evaluate(node => ({ value: node.value, files: Array.from(node.files || []).map(file => ({ name: file.name, type: file.type, size: file.size })) })).catch(() => null)
+      },
+      gatewayCalls
+    };
+    const report = "# Upload production bundle failure diagnostics\\n\\n```json\\n" + JSON.stringify(diagnostics, null, 2) + "\\n```\\n";
+    mkdirSync("docs/diagnostics", { recursive: true });
+    writeFileSync("docs/diagnostics/upload-production-bundle.md", report);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+    console.error("UPLOAD_PRODUCTION_BUNDLE_DIAGNOSTICS", JSON.stringify(diagnostics));
+    throw failure;
+  }
   await expect(page.getByText(/Drive file ID: fixture-drive-file-id/)).toBeVisible({ timeout: 30000 });
   await expect(page.getByText(/PASS — Create Drive file/)).toBeVisible({ timeout: 30000 });
   await expect(page.getByText(/Document uploaded successfully to Google Drive/)).toBeVisible({ timeout: 30000 });
