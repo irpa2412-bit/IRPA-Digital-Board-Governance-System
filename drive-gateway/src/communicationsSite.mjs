@@ -251,11 +251,11 @@ export function createCommunicationsSiteRouter(deps) {
     });
     const user = await response.json().catch(() => null);
     if (!response.ok || !Number.isSafeInteger(user?.id)) {
-      throw new Error("Staging WordPress authentication failed; the integration account was not verified.");
+      throw new Error("Configured WordPress authentication failed; the integration account was not verified.");
     }
     const roles = Array.isArray(user.roles) ? user.roles.map(role => String(role).toLowerCase()) : [];
     if (!roles.includes("editor") || roles.includes("administrator")) {
-      throw new Error("The staging WordPress integration account must have the Editor role and must not be an Administrator.");
+      throw new Error("The WordPress integration account must have the Editor role and must not be an Administrator.");
     }
     return user;
   }
@@ -500,7 +500,7 @@ export function createCommunicationsSiteRouter(deps) {
     let stage = "check_storage";
     try {
       if (!env.DRIVE_KV || typeof env.DRIVE_KV.put !== "function") {
-        throw new Error("Staging revision storage is unavailable; no edit was made.");
+        throw new Error("Website revision storage is unavailable; no edit was made.");
       }
       stage = "read_revisions";
       const revisions = await readWebsiteRevisions(wp, type, id);
@@ -536,7 +536,7 @@ export function createCommunicationsSiteRouter(deps) {
     } catch (error) {
       const message = String(error?.message || "");
       if (message === "No current WordPress revision ID is available; no edit was made." ||
-          message === "Staging revision storage is unavailable; no edit was made." ||
+          message === "Website revision storage is unavailable; no edit was made." ||
           message === "The current page/post exceeds the safe revision snapshot limit; no edit was made.") {
         throw error;
       }
@@ -549,7 +549,7 @@ export function createCommunicationsSiteRouter(deps) {
       else if (/is not defined/i.test(message)) category = "reference_error";
       else if (/DataError|InvalidAccessError|OperationError/i.test(message)) category = "crypto_key_import_or_sign_error";
       else if (error?.name === "ReferenceError") category = "reference_error";
-      throw new Error("Staging website snapshot failed at stage " + stage + " (" + category + "); no page edit was made.");
+      throw new Error("Website snapshot failed at stage " + stage + " (" + category + "); no page edit was made.");
     }
   }
 
@@ -939,8 +939,8 @@ export function createCommunicationsSiteRouter(deps) {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Array.isArray(data)) throw new Error("Could not list staging website content.");
-      if (data.some(item => !isAllowedWordPressLink(item.link, wp))) throw new Error("WordPress returned a non-staging page URL; content listing was blocked.");
+      if (!response.ok || !Array.isArray(data)) throw new Error("Could not list website content from the configured WordPress site.");
+      if (data.some(item => !isAllowedWordPressLink(item.link, wp))) throw new Error("WordPress returned a URL outside the configured host allowlist; content listing was blocked.");
       return json({ items: data.map(item => ({
         id: Number(item.id), type, title: editorRaw(item, "title"), excerpt: editorRaw(item, "excerpt"),
         featuredMedia: Number(item.featured_media || 0), status: String(item.status || "draft"),
@@ -971,7 +971,7 @@ export function createCommunicationsSiteRouter(deps) {
       await readWebsiteItem(wp, type, id);
       const native = await readWebsiteRevisions(wp, type, id);
       if (!env.DRIVE_KV || typeof env.DRIVE_KV.list !== "function" || typeof env.DRIVE_KV.get !== "function") {
-        throw new Error("Staging revision storage is unavailable.");
+        throw new Error("Website revision storage is unavailable.");
       }
       const prefix = "irpa:website-editor:snapshot:" + type + ":" + id + ":";
       const listing = await env.DRIVE_KV.list({ prefix, limit: 50 });
@@ -1043,7 +1043,7 @@ export function createCommunicationsSiteRouter(deps) {
           snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
         });
         const wordpressCode = typeof data?.code === "string" ? data.code.replace(/[^a-z0-9_]/gi, "").slice(0, 80) : "invalid_response";
-        throw new Error("WordPress rejected the staging page/post update (HTTP " + response.status + ", code " + wordpressCode + "). The saved pre-edit snapshot remains available.");
+        throw new Error("WordPress rejected the page/post update (HTTP " + response.status + ", code " + wordpressCode + "). The saved pre-edit snapshot remains available.");
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATED", type, id, {
         snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId,
@@ -1061,7 +1061,7 @@ export function createCommunicationsSiteRouter(deps) {
       return json({
         success: true, item: editorItem(verified, type), snapshotId: snapshot.snapshotId,
         previousRevisionId: snapshot.currentRevisionId, revisionId,
-        message: status === "publish" ? "Staging page/post published and verified." : "Staging draft saved and verified."
+        message: status === "publish" ? "Page/post published and verified." : "Draft saved and verified."
       }, 200, corsHeaders(request));
     }
 
@@ -1083,7 +1083,7 @@ export function createCommunicationsSiteRouter(deps) {
       const safetySnapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, ["restore"]);
       let target;
       if (snapshotId) {
-        if (!env.DRIVE_KV || typeof env.DRIVE_KV.get !== "function") throw new Error("Staging revision storage is unavailable.");
+        if (!env.DRIVE_KV || typeof env.DRIVE_KV.get !== "function") throw new Error("Website revision storage is unavailable.");
         const raw = await env.DRIVE_KV.get(websiteSnapshotKey(type, id, snapshotId));
         if (!raw) throw new Error("Saved revision snapshot not found.");
         const snapshot = JSON.parse(raw);
@@ -1119,7 +1119,7 @@ export function createCommunicationsSiteRouter(deps) {
           requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
           safetySnapshotId: safetySnapshot.snapshotId
         });
-        throw new Error("WordPress rejected the staging revision restore. The pre-restore snapshot remains available.");
+        throw new Error("WordPress rejected the revision restore. The pre-restore snapshot remains available.");
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_REVISION_RESTORED", type, id, {
         requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
@@ -1135,7 +1135,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       return json({
         success: true, item: editorItem(verified, type), safetySnapshotId: safetySnapshot.snapshotId,
-        message: "Staging revision restored and verified."
+        message: "Website revision restored and verified."
       }, 200, corsHeaders(request));
     }
 
