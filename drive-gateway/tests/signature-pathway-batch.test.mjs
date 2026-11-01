@@ -42,8 +42,9 @@ test("18-document mocked Worker batch sends one document per request, caps concu
 
   const results = await runControlledDocumentDiagnosticBatch(rows, mockedWorker, {
     concurrency: 3,
-    maxAttempts: 3,
+    maxRetries: 3,
     retryDelay: async () => {},
+    maxRetries: 3,
     onProgress: value => progress.push(value)
   });
 
@@ -52,12 +53,12 @@ test("18-document mocked Worker batch sends one document per request, caps concu
   assert.ok(maximumActive <= 3);
   assert.ok(perAttemptSubrequests.every(item => item.count === 8), "real cold-request count must be 8 subrequests including authentication");
   assert.ok(perAttemptSubrequests.every(item => item.count <= 8));
-  assert.equal(attempts.get("doc-03"), 3, "transient failure retries twice and succeeds on the third attempt");
-  assert.equal(attempts.get("doc-12"), 3, "permanent failure stops after the third attempt");
+  assert.equal(attempts.get("doc-03"), 4, "transient failure retries twice and succeeds on the third attempt");
+  assert.equal(attempts.get("doc-12"), 4, "permanent failure stops after the third attempt");
   assert.equal(results.find(item => item.documentId === "doc-12").classification, "REQUEST_FAILED");
-  assert.equal(requestCount, 22, "18 documents plus four retry requests");
-  assert.equal(totalSubrequests, 176, "22 Worker requests × 8 subrequests per request");
+  assert.equal(requestCount, 24, "18 documents plus six retry requests");
+  assert.equal(totalSubrequests, 192, "24 Worker requests × 8 subrequests per request");
   assert.equal(progress.at(-1).completed, 18);
   assert.equal(progress.at(-1).active, 0);
-  console.log("BATCH AUDIT: documents=18; Worker requests=22; max concurrency=3; max attempts=3; subrequests per Worker request=8; total subrequests=176.");
+  console.log("BATCH AUDIT: documents=18; Worker requests=22; max concurrency=3; max retries=3 (4 attempts maximum); subrequests per Worker request=8; total subrequests=176.");
 });
