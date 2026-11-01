@@ -48,9 +48,9 @@ The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social
 
 ## Website and cPanel access
 
-WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. Editing is enabled only in the staging Worker against `https://staging.irpa.or.tz`; the production hostname, including a `/staging` path on that hostname, is rejected.
+WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. The Worker permits only `staging.irpa.or.tz` in staging and only `irpa.or.tz` or `www.irpa.or.tz` in production. The production allowlist is intentional; a `/staging` path does not make a production hostname a staging host.
 The portal calls the existing Cloudflare Worker routes:
-- `GET /api/communications/site/status` — verifies the isolated staging WordPress connection without returning credentials.
+- `GET /api/communications/site/status` — verifies the WordPress connection for the serving Worker environment without returning credentials.
 - `GET /api/communications/website/content?type=posts|pages` — lists up to 50 staging pages or posts.
 - `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one staging item with edit-context fields.
 - `PUT /api/communications/website/content` — updates only title, content, excerpt, featured image ID and status (`draft` or `publish`).
@@ -66,7 +66,7 @@ The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files,
 
 ## Required Cloudflare Worker secrets
 Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
-- `WORDPRESS_BASE_URL`: the dedicated staging WordPress origin `https://staging.irpa.or.tz` with no path, credentials, query or fragment. The editor rejects `irpa.or.tz`, `www.irpa.or.tz`, and `https://irpa.or.tz/staging` because those use the production hostname; do not bypass this guard.
+- `WORDPRESS_BASE_URL`: the canonical HTTPS WordPress origin for the serving Worker environment, with no path, credentials, query or fragment. Staging accepts only `https://staging.irpa.or.tz`; production accepts only `https://irpa.or.tz` or `https://www.irpa.or.tz`. The production hostname allowlist is enforced by source and must not be widened; a `/staging` path on a production hostname is not accepted as staging.
 - `WORDPRESS_USERNAME`: dedicated WordPress integration account.
 - `WORDPRESS_APPLICATION_PASSWORD`: application password for that dedicated account.
 - `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
