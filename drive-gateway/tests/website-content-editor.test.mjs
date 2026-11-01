@@ -12,6 +12,9 @@ let requestCount;
 let wpRoles;
 let wpItemLink;
 let lastMediaUpload;
+let lastMediaMetadata;
+let createdPostPayload;
+let createdPost;
 let consoleMessages;
 let originalFetch;
 let originalConsole;
@@ -118,6 +121,9 @@ test.beforeEach(() => {
   wpRoles = ["editor"];
   wpItemLink = "https://staging.irpa.or.tz/test-page/";
   lastMediaUpload = null;
+  lastMediaMetadata = null;
+  createdPostPayload = null;
+  createdPost = null;
   consoleMessages = [];
   originalFetch = globalThis.fetch;
   originalConsole = { log: console.log, info: console.info, warn: console.warn, error: console.error };
@@ -130,9 +136,21 @@ test.beforeEach(() => {
     const url = new URL(typeof input === "string" ? input : input.url);
     const method = init.method || "GET";
     if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
+    if (url.pathname === "/wp-json/wp/v2/posts" && method === "OPTIONS") return response({ schema: { properties: { meta: { properties: {} } } } });
+    if (url.pathname === "/wp-json/wp/v2/categories" || url.pathname === "/wp-json/wp/v2/tags") return response([{ id: 2, name: "Rangelands", slug: "rangelands" }]);
+    if (url.pathname === "/wp-json/wp/v2/posts" && method === "POST") {
+      createdPostPayload = JSON.parse(init.body || "{}");
+      createdPost = { id: 124, title: { raw: createdPostPayload.title }, content: { raw: createdPostPayload.content }, excerpt: { raw: createdPostPayload.excerpt }, status: createdPostPayload.status, categories: createdPostPayload.categories || [], tags: createdPostPayload.tags || [], featured_media: Number(createdPostPayload.featured_media || 0), link: "https://staging.irpa.or.tz/?p=124", modified: "2026-11-01T09:00:00" };
+      return response(createdPost, 201);
+    }
+    if (url.pathname === "/wp-json/wp/v2/posts/124" && method === "GET") return response(createdPost);
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
       lastMediaUpload = { contentType: new Headers(init.headers).get("Content-Type"), disposition: new Headers(init.headers).get("Content-Disposition"), bytes: new Uint8Array(init.body) };
       return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: "" }, 201);
+    }
+    if (url.pathname === "/wp-json/wp/v2/media/88" && method === "POST") {
+      lastMediaMetadata = JSON.parse(init.body || "{}");
+      return response({ id: 88, alt_text: lastMediaMetadata.alt_text, caption: { raw: lastMediaMetadata.caption } });
     }
     if (url.pathname === "/wp-json/wp/v2/users/me") {
       return response({ id: 7, name: "Staging Editor", roles: wpRoles, capabilities: { edit_posts: true, edit_pages: true } });
@@ -244,6 +262,105 @@ test("an edit saves a snapshot and one-click restore returns all allowed fields 
   assert.ok(auditEvents.some(event => JSON.stringify(event).includes("COMMUNICATION_WEBSITE_REVISION_RESTORED")));
 });
 
+
+
+test("WordPress terms response exposes the configured per-image limit with an 8 MiB hard ceiling", async () => {
+  const router = makeRouter();
+  const configured = await call(router, makeEnv({ WORDPRESS_MEDIA_MAX_BYTES: "3145728" }), "/api/communications/website/terms");
+  assert.equal(configured.status, 200);
+  assert.equal((await configured.json()).maxImageBytes, 3145728);
+  const capped = await call(router, makeEnv({ WORDPRESS_MEDIA_MAX_BYTES: String(12 * 1024 * 1024) }), "/api/communications/website/terms");
+  assert.equal(capped.status, 200);
+  assert.equal((await capped.json()).maxImageBytes, 8 * 1024 * 1024);
+});
+
+test("new Website Studio posts cannot be created as published and valid requests are draft-only", async () => {
+  const router = makeRouter();
+  const attemptedPublish = await call(router, makeEnv(), "/api/communications/website/content", {
+    method: "POST", body: { type: "posts", title: "Attempted public update", content: "Body", status: "publish" }
+  });
+  assert.equal(attemptedPublish.status, 400);
+  assert.equal(createdPostPayload, null);
+  const result = await call(router, makeEnv(), "/api/communications/website/content", {
+    method: "POST", body: { type: "posts", title: "New field update", content: "<p>Update body</p>", excerpt: "Short summary", featuredMedia: 55, categories: [2], tags: [2] }
+  });
+  assert.equal(result.status, 201);
+  const data = await result.json();
+  assert.equal(data.status, "draft");
+  assert.equal(data.item.status, "draft");
+  assert.equal(createdPostPayload.status, "draft");
+  assert.equal(createdPostPayload.featured_media, 55);
+  assert.deepEqual(createdPostPayload.categories, [2]);
+  assert.deepEqual(createdPostPayload.tags, [2]);
+  assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_DRAFT_POST_CREATED"));
+  assert.equal(JSON.stringify(createdPostPayload).includes('"publish"'), false);
+});
+
+test("new post creation rejects category or tag IDs absent from the WordPress terms list", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/content", {
+    method: "POST", body: { type: "posts", title: "Invalid term", content: "Body", categories: [999] }
+  });
+  assert.equal(result.status, 400);
+  assert.equal(createdPostPayload, null);
+});
+
+test("image upload requires alternative text and refuses unsupported file types", async () => {
+  const router = makeRouter();
+  const missingAlt = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==" }
+  });
+  assert.equal(missingAlt.status, 400);
+  const unsupported = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "animation.svg", contentType: "image/svg+xml", dataBase64: "PHN2Zz4=", altText: "SVG" }
+  });
+  assert.equal(unsupported.status, 400);
+  assert.equal(lastMediaUpload, null);
+});
+
+test("image upload rejects spoofed extensions and mismatched image signatures", async () => {
+  const router = makeRouter();
+  const wrongExtension = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "image.svg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Image" }
+  });
+  assert.equal(wrongExtension.status, 400);
+  const wrongSignature = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "image.jpg", contentType: "image/jpeg", dataBase64: "SGVsbG8=", altText: "Image" }
+  });
+  assert.equal(wrongSignature.status, 400);
+  assert.equal(lastMediaUpload, null);
+});
+
+test("Yoast fields are not sent when WordPress does not expose writable REST meta properties", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/content", {
+    method: "POST", body: { type: "posts", title: "Yoast schema test", content: "Body", yoastDescription: "Description", yoastFocusKeyphrase: "rangeland" }
+  });
+  assert.equal(result.status, 201);
+  assert.equal(createdPostPayload.meta, undefined);
+  const data = await result.json();
+  assert.deepEqual(data.yoast.writable, []);
+});
+
+test("Yoast meta is sent only for writable properties advertised by the WordPress REST schema", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/wp-json/wp/v2/posts" && init.method === "OPTIONS") return response({ schema: { properties: { meta: { properties: { _yoast_wpseo_metadesc: {}, _yoast_wpseo_focuskw: {} } } } } });
+    return originalFetch(input, init);
+  };
+  try {
+    const result = await call(router, makeEnv(), "/api/communications/website/content", {
+      method: "POST", body: { type: "posts", title: "Yoast writable test", content: "Body", yoastDescription: "Pastoral rangeland update", yoastFocusKeyphrase: "rangeland management" }
+    });
+    assert.equal(result.status, 201);
+    assert.deepEqual(createdPostPayload.meta, { _yoast_wpseo_metadesc: "Pastoral rangeland update", _yoast_wpseo_focuskw: "rangeland management" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("the registered Communication & Media authority can access the website connection check", async () => {
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/site/status", { role: "Communication & Media" });
@@ -320,6 +437,18 @@ test("audit records and application logs never contain the Worker credential", a
   assert.equal(JSON.stringify(consoleMessages).includes(TEST_PASSWORD), false);
 });
 
+
+test("WordPress HTML sanitizer remains applied to draft content", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/content", {
+    method: "PUT", body: { type: "pages", id: 123, title: "Sanitizer test", content: '<p>Safe</p><script>alert(1)</script><a href="javascript:alert(1)">bad</a>', excerpt: "", featuredMedia: 0, status: "draft" }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(state.content.includes("<script>"), false);
+  assert.equal(state.content.includes("javascript:"), false);
+  assert.ok(state.content.includes("<p>Safe</p>"));
+});
+
 test("editing is refused when WordPress has no current revision ID", async () => {
   nativeRevisions = [];
   const router = makeRouter();
@@ -371,7 +500,7 @@ test("authenticated staging image upload accepts safe image types and records an
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST",
-    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==" }
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist herding cattle", caption: "Livestock grazing in Longido" }
   });
   assert.equal(result.status, 200);
   const data = await result.json();
@@ -379,17 +508,18 @@ test("authenticated staging image upload accepts safe image types and records an
   assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
   assert.equal(lastMediaUpload.contentType, "image/jpeg");
   assert.match(lastMediaUpload.disposition, /field.jpg/);
+  assert.deepEqual(lastMediaMetadata, { alt_text: "Pastoralist herding cattle", caption: "Livestock grazing in Longido" });
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
 });
 
 test("image upload rejects unsupported formats and oversized payloads before WordPress writes", async () => {
   const router = makeRouter();
   const unsupported = await call(router, makeEnv(), "/api/communications/website/media", {
-    method: "POST", body: { filename: "script.svg", contentType: "image/svg+xml", dataBase64: "PHN2Zz4=" }
+    method: "POST", body: { filename: "script.svg", contentType: "image/svg+xml", dataBase64: "PHN2Zz4=", altText: "SVG" }
   });
   assert.equal(unsupported.status, 400);
   const oversized = await call(router, makeEnv(), "/api/communications/website/media", {
-    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(12 * 1024 * 1024) }
+    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(7 * 1024 * 1024), altText: "Large image" }
   });
   assert.equal(oversized.status, 413);
 });

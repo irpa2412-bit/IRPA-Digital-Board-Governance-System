@@ -379,10 +379,46 @@ export function createCommunicationsSiteRouter(deps) {
       content: editorRaw(item, "content"),
       excerpt: editorRaw(item, "excerpt"),
       featuredMedia: Number(item.featured_media || 0),
+      categories: Array.isArray(item.categories) ? item.categories.map(Number) : [],
+      tags: Array.isArray(item.tags) ? item.tags.map(Number) : [],
+      yoastDescription: String(item.meta?._yoast_wpseo_metadesc || item.meta?.wpseo_metadesc || ""),
+      yoastFocusKeyphrase: String(item.meta?._yoast_wpseo_focuskw || item.meta?.wpseo_focuskw || ""),
       status: String(item.status || "draft"),
       link: String(item.link || ""),
       modified: String(item.modified || "")
     };
+  }
+
+  function websiteMediaMaxBytes(env) {
+    const configuredLimit = Number(env.WORDPRESS_MEDIA_MAX_BYTES || 5 * 1024 * 1024);
+    return Number.isSafeInteger(configuredLimit) && configuredLimit > 0 ? Math.min(configuredLimit, 8 * 1024 * 1024) : 5 * 1024 * 1024;
+  }
+
+  async function readPostTaxonomies(wp) {
+    const result = { categories: [], tags: [] };
+    for (const taxonomy of ["categories", "tags"]) {
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + taxonomy + "?context=view&per_page=100&hide_empty=false", {
+        headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(data)) throw new Error("WordPress " + taxonomy + " terms could not be loaded.");
+      result[taxonomy] = data.map(term => ({ id: Number(term.id), name: cleanText(term.name, 120), slug: cleanText(term.slug, 120) })).filter(term => Number.isSafeInteger(term.id) && term.id > 0 && term.name);
+    }
+    return result;
+  }
+
+  async function readYoastWritableFields(wp) {
+    try {
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+        method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
+      });
+      const schema = await response.json().catch(() => null);
+      if (!response.ok) return { fields: [] };
+      const properties = schema?.schema?.properties?.meta?.properties || schema?.endpoints?.[0]?.args?.meta?.properties || {};
+      return { fields: ["_yoast_wpseo_metadesc", "wpseo_metadesc", "_yoast_wpseo_focuskw", "wpseo_focuskw"].filter(name => Object.prototype.hasOwnProperty.call(properties, name)) };
+    } catch {
+      return { fields: [] };
+    }
   }
 
   function websiteSnapshotKey(type, id, snapshotId) {
@@ -754,35 +790,98 @@ export function createCommunicationsSiteRouter(deps) {
       const filename = cleanText(input.filename, 160).replace(/[\\/:*?"<>|]/g, "-");
       const contentType = String(input.contentType || "").toLowerCase();
       const encoded = String(input.dataBase64 || "");
+      const altText = cleanText(input.altText, 250);
+      const caption = cleanText(input.caption, 500);
+      const maxBytes = websiteMediaMaxBytes(env);
       const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-      if (!filename || !allowedTypes.has(contentType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
-        return json({ error: "Choose a JPEG, PNG, WebP or GIF image." }, 400, corsHeaders(request));
-      }
+      if (!filename || !allowedTypes.has(contentType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return json({ error: "Choose a JPEG, PNG, WebP or GIF image." }, 400, corsHeaders(request));
+      if (!altText) return json({ error: "Alternative text is required for every uploaded image." }, 400, corsHeaders(request));
       const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
-      if (estimatedBytes < 1 || estimatedBytes > 8 * 1024 * 1024) return json({ error: "Images must be no larger than 8 MiB." }, 413, corsHeaders(request));
+      if (estimatedBytes < 1 || estimatedBytes > maxBytes) return json({ error: "Images must not exceed " + (maxBytes / 1024 / 1024) + " MiB." }, 413, corsHeaders(request));
+      const extension = filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "";
+      const extensionTypes = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
+      if (extensionTypes[extension] !== contentType) return json({ error: "The image filename extension does not match its permitted image type." }, 400, corsHeaders(request));
       const binary = atob(encoded);
       const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+      const isJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      const isPng = bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((value, index) => bytes[index] === value);
+      const isGif = bytes.length >= 6 && ["GIF87a","GIF89a"].includes(String.fromCharCode(...bytes.slice(0,6)));
+      const isWebp = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0,4)) === "RIFF" && String.fromCharCode(...bytes.slice(8,12)) === "WEBP";
+      const signatureValid = contentType === "image/jpeg" ? isJpeg : contentType === "image/png" ? isPng : contentType === "image/gif" ? isGif : isWebp;
+      if (!signatureValid) return json({ error: "The uploaded file contents do not match the declared image type." }, 400, corsHeaders(request));
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
-      const endpoint = wp.root + "/wp-json/wp/v2/media";
-      const response = await wordpressEditorFetch(wp, endpoint, {
-        method: "POST",
-        headers: wordpressHeaders(wp, {
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/media", {
+        method: "POST", headers: wordpressHeaders(wp, {
           "Content-Type": contentType,
-          "Content-Disposition": 'attachment; filename="' + filename.replace(/["\\\r\n]/g, "-") + '"',
+          "Content-Disposition": 'attachment; filename="' + filename.replace(/["\\\\\\r\\n]/g, "-") + '"',
           Accept: "application/json"
         }),
-        body: bytes,
-        signal: AbortSignal.timeout(30000)
+        body: bytes, signal: AbortSignal.timeout(30000)
       });
-      const media = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(media?.id) || typeof media?.source_url !== "string" || !isAllowedWordPressLink(media.source_url, wp)) {
-        throw new Error("WordPress image upload failed; check the staging media permissions and try again.");
+      const uploaded = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(uploaded?.id) || typeof uploaded?.source_url !== "string" || !isAllowedWordPressLink(uploaded.source_url, wp)) throw new Error("WordPress image upload failed; check the WordPress media permissions and try again.");
+      const metadataResponse = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/media/" + uploaded.id, {
+        method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
+        body: JSON.stringify({ alt_text: altText, caption }), signal: AbortSignal.timeout(15000)
+      });
+      const metadata = await metadataResponse.json().catch(() => null);
+      if (!metadataResponse.ok || Number(metadata?.id) !== uploaded.id || String(metadata?.alt_text || "") !== altText) {
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_METADATA_FAILED", "media", uploaded.id, { filename, mediaId: uploaded.id });
+        throw new Error("Image uploaded, but WordPress did not confirm the required alternative text. Do not insert it until metadata is corrected.");
       }
-      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_UPLOADED", "media", media.id, {
-        filename, contentType, fileSize: bytes.byteLength, mediaId: media.id
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_UPLOADED", "media", uploaded.id, { filename, contentType, fileSize: bytes.byteLength, mediaId: uploaded.id, hasCaption: !!caption });
+      return json({ success: true, media: { id: uploaded.id, url: uploaded.source_url, title: editorRaw(uploaded, "title") || filename, altText, caption }, message: "Image uploaded with verified alternative text." }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/terms" && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const terms = await readPostTaxonomies(wp);
+      const yoast = await readYoastWritableFields(wp);
+      return json({ ...terms, maxImageBytes: websiteMediaMaxBytes(env), yoast: { writable: yoast.fields, available: yoast.fields.length > 0 } }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/content" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const allowedKeys = new Set(["type", "title", "content", "excerpt", "featuredMedia", "categories", "tags", "yoastDescription", "yoastFocusKeyphrase"]);
+      if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) return json({ error: "Unsupported new-post field." }, 400, corsHeaders(request));
+      const title = cleanText(input.title, 180);
+      const content = String(input.content || "");
+      const excerpt = String(input.excerpt || "").replace(/<[^>]*>/g, "").trim();
+      const featuredMedia = Number(input.featuredMedia ?? 0);
+      const categories = Array.isArray(input.categories) ? input.categories.map(Number) : [];
+      const tags = Array.isArray(input.tags) ? input.tags.map(Number) : [];
+      if (input.type !== "posts" || !title || content.length > 30000 || excerpt.length > 600 || !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || categories.some(id => !Number.isSafeInteger(id) || id < 1) || tags.some(id => !Number.isSafeInteger(id) || id < 1)) return json({ error: "A post title and valid content, excerpt and existing category/tag IDs are required." }, 400, corsHeaders(request));
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const terms = await readPostTaxonomies(wp);
+      const categoryIds = new Set(terms.categories.map(term => term.id));
+      const tagIds = new Set(terms.tags.map(term => term.id));
+      if (categories.some(id => !categoryIds.has(id)) || tags.some(id => !tagIds.has(id))) return json({ error: "Only existing WordPress categories and tags may be selected." }, 400, corsHeaders(request));
+      const yoast = await readYoastWritableFields(wp);
+      const meta = {};
+      if (input.yoastDescription !== undefined) {
+        if (yoast.fields.includes("_yoast_wpseo_metadesc")) meta._yoast_wpseo_metadesc = cleanText(input.yoastDescription, 160);
+        else if (yoast.fields.includes("wpseo_metadesc")) meta.wpseo_metadesc = cleanText(input.yoastDescription, 160);
+      }
+      if (input.yoastFocusKeyphrase !== undefined) {
+        if (yoast.fields.includes("_yoast_wpseo_focuskw")) meta._yoast_wpseo_focuskw = cleanText(input.yoastFocusKeyphrase, 100);
+        else if (yoast.fields.includes("wpseo_focuskw")) meta.wpseo_focuskw = cleanText(input.yoastFocusKeyphrase, 100);
+      }
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status: "draft", categories, tags, ...(Object.keys(meta).length ? { meta } : {}) };
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+        method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
       });
-      return json({ success: true, media: { id: media.id, url: media.source_url, title: editorRaw(media, "title") || filename, altText: String(media.alt_text || "") }, message: "Image uploaded to the configured WordPress environment." }, 200, corsHeaders(request));
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(data?.id) || String(data.status || "") !== "draft" || !isAllowedWordPressLink(data.link, wp)) throw new Error("WordPress did not confirm creation of a draft post; no published post was accepted.");
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_DRAFT_POST_CREATED", "posts", data.id, { status: "draft", featuredMedia, categories, tags, yoastWritable: yoast.fields });
+      const verified = await readWebsiteItem(wp, "posts", data.id);
+      if (String(verified.status || "") !== "draft") throw new Error("New post status verification failed; WordPress did not retain draft status.");
+      return json({ success: true, item: editorItem(verified, "posts"), status: "draft", yoast: { writable: yoast.fields, available: yoast.fields.length > 0 } }, 201, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/content" && request.method === "GET") {
@@ -865,7 +964,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/content" && request.method === "PUT") {
       const { claims } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const allowedKeys = new Set(["type", "id", "title", "content", "excerpt", "featuredMedia", "status"]);
+      const allowedKeys = new Set(["type", "id", "title", "content", "excerpt", "featuredMedia", "status", "categories", "tags", "yoastDescription", "yoastFocusKeyphrase"]);
       if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) {
         return json({ error: "Only title, content, excerpt, featured image and status may be changed." }, 400, corsHeaders(request));
       }
@@ -893,7 +992,27 @@ export function createCommunicationsSiteRouter(deps) {
         return currentValue !== nextValue;
       });
       const snapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields);
-      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status };
+      const categories = Array.isArray(input.categories) ? input.categories.map(Number) : undefined;
+      const tags = Array.isArray(input.tags) ? input.tags.map(Number) : undefined;
+      if ([categories, tags].filter(Boolean).some(ids => ids.some(id => !Number.isSafeInteger(id) || id < 1))) return json({ error: "Category and tag selections must use existing WordPress term IDs." }, 400, corsHeaders(request));
+      if (type === "posts" && (categories || tags)) {
+        const terms = await readPostTaxonomies(wp);
+        const categoryIds = new Set(terms.categories.map(term => term.id));
+        const tagIds = new Set(terms.tags.map(term => term.id));
+        if ((categories || []).some(id => !categoryIds.has(id)) || (tags || []).some(id => !tagIds.has(id))) return json({ error: "Only existing WordPress categories and tags may be selected." }, 400, corsHeaders(request));
+      }
+      const yoast = type === "posts" ? await readYoastWritableFields(wp) : { fields: [] };
+      const meta = {};
+      if (input.yoastDescription !== undefined) {
+        if (yoast.fields.includes("_yoast_wpseo_metadesc")) meta._yoast_wpseo_metadesc = cleanText(input.yoastDescription, 160);
+        else if (yoast.fields.includes("wpseo_metadesc")) meta.wpseo_metadesc = cleanText(input.yoastDescription, 160);
+      }
+      if (input.yoastFocusKeyphrase !== undefined) {
+        if (yoast.fields.includes("_yoast_wpseo_focuskw")) meta._yoast_wpseo_focuskw = cleanText(input.yoastFocusKeyphrase, 100);
+        else if (yoast.fields.includes("wpseo_focuskw")) meta.wpseo_focuskw = cleanText(input.yoastFocusKeyphrase, 100);
+      }
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status,
+        ...(categories ? { categories } : {}), ...(tags ? { tags } : {}), ...(Object.keys(meta).length ? { meta } : {}) };
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + id, {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)

@@ -55,11 +55,28 @@ test("publishing, website content edits and cPanel file edits route through Clou
 test("website studio supports authenticated WordPress article photo uploads without publishing",()=>{
  assert.ok(site.includes('path === "/api/communications/website/media" && request.method === "POST"'));
  for(const type of ['"image/jpeg"','"image/png"','"image/webp"','"image/gif"']) assert.ok(site.includes(type));
- assert.ok(site.includes("8 * 1024 * 1024"));
+ assert.ok(site.includes("5 * 1024 * 1024"));
+ assert.ok(site.includes("WORDPRESS_MEDIA_MAX_BYTES"));
+ assert.ok(site.includes("maxImageBytes: websiteMediaMaxBytes(env)"));
+ assert.ok(websiteStudio.includes("setImageLimit(Number(d.maxImageBytes)||IMAGE_LIMIT)"));
+ assert.ok(websiteStudio.includes("row.file.size>imageLimit"));
  assert.ok(site.includes("COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
- assert.ok(websiteStudio.includes('call("/api/communications/website/media","POST"'));
- assert.ok(websiteStudio.includes('type="file" accept="image/jpeg,image/png,image/webp,image/gif"'));
- assert.ok(websiteStudio.includes("inserted into the article"));
+ assert.ok(websiteStudio.includes("/api/communications/website/media"));
+ assert.ok(websiteStudio.includes('multiple accept="image/jpeg,image/png,image/webp,image/gif"'));
+ assert.ok(websiteStudio.includes("uploadSelectedImages"));
+ assert.ok(websiteStudio.includes("xhr.upload.onprogress"));
+ assert.ok(websiteStudio.includes("row.status===\"complete\""));
+ assert.ok(websiteStudio.includes("status:\"error\""));
+ assert.ok(websiteStudio.includes("Alternative text is required"));
+ assert.ok(websiteStudio.includes("caption"));
+ assert.ok(websiteStudio.includes("New update"));
+ assert.ok(websiteStudio.includes("Upload selected images sequentially"));
+ assert.ok(websiteStudio.includes("YouTube"));
+ assert.ok(websiteStudio.includes("Vimeo"));
+ assert.ok(websiteStudio.includes("inserted"));
+ assert.ok(site.includes("Alternative text is required for every uploaded image."));
+ assert.ok(site.includes("signatureValid"));
+ assert.ok(site.includes("extensionTypes"));
  assert.ok(websiteStudio.includes("Save as draft"));
 });
 
@@ -377,4 +394,20 @@ test("public HTML and Settings show the exact web and Worker build stamps",()=>{
  assert.ok(settings.includes('String(workerHealth?.commit || workerHealth?.version || "unavailable")'));
  assert.ok(firebaseDeploy.includes("VITE_BUILD_COMMIT: ${{ github.sha }}"));
  assert.ok(pagesDeploy.includes('grep -Fq "content=\\"$GITHUB_SHA\\"" dist/index.html'));
+});
+
+test("Website Studio new-post and editorial controls preserve authorization, sanitization, revisions, audits and approval gate",()=>{
+ assert.ok(site.includes('path === "/api/communications/website/content" && request.method === "POST"'));
+ assert.ok(site.includes('status: "draft"'));
+ assert.ok(site.includes('String(data.status || "") !== "draft"'));
+ assert.ok(site.includes('Only existing WordPress categories and tags may be selected.'));
+ assert.ok(site.includes('readYoastWritableFields'));
+ assert.ok(site.includes('COMMUNICATION_WEBSITE_DRAFT_POST_CREATED'));
+ assert.ok(site.includes('sanitizeWordPressContent(content)'));
+ assert.ok(site.includes('saveWebsiteSnapshot(env, claims, wp, type, id, current, changedFields)'));
+ assert.ok(site.includes('COMMUNICATION_WEBSITE_CONTENT_UPDATED'));
+ assert.ok(site.includes('roles.includes("editor") || roles.includes("administrator")'));
+ assert.ok(site.includes('item.status !== "Approved"'));
+ assert.ok(site.includes('The author cannot approve their own public item.'));
+ assert.ok(site.includes('Production publishing requires the approved communication-media workflow'));
 });
