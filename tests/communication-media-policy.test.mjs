@@ -412,3 +412,16 @@ test("new Website Studio post creation preserves the independent production appr
  assert.ok(approvalGate>=0&&promoteDraft>approvalGate,"existing WordPress drafts may be promoted only after the approved-item gate");
  assert.ok(site.includes('status: "publish"'));
 });
+
+
+test("Website Studio exposes approval-ready submission and guarded Yoast metadata capability checks",()=>{
+ assert.ok(site.includes('path === "/api/communications/website/seo-capabilities"'));
+ assert.ok(site.includes('method: "OPTIONS"'));
+ assert.ok(site.includes('_yoast_wpseo_metadesc'));
+ assert.ok(site.includes('_yoast_wpseo_focuskw'));
+ assert.ok(websiteStudio.includes('action:"submit"'));
+ assert.ok(websiteStudio.includes("Submit for approval"));
+ assert.ok(websiteStudio.includes("Change summary"));
+ assert.ok(websiteStudio.includes("Approval-ready website draft"));
+ assert.ok(websiteStudio.includes("loadSeoCapabilities"));
+});
