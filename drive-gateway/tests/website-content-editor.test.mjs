@@ -387,7 +387,7 @@ test("cPanel diagnostics match SSL certificate subject and read .user.ini before
     CPANEL_BASE_URL: "https://cpanel.example.test:2083",
     CPANEL_USERNAME: "irpaortz",
     CPANEL_API_TOKEN: "test-only-cpanel-token",
-    CPANEL_DOCUMENT_ROOT: "public_html"
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
   });
   const requests = [];
   globalThis.fetch = async input => {
@@ -414,7 +414,7 @@ test("cPanel PHP limits fall through to MultiPHP and report INFO when unavailabl
     CPANEL_BASE_URL: "https://cpanel.example.test:2083",
     CPANEL_USERNAME: "irpaortz",
     CPANEL_API_TOKEN: "test-only-cpanel-token",
-    CPANEL_DOCUMENT_ROOT: "public_html"
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
   });
   let multiPhpRead = false;
   globalThis.fetch = async input => {
