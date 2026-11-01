@@ -59,7 +59,7 @@ export default function SignaturePathwaySelfTest() {
     setBusy(true);
     setResults([]);
     setProgress({ completed: 0, total: 0, active: 0 });
-    setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 attempts. No changes will be made.");
+    setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 times (4 total attempts). No changes will be made.");
     try {
       await requireAdministrator();
       const snapshot = await getDocs(collection(db, "documents"));
