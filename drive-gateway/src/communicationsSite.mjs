@@ -954,7 +954,7 @@ export function createCommunicationsSiteRouter(deps) {
         let data = null; try { data = JSON.parse(rawBody); } catch {}
         const diagnosticHeaders = {};
         for (const [name, value] of response.headers.entries()) if (/^(server|cf-ray|cf-cache-status|x-waf|x-sucuri|x-mod-security|x-firewall|x-cache)/i.test(name)) diagnosticHeaders[name] = cleanText(value, 180);
-        const body = cleanText(rawBody, 300).replace(/(authorization|application.password|token|secret)\\s*[:=]\\s*[^,;\\s]+/ig, "$1=[REDACTED]");
+        const body = cleanText(rawBody, 300).replace(/(authorization|application.password|token|secret)\s*[:=]\s*[^,;\s]+/ig, "$1=[REDACTED]");
         return { response, data, diagnostics: { step: endpoint, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120), body, headers: diagnosticHeaders } };
       };
       for (const [title, slug] of pages) {
