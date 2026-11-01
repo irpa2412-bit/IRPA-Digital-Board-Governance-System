@@ -865,7 +865,7 @@ export function createCommunicationsSiteRouter(deps) {
       const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
       if (user?.capabilities?.upload_files !== true) return json({ error: "WordPress media upload is blocked: the configured integration account is missing the upload_files capability. Ask the WordPress administrator to grant upload_files to the dedicated Editor account, then run diagnostics again.", code: "wordpress_upload_files_capability_missing", capability: "upload_files" }, 403, corsHeaders(request));
       const endpoint=wp.root+"/wp-json/wp/v2/media";
-      const safeFilename=meta.filename.normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
+      const safeFilename=meta.filename.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
       const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
       const uploaded=await response.json().catch(()=>null);
       if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
