@@ -68,13 +68,13 @@ export default function SignaturePathwaySelfTest() {
       const diagnostics = await runControlledDocumentDiagnosticBatch(
         rows,
         (oneDocument, options) => reconcileSignatureDocumentIds(oneDocument, options),
-        { concurrency: 3, maxAttempts: 3, onProgress: setProgress }
+        { concurrency: 3, maxRetries: 3, onProgress: setProgress }
       );
       const output = rows.map((item, index) => diagnosticRow(item, diagnostics[index]));
       setResults(output);
       const failed = output.filter(row => row.checks[0].status === "FAIL").length;
       const review = output.filter(row => row.checks[0].status === "NEEDS REVIEW").length;
-      setMessage("Read-only diagnostics completed. " + rows.length + " document(s) checked using exactly one document per Worker request (maximum concurrency 3; up to 3 attempts per document); " + (rows.length - failed - review) + " pass, " + review + " need review, " + failed + " fail. No metadata or document was changed.");
+      setMessage("Read-only diagnostics completed. " + rows.length + " document(s) checked using exactly one document per Worker request (maximum concurrency 3; up to 3 retries (4 total attempts) per document); " + (rows.length - failed - review) + " pass, " + review + " need review, " + failed + " fail. No metadata or document was changed.");
     } catch (error) {
       setMessage("Read-only diagnostic failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
     } finally {
