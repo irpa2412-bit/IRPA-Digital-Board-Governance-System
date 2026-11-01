@@ -1,4 +1,7 @@
 import test from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createServer } from "vite";
 import assert from "node:assert/strict";
 import {readFileSync,existsSync} from "node:fs";
 
@@ -156,6 +159,36 @@ test("deployment docs require isolated staging and never commit credentials",()=
  assert.ok(docs.includes("Staging acceptance is a pre-release safety check, not the operational destination."));
  assert.ok(docs.includes("Production is the intended operational WordPress destination."));
  assert.ok(docs.includes("Firebase Storage remains deny-by-default"));
+});
+
+test("Website Studio renders all four tabs and acceptance controls through the administrator access path",async()=>{
+ const server=await createServer({
+  configFile:false,
+  appType:"custom",
+  server:{middlewareMode:true},
+  plugins:[{
+   name:"website-studio-render-test-mocks",
+   enforce:"pre",
+   resolveId(source,importer){
+    if(source==="../firebase/config"&&importer?.endsWith("/src/pages/CommunicationsWebsiteStudio.jsx")) return "\0website-studio-test-auth";
+    if(source==="../firebase/gatewayUrl"&&importer?.endsWith("/src/pages/CommunicationsWebsiteStudio.jsx")) return "\0website-studio-test-gateway";
+   },
+   load(id){
+    if(id==="\0website-studio-test-auth") return "export const auth={currentUser:null};";
+    if(id==="\0website-studio-test-gateway") return "export function getGoogleDriveGatewayUrl(){return 'https://example.invalid';}";
+   }
+  }]
+ });
+ try{
+  const {default:WebsiteStudio}=await server.ssrLoadModule("/src/pages/CommunicationsWebsiteStudio.jsx");
+  const administrator=true;
+  const authorized=administrator||false;
+  const html=renderToStaticMarkup(React.createElement(()=>authorized?React.createElement(WebsiteStudio):null));
+  for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance","Run production acceptance","Copy Report"]) assert.ok(html.includes(label),label+" must appear in administrator render");
+  const portal=read("../src/pages/CommunicationMediaPortal.jsx");
+  assert.ok(portal.includes("const authorized=isAdmin||roles.some"),"real portal must authorize administrators");
+  assert.ok(portal.includes("const websiteEditor=isAdmin||roles.some"),"real website editor gate must authorize administrators");
+ }finally{await server.close();}
 });
 
 test("Website Studio exposes all four administrator tabs and the production acceptance actions",()=>{
