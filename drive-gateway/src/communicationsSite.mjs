@@ -589,9 +589,15 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/site/status" && request.method === "GET") {
       const { roles } = await websiteEditorAuthorised(request, env);
       const workerEnvironment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "unknown").trim().toLowerCase();
+      let configuredWordPressHost = "not configured";
+      try { configuredWordPressHost = new URL(String(env.WORDPRESS_BASE_URL || "").trim()).hostname.toLowerCase() || "invalid"; }
+      catch { if (String(env.WORDPRESS_BASE_URL || "").trim()) configuredWordPressHost = "invalid"; }
       const result = {
         website: "not_configured", cpanel: "not_configured", workerEnvironment,
         workerName: cleanText(env.IRPA_WORKER_NAME || "unknown", 100),
+        configuredWordPressHost,
+        websiteHostGuardBlocked: false,
+        websiteDiagnosticCategory: "not_checked",
         secretChecks: {
           WORDPRESS_BASE_URL: { present: !!String(env.WORDPRESS_BASE_URL || "").trim(), length: String(env.WORDPRESS_BASE_URL || "").trim().length },
           WORDPRESS_USERNAME: { present: !!String(env.WORDPRESS_USERNAME || "").trim(), length: String(env.WORDPRESS_USERNAME || "").trim().length },
@@ -702,12 +708,15 @@ export function createCommunicationsSiteRouter(deps) {
         if (error?.diagnosticCode) {
           result.website = "not_configured";
           result.websiteDiagnosticCode = safeCode(error.diagnosticCode);
+          result.websiteHostGuardBlocked = error.diagnosticCode === "wordpress_host_not_allowed_for_environment";
+          result.websiteDiagnosticCategory = result.websiteHostGuardBlocked ? "irpa_host_guard" : "worker_configuration";
           result.websiteDiagnosticMessage = message.slice(0, 240);
           if (error.diagnosticCode === "credentials_missing") {
             result.websiteMissingSettings = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"].filter(name => message.includes(name));
           }
         } else {
           result.website = "unavailable";
+          result.websiteDiagnosticCategory = "worker_probe_failure";
           result.websiteDiagnosticCode = "probe_setup_failed";
           result.websiteDiagnosticMessage = "The Worker failed during WordPress diagnostic setup; inspect the safe Worker diagnostic event for the failing stage.";
         }
