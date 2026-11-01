@@ -12,7 +12,7 @@ const validPdf = async () => {
 };
 const run = (overrides = {}) => diagnoseControlledDocument({
   item,
-  record: { size: 15, sha256: "expected", pageCount: 1, uploadedBy: "records@irpa.or.tz", uploadedAt: "2026-01-01T00:00:00Z", ...overrides.record },
+  record: { size: 15, sha256: "", pageCount: 1, uploadedBy: "records@irpa.or.tz", uploadedAt: "2026-01-01T00:00:00Z", ...overrides.record },
   getMetadata: overrides.getMetadata || (async () => ({ mimeType: "application/pdf", size: 15, trashed: false, parents: ["folder-1"], createdTime: "2026-01-01T00:00:00Z" })),
   downloadBytes: overrides.downloadBytes || (async () => pdf)
 });
