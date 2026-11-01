@@ -885,7 +885,7 @@ export function createCommunicationsSiteRouter(deps) {
       const chunks=[];
       for(let i=0;i<input.total;i++){const chunk=await env.DRIVE_KV.get("irpa:website-media-chunk:"+uploadId+":"+i);if(!chunk)return json({error:"Upload is incomplete; missing chunk "+i+"."},409,corsHeaders(request));chunks.push(chunk);}
       const encoded=chunks.join("");const size=Math.floor(encoded.length*3/4);
-      const max=Number(env.CPANEL_MEDIA_MAX_BYTES||32*1024*1024);
+      const max=Math.min(50*1024*1024,Math.max(1,Number(env.CPANEL_MEDIA_MAX_BYTES||50*1024*1024)));
       if(size<1||size>max)return json({error:"cPanel media upload exceeds the configured maximum of "+max+" bytes."},413,corsHeaders(request));
       let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
       if(String(input.contentType||"")==="image/svg+xml")bytes=new TextEncoder().encode(sanitizeWebsiteSvg(new TextDecoder().decode(bytes)));
