@@ -199,7 +199,7 @@ test("Signature Pathway diagnostics batch one document per Worker request with b
   assert.match(ui, /attempt <= 3/);
   assert.match(ui, /role="progressbar"/);
   const route = worker.slice(worker.indexOf("async function reconcileSignatureDocumentIds"), worker.indexOf("async function controlledDocumentUploadPolicyCheck"));
-  assert.match(route, /items\.length !== 1/);
+  assert.match(route, /body\.documents\.length !== 1/);
   assert.match(route, /Exactly one controlled document must be checked per Worker request/);
   assert.match(route, /fields=id,name,mimeType,size,description,trashed,parents,createdTime/);
   assert.match(route, /alt=media/);
