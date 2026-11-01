@@ -44,6 +44,24 @@ The date-bounded path history shows the following upload implementation lineage:
 
 No commit in the inspected upload lineage adds or removes a Firestore emergency-copy collection or chunk writer. In particular, the dual-channel controlled-document upload writes two Google Drive files, not a Firestore emergency copy.
 
+
+## Pull requests reviewed for 2026-09-20 through 2026-09-28
+
+The repository PR list for the requested creation-date window was enumerated (PRs #5–#71). The changed-file lists were checked for controlled-document upload, signature storage, Drive Gateway, Firebase Functions, upload/fallback and emergency-related paths. Patches of the related PRs were inspected:
+
+| PR | Title | Relevant files reviewed | Finding |
+|---|---|---|---|
+| #8 | Migrate Signature Portal to Signer Identity trust records | `src/firebase/signaturePlatform.js`, `src/firebase/signerIdentity.js`, `src/pages/SignaturePlatform.jsx`, `firestore.rules` | Signer identity and signature-profile workflow; no controlled-document Firestore emergency-copy writer. |
+| #10 | Repair Firebase Functions entrypoint integrity gate | `functions/index.js` and Functions workflow/docs | Entrypoint integrity only; no emergency-copy writer. |
+| #11 | Test Authorization Functions bootstrap integration safely | `functions/index.js`, authorization Functions modules | Authorization bootstrap only; no emergency-copy writer. |
+| #65 | feat: integrate Governance and Communication & Media portals | `src/App.jsx`, `src/pages/GovernancePortal.jsx`, `src/pages/CommunicationMediaPortal.jsx`, `firestore.rules` | Portal integration; no emergency-copy writer. |
+| #66 | feat: complete communication media asset management | `drive-gateway/src/index.js`, `src/firebase/signatureStorage.js`, `src/pages/CommunicationMediaPortal.jsx` | Adds a Communication & Media upload route that writes to Google Drive; no Firestore emergency byte/chunk fallback. |
+| #71 | feat: expand communication media command centre | `src/pages/CommunicationMediaPortal.jsx` | UI calls the existing controlled Drive media upload; no emergency-copy writer. |
+
+PRs #67–#70 were also checked by changed-file list; they contain administrator portal visibility, sidebar/navigation and governance links, not the controlled upload/Functions storage implementation. The relevant controlled-upload commits listed above have no associated pull request according to GitHub's commit-to-PR association endpoint.
+
+This PR review agrees with the full-history string searches and the date-bounded commit/file history: no PR or commit in the available repository history identifies the writer that emitted the reported `firestore-emergency://` IDs.
+
 ## Firebase Functions and deleted-file review
 
 The history job included `functions/` in the exact-string search and the date-bounded `--name-status` history, so changes and deletions under the Firebase Functions folder were in scope. The current `main` tree contains `functions/index.js` and the current Functions modules, but no emergency-copy writer was found in the searched history. No deleted emergency-named file appeared in the filename history.
