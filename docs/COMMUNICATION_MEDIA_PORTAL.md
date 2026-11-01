@@ -48,12 +48,12 @@ The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social
 
 ## Website and cPanel access
 
-WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. Editing is enabled only in the staging Worker against `https://staging.irpa.or.tz`; the production hostname, including a `/staging` path on that hostname, is rejected.
+WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. The gateway host guard is environment-specific and unchanged: the production Worker accepts only `irpa.or.tz` or `www.irpa.or.tz`; the staging Worker accepts only `staging.irpa.or.tz`. A production hostname with a `/staging` path is rejected. Website Studio saves edits as drafts; production publication remains reserved for the separate approved communications workflow.
 The portal calls the existing Cloudflare Worker routes:
 - `GET /api/communications/site/status` — verifies the isolated staging WordPress connection without returning credentials.
 - `GET /api/communications/website/content?type=posts|pages` — lists up to 50 staging pages or posts.
 - `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one staging item with edit-context fields.
-- `PUT /api/communications/website/content` — updates only title, content, excerpt, featured image ID and status (`draft` or `publish`).
+- `POST /api/communications/website/content` — creates a new WordPress post with title, content, excerpt, existing category/tag IDs and supported Yoast metadata; the Worker hard-codes `status: draft`, verifies the returned post is still a draft, and audits creation. A caller cannot supply a publish status.\n- `PUT /api/communications/website/content` — updates title, content, excerpt, featured image ID and status; the Website Studio UI submits `draft`. Production publish status is rejected by the Worker.\n- `GET /api/communications/website/terms` — reads existing WordPress categories/tags and reports Yoast meta fields that are writable through the WordPress REST schema. The Worker sends Yoast fields only when the REST `OPTIONS` schema exposes the matching writable property; otherwise it reports no writable fields and does not guess.
 - `GET /api/communications/website/revisions?type=pages|posts&id={id}` — lists native WordPress revisions and complete pre-edit snapshots.
 - `POST /api/communications/website/restore` — restores a saved snapshot or WordPress revision; a pre-restore snapshot is saved first.
 - `POST /api/communications/website/publish` — retains the existing approved article/press-release workflow and deterministic-slug reconciliation.
@@ -119,7 +119,7 @@ Production secrets and deployments must not be changed merely by merging this co
 
 ## Supported document and media upload formats
 
-The Media Asset Studio uploads through the authenticated Google Drive gateway; it does not write to Firebase Storage. Each upload is limited to 25 MiB by the current browser route. The selector advertises these formats:
+The Media Asset Studio uploads through the authenticated Google Drive gateway; it does not write to Firebase Storage. Each generic archive upload is limited to 25 MiB by the current browser route. Website Studio WordPress article images use a separate 5 MiB default per-file limit. The selector advertises these formats:
 
 - **Office documents:** PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, RTF, ODT, ODS, ODP.
 - **Structured and text content:** TXT, CSV, TSV, Markdown (MD), HTML, JSON, XML, EPUB, ZIP.
@@ -127,11 +127,11 @@ The Media Asset Studio uploads through the authenticated Google Drive gateway; i
 - **Audio:** MP3, WAV, M4A, AAC, OGG, FLAC.
 - **Video:** MP4, WEBM, MOV, AVI, MKV.
 
-This is the supported list, not a claim that every proprietary, encrypted, damaged, or future file format is supported. MIME type is checked against the allowlist; unknown types are rejected. Files are stored as originals in the existing Drive pathway and registered as metadata in Firestore. Authenticated download is by Drive file ID. Image adjustments and browser-native audio/video trimming export a new local derivative and never overwrite the original. The current upload route accepts one file per submission; upload additional files as separate submissions.
+This is the supported list, not a claim that every proprietary, encrypted, damaged, or future file format is supported. MIME type is checked against the allowlist; unknown types are rejected. Files are stored as originals in the existing Drive pathway and registered as metadata in Firestore. Authenticated download is by Drive file ID. Image adjustments and browser-native audio/video trimming export a new local derivative and never overwrite the original. The generic Communication Media Asset Studio accepts one file per submission. Website Studio accepts a multi-image selection and uploads each image sequentially, reporting progress and errors per file. Website Studio does not upload video files; it accepts YouTube/Vimeo links only.
 
 ## Live website editor and preview
 
-The Publishing Setup workspace loads existing WordPress pages or posts, lets an authorised reviewer edit the title and content, and saves through the authenticated Cloudflare Worker. The editor provides an **unsaved, sandboxed live preview** that updates from the current form contents when preview is open. The preview iframe has an empty sandbox (no script execution), sends no referrer, and is explicitly a visual approximation rather than the live theme. It does not publish or save content by opening preview.
+The Publishing Setup workspace loads existing WordPress pages or posts, lets an authorised reviewer edit the title and content, and saves through the authenticated Cloudflare Worker. It also offers a “New update” action that creates a post as a draft only. The editor provides an **unsaved, sandboxed live preview** that updates from the current form contents when preview is open. The preview iframe has an empty sandbox (no script execution), sends no referrer, and is explicitly a visual approximation rather than the live theme. It does not publish or save content by opening preview.
 
 The server-side editor enforces Firebase authentication, active registered reviewer roles, HTTPS WordPress configuration, a 30,000-character content limit, allowlisted HTML tags/attributes and URL schemes, and audit recording. Saving is an immediate live WordPress write; the interface requires an explicit confirmation before the write. Review the preview, confirm the target page/post and keep a copy of the prior content before saving. Confirm the returned public URL after the write. If the WordPress or cPanel connection is not configured and verified, the portal must show the connection failure rather than simulate a successful edit.
 
