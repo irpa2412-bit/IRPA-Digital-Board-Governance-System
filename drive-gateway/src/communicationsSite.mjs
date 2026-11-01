@@ -790,7 +790,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (!altText) return json({ error: "Alternative text is required for every uploaded image." }, 400, corsHeaders(request));
       const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
       if (estimatedBytes < 1 || estimatedBytes > maxBytes) return json({ error: "Images must not exceed " + (maxBytes / 1024 / 1024) + " MiB." }, 413, corsHeaders(request));
-      const extension = filename.toLowerCase().match(/\\.([a-z0-9]+)$/)?.[1] || "";
+      const extension = filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "";
       const extensionTypes = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
       if (extensionTypes[extension] !== contentType) return json({ error: "The image filename extension does not match its permitted image type." }, 400, corsHeaders(request));
       const binary = atob(encoded);
