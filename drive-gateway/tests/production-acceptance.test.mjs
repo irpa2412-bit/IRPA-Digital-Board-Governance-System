@@ -122,3 +122,40 @@ test("production acceptance blocks media tests if upload_files is absent", async
     assert.ok(data.report.filter(row => row.label.includes("upload to WordPress")).every(row => row.status === "FAIL"));
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("WordPress media 406 records sanitized firewall diagnostics and uses cPanel media-register fallback", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url);
+    if (url.hostname === "cpanel.test" && url.pathname.endsWith("/Fileman/upload_files")) return response({ status: 1, data: [{ file: "TEST-fallback.png" }] });
+    if (url.hostname === "staging.irpa.or.tz" && url.pathname.endsWith("/wp-json/wp/v2/users/me")) return response({ id: 7, capabilities: { upload_files: true } });
+    if (url.hostname === "staging.irpa.or.tz" && url.pathname.endsWith("/wp-json/wp/v2/media") && init.method === "POST") {
+      return new Response("WAF blocked upload Authorization: hidden-token", { status: 406, headers: { "Content-Type": "text/html", "Server": "cloudflare", "cf-ray": "test-ray-123", "x-sucuri-id": "firewall-test" } });
+    }
+    if (url.hostname === "staging.irpa.or.tz" && url.pathname.startsWith("/wp-content/uploads/")) return response(new Uint8Array([1, 2, 3]), 200, { "Content-Type": "image/png" });
+    throw new Error("Unexpected request: " + url.hostname + url.pathname);
+  };
+  try {
+    const router = makeRouter();
+    const result = await router(new Request("https://gateway.test/api/communications/website/production-acceptance-step", {
+      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" },
+      body: JSON.stringify({ step: "wp-media|image|media-library", pageId: 111 })
+    }), {
+      IRPA_ENVIRONMENT: "staging", IRPA_WORKER_ENVIRONMENT: "staging",
+      WORDPRESS_BASE_URL: "https://staging.irpa.or.tz", WORDPRESS_USERNAME: "editor", WORDPRESS_APPLICATION_PASSWORD: "testpassword",
+      CPANEL_BASE_URL: "https://cpanel.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token",
+      CPANEL_DOCUMENT_ROOT: "public_html/staging"
+    });
+    const data = await result.json();
+    const blocked = data.report.find(row => row.label.includes("upload to WordPress"));
+    const fallback = data.report.find(row => row.label.includes("firewall fallback"));
+    assert.equal(blocked.status, "FAIL");
+    assert.equal(blocked.httpStatus, 406);
+    assert.match(blocked.detail, /text\/html/);
+    assert.match(blocked.detail, /test-ray-123/);
+    assert.doesNotMatch(blocked.detail, /hidden-token/);
+    assert.equal(fallback.status, "PASS");
+    assert.equal(data.cleanupList.length, 1);
+    assert.ok(data.cleanupList[0].id && data.cleanupList[0].url);
+  } finally { globalThis.fetch = originalFetch; }
+});
