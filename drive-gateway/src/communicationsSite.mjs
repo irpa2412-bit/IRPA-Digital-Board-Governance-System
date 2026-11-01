@@ -1059,6 +1059,7 @@ export function createCommunicationsSiteRouter(deps) {
       };
       const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
       let testPageId = 0, testPostId = 0, uploadAllowed = false;
+      const cleanupItems = [];
       try {
         const user = await wpRequest("users/me?context=edit");
         uploadAllowed = !!user.response.ok && user.data?.capabilities?.upload_files === true;
@@ -1075,6 +1076,7 @@ export function createCommunicationsSiteRouter(deps) {
           if (type === "pages") testPageId = ok ? id : 0; else testPostId = ok ? id : 0;
           add(type + " draft create", ok ? "PASS" : "FAIL", created.response.status, ok ? "" : created.data?.message || "WordPress did not confirm a same-host draft.");
           if (!ok) continue;
+          cleanupItems.push({ kind: "TEST draft " + (type === "pages" ? "page" : "post"), title, id, url: created.data.link });
           await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_TEST_DRAFT_CREATED", type, id, { title, slug, status: "draft", test: true });
           const edited = await wpRequest(type + "/" + id, "POST", { title: title + " — EDITED TEST", content: "<p>TEST ONLY — edited and revised by the production acceptance check. Retain as draft.</p>", status: "draft" });
           const editOk = edited.response.ok && Number(edited.data?.id) === id && edited.data?.status === "draft";
@@ -1103,17 +1105,19 @@ export function createCommunicationsSiteRouter(deps) {
             });
             const mediaId = Number(upload.data?.id);
             if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(upload.data?.source_url, wp)) {
-              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, upload.data?.message || "WordPress did not return a same-host media URL.");
+              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, upload.data?.message || "WordPress did not return a same-host media URL.", upload.detail);
               continue;
             }
-            const meta = await wpRequest("media/" + mediaId, "POST", { title: "TEST " + file.name + " " + destination, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) });
+            const mediaTitle = "TEST " + file.name + " " + destination;
+            cleanupItems.push({ kind: "TEST media", title: mediaTitle, id: mediaId, url: upload.data.source_url });
+            const meta = await wpRequest("media/" + mediaId, "POST", { title: mediaTitle, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) }, {}, "media_metadata_attach");
             if (!meta.response.ok || Number(meta.data?.id) !== mediaId) {
-              add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, meta.data?.message || "Media metadata/attachment failed.");
+              add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, meta.data?.message || "Media metadata/attachment failed.", meta.detail);
               continue;
             }
             if (destination === "featured") {
               const featured = await wpRequest("pages/" + testPageId, "POST", { featured_media: mediaId, status: "draft" });
-              if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, featured.data?.message || "Featured image assignment failed."); continue; }
+              if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, featured.data?.message || "Featured image assignment failed.", featured.detail); continue; }
             }
             const opened = await wordpressEditorFetch(wp, upload.data.source_url, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
             add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
@@ -1147,7 +1151,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
