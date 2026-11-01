@@ -119,6 +119,7 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
   } else if (sizeMismatch) {
     diagnostic.classification = "SIZE_MISMATCH";
     diagnostic.step = "Size check";
+    diagnostic.step = "Size check";
     diagnostic.reason = "Downloaded byte count does not match Drive metadata size or the size recorded at upload.";
   } else if (pdfError) {
     diagnostic.classification = "PDF_PARSE_FAILED";
