@@ -179,9 +179,10 @@ export function createCommunicationsSiteRouter(deps) {
     const required = ["WORDPRESS_BASE_URL", "WORDPRESS_USERNAME", "WORDPRESS_APPLICATION_PASSWORD"];
     const missing = required.filter(name => !String(env?.[name] || "").trim());
     if (missing.length) throw configurationError("credentials_missing", "Required WordPress settings are missing: " + missing.join(", ") + ".");
-    const rawEndpoint = String(env.WORDPRESS_BASE_URL).trim();
+    const rawEndpoint = String(env.WORDPRESS_BASE_URL || "").trim();
+    const normalizedEndpoint = rawEndpoint.replace(/\/wp-json\/?$/i, "").replace(/\/+$/, "");
     let base;
-    try { base = new URL(rawEndpoint); }
+    try { base = new URL(normalizedEndpoint); }
     catch { throw configurationError("endpoint_invalid_url", "WORDPRESS_BASE_URL is not a valid absolute URL."); }
     if (base.protocol !== "https:") throw configurationError("endpoint_not_https", "WORDPRESS_BASE_URL must use HTTPS.");
     if (base.username || base.password) throw configurationError("endpoint_contains_url_credentials", "WORDPRESS_BASE_URL must not contain embedded username or password fields.");
@@ -200,9 +201,19 @@ export function createCommunicationsSiteRouter(deps) {
     if (environment === "staging" && host !== "staging.irpa.or.tz") {
       throw configurationError("wordpress_host_not_allowed_for_environment", "Staging permits only staging.irpa.or.tz; the configured hostname does not match.");
     }
-    const username = String(env.WORDPRESS_USERNAME).trim();
-    const password = String(env.WORDPRESS_APPLICATION_PASSWORD).replace(/\s/g, "");
-    return { root: base.origin, hostname: host, environment, auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))), stagingAuthHeader: host === "staging.irpa.or.tz" };
+    const username = String(env.WORDPRESS_USERNAME || "").trim().replace(/[\r\n]+/g, "");
+    const rawPassword = String(env.WORDPRESS_APPLICATION_PASSWORD || "").trim();
+    const password = rawPassword.replace(/\s/g, "");
+    return {
+      root: base.origin, hostname: host, environment,
+      auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))),
+      stagingAuthHeader: host === "staging.irpa.or.tz",
+      secretChecks: {
+        baseUrl: { present: !!rawEndpoint, https: base.protocol === "https:", hasWpJsonSuffix: /\/wp-json\/?$/i.test(rawEndpoint), canonicalOriginOnly: base.pathname === "/" },
+        username: { present: !!username, length: username.length },
+        applicationPassword: { present: !!password, length: password.length, containsSpaces: /\s/.test(rawPassword), expectedLength: password.length === 24 }
+      }
+    };
   }
 
   function wordpressHeaders(wp, extra = {}) {
@@ -247,6 +258,40 @@ export function createCommunicationsSiteRouter(deps) {
       throw new Error("The staging WordPress integration account must have the Editor role and must not be an Administrator.");
     }
     return user;
+  }
+
+  function safeWordPressUrl(value, fallback = "") {
+    try {
+      const url = new URL(String(value || fallback));
+      return url.origin + url.pathname.replace(/\/$/, "") + (url.search ? "?[query-redacted]" : "");
+    } catch { return fallback || "unavailable"; }
+  }
+
+  function sanitizedWordPressBody(raw, wp) {
+    let value = String(raw || "");
+    if (wp?.auth) value = value.split(wp.auth).join("[redacted-auth]");
+    for (const secret of [wp?.username, wp?.password].filter(Boolean)) value = value.split(secret).join("[redacted]");
+    value = value.replace(/(authorization\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]")
+      .replace(/(application[_ -]?password\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]")
+      .replace(/(password\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]");
+    return value.slice(0, 1024);
+  }
+
+  function wordpressErrorFinding(status, code, message, body) {
+    const normalized = String(code || "").toLowerCase();
+    const detail = cleanText(message, 220).replace(/[\r\n]/g, " ");
+    if (["incorrect_password", "invalid_username"].includes(normalized)) {
+      return { code: normalized, finding: "WordPress rejected the username or Application Password. Verify the integration username and rotate the Application Password." };
+    }
+    if (["rest_cannot_view", "rest_forbidden", "application_passwords_disabled"].includes(normalized)) {
+      return { code: normalized, finding: "WordPress denied REST access. Check the integration user's Editor/Administrator role and whether Application Passwords are enabled." };
+    }
+    if ((status === 401 || status === 403) && (!String(body || "").trim() || !normalized)) {
+      return { code: normalized || "authentication_rejected_empty_body", finding: "No WordPress REST error JSON was returned. The Authorization header may be stripped by Apache/LiteSpeed/PHP, or a WAF/proxy may be intercepting the request." };
+    }
+    if (status === 401) return { code: normalized || "authentication_rejected", finding: "WordPress returned HTTP 401. Check credentials and Authorization-header forwarding." + (detail ? " WordPress message: " + detail : "") };
+    if (status === 403) return { code: normalized || "rest_forbidden", finding: "WordPress returned HTTP 403. Check the integration user's role, REST permissions and security-plugin rules." + (detail ? " WordPress message: " + detail : "") };
+    return { code: normalized || "wordpress_http_" + status, finding: detail || "WordPress returned HTTP " + status + "." };
   }
 
   function cpanelConfig(env) {
@@ -543,14 +588,29 @@ export function createCommunicationsSiteRouter(deps) {
 
     if (path === "/api/communications/site/status" && request.method === "GET") {
       const { roles } = await websiteEditorAuthorised(request, env);
-      const result = { website: "not_configured", cpanel: "not_configured" };
+      const workerEnvironment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "unknown").trim().toLowerCase();
+      const result = {
+        website: "not_configured", cpanel: "not_configured", workerEnvironment,
+        workerName: cleanText(env.IRPA_WORKER_NAME || "unknown", 100),
+        secretChecks: {
+          WORDPRESS_BASE_URL: { present: !!String(env.WORDPRESS_BASE_URL || "").trim(), length: String(env.WORDPRESS_BASE_URL || "").trim().length },
+          WORDPRESS_USERNAME: { present: !!String(env.WORDPRESS_USERNAME || "").trim(), length: String(env.WORDPRESS_USERNAME || "").trim().length },
+          WORDPRESS_APPLICATION_PASSWORD: { present: !!String(env.WORDPRESS_APPLICATION_PASSWORD || "").trim(), length: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "").length, containsSpaces: /\s/.test(String(env.WORDPRESS_APPLICATION_PASSWORD || "")) }
+        }
+      };
       const safeCode = value => String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100) || undefined;
       const authBridgeDiagnostic = value => safeCode(value) || null;
       try {
         const wp = websiteWordPressConfig(env);
+        result.secretChecks = {
+          ...result.secretChecks, format: wp.secretChecks,
+          boundToServingWorkerEnvironment: ["production", "staging"].includes(workerEnvironment) &&
+            Object.values(result.secretChecks).every(item => item.present)
+        };
+        const authUrl = wp.root + "/wp-json/wp/v2/users/me?context=edit";
         let response;
         try {
-          response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/users/me?context=edit", {
+          response = await wordpressEditorFetch(wp, authUrl, {
             headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
             signal: AbortSignal.timeout(12000)
           });
@@ -562,65 +622,80 @@ export function createCommunicationsSiteRouter(deps) {
             error?.name === "TypeError" ? "The Worker could not establish a WordPress response." : "The WordPress probe failed before receiving an HTTP response.";
         }
         if (response) {
+          const raw = await response.clone().text().catch(() => "");
+          const contentType = response.headers.get("content-type") || "unknown";
+          let detail = {};
+          try { detail = JSON.parse(raw); } catch {}
+          const wpCode = safeCode(detail.code);
+          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }).replace(/[\\r\\n]/g, " ");
+          const location = response.headers.get("location");
+          const redirected = response.status >= 300 && response.status < 400;
           result.websiteHttpStatus = response.status;
+          result.websiteFinalUrl = safeWordPressUrl(response.url, authUrl);
+          result.websiteRedirectCount = redirected ? 1 : 0;
+          result.websiteRedirectTarget = location ? safeWordPressUrl(new URL(location, authUrl).toString()) : null;
+          result.websiteRedirectFinding = redirected ? "Authentication redirects are not followed. Configure WORDPRESS_BASE_URL to the canonical HTTPS origin; Authorization is not forwarded to another hop." : null;
+          result.websiteAuthHeaderPresent = true;
+          result.websiteWwwAuthenticatePresent = response.headers.has("www-authenticate");
           result.websiteAuthBridgeDiagnostic = authBridgeDiagnostic(response.headers.get("x-irpa-staging-auth-diagnostic"));
-          result.websiteResponseType = safeCode((response.headers.get("content-type") || "").split(";")[0]) || "unknown";
+          result.websiteResponseType = String(contentType.split(";")[0] || "unknown").trim().toLowerCase().slice(0, 80);
           result.websiteCloudflareRay = safeCode(response.headers.get("cf-ray")) || undefined;
+          result.websiteErrorCode = wpCode;
+          result.websiteErrorMessage = wpMessage || undefined;
+          result.websiteRawResponse = sanitizedWordPressBody(raw, {
+            ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(),
+            password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "")
+          }) || "(empty response body)";
           if (response.ok) {
-            const user = await response.json().catch(() => null);
+            let user = null;
+            try { user = JSON.parse(raw); } catch {}
             if (!user || !Number.isSafeInteger(user.id) || !Array.isArray(user.roles)) {
               result.website = "unavailable";
               result.websiteDiagnosticCode = "unexpected_response";
+              result.websiteDiagnosticMessage = "The authenticated endpoint returned HTTP success but not a valid WordPress user JSON object.";
             } else {
               const accountRoles = user.roles.map(role => String(role).toLowerCase());
               const isDedicatedEditor = accountRoles.includes("editor") && !accountRoles.includes("administrator");
               result.website = isDedicatedEditor ? "connected" : "wrong_account_role";
               result.websiteAccount = {
-                name: cleanText(user.name, 100),
-                role: isDedicatedEditor ? "editor" : "unverified",
+                name: cleanText(user.name, 100), role: isDedicatedEditor ? "editor" : "unverified",
                 canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined,
                 canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined
               };
               if (!isDedicatedEditor) result.websiteDiagnosticCode = "wrong_account_role";
             }
           } else {
-            const raw = await response.text().catch(() => "");
-            let detail = {};
-            if (result.websiteResponseType === "application/json") {
-              try { detail = JSON.parse(raw); } catch {}
-            }
-            result.websiteErrorCode = safeCode(detail.code);
-            const wpReason = cleanText(detail.message || detail.error || "", 220).replace(/[\\r\\n]/g, " ");
-            const wpCode = String(detail.code || "").toLowerCase();
+            const finding = wordpressErrorFinding(response.status, wpCode, wpMessage, raw);
             result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable";
-            if ((response.status === 401 || response.status === 403) && /application.?password|application_passwords_disabled|application passwords are disabled/i.test(wpCode + " " + wpReason)) {
-              result.websiteDiagnosticCode = "application_passwords_disabled";
-              result.websiteDiagnosticMessage = "WordPress application passwords are disabled (HTTP " + response.status + ")." + (wpReason ? " Reason: " + wpReason : "");
-            } else if (response.status === 401 || response.status === 403) {
-              result.websiteDiagnosticCode = response.status === 401 ? "authentication_rejected" : "permission_denied";
-              result.websiteDiagnosticMessage = "WordPress rejected the integration credentials or permissions (HTTP " + response.status + ")." + (wpReason ? " Reason: " + wpReason : "");
-            } else if (response.status === 404) {
-              let restResponse;
-              try {
-                restResponse = await wordpressEditorFetch(wp, wp.root + "/wp-json/", {
-                  headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
-                  signal: AbortSignal.timeout(8000)
-                });
-              } catch {}
-              if (restResponse && restResponse.status === 404) {
-                result.websiteDiagnosticCode = "rest_api_disabled";
-                result.websiteDiagnosticMessage = "WordPress REST API endpoint /wp-json/ returned HTTP 404; the REST API may be disabled or blocked (HTTP 404).";
-              } else {
-                result.websiteDiagnosticCode = "wordpress_endpoint_not_found";
-                result.websiteDiagnosticMessage = "WordPress returned HTTP 404 for the authenticated users/me endpoint." + (wpReason ? " Reason: " + wpReason : "");
-              }
-            } else {
-              result.websiteDiagnosticCode = response.status >= 300 && response.status < 400 ? "unexpected_redirect" :
-                response.status >= 500 ? "wordpress_server_error" :
-                result.websiteErrorCode ? "wordpress_api_error" : "unexpected_http_response";
-              result.websiteDiagnosticMessage = "WordPress connection probe returned HTTP " + response.status + "." + (wpReason ? " Reason: " + wpReason : "");
-            }
+            result.websiteDiagnosticCode = redirected ? "unexpected_redirect" : finding.code;
+            result.websiteDiagnosticMessage = redirected
+              ? "The authenticated endpoint redirected to " + (result.websiteRedirectTarget || "an undisclosed location") + ". Configure the canonical HTTPS hostname; the Authorization header was not forwarded."
+              : finding.finding;
           }
+        }
+
+        try {
+          const publicUrl = wp.root + "/wp-json/";
+          const publicResponse = await fetch(publicUrl, {
+            method: "GET", headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+            redirect: "manual", signal: AbortSignal.timeout(8000)
+          });
+          const publicRaw = await publicResponse.clone().text().catch(() => "");
+          let publicBody = {};
+          try { publicBody = JSON.parse(publicRaw); } catch {}
+          const publicLocation = publicResponse.headers.get("location");
+          result.websitePublicRest = {
+            status: publicResponse.status, finalUrl: safeWordPressUrl(publicResponse.url, publicUrl),
+            redirectCount: publicResponse.status >= 300 && publicResponse.status < 400 ? 1 : 0,
+            redirectTarget: publicLocation ? safeWordPressUrl(new URL(publicLocation, publicUrl).toString()) : null,
+            contentType: String((publicResponse.headers.get("content-type") || "unknown").split(";")[0]).trim().toLowerCase().slice(0, 80),
+            errorCode: safeCode(publicBody.code),
+            errorMessage: sanitizedWordPressBody(cleanText(publicBody.message || publicBody.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }) || undefined,
+            wwwAuthenticatePresent: publicResponse.headers.has("www-authenticate"),
+            rawResponse: sanitizedWordPressBody(publicRaw, wp) || "(empty response body)"
+          };
+        } catch (error) {
+          result.websitePublicRest = { error: error?.name === "TimeoutError" ? "timeout" : "request_failed" };
         }
       } catch (error) {
         const message = String(error?.message || "");
@@ -643,7 +718,6 @@ export function createCommunicationsSiteRouter(deps) {
         result.cpanel = "connected";
       } catch (error) {
         const message = String(error?.message || "");
-        const lower = message.toLowerCase();
         if (error?.diagnosticCode) {
           result.cpanel = error.diagnosticCode === "cpanel_credentials_missing" || error.diagnosticCode === "cpanel_base_url_missing" ? "not_configured" :
             error.diagnosticCode === "cpanel_authentication_rejected" ? "authentication_rejected" :
@@ -656,18 +730,10 @@ export function createCommunicationsSiteRouter(deps) {
         } else {
           result.cpanel = "unavailable";
           result.cpanelDiagnostic = error?.name === "TimeoutError" || error?.name === "AbortError" ? "cpanel_request_timeout" :
-            error?.name === "TypeError" ? "cpanel_network_error" :
-            message.includes("endpoint configuration is invalid") ? "cpanel_endpoint_invalid" :
-            /category invalid_operation/.test(message) ? "cpanel_invalid_operation" :
-            /category not_found/.test(message) ? "cpanel_resource_not_found" :
-            /category uapi_error/.test(message) ? "cpanel_uapi_error" :
-            /category/.test(message) ? "cpanel_request_failed" :
-            message.includes("not configured") ? "cpanel_configuration_missing" : "cpanel_connection_failed";
+            error?.name === "TypeError" ? "cpanel_network_error" : "cpanel_connection_failed";
           result.cpanelDiagnosticMessage = error?.name === "TimeoutError" || error?.name === "AbortError"
             ? "The cPanel API request exceeded its 15-second deadline."
-            : error?.name === "TypeError"
-              ? "The Worker fetch failed before receiving an HTTP response; runtime fetch errors do not reliably distinguish DNS from TLS or routing causes."
-              : "The cPanel API request failed; inspect the diagnostic code and HTTP/UAPI category if present.";
+            : error?.name === "TypeError" ? "The cPanel API request failed before receiving an HTTP response." : "The cPanel API request failed.";
         }
       }
       return json({ ok: true, connections: result, permissions: { websiteEditor: true, staticFileEditing: roles.some(r => REVIEW_ROLES.has(r)) } }, 200, corsHeaders(request));
