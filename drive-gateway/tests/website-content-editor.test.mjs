@@ -400,7 +400,7 @@ test("authenticated staging image upload accepts safe image types and records an
   assert.equal(lastMediaUpload.contentType, "image/jpeg");
   assert.match(lastMediaUpload.disposition, /field.jpg/);
   assert.deepEqual([...lastMediaUpload.bytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
-  assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+  assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
 });
 
 test("image upload requires non-empty alt text", async () => {
@@ -415,11 +415,11 @@ test("image upload requires non-empty alt text", async () => {
 test("image upload rejects unsupported formats and oversized payloads before WordPress writes", async () => {
   const router = makeRouter();
   const unsupported = await call(router, makeEnv(), "/api/communications/website/media", {
-    method: "POST", body: { filename: "script.svg", contentType: "image/svg+xml", dataBase64: "PHN2Zz4=" }
+    method: "POST", body: { filename: "script.exe", contentType: "application/octet-stream", dataBase64: "TVqQAA==" }
   });
-  assert.equal(unsupported.status, 400);
+  assert.equal(unsupported.status, 415);
   const oversized = await call(router, makeEnv(), "/api/communications/website/media", {
-    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(8 * 1024 * 1024), altText: "Large image" }
+    method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(12 * 1024 * 1024), altText: "Large image" }
   });
   assert.equal(oversized.status, 413);
 });

@@ -50,6 +50,6 @@ export async function websiteMediaSha256(bytes) {
   return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 export function validateMediaChunk({uploadId,index,total,dataBase64}) {
-  if(!/^[a-f0-9-]{36}$/i.test(String(uploadId||""))||!Number.isInteger(index)||!Number.isInteger(total)||total<1||total>512||index<0||index>=total||!/^[A-Za-z0-9+/]+={0,2}$/.test(String(dataBase64||""))||dataBase64.length>360000) throw new Error("Invalid media upload chunk.");
+  if(!/^[a-f0-9-]{36}$/i.test(String(uploadId||""))||!Number.isInteger(index)||!Number.isInteger(total)||total<1||total>512||index<0||index>=total||!/^[A-Za-z0-9+/]+={0,2}$/.test(String(dataBase64||""))||String(dataBase64||'').length>360000) throw new Error("Invalid media upload chunk.");
   return true;
 }

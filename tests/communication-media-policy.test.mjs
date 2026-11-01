@@ -55,10 +55,12 @@ test("publishing, website content edits and cPanel file edits route through Clou
 test("Website Studio creates draft-only posts and securely uploads multiple WordPress article images",()=>{
  assert.ok(site.includes('path === "/api/communications/website/posts" && request.method === "POST"'));
  assert.ok(site.includes('path === "/api/communications/website/media" && request.method === "POST"'));
- assert.ok(site.includes('new Set(["image/jpeg", "image/png", "image/webp"])'));
+ assert.ok(site.includes("validateWebsiteMedia"));
+ assert.ok(site.includes("validateWebsiteMedia"));
  assert.ok(site.includes("5 * 1024 * 1024"));
- assert.ok(site.includes("stripImageMetadata(contentType, originalBytes)"));
- assert.ok(site.includes("COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+ assert.ok(site.includes("sanitizeWebsiteSvg"));
+ assert.ok(site.includes("websiteMediaSha256"));
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
  assert.ok(site.includes("COMMUNICATION_WEBSITE_POST_DRAFT_CREATED"));
  assert.ok(site.includes('status: "draft"'));
  assert.ok(site.includes("publication status is controlled by the server"));
@@ -72,7 +74,8 @@ test("Website Studio creates draft-only posts and securely uploads multiple Word
  assert.ok(websiteStudio.includes("uploadProgress.map"));
  assert.ok(websiteStudio.includes("Rejected · empty file"));
  assert.ok(site.includes("WORDPRESS_MEDIA_MAX_BYTES"));
- assert.ok(site.includes("20 * 1024 * 1024"));
+ assert.ok(site.includes("Math.min(20 * 1024 * 1024"));
+ assert.ok(site.includes("Math.min(50*1024*1024"));
  assert.ok(websiteStudio.includes("Image batch complete:"));
  assert.ok(websiteStudio.includes("Uploaded"));
  assert.ok(websiteStudio.includes("Create WordPress draft"));

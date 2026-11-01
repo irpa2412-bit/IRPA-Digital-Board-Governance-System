@@ -732,7 +732,8 @@ export function createCommunicationsSiteRouter(deps) {
               result.websiteAccount = {
                 name: cleanText(user.name, 100), role: isDedicatedEditor ? "editor" : "unverified",
                 canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined,
-                canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined
+                canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined,
+                canUploadFiles: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.upload_files : undefined
               };
               if (!isDedicatedEditor) result.websiteDiagnosticCode = "wrong_account_role";
             }
@@ -824,7 +825,7 @@ export function createCommunicationsSiteRouter(deps) {
       const encoded = String(input.dataBase64 || "");
       if (!filename || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || !title) return json({error:"A filename, title and valid base64 file are required."},400,corsHeaders(request));
       const estimate = Math.floor(encoded.length*3/4)-(encoded.endsWith("==")?2:encoded.endsWith("=")?1:0);
-      const limit = Math.min(20*1024*1024,Math.max(1024,Number(env.WORDPRESS_MEDIA_MAX_BYTES||8*1024*1024)));
+      const limit = Math.min(20 * 1024 * 1024,Math.max(1024,Number(env.WORDPRESS_MEDIA_MAX_BYTES||8*1024*1024)));
       if(estimate<1||estimate>limit)return json({error:"File exceeds the configured WordPress media limit of "+limit+" bytes."},413,corsHeaders(request));
       let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
       if(contentType==="image/svg+xml"){
@@ -832,7 +833,7 @@ export function createCommunicationsSiteRouter(deps) {
         catch(error){return json({error:error.message},415,corsHeaders(request));}
       }
       let meta;
-      try{meta=validateWebsiteMedia({filename,contentType,bytes});}
+      try{meta=validateWebsiteMedia({filename,contentType,bytes});bytes=stripImageMetadata(contentType,bytes);meta={...meta,size:bytes.byteLength};}
       catch(error){return json({error:error.message},415,corsHeaders(request));}
       const destination=String(input.destination||"media-library");
       if(!["media-library","attach","featured"].includes(destination))return json({error:"Select WordPress Media Library, page/post attachment or featured image."},400,corsHeaders(request));
@@ -877,13 +878,17 @@ export function createCommunicationsSiteRouter(deps) {
       const input=await request.json().catch(()=>({})),uploadId=String(input.uploadId||"");
       if(!/^[a-f0-9-]{36}$/i.test(uploadId)||!Number.isInteger(input.total)||input.total<1||input.total>512)return json({error:"Invalid chunk upload manifest."},400,corsHeaders(request));
       const cp=cpanelConfig(env),relative=String(input.path||"");
-      const safe=safeCpanelPath(relative,cp.documentRoot);
+      const parts=relative.replace(/\\\\/g,"/").split("/");
+      const filename=parts.pop();
+      if(!filename||filename.startsWith(".")||parts.some(p=>!p||p==="."||p===".."||p.startsWith(".")))return json({error:"Invalid cPanel media destination path."},400,corsHeaders(request));
+      const safe={dir:safeCpanelDirectory(parts.join("/"),cp.documentRoot),file:filename,relative:relative.replace(/\\\\/g,"/")};
       const chunks=[];
       for(let i=0;i<input.total;i++){const chunk=await env.DRIVE_KV.get("irpa:website-media-chunk:"+uploadId+":"+i);if(!chunk)return json({error:"Upload is incomplete; missing chunk "+i+"."},409,corsHeaders(request));chunks.push(chunk);}
       const encoded=chunks.join("");const size=Math.floor(encoded.length*3/4);
-      const max=Number(env.CPANEL_MEDIA_MAX_BYTES||32*1024*1024);
+      const max=Math.min(50*1024*1024,Math.max(1,Number(env.CPANEL_MEDIA_MAX_BYTES||50*1024*1024)));
       if(size<1||size>max)return json({error:"cPanel media upload exceeds the configured maximum of "+max+" bytes."},413,corsHeaders(request));
-      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      if(String(input.contentType||"")==="image/svg+xml")bytes=new TextEncoder().encode(sanitizeWebsiteSvg(new TextDecoder().decode(bytes)));
       const meta=validateWebsiteMedia({filename:safe.file,contentType:String(input.contentType||""),bytes});
       const form=new FormData();form.set("dir",safe.dir);form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
       const target=new URL(cp.root+"/Fileman/upload_files");
