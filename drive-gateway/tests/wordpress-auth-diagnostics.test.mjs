@@ -124,7 +124,7 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
     const payload = url.pathname.endsWith("/Email/list_pops")
       ? { status: 1, data: [{ email: "info@staging.irpa.or.tz" }, { email: "contact@staging.irpa.or.tz" }] }
       : url.pathname.endsWith("/SSL/installed_hosts")
-        ? { status: 1, data: [{ domain: "staging.irpa.or.tz", status: "valid", issuer: "TEST CA" }] }
+        ? { status: 1, data: [{ servername: "staging.irpa.or.tz", status: "valid", issuer: "TEST CA", notAfter: "2030-01-01T00:00:00Z" }] }
         : url.pathname.endsWith("/LangPHP/php_ini_get_user_content")
           ? { status: 1, data: [{ content: "upload_max_filesize = 32M\npost_max_size = 40M\n" }] }
           : null;
@@ -139,10 +139,12 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
     assert.equal(response.status, 200);
     assert.equal(data.readOnly, true);
     assert.deepEqual(data.emailAccounts.accounts, ["info@staging.irpa.or.tz", "contact@staging.irpa.or.tz"]);
+    assert.equal(data.ssl.status, "PASS");
     assert.equal(data.ssl.hosts[0].status, "valid");
+    assert.equal(data.ssl.hosts[0].expiry, "2030-01-01T00:00:00Z");
     assert.equal(data.phpLimits.upload_max_filesize, "32M");
     assert.equal(data.phpLimits.post_max_size, "40M");
-    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/LangPHP/php_ini_get_user_content"]);
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content"]);
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -238,4 +240,28 @@ test("staging host-guard rejection is classified separately from a WordPress HTT
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("cPanel diagnostics accepts top-level certificate arrays and reports a missing matching certificate as FAIL", async () => {
+  const router = makeRouter("Executive Director");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname.endsWith("/Email/list_pops")) return makeResponse({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return makeResponse([{ subject: "CN=other.example.test", expires: "2031-01-01" }]);
+    if (url.pathname.endsWith("/Fileman/get_file_content")) throw new Error("not present");
+    if (url.pathname.endsWith("/LangPHP/php_ini_get_user_content")) throw new Error("not exposed");
+    throw new Error("Unexpected cPanel operation: " + url.pathname);
+  };
+  try {
+    const response = await router(new Request("https://gateway.test/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { headers: { Authorization: "Bearer firebase-token" } }), env({
+      CPANEL_BASE_URL: "https://cpanel.example.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token", CPANEL_DOCUMENT_ROOT: "public_html/staging"
+    }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.ssl.status, "FAIL");
+    assert.match(data.ssl.error, /No matching SSL certificate/);
+    assert.equal(data.phpLimits.status, "INFO");
+    assert.equal(data.phpLimits.diagnostic, "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor");
+  } finally { globalThis.fetch = originalFetch; }
 });
