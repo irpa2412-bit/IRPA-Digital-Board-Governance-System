@@ -42,5 +42,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install locked application dependencies
+        run: npm ci
       - name: Run isolated navigation regression tests
         run: npm run test:portal-navigation && npm run test:communication-media
