@@ -80,7 +80,7 @@ test("WCAG contrast audit: every administrator portal at desktop/mobile in light
         const url = baseURL + "/?adminModule=" + encodeURIComponent(module);
         await page.goto(url);
         await expect(page.locator(".topbar h2")).toContainText(displayLabels[module] || module,{timeout:30000});
-        await expect(page.locator("[data-active-portal-content]:visible").first()).toBeVisible({timeout:30000});
+        await expect(page.locator(".content-area:visible").first(), "authenticated workspace should be visible for " + module).toBeVisible({timeout:30000});
         await page.addScriptTag({content:axe.source});
         const pageLabel = module + " · " + viewport.name + " · " + scheme;
         const before = await page.evaluate(async () => {
