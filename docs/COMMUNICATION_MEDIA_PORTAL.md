@@ -144,6 +144,14 @@ Website Studio now provides a dedicated **New update** flow in addition to editi
 
 The production WordPress host allowlist remains exactly `irpa.or.tz` and `www.irpa.or.tz`; staging remains restricted to `staging.irpa.or.tz`. This feature does not alter the allowlist, Worker secrets, WordPress configuration or deployment settings.
 
+## Website Studio approval-ready handoff and Yoast REST capability
+
+- After a new WordPress draft is created and re-read successfully, Website Studio presents an approval-ready handoff containing the linked editorial record ID, WordPress post ID, a concise change summary and a sandboxed mobile preview.
+- **Submit for approval** invokes the existing communications records action (`action: "submit"`) for the linked editorial record. The Worker moves the editorial record to **Pending Approval** and writes its existing audit event. This action does not publish the WordPress post. Publication still requires a separate authorised reviewer, the existing Approved status and the existing website publishing gate.
+- Categories and tags are loaded from the existing WordPress taxonomy endpoints and selected by term ID. Website Studio does not create terms; term creation is outside this workflow.
+- Yoast SEO capability is checked at runtime using an authenticated WordPress REST `OPTIONS /wp-json/wp/v2/posts` request. Website Studio checks whether `_yoast_wpseo_metadesc` and `_yoast_wpseo_focuskw` appear as writable properties under the REST `meta` schema. The gateway exposes only boolean capability results and never returns credentials.
+- If a Yoast field is not exposed as writable, Website Studio does not attempt to write it. The safe alternative is to add the meta description and focus keyphrase in the WordPress/Yoast editor on the saved draft before approval. No plugin is installed, enabled, reconfigured or modified. The live site's actual capability result must be confirmed by the production connection after an authorised merge/deployment; source tests use a controlled REST schema fixture and do not prove the live site's Yoast configuration.
+
 ## Live website editor and preview
 
 The Publishing Setup workspace loads existing WordPress pages or posts, lets an authorised reviewer edit the title and content, and saves through the authenticated Cloudflare Worker. The editor provides an **unsaved, sandboxed live preview** that updates from the current form contents when preview is open. The preview iframe has an empty sandbox (no script execution), sends no referrer, and is explicitly a visual approximation rather than the live theme. It does not publish or save content by opening preview.
