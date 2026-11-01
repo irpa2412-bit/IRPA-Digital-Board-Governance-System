@@ -25,13 +25,16 @@ test("signature draft save is routed through the authenticated Worker", () => {
   assert.doesNotMatch(fn, /recordEnvelopeEvent\(id,"Owner Section Saved"/);
 });
 
-test("Worker reconciliation reports the previous Drive ID and verifies the repaired value", () => {
+test("Worker reconciliation reports diagnostic evidence and never repairs documents", () => {
   assert.match(worker, /previousDescriptionDocumentId/);
-  assert.match(worker, /Drive description verification failed after repair/);
+  assert.match(worker, /diagnoseControlledDocument/);
+  assert.match(worker, /This diagnostic endpoint is read-only/);
+  assert.match(worker, /writesPerformed:false,driveMutationsPerformed:false/);
   assert.match(selfTest, /wiAfPSIxHLTd6MdeM04q/);
   assert.match(worker, /const requiredId = "wiAfPSIxHLTd6MdeM04q"/);
   assert.match(selfTest, /autoDiscover: true/);
-  assert.match(selfTest, /Repair mismatches/);
+  assert.match(selfTest, /Copy report/);
+  assert.match(selfTest, /Classification:/);
   assert.match(selfTest, /previousDescriptionDocumentId/);
 });
 
