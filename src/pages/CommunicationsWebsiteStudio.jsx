@@ -57,7 +57,8 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
     const result=await call("/api/communications/website/production-acceptance","POST",{},true);
     add("TEST draft lifecycle and destination upload suite",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||"");
     acceptance=result.data||null;
-    for(const row of acceptance?.report||[])rows.push(row);\n    if(Array.isArray(acceptance?.cleanupItems))rows.push({label:"TEST cleanup inventory",status:"INFO",httpStatus:null,error:"Retained test drafts and media; remove manually if no longer needed.",detail:"See cleanup list below.",cleanupItems:acceptance.cleanupItems});
+    for(const row of acceptance?.report||[])rows.push(row);
+    if(Array.isArray(acceptance?.cleanupItems))rows.push({label:"TEST cleanup inventory",status:"INFO",httpStatus:null,error:"Retained test drafts and media; remove manually if no longer needed.",detail:"See cleanup list below.",cleanupItems:acceptance.cleanupItems});
    }catch(error){add("TEST draft lifecycle and destination upload suite","FAIL",error.httpStatus||0,error.message||"Acceptance run failed.");}
    for(const [type,id] of [["pages",acceptance?.createdDrafts?.pageId],["posts",acceptance?.createdDrafts?.postId]]){
     if(!id)continue;
