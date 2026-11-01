@@ -961,8 +961,9 @@ export function createCommunicationsSiteRouter(deps) {
         title, categories, tags, featuredMedia, status: "draft", publicUrl: String(created.link || "")
       });
       const verified = await readWebsiteItem(wp, "posts", Number(created.id));
+      const seoMetaVerified = !payload.meta || Object.entries(payload.meta).every(([key, value]) => verified.meta?.[key] === value);
       if (String(verified.status || "") !== "draft" || Number(verified.featured_media || 0) !== featuredMedia ||
-          !sameEditorFields(verified, payload)) {
+          !sameEditorFields(verified, payload) || !seoMetaVerified) {
         await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_POST_DRAFT_VERIFICATION_FAILED", "posts", created.id, { status: String(verified.status || "") });
         throw new Error("The new WordPress update did not pass draft verification. It has not been submitted for approval.");
       }
