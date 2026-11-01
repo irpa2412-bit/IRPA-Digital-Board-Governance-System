@@ -1172,6 +1172,12 @@ export function createCommunicationsSiteRouter(deps) {
             const data = await response.json().catch(() => null);
             if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
             const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+            const registerId = crypto.randomUUID(), now = new Date().toISOString(), sha256 = await websiteMediaSha256(bytes);
+            const registerRow = { file: filename, title: "TEST " + file.name + " cPanel acceptance upload", altText: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", category: "Production Acceptance", tags: ["TEST"], destination: "cpanel-folder", url: publicUrl, uploader: claims.user_id, uploaderEmail: claims.email || "", date: now, size: bytes.byteLength, sha256, wordpressMediaId: null, status: "Available", test: true };
+            const recordFields = fields(registerRow);
+            const auditFields = fields({ action: "COMMUNICATION_WEBSITE_MEDIA_REGISTERED", category: "COMMUNICATIONS", collection: "communicationMediaAssets", recordId: registerId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { file: filename, destination: "cpanel-folder", url: publicUrl, size: bytes.byteLength, sha256, test: true }, createdAt: now });
+            await commitDocumentAndAudit(env, "communicationMediaAssets/" + registerId, claims.token, recordFields, Object.keys(registerRow), auditFields, { createOnly: true, collectionName: "communicationMediaAssets" });
+            cleanupItems.push({ kind: "TEST media", title: registerRow.title, id: registerId, url: publicUrl });
             const opened = await wordpressEditorFetch(wp, publicUrl, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
             add(file.name + " upload to cPanel folder URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded cPanel URL did not open successfully.");
           } catch (error) { add(file.name + " upload to cPanel folder", "FAIL", error.httpStatus || 0, error.message); }
