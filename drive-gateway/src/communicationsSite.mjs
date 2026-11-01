@@ -1202,7 +1202,13 @@ export function createCommunicationsSiteRouter(deps) {
         context: "edit", status: "any", per_page: "50", orderby: "modified", order: "desc"
       });
       const search = cleanText(url.searchParams.get("search"), 101);
-      if (search) listParams.set("search", search);
+      if (search) {
+        listParams.set("search", search);
+        listParams.append("search_columns[]", "post_title");
+      }
+      const requestedStatus = String(url.searchParams.get("status") || "").toLowerCase();
+      const allowedStatuses = new Set(["publish", "draft", "pending", "private", "future", "trash"]);
+      if (requestedStatus && allowedStatuses.has(requestedStatus)) listParams.set("status", requestedStatus);
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "?" + listParams.toString(), {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
