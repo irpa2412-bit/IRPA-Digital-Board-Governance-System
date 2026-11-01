@@ -389,7 +389,7 @@ test("authenticated staging image upload accepts safe image types and records an
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST",
-    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/4QAGRXhpZgAA/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/4QAHRXhpZgD/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
   });
   assert.equal(result.status, 200);
   const data = await result.json();
