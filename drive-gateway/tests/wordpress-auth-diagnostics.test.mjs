@@ -147,3 +147,23 @@ test("empty non-WordPress 401 response is classified as likely Authorization str
     globalThis.fetch = originalFetch;
   }
 });
+
+test("staging host-guard rejection is classified separately from a WordPress HTTP 401", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error("WordPress must not be contacted when the host guard blocks"); };
+  try {
+    const response = await status(router, env({ WORDPRESS_BASE_URL: "https://www.irpa.or.tz" }));
+    const data = (await response.json()).connections;
+    assert.equal(data.workerEnvironment, "staging");
+    assert.equal(data.configuredWordPressHost, "www.irpa.or.tz");
+    assert.equal(data.websiteHostGuardBlocked, true);
+    assert.equal(data.websiteDiagnosticCategory, "irpa_host_guard");
+    assert.equal(data.websiteDiagnosticCode, "wordpress_host_not_allowed_for_environment");
+    assert.equal(data.websiteHttpStatus, undefined);
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
