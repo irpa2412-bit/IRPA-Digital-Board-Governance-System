@@ -185,3 +185,31 @@ test("document lifecycle opens its existing signature envelope instead of prepar
   assert.match(platform, /setSelected\(envelope\);setTab\("Sign Document"\)/);
   assert.match(platform, /a duplicate envelope was not created/);
 });
+
+
+test("Signature Pathway diagnostics batch one document per Worker request with bounded concurrency and retry", async () => {
+  const [ui, worker, diagnostics, readiness, batch] = await Promise.all([
+    read("../src/components/SignaturePathwaySelfTest.jsx"),
+    read("../drive-gateway/src/index.js"),
+    read("../drive-gateway/src/controlledDocumentDiagnostics.mjs"),
+    read("../drive-gateway/src/releaseReadinessRoutes.mjs"),
+    read("../src/utils/controlledDocumentDiagnosticBatch.mjs")
+  ]);
+  assert.match(ui, /reconcileSignatureDocumentIds\(oneDocument, options\)/);
+  assert.match(batch, /requestDocument\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
+  assert.match(batch, /Math\.max\(1, Math\.min\(3, Number\(concurrency\)/);
+  assert.match(batch, /Math\.min\(limit, rows\.length\)/);
+  assert.match(batch, /maxRetries = 3/);
+  assert.match(batch, /attempt <= attemptsLimit/);
+  assert.match(ui, /maxRetries: 3/);
+  assert.match(ui, /role="progressbar"/);
+  const route = worker.slice(worker.indexOf("async function reconcileSignatureDocumentIds"), worker.indexOf("async function controlledDocumentUploadPolicyCheck"));
+  assert.match(route, /body\.documents\.length !== 1/);
+  assert.match(route, /Exactly one controlled document must be checked per Worker request/);
+  assert.match(route, /fields=id,name,mimeType,size,description,trashed,parents,createdTime/);
+  assert.match(route, /alt=media/);
+  assert.match(route, /diagnostic\.driveDescription/);
+  assert.doesNotMatch(route, /const metadata=await diagnosticFetch/);
+  assert.match(diagnostics, /diagnostic\.driveDescription = metadata\.description/);
+  assert.match(readiness, /documents: \[\{ documentId: "wiAfPSIxHLTd6MdeM04q"/);
+});

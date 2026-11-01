@@ -21,7 +21,8 @@ function fixture({ admin = true, gateEnabled = false } = {}) {
       assert.equal(request.method, "POST");
       const body = await request.json();
       assert.equal(body.dryRun, true);
-      assert.deepEqual(body.documents, []);
+      assert.equal(body.autoDiscover, false);
+      assert.deepEqual(body.documents, [{ documentId: "wiAfPSIxHLTd6MdeM04q", fileId: "" }]);
       calls.push("reconcile");
       return new Response(JSON.stringify({ ok: true, dryRun: true, writesPerformed: false }), { status: 200 });
     }

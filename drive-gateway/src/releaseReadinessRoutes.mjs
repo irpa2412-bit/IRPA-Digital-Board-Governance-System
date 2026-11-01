@@ -83,7 +83,7 @@ export function createReleaseReadinessRoute(deps) {
 
     try {
       const reconcileRequest = new Request(new URL("/api/signature-pathway/reconcile", request.url), {
-        method: "POST", headers: request.headers, body: JSON.stringify({ dryRun: true, documents: [] })
+        method: "POST", headers: request.headers, body: JSON.stringify({ dryRun: true, autoDiscover: false, documents: [{ documentId: "wiAfPSIxHLTd6MdeM04q", fileId: "" }] })
       });
       const response = await deps.reconcileSignatureDocumentIds(reconcileRequest, env);
       const data = await response.json();

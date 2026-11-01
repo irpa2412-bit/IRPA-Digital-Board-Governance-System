@@ -1,17 +1,51 @@
 import React, { useState } from "react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
-import { downloadControlledDocumentBytes, reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
+import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
+import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
 
 function driveFileId(record = {}) {
   return String(record.fileId || record.driveFileId || record.sourceFileId || record.archiveFileId || record.governanceArchiveFileId || record.primaryArchiveFileId || "").trim();
+}
+
+function diagnosticRow(item, result) {
+  const detail = [
+    "Classification: " + (result.classification || result.status || "UNKNOWN"),
+    "Exact failing step: " + (result.step || "(none)"),
+    "HTTP status: " + (result.httpStatus ?? "(none)"),
+    "Drive error reason: " + (result.driveErrorReason || "(none)"),
+    "Drive mimeType: " + (result.mimeType || "(not returned)"),
+    "Drive size: " + (result.driveSize ?? "(not returned)") + " bytes; stored size: " + (result.storedSize ?? "(not recorded)") + " bytes",
+    "Stored SHA-256: " + (result.storedSha256 || "(not recorded)"),
+    "Computed SHA-256: " + (result.computedSha256 || "(not computed)"),
+    "Trashed: " + (result.trashed == null ? "(not returned)" : String(result.trashed)),
+    "Parents: " + (Array.isArray(result.parents) ? result.parents.join(", ") : "(not returned)"),
+    "Drive created: " + (result.createdTime || "(not returned)"),
+    "Uploaded by: " + (result.uploadedBy || "(not recorded)"),
+    "Uploaded at: " + (result.uploadedAt || "(not recorded)"),
+    "PDF parses: " + (result.pdfParses == null ? "(not checked)" : String(result.pdfParses)),
+    "PDF pages: " + (result.pdfPageCount ?? "(not parsed)") + "; stored page count: " + (result.storedPageCount ?? "(not recorded)"),
+    result.pageCountComparison || "",
+    "Drive description.documentId: " + (result.previousDescriptionDocumentId || "(not checked)"),
+    "Reason: " + (result.reason || "(no reason returned)")
+  ].filter(Boolean).join("\n");
+  return {
+    documentId: item.documentId,
+    title: result.title || item.title || item.fileName || item.reference || item.documentId,
+    checks: [{
+      name: (result.status || "unreadable") + " · " + (result.fileId || driveFileId(item) || "no file ID"),
+      status: result.status === "match" ? "PASS" : result.status === "mismatch" ? "NEEDS REVIEW" : "FAIL",
+      reason: "Firestore ID: " + item.documentId + "; file ID: " + (result.fileId || driveFileId(item) || "(none)") + "\n" + detail
+    }],
+    diagnostic: result
+  };
 }
 
 export default function SignaturePathwaySelfTest() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Ready. Run the test to inspect registered controlled documents.");
   const [results, setResults] = useState([]);
-  const [documents, setDocuments] = useState([]);
+  const [progress, setProgress] = useState({ completed: 0, total: 0, active: 0 });
 
   async function requireAdministrator() {
     const user = auth.currentUser;
@@ -21,76 +55,26 @@ export default function SignaturePathwaySelfTest() {
     if (!admin.exists() || admin.data()?.active !== true) throw new Error("STEP administrator check failed: active administrator access is required.");
   }
 
-  async function runChecks() {
+  async function reconcile() {
     setBusy(true);
-    setMessage("Running Signature Pathway Self-Test…");
     setResults([]);
+    setProgress({ completed: 0, total: 0, active: 0 });
+    setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 times (4 total attempts). No changes will be made.");
     try {
       await requireAdministrator();
       const snapshot = await getDocs(collection(db, "documents"));
-      const rows = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-      setDocuments(rows);
-      const output = [];
-      for (const item of rows) {
-        const row = { documentId: item.id, title: item.title || item.fileName || item.reference || item.id, checks: [] };
-        row.checks.push({ name: "Firestore document found", status: "PASS", reason: "documents/" + item.id + " was returned by Firestore." });
-        const storedId = String(item.documentId || "").trim();
-        row.checks.push({ name: "ID contract", status: !storedId || storedId === item.id ? "PASS" : "FAIL", reason: !storedId ? "Firestore key documents/" + item.id + " is canonical; no conflicting documentId field is stored." : storedId === item.id ? "Firestore key and documentId field both equal " + item.id + "." : "Mismatch: Firestore key=" + item.id + "; stored documentId field=" + storedId + "." });
-        const fileId = driveFileId(item);
-        if (!fileId) {
-          row.checks.push({ name: "Drive reachability / gateway route", status: "FAIL", reason: "No registered Drive file ID was found on this document." });
-        } else {
-          try {
-            await downloadControlledDocumentBytes(fileId, item.id);
-            row.checks.push({ name: "Drive reachability / gateway route", status: "PASS", reason: "Gateway returned the controlled PDF bytes for Drive file " + fileId + "." });
-          } catch (error) {
-            row.checks.push({ name: "Drive reachability / gateway route", status: "FAIL", reason: "STEP controlled download failed for documentId=" + item.id + ", fileId=" + fileId + ": " + (error?.message || "Unknown gateway error") });
-          }
-        }
-        row.checks.push({ name: "Add-signer write", status: "NOT RUN", reason: "No real envelope or signer was written by the self-test. Use the explicit Add Signer action to verify its write without creating hidden test records." });
-        output.push(row);
-        setResults([...output]);
-      }
-      setMessage("Self-test finished. " + rows.length + " document(s) checked. Read each FAIL reason; Add-signer write is explicitly marked NOT RUN.");
-    } catch (error) {
-      setMessage(error?.message || "STEP self-test failed without a returned reason.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function reconcile() {
-    setBusy(true);
-    setMessage("Read-only diagnostic: inspecting Drive metadata, downloaded bytes, hashes, sizes and PDF structure. No changes will be made.");
-    try {
-      await requireAdministrator();
-      const result = await reconcileSignatureDocumentIds([], { autoDiscover: true, dryRun: true });
-      const lines = (result.results || []).map(item => {
-        const detail = [
-          "Classification: " + (item.classification || item.status || "UNKNOWN"),
-          "Exact failing step: " + (item.step || "(none)"),
-          "HTTP status: " + (item.httpStatus ?? "(none)"),
-          "Drive error reason: " + (item.driveErrorReason || "(none)"),
-          "Drive mimeType: " + (item.mimeType || "(not returned)"),
-          "Drive size: " + (item.driveSize ?? "(not returned)") + " bytes; stored size: " + (item.storedSize ?? "(not recorded)") + " bytes",
-          "Stored SHA-256: " + (item.storedSha256 || "(not recorded)"),
-          "Computed SHA-256: " + (item.computedSha256 || "(not computed)"),
-          "Trashed: " + (item.trashed == null ? "(not returned)" : String(item.trashed)),
-          "Parents: " + (Array.isArray(item.parents) ? item.parents.join(", ") : "(not returned)"),
-          "Drive created: " + (item.createdTime || "(not returned)"),
-          "Uploaded by: " + (item.uploadedBy || "(not recorded)"),
-          "Uploaded at: " + (item.uploadedAt || "(not recorded)"),
-          "PDF parses: " + (item.pdfParses == null ? "(not checked)" : String(item.pdfParses)),
-          "PDF pages: " + (item.pdfPageCount ?? "(not parsed)") + "; stored page count: " + (item.storedPageCount ?? "(not recorded)"),
-          item.pageCountComparison || "",
-          "Drive description.documentId: " + (item.previousDescriptionDocumentId || "(not checked)"),
-          "Reason: " + (item.reason || "(no reason returned)")
-        ].filter(Boolean).join("\n");
-        return { documentId:item.documentId, title:item.title || item.documentId, checks:[{name:item.status + " · Drive " + item.fileId,status:item.status === "match" ? "PASS" : item.status === "mismatch" ? "NEEDS REVIEW" : "FAIL",reason:"Firestore ID: " + item.documentId + "; Drive file ID: " + item.fileId + "\n" + detail}], diagnostic:item };
-      });
-      setResults(lines);
-      const summary = result.summary || {};
-      setMessage("Read-only diagnostics completed; no metadata or document was changed. " + (summary.match || 0) + " match; " + (summary.mismatch || 0) + " mismatch; " + (summary.unreadable || 0) + " unreadable. Every discovered document has a result line, including wiAfPSIxHLTd6MdeM04q.");
+      const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
+      setProgress({ completed: 0, total: rows.length, active: 0 });
+      const diagnostics = await runControlledDocumentDiagnosticBatch(
+        rows,
+        (oneDocument, options) => reconcileSignatureDocumentIds(oneDocument, options),
+        { concurrency: 3, maxRetries: 3, onProgress: setProgress }
+      );
+      const output = rows.map((item, index) => diagnosticRow(item, diagnostics[index]));
+      setResults(output);
+      const failed = output.filter(row => row.checks[0].status === "FAIL").length;
+      const review = output.filter(row => row.checks[0].status === "NEEDS REVIEW").length;
+      setMessage("Read-only diagnostics completed. " + rows.length + " document(s) checked using exactly one document per Worker request (maximum concurrency 3; up to 3 retries (4 total attempts) per document); " + (rows.length - failed - review) + " pass, " + review + " need review, " + failed + " fail. No metadata or document was changed.");
     } catch (error) {
       setMessage("Read-only diagnostic failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
     } finally {
@@ -100,6 +84,7 @@ export default function SignaturePathwaySelfTest() {
 
   return <section className="panel">
     <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Read-only inspection of every registered controlled document: Drive metadata, download, SHA-256, byte size and PDF parsing. No document, Drive file or Firestore record is repaired or changed.</p></div></div>
+    {progress.total > 0 && <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:13,marginBottom:5}}><strong>Document checks</strong><span>{progress.completed} / {progress.total} · {progress.active} active (max 3)</span></div><div role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.completed} style={{height:10,borderRadius:99,overflow:"hidden",background:"var(--border)"}}><div style={{height:"100%",width:(progress.total ? progress.completed / progress.total * 100 : 0)+"%",background:"var(--accent,#2563eb)",transition:"width .2s"}} /></div></div>}
     <div className="auth-message" role="status" aria-live="polite" style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginBottom:12}}>{message}</div>
     <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={() => reconcile()} disabled={busy}>{busy ? "Working…" : "Run Self-Test & Drive Diagnostics"}</button><button type="button" className="secondary-button" onClick={() => { const report = results.map(row => [row.title || row.documentId, "Firestore ID: " + row.documentId, ...row.checks.map(check => check.status + ": " + check.name + "\n" + check.reason)].join("\n")).join("\n\n"); navigator.clipboard.writeText(report).then(() => setMessage("Full diagnostic report copied to clipboard.")).catch(error => setMessage("Copy failed: " + (error?.message || "Clipboard access unavailable."))); }} disabled={!results.length}>Copy report</button></div>
     {results.map((row,index)=><article key={row.documentId + "-" + index} className="panel" style={{marginBottom:10,padding:12}}>

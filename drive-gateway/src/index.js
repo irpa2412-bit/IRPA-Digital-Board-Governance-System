@@ -1186,6 +1186,9 @@ async function reconcileSignatureDocumentIds(request, env) {
   if (body?.repairMismatches === true) return json({ok:false,error:"This diagnostic endpoint is read-only. Document and Drive metadata repair is not permitted."},400,corsHeaders(request));
   const dryRun = true;
   const autoDiscover = body?.autoDiscover === true || !Array.isArray(body.documents) || body.documents.length === 0;
+  if (autoDiscover || !Array.isArray(body.documents) || body.documents.length !== 1) {
+    return json({ok:false,error:"Exactly one controlled document must be checked per Worker request. Discover documents in the browser and submit individual document IDs.",writesPerformed:false,driveMutationsPerformed:false},400,corsHeaders(request));
+  }
   const firestoreToken = await getFirestoreAdminAccessToken(env);
   let items = Array.isArray(body.documents) ? body.documents : [];
   if (autoDiscover) {
@@ -1224,7 +1227,7 @@ async function reconcileSignatureDocumentIds(request, env) {
   const results = [];
   for (const item of items) {
     const documentId = String(item?.documentId || "").trim();
-    const fileId = String(item?.fileId || item?.driveFileId || item?.archiveFileId || item?.governanceArchiveFileId || item?.sourceFileId || item?.primaryArchiveFileId || "").trim();
+    let fileId = String(item?.fileId || item?.driveFileId || item?.archiveFileId || item?.governanceArchiveFileId || item?.sourceFileId || item?.primaryArchiveFileId || "").trim();
     const title = String(item?.title || item?.fileName || item?.reference || documentId || "Untitled");
     const line = {documentId:documentId || "(missing Firestore ID)",fileId:fileId || "(missing Drive file ID)",title,status:"unreadable",reason:"",classification:"UNKNOWN"};
     try {
@@ -1233,6 +1236,8 @@ async function reconcileSignatureDocumentIds(request, env) {
       if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
       const data = firestoreDocumentToPlain(record) || {};
       const registeredIds = [data.fileId,data.driveFileId,data.archiveFileId,data.governanceArchiveFileId,data.sourceFileId,data.primaryArchiveFileId].filter(Boolean).map(String);
+      fileId = fileId || String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim();
+      line.fileId = fileId || "(missing Drive file ID)";
       if (!fileId) {
         line.classification="FILE_MISSING"; line.step="Drive metadata call"; line.driveErrorReason="notFound"; line.reason="FILE_MISSING at Drive metadata call: No registered Drive file ID exists on this Firestore document.";
       } else if (!registeredIds.includes(fileId)) {
@@ -1250,8 +1255,7 @@ async function reconcileSignatureDocumentIds(request, env) {
         Object.assign(line,diagnostic);
         if(diagnostic.classification!=="OK"){line.status="unreadable";line.reason=diagnostic.classification+" at "+diagnostic.step+": "+diagnostic.reason;}
         else {
-          const metadata=await diagnosticFetch(`/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,description`);
-          const description=parseDescription(metadata.description);
+          const description=parseDescription(diagnostic.driveDescription);
           if(!description?.irpaGovernance){line.status="unreadable";line.classification="UNKNOWN";line.step="Drive metadata validation";line.reason="UNKNOWN at Drive metadata validation: Drive file is not marked as an IRPA governance document.";}
           else {
             const previousDocumentId=String(description.documentId||"");line.previousDescriptionDocumentId=previousDocumentId||"(missing)";
