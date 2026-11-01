@@ -867,24 +867,27 @@ export function createCommunicationsSiteRouter(deps) {
       const endpoint=wp.root+"/wp-json/wp/v2/media";
       const safeFilename=meta.filename.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
       const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
+      const responseDetail = response.ok ? null : await wordpressResponseDetail(response,wp,"media_upload");
       const uploaded=await response.json().catch(()=>null);
       if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
-        const detail=await wordpressResponseDetail(response,wp,"media_upload");
+        const detail=responseDetail;
         return json({error:"WordPress media upload failed (HTTP "+response.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:response.status,detail},response.status||502,corsHeaders(request));
       }
       const update={title,alt_text:altText,caption};
       if(destination!=="media-library")update.post=Number(input.parentId||input.postId);
       const metadata=await wordpressEditorFetch(wp,endpoint+"/"+uploaded.id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify(update),signal:AbortSignal.timeout(20000)});
+      const metadataDetail = metadata.ok ? null : await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
       const media=await metadata.json().catch(()=>null);
       if(!metadata.ok||Number(media?.id)!==uploaded.id){
-        const detail=await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
+        const detail=metadataDetail;
         return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status,detail},502,corsHeaders(request));
       }
       if(destination==="featured"){
         const kind=String(input.parentType||"posts")==="pages"?"pages":"posts",id=Number(input.parentId||input.postId);
         const parent=await wordpressEditorFetch(wp,wp.root+"/wp-json/wp/v2/"+kind+"/"+id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify({featured_media:uploaded.id}),signal:AbortSignal.timeout(20000)});
+        const parentDetail = parent.ok ? null : await wordpressResponseDetail(parent,wp,"featured_media_attach");
         if(!parent.ok){
-          const detail=await wordpressResponseDetail(parent,wp,"featured_media_attach");
+          const detail=parentDetail;
           return json({error:"Media uploaded, but featured-image assignment failed (HTTP "+parent.status+").",httpStatus:parent.status,detail},502,corsHeaders(request));
         }
       }
