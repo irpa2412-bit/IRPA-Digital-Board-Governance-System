@@ -25,18 +25,21 @@ test("controlled upload allocates one Firestore ID before gateway upload and wri
   assert.match(uploadRoute, /documentId,\s*documentUid:documentId/);
 });
 
-test("reconcile route authorizes administrators, verifies registered file ownership, and returns a line per file", async () => {
+test("reconcile route authorizes administrators, diagnoses each registered file and remains read-only", async () => {
   const worker = await read("../drive-gateway/src/index.js");
   const route = worker.slice(worker.indexOf("async function reconcileSignatureDocumentIds"), worker.indexOf("async function uploadControlledDocument"));
   assert.match(worker, /api\/signature-pathway\/reconcile/);
   assert.match(route, /adminProfiles/);
   assert.match(route, /registeredIds\.includes\(fileId\)/);
   assert.match(route, /description\.documentId/);
-  assert.match(route, /method:"PATCH"/);
+  assert.match(route, /diagnoseControlledDocument/);
+  assert.match(route, /fields=id,name,mimeType,size,description,trashed,parents,createdTime/);
+  assert.match(route, /alt=media/);
   assert.match(route, /results\.push\(line\)/);
-  assert.match(route, /already correct/);
-  assert.match(route, /status = "repaired"/);
-  assert.match(route, /status = "failed"/);
+  assert.match(route, /body\?\.repairMismatches === true/);
+  assert.match(route, /This diagnostic endpoint is read-only/);
+  assert.match(route, /writesPerformed:false,driveMutationsPerformed:false/);
+  assert.doesNotMatch(route, /method:"PATCH"/);
 });
 
 test("signature palette exposes readable errors in an accessible visible status area", async () => {
