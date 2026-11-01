@@ -1,6 +1,8 @@
 name: Authenticated Cross-Portal Browser Fixture
 
 on:
+  push:
+    branches: ["diagnostic/upload-production-bundle-main-20261101"]
   pull_request:
     paths:
       - "src/styles/portal-readability-standard.css"
@@ -21,7 +23,7 @@ on:
       - "firebase.emulator.test.json"
       - "firestore.rules"
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: authenticated-cross-portal-fixture-${{ github.ref }}
@@ -56,6 +58,16 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Authenticate against isolated Firebase Auth and Firestore emulators; run full suite three times at mobile, tablet and desktop sizes
         run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --repeat-each=3 --workers=1"
+      - name: Commit upload diagnostics when the production bundle regression fails
+        if: always()
+        run: |
+          if [ -f docs/diagnostics/upload-production-bundle.md ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/diagnostics/upload-production-bundle.md
+            git commit -m "docs: record upload production bundle failure diagnostics" || true
+            git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          fi
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@v4
