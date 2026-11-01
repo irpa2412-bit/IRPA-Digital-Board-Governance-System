@@ -70,7 +70,7 @@ The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files,
 
 ## Required Cloudflare Worker secrets
 Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
-- `WORDPRESS_BASE_URL`: the dedicated staging WordPress origin `https://staging.irpa.or.tz` with no path, credentials, query or fragment. The editor rejects `irpa.or.tz`, `www.irpa.or.tz`, and `https://irpa.or.tz/staging` because those use the production hostname; do not bypass this guard.
+- `WORDPRESS_BASE_URL`: the HTTPS WordPress origin for the Worker environment, with no path, credentials, query or fragment. Staging accepts only `https://staging.irpa.or.tz`; production accepts only `https://irpa.or.tz` or `https://www.irpa.or.tz`. The gateway rejects a production hostname with a `/staging` path; do not bypass this guard.
 - `WORDPRESS_USERNAME`: dedicated WordPress integration account.
 - `WORDPRESS_APPLICATION_PASSWORD`: application password for that dedicated account.
 - `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
