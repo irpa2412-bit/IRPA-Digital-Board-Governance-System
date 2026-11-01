@@ -389,6 +389,11 @@ export function createCommunicationsSiteRouter(deps) {
     };
   }
 
+  function websiteMediaMaxBytes(env) {
+    const configuredLimit = Number(env.WORDPRESS_MEDIA_MAX_BYTES || 5 * 1024 * 1024);
+    return Number.isSafeInteger(configuredLimit) && configuredLimit > 0 ? Math.min(configuredLimit, 8 * 1024 * 1024) : 5 * 1024 * 1024;
+  }
+
   async function readPostTaxonomies(wp) {
     const result = { categories: [], tags: [] };
     for (const taxonomy of ["categories", "tags"]) {
@@ -787,8 +792,7 @@ export function createCommunicationsSiteRouter(deps) {
       const encoded = String(input.dataBase64 || "");
       const altText = cleanText(input.altText, 250);
       const caption = cleanText(input.caption, 500);
-      const configuredLimit = Number(env.WORDPRESS_MEDIA_MAX_BYTES || 5 * 1024 * 1024);
-      const maxBytes = Number.isSafeInteger(configuredLimit) && configuredLimit > 0 ? Math.min(configuredLimit, 8 * 1024 * 1024) : 5 * 1024 * 1024;
+      const maxBytes = websiteMediaMaxBytes(env);
       const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
       if (!filename || !allowedTypes.has(contentType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return json({ error: "Choose a JPEG, PNG, WebP or GIF image." }, 400, corsHeaders(request));
       if (!altText) return json({ error: "Alternative text is required for every uploaded image." }, 400, corsHeaders(request));
@@ -836,7 +840,7 @@ export function createCommunicationsSiteRouter(deps) {
       await verifyDedicatedWordPressEditor(wp);
       const terms = await readPostTaxonomies(wp);
       const yoast = await readYoastWritableFields(wp);
-      return json({ ...terms, yoast: { writable: yoast.fields, available: yoast.fields.length > 0 } }, 200, corsHeaders(request));
+      return json({ ...terms, maxImageBytes: websiteMediaMaxBytes(env), yoast: { writable: yoast.fields, available: yoast.fields.length > 0 } }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/content" && request.method === "POST") {
