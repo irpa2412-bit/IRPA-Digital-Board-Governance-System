@@ -833,7 +833,7 @@ export function createCommunicationsSiteRouter(deps) {
         catch(error){return json({error:error.message},415,corsHeaders(request));}
       }
       let meta;
-      try{meta=validateWebsiteMedia({filename,contentType,bytes});}
+      try{meta=validateWebsiteMedia({filename,contentType,bytes});bytes=stripImageMetadata(contentType,bytes);meta={...meta,size:bytes.byteLength};}
       catch(error){return json({error:error.message},415,corsHeaders(request));}
       const destination=String(input.destination||"media-library");
       if(!["media-library","attach","featured"].includes(destination))return json({error:"Select WordPress Media Library, page/post attachment or featured image."},400,corsHeaders(request));
