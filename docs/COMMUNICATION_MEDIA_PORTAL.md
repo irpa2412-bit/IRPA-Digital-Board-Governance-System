@@ -69,6 +69,7 @@ Set these as Worker secrets in the correct environment; never commit them or pas
 - `WORDPRESS_BASE_URL`: the canonical HTTPS WordPress origin for the serving Worker environment, with no path, credentials, query or fragment. Staging accepts only `https://staging.irpa.or.tz`; production accepts only `https://irpa.or.tz` or `https://www.irpa.or.tz`. The production hostname allowlist is enforced by source and must not be widened; a `/staging` path on a production hostname is not accepted as staging.
 - `WORDPRESS_USERNAME`: dedicated WordPress integration account.
 - `WORDPRESS_APPLICATION_PASSWORD`: application password for that dedicated account.
+- `WORDPRESS_MEDIA_MAX_BYTES` (optional non-secret Worker variable): per-image upload limit in bytes, accepted from 1 MiB to 20 MiB; defaults to 5 MiB when unset or invalid. The browser reports per-file progress while the Worker enforces the configured limit. Keep this limit conservative; changing it does not change accepted image MIME types.
 - `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
 - `CPANEL_USERNAME`: the cPanel account username.
 - `CPANEL_API_TOKEN`: a cPanel API token with only the required account-level permissions.
