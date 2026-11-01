@@ -48,12 +48,12 @@ The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social
 
 ## Website and cPanel access
 
-WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. Editing is enabled only in the staging Worker against `https://staging.irpa.or.tz`; the production hostname, including a `/staging` path on that hostname, is rejected.
+WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. The Worker permits only `staging.irpa.or.tz` in staging and only `irpa.or.tz` or `www.irpa.or.tz` in production. The production allowlist is intentional; a `/staging` path does not make a production hostname a staging host.
 The portal calls the existing Cloudflare Worker routes:
-- `GET /api/communications/site/status` — verifies the isolated staging WordPress connection without returning credentials.
-- `GET /api/communications/website/content?type=posts|pages` — lists up to 50 staging pages or posts.
-- `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one staging item with edit-context fields.
-- `PUT /api/communications/website/content` — updates only title, content, excerpt, featured image ID and status (`draft` or `publish`).
+- `GET /api/communications/site/status` — verifies the WordPress connection for the serving Worker environment without returning credentials.
+- `GET /api/communications/website/content?type=posts|pages` — lists up to 50 pages or posts from the configured WordPress environment.
+- `GET /api/communications/website/content/pages/{id}` or `/posts/{id}` — reads one item from the configured WordPress environment with edit-context fields.
+- `PUT /api/communications/website/content` — updates allowlisted title, content, excerpt, featured image and draft fields; public publication remains restricted to the independent approved communications workflow.
 - `GET /api/communications/website/revisions?type=pages|posts&id={id}` — lists native WordPress revisions and complete pre-edit snapshots.
 - `POST /api/communications/website/restore` — restores a saved snapshot or WordPress revision; a pre-restore snapshot is saved first.
 - `POST /api/communications/website/publish` — retains the existing approved article/press-release workflow and deterministic-slug reconciliation.
@@ -66,9 +66,11 @@ The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files,
 
 ## Required Cloudflare Worker secrets
 Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
-- `WORDPRESS_BASE_URL`: the dedicated staging WordPress origin `https://staging.irpa.or.tz` with no path, credentials, query or fragment. The editor rejects `irpa.or.tz`, `www.irpa.or.tz`, and `https://irpa.or.tz/staging` because those use the production hostname; do not bypass this guard.
+- `WORDPRESS_BASE_URL`: the canonical HTTPS WordPress origin for the serving Worker environment, with no path, credentials, query or fragment. Staging accepts only `https://staging.irpa.or.tz`; production accepts only `https://irpa.or.tz` or `https://www.irpa.or.tz`. The production hostname allowlist is enforced by source and must not be widened; a `/staging` path on a production hostname is not accepted as staging.
 - `WORDPRESS_USERNAME`: dedicated WordPress integration account.
 - `WORDPRESS_APPLICATION_PASSWORD`: application password for that dedicated account.
+- `WORDPRESS_MEDIA_MAX_BYTES` (optional non-secret Worker variable): per-image upload limit in bytes, accepted from 1 MiB to 20 MiB; defaults to 5 MiB when unset or invalid. The browser reports per-file progress while the Worker enforces the configured limit. Keep this limit conservative; changing it does not change accepted image MIME types.
+- `WORDPRESS_MEDIA_MAX_BYTES` (optional non-secret Worker variable): per-image upload limit in bytes, accepted from 1 MiB to 20 MiB; defaults to 5 MiB when unset or invalid. The browser reports per-file progress while the Worker enforces the configured limit. Keep this limit conservative; changing it does not change accepted image MIME types.
 - `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
 - `CPANEL_USERNAME`: the cPanel account username.
 - `CPANEL_API_TOKEN`: a cPanel API token with only the required account-level permissions.
@@ -102,20 +104,21 @@ Before any staging WordPress file or page write, configure protected Actions sec
 - Every website and cPanel route verifies the Firebase ID token at the Cloudflare Worker.
 - WordPress page/post edits and restores require an active registered Communication & Media role or an active administrator profile; broader reviewer roles alone are insufficient. The cPanel static-file editor retains its separate reviewer gate. Credentials stay server-side.
 - Website publishing is limited to approved website articles and press releases.
-- Before every page/post edit or restore, the Worker saves a complete pre-edit snapshot in the staging Worker KV namespace, records the current WordPress revision ID, and writes an audit event with actor, action, timestamp and page/post ID. The update is then verified by re-reading the item; the saved snapshot appears in revision history and can be restored with one click. Audit entries contain no WordPress credentials or content secrets.
+- Before every page/post edit or restore, the Worker saves a complete pre-edit snapshot in the KV namespace bound to the serving Worker environment (production or staging), records the current WordPress revision ID, and writes an audit event with actor, action, timestamp and page/post ID. The update is then verified by re-reading the item; the saved snapshot appears in revision history and can be restored with one click. Audit entries contain no WordPress credentials or content secrets.
 - cPanel writes are restricted to static content file types and record an audit event.
 - No Firebase Functions callable is required for website publishing, avoiding a new Cloud Functions billing dependency.
 
 ## Acceptance and release gates
 1. Run `npm run test:communication-media`, the full required test suite, production build, gateway syntax/security tests and browser regression checks.
 2. Verify role-denial behavior for unauthenticated and non-reviewer users.
-3. Verify the staging WordPress `users/me` status code is 200, list and read a test page/post, edit only allowlisted fields, verify the edit, and restore the saved snapshot exactly. Verify a non-Communication & Media user is refused. Check logs and audit events for secrets. Also verify approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
+3. Verify the staging WordPress `users/me` status code is 200, list and read a dedicated test page/post, edit only allowlisted fields, verify the edit, and restore the saved snapshot exactly. Verify a non-Communication & Media user is refused. Check logs and audit events for secrets. Also verify approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
 4. Verify cPanel token authentication, permitted file listing/read/write, path traversal rejection, executable-file rejection and audit evidence against isolated staging hosting.
 5. Confirm the public page after a staged edit and verify the previous content is preserved for rollback.
 6. Verify desktop and mobile portal usability and ensure unrelated governance portals retain existing behavior.
-7. Merge only after all required checks pass; deploy and live-verify only after staging acceptance. Do not claim live integration until the secret-backed connection checks and actual test writes succeed.
+7. Staging acceptance is a pre-release safety check, not the operational destination. Once the change is reviewed and an authorised production deployment is approved, verify the production Worker reports the production environment and the configured WordPress host is exactly `irpa.or.tz` or `www.irpa.or.tz`. Confirm authenticated `users/me` returns the dedicated Editor account, load production pages/posts and taxonomies, then create a clearly labelled non-public draft and upload a small approved test image only if the organisation authorises that production test. Verify the draft status, media alt text/caption, featured image, audit events and editorial-record linkage. Remove any test draft/media only through an explicitly approved cleanup action; do not delete or alter existing public content during acceptance.
+8. After the production connection and draft workflow are verified, exercise the independent approval process with an authorised test item and verify that approval publishes the same draft exactly once. Do not bypass reviewer authorization or publish unapproved content. Confirm normal page editing, revision snapshots/restoration, mobile usability and unrelated portal regression status.
 
-Production secrets and deployments must not be changed merely by merging this code.
+Production is the intended operational WordPress destination. Staging remains an isolated test environment. Production secrets and deployments must not be changed merely by merging this code; deployment and live acceptance require explicit authorization and must be recorded separately from source/CI verification.
 
 ## Supported document and media upload formats
 
@@ -128,6 +131,28 @@ The Media Asset Studio uploads through the authenticated Google Drive gateway; i
 - **Video:** MP4, WEBM, MOV, AVI, MKV.
 
 This is the supported list, not a claim that every proprietary, encrypted, damaged, or future file format is supported. MIME type is checked against the allowlist; unknown types are rejected. Files are stored as originals in the existing Drive pathway and registered as metadata in Firestore. Authenticated download is by Drive file ID. Image adjustments and browser-native audio/video trimming export a new local derivative and never overwrite the original. The current upload route accepts one file per submission; upload additional files as separate submissions.
+
+## Website Studio: new updates and WordPress media
+
+Website Studio now provides a dedicated **New update** flow in addition to editing existing pages and posts.
+
+- New updates let the author select English or Kiswahili and first create a `Draft` communication-media editorial record, then create the matching WordPress post through `POST /api/communications/website/posts`. The editorial record uses the deterministic `irpa-{record-id}` slug; the WordPress draft uses the matching `-en` or `-sw` language-suffixed slug, so language versions remain separate posts. The Worker constructs the WordPress REST payload with `status: "draft"`; callers cannot provide a publication status. The route verifies the returned post is still a draft, re-reads it, and records `COMMUNICATION_WEBSITE_POST_DRAFT_CREATED`. Authors submit the linked editorial record for the existing independent review and approval process. After reviewer approval, the existing publishing route finds and promotes that same WordPress draft to `publish`; the promotion branch is reached only after the existing `Approved` status, type, channel and reviewer authorization checks.
+- `GET /api/communications/website/taxonomies` loads existing WordPress categories and tags for selection. The post payload includes selected category/tag IDs, excerpt and featured-media ID.
+- `POST /api/communications/website/media` uploads JPEG, PNG or WebP images to the configured WordPress REST media endpoint. Each file is limited to 5 MiB; alt text is mandatory and caption optional. Multiple selections are uploaded as separate authenticated requests. The Worker validates file signatures and strips JPEG EXIF/IPTC/comment segments, PNG EXIF/text chunks, and WebP EXIF/XMP chunks before upload. It then writes alt text/caption to the WordPress media record and records the uploader, filename, type, size and media ID in the existing communications website audit trail.
+- Uploaded images are inserted into the article body as figures; the first image becomes the featured image unless the author changes the attachment selection.
+- New updates include an unsaved narrow-phone preview. HTTPS YouTube/Vimeo URLs can be inserted as standalone paragraphs for WordPress oEmbed rendering. Large video files are not uploaded to WordPress; no MP4 upload is implemented.
+- Categories and tags are selected from the configured WordPress taxonomy endpoints. SEO plugin fields are not part of this feature.
+- Upload and post creation retain the existing Firebase authentication, active registered Communication & Media role check, dedicated WordPress Editor verification, server-side host restriction and secret custody. No WordPress credential is sent to the browser or written to logs.
+
+The production WordPress host allowlist remains exactly `irpa.or.tz` and `www.irpa.or.tz`; staging remains restricted to `staging.irpa.or.tz`. This feature does not alter the allowlist, Worker secrets, WordPress configuration or deployment settings.
+
+## Website Studio approval-ready handoff and Yoast REST capability
+
+- After a new WordPress draft is created and re-read successfully, Website Studio presents an approval-ready handoff containing the linked editorial record ID, WordPress post ID, a concise change summary and a sandboxed mobile preview.
+- **Submit for approval** invokes the existing communications records action (`action: "submit"`) for the linked editorial record. The Worker moves the editorial record to **Pending Approval** and writes its existing audit event. This action does not publish the WordPress post. Publication still requires a separate authorised reviewer, the existing Approved status and the existing website publishing gate.
+- Categories and tags are loaded from the existing WordPress taxonomy endpoints and selected by term ID. Website Studio does not create terms; term creation is outside this workflow.
+- Yoast SEO capability is checked at runtime using an authenticated WordPress REST `OPTIONS /wp-json/wp/v2/posts` request. Website Studio checks whether `_yoast_wpseo_metadesc` and `_yoast_wpseo_focuskw` appear as writable properties under the REST `meta` schema. The gateway exposes only boolean capability results and never returns credentials.
+- If a Yoast field is not exposed as writable, Website Studio does not attempt to write it. The safe alternative is to add the meta description and focus keyphrase in the WordPress/Yoast editor on the saved draft before approval. No plugin is installed, enabled, reconfigured or modified. The live site's actual capability result must be confirmed by the production connection after an authorised merge/deployment; source tests use a controlled REST schema fixture and do not prove the live site's Yoast configuration.
 
 ## Live website editor and preview
 

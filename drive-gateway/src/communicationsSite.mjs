@@ -1,3 +1,4 @@
+import { sanitizeWebsiteSvg, validateWebsiteMedia, websiteMediaSha256, validateMediaChunk } from "./websiteMedia.mjs";
 const AUTHOR_ROLES = new Set([
   "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
   "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
@@ -251,11 +252,11 @@ export function createCommunicationsSiteRouter(deps) {
     });
     const user = await response.json().catch(() => null);
     if (!response.ok || !Number.isSafeInteger(user?.id)) {
-      throw new Error("Staging WordPress authentication failed; the integration account was not verified.");
+      throw new Error("Configured WordPress authentication failed; the integration account was not verified.");
     }
     const roles = Array.isArray(user.roles) ? user.roles.map(role => String(role).toLowerCase()) : [];
     if (!roles.includes("editor") || roles.includes("administrator")) {
-      throw new Error("The staging WordPress integration account must have the Editor role and must not be an Administrator.");
+      throw new Error("The WordPress integration account must have the Editor role and must not be an Administrator.");
     }
     return user;
   }
@@ -357,6 +358,71 @@ export function createCommunicationsSiteRouter(deps) {
     return data;
   }
 
+  function stripImageMetadata(contentType, bytes) {
+    const starts = (...signature) => signature.every((value, index) => bytes[index] === value);
+    if (contentType === "image/jpeg" && starts(0xff, 0xd8, 0xff)) {
+      const parts = [bytes.slice(0, 2)];
+      let offset = 2;
+      while (offset < bytes.length) {
+        if (bytes[offset] !== 0xff) throw new Error("Invalid JPEG marker.");
+        let markerOffset = offset;
+        while (bytes[markerOffset] === 0xff) markerOffset++;
+        const marker = bytes[markerOffset];
+        if (marker === 0xda) { parts.push(bytes.slice(offset)); offset = bytes.length; break; }
+        if (marker === 0xd9) { parts.push(bytes.slice(offset, markerOffset + 1)); offset = markerOffset + 1; break; }
+        if (marker >= 0xd0 && marker <= 0xd7 || marker === 0x01) {
+          parts.push(bytes.slice(offset, markerOffset + 1)); offset = markerOffset + 1; continue;
+        }
+        if (markerOffset + 2 >= bytes.length) throw new Error("Truncated JPEG segment.");
+        const length = (bytes[markerOffset + 1] << 8) | bytes[markerOffset + 2];
+        const end = markerOffset + 1 + length;
+        if (length < 2 || end > bytes.length) throw new Error("Invalid JPEG segment length.");
+        if (![0xe1, 0xed, 0xfe].includes(marker)) parts.push(bytes.slice(offset, end));
+        offset = end;
+      }
+      if (offset !== bytes.length) throw new Error("Invalid JPEG end.");
+      const total = parts.reduce((sum, part) => sum + part.length, 0);
+      const output = new Uint8Array(total); let cursor = 0;
+      for (const part of parts) { output.set(part, cursor); cursor += part.length; }
+      return output;
+    }
+    if (contentType === "image/png" && starts(0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a)) {
+      const chunks = [bytes.slice(0, 8)]; let offset = 8; let ended = false;
+      while (offset + 12 <= bytes.length) {
+        const length = new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0);
+        const end = offset + 12 + length;
+        if (end > bytes.length) throw new Error("Truncated PNG chunk.");
+        const name = new TextDecoder().decode(bytes.slice(offset + 4, offset + 8));
+        if (!["eXIf", "tEXt", "zTXt", "iTXt"].includes(name)) chunks.push(bytes.slice(offset, end));
+        offset = end;
+        if (name === "IEND") { ended = true; break; }
+      }
+      if (!ended || offset !== bytes.length) throw new Error("Invalid PNG structure.");
+      const total = chunks.reduce((sum, part) => sum + part.length, 0);
+      const output = new Uint8Array(total); let cursor = 0;
+      for (const part of chunks) { output.set(part, cursor); cursor += part.length; }
+      return output;
+    }
+    if (contentType === "image/webp" && starts(0x52,0x49,0x46,0x46) && new TextDecoder().decode(bytes.slice(8,12)) === "WEBP") {
+      const chunks = [bytes.slice(0, 12)]; let offset = 12;
+      while (offset + 8 <= bytes.length) {
+        const name = new TextDecoder().decode(bytes.slice(offset, offset + 4));
+        const length = new DataView(bytes.buffer, bytes.byteOffset + offset + 4, 4).getUint32(0, true);
+        const end = offset + 8 + length + (length % 2);
+        if (end > bytes.length) throw new Error("Truncated WebP chunk.");
+        if (!["EXIF", "XMP "].includes(name)) chunks.push(bytes.slice(offset, end));
+        offset = end;
+      }
+      if (offset !== bytes.length) throw new Error("Invalid WebP structure.");
+      const total = chunks.reduce((sum, part) => sum + part.length, 0);
+      const output = new Uint8Array(total); let cursor = 0;
+      for (const part of chunks) { output.set(part, cursor); cursor += part.length; }
+      new DataView(output.buffer).setUint32(4, output.length - 8, true);
+      return output;
+    }
+    throw new Error("Image signature does not match MIME type.");
+  }
+
   function isAllowedWordPressLink(value, wp) {
     try {
       const link = new URL(String(value || ""));
@@ -435,7 +501,7 @@ export function createCommunicationsSiteRouter(deps) {
     let stage = "check_storage";
     try {
       if (!env.DRIVE_KV || typeof env.DRIVE_KV.put !== "function") {
-        throw new Error("Staging revision storage is unavailable; no edit was made.");
+        throw new Error("Website revision storage is unavailable; no edit was made.");
       }
       stage = "read_revisions";
       const revisions = await readWebsiteRevisions(wp, type, id);
@@ -471,7 +537,7 @@ export function createCommunicationsSiteRouter(deps) {
     } catch (error) {
       const message = String(error?.message || "");
       if (message === "No current WordPress revision ID is available; no edit was made." ||
-          message === "Staging revision storage is unavailable; no edit was made." ||
+          message === "Website revision storage is unavailable; no edit was made." ||
           message === "The current page/post exceeds the safe revision snapshot limit; no edit was made.") {
         throw error;
       }
@@ -484,7 +550,7 @@ export function createCommunicationsSiteRouter(deps) {
       else if (/is not defined/i.test(message)) category = "reference_error";
       else if (/DataError|InvalidAccessError|OperationError/i.test(message)) category = "crypto_key_import_or_sign_error";
       else if (error?.name === "ReferenceError") category = "reference_error";
-      throw new Error("Staging website snapshot failed at stage " + stage + " (" + category + "); no page edit was made.");
+      throw new Error("Website snapshot failed at stage " + stage + " (" + category + "); no page edit was made.");
     }
   }
 
@@ -751,38 +817,188 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/media" && request.method === "POST") {
       const { claims } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const filename = cleanText(input.filename, 160).replace(/[\\/:*?"<>|]/g, "-");
+      const filename = cleanText(input.filename, 180);
       const contentType = String(input.contentType || "").toLowerCase();
+      const altText = cleanText(input.altText, 250), caption = cleanText(input.caption, 500);
+      const title = cleanText(input.title || filename, 180);
       const encoded = String(input.dataBase64 || "");
-      const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-      if (!filename || !allowedTypes.has(contentType) || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
-        return json({ error: "Choose a JPEG, PNG, WebP or GIF image." }, 400, corsHeaders(request));
+      if (!filename || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || !title) return json({error:"A filename, title and valid base64 file are required."},400,corsHeaders(request));
+      const estimate = Math.floor(encoded.length*3/4)-(encoded.endsWith("==")?2:encoded.endsWith("=")?1:0);
+      const limit = Math.min(20*1024*1024,Math.max(1024,Number(env.WORDPRESS_MEDIA_MAX_BYTES||8*1024*1024)));
+      if(estimate<1||estimate>limit)return json({error:"File exceeds the configured WordPress media limit of "+limit+" bytes."},413,corsHeaders(request));
+      let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      if(contentType==="image/svg+xml"){
+        try{bytes=new TextEncoder().encode(sanitizeWebsiteSvg(new TextDecoder().decode(bytes)));}
+        catch(error){return json({error:error.message},415,corsHeaders(request));}
       }
-      const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
-      if (estimatedBytes < 1 || estimatedBytes > 8 * 1024 * 1024) return json({ error: "Images must be no larger than 8 MiB." }, 413, corsHeaders(request));
-      const binary = atob(encoded);
-      const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+      let meta;
+      try{meta=validateWebsiteMedia({filename,contentType,bytes});}
+      catch(error){return json({error:error.message},415,corsHeaders(request));}
+      const destination=String(input.destination||"media-library");
+      if(!["media-library","attach","featured"].includes(destination))return json({error:"Select WordPress Media Library, page/post attachment or featured image."},400,corsHeaders(request));
+      if(destination!=="media-library"&&!Number.isSafeInteger(Number(input.parentId||input.postId)) )return json({error:"A valid existing page/post ID is required for attachment or featured image."},400,corsHeaders(request));
+      if(["image/jpeg","image/png","image/webp","image/gif"].includes(contentType)&&!altText)return json({error:"Descriptive alt text is required for raster images."},400,corsHeaders(request));
+      const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
+      const endpoint=wp.root+"/wp-json/wp/v2/media";
+      const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+meta.filename.replace(/["\\\r\n]/g,"-")+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
+      const uploaded=await response.json().catch(()=>null);
+      if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp))return json({error:"WordPress media upload failed (HTTP "+response.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:response.status},response.status||502,corsHeaders(request));
+      const update={title,alt_text:altText,caption};
+      if(destination!=="media-library")update.post=Number(input.parentId||input.postId);
+      const metadata=await wordpressEditorFetch(wp,endpoint+"/"+uploaded.id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify(update),signal:AbortSignal.timeout(20000)});
+      const media=await metadata.json().catch(()=>null);
+      if(!metadata.ok||Number(media?.id)!==uploaded.id)return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status},502,corsHeaders(request));
+      if(destination==="featured"){
+        const kind=String(input.parentType||"posts")==="pages"?"pages":"posts",id=Number(input.parentId||input.postId);
+        const parent=await wordpressEditorFetch(wp,wp.root+"/wp-json/wp/v2/"+kind+"/"+id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify({featured_media:uploaded.id}),signal:AbortSignal.timeout(20000)});
+        if(!parent.ok)return json({error:"Media uploaded, but featured-image assignment failed (HTTP "+parent.status+").",httpStatus:parent.status},502,corsHeaders(request));
+      }
+      const sha256=await websiteMediaSha256(bytes),now=new Date().toISOString(),id=crypto.randomUUID();
+      const row={file:meta.filename,title,altText,caption,category:cleanText(input.category,100),tags:Array.isArray(input.tags)?input.tags.map(x=>cleanText(x,60)).slice(0,30):[],destination,url:media.source_url,uploader:claims.user_id,uploaderEmail:claims.email||"",date:now,size:bytes.byteLength,sha256,wordpressMediaId:uploaded.id,status:"Available"};
+      const recordFields=fields(row),auditFields=fields({action:"COMMUNICATION_WEBSITE_MEDIA_REGISTERED",category:"COMMUNICATIONS",collection:"communicationMediaAssets",recordId:id,actorUid:claims.user_id,actorEmail:claims.email||"",details:{file:meta.filename,destination,url:media.source_url,size:bytes.byteLength,sha256},createdAt:now});
+      await commitDocumentAndAudit(env,"communicationMediaAssets/"+id,claims.token,recordFields,Object.keys(row),auditFields,{createOnly:true,collectionName:"communicationMediaAssets"});
+      await recordWebsiteAudit(env,claims,"COMMUNICATION_WEBSITE_MEDIA_UPLOADED","media",uploaded.id,{filename:meta.filename,contentType,size:bytes.byteLength,sha256,destination});
+      return json({success:true,media:{id:uploaded.id,url:media.source_url,title,altText,caption,sha256,size:bytes.byteLength,destination,registerId:id}},200,corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/media/chunk" && request.method === "POST") {
+      const {claims}=await websiteEditorAuthorised(request,env);
+      if(!env.DRIVE_KV)return json({error:"Chunk storage is unavailable; no upload was started."},503,corsHeaders(request));
+      const input=await request.json().catch(()=>({}));
+      try{validateMediaChunk(input);}catch(error){return json({error:error.message},400,corsHeaders(request));}
+      const key="irpa:website-media-chunk:"+input.uploadId+":"+input.index;
+      await env.DRIVE_KV.put(key,String(input.dataBase64),{expirationTtl:3600});
+      return json({success:true,uploadId:input.uploadId,index:input.index},200,corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/media/complete" && request.method === "POST") {
+      const {claims}=await websiteEditorAuthorised(request,env);
+      if(!env.DRIVE_KV)return json({error:"Chunk storage is unavailable; no upload was completed."},503,corsHeaders(request));
+      const input=await request.json().catch(()=>({})),uploadId=String(input.uploadId||"");
+      if(!/^[a-f0-9-]{36}$/i.test(uploadId)||!Number.isInteger(input.total)||input.total<1||input.total>512)return json({error:"Invalid chunk upload manifest."},400,corsHeaders(request));
+      const cp=cpanelConfig(env),relative=String(input.path||"");
+      const safe=safeCpanelPath(relative,cp.documentRoot);
+      const chunks=[];
+      for(let i=0;i<input.total;i++){const chunk=await env.DRIVE_KV.get("irpa:website-media-chunk:"+uploadId+":"+i);if(!chunk)return json({error:"Upload is incomplete; missing chunk "+i+"."},409,corsHeaders(request));chunks.push(chunk);}
+      const encoded=chunks.join("");const size=Math.floor(encoded.length*3/4);
+      const max=Number(env.CPANEL_MEDIA_MAX_BYTES||32*1024*1024);
+      if(size<1||size>max)return json({error:"cPanel media upload exceeds the configured maximum of "+max+" bytes."},413,corsHeaders(request));
+      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      const meta=validateWebsiteMedia({filename:safe.file,contentType:String(input.contentType||""),bytes});
+      const form=new FormData();form.set("dir",safe.dir);form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
+      const target=new URL(cp.root+"/Fileman/upload_files");
+      const response=await fetch(target,{method:"POST",headers:{Authorization:authHeader(cp.username,cp.token),Accept:"application/json"},body:form,signal:AbortSignal.timeout(60000)});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||result?.status!==1)return json({error:"cPanel upload failed (HTTP "+response.status+"): "+cleanText(result?.errors?.join(" ")||"UAPI upload rejected",240),httpStatus:response.status},response.status||502,corsHeaders(request));
+      const wp=websiteWordPressConfig(env),url=wp.root+"/"+safe.relative.split("/").map(encodeURIComponent).join("/");
+      const sha256=await websiteMediaSha256(bytes),now=new Date().toISOString(),id=crypto.randomUUID();
+      const row={file:meta.filename,title:cleanText(input.title||meta.filename,180),altText:cleanText(input.altText,250),caption:cleanText(input.caption,500),category:cleanText(input.category,100),tags:Array.isArray(input.tags)?input.tags.map(x=>cleanText(x,60)).slice(0,30):[],destination:"cpanel-folder",url,uploader:claims.user_id,uploaderEmail:claims.email||"",date:now,size:bytes.byteLength,sha256,status:"Available"};
+      await commitDocumentAndAudit(env,"communicationMediaAssets/"+id,claims.token,fields(row),Object.keys(row),fields({action:"COMMUNICATION_WEBSITE_MEDIA_REGISTERED",category:"COMMUNICATIONS",collection:"communicationMediaAssets",recordId:id,actorUid:claims.user_id,actorEmail:claims.email||"",details:{file:meta.filename,destination:"cpanel-folder",url,size:bytes.byteLength,sha256},createdAt:now}),{createOnly:true,collectionName:"communicationMediaAssets"});
+      for(let i=0;i<input.total;i++)await env.DRIVE_KV.delete("irpa:website-media-chunk:"+uploadId+":"+i);
+      return json({success:true,url,size:bytes.byteLength,sha256,registerId:id},200,corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/taxonomies" && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
-      const endpoint = wp.root + "/wp-json/wp/v2/media";
-      const response = await wordpressEditorFetch(wp, endpoint, {
-        method: "POST",
-        headers: wordpressHeaders(wp, {
-          "Content-Type": contentType,
-          "Content-Disposition": 'attachment; filename="' + filename.replace(/["\\\r\n]/g, "-") + '"',
-          Accept: "application/json"
-        }),
-        body: bytes,
-        signal: AbortSignal.timeout(30000)
+      const readTerms = async taxonomy => {
+        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + taxonomy + "?context=edit&per_page=100&orderby=name&order=asc", {
+          headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
+        });
+        const terms = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(terms)) throw new Error("WordPress " + taxonomy + " could not be loaded.");
+        return terms.filter(term => Number.isSafeInteger(Number(term.id)) && Number(term.id) > 0)
+          .map(term => ({ id: Number(term.id), name: String(term.name?.raw ?? term.name?.rendered ?? term.name ?? "") }));
+      };
+      const [categories, tags] = await Promise.all([readTerms("categories"), readTerms("tags")]);
+      return json({ categories, tags }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+        method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }),
+        signal: AbortSignal.timeout(15000)
       });
-      const media = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(media?.id) || typeof media?.source_url !== "string" || !isAllowedWordPressLink(media.source_url, wp)) {
-        throw new Error("WordPress image upload failed; check the staging media permissions and try again.");
+      const schema = await response.json().catch(() => null);
+      const properties = schema?.schema?.properties?.meta?.properties || {};
+      const writable = key => !!properties[key] && properties[key].readonly !== true &&
+        (!Array.isArray(properties[key].context) || properties[key].context.includes("edit"));
+      const metaDescription = writable("_yoast_wpseo_metadesc");
+      const focusKeyphrase = writable("_yoast_wpseo_focuskw");
+      return json({
+        source: "WordPress REST OPTIONS schema",
+        verified: response.ok,
+        yoast: { metaDescription, focusKeyphrase },
+        writable: response.ok && (metaDescription || focusKeyphrase),
+        message: response.ok && metaDescription && focusKeyphrase
+          ? "Both Yoast fields are exposed as writable WordPress REST meta."
+          : "One or both Yoast fields are not exposed as writable WordPress REST meta, or the REST schema could not be verified. Website Studio will not attempt to write unsupported fields."
+      }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/posts" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const allowedKeys = new Set(["title", "content", "excerpt", "categories", "tags", "featuredMedia", "slug", "seoMetaDescription", "seoFocusKeyphrase"]);
+      if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) {
+        return json({ error: "New website updates accept content fields only; publication status is controlled by the server." }, 400, corsHeaders(request));
       }
-      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_UPLOADED", "media", media.id, {
-        filename, contentType, fileSize: bytes.byteLength, mediaId: media.id
+      const title = cleanText(input.title, 180);
+      const content = String(input.content || "");
+      const excerpt = cleanText(String(input.excerpt || "").replace(/<[^>]*>/g, ""), 600);
+      const featuredMedia = Number(input.featuredMedia || 0);
+      const slug = cleanText(input.slug, 100).toLowerCase();
+      const parseIds = value => Array.isArray(value) && value.length <= 100 &&
+        value.every(id => Number.isSafeInteger(Number(id)) && Number(id) > 0) ? value.map(Number) : null;
+      const categories = parseIds(input.categories || []);
+      const tags = parseIds(input.tags || []);
+      if (!title || !content || content.length > 30000 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !categories || !tags) {
+        return json({ error: "Provide a title, content, valid excerpt, featured image ID and valid category/tag IDs." }, 400, corsHeaders(request));
+      }
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, slug, categories, tags, featured_media: featuredMedia, status: "draft" };
+      const seoDescription = cleanText(input.seoMetaDescription, 160);
+      const seoFocusKeyphrase = cleanText(input.seoFocusKeyphrase, 100);
+      if (seoDescription || seoFocusKeyphrase) {
+        const optionsResponse = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+          method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }),
+          signal: AbortSignal.timeout(15000)
+        });
+        const options = await optionsResponse.json().catch(() => null);
+        const properties = options?.schema?.properties?.meta?.properties || {};
+        const writable = key => !!properties[key] && properties[key].readonly !== true &&
+          (!Array.isArray(properties[key].context) || properties[key].context.includes("edit"));
+        if (!optionsResponse.ok || seoDescription && !writable("_yoast_wpseo_metadesc") || seoFocusKeyphrase && !writable("_yoast_wpseo_focuskw")) {
+          return json({ error: "The requested Yoast SEO field is not confirmed as writable through this site's WordPress REST API. Add it in the WordPress editor after draft creation; no plugin or site configuration was changed." }, 422, corsHeaders(request));
+        }
+        payload.meta = {};
+        if (seoDescription) payload.meta._yoast_wpseo_metadesc = seoDescription;
+        if (seoFocusKeyphrase) payload.meta._yoast_wpseo_focuskw = seoFocusKeyphrase;
+      }
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+        method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
       });
-      return json({ success: true, media: { id: media.id, url: media.source_url, title: editorRaw(media, "title") || filename, altText: String(media.alt_text || "") }, message: "Image uploaded to the configured WordPress environment." }, 200, corsHeaders(request));
+      const created = await response.json().catch(() => null);
+      if (!response.ok || !Number.isSafeInteger(created?.id) || String(created?.status || "") !== "draft" || !isAllowedWordPressLink(created?.link, wp)) {
+        throw new Error("WordPress did not confirm creation of a draft update. No publishing action was requested.");
+      }
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_POST_DRAFT_CREATED", "posts", created.id, {
+        title, categories, tags, featuredMedia, status: "draft", publicUrl: String(created.link || "")
+      });
+      const verified = await readWebsiteItem(wp, "posts", Number(created.id));
+      const seoMetaVerified = !payload.meta || Object.entries(payload.meta).every(([key, value]) => verified.meta?.[key] === value);
+      if (String(verified.status || "") !== "draft" || Number(verified.featured_media || 0) !== featuredMedia ||
+          !sameEditorFields(verified, payload) || !seoMetaVerified) {
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_POST_DRAFT_VERIFICATION_FAILED", "posts", created.id, { status: String(verified.status || "") });
+        throw new Error("The new WordPress update did not pass draft verification. It has not been submitted for approval.");
+      }
+      return json({ success: true, item: editorItem(verified, "posts"), message: "New update created and verified as a WordPress draft." }, 201, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/content" && request.method === "GET") {
@@ -800,8 +1016,8 @@ export function createCommunicationsSiteRouter(deps) {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Array.isArray(data)) throw new Error("Could not list staging website content.");
-      if (data.some(item => !isAllowedWordPressLink(item.link, wp))) throw new Error("WordPress returned a non-staging page URL; content listing was blocked.");
+      if (!response.ok || !Array.isArray(data)) throw new Error("Could not list website content from the configured WordPress site.");
+      if (data.some(item => !isAllowedWordPressLink(item.link, wp))) throw new Error("WordPress returned a URL outside the configured host allowlist; content listing was blocked.");
       return json({ items: data.map(item => ({
         id: Number(item.id), type, title: editorRaw(item, "title"), excerpt: editorRaw(item, "excerpt"),
         featuredMedia: Number(item.featured_media || 0), status: String(item.status || "draft"),
@@ -832,7 +1048,7 @@ export function createCommunicationsSiteRouter(deps) {
       await readWebsiteItem(wp, type, id);
       const native = await readWebsiteRevisions(wp, type, id);
       if (!env.DRIVE_KV || typeof env.DRIVE_KV.list !== "function" || typeof env.DRIVE_KV.get !== "function") {
-        throw new Error("Staging revision storage is unavailable.");
+        throw new Error("Website revision storage is unavailable.");
       }
       const prefix = "irpa:website-editor:snapshot:" + type + ":" + id + ":";
       const listing = await env.DRIVE_KV.list({ prefix, limit: 50 });
@@ -904,7 +1120,7 @@ export function createCommunicationsSiteRouter(deps) {
           snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId
         });
         const wordpressCode = typeof data?.code === "string" ? data.code.replace(/[^a-z0-9_]/gi, "").slice(0, 80) : "invalid_response";
-        throw new Error("WordPress rejected the staging page/post update (HTTP " + response.status + ", code " + wordpressCode + "). The saved pre-edit snapshot remains available.");
+        throw new Error("WordPress rejected the page/post update (HTTP " + response.status + ", code " + wordpressCode + "). The saved pre-edit snapshot remains available.");
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_CONTENT_UPDATED", type, id, {
         snapshotId: snapshot.snapshotId, previousRevisionId: snapshot.currentRevisionId,
@@ -922,7 +1138,7 @@ export function createCommunicationsSiteRouter(deps) {
       return json({
         success: true, item: editorItem(verified, type), snapshotId: snapshot.snapshotId,
         previousRevisionId: snapshot.currentRevisionId, revisionId,
-        message: status === "publish" ? "Staging page/post published and verified." : "Staging draft saved and verified."
+        message: status === "publish" ? "Page/post published and verified." : "Draft saved and verified."
       }, 200, corsHeaders(request));
     }
 
@@ -944,7 +1160,7 @@ export function createCommunicationsSiteRouter(deps) {
       const safetySnapshot = await saveWebsiteSnapshot(env, claims, wp, type, id, current, ["restore"]);
       let target;
       if (snapshotId) {
-        if (!env.DRIVE_KV || typeof env.DRIVE_KV.get !== "function") throw new Error("Staging revision storage is unavailable.");
+        if (!env.DRIVE_KV || typeof env.DRIVE_KV.get !== "function") throw new Error("Website revision storage is unavailable.");
         const raw = await env.DRIVE_KV.get(websiteSnapshotKey(type, id, snapshotId));
         if (!raw) throw new Error("Saved revision snapshot not found.");
         const snapshot = JSON.parse(raw);
@@ -980,7 +1196,7 @@ export function createCommunicationsSiteRouter(deps) {
           requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
           safetySnapshotId: safetySnapshot.snapshotId
         });
-        throw new Error("WordPress rejected the staging revision restore. The pre-restore snapshot remains available.");
+        throw new Error("WordPress rejected the revision restore. The pre-restore snapshot remains available.");
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_REVISION_RESTORED", type, id, {
         requestedSnapshotId: snapshotId || null, requestedRevisionId: snapshotId ? null : revisionId,
@@ -996,7 +1212,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       return json({
         success: true, item: editorItem(verified, type), safetySnapshotId: safetySnapshot.snapshotId,
-        message: "Staging revision restored and verified."
+        message: "Website revision restored and verified."
       }, 200, corsHeaders(request));
     }
 
@@ -1021,21 +1237,35 @@ export function createCommunicationsSiteRouter(deps) {
       const requestedSlug = cleanText(item.slug, 100).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
       const languageSuffix = String(item.language || "English").toLowerCase().startsWith("kiswahili") ? "-sw" : "-en";
       const slug = requestedSlug ? requestedSlug + languageSuffix : "irpa-" + itemId;
+      const contentHtml = /<\/?[a-z][^>]*>/i.test(body) ? sanitizeWordPressContent(body) : plainContent(body);
       const lookup = await fetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const found = await lookup.json().catch(() => null);
       if (!lookup.ok || !Array.isArray(found)) throw new Error("Could not safely check existing website content before publishing.");
       let post = found.find(p => Number.isInteger(p.id) && typeof p.link === "string");
+      const publicationContent = contentHtml + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : "");
       if (!post) {
-        const response = await fetch(endpoint, {
+        const response = await wordpressEditorFetch(wp, endpoint, {
           method: "POST",
           headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-          body: JSON.stringify({ title, content: plainContent(body) + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : ""), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
+          body: JSON.stringify({ title, content: publicationContent, excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
           signal: AbortSignal.timeout(30000)
         });
         post = await response.json().catch(() => null);
-        if (!response.ok || !Number.isInteger(post?.id) || typeof post?.link !== "string") throw new Error("The website rejected the publishing request.");
+        if (!response.ok || !Number.isInteger(post?.id) || typeof post?.link !== "string" || String(post?.status || "") !== "publish") throw new Error("The website rejected the publishing request.");
+      } else if (String(post.status || "") !== "publish") {
+        const response = await wordpressEditorFetch(wp, endpoint + "/" + Number(post.id), {
+          method: "POST",
+          headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
+          body: JSON.stringify({ title, content: publicationContent, excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish" }),
+          signal: AbortSignal.timeout(30000)
+        });
+        const promoted = await response.json().catch(() => null);
+        if (!response.ok || Number(promoted?.id) !== Number(post.id) || String(promoted?.status || "") !== "publish" || !isAllowedWordPressLink(promoted?.link, wp)) {
+          throw new Error("The approved WordPress draft could not be promoted to Published.");
+        }
+        post = promoted;
       }
       const now = new Date().toISOString();
       const documentFields = fields({ status: "Published", wpPostId: post.id, publicUrl: post.link, publishedAt: now, publishedByUid: claims.user_id, publishedByEmail: claims.email || "", updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: claims.email || "" });
