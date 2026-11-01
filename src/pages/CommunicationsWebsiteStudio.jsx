@@ -48,16 +48,27 @@ export default function CommunicationsWebsiteStudio(){
  async function createNewPost(){
   if(!newPost)return;
   setBusy(true);setMessage("");
+  const editorialId=crypto.randomUUID();
+  const editorialSlug="irpa-"+editorialId.toLowerCase();
   try{
-   const data=await call("/api/communications/website/posts","POST",{
-    title:newPost.title,content:newPost.content,excerpt:newPost.excerpt,
-    categories:newPost.categories,tags:newPost.tags,featuredMedia:Number(newPost.featuredMedia||0)
+   const selectedTagNames=taxonomies.tags.filter(term=>newPost.tags.includes(term.id)).map(term=>term.name);
+   await call("/api/communications/records","POST",{
+    collection:"communicationMediaItems",action:"create",id:editorialId,
+    data:{title:newPost.title,type:"Website Article",channel:"IRPA Website",summary:newPost.excerpt||"",body:newPost.content,slug:editorialSlug,language:"English",tags:selectedTagNames.join(", ")}
    });
-   const item=data.item;
-   setItems(current=>[item,...current.filter(existing=>existing.id!==item.id)]);
-   setType("posts");setNewPost(null);
-   setMessage("New update created as a WordPress draft. It must still be submitted through the independent editorial approval workflow.");
-  }catch(e){setMessage(e.message||"New update could not be saved as a draft.")}
+   try{
+    const data=await call("/api/communications/website/posts","POST",{
+     title:newPost.title,content:newPost.content,excerpt:newPost.excerpt,
+     categories:newPost.categories,tags:newPost.tags,featuredMedia:Number(newPost.featuredMedia||0),slug:editorialSlug+"-en"
+    });
+    const item=data.item;
+    setItems(current=>[item,...current.filter(existing=>existing.id!==item.id)]);
+    setType("posts");setNewPost(null);
+    setMessage("WordPress draft created and linked to editorial draft "+editorialId+". Submit that item from the Communications Library for independent approval before publication.");
+   }catch(error){
+    setMessage("Editorial draft "+editorialId+" was saved, but the WordPress draft could not be created: "+(error.message||"unknown error")+". The editorial draft remains available for the existing approval workflow.");
+   }
+  }catch(e){setMessage(e.message||"The editorial draft could not be created. No WordPress post was created.")}
   finally{setBusy(false)}
  }
  async function save(){if(!edit)return;setBusy(true);setMessage("");try{const d=await call("/api/communications/website/content","PUT",{type,id:edit.id,title:edit.title,content:edit.content,excerpt:edit.excerpt||"",featuredMedia:Number(edit.featuredMedia||0),status:"draft"});setEdit(d.item||null);await load(type);setMessage("Draft saved to WordPress. Submit the matching item for independent approval before any publication.");}catch(e){setMessage(e.message||"Draft save failed.")}finally{setBusy(false)}}
