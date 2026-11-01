@@ -1,3 +1,4 @@
+import { sanitizeWebsiteSvg, validateWebsiteMedia, websiteMediaSha256, validateMediaChunk } from "./websiteMedia.mjs";
 const AUTHOR_ROLES = new Set([
   "Communication & Media", "Communications & Media", "Communication and Media", "Communications and Media",
   "Communications Officer", "Communication Officer", "Communications Manager", "Communication Manager",
@@ -816,55 +817,85 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/media" && request.method === "POST") {
       const { claims } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const filename = cleanText(input.filename, 160).replace(/[\\/:*?"<>|]/g, "-");
+      const filename = cleanText(input.filename, 180);
       const contentType = String(input.contentType || "").toLowerCase();
+      const altText = cleanText(input.altText, 250), caption = cleanText(input.caption, 500);
+      const title = cleanText(input.title || filename, 180);
       const encoded = String(input.dataBase64 || "");
-      const altText = cleanText(input.altText, 250);
-      const caption = cleanText(input.caption, 500);
-      const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-      if (!filename || !allowedTypes.has(contentType) || !altText || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
-        return json({ error: "Choose a JPEG, PNG or WebP image and provide descriptive alt text." }, 400, corsHeaders(request));
+      if (!filename || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || !title) return json({error:"A filename, title and valid base64 file are required."},400,corsHeaders(request));
+      const estimate = Math.floor(encoded.length*3/4)-(encoded.endsWith("==")?2:encoded.endsWith("=")?1:0);
+      const limit = Math.min(20*1024*1024,Math.max(1024,Number(env.WORDPRESS_MEDIA_MAX_BYTES||8*1024*1024)));
+      if(estimate<1||estimate>limit)return json({error:"File exceeds the configured WordPress media limit of "+limit+" bytes."},413,corsHeaders(request));
+      let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      if(contentType==="image/svg+xml"){
+        try{bytes=new TextEncoder().encode(sanitizeWebsiteSvg(new TextDecoder().decode(bytes)));}
+        catch(error){return json({error:error.message},415,corsHeaders(request));}
       }
-      const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
-      const configuredLimit = Number(env.WORDPRESS_MEDIA_MAX_BYTES || 5 * 1024 * 1024);
-      const maxImageBytes = Number.isSafeInteger(configuredLimit) && configuredLimit >= 1024 * 1024 && configuredLimit <= 20 * 1024 * 1024 ? configuredLimit : 5 * 1024 * 1024;
-      if (estimatedBytes < 1 || estimatedBytes > maxImageBytes) return json({ error: "Images must be no larger than " + (maxImageBytes / 1024 / 1024) + " MiB." }, 413, corsHeaders(request));
-      const binary = atob(encoded);
-      const originalBytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
-      let bytes;
-      try { bytes = stripImageMetadata(contentType, originalBytes); }
-      catch { return json({ error: "The image content does not match its declared JPEG, PNG or WebP type." }, 415, corsHeaders(request)); }
-      const wp = websiteWordPressConfig(env);
-      await verifyDedicatedWordPressEditor(wp);
-      const endpoint = wp.root + "/wp-json/wp/v2/media";
-      const response = await wordpressEditorFetch(wp, endpoint, {
-        method: "POST",
-        headers: wordpressHeaders(wp, {
-          "Content-Type": contentType,
-          "Content-Disposition": 'attachment; filename="' + filename.replace(/["\\\\\\r\\n]/g, "-") + '"',
-          Accept: "application/json"
-        }),
-        body: bytes,
-        signal: AbortSignal.timeout(30000)
-      });
-      const uploaded = await response.json().catch(() => null);
-      if (!response.ok || !Number.isSafeInteger(uploaded?.id) || typeof uploaded?.source_url !== "string" || !isAllowedWordPressLink(uploaded.source_url, wp)) {
-        throw new Error("WordPress image upload failed; check the integration account's media permissions.");
+      let meta;
+      try{meta=validateWebsiteMedia({filename,contentType,bytes});}
+      catch(error){return json({error:error.message},415,corsHeaders(request));}
+      const destination=String(input.destination||"media-library");
+      if(!["media-library","attach","featured"].includes(destination))return json({error:"Select WordPress Media Library, page/post attachment or featured image."},400,corsHeaders(request));
+      if(destination!=="media-library"&&!Number.isSafeInteger(Number(input.parentId||input.postId)) )return json({error:"A valid existing page/post ID is required for attachment or featured image."},400,corsHeaders(request));
+      if(["image/jpeg","image/png","image/webp","image/gif"].includes(contentType)&&!altText)return json({error:"Descriptive alt text is required for raster images."},400,corsHeaders(request));
+      const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
+      const endpoint=wp.root+"/wp-json/wp/v2/media";
+      const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+meta.filename.replace(/["\\\r\n]/g,"-")+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
+      const uploaded=await response.json().catch(()=>null);
+      if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp))return json({error:"WordPress media upload failed (HTTP "+response.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:response.status},response.status||502,corsHeaders(request));
+      const update={title,alt_text:altText,caption};
+      if(destination!=="media-library")update.post=Number(input.parentId||input.postId);
+      const metadata=await wordpressEditorFetch(wp,endpoint+"/"+uploaded.id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify(update),signal:AbortSignal.timeout(20000)});
+      const media=await metadata.json().catch(()=>null);
+      if(!metadata.ok||Number(media?.id)!==uploaded.id)return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status},502,corsHeaders(request));
+      if(destination==="featured"){
+        const kind=String(input.parentType||"posts")==="pages"?"pages":"posts",id=Number(input.parentId||input.postId);
+        const parent=await wordpressEditorFetch(wp,wp.root+"/wp-json/wp/v2/"+kind+"/"+id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify({featured_media:uploaded.id}),signal:AbortSignal.timeout(20000)});
+        if(!parent.ok)return json({error:"Media uploaded, but featured-image assignment failed (HTTP "+parent.status+").",httpStatus:parent.status},502,corsHeaders(request));
       }
-      const metadataResponse = await wordpressEditorFetch(wp, endpoint + "/" + uploaded.id, {
-        method: "POST",
-        headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-        body: JSON.stringify({ alt_text: altText, caption }),
-        signal: AbortSignal.timeout(15000)
-      });
-      const media = await metadataResponse.json().catch(() => null);
-      if (!metadataResponse.ok || Number(media?.id) !== uploaded.id || String(media?.alt_text || "") !== altText || editorRaw(media, "caption") !== caption) {
-        throw new Error("The image was uploaded, but WordPress did not verify its required alt text and caption.");
-      }
-      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_UPLOADED", "media", media.id, {
-        filename, contentType, fileSize: bytes.byteLength, mediaId: media.id, altText, caption
-      });
-      return json({ success: true, media: { id: media.id, url: media.source_url, title: editorRaw(media, "title") || filename, altText: String(media.alt_text || ""), caption: editorRaw(media, "caption") }, message: "Image uploaded to the configured WordPress environment." }, 200, corsHeaders(request));
+      const sha256=await websiteMediaSha256(bytes),now=new Date().toISOString(),id=crypto.randomUUID();
+      const row={file:meta.filename,title,altText,caption,category:cleanText(input.category,100),tags:Array.isArray(input.tags)?input.tags.map(x=>cleanText(x,60)).slice(0,30):[],destination,url:media.source_url,uploader:claims.user_id,uploaderEmail:claims.email||"",date:now,size:bytes.byteLength,sha256,wordpressMediaId:uploaded.id,status:"Available"};
+      const recordFields=fields(row),auditFields=fields({action:"COMMUNICATION_WEBSITE_MEDIA_REGISTERED",category:"COMMUNICATIONS",collection:"communicationMediaAssets",recordId:id,actorUid:claims.user_id,actorEmail:claims.email||"",details:{file:meta.filename,destination,url:media.source_url,size:bytes.byteLength,sha256},createdAt:now});
+      await commitDocumentAndAudit(env,"communicationMediaAssets/"+id,claims.token,recordFields,Object.keys(row),auditFields,{createOnly:true,collectionName:"communicationMediaAssets"});
+      await recordWebsiteAudit(env,claims,"COMMUNICATION_WEBSITE_MEDIA_UPLOADED","media",uploaded.id,{filename:meta.filename,contentType,size:bytes.byteLength,sha256,destination});
+      return json({success:true,media:{id:uploaded.id,url:media.source_url,title,altText,caption,sha256,size:bytes.byteLength,destination,registerId:id}},200,corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/media/chunk" && request.method === "POST") {
+      const {claims}=await websiteEditorAuthorised(request,env);
+      if(!env.DRIVE_KV)return json({error:"Chunk storage is unavailable; no upload was started."},503,corsHeaders(request));
+      const input=await request.json().catch(()=>({}));
+      try{validateMediaChunk(input);}catch(error){return json({error:error.message},400,corsHeaders(request));}
+      const key="irpa:website-media-chunk:"+input.uploadId+":"+input.index;
+      await env.DRIVE_KV.put(key,String(input.dataBase64),{expirationTtl:3600});
+      return json({success:true,uploadId:input.uploadId,index:input.index},200,corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/media/complete" && request.method === "POST") {
+      const {claims}=await websiteEditorAuthorised(request,env);
+      if(!env.DRIVE_KV)return json({error:"Chunk storage is unavailable; no upload was completed."},503,corsHeaders(request));
+      const input=await request.json().catch(()=>({})),uploadId=String(input.uploadId||"");
+      if(!/^[a-f0-9-]{36}$/i.test(uploadId)||!Number.isInteger(input.total)||input.total<1||input.total>512)return json({error:"Invalid chunk upload manifest."},400,corsHeaders(request));
+      const cp=cpanelConfig(env),relative=String(input.path||"");
+      const safe=safeCpanelPath(relative,cp.documentRoot);
+      const chunks=[];
+      for(let i=0;i<input.total;i++){const chunk=await env.DRIVE_KV.get("irpa:website-media-chunk:"+uploadId+":"+i);if(!chunk)return json({error:"Upload is incomplete; missing chunk "+i+"."},409,corsHeaders(request));chunks.push(chunk);}
+      const encoded=chunks.join("");const size=Math.floor(encoded.length*3/4);
+      const max=Number(env.CPANEL_MEDIA_MAX_BYTES||32*1024*1024);
+      if(size<1||size>max)return json({error:"cPanel media upload exceeds the configured maximum of "+max+" bytes."},413,corsHeaders(request));
+      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      const meta=validateWebsiteMedia({filename:safe.file,contentType:String(input.contentType||""),bytes});
+      const form=new FormData();form.set("dir",safe.dir);form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
+      const target=new URL(cp.root+"/Fileman/upload_files");
+      const response=await fetch(target,{method:"POST",headers:{Authorization:authHeader(cp.username,cp.token),Accept:"application/json"},body:form,signal:AbortSignal.timeout(60000)});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||result?.status!==1)return json({error:"cPanel upload failed (HTTP "+response.status+"): "+cleanText(result?.errors?.join(" ")||"UAPI upload rejected",240),httpStatus:response.status},response.status||502,corsHeaders(request));
+      const wp=websiteWordPressConfig(env),url=wp.root+"/"+safe.relative.split("/").map(encodeURIComponent).join("/");
+      const sha256=await websiteMediaSha256(bytes),now=new Date().toISOString(),id=crypto.randomUUID();
+      const row={file:meta.filename,title:cleanText(input.title||meta.filename,180),altText:cleanText(input.altText,250),caption:cleanText(input.caption,500),category:cleanText(input.category,100),tags:Array.isArray(input.tags)?input.tags.map(x=>cleanText(x,60)).slice(0,30):[],destination:"cpanel-folder",url,uploader:claims.user_id,uploaderEmail:claims.email||"",date:now,size:bytes.byteLength,sha256,status:"Available"};
+      await commitDocumentAndAudit(env,"communicationMediaAssets/"+id,claims.token,fields(row),Object.keys(row),fields({action:"COMMUNICATION_WEBSITE_MEDIA_REGISTERED",category:"COMMUNICATIONS",collection:"communicationMediaAssets",recordId:id,actorUid:claims.user_id,actorEmail:claims.email||"",details:{file:meta.filename,destination:"cpanel-folder",url,size:bytes.byteLength,sha256},createdAt:now}),{createOnly:true,collectionName:"communicationMediaAssets"});
+      for(let i=0;i<input.total;i++)await env.DRIVE_KV.delete("irpa:website-media-chunk:"+uploadId+":"+i);
+      return json({success:true,url,size:bytes.byteLength,sha256,registerId:id},200,corsHeaders(request));
     }
 
     if (path === "/api/communications/website/taxonomies" && request.method === "GET") {
