@@ -74,6 +74,10 @@ test("production minified bundle completes authenticated Create Drive file with 
   await page.locator('.auth-card input[type="email"]').fill(fixtureEmail);
   await page.locator('.auth-card input[type="password"]').fill(fixturePassword);
   await page.getByRole("button", { name: "Sign In Securely" }).click();
+  await page.getByRole("radio", { name: "Documents, correspondence and files" }).check();
+  await page.getByRole("radio", { name: "Trial data — testing and demonstrations" }).check();
+  await page.getByRole("button", { name: "Confirm environment and continue" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden({ timeout: 15000 });
   await expect(page.locator(".topbar h2")).toContainText("Authorization", { timeout: 45000 });
   await expect(page.getByText("CONTROLLED DOCUMENT UPLOAD")).toBeVisible({ timeout: 30000 });
 
