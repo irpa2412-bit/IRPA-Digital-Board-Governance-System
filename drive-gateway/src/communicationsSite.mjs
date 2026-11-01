@@ -283,11 +283,11 @@ export function createCommunicationsSiteRouter(deps) {
     const headerDetails = {};
     for (const constName of ["server", "cf-ray", "x-powered-by"]) {
       const value = headers.get(constName);
-      if (value) headerDetails[constName] = cleanText(value, 200);
+      if (value) headerDetails[constName] = sanitizedWordPressBody(value, wp).slice(0, 200);
     }
     for (const [name, value] of headers.entries()) {
       if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) {
-        headerDetails[name] = cleanText(value, 200);
+        headerDetails[name] = /token|secret|authorization|cookie/i.test(name) ? "[redacted]" : sanitizedWordPressBody(value, wp).slice(0, 200);
       }
     }
     const raw = await response.clone().text().catch(() => "");
@@ -1048,10 +1048,10 @@ export function createCommunicationsSiteRouter(deps) {
         const responseHeaders = {};
         for (const name of ["server", "cf-ray", "x-powered-by"]) {
           const value = response.headers.get(name);
-          if (value) responseHeaders[name] = cleanText(value, 200);
+          if (value) responseHeaders[name] = sanitizedWordPressBody(value, wp).slice(0, 200);
         }
         for (const [name, value] of response.headers.entries()) {
-          if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) responseHeaders[name] = cleanText(value, 200);
+          if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) responseHeaders[name] = /token|secret|authorization|cookie/i.test(name) ? "[redacted]" : sanitizedWordPressBody(value, wp).slice(0, 200);
         }
         const detail = response.ok ? null : {
           step, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120),
