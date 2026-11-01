@@ -1083,7 +1083,7 @@ export function createCommunicationsSiteRouter(deps) {
       };
       const mediaTests = [
         { name: "image", filename: "png", mime: "image/png", b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==" },
-        { name: "video", filename: "mp4", mime: "video/mp4", b64: "AAAAHGZ0eXBpc29tAAACAGlzb21pc28yAAAAAAhtZGF0" },
+        { name: "video", filename: "mp4", mime: "video/mp4", b64: "AAAAGGZ0eXBpc29tAAACAGlzb21pc28yAAAACG1kYXQ=" },
         { name: "pdf", filename: "pdf", mime: "application/pdf", bytes: makePdfFixture() },
         { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", bytes: makeDocxFixture() }
       ];
