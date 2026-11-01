@@ -12,6 +12,7 @@ let requestCount;
 let wpRoles;
 let wpItemLink;
 let lastMediaUpload;
+let mediaUploadStatus;
 let createdPost;
 let postCreateCount;
 let consoleMessages;
@@ -120,6 +121,7 @@ test.beforeEach(() => {
   wpRoles = ["editor"];
   wpItemLink = "https://staging.irpa.or.tz/test-page/";
   lastMediaUpload = null;
+  mediaUploadStatus = 201;
   createdPost = null;
   postCreateCount = 0;
   consoleMessages = [];
@@ -136,6 +138,7 @@ test.beforeEach(() => {
     if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
       lastMediaUpload = { contentType: new Headers(init.headers).get("Content-Type"), disposition: new Headers(init.headers).get("Content-Disposition"), bytes: new Uint8Array(init.body) };
+      if (mediaUploadStatus === 406) return new Response("<html>Not Acceptable: ModSecurity rule blocked upload</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "test-ray-123", "X-Powered-By": "PHP/8" } });
       return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: "" }, 201);
     }
     if (url.pathname === "/wp-json/wp/v2/media/88" && method === "POST") {
@@ -378,6 +381,76 @@ test("WordPress items that advertise a production-host link are refused", async 
   assert.equal(kvStore.size, 0);
 });
 
+test("cPanel diagnostics match SSL certificate subject and read .user.ini before other PHP sources", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
+  });
+  const requests = [];
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    requests.push(url.pathname + url.search);
+    if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: { certificates: [{ subject: "CN=staging.irpa.or.tz", not_after: "2027-12-31T23:59:59Z", issuer: "Test CA" }] } });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "upload_max_filesize=64M\npost_max_size=64M\n" } });
+    throw new Error("Unexpected cPanel request " + url.pathname);
+  };
+  const result = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.ssl.status, "PASS");
+  assert.equal(data.ssl.hosts[0].expiry, "2027-12-31T23:59:59Z");
+  assert.equal(data.phpLimits.status, "PASS");
+  assert.equal(data.phpLimits.source, ".user.ini");
+  assert.equal(requests.filter(path => path.includes("/Fileman/get_file_content")).length, 1);
+});
+
+test("cPanel PHP limits fall through to MultiPHP and report INFO when unavailable", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
+  });
+  let multiPhpRead = false;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "" } });
+    if (url.pathname.endsWith("/LangPHP/php_ini_get_user_content")) {
+      multiPhpRead = true;
+      return response({ status: 1, data: { content: "upload_max_filesize=32M\npost_max_size=40M\n" } });
+    }
+    throw new Error("Unexpected cPanel request " + url.pathname);
+  };
+  const result = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
+  const data = await result.json();
+  assert.equal(result.status, 200);
+  assert.equal(multiPhpRead, true);
+  assert.equal(data.phpLimits.status, "PASS");
+  assert.equal(data.phpLimits.source, "MultiPHP INI");
+
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "" } });
+    if (url.pathname.endsWith("/LangPHP/php_ini_get_user_content")) return response({ status: 1, data: { content: "" } });
+    throw new Error("Unexpected cPanel request " + url.pathname);
+  };
+  const unavailable = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
+  const unavailableData = await unavailable.json();
+  assert.equal(unavailableData.phpLimits.status, "INFO");
+  assert.equal(unavailableData.phpLimits.diagnostic, "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor");
+  assert.equal(unavailableData.ssl.status, "FAIL");
+  assert.match(unavailableData.ssl.error, /No installed SSL certificate matched/);
+});
+
 test("WordPress Administrator credentials are rejected even when authentication returns HTTP 200", async () => {
   wpRoles = ["administrator"];
   const router = makeRouter();
@@ -401,6 +474,25 @@ test("authenticated staging image upload accepts safe image types and records an
   assert.match(lastMediaUpload.disposition, /field.jpg/);
   assert.deepEqual([...lastMediaUpload.bytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
+});
+
+test("WordPress media HTTP 406 returns sanitised step-level server and WAF diagnostics", async () => {
+  mediaUploadStatus = 406;
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting" }
+  });
+  assert.equal(result.status, 406);
+  const data = await result.json();
+  assert.equal(data.detail.step, "media_upload");
+  assert.equal(data.detail.status, 406);
+  assert.equal(data.detail.contentType, "text/html");
+  assert.match(data.detail.body, /ModSecurity/);
+  assert.equal(data.detail.headers.server, "LiteSpeed");
+  assert.equal(data.detail.headers["cf-ray"], "test-ray-123");
+  assert.equal(data.detail.headers["x-powered-by"], "PHP/8");
+  assert.equal(JSON.stringify(data).includes(TEST_PASSWORD), false);
 });
 
 test("image upload requires non-empty alt text", async () => {

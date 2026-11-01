@@ -53,7 +53,16 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
     }
     if (url.pathname.endsWith("/revisions")) return response([{ id: 900 }]);
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
-      assert.ok(init.body instanceof Uint8Array);
+      assert.ok(init.body instanceof Uint8Array, "WordPress receives raw binary, never JSON or base64");
+      const headers = new Headers(init.headers);
+      assert.equal(headers.get("Accept"), "application/json");
+      assert.match(headers.get("Content-Disposition") || "", /^attachment; filename="[A-Za-z0-9._-]+"$/);
+      const mime = headers.get("Content-Type");
+      const bytes = new Uint8Array(init.body);
+      if (mime === "image/png") assert.deepEqual([...bytes.slice(0, 8)], [137,80,78,71,13,10,26,10]);
+      if (mime === "video/mp4") assert.equal(new TextDecoder().decode(bytes.slice(4, 8)), "ftyp");
+      if (mime === "application/pdf") assert.equal(new TextDecoder().decode(bytes.slice(0, 8)), "%PDF-1.4");
+      if (mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") assert.deepEqual([...bytes.slice(0, 2)], [80,75]);
       const id = ++nextMediaId;
       return response({ id, source_url: "https://staging.irpa.or.tz/wp-content/uploads/test-" + id + ".bin" }, 201);
     }
@@ -82,6 +91,9 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
     assert.equal(data.uploadsRetained, true);
     assert.equal(data.createdDrafts.pageId, 111);
     assert.equal(data.createdDrafts.postId, 112);
+    assert.ok(data.cleanupItems.some(item => item.kind === "TEST draft page" && item.id === 111 && item.url));
+    assert.ok(data.cleanupItems.some(item => item.kind === "TEST draft post" && item.id === 112 && item.url));
+    assert.equal(data.cleanupItems.filter(item => item.kind === "TEST media").length, 16);
     assert.equal(data.failCount, 0, JSON.stringify(data.report.filter(row => row.status !== "PASS")));
     assert.equal(data.report.filter(row => row.label.includes("URL open")).length, 16);
     assert.equal(data.report.filter(row => row.status === "PASS").length, data.report.length);
