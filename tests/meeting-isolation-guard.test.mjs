@@ -24,6 +24,20 @@ test("staging keeps its dedicated KV namespace and rejects the production namesp
   assert.match(workflow, /Production DRIVE_KV cannot be used by staging/);
 });
 
+test("Website Studio acceptance is isolated to its exact paired UI, Gateway and test files", () => {
+  assert.match(workflow, /const websiteStudioAcceptancePaths = new Set\(\[/);
+  assert.match(workflow, /const websiteStudioAcceptanceOnly =/);
+  assert.match(workflow, /changed\.every\(path => websiteStudioAcceptancePaths\.has\(path\)\)/);
+  assert.match(workflow, /websiteStudioAcceptanceOnly && websiteStudioAcceptancePaths\.has\(path\)/);
+  assert.match(workflow, /!websiteStudioAcceptanceOnly/);
+  for (const path of [
+    "drive-gateway/src/communicationsSite.mjs",
+    "drive-gateway/tests/production-acceptance.test.mjs",
+    "drive-gateway/tests/website-structure-creator.test.mjs",
+    "drive-gateway/tests/wordpress-auth-diagnostics.test.mjs",
+    "src/pages/CommunicationsWebsiteStudio.jsx",
+  ]) assert.ok(workflow.includes("\"" + path + "\""), "missing exact acceptance path: " + path);
+});
 test("workflow-only guard maintenance requires its paired regression test", () => {
   assert.match(workflow, /const guardOnlyWorkflowRepair = changed\.includes\("\.github\/workflows\/meeting-portal-fixture-browser\.yml"\)/);
   assert.match(workflow, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
