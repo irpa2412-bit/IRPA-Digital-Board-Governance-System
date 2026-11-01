@@ -397,7 +397,7 @@ export function createCommunicationsSiteRouter(deps) {
   async function readPostTaxonomies(wp) {
     const result = { categories: [], tags: [] };
     for (const taxonomy of ["categories", "tags"]) {
-      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + taxonomy + "?context=edit&per_page=100&hide_empty=false", {
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + taxonomy + "?context=view&per_page=100&hide_empty=false", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(12000)
       });
       const data = await response.json().catch(() => null);
@@ -846,14 +846,15 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/content" && request.method === "POST") {
       const { claims } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const allowedKeys = new Set(["type", "title", "content", "excerpt", "categories", "tags", "yoastDescription", "yoastFocusKeyphrase"]);
+      const allowedKeys = new Set(["type", "title", "content", "excerpt", "featuredMedia", "categories", "tags", "yoastDescription", "yoastFocusKeyphrase"]);
       if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) return json({ error: "Unsupported new-post field." }, 400, corsHeaders(request));
       const title = cleanText(input.title, 180);
       const content = String(input.content || "");
       const excerpt = String(input.excerpt || "").replace(/<[^>]*>/g, "").trim();
+      const featuredMedia = Number(input.featuredMedia ?? 0);
       const categories = Array.isArray(input.categories) ? input.categories.map(Number) : [];
       const tags = Array.isArray(input.tags) ? input.tags.map(Number) : [];
-      if (input.type !== "posts" || !title || content.length > 30000 || excerpt.length > 600 || categories.some(id => !Number.isSafeInteger(id) || id < 1) || tags.some(id => !Number.isSafeInteger(id) || id < 1)) return json({ error: "A post title and valid content, excerpt and existing category/tag IDs are required." }, 400, corsHeaders(request));
+      if (input.type !== "posts" || !title || content.length > 30000 || excerpt.length > 600 || !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || categories.some(id => !Number.isSafeInteger(id) || id < 1) || tags.some(id => !Number.isSafeInteger(id) || id < 1)) return json({ error: "A post title and valid content, excerpt and existing category/tag IDs are required." }, 400, corsHeaders(request));
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const terms = await readPostTaxonomies(wp);
@@ -870,14 +871,14 @@ export function createCommunicationsSiteRouter(deps) {
         if (yoast.fields.includes("_yoast_wpseo_focuskw")) meta._yoast_wpseo_focuskw = cleanText(input.yoastFocusKeyphrase, 100);
         else if (yoast.fields.includes("wpseo_focuskw")) meta.wpseo_focuskw = cleanText(input.yoastFocusKeyphrase, 100);
       }
-      const payload = { title, content: sanitizeWordPressContent(content), excerpt, status: "draft", categories, tags, ...(Object.keys(meta).length ? { meta } : {}) };
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, featured_media: featuredMedia, status: "draft", categories, tags, ...(Object.keys(meta).length ? { meta } : {}) };
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !Number.isSafeInteger(data?.id) || String(data.status || "") !== "draft" || !isAllowedWordPressLink(data.link, wp)) throw new Error("WordPress did not confirm creation of a draft post; no published post was accepted.");
-      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_DRAFT_POST_CREATED", "posts", data.id, { status: "draft", categories, tags, yoastWritable: yoast.fields });
+      await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_DRAFT_POST_CREATED", "posts", data.id, { status: "draft", featuredMedia, categories, tags, yoastWritable: yoast.fields });
       const verified = await readWebsiteItem(wp, "posts", data.id);
       if (String(verified.status || "") !== "draft") throw new Error("New post status verification failed; WordPress did not retain draft status.");
       return json({ success: true, item: editorItem(verified, "posts"), status: "draft", yoast: { writable: yoast.fields, available: yoast.fields.length > 0 } }, 201, corsHeaders(request));

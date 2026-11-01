@@ -140,7 +140,7 @@ test.beforeEach(() => {
     if (url.pathname === "/wp-json/wp/v2/categories" || url.pathname === "/wp-json/wp/v2/tags") return response([{ id: 2, name: "Rangelands", slug: "rangelands" }]);
     if (url.pathname === "/wp-json/wp/v2/posts" && method === "POST") {
       createdPostPayload = JSON.parse(init.body || "{}");
-      createdPost = { id: 124, title: { raw: createdPostPayload.title }, content: { raw: createdPostPayload.content }, excerpt: { raw: createdPostPayload.excerpt }, status: createdPostPayload.status, categories: createdPostPayload.categories || [], tags: createdPostPayload.tags || [], featured_media: 0, link: "https://staging.irpa.or.tz/?p=124", modified: "2026-11-01T09:00:00" };
+      createdPost = { id: 124, title: { raw: createdPostPayload.title }, content: { raw: createdPostPayload.content }, excerpt: { raw: createdPostPayload.excerpt }, status: createdPostPayload.status, categories: createdPostPayload.categories || [], tags: createdPostPayload.tags || [], featured_media: Number(createdPostPayload.featured_media || 0), link: "https://staging.irpa.or.tz/?p=124", modified: "2026-11-01T09:00:00" };
       return response(createdPost, 201);
     }
     if (url.pathname === "/wp-json/wp/v2/posts/124" && method === "GET") return response(createdPost);
@@ -282,13 +282,14 @@ test("new Website Studio posts cannot be created as published and valid requests
   assert.equal(attemptedPublish.status, 400);
   assert.equal(createdPostPayload, null);
   const result = await call(router, makeEnv(), "/api/communications/website/content", {
-    method: "POST", body: { type: "posts", title: "New field update", content: "<p>Update body</p>", excerpt: "Short summary", categories: [2], tags: [2] }
+    method: "POST", body: { type: "posts", title: "New field update", content: "<p>Update body</p>", excerpt: "Short summary", featuredMedia: 55, categories: [2], tags: [2] }
   });
   assert.equal(result.status, 201);
   const data = await result.json();
   assert.equal(data.status, "draft");
   assert.equal(data.item.status, "draft");
   assert.equal(createdPostPayload.status, "draft");
+  assert.equal(createdPostPayload.featured_media, 55);
   assert.deepEqual(createdPostPayload.categories, [2]);
   assert.deepEqual(createdPostPayload.tags, [2]);
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_DRAFT_POST_CREATED"));
