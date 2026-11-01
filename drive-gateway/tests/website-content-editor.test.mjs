@@ -379,6 +379,76 @@ test("WordPress items that advertise a production-host link are refused", async 
   assert.equal(kvStore.size, 0);
 });
 
+test("cPanel diagnostics match SSL certificate subject and read .user.ini before other PHP sources", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html"
+  });
+  const requests = [];
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    requests.push(url.pathname + url.search);
+    if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: { certificates: [{ subject: "CN=staging.irpa.or.tz", not_after: "2027-12-31T23:59:59Z", issuer: "Test CA" }] } });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "upload_max_filesize=64M\npost_max_size=64M\n" } });
+    throw new Error("Unexpected cPanel request " + url.pathname);
+  };
+  const result = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.ssl.status, "PASS");
+  assert.equal(data.ssl.hosts[0].expiry, "2027-12-31T23:59:59Z");
+  assert.equal(data.phpLimits.status, "PASS");
+  assert.equal(data.phpLimits.source, ".user.ini");
+  assert.equal(requests.filter(path => path.includes("/Fileman/get_file_content")).length, 1);
+});
+
+test("cPanel PHP limits fall through to MultiPHP and report INFO when unavailable", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html"
+  });
+  let multiPhpRead = false;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "" } });
+    if (url.pathname.endsWith("/LangPHP/php_ini_get_user_content")) {
+      multiPhpRead = true;
+      return response({ status: 1, data: { content: "upload_max_filesize=32M\npost_max_size=40M\n" } });
+    }
+    throw new Error("Unexpected cPanel request " + url.pathname);
+  };
+  const result = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
+  const data = await result.json();
+  assert.equal(result.status, 200);
+  assert.equal(multiPhpRead, true);
+  assert.equal(data.phpLimits.status, "PASS");
+  assert.equal(data.phpLimits.source, "MultiPHP INI");
+
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: [] });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "" } });
+    if (url.pathname.endsWith("/LangPHP/php_ini_get_user_content")) return response({ status: 1, data: { content: "" } });
+    throw new Error("Unexpected cPanel request " + url.pathname);
+  };
+  const unavailable = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
+  const unavailableData = await unavailable.json();
+  assert.equal(unavailableData.phpLimits.status, "INFO");
+  assert.equal(unavailableData.phpLimits.diagnostic, "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor");
+  assert.equal(unavailableData.ssl.status, "FAIL");
+  assert.match(unavailableData.ssl.error, /No installed SSL certificate matched/);
+});
+
 test("WordPress Administrator credentials are rejected even when authentication returns HTTP 200", async () => {
   wpRoles = ["administrator"];
   const router = makeRouter();
