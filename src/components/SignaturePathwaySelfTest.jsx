@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
-import { downloadControlledDocumentBytes, reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
+import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
 import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
 
 function driveFileId(record = {}) {
