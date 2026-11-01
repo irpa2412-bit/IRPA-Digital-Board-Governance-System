@@ -9,9 +9,9 @@ function makeResponse(body, status = 200, headers = { "Content-Type": "applicati
   return new Response(typeof body === "string" ? body : JSON.stringify(body), { status, headers });
 }
 
-function makeRouter() {
+function makeRouter(role = "Communications Officer") {
   return createCommunicationsSiteRouter({
-    authenticateFirebaseRequest: async () => ({ user_id: "diag-user", email: "diag@example.test", token: "firebase-token", role: "Communications Officer" }),
+    authenticateFirebaseRequest: async () => ({ user_id: "diag-user", email: "diag@example.test", token: "firebase-token", role }),
     getFirestoreDocument: async () => ({ active: false }),
     getInstitutionalProfileForUser: async () => ({ memberRecord: { role: "Communications Officer", status: "Active" }, employeeRecord: null }),
     firestoreDocumentToPlain: value => value,
@@ -115,7 +115,7 @@ test("media upload is blocked with a clear error when WordPress upload_files is 
 });
 
 test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without writes", async () => {
-  const router = makeRouter();
+  const router = makeRouter("Executive Director");
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async input => {
