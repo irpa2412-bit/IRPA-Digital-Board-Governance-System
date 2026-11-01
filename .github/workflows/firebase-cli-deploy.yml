@@ -12,6 +12,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build-and-deploy:
+    # Production Firebase changes require protected Environment approval.
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
