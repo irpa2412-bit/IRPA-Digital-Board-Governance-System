@@ -11,7 +11,7 @@ let auditEvents;
 let requestCount;
 let wpRoles;
 let wpItemLink;
-let lastMediaUpload;
+let lastMediaUpload;\nlet mediaUploadStatus;
 let createdPost;
 let postCreateCount;
 let consoleMessages;
@@ -119,7 +119,7 @@ test.beforeEach(() => {
   requestCount = 0;
   wpRoles = ["editor"];
   wpItemLink = "https://staging.irpa.or.tz/test-page/";
-  lastMediaUpload = null;
+  lastMediaUpload = null;\n  mediaUploadStatus = 201;
   createdPost = null;
   postCreateCount = 0;
   consoleMessages = [];
@@ -136,6 +136,7 @@ test.beforeEach(() => {
     if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
       lastMediaUpload = { contentType: new Headers(init.headers).get("Content-Type"), disposition: new Headers(init.headers).get("Content-Disposition"), bytes: new Uint8Array(init.body) };
+      if (mediaUploadStatus === 406) return new Response("<html>Not Acceptable: ModSecurity rule blocked upload</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "test-ray-123", "X-Powered-By": "PHP/8" } });
       return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: "" }, 201);
     }
     if (url.pathname === "/wp-json/wp/v2/media/88" && method === "POST") {
@@ -401,6 +402,25 @@ test("authenticated staging image upload accepts safe image types and records an
   assert.match(lastMediaUpload.disposition, /field.jpg/);
   assert.deepEqual([...lastMediaUpload.bytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
+});
+
+test("WordPress media HTTP 406 returns sanitised step-level server and WAF diagnostics", async () => {
+  mediaUploadStatus = 406;
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting" }
+  });
+  assert.equal(result.status, 406);
+  const data = await result.json();
+  assert.equal(data.detail.step, "media_upload");
+  assert.equal(data.detail.status, 406);
+  assert.equal(data.detail.contentType, "text/html");
+  assert.match(data.detail.body, /ModSecurity/);
+  assert.equal(data.detail.headers.server, "LiteSpeed");
+  assert.equal(data.detail.headers["cf-ray"], "test-ray-123");
+  assert.equal(data.detail.headers["x-powered-by"], "PHP/8");
+  assert.equal(JSON.stringify(data).includes(TEST_PASSWORD), false);
 });
 
 test("image upload requires non-empty alt text", async () => {
