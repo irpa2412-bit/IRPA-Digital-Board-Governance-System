@@ -1034,15 +1034,28 @@ export function createCommunicationsSiteRouter(deps) {
       const { claims } = await authorised(request, env, true);
       const wp = websiteWordPressConfig(env);
       const report = [];
-      const add = (label, status, httpStatus, error = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null });
-      const wpRequest = async (endpoint, method = "GET", payload, headers = {}) => {
+      const add = (label, status, httpStatus, error = "", detail = null) => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail });
+      const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint) => {
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
           method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
           ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
           signal: AbortSignal.timeout(30000)
         });
+        const rawBody = response.ok ? "" : await response.clone().text().catch(() => "");
+        const responseHeaders = {};
+        for (const name of ["server", "cf-ray", "x-powered-by"]) {
+          const value = response.headers.get(name);
+          if (value) responseHeaders[name] = cleanText(value, 200);
+        }
+        for (const [name, value] of response.headers.entries()) {
+          if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) responseHeaders[name] = cleanText(value, 200);
+        }
+        const detail = response.ok ? null : {
+          step, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120),
+          body: sanitizedWordPressBody(rawBody, wp).slice(0, 300), headers: responseHeaders
+        };
         const data = await response.json().catch(() => null);
-        return { response, data };
+        return { response, data, detail };
       };
       const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
       let testPageId = 0, testPostId = 0, uploadAllowed = false;
