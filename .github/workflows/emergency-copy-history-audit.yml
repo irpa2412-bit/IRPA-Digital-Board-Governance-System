@@ -1,0 +1,53 @@
+name: Emergency copy storage history audit
+on:
+  push:
+    branches:
+      - fix/emergency-document-retrieval-20261101
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/emergency-copy-history-audit.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Fetch every remote branch and tag
+        run: |
+          git fetch --all --tags --prune
+          git branch -a
+      - name: Search exact historical strings across all refs
+        shell: bash
+        run: |
+          set +e
+          {
+            echo '## git log --all -S"firestore-emergency"'
+            git log --all --oneline -S"firestore-emergency"
+            echo
+            echo '## git log --all -S"IRPA-EMG-DOC"'
+            git log --all --oneline -S"IRPA-EMG-DOC"
+            echo
+            echo '## git log --all -S"emergency" -- src drive-gateway functions'
+            git log --all --oneline -S"emergency" -- src drive-gateway functions
+            echo
+            echo '## Upload fallback commits and deleted paths (2026-09-20 through 2026-09-28)'
+            git log --all --since='2026-09-20 00:00:00 +0000' --until='2026-09-29 00:00:00 +0000' --date=iso-strict --name-status --format='COMMIT %H%nDATE %ad%nSUBJECT %s' -- src drive-gateway functions
+            echo
+            echo '## All historical paths containing emergency/fallback/upload in filename'
+            git log --all --name-status --format='COMMIT %H %ad %s' --date=short -- '**/*emergency*' '**/*fallback*' '**/*upload*'
+          } | tee emergency-copy-history.txt
+          echo '### Historical source search' >> "$GITHUB_STEP_SUMMARY"
+          cat emergency-copy-history.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload history evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emergency-copy-history-evidence
+          path: emergency-copy-history.txt
+          retention-days: 30
