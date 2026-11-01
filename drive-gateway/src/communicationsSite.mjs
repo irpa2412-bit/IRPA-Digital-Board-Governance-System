@@ -882,10 +882,34 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ categories, tags }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
+      await websiteEditorAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+        method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }),
+        signal: AbortSignal.timeout(15000)
+      });
+      const schema = await response.json().catch(() => null);
+      const properties = schema?.schema?.properties?.meta?.properties || {};
+      const writable = key => !!properties[key] && properties[key].readonly !== true &&
+        (!Array.isArray(properties[key].context) || properties[key].context.includes("edit"));
+      const metaDescription = writable("_yoast_wpseo_metadesc");
+      const focusKeyphrase = writable("_yoast_wpseo_focuskw");
+      return json({
+        source: "WordPress REST OPTIONS schema",
+        yoast: { metaDescription, focusKeyphrase },
+        writable: metaDescription || focusKeyphrase,
+        message: metaDescription && focusKeyphrase
+          ? "Both Yoast fields are exposed as writable WordPress REST meta."
+          : "One or both Yoast fields are not exposed as writable WordPress REST meta on this site. Website Studio will not attempt to write unsupported fields."
+      }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/website/posts" && request.method === "POST") {
       const { claims } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const allowedKeys = new Set(["title", "content", "excerpt", "categories", "tags", "featuredMedia", "slug"]);
+      const allowedKeys = new Set(["title", "content", "excerpt", "categories", "tags", "featuredMedia", "slug", "seoMetaDescription", "seoFocusKeyphrase"]);
       if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) {
         return json({ error: "New website updates accept content fields only; publication status is controlled by the server." }, 400, corsHeaders(request));
       }
@@ -904,6 +928,24 @@ export function createCommunicationsSiteRouter(deps) {
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const payload = { title, content: sanitizeWordPressContent(content), excerpt, slug, categories, tags, featured_media: featuredMedia, status: "draft" };
+      const seoDescription = cleanText(input.seoMetaDescription, 160);
+      const seoFocusKeyphrase = cleanText(input.seoFocusKeyphrase, 100);
+      if (seoDescription || seoFocusKeyphrase) {
+        const optionsResponse = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
+          method: "OPTIONS", headers: wordpressHeaders(wp, { Accept: "application/json" }),
+          signal: AbortSignal.timeout(15000)
+        });
+        const options = await optionsResponse.json().catch(() => null);
+        const properties = options?.schema?.properties?.meta?.properties || {};
+        const writable = key => !!properties[key] && properties[key].readonly !== true &&
+          (!Array.isArray(properties[key].context) || properties[key].context.includes("edit"));
+        if (seoDescription && !writable("_yoast_wpseo_metadesc") || seoFocusKeyphrase && !writable("_yoast_wpseo_focuskw")) {
+          return json({ error: "The requested Yoast SEO field is not exposed as writable through this site's WordPress REST API. Add it in the WordPress editor after draft creation; no plugin or site configuration was changed." }, 422, corsHeaders(request));
+        }
+        payload.meta = {};
+        if (seoDescription) payload.meta._yoast_wpseo_metadesc = seoDescription;
+        if (seoFocusKeyphrase) payload.meta._yoast_wpseo_focuskw = seoFocusKeyphrase;
+      }
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
