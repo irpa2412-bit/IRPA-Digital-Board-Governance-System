@@ -180,7 +180,7 @@ test("Website Studio renders all four tabs and acceptance controls through the a
   }]
  });
  try{
-  const {default:WebsiteStudio}=await server.ssrLoadModule("/src/pages/CommunicationsWebsiteStudio.jsx");
+  const {default:WebsiteStudio,websiteConnectionLabel}=await server.ssrLoadModule("/src/pages/CommunicationsWebsiteStudio.jsx");
   const administrator=true;
   const authorized=administrator||false;
   const renderForAdministrator=initialTab=>renderToStaticMarkup(React.createElement(()=>authorized?React.createElement(WebsiteStudio,{initialTab}):null));
@@ -189,6 +189,13 @@ test("Website Studio renders all four tabs and acceptance controls through the a
   for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance"]) assert.ok(pagesHtml.includes(label),label+" tab must appear in administrator render");
   assert.ok(acceptanceHtml.includes("Run production acceptance"),"Run production acceptance must appear when the administrator opens its tab");
   assert.ok(acceptanceHtml.includes("Copy Report"),"Copy Report must appear in the acceptance tab");
+  assert.equal(websiteConnectionLabel("connected"),"Connected","connected status response must display Connected");
+  assert.equal(websiteConnectionLabel("authentication_failed"),"Authentication failed","connection failures must remain distinguishable");
+  const studioSource=read("../src/pages/CommunicationsWebsiteStudio.jsx");
+  assert.ok(studioSource.includes('useEffect(()=>{void connect();},[])'),"Website Studio must call the status route automatically on entry");
+  assert.ok(studioSource.includes('<strong>WordPress: {status?websiteConnectionLabel(status.website):busy?"Checking connection…":"Not checked"}</strong>'),"visible status line must render Connected from the route response");
+  assert.ok(studioSource.includes('accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,.mov,.webm,.mp3,.pdf,.docx,.xlsx,.pptx"'),"Upload Media must accept all requested file formats");
+  assert.ok(studioSource.includes('value={mediaDestination}'),"Upload Media destination selector must remain available");
   const portal=read("../src/pages/CommunicationMediaPortal.jsx");
   assert.ok(portal.includes("const authorized=isAdmin||roles.some"),"real portal must authorize administrators");
   assert.ok(portal.includes("const websiteEditor=isAdmin||roles.some"),"real website editor gate must authorize administrators");
