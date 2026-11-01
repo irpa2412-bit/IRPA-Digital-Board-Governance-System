@@ -19,7 +19,7 @@ test("controlled upload allocates one Firestore ID before gateway upload and wri
   assert.match(data, /createRecord\(collectionName,data,recordId=null\)/);
   assert.match(data, /recordId\?doc\(db,collectionName,String\(recordId\)\):null/);
   assert.match(storage, /gatewayPost\(\"\/api\/upload-controlled-document\"/);
-  const uploadRoute = worker.slice(worker.indexOf("async function uploadControlledDocument"), worker.indexOf("const categoryFile=await uploadToFolder"));
+  const uploadRoute = worker.slice(worker.indexOf("async function controlledDocumentUploadPolicyCheck"), worker.indexOf("const categoryFile=await uploadToFolder"));
   assert.match(uploadRoute, /const documentId = cleanId\(data\.documentId \|\| ""\)/);
   assert.match(uploadRoute, /description:JSON\.stringify\(\{/);
   assert.match(uploadRoute, /documentId,\s*documentUid:documentId/);
