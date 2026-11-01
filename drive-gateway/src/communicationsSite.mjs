@@ -950,8 +950,12 @@ export function createCommunicationsSiteRouter(deps) {
           method, headers: wordpressHeaders(wp, { Accept: "application/json", ...(payload ? { "Content-Type": "application/json" } : {}) }),
           ...(payload ? { body: JSON.stringify(payload) } : {}), signal: AbortSignal.timeout(20000)
         });
-        const data = await response.json().catch(() => null);
-        return { response, data };
+        const rawBody = await response.text();
+        let data = null; try { data = JSON.parse(rawBody); } catch {}
+        const headers = {};
+        for (const [name, value] of response.headers.entries()) if (/^(server|cf-ray|cf-cache-status|x-waf|x-sucuri|x-mod-security|x-firewall|x-cache)/i.test(name)) headers[name] = cleanText(value, 180);
+        const body = cleanText(rawBody, 300).replace(/(authorization|application.password|token|secret)\\s*[:=]\\s*[^,;\\s]+/ig, "$1=[REDACTED]");
+        return { response, data, diagnostics: { step: endpoint, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120), body, headers } };
       };
       for (const [title, slug] of pages) {
         const existing = await wpJson("pages?slug=" + encodeURIComponent(slug) + "&context=edit&per_page=10");
@@ -1007,7 +1011,7 @@ export function createCommunicationsSiteRouter(deps) {
       const [stepKind, stepFile, stepDestination] = step.split("|");
       if (!["page-lifecycle", "post-lifecycle", "wp-media", "cpanel"].includes(stepKind)) return json({ error: "A supported independent acceptance step is required." }, 400, corsHeaders(request));
       const report = [];
-      const add = (label, status, httpStatus, error = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null });
+      const add = (label, status, httpStatus, error = "", detail = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail: cleanText(detail, 1200) || null });
       const wpRequest = async (endpoint, method = "GET", payload, headers = {}) => {
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
           method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
@@ -1059,21 +1063,21 @@ export function createCommunicationsSiteRouter(deps) {
             validateWebsiteMedia({ filename, contentType: file.mime, bytes });
             const upload = await wpRequest("media", "POST", bytes, {
               "Content-Type": file.mime,
-              "Content-Disposition": 'attachment; filename="' + filename + '"'
+              "Content-Disposition": 'attachment; filename="' + filename.replace(/[^A-Za-z0-9._-]/g, "_") + '"', "Accept": "application/json"
             });
             const mediaId = Number(upload.data?.id);
             if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(upload.data?.source_url, wp)) {
-              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, upload.data?.message || "WordPress did not return a same-host media URL.");
+              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, [403, 406].includes(upload.response.status) ? "FAIL: blocked by server firewall" : "WordPress media upload failed.", JSON.stringify(upload.diagnostics));
               continue;
             }
             const meta = await wpRequest("media/" + mediaId, "POST", { title: "TEST " + file.name + " " + destination, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) });
             if (!meta.response.ok || Number(meta.data?.id) !== mediaId) {
-              add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, meta.data?.message || "Media metadata/attachment failed.");
+              add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, "WordPress media metadata/attachment failed.", JSON.stringify(meta.diagnostics));
               continue;
             }
             if (destination === "featured") {
               const featured = await wpRequest("pages/" + testPageId, "POST", { featured_media: mediaId, status: "draft" });
-              if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, featured.data?.message || "Featured image assignment failed."); continue; }
+              if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, "WordPress featured-media assignment failed.", JSON.stringify(featured.diagnostics)); continue; }
             }
             const opened = await wordpressEditorFetch(wp, upload.data.source_url, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
             add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
@@ -1107,7 +1111,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, step, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      return json({ testRun: true, step, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupList: [], uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
