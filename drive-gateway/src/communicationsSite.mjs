@@ -1494,11 +1494,12 @@ export function createCommunicationsSiteRouter(deps) {
         result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
       }
       try {
-        const response = await cpanelCall(cp, "LangPHP/php_ini_get_user", { domain });
-        const data = response?.data?.[0] || response?.data || {};
-        const ini = data.ini || data.settings || data;
-        const upload = ini.upload_max_filesize || ini.uploadMaxFilesize;
-        const post = ini.post_max_size || ini.postMaxSize;
+        const response = await cpanelCall(cp, "LangPHP/php_ini_get_user_content", { type: "vhost", vhost: domain });
+        const data = response?.[0] || response?.data?.[0] || response?.data || response || {};
+        const iniContent = typeof data === "string" ? data : String(data.content || data.ini || data.php_ini || "");
+        const directive = name => iniContent.match(new RegExp("^\\s*" + name + "\\s*=\\s*([^\\s;#]+)", "im"))?.[1] || null;
+        const upload = directive("upload_max_filesize");
+        const post = directive("post_max_size");
         result.phpLimits = { status: upload && post ? "PASS" : "UNAVAILABLE", httpStatus: response.__httpStatus, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload || post ? null : "The cPanel UAPI response did not expose upload_max_filesize or post_max_size." };
       } catch (error) {
         result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), error: cleanText(error.message, 240) };

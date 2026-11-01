@@ -125,8 +125,8 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
       ? { status: 1, data: [{ email: "info@staging.irpa.or.tz" }, { email: "contact@staging.irpa.or.tz" }] }
       : url.pathname.endsWith("/SSL/installed_hosts")
         ? { status: 1, data: [{ domain: "staging.irpa.or.tz", status: "valid", issuer: "TEST CA" }] }
-        : url.pathname.endsWith("/LangPHP/php_ini_get_user")
-          ? { status: 1, data: [{ upload_max_filesize: "32M", post_max_size: "40M" }] }
+        : url.pathname.endsWith("/LangPHP/php_ini_get_user_content")
+          ? { status: 1, data: [{ content: "upload_max_filesize = 32M\\npost_max_size = 40M\\n" }] }
           : null;
     if (!payload) throw new Error("Unexpected cPanel operation: " + url.pathname);
     return makeResponse(payload);
@@ -142,7 +142,7 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
     assert.equal(data.ssl.hosts[0].status, "valid");
     assert.equal(data.phpLimits.upload_max_filesize, "32M");
     assert.equal(data.phpLimits.post_max_size, "40M");
-    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/LangPHP/php_ini_get_user"]);
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/LangPHP/php_ini_get_user_content"]);
   } finally { globalThis.fetch = originalFetch; }
 });
 
