@@ -478,3 +478,14 @@ test("Website Studio exposes approval-ready submission and guarded Yoast metadat
  assert.ok(websiteStudio.includes("Approval-ready website draft"));
  assert.ok(websiteStudio.includes("loadSeoCapabilities"));
 });
+
+
+test("administrator Communication & Media tab bar clearly separates Website Studio from bilingual page drafts",()=>{
+ assert.ok(portal.includes('{["Website Studio","Page Drafts (EN/SW)"'),"tab bar must place Website Studio first and expose Page Drafts (EN/SW) separately");
+ assert.ok(portal.includes('const authorized=isAdmin||roles.some'),"administrators retain the existing portal authorization path");
+ assert.ok(portal.includes('if(!authorized)return'),"unauthorized users remain blocked by the existing portal gate");
+ assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio/>'),"Website Studio tab opens the CommunicationsWebsiteStudio component");
+ assert.ok(portal.includes('tab==="Page Drafts (EN/SW)"&&<section'),"bilingual page-draft form remains on its distinct tab");
+ assert.ok(portal.includes("Upload media, choose pages and run Production Acceptance in Website Studio"));
+ assert.ok(portal.includes('onClick={()=>setTab("Website Studio")}>Open Website Studio</button>'));
+});
