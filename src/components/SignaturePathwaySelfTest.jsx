@@ -59,37 +59,55 @@ export default function SignaturePathwaySelfTest() {
     }
   }
 
-  async function reconcile(repairMismatches = false) {
+  async function reconcile() {
     setBusy(true);
-    setMessage(repairMismatches ? "Repairing confirmed Drive metadata mismatches…" : "Dry-run: discovering controlled documents and comparing Firestore IDs with Drive descriptions. No changes will be made.");
+    setMessage("Read-only diagnostic: inspecting Drive metadata, downloaded bytes, hashes, sizes and PDF structure. No changes will be made.");
     try {
       await requireAdministrator();
-      const result = await reconcileSignatureDocumentIds([], { autoDiscover: true, dryRun: !repairMismatches, repairMismatches });
-      const lines = (result.results || []).map(item => ({
-        documentId: item.documentId,
-        title: item.title || item.documentId,
-        checks: [{ name: item.status + " · Drive " + item.fileId, status: item.status === "match" || item.status === "repaired" ? "PASS" : item.status === "mismatch" ? (repairMismatches ? "FAIL" : "NEEDS REPAIR") : "FAIL", reason: "Firestore ID: " + item.documentId + "; Drive file ID: " + item.fileId + "; Drive description.documentId: " + (item.previousDescriptionDocumentId || "(unreadable/not reported)") + ". " + item.reason }]
-      }));
+      const result = await reconcileSignatureDocumentIds([], { autoDiscover: true, dryRun: true });
+      const lines = (result.results || []).map(item => {
+        const detail = [
+          "Classification: " + (item.classification || item.status || "UNKNOWN"),
+          "Exact failing step: " + (item.step || "(none)"),
+          "HTTP status: " + (item.httpStatus ?? "(none)"),
+          "Drive error reason: " + (item.driveErrorReason || "(none)"),
+          "Drive mimeType: " + (item.mimeType || "(not returned)"),
+          "Drive size: " + (item.driveSize ?? "(not returned)") + " bytes; stored size: " + (item.storedSize ?? "(not recorded)") + " bytes",
+          "Stored SHA-256: " + (item.storedSha256 || "(not recorded)"),
+          "Computed SHA-256: " + (item.computedSha256 || "(not computed)"),
+          "Trashed: " + (item.trashed == null ? "(not returned)" : String(item.trashed)),
+          "Parents: " + (Array.isArray(item.parents) ? item.parents.join(", ") : "(not returned)"),
+          "Drive created: " + (item.createdTime || "(not returned)"),
+          "Uploaded by: " + (item.uploadedBy || "(not recorded)"),
+          "Uploaded at: " + (item.uploadedAt || "(not recorded)"),
+          "PDF parses: " + (item.pdfParses == null ? "(not checked)" : String(item.pdfParses)),
+          "PDF pages: " + (item.pdfPageCount ?? "(not parsed)") + "; stored page count: " + (item.storedPageCount ?? "(not recorded)"),
+          item.pageCountComparison || "",
+          "Drive description.documentId: " + (item.previousDescriptionDocumentId || "(not checked)"),
+          "Reason: " + (item.reason || "(no reason returned)")
+        ].filter(Boolean).join("\n");
+        return { documentId:item.documentId, title:item.title || item.documentId, checks:[{name:item.status + " · Drive " + item.fileId,status:item.status === "match" ? "PASS" : item.status === "mismatch" ? "NEEDS REVIEW" : "FAIL",reason:"Firestore ID: " + item.documentId + "; Drive file ID: " + item.fileId + "\n" + detail}], diagnostic:item };
+      });
       setResults(lines);
       const summary = result.summary || {};
-      setMessage((repairMismatches ? "Repair completed. " : "Dry-run completed; no metadata was changed. ") + (summary.match || 0) + " match; " + (summary.mismatch || 0) + " mismatch; " + (summary.repaired || 0) + " repaired; " + (summary.unreadable || 0) + " unreadable. Every discovered document has a result line, including wiAfPSIxHLTd6MdeM04q.");
+      setMessage("Read-only diagnostics completed; no metadata or document was changed. " + (summary.match || 0) + " match; " + (summary.mismatch || 0) + " mismatch; " + (summary.unreadable || 0) + " unreadable. Every discovered document has a result line, including wiAfPSIxHLTd6MdeM04q.");
     } catch (error) {
-      setMessage((repairMismatches ? "Repair" : "Dry-run") + " failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
+      setMessage("Read-only diagnostic failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
     } finally {
       setBusy(false);
     }
   }
 
   return <section className="panel">
-    <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Checks registered document IDs and the controlled-download route. Dry-run discovers controlled documents from Firestore and compares Drive description.documentId with each Firestore ID. Use Repair mismatches only after reviewing the dry-run results.</p></div></div>
+    <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Read-only inspection of every registered controlled document: Drive metadata, download, SHA-256, byte size and PDF parsing. No document, Drive file or Firestore record is repaired or changed.</p></div></div>
     <div className="auth-message" role="status" aria-live="polite" style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginBottom:12}}>{message}</div>
-    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={runChecks} disabled={busy}>{busy ? "Working…" : "Run Self-Test"}</button><button type="button" className="secondary-button" onClick={() => reconcile(false)} disabled={busy}>Dry-run Drive ID Reconciliation</button><button type="button" onClick={() => reconcile(true)} disabled={busy}>Repair mismatches</button></div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={() => reconcile()} disabled={busy}>{busy ? "Working…" : "Run Self-Test & Drive Diagnostics"}</button><button type="button" className="secondary-button" onClick={() => { const report = results.map(row => [row.title || row.documentId, "Firestore ID: " + row.documentId, ...row.checks.map(check => check.status + ": " + check.name + "\n" + check.reason)].join("\n")).join("\n\n"); navigator.clipboard.writeText(report).then(() => setMessage("Full diagnostic report copied to clipboard.")).catch(error => setMessage("Copy failed: " + (error?.message || "Clipboard access unavailable."))); }} disabled={!results.length}>Copy report</button></div>
     {results.map((row,index)=><article key={row.documentId + "-" + index} className="panel" style={{marginBottom:10,padding:12}}>
       <strong style={{display:"block",overflowWrap:"anywhere"}}>{row.title || row.documentId}</strong><small style={{display:"block",overflowWrap:"anywhere"}}>Firestore ID: {row.documentId}</small>
       {row.checks.map((check,i)=><div key={check.name + i} style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8}}>
         <strong>{check.status}: {check.name}</strong><div style={{fontSize:13,whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginTop:3}}>{check.reason}</div>
       </div>)}
     </article>)}
-    {!results.length && <p className="muted">No results yet. Tap Run Self-Test to display a readable result for each registered document.</p>}
+    {!results.length && <p className="muted">No results yet. Tap Run Self-Test & Drive Diagnostics to inspect each registered document and its exact failure reason.</p>}
   </section>;
 }
