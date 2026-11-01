@@ -627,7 +627,7 @@ export function createCommunicationsSiteRouter(deps) {
           let detail = {};
           try { detail = JSON.parse(raw); } catch {}
           const wpCode = safeCode(detail.code);
-          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\\s/g, "") }).replace(/[\\r\\n]/g, " ");
+          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }).replace(/[\\r\\n]/g, " ");
           const location = response.headers.get("location");
           const redirected = response.status >= 300 && response.status < 400;
           result.websiteHttpStatus = response.status;
@@ -690,7 +690,7 @@ export function createCommunicationsSiteRouter(deps) {
             redirectTarget: publicLocation ? safeWordPressUrl(new URL(publicLocation, publicUrl).toString()) : null,
             contentType: String((publicResponse.headers.get("content-type") || "unknown").split(";")[0]).trim().toLowerCase().slice(0, 80),
             errorCode: safeCode(publicBody.code),
-            errorMessage: sanitizedWordPressBody(cleanText(publicBody.message || publicBody.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\\s/g, "") }) || undefined,
+            errorMessage: sanitizedWordPressBody(cleanText(publicBody.message || publicBody.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }) || undefined,
             wwwAuthenticatePresent: publicResponse.headers.has("www-authenticate"),
             rawResponse: sanitizedWordPressBody(publicRaw, wp) || "(empty response body)"
           };
