@@ -885,7 +885,7 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/posts" && request.method === "POST") {
       const { claims } = await websiteEditorAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
-      const allowedKeys = new Set(["title", "content", "excerpt", "categories", "tags", "featuredMedia"]);
+      const allowedKeys = new Set(["title", "content", "excerpt", "categories", "tags", "featuredMedia", "slug"]);
       if (Object.keys(input || {}).some(key => !allowedKeys.has(key))) {
         return json({ error: "New website updates accept content fields only; publication status is controlled by the server." }, 400, corsHeaders(request));
       }
@@ -893,16 +893,17 @@ export function createCommunicationsSiteRouter(deps) {
       const content = String(input.content || "");
       const excerpt = cleanText(String(input.excerpt || "").replace(/<[^>]*>/g, ""), 600);
       const featuredMedia = Number(input.featuredMedia || 0);
+      const slug = cleanText(input.slug, 100).toLowerCase();
       const parseIds = value => Array.isArray(value) && value.length <= 100 &&
         value.every(id => Number.isSafeInteger(Number(id)) && Number(id) > 0) ? value.map(Number) : null;
       const categories = parseIds(input.categories || []);
       const tags = parseIds(input.tags || []);
-      if (!title || !content || content.length > 30000 || !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !categories || !tags) {
+      if (!title || !content || content.length > 30000 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !Number.isSafeInteger(featuredMedia) || featuredMedia < 0 || !categories || !tags) {
         return json({ error: "Provide a title, content, valid excerpt, featured image ID and valid category/tag IDs." }, 400, corsHeaders(request));
       }
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
-      const payload = { title, content: sanitizeWordPressContent(content), excerpt, categories, tags, featured_media: featuredMedia, status: "draft" };
+      const payload = { title, content: sanitizeWordPressContent(content), excerpt, slug, categories, tags, featured_media: featuredMedia, status: "draft" };
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/posts", {
         method: "POST", headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
         body: JSON.stringify(payload), signal: AbortSignal.timeout(30000)
@@ -1159,21 +1160,35 @@ export function createCommunicationsSiteRouter(deps) {
       const requestedSlug = cleanText(item.slug, 100).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
       const languageSuffix = String(item.language || "English").toLowerCase().startsWith("kiswahili") ? "-sw" : "-en";
       const slug = requestedSlug ? requestedSlug + languageSuffix : "irpa-" + itemId;
+      const contentHtml = /<\/?[a-z][^>]*>/i.test(body) ? sanitizeWordPressContent(body) : plainContent(body);
       const lookup = await fetch(endpoint + "?slug=" + encodeURIComponent(slug) + "&status=publish,draft,pending,private&per_page=1", {
         headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(15000)
       });
       const found = await lookup.json().catch(() => null);
       if (!lookup.ok || !Array.isArray(found)) throw new Error("Could not safely check existing website content before publishing.");
       let post = found.find(p => Number.isInteger(p.id) && typeof p.link === "string");
+      const publicationContent = contentHtml + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : "");
       if (!post) {
-        const response = await fetch(endpoint, {
+        const response = await wordpressEditorFetch(wp, endpoint, {
           method: "POST",
           headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
-          body: JSON.stringify({ title, content: plainContent(body) + (isPage && /^https:\/\//i.test(String(item.assetUrl || "")) ? '<p><img src="' + htmlEscape(String(item.assetUrl)) + '" alt="' + htmlEscape(title) + '" /></p>' : ""), excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
+          body: JSON.stringify({ title, content: publicationContent, excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish", comment_status: "closed", ping_status: "closed" }),
           signal: AbortSignal.timeout(30000)
         });
         post = await response.json().catch(() => null);
-        if (!response.ok || !Number.isInteger(post?.id) || typeof post?.link !== "string") throw new Error("The website rejected the publishing request.");
+        if (!response.ok || !Number.isInteger(post?.id) || typeof post?.link !== "string" || String(post?.status || "") !== "publish") throw new Error("The website rejected the publishing request.");
+      } else if (String(post.status || "") !== "publish") {
+        const response = await wordpressEditorFetch(wp, endpoint + "/" + Number(post.id), {
+          method: "POST",
+          headers: wordpressHeaders(wp, { "Content-Type": "application/json", Accept: "application/json" }),
+          body: JSON.stringify({ title, content: publicationContent, excerpt: htmlEscape(cleanText(item.summary, 600)), slug, status: "publish" }),
+          signal: AbortSignal.timeout(30000)
+        });
+        const promoted = await response.json().catch(() => null);
+        if (!response.ok || Number(promoted?.id) !== Number(post.id) || String(promoted?.status || "") !== "publish" || !isAllowedWordPressLink(promoted?.link, wp)) {
+          throw new Error("The approved WordPress draft could not be promoted to Published.");
+        }
+        post = promoted;
       }
       const now = new Date().toISOString();
       const documentFields = fields({ status: "Published", wpPostId: post.id, publicUrl: post.link, publishedAt: now, publishedByUid: claims.user_id, publishedByEmail: claims.email || "", updatedAt: now, updatedByUid: claims.user_id, updatedByEmail: claims.email || "" });
