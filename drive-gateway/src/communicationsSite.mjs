@@ -1121,6 +1121,7 @@ export function createCommunicationsSiteRouter(deps) {
               }
               continue;
             }
+            cleanupList.push({ type: "media", id: mediaId, url: upload.data.source_url });
             const meta = await wpRequest("media/" + mediaId, "POST", { title: "TEST " + file.name + " " + destination, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) });
             if (!meta.response.ok || Number(meta.data?.id) !== mediaId) {
               add(file.name + " upload to WordPress " + destination + " metadata", "FAIL", meta.response.status, "WordPress media metadata/attachment failed.", JSON.stringify(meta.diagnostics));
@@ -1130,7 +1131,6 @@ export function createCommunicationsSiteRouter(deps) {
               const featured = await wpRequest("pages/" + testPageId, "POST", { featured_media: mediaId, status: "draft" });
               if (!featured.response.ok) { add(file.name + " upload to WordPress featured", "FAIL", featured.response.status, "WordPress featured-media assignment failed.", JSON.stringify(featured.diagnostics)); continue; }
             }
-            cleanupList.push({ type: "media", id: mediaId, url: upload.data.source_url });
             const opened = await wordpressEditorFetch(wp, upload.data.source_url, { headers: { Accept: "*/*" }, signal: AbortSignal.timeout(20000) });
             add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
           } catch (error) { add(file.name + " upload to WordPress " + destination, "FAIL", error.httpStatus || 0, error.message); }
@@ -1556,7 +1556,7 @@ export function createCommunicationsSiteRouter(deps) {
         const normal = value => String(value || "").toLowerCase().replace(/^\\*\\./, "");
         const match = rawRows.find(row => [row.domain, row.host, row.servername, row.subject].some(value => normal(value).includes(normal(domain))));
         const expiry = match && (match.not_after || match.expiry || match.expires || match.notAfter || "");
-        result.ssl = { status: match && expiry ? "PASS" : "FAIL", httpStatus: response.__httpStatus, hosts: match ? [{ domain: cleanText(match.domain || match.host || match.servername || match.subject || domain, 253), status: cleanText(match.status || match.certificate_status || "installed", 80), issuer: cleanText(match.issuer || "", 120), expiry: cleanText(expiry, 80) }] : [], error: match ? (!expiry ? "Matching certificate has no readable expiry field." : "") : "No matching SSL certificate was returned.", detail: match ? "" : cleanText(typeof response === "string" ? response : JSON.stringify(response), 200) };
+        result.ssl = { status: match && expiry ? "PASS" : "FAIL", httpStatus: response.__httpStatus, hosts: match ? [{ domain: cleanText(match.domain || match.host || match.servername || match.subject || domain, 253), status: cleanText(match.status || match.certificate_status || "installed", 80), issuer: cleanText(match.issuer || "", 120), expiry: cleanText(expiry, 80) }] : [], error: match ? (!expiry ? "Matching certificate has no readable expiry field." : "") : "No matching SSL certificate was returned.", detail: match ? "" : cleanText(typeof response === "string" ? response : JSON.stringify(response), 200).replace(/(authorization|token|secret)\\s*[:=]\\s*[^,;\\s]+/ig, "$1=[REDACTED]") };
       } catch (error) {
         result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
       }
