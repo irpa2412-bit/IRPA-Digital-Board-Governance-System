@@ -341,7 +341,7 @@ export function createCommunicationsSiteRouter(deps) {
       signal: AbortSignal.timeout(15000)
     });
     const data = await response.json().catch(() => null);
-    if (!response.ok || !data || data.status !== 1) {
+    if (!response.ok || !data || (!Array.isArray(data) && data.status !== 1)) {
       const status = Number.isInteger(response.status) ? response.status : 0;
       const uapiStatus = data && Number.isInteger(data.status) ? data.status : "unknown";
       const errorCount = Array.isArray(data?.errors) ? data.errors.length : 0;
@@ -1019,8 +1019,12 @@ export function createCommunicationsSiteRouter(deps) {
           ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
           signal: AbortSignal.timeout(30000)
         });
-        const data = await response.json().catch(() => null);
-        return { response, data };
+        const rawBody = await response.text();
+        let data = null; try { data = JSON.parse(rawBody); } catch {}
+        const headers = {};
+        for (const [name, value] of response.headers.entries()) if (/^(server|cf-ray|cf-cache-status|x-waf|x-sucuri|x-mod-security|x-firewall|x-cache)/i.test(name)) headers[name] = cleanText(value, 180);
+        const body = cleanText(rawBody, 300).replace(/(authorization|application.password|token|secret)\\s*[:=]\\s*[^,;\\s]+/ig, "$1=[REDACTED]");
+        return { response, data, diagnostics: { step: endpoint, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120), body, headers } };
       };
       const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
       let testPageId = Number(input.pageId || 0), testPostId = Number(input.postId || 0), uploadAllowed = false;
