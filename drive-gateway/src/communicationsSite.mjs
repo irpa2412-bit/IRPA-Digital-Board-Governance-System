@@ -278,6 +278,27 @@ export function createCommunicationsSiteRouter(deps) {
     return value.slice(0, 1024);
   }
 
+  async function wordpressResponseDetail(response, wp, step) {
+    const headers = response.headers;
+    const headerDetails = {};
+    for ( (constName of ["server", "cf-ray", "x-powered-by"]) ) {
+      const value = headers.get(constName);
+      if (value) headerDetails[constName] = cleanText(value, 200);
+    }
+    for (const [name, value] of headers.entries()) {
+      if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) {
+        headerDetails[name] = cleanText(value, 200);
+      }
+    }
+    const raw = await response.clone().text().catch(() => "");
+    return {
+      step, status: response.status,
+      contentType: cleanText(headers.get("content-type") || "", 120),
+      body: sanitizedWordPressBody(raw, wp).slice(0, 300),
+      headers: headerDetails
+    };
+  }
+
   function wordpressErrorFinding(status, code, message, body) {
     const normalized = String(code || "").toLowerCase();
     const detail = cleanText(message, 220).replace(/[\r\n]/g, " ");
@@ -844,18 +865,28 @@ export function createCommunicationsSiteRouter(deps) {
       const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
       if (user?.capabilities?.upload_files !== true) return json({ error: "WordPress media upload is blocked: the configured integration account is missing the upload_files capability. Ask the WordPress administrator to grant upload_files to the dedicated Editor account, then run diagnostics again.", code: "wordpress_upload_files_capability_missing", capability: "upload_files" }, 403, corsHeaders(request));
       const endpoint=wp.root+"/wp-json/wp/v2/media";
-      const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+meta.filename.replace(/["\\\r\n]/g,"-")+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
+      const safeFilename=meta.filename.normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
+      const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
       const uploaded=await response.json().catch(()=>null);
-      if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp))return json({error:"WordPress media upload failed (HTTP "+response.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:response.status},response.status||502,corsHeaders(request));
+      if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
+        const detail=await wordpressResponseDetail(response,wp,"media_upload");
+        return json({error:"WordPress media upload failed (HTTP "+response.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:response.status,detail},response.status||502,corsHeaders(request));
+      }
       const update={title,alt_text:altText,caption};
       if(destination!=="media-library")update.post=Number(input.parentId||input.postId);
       const metadata=await wordpressEditorFetch(wp,endpoint+"/"+uploaded.id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify(update),signal:AbortSignal.timeout(20000)});
       const media=await metadata.json().catch(()=>null);
-      if(!metadata.ok||Number(media?.id)!==uploaded.id)return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status},502,corsHeaders(request));
+      if(!metadata.ok||Number(media?.id)!==uploaded.id){
+        const detail=await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
+        return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status,detail},502,corsHeaders(request));
+      }
       if(destination==="featured"){
         const kind=String(input.parentType||"posts")==="pages"?"pages":"posts",id=Number(input.parentId||input.postId);
         const parent=await wordpressEditorFetch(wp,wp.root+"/wp-json/wp/v2/"+kind+"/"+id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify({featured_media:uploaded.id}),signal:AbortSignal.timeout(20000)});
-        if(!parent.ok)return json({error:"Media uploaded, but featured-image assignment failed (HTTP "+parent.status+").",httpStatus:parent.status},502,corsHeaders(request));
+        if(!parent.ok){
+          const detail=await wordpressResponseDetail(parent,wp,"featured_media_attach");
+          return json({error:"Media uploaded, but featured-image assignment failed (HTTP "+parent.status+").",httpStatus:parent.status,detail},502,corsHeaders(request));
+        }
       }
       const sha256=await websiteMediaSha256(bytes),now=new Date().toISOString(),id=crypto.randomUUID();
       const row={file:meta.filename,title,altText,caption,category:cleanText(input.category,100),tags:Array.isArray(input.tags)?input.tags.map(x=>cleanText(x,60)).slice(0,30):[],destination,url:media.source_url,uploader:claims.user_id,uploaderEmail:claims.email||"",date:now,size:bytes.byteLength,sha256,wordpressMediaId:uploaded.id,status:"Available"};
