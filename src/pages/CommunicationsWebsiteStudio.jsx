@@ -38,6 +38,13 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
   }
   try{
    const health=await call("/health","GET",undefined,true);rows.push({label:"TEST Worker health",status:health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",httpStatus:health.httpStatus,error:health.error||""});
+   try{
+    const site=await call("/api/communications/site/status","GET",undefined,true);
+    const domain=site.data?.connections?.configuredWordPressHost||"irpa.or.tz";
+    const diag=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain),"GET",undefined,true);
+    rows.push({label:"TEST cPanel SSL certificate",status:diag.data?.ssl?.status==="PASS"?"PASS":"FAIL",httpStatus:diag.data?.ssl?.httpStatus??diag.httpStatus,error:diag.data?.ssl?.error||diag.data?.ssl?.detail||""});
+    rows.push({label:"TEST PHP upload_max_filesize and post_max_size",status:diag.data?.phpLimits?.status==="PASS"?"PASS":diag.data?.phpLimits?.status==="INFO"?"INFO":"FAIL",httpStatus:diag.data?.phpLimits?.httpStatus??diag.httpStatus,error:diag.data?.phpLimits?.diagnostic||diag.data?.phpLimits?.error||""});
+   }catch(error){rows.push({label:"TEST cPanel SSL/PHP diagnostics",status:"FAIL",httpStatus:error.httpStatus||0,error:error.message||"cPanel diagnostics failed."});}
    for(let i=0;i<steps.length;i++){rows.push(await runStep(steps[i],i));setAcceptanceReport([...rows]);}
    rows.push({label:"TEST cleanup list",status:"INFO",httpStatus:null,error:"TEST content and media are retained; nothing is deleted or published.",cleanupList:cleanup});
    setAcceptanceReport([...rows]);setMessage("Production acceptance finished: "+rows.filter(row=>row.status==="PASS").length+" PASS, "+rows.filter(row=>row.status==="FAIL").length+" FAIL. Every step was attempted independently.");
