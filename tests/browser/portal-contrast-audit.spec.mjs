@@ -32,11 +32,12 @@ const displayLabels={
 };
 const viewports=[{name:"desktop",width:1280,height:900},{name:"mobile",width:390,height:844}];
 const schemes=["light","dark"];
-const contrastFailures=[],pageCounts=[],opacityFindings=[];
+const baselineFailures=[],contrastFailures=[],pageCounts=[],opacityFindings=[];
 
 function safe(value){return String(value??"").replace(/\|/g,"\\|").replace(/\r?\n/g," ").trim();}
 function reportMarkdown(){
  const pageRows=pageCounts.map(x=>`| ${safe(x.page)} | ${x.before} | ${x.after} |`).join("\n");
+ const baselineRows=baselineFailures.map(x=>`| ${safe(x.page)} | ${safe(x.selector)} | ${safe(x.text)} | ${safe(x.foreground)} | ${safe(x.background)} | ${safe(x.ratio)} |`).join("\n");
  const failureRows=contrastFailures.map(x=>`| ${safe(x.page)} | ${safe(x.selector)} | ${safe(x.text)} | ${safe(x.foreground)} | ${safe(x.background)} | ${safe(x.ratio)} |`).join("\n");
  const opacityRows=opacityFindings.map(x=>`| ${safe(x.page)} | ${safe(x.selector)} | ${safe(x.text)} | ${safe(x.opacity)} | ${safe(x.foreground)} | ${safe(x.background)} |`).join("\n");
  return `# Cross-portal WCAG contrast audit
@@ -80,11 +81,12 @@ async function scanPage(page,pageLabel){
   finally{style.remove();}
  });
  const after=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"rule",values:["color-contrast"]}}));
- const beforeCount=before.violations.reduce((n,v)=>n+v.nodes.length,0);
- const afterNodes=after.violations.flatMap(v=>v.nodes.map(node=>{
+ const extractFailures=result=>result.violations.flatMap(v=>v.nodes.map(node=>{
   const data=node.any?.find(x=>x.data?.contrastRatio!==undefined)?.data||{};
-  return {page:pageLabel,selector:(node.target||[]).join(", "),text:(node.html||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").slice(0,180),foreground:data.fgColor||"(not reported)",background:data.bgColor||"(not reported)",ratio:data.contrastRatio==null?"(not reported)":String(data.contrastRatio)};
+  return {page:pageLabel,selector:(node.target||[]).join(", "),text:(node.html||"").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").slice(0,180),foreground:data.fgColor||"(not reported)",background:data.bgColor||"(not reported)",ratio:data.contrastRatio==null?"(not reported)":String(data.contrastRatio)};
  }));
+ const beforeNodes=extractFailures(before),afterNodes=extractFailures(after);
+ const beforeCount=beforeNodes.length;
  const opacity=await page.evaluate(()=>{
   const visible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=="hidden"&&s.display!=="none";};
   return [...document.querySelectorAll("body *")].filter(el=>visible(el)&&String(el.textContent||"").trim()&&el.children.length===0).map(el=>{
@@ -94,6 +96,7 @@ async function scanPage(page,pageLabel){
   }).filter(Boolean);
  });
  pageCounts.push({page:pageLabel,before:beforeCount,after:afterNodes.length});
+ baselineFailures.push(...beforeNodes);
  contrastFailures.push(...afterNodes);
  opacityFindings.push(...opacity.map(x=>({...x,page:pageLabel})));
 }
