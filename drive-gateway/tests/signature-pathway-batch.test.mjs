@@ -31,7 +31,7 @@ test("18-document mocked Worker batch sends one document per request, caps concu
       perAttemptSubrequests.push({ documentId: item.documentId, count: subrequests });
       const attempt = (attempts.get(item.documentId) || 0) + 1;
       attempts.set(item.documentId, attempt);
-      if (item.documentId === "doc-03" && attempt < 3) throw new Error("temporary 503 from mocked Worker");
+      if (item.documentId === "doc-03" && attempt < 4) throw new Error("temporary 503 from mocked Worker");
       if (item.documentId === "doc-12") throw new Error("persistent 503 from mocked Worker");
       await new Promise(resolve => setTimeout(resolve, 2));
       return { results: [{ documentId: item.documentId, status: "match", classification: "OK", fileId: item.fileId }] };
@@ -44,7 +44,6 @@ test("18-document mocked Worker batch sends one document per request, caps concu
     concurrency: 3,
     maxRetries: 3,
     retryDelay: async () => {},
-    maxRetries: 3,
     onProgress: value => progress.push(value)
   });
 
@@ -53,12 +52,12 @@ test("18-document mocked Worker batch sends one document per request, caps concu
   assert.ok(maximumActive <= 3);
   assert.ok(perAttemptSubrequests.every(item => item.count === 8), "real cold-request count must be 8 subrequests including authentication");
   assert.ok(perAttemptSubrequests.every(item => item.count <= 8));
-  assert.equal(attempts.get("doc-03"), 4, "transient failure retries twice and succeeds on the third attempt");
-  assert.equal(attempts.get("doc-12"), 4, "permanent failure stops after the third attempt");
+  assert.equal(attempts.get("doc-03"), 4, "transient failure retries three times and succeeds on the fourth attempt");
+  assert.equal(attempts.get("doc-12"), 4, "permanent failure stops after the fourth attempt");
   assert.equal(results.find(item => item.documentId === "doc-12").classification, "REQUEST_FAILED");
   assert.equal(requestCount, 24, "18 documents plus six retry requests");
   assert.equal(totalSubrequests, 192, "24 Worker requests × 8 subrequests per request");
   assert.equal(progress.at(-1).completed, 18);
   assert.equal(progress.at(-1).active, 0);
-  console.log("BATCH AUDIT: documents=18; Worker requests=22; max concurrency=3; max retries=3 (4 attempts maximum); subrequests per Worker request=8; total subrequests=176.");
+  console.log("BATCH AUDIT: documents=18; Worker requests=24; max concurrency=3; max retries=3 (4 attempts maximum); subrequests per Worker request=8; total subrequests=192.");
 });
