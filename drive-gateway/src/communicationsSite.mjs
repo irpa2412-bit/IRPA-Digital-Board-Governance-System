@@ -1146,7 +1146,7 @@ export function createCommunicationsSiteRouter(deps) {
         for (const file of mediaTests.filter(item => item.name === stepFile)) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "." + file.filename;
           try {
-            const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
+            const bytes = file.bytes || Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
             validateWebsiteMedia({ filename, contentType: file.mime, bytes });
             const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
             const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(60000) });
