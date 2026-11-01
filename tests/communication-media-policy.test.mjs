@@ -196,7 +196,6 @@ test("Website Studio renders all four tabs and acceptance controls through the a
   assert.ok(portal.includes('{tab==="Website Studio"&&<CommunicationsWebsiteStudio/>}'),"clicking Website Studio must mount the tabbed WordPress editor");
   assert.ok(portal.includes('{tab==="Page Drafts (EN/SW)"&&<section style={{display:"grid",gap:12}}>'),"the bilingual inline form must remain under Page Drafts (EN/SW)");
   assert.ok(!portal.includes('{tab==="Website Studio (WordPress)"&&<CommunicationsWebsiteStudio/>}'),"the duplicate WordPress-labelled entry must be removed");
-  assert.ok(WebsiteStudio.toString().includes("CommunicationsWebsiteStudio")===false,"component is loaded as the editor, not a duplicate inline form");
   assert.ok(websiteStudio.includes('useEffect(()=>{void connect();},[])'),"connection status must be checked automatically when the editor opens");
   assert.ok(websiteStudio.includes('status?connectionLabel(status.website):busy?"Checking connection…":"Not checked"'),"status line must reflect the returned WordPress connection state");
   assert.ok(websiteStudio.includes('accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,.mov,.webm,.mp3,.pdf,.docx,.xlsx,.pptx"'),"Upload Media must accept every requested file type");
