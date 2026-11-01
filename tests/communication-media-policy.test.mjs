@@ -73,7 +73,7 @@ test("Website Studio creates draft-only posts and securely uploads multiple Word
  assert.ok(websiteStudio.includes("Rejected · empty file"));
  assert.ok(site.includes("WORDPRESS_MEDIA_MAX_BYTES"));
  assert.ok(site.includes("20 * 1024 * 1024"));
- assert.ok(websiteStudio.includes("Image batch finished with"));
+ assert.ok(websiteStudio.includes("Image batch complete:"));
  assert.ok(websiteStudio.includes("Uploaded"));
  assert.ok(websiteStudio.includes("Create WordPress draft"));
 });
