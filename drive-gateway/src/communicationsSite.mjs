@@ -1499,9 +1499,9 @@ export function createCommunicationsSiteRouter(deps) {
         const ini = data.ini || data.settings || data;
         const upload = ini.upload_max_filesize || ini.uploadMaxFilesize;
         const post = ini.post_max_size || ini.postMaxSize;
-        result.phpLimits = { status: upload || post ? "PASS" : "UNAVAILABLE", httpStatus: response.__httpStatus, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload || post ? null : "The cPanel UAPI response did not expose upload_max_filesize or post_max_size." };
+        result.phpLimits = { status: upload && post ? "PASS" : "UNAVAILABLE", httpStatus: response.__httpStatus, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload || post ? null : "The cPanel UAPI response did not expose upload_max_filesize or post_max_size." };
       } catch (error) {
-        result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: safeCode(error.diagnosticCode), error: cleanText(error.message, 240) };
+        result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), error: cleanText(error.message, 240) };
       }
       return json(result, 200, corsHeaders(request));
     }
