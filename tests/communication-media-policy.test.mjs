@@ -144,7 +144,8 @@ test("media studio keeps uploads on authenticated Google Drive gateway, not Fire
 test("deployment docs require isolated staging and never commit credentials",()=>{
  assert.ok(docs.includes("Cloudflare Worker secrets"));
  assert.ok(docs.includes("CPANEL_API_TOKEN"));
- assert.ok(docs.includes("deploy and live-verify only after staging acceptance"));
+ assert.ok(docs.includes("Staging acceptance is a pre-release safety check, not the operational destination."));
+ assert.ok(docs.includes("Production is the intended operational WordPress destination."));
  assert.ok(docs.includes("Firebase Storage remains deny-by-default"));
 });
 
