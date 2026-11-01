@@ -1,8 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { runControlledDocumentDiagnosticBatch } from "../../src/utils/controlledDocumentDiagnosticBatch.mjs";
 
+const workerSource = fs.readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+const authStart = workerSource.indexOf("async function authenticateFirebaseRequest");
+const authEnd = workerSource.indexOf("async function assertActivatedPortalUser", authStart);
+const authSource = workerSource.slice(authStart, authEnd);
+
 test("18-document mocked Worker batch sends one document per request, caps concurrency at 3, retries at most 3 times, and stays within 8 subrequests", async () => {
+  assert.match(authSource, /getFirebaseJwks\\(\\)/, "Firebase ID-token signature verification uses one cold JWKS fetch");
+  assert.match(authSource, /assertActivatedPortalUser\\(claims, env\\)/, "authentication performs the activation-profile Firestore read");
+  const reconcileStart = workerSource.indexOf("async function reconcileSignatureDocumentIds");
+  const reconcileEnd = workerSource.indexOf("async function controlledDocumentUploadPolicyCheck", reconcileStart);
+  const reconcileSource = workerSource.slice(reconcileStart, reconcileEnd);
+  assert.match(reconcileSource, /getFirestoreAdminAccessToken\\(env\\)/);
+  assert.match(reconcileSource, /getFirestoreDocument\\(env,.*adminProfiles/);
+  assert.match(reconcileSource, /getFirestoreDocument\\(env,.*documents/);
+  assert.match(reconcileSource, /getDriveAccessToken\\(env\\)/);
+  assert.match(reconcileSource, /diagnosticFetch\\(/);
+  assert.match(reconcileSource, /alt=media/);
+  assert.match(reconcileSource, /diagnostic\\.driveDescription/);
   const rows = Array.from({ length: 18 }, (_, index) => ({ documentId: "doc-" + String(index + 1).padStart(2, "0"), title: "Document " + (index + 1), fileId: "drive-" + (index + 1) }));
   const attempts = new Map();
   const perAttemptSubrequests = [];
@@ -24,9 +42,10 @@ test("18-document mocked Worker batch sends one document per request, caps concu
     const subrequest = async () => { subrequests += 1; totalSubrequests += 1; };
     try {
       // Cold Worker invocation's actual diagnostic dependency sequence:
-      // Firebase ID-token/JWKS authentication; service-account token + admin profile read;
-      // Firestore diagnostic token + target document read; Drive OAuth token;
-      // Drive metadata read; Drive media download. No second metadata lookup.
+      // 1 Firebase JWKS key fetch; 2 activation-profile Firestore read;
+      // 3 service-account token exchange; 4 admin-profile Firestore read;
+      // 5 target-document Firestore read; 6 Drive OAuth refresh;
+      // 7 Drive metadata; 8 Drive media download. No second metadata lookup.
       for (let i = 0; i < 8; i += 1) await subrequest();
       perAttemptSubrequests.push({ documentId: item.documentId, count: subrequests });
       const attempt = (attempts.get(item.documentId) || 0) + 1;
