@@ -12,19 +12,59 @@ export default function CommunicationsWebsiteStudio(){
   setBusy(true);setMessage("");setAcceptanceReport(null);
   const rows=[];
   const add=(label,status,httpStatus,error="")=>rows.push({label,status,httpStatus,error});
+  let connections=null;
   try{
-   const health=await call("/health","GET",undefined,true);add("TEST Worker health",health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",health.httpStatus,health.error||health.data?.status||"");
+   const health=await call("/health","GET",undefined,true);
+   add("TEST Worker health",health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",health.httpStatus,health.error||health.data?.status||"");
    const reads=[
     ["TEST WordPress connection and capability read","/api/communications/site/status"],
     ["TEST WordPress pages read","/api/communications/website/content?type=pages"],
     ["TEST WordPress posts read","/api/communications/website/content?type=posts"],
     ["TEST WordPress categories and tags read","/api/communications/website/taxonomies"],
     ["TEST WordPress SEO capability read","/api/communications/website/seo-capabilities"],
-    ["TEST cPanel root directory read","/api/communications/cpanel/files"],
-    ["TEST cPanel email, SSL and PHP limit probes","/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(status?.configuredWordPressHost||"irpa.or.tz")]
+    ["TEST cPanel root directory read","/api/communications/cpanel/files"]
    ];
-   for(const [label,path] of reads){try{const result=await call(path,"GET",undefined,true);add(label,result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");if(path.endsWith("/site/status")&&result.data?.connections?.websiteAccount?.uploadFilesCapability!=="granted")add("TEST WordPress upload_files capability","FAIL",result.httpStatus,"upload_files is missing or unverified.");}catch(error){add(label,"FAIL",error.httpStatus||0,error.message||"Read route failed.");}}
-   try{const result=await call("/api/communications/website/production-acceptance","POST",{},true);add("TEST draft lifecycle and destination upload suite",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||"");for(const row of result.data?.report||[])rows.push(row);}catch(error){add("TEST draft lifecycle and destination upload suite","FAIL",error.httpStatus||0,error.message||"Acceptance run failed.");}
+   let cpanelEntries=[];
+   for(const [label,path] of reads){
+    try{
+     const result=await call(path,"GET",undefined,true);
+     add(label,result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");
+     if(path.endsWith("/site/status")){
+      connections=result.data?.connections||null;
+      const capability=connections?.websiteAccount?.uploadFilesCapability;
+      add("TEST WordPress upload_files capability",capability==="granted"?"PASS":"FAIL",connections?.websiteHttpStatus??result.httpStatus,capability==="granted"?"":"upload_files is missing or unverified; media uploads must be blocked.");
+     }
+     if(path.endsWith("/cpanel/files"))cpanelEntries=result.data?.entries||[];
+    }catch(error){add(label,"FAIL",error.httpStatus||0,error.message||"Read route failed.");}
+   }
+   const readableFile=cpanelEntries.find(entry=>entry.type==="file");
+   if(readableFile){
+    try{const result=await call("/api/communications/cpanel/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);add("TEST cPanel website file content read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    catch(error){add("TEST cPanel website file content read","FAIL",error.httpStatus||0,error.message||"File read failed.");}
+   }else add("TEST cPanel website file content read","FAIL",null,"No safe HTML/CSS/TXT/JSON file was returned by the read-only directory listing.");
+   try{
+    const domain=connections?.configuredWordPressHost||"irpa.or.tz";
+    const probe=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain),"GET",undefined,true);
+    add("TEST cPanel diagnostics route",probe.httpStatus>=200&&probe.httpStatus<300?"PASS":"FAIL",probe.httpStatus,probe.error||probe.data?.error||"");
+    const diag=probe.data||{};
+    add("TEST cPanel email accounts list",diag.emailAccounts?.status==="PASS"?"PASS":"FAIL",diag.emailAccounts?.httpStatus??probe.httpStatus,diag.emailAccounts?.error||"");
+    add("TEST cPanel SSL status",diag.ssl?.status==="PASS"?"PASS":"FAIL",diag.ssl?.httpStatus??probe.httpStatus,diag.ssl?.error||diag.ssl?.status||"");
+    add("TEST PHP upload_max_filesize and post_max_size",diag.phpLimits?.status==="PASS"?"PASS":"FAIL",diag.phpLimits?.httpStatus??probe.httpStatus,diag.phpLimits?.error||diag.phpLimits?.diagnostic||"The configured cPanel UAPI did not expose both PHP upload limits.");
+   }catch(error){add("TEST cPanel diagnostics route","FAIL",error.httpStatus||0,error.message||"cPanel diagnostics failed.");}
+   let acceptance=null;
+   try{
+    const result=await call("/api/communications/website/production-acceptance","POST",{},true);
+    add("TEST draft lifecycle and destination upload suite",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||"");
+    acceptance=result.data||null;
+    for(const row of acceptance?.report||[])rows.push(row);
+   }catch(error){add("TEST draft lifecycle and destination upload suite","FAIL",error.httpStatus||0,error.message||"Acceptance run failed.");}
+   for(const [type,id] of [["pages",acceptance?.createdDrafts?.pageId],["posts",acceptance?.createdDrafts?.postId]]){
+    if(!id)continue;
+    try{const result=await call("/api/communications/website/content/"+type+"/"+id,"GET",undefined,true);add("TEST WordPress "+type+" single-item read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    catch(error){add("TEST WordPress "+type+" single-item read","FAIL",error.httpStatus||0,error.message||"Single-item read failed.");}
+    try{const result=await call("/api/communications/website/revisions?type="+type+"&id="+id,"GET",undefined,true);add("TEST WordPress "+type+" revision-route read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    catch(error){add("TEST WordPress "+type+" revision-route read","FAIL",error.httpStatus||0,error.message||"Revision read failed.");}
+   }
    setAcceptanceReport(rows);setMessage("Production acceptance finished: "+rows.filter(x=>x.status==="PASS").length+" PASS, "+rows.filter(x=>x.status==="FAIL").length+" FAIL. TEST drafts and uploaded files are retained; nothing was published or deleted.");
   }catch(error){add("TEST production acceptance runner","FAIL",0,error.message);setAcceptanceReport(rows);setMessage(error.message||"Production acceptance failed.");}
   finally{setBusy(false)}

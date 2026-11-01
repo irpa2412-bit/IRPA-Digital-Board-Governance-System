@@ -1482,16 +1482,16 @@ export function createCommunicationsSiteRouter(deps) {
       };
       try {
         const response = await cpanelCall(cp, "Email/list_pops", { domain });
-        result.emailAccounts = { status: "PASS", count: extractRows(response).length, accounts: extractRows(response).map(row => cleanText(row.email || row.login || "", 254)).filter(Boolean) };
+        result.emailAccounts = { status: "PASS", httpStatus: response.__httpStatus, count: extractRows(response).length, accounts: extractRows(response).map(row => cleanText(row.email || row.login || "", 254)).filter(Boolean) };
       } catch (error) {
         result.emailAccounts = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
       }
       try {
         const response = await cpanelCall(cp, "SSL/installed_hosts");
-        result.ssl = { status: "PASS", hosts: extractRows(response).filter(row => String(row.domain || row.host || "").toLowerCase() === domain).map(row => ({ domain: cleanText(row.domain || row.host, 253), status: cleanText(row.status || row.certificate_status || "installed", 80), issuer: cleanText(row.issuer || "", 120), expiry: cleanText(row.expiry || row.not_after || "", 80) })) };
+        result.ssl = { status: "PASS", httpStatus: response.__httpStatus, hosts: extractRows(response).filter(row => String(row.domain || row.host || "").toLowerCase() === domain).map(row => ({ domain: cleanText(row.domain || row.host, 253), status: cleanText(row.status || row.certificate_status || "installed", 80), issuer: cleanText(row.issuer || "", 120), expiry: cleanText(row.expiry || row.not_after || "", 80) })) };
         if (!result.ssl.hosts.length) result.ssl.status = "NO_MATCH";
       } catch (error) {
-        result.ssl = { status: "FAIL", diagnosticCode: safeCode(error.diagnosticCode), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+        result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
       }
       try {
         const response = await cpanelCall(cp, "LangPHP/php_ini_get_user", { domain });
@@ -1499,7 +1499,7 @@ export function createCommunicationsSiteRouter(deps) {
         const ini = data.ini || data.settings || data;
         const upload = ini.upload_max_filesize || ini.uploadMaxFilesize;
         const post = ini.post_max_size || ini.postMaxSize;
-        result.phpLimits = { status: upload || post ? "PASS" : "UNAVAILABLE", upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload || post ? null : "The cPanel UAPI response did not expose upload_max_filesize or post_max_size." };
+        result.phpLimits = { status: upload || post ? "PASS" : "UNAVAILABLE", httpStatus: response.__httpStatus, upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload || post ? null : "The cPanel UAPI response did not expose upload_max_filesize or post_max_size." };
       } catch (error) {
         result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: safeCode(error.diagnosticCode), error: cleanText(error.message, 240) };
       }
