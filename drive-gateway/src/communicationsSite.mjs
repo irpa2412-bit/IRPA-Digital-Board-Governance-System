@@ -856,7 +856,7 @@ export function createCommunicationsSiteRouter(deps) {
         signal: AbortSignal.timeout(15000)
       });
       const media = await metadataResponse.json().catch(() => null);
-      if (!metadataResponse.ok || Number(media?.id) !== uploaded.id || String(media?.alt_text || "") !== altText) {
+      if (!metadataResponse.ok || Number(media?.id) !== uploaded.id || String(media?.alt_text || "") !== altText || editorRaw(media, "caption") !== caption) {
         throw new Error("The image was uploaded, but WordPress did not verify its required alt text and caption.");
       }
       await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_IMAGE_UPLOADED", "media", media.id, {
