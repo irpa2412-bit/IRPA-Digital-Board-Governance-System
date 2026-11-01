@@ -38,21 +38,21 @@ export default function CommunicationsWebsiteStudio(){
   const rows=selected.map((file,index)=>({key:target+"-"+Date.now()+"-"+index,name:file.name,status:"Queued"}));
   setUploadProgress(rows);setBusy(true);setMessage("");
   const update=(index,status)=>setUploadProgress(current=>current.map((row,i)=>i===index?{...row,status}:row));
-  const errors=[];
+  const errors=[];let uploaded=0,skipped=0;
   try{
    for(let index=0;index<selected.length;index++){
     const file=selected[index];
     if(file.size<1){update(index,"Rejected · empty file");errors.push(file.name+": file is empty.");continue;}
     if(!["image/jpeg","image/png","image/webp"].includes(String(file.type||"").toLowerCase())){update(index,"Rejected · unsupported type");errors.push(file.name+": only JPEG, PNG and WebP are accepted.");continue;}
     const altText=window.prompt("Required descriptive alt text for: "+file.name,"");
-    if(altText===null){update(index,"Skipped · alt text cancelled");continue;}
+    if(altText===null){update(index,"Skipped · alt text cancelled");skipped++;continue;}
     if(!String(altText).trim()){update(index,"Rejected · alt text required");errors.push(file.name+": descriptive alt text is required.");continue;}
     const caption=window.prompt("Optional image caption for: "+file.name,"");
-    if(caption===null){update(index,"Skipped · caption cancelled");continue;}
-    try{update(index,"Uploading");await uploadPhoto(file,target,String(altText).trim(),String(caption||"").trim());update(index,"Uploaded");}
+    if(caption===null){update(index,"Skipped · caption cancelled");skipped++;continue;}
+    try{update(index,"Uploading");await uploadPhoto(file,target,String(altText).trim(),String(caption||"").trim());update(index,"Uploaded");uploaded++;}
     catch(error){update(index,"Failed");errors.push(file.name+": "+(error.message||"upload failed"));}
    }
-   setMessage(errors.length?"Image batch finished with "+errors.length+" issue(s): "+errors.join(" | "):"All selected images uploaded. Review the inserted figures and save the update as a draft.");
+   setMessage("Image batch complete: "+uploaded+" uploaded, "+skipped+" skipped, "+errors.length+" failed."+ (errors.length?" "+errors.join(" | "):" Review the inserted figures and save the update as a draft."));
   }finally{setBusy(false)}
  }
  async function createNewPost(){
