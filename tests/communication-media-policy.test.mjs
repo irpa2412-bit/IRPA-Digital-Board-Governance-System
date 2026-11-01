@@ -28,9 +28,9 @@ test("communications portal stays integrated in the existing app with role-based
 });
 
 test("communications authoring, approvals, library, calendar and exports remain available",()=>{
- for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website",'exportDraft("txt")','exportDraft("md")','exportDraft("html")','exportDraft("pdf")']) assert.ok(portal.includes(term),term);
+ for(const term of ["Create communications item","Content library","Editorial Calendar","Publishing Setup","Pending Approval","Approved","Returned","Media Asset","Submit for approval","Publish to website","exportDraft(\"txt\")","exportDraft(\"md\")","exportDraft(\"html\")","exportDraft(\"pdf\")"]) assert.ok(portal.includes(term),term);
  assert.ok(portal.includes('/api/communications/records?collection=communicationMediaItems'));
- assert.ok(portal.includes("await refreshItems();setNotice(selected?\"Draft updated through the Worker.\":\"Draft saved through the Worker.\");reset();setTab(\"Library\")'),"saved drafts must refresh and open the library");
+ assert.ok(portal.includes("await refreshItems();setNotice(selected?\"Draft updated through the Worker.\":\"Draft saved through the Worker.\");reset();setTab(\"Library\")"),"saved drafts must refresh and open the library");
  assert.ok(portal.includes("Refresh library"),"the library must have a manual refresh control");
  assert.ok(portal.includes("WordPress connection status is checked in Publishing Setup."),"WordPress status guidance must not falsely imply secrets are missing");
  assert.ok(!portal.includes("<span>Publishing requires server-side WordPress secrets.</span>"));
@@ -56,17 +56,18 @@ test("Website Studio creates draft-only posts and securely uploads multiple Word
  assert.ok(site.includes('path === "/api/communications/website/posts" && request.method === "POST"'));
  assert.ok(site.includes('path === "/api/communications/website/media" && request.method === "POST"'));
  assert.ok(site.includes("validateWebsiteMedia"));
+ assert.ok(site.includes("validateWebsiteMedia"));
  assert.ok(site.includes("5 * 1024 * 1024"));
  assert.ok(site.includes("sanitizeWebsiteSvg"));
  assert.ok(site.includes("websiteMediaSha256"));
- assert.ok(site.includes("COMMUNICATION_WEBSITE_MEDIA_UPLOADED"),"media upload audit action must match the gateway's actual audit event");
+ assert.ok(site.includes("COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
  assert.ok(site.includes("COMMUNICATION_WEBSITE_POST_DRAFT_CREATED"));
  assert.ok(site.includes('status: "draft"'));
  assert.ok(site.includes("publication status is controlled by the server"));
  assert.ok(site.includes('path === "/api/communications/website/taxonomies" && request.method === "GET"'));
  assert.ok(websiteStudio.includes('call("/api/communications/website/posts","POST"'));
  assert.ok(websiteStudio.includes('call("/api/communications/website/media","POST"'));
- assert.ok(websiteStudio.includes('multiple accept="image/jpeg,image/png,image/webp"'));
+ assert.ok(websiteStudio.includes("multiple accept=\"image/jpeg,image/png,image/webp\""));
  assert.ok(websiteStudio.includes("Required descriptive alt text"));
  assert.ok(websiteStudio.includes("Optional image caption"));
  assert.ok(websiteStudio.includes("Phone preview"));
@@ -125,7 +126,7 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  assert.ok(site.includes("const allowedTags = new Set"));
  assert.ok(site.includes("const allowedUrl = /^https:\\/\\//.test(decoded)"));
  assert.ok(site.includes("noopener noreferrer"));
- assert.ok(site.includes('base.port !== "2083"'));
+ assert.ok(site.includes("base.port !== \"2083\""));
  assert.ok(site.includes('environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"]'));
  assert.ok(!site.includes("Fileman/delete_file"));
 });
@@ -135,7 +136,7 @@ test("Firestore communications records remain role-scoped and protected from del
  assert.ok(rules.includes("function communicationMediaReviewer()"));
  assert.ok(rules.includes("match /communicationMediaItems/{id}"));
  assert.ok(rules.includes("allow delete:if false;"));
- assert.ok(rules.includes('request.resource.data.get("status","")==="Draft"'));
+ assert.ok(rules.includes('request.resource.data.get("status","")=="Draft"'));
  assert.ok(rules.includes('request.resource.data.get("status","") in ["Approved","Returned"]'));
 });
 
@@ -145,7 +146,7 @@ test("media studio keeps uploads on authenticated Google Drive gateway, not Fire
  for(const term of ['type="file"','uploadBytes','purpose:"Communication Media"','collection(db,"communicationMediaAssets")','downloadDriveBytes','brightness','contrast','saturation','canvas.toBlob','Export edited image','Download original']) assert.ok(studio.includes(term),term);
  assert.ok(studio.includes("MAX_BYTES=25*1024*1024"));
  assert.ok(studio.includes('storageProvider:"Google Drive"'));
- assert.ok(rules.includes('request.resource.data.get("storageProvider","")==="Google Drive"'));
+ assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
 });
 
 test("deployment docs require isolated staging and never commit credentials",()=>{
@@ -181,4 +182,248 @@ test("website page editing is host-restricted for staging and production, Commun
  assert.ok(site.includes("COMMUNICATION_WEBSITE_CONTENT_UPDATED"));
  assert.ok(site.includes("snapshotId"));
  assert.ok(site.includes("featured_media"));
+ assert.ok(site.includes('["draft", "publish"]'));
+ assert.ok(!site.includes("console.log(WORDPRESS_APPLICATION_PASSWORD"));
+ assert.ok(!portal.includes("WORDPRESS_APPLICATION_PASSWORD"));
+ assert.ok(!portal.includes("process.env.CPANEL_API_TOKEN"));
+ assert.ok(!/CPANEL_API_TOKEN\s*[:=]\s*["'][^"']+["']/.test(portal));
+});
+
+
+test("communications operations registers provide campaigns, media contacts, brand resources, crisis plans and coverage logs",()=>{
+ for(const term of ['Campaign','Media Contact','Brand Asset','Crisis Plan','Coverage Log','startDate','contactName','rights','holdingStatement','sourceUrl','observedDate']) assert.ok(operations.includes(term),term);
+ assert.ok(portal.includes('import CommunicationMediaOperations from "./CommunicationMediaOperations"'));
+ assert.ok(portal.includes('tab==="Communications Operations"&&<CommunicationMediaOperations'));
+ assert.ok(operations.includes('writeBatch(db)'));
+ assert.ok(operations.includes('collection(db,"communicationOperationsAudit")'));
+ assert.ok(operations.includes('limit(50)'));
+ assert.ok(operations.includes("Communications audit history"));
+ assert.ok(operations.includes('No records are deleted'));
+ assert.ok(rules.includes('match /communicationOperations/{id}'));
+ assert.ok(rules.includes('match /communicationOperationsAudit/{id}'));
+ assert.ok(rules.includes('allow delete:if false;'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
+ assert.ok(rules.includes('"Crisis Plan"'));
+ assert.ok(rules.includes('request.resource.data.get("actorUid","")==request.auth.uid'));
+ assert.ok(rules.includes('existsAfter(/databases/$(database)/documents/communicationOperations/$(request.resource.data.recordId))'));
+ assert.ok(rules.includes('request.resource.data.get("actorEmail","")==request.auth.token.get("email","")'));
+ assert.ok(rules.includes('function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communication & Media"'));
+ assert.ok(rules.includes('resource.data.get("status","")=="Draft"&&request.resource.data.get("status","") in ["Under Review","Approved","Archived"]'));
+ assert.ok(rules.includes('resource.data.get("status","")=="Completed"&&request.resource.data.get("status","")=="Archived"'));
+});
+
+
+test("social account enrolment is integrated, metadata-only, role-scoped and audited",()=>{
+ assert.ok(portal.includes('import SocialMediaAccounts from "./SocialMediaAccounts"'));
+ assert.ok(portal.includes('"Social Accounts"'));
+ assert.ok(portal.includes('tab==="Social Accounts"&&<SocialMediaAccounts'));
+ for(const term of ['Facebook','Instagram','LinkedIn','YouTube','TikTok','Pending Verification','authorizationReference','custodian','reviewDate','writeBatch(db)','socialMediaAccountsAudit','noopener noreferrer','does not publish posts']) assert.ok(social.includes(term),term);
+ assert.ok(!social.includes('accessToken'));
+ assert.ok(!social.includes('clientSecret'));
+ assert.ok(!/\bpassword\s*[:=]/i.test(social));
+ assert.ok(rules.includes('match /socialMediaAccounts/{id}'));
+ assert.ok(rules.includes('match /socialMediaAccountsAudit/{id}'));
+ assert.ok(rules.includes('data.keys().hasOnly(["platform","accountName","handle","profileUrl"'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
+ assert.ok(rules.includes('getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))'));
+ assert.ok(rules.includes('"Pending Verification","Active","Suspended","Disconnected","Archived"'));
+});
+
+
+test("social-account enrolment always displays accessible success and failure feedback, including custom required-field validation",()=>{
+ assert.ok(social.includes('onSubmit={save} noValidate'));
+ assert.ok(social.includes('role="alert" aria-live="assertive"'));
+ assert.ok(social.includes('role="status" aria-live="polite"'));
+ assert.ok(social.includes("Enter the account or page name."));
+ assert.ok(social.includes("Assign a responsible officer."));
+ assert.ok(social.includes("Social-media account enrolled and audit recorded."));
+ assert.ok(social.includes("Unable to save the account record."));
+});
+
+test("Meta API uses the existing staging-only OAuth router, minimal read permissions, encrypted tokens and no publishing",()=>{
+ assert.ok(social.includes("metaStagingEnabled"));
+ assert.ok(social.includes("/api/communications/meta/connect"));
+ assert.ok(social.includes("/api/communications/meta/status"));
+ assert.ok(social.includes("/api/communications/meta/disconnect"));
+ assert.ok(social.includes("Posting enabled: No"));
+ assert.ok(metaOAuth.includes('env?.IRPA_ENVIRONMENT !== "staging"'));
+ assert.ok(metaOAuth.includes('FIREBASE_PROJECT_ID !== STAGING_PROJECT'));
+ assert.ok(metaOAuth.includes('IRPA_PRODUCTION_CUTOVER !== "false"'));
+ assert.ok(metaOAuth.includes('META_TOKEN_ENCRYPTION_KEY'));
+ assert.ok(metaOAuth.includes('meta:readonly:oauth-state:'));
+ assert.ok(metaOAuth.includes('await env.DRIVE_KV.delete(stateKey)'));
+ assert.ok(metaOAuth.includes('"pages_show_list", "pages_read_engagement", "instagram_basic"'));
+ assert.ok(metaOAuth.includes('postingEnabled: false'));
+ assert.ok(!metaOAuth.includes('instagram_content_publish'));
+ assert.ok(!metaOAuth.includes('pages_manage_posts'));
+ assert.ok(metaOAuth.includes('/api/communications/meta/disconnect'));
+ assert.ok(gateway.includes('import { createMetaOAuthRouter } from "./metaOAuth.mjs"'));
+ assert.ok(gateway.includes('const metaOAuthRouter = createMetaOAuthRouter'));
+ assert.ok(gateway.includes('const metaResponse = await metaOAuthRouter(request, env)'));
+ assert.ok(docs.includes("Meta (Facebook and Instagram) API — staging-only connection and access verification"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_APP_ID"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_APP_SECRET"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
+ assert.ok(stagingWorkflow.includes("META_OAUTH_CONFIGURATION_SHAPE=VALID"));
+ assert.ok(stagingWorkflow.includes('IRPA_PRODUCTION_CUTOVER:"false"'));
+ assert.ok(stagingWorkflow.includes("STAGING_COMMUNICATION_MEDIA_ARCHIVE_PROVISION=PASS"));
+ assert.ok(stagingWorkflow.includes("STAGING_CONTROLLED_PDF_UPLOAD=PASS"));
+ assert.ok(stagingWorkflow.includes("firestore-rules-approved"));
+ assert.ok(stagingWorkflow.includes("refusing to configure Worker secrets"));
+});
+
+test("communication portal light cards and secondary controls retain readable foreground contrast",()=>{
+ assert.match(readability,/\.communication-media-portal > section:first-child > div:nth-child\(2\) > button span[\s\S]*?color:#17372b!important/);
+ assert.match(readability,/\.communication-media-portal button:not\(\[style\*="#1d4ed8"\]\)[\s\S]*?color:#17372b!important/);
+ assert.match(readability,/\.communication-media-portal button\[style\*="#1d4ed8"\][\s\S]*?color:#ffffff!important/);
+ assert.match(readability,/\.communication-media-portal input,[\s\S]*?color:#172033!important/);
+ assert.match(readability,/\.communication-media-portal input::placeholder,[\s\S]*?color:#526176!important/);
+});
+
+test("media studio upload size matches the gateway enforced maximum and labels staging records correctly",()=>{
+ assert.ok(studio.includes("MAX_BYTES=25*1024*1024"));
+ assert.ok(gateway.includes('purpose === "Communication Media" ? 25 * 1024 * 1024'));
+ assert.ok(studio.includes('recordOrigin:auth.app?.options?.projectId === "irpa-dbg-staging-a73ec" ? "STAGING" : "PRODUCTION"'));
+});
+
+test("media asset register is authenticated, size-limited, immutable and deny-by-default for edits/deletion",()=>{
+ assert.ok(rules.includes('match /communicationMediaAssets/{id}'));
+ assert.ok(rules.includes('request.resource.data.get("uploadedByUid","")==request.auth.uid'));
+ assert.ok(rules.includes('request.resource.data.get("fileSize",0)<=26214400'));
+ assert.ok(rules.includes('request.resource.data.get("storageProvider","")=="Google Drive"'));
+ assert.ok(rules.includes('allow update,delete:if false;'));
+});
+
+test("media asset and item record origins are restricted to the authenticated Firebase project",()=>{
+ assert.ok(rules.includes('function communicationMediaRecordOriginMatches(data)'));
+ assert.ok(rules.includes('request.auth.token.get("aud","")=="irpa-dbg-staging-a73ec"'));
+ assert.equal(rules.split("communicationMediaRecordOriginMatches(request.resource.data)").length-1,2);
+});
+
+test("staging gateway is isolated from production Firebase, app URL and Drive archive root",()=>{
+ const staging=wrangler.slice(wrangler.indexOf("[env.staging.vars]"));
+ assert.ok(staging.includes('FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"'));
+ assert.ok(staging.includes('IRPA_APP_URL = "https://irpa-dbg-staging-a73ec.web.app"'));
+ assert.ok(staging.includes('DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System - STAGING"'));
+ assert.ok(gateway.includes("function getDriveRootFolderName(env)"));
+ assert.ok(gateway.includes('env?.IRPA_ENVIRONMENT === "staging" ? "IRPA Governance System - STAGING"'));
+});
+
+test("Communication and Media Archive is provisioned and verified before media upload",()=>{
+ assert.ok(studio.includes("provisionCommunicationMediaArchive"));
+ assert.ok(studio.includes("folderId:archive.folderId"));
+ assert.ok(studio.includes("archive.archivePath"));
+ assert.ok(gateway.includes('pathname === "/api/communication-media-archive/provision"'));
+ assert.ok(gateway.includes('"Communication and Media Archive"'));
+ assert.ok(gateway.includes('irpaCommunicationMediaArchive:true'));
+ assert.ok(gateway.includes('folderDescription.irpaCommunicationMediaArchive !== true'));
+ assert.ok(gateway.includes('purpose === "Communication Media" && !requestedFolderId'));
+ assert.ok(gateway.includes('code:"GOOGLE_DRIVE_NOT_AUTHORIZED"'));
+ assert.ok(gateway.includes('https://irpa-dbg-staging-a73ec.web.app'));
+ assert.ok(gateway.includes('https://irpa-dbg-staging-a73ec.firebaseapp.com'));
+ assert.ok(gateway.includes('},503,corsHeaders(request))'));
+});
+
+test("media upload and download both enforce registered communications roles at the gateway",()=>{
+ assert.ok(gateway.includes("async function authorizeCommunicationMediaDownload(env,claims)"));
+ assert.ok(gateway.includes('purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims))'));
+ assert.ok(gateway.includes('if (purpose === "Communication Media" && !(await authorizeCommunicationMediaDownload(env, claims)))'));
+ assert.ok(gateway.includes("Your registered IRPA role does not permit communications media uploads."));
+ assert.ok(gateway.includes("Your registered IRPA role does not permit access to the communications media archive."));
+});
+
+test("communication media asset registration uses an authenticated Worker write instead of direct browser Firestore writes",()=>{
+ assert.ok(site.includes('path === "/api/communications/records" && request.method === "POST"'));
+ assert.ok(site.includes('action === "register-media-asset"'));
+ assert.ok(site.includes('collectionName === "communicationMediaAssets"'));
+ assert.ok(studio.includes('"/api/communications/records"'));
+ assert.ok(!studio.includes('addDoc(collection(db,"communicationMediaAssets")'));
+ assert.ok(gateway.includes('collectionName="documents"'));
+ assert.ok(gateway.includes('"communicationMediaAssets"'));
+});
+
+test("communications draft and approval writes are Worker-routed and approval is independent",()=>{
+ assert.ok(portal.includes('collection:"communicationMediaItems",action:selected?"update":"create"'));
+ assert.ok(portal.includes('action:"submit"'));
+ assert.ok(portal.includes('action:status==="Approved"?"approve":"return"'));
+ assert.ok(site.includes('existing.createdByUid === claims.user_id'));
+ assert.ok(site.includes('Only items awaiting approval can be approved or returned.'));
+ assert.ok(site.includes('The author cannot approve their own public item.'));
+ assert.ok(site.includes('commitDocumentAndAudit(env, id, claims.token'));
+});
+
+test("social media studio provides a manual export fallback and funding view without claiming live API publishing",()=>{
+ for(const term of ["Social Media Studio","Facebook","Instagram","LinkedIn","YouTube","WhatsApp Channel","exportSocialPost","Export ready-to-paste TXT","Use funder update template","Use donor thank-you template","Use project story template","Funding View","Platform reach and engagement are unavailable","Not connected in production"]) assert.ok(portal.includes(term),term);
+ assert.ok(portal.includes('collection:"communicationMediaItems",action:"create"'));
+});
+
+
+test("website studio supports bilingual page drafts, approval-gated publishing, and portal route self-test",()=>{
+ for(const term of ["Website Studio","English","Kiswahili","Home","About","Programmes","Projects","Impact","Partners","Funding and Reports","News","Contact","MOBILE PREVIEW","Portal Self-Test","Run Portal Self-Test"]) assert.ok(portal.includes(term),term);
+ assert.ok(site.includes('["Website Article", "Press Release", "Website Page"].includes(item.type)'));
+ assert.ok(site.includes('const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts")'));
+ assert.ok(site.includes('item.status !== "Approved"'));
+});
+
+test("production Worker deployments stamp and verify the exact deployed commit",()=>{
+ const gatewayDeploy=read("../.github/workflows/cloudflare-gateway-deploy.yml");
+ const dispatchDeploy=read("../.github/workflows/cloudflare-production-gateway.yml");
+ assert.ok(gatewayDeploy.includes("--var GIT_SHA:${{ github.sha }}"));
+ const healthVerifier=read("../drive-gateway/scripts/verify-production-health.mjs");
+ assert.ok(gatewayDeploy.includes("scripts/verify-production-health.mjs"));
+ assert.ok(gatewayDeploy.includes("steps.verify-production-gateway.outcome == 'failure'"));
+ assert.ok(healthVerifier.includes("timeoutMs = 180_000"));
+ assert.ok(healthVerifier.includes("intervalMs = 5_000"));
+ assert.ok(healthVerifier.includes("health?.commit !== expectedCommit"));
+ assert.ok(dispatchDeploy.includes('--var "GIT_SHA:${GIT_SHA}"'));
+ assert.ok(dispatchDeploy.includes("health.commit === process.env.GIT_SHA"), "health verification must compare the returned commit to GIT_SHA");
+ assert.ok(dispatchDeploy.includes("deadline=$((SECONDS + 180))"), "health verification must allow a 180-second propagation window");
+ assert.ok(dispatchDeploy.includes("while (( SECONDS < deadline ))"), "health verification must retry until the deadline");
+ assert.ok(dispatchDeploy.includes("sleep 5"), "health verification must pause between retries");
+ assert.ok(dispatchDeploy.includes("Production gateway health verification failed after 180 seconds"));
+ assert.ok(dispatchDeploy.includes("exit 1"), "health verification must fail when the deployed commit never matches");
+});
+
+test("public HTML and Settings show the exact web and Worker build stamps",()=>{
+ const html=read("../index.html");
+ const settings=read("../src/pages/Settings.jsx");
+ const firebaseDeploy=read("../.github/workflows/firebase-cli-deploy.yml");
+ const pagesDeploy=read("../.github/workflows/cloudflare-pages-deploy.yml");
+ assert.ok(html.includes('content="%VITE_BUILD_COMMIT%"'));
+ assert.ok(html.includes('content="%VITE_BUILD_TIME%"'));
+ assert.ok(settings.includes('String(import.meta.env.VITE_BUILD_COMMIT || "unavailable")'));
+ assert.ok(settings.includes('String(workerHealth?.commit || workerHealth?.version || "unavailable")'));
+ assert.ok(firebaseDeploy.includes("VITE_BUILD_COMMIT: ${{ github.sha }}"));
+ assert.ok(pagesDeploy.includes('grep -Fq "content=\\"$GITHUB_SHA\\"" dist/index.html'));
+});
+
+
+test("new Website Studio post creation preserves the independent production approval gate and host allowlist",()=>{
+ assert.ok(site.includes('environment === "production" && !["irpa.or.tz", "www.irpa.or.tz"].includes(host)'));
+ assert.ok(site.includes('Production publishing requires the approved communication-media workflow'));
+ assert.ok(site.includes('if (String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").toLowerCase() === "production" && status === "publish")'));
+ assert.ok(site.includes('await authorised(request, env, true)'));
+ assert.ok(portal.includes('gatewayRequest("/api/communications/website/publish"'));
+ assert.ok(websiteStudio.includes('collection:"communicationMediaItems",action:"create"'));
+ assert.ok(websiteStudio.includes('type:"Website Article",channel:"IRPA Website"'));
+ assert.ok(websiteStudio.includes('slug:editorialSlug+(newPost.language==="Kiswahili"?"-sw":"-en")'));
+ assert.ok(websiteStudio.includes('Publication language'));
+ assert.ok(websiteStudio.includes('language:newPost.language'));
+ const approvalGate=site.indexOf('item.status !== "Approved"');
+ const promoteDraft=site.indexOf('else if (String(post.status || "") !== "publish")');
+ assert.ok(approvalGate>=0&&promoteDraft>approvalGate,"existing WordPress drafts may be promoted only after the approved-item gate");
+ assert.ok(site.includes('status: "publish"'));
+});
+
+
+test("Website Studio exposes approval-ready submission and guarded Yoast metadata capability checks",()=>{
+ assert.ok(site.includes('path === "/api/communications/website/seo-capabilities"'));
+ assert.ok(site.includes('method: "OPTIONS"'));
+ assert.ok(site.includes('_yoast_wpseo_metadesc'));
+ assert.ok(site.includes('_yoast_wpseo_focuskw'));
+ assert.ok(websiteStudio.includes('action:"submit"'));
+ assert.ok(websiteStudio.includes("Submit for approval"));
+ assert.ok(websiteStudio.includes("Change summary"));
+ assert.ok(websiteStudio.includes("Approval-ready website draft"));
+ assert.ok(websiteStudio.includes("loadSeoCapabilities"));
 });
