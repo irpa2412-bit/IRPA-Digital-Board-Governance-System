@@ -1017,7 +1017,7 @@ export function createCommunicationsSiteRouter(deps) {
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
           method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
           ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
-          signal: AbortSignal.timeout(30000)
+          signal: AbortSignal.timeout(10000)
         });
         const rawBody = await response.text();
         let data = null; try { data = JSON.parse(rawBody); } catch {}
@@ -1149,7 +1149,7 @@ export function createCommunicationsSiteRouter(deps) {
             const bytes = file.bytes || Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
             validateWebsiteMedia({ filename, contentType: file.mime, bytes });
             const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
-            const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(60000) });
+            const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(20000) });
             const data = await response.json().catch(() => null);
             if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
             const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
