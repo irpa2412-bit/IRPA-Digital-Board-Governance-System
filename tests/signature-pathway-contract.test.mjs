@@ -188,15 +188,19 @@ test("document lifecycle opens its existing signature envelope instead of prepar
 
 
 test("Signature Pathway diagnostics batch one document per Worker request with bounded concurrency and retry", async () => {
-  const [ui, worker, diagnostics, readiness] = await Promise.all([
+  const [ui, worker, diagnostics, readiness, batch] = await Promise.all([
     read("../src/components/SignaturePathwaySelfTest.jsx"),
     read("../drive-gateway/src/index.js"),
     read("../drive-gateway/src/controlledDocumentDiagnostics.mjs"),
-    read("../drive-gateway/src/releaseReadinessRoutes.mjs")
+    read("../drive-gateway/src/releaseReadinessRoutes.mjs"),
+    read("../src/utils/controlledDocumentDiagnosticBatch.mjs")
   ]);
-  assert.match(ui, /reconcileSignatureDocumentIds\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
+  assert.match(ui, /reconcileSignatureDocumentIds\(oneDocument, options\)/);
+  assert.match(batch, /requestDocument\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
   assert.match(ui, /Math\.min\(3, rows\.length\)/);
-  assert.match(ui, /attempt <= 3/);
+  assert.match(batch, /maxRetries = 3/);
+  assert.match(batch, /attempt <= attemptsLimit/);
+  assert.match(ui, /maxRetries: 3/);
   assert.match(ui, /role="progressbar"/);
   const route = worker.slice(worker.indexOf("async function reconcileSignatureDocumentIds"), worker.indexOf("async function controlledDocumentUploadPolicyCheck"));
   assert.match(route, /body\.documents\.length !== 1/);
