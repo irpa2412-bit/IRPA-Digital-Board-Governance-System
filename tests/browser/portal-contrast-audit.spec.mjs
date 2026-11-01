@@ -89,7 +89,7 @@ async function scanPage(page,pageLabel){
  const after=await page.evaluate(async()=>window.axe.run(document,{runOnly:{type:"rule",values:["color-contrast"]}}));
  const extractFailures=result=>result.violations.flatMap(v=>v.nodes.map(node=>{
   const data=node.any?.find(x=>x.data?.contrastRatio!==undefined)?.data||{};
-  return {page:pageLabel,selector:(node.target||[]).join(", "),text:(node.html||"").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").slice(0,180),foreground:data.fgColor||"(not reported)",background:data.bgColor||"(not reported)",ratio:data.contrastRatio==null?"(not reported)":String(data.contrastRatio)};
+  return {page:pageLabel,selector:(node.target||[]).join(", "),text:(node.html||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").slice(0,180),foreground:data.fgColor||"(not reported)",background:data.bgColor||"(not reported)",ratio:data.contrastRatio==null?"(not reported)":String(data.contrastRatio)};
  }));
  const beforeNodes=extractFailures(before),afterNodes=extractFailures(after);
  const beforeCount=beforeNodes.length;
