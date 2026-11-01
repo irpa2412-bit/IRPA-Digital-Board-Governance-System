@@ -415,9 +415,9 @@ test("image upload requires non-empty alt text", async () => {
 test("image upload rejects unsupported formats and oversized payloads before WordPress writes", async () => {
   const router = makeRouter();
   const unsupported = await call(router, makeEnv(), "/api/communications/website/media", {
-    method: "POST", body: { filename: "script.svg", contentType: "image/svg+xml", dataBase64: "PHN2Zz4=" }
+    method: "POST", body: { filename: "script.exe", contentType: "application/octet-stream", dataBase64: "TVqQAA==" }
   });
-  assert.equal(unsupported.status, 400);
+  assert.equal(unsupported.status, 415);
   const oversized = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST", body: { filename: "large.png", contentType: "image/png", dataBase64: "A".repeat(8 * 1024 * 1024), altText: "Large image" }
   });
