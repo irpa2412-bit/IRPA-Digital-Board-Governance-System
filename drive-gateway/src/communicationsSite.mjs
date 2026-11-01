@@ -999,9 +999,13 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ success: true, draftOnly: true, liveMenuChanged: false, result }, 200, corsHeaders(request));
     }
 
-    if (path === "/api/communications/website/production-acceptance" && request.method === "POST") {
+    if ((path === "/api/communications/website/production-acceptance-step" || path === "/api/communications/website/production-acceptance") && request.method === "POST") {
       const { claims } = await authorised(request, env, true);
       const wp = websiteWordPressConfig(env);
+      const input = await request.json().catch(() => ({}));
+      const step = String(input.step || "");
+      const [stepKind, stepFile, stepDestination] = step.split("|");
+      if (!["page-lifecycle", "post-lifecycle", "wp-media", "cpanel"].includes(stepKind)) return json({ error: "A supported independent acceptance step is required." }, 400, corsHeaders(request));
       const report = [];
       const add = (label, status, httpStatus, error = "") => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null });
       const wpRequest = async (endpoint, method = "GET", payload, headers = {}) => {
@@ -1014,14 +1018,14 @@ export function createCommunicationsSiteRouter(deps) {
         return { response, data };
       };
       const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
-      let testPageId = 0, testPostId = 0, uploadAllowed = false;
+      let testPageId = Number(input.pageId || 0), testPostId = Number(input.postId || 0), uploadAllowed = false;
       try {
         const user = await wpRequest("users/me?context=edit");
         uploadAllowed = !!user.response.ok && user.data?.capabilities?.upload_files === true;
         add("WordPress authenticated user read", user.response.ok ? "PASS" : "FAIL", user.response.status, user.response.ok ? "" : user.data?.message || "WordPress user endpoint failed.");
         add("WordPress upload_files capability", uploadAllowed ? "PASS" : "FAIL", user.response.status, uploadAllowed ? "" : "Missing or unverified upload_files capability; TEST media uploads are blocked.");
       } catch (error) { add("WordPress authenticated user read", "FAIL", 0, error.message); add("WordPress upload_files capability", "FAIL", 0, "Capability could not be verified; uploads were not attempted."); }
-      for (const type of ["pages", "posts"]) {
+      for (const type of (stepKind === "page-lifecycle" ? ["pages"] : stepKind === "post-lifecycle" ? ["posts"] : [])) {
         const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
         try {
@@ -1047,8 +1051,8 @@ export function createCommunicationsSiteRouter(deps) {
         { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKJUVPRgo=" },
         { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBA==" }
       ];
-      if (uploadAllowed && testPageId) {
-        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) {
+      if (stepKind === "wp-media" && uploadAllowed && testPageId) {
+        for (const file of mediaTests.filter(item => item.name === stepFile)) for (const destination of [stepDestination].filter(value => ["media-library", "attach", "featured"].includes(value))) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
           try {
             const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
@@ -1075,15 +1079,15 @@ export function createCommunicationsSiteRouter(deps) {
             add(file.name + " upload to WordPress " + destination + " URL open", opened.ok ? "PASS" : "FAIL", opened.status, opened.ok ? "" : "Uploaded URL did not open successfully.");
           } catch (error) { add(file.name + " upload to WordPress " + destination, "FAIL", error.httpStatus || 0, error.message); }
         }
-      } else {
-        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) add(file.name + " upload to WordPress " + destination, "FAIL", null, "Skipped because upload_files capability or TEST page creation was not confirmed.");
+      } else if (stepKind === "wp-media") {
+        add(stepFile + " upload to WordPress " + stepDestination, "FAIL", null, "Skipped because upload_files capability or TEST page creation was not confirmed.");
       }
-      try {
+      if (stepKind === "cpanel") try {
         const cp = cpanelConfig(env);
         const directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
         const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
         add("cPanel upload directory read", "PASS", listing.__httpStatus, "");
-        for (const file of mediaTests) {
+        for (const file of mediaTests.filter(item => item.name === stepFile)) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "." + file.filename;
           try {
             const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
@@ -1099,11 +1103,11 @@ export function createCommunicationsSiteRouter(deps) {
         }
       } catch (error) {
         add("cPanel upload directory read", "FAIL", error.httpStatus || 0, error.message);
-        for (const file of mediaTests) add(file.name + " upload to cPanel folder", "FAIL", null, "Skipped because the existing cPanel uploads directory could not be read.");
+        for (const file of mediaTests.filter(item => item.name === stepFile)) add(file.name + " upload to cPanel folder", "FAIL", null, "Skipped because the existing cPanel uploads directory could not be read.");
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      return json({ testRun: true, step, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
