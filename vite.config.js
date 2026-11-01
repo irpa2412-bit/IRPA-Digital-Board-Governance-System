@@ -29,6 +29,10 @@ export default defineConfig(({ mode }) => {
         "firebase/storage": "/src/firebase/signatureStorage.js"
       }
     },
+    build: {
+      minify: process.env.VITE_DIAGNOSTIC_UNMINIFIED === "true" ? false : "esbuild",
+      sourcemap: process.env.VITE_DIAGNOSTIC_UNMINIFIED === "true"
+    },
     server: { port: 5173 }
   };
 });

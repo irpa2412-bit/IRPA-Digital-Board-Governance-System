@@ -50,10 +50,27 @@ jobs:
         run: npm ci
       - name: Install Firebase Admin SDK for emulator-only fixture seeding
         run: npm --prefix functions install --omit=dev
+      - name: Enforce no-use-before-define in application source
+        run: >-
+          npx --yes eslint@9 --no-config-lookup --no-ignore
+          --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}'
+          --rule 'no-use-before-define: [error, { variables: true, functions: false }]'
+          "src/**/*.{js,jsx,mjs,cjs}"
+      - name: Audit upload-path shadowing and undefined identifiers
+        continue-on-error: true
+        run: >-
+          npx --yes eslint@9 --no-config-lookup --no-ignore
+          --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}'
+          --rule 'no-shadow: error' --rule 'no-undef: error'
+          "src/**/*.{js,jsx,mjs,cjs}"
       - name: Install Playwright test runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Reproduce upload pathway against unminified bundle and source maps
+        env:
+          VITE_DIAGNOSTIC_UNMINIFIED: "true"
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/upload-production-bundle.spec.mjs --workers=1"
       - name: Authenticate against isolated Firebase Auth and Firestore emulators; run full suite three times at mobile, tablet and desktop sizes
         run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --repeat-each=3 --workers=1"
       - name: Upload browser evidence on failure
