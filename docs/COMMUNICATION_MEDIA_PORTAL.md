@@ -102,20 +102,21 @@ Before any staging WordPress file or page write, configure protected Actions sec
 - Every website and cPanel route verifies the Firebase ID token at the Cloudflare Worker.
 - WordPress page/post edits and restores require an active registered Communication & Media role or an active administrator profile; broader reviewer roles alone are insufficient. The cPanel static-file editor retains its separate reviewer gate. Credentials stay server-side.
 - Website publishing is limited to approved website articles and press releases.
-- Before every page/post edit or restore, the Worker saves a complete pre-edit snapshot in the staging Worker KV namespace, records the current WordPress revision ID, and writes an audit event with actor, action, timestamp and page/post ID. The update is then verified by re-reading the item; the saved snapshot appears in revision history and can be restored with one click. Audit entries contain no WordPress credentials or content secrets.
+- Before every page/post edit or restore, the Worker saves a complete pre-edit snapshot in the KV namespace bound to the serving Worker environment (production or staging), records the current WordPress revision ID, and writes an audit event with actor, action, timestamp and page/post ID. The update is then verified by re-reading the item; the saved snapshot appears in revision history and can be restored with one click. Audit entries contain no WordPress credentials or content secrets.
 - cPanel writes are restricted to static content file types and record an audit event.
 - No Firebase Functions callable is required for website publishing, avoiding a new Cloud Functions billing dependency.
 
 ## Acceptance and release gates
 1. Run `npm run test:communication-media`, the full required test suite, production build, gateway syntax/security tests and browser regression checks.
 2. Verify role-denial behavior for unauthenticated and non-reviewer users.
-3. Verify the staging WordPress `users/me` status code is 200, list and read a test page/post, edit only allowlisted fields, verify the edit, and restore the saved snapshot exactly. Verify a non-Communication & Media user is refused. Check logs and audit events for secrets. Also verify approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
+3. Verify the staging WordPress `users/me` status code is 200, list and read a dedicated test page/post, edit only allowlisted fields, verify the edit, and restore the saved snapshot exactly. Verify a non-Communication & Media user is refused. Check logs and audit events for secrets. Also verify approved publishing, failure handling and duplicate reconciliation against isolated staging WordPress.
 4. Verify cPanel token authentication, permitted file listing/read/write, path traversal rejection, executable-file rejection and audit evidence against isolated staging hosting.
 5. Confirm the public page after a staged edit and verify the previous content is preserved for rollback.
 6. Verify desktop and mobile portal usability and ensure unrelated governance portals retain existing behavior.
-7. Merge only after all required checks pass; deploy and live-verify only after staging acceptance. Do not claim live integration until the secret-backed connection checks and actual test writes succeed.
+7. Staging acceptance is a pre-release safety check, not the operational destination. Once the change is reviewed and an authorised production deployment is approved, verify the production Worker reports the production environment and the configured WordPress host is exactly `irpa.or.tz` or `www.irpa.or.tz`. Confirm authenticated `users/me` returns the dedicated Editor account, load production pages/posts and taxonomies, then create a clearly labelled non-public draft and upload a small approved test image only if the organisation authorises that production test. Verify the draft status, media alt text/caption, featured image, audit events and editorial-record linkage. Remove any test draft/media only through an explicitly approved cleanup action; do not delete or alter existing public content during acceptance.
+8. After the production connection and draft workflow are verified, exercise the independent approval process with an authorised test item and verify that approval publishes the same draft exactly once. Do not bypass reviewer authorization or publish unapproved content. Confirm normal page editing, revision snapshots/restoration, mobile usability and unrelated portal regression status.
 
-Production secrets and deployments must not be changed merely by merging this code.
+Production is the intended operational WordPress destination. Staging remains an isolated test environment. Production secrets and deployments must not be changed merely by merging this code; deployment and live acceptance require explicit authorization and must be recorded separately from source/CI verification.
 
 ## Supported document and media upload formats
 
