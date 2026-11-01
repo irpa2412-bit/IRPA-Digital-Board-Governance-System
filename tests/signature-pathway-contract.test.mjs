@@ -197,7 +197,7 @@ test("Signature Pathway diagnostics batch one document per Worker request with b
   ]);
   assert.match(ui, /reconcileSignatureDocumentIds\(oneDocument, options\)/);
   assert.match(batch, /requestDocument\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
-  assert.match(ui, /Math\.min\(3, rows\.length\)/);
+  assert.match(batch, /Math\.min\(3, rows\.length\)/);
   assert.match(batch, /maxRetries = 3/);
   assert.match(batch, /attempt <= attemptsLimit/);
   assert.match(ui, /maxRetries: 3/);
