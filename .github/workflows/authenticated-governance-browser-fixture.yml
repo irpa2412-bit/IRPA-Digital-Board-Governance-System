@@ -50,6 +50,11 @@ jobs:
         run: npm ci
       - name: Install Firebase Admin SDK for emulator-only fixture seeding
         run: npm --prefix functions install --omit=dev
+      - name: Enforce no-use-before-define in application source
+        run: npx --yes eslint@9 --no-config-lookup --no-ignore --rule 'no-use-before-define: [error, { variables: true, functions: false }]' "src/**/*.{js,jsx,mjs,cjs}"
+      - name: Audit upload-path shadowing and undefined identifiers
+        continue-on-error: true
+        run: npx --yes eslint@9 --no-config-lookup --no-ignore --rule 'no-shadow: error' --rule 'no-undef: error' "src/**/*.{js,jsx,mjs,cjs}"
       - name: Install Playwright test runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test
       - name: Install Chromium
