@@ -876,7 +876,7 @@ export function createCommunicationsSiteRouter(deps) {
         const terms = await response.json().catch(() => null);
         if (!response.ok || !Array.isArray(terms)) throw new Error("WordPress " + taxonomy + " could not be loaded.");
         return terms.filter(term => Number.isSafeInteger(Number(term.id)) && Number(term.id) > 0)
-          .map(term => ({ id: Number(term.id), name: editorRaw(term, "name") || String(term.name || "") }));
+          .map(term => ({ id: Number(term.id), name: String(term.name?.raw ?? term.name?.rendered ?? term.name ?? "") }));
       };
       const [categories, tags] = await Promise.all([readTerms("categories"), readTerms("tags")]);
       return json({ categories, tags }, 200, corsHeaders(request));
