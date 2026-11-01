@@ -409,11 +409,12 @@ test("social media studio provides a manual export fallback and funding view wit
 });
 
 
-test("website studio supports bilingual page drafts, approval-gated publishing, and portal route self-test",()=>{
- for(const term of ["Website Studio","English","Kiswahili","Home","About","Programmes","Projects","Impact","Partners","Funding and Reports","News","Contact","MOBILE PREVIEW","Portal Self-Test","Run Portal Self-Test"]) assert.ok(portal.includes(term),term);
+test("Website Studio retains bilingual draft creation, approval-gated WordPress page support and portal route self-test",()=>{
+ for(const term of ["Website Studio","Publication language","English","Kiswahili","Create WordPress draft","Portal Self-Test","Run Portal Self-Test"]) assert.ok(websiteStudio.includes(term)||portal.includes(term),term);
  assert.ok(site.includes('["Website Article", "Press Release", "Website Page"].includes(item.type)'));
  assert.ok(site.includes('const endpoint = wp.root + "/wp-json/wp/v2/" + (isPage ? "pages" : "posts")'));
  assert.ok(site.includes('item.status !== "Approved"'));
+ assert.ok(!portal.includes("Page Drafts (EN/SW)")&&!portal.includes("saveWebsitePageDraft"),"the duplicate page-draft editor is not restored");
 });
 
 test("production Worker deployments stamp and verify the exact deployed commit",()=>{
@@ -480,12 +481,28 @@ test("Website Studio exposes approval-ready submission and guarded Yoast metadat
 });
 
 
-test("administrator Communication & Media tab bar clearly separates Website Studio from bilingual page drafts",()=>{
- assert.ok(portal.includes('{["Website Studio","Page Drafts (EN/SW)"'),"tab bar must place Website Studio first and expose Page Drafts (EN/SW) separately");
+test("administrator Communication & Media navigation opens the single Website Studio component without a duplicate legacy editor",()=>{
+ assert.ok(portal.includes('{["Website Studio","Workspace"'),"Website Studio remains first in the tab bar");
  assert.ok(portal.includes('const authorized=isAdmin||roles.some'),"administrators retain the existing portal authorization path");
  assert.ok(portal.includes('if(!authorized)return'),"unauthorized users remain blocked by the existing portal gate");
- assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio/>'),"Website Studio tab opens the CommunicationsWebsiteStudio component");
- assert.ok(portal.includes('tab==="Page Drafts (EN/SW)"&&<section'),"bilingual page-draft form remains on its distinct tab");
- assert.ok(portal.includes("Upload media, choose pages and run Production Acceptance in Website Studio"));
- assert.ok(portal.includes('onClick={()=>setTab("Website Studio")}>Open Website Studio</button>'));
+ assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio/>'),"Website Studio opens the four-tab CommunicationsWebsiteStudio component");
+ assert.ok(!portal.includes("Page Drafts (EN/SW)")&&!portal.includes("saveWebsitePageDraft"),"duplicate legacy bilingual page-draft editor is removed");
+});
+
+
+test("administrator Website Studio exposes all four tabs, runs acceptance and reports the live status response",()=>{
+ assert.ok(portal.includes('const authorized=isAdmin||roles.some'),"existing administrator authorization remains");
+ assert.ok(portal.includes('if(!authorized)return'),"existing portal authorization gate remains");
+ for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance"])assert.ok(websiteStudio.includes(label),label+" tab is present");
+ assert.ok(websiteStudio.includes('onClick={runProductionAcceptance}'),"Production Acceptance run button is wired");
+ assert.ok(websiteStudio.includes('call("/api/communications/site/status")'),"status is read from the required route");
+ assert.ok(websiteStudio.includes("const connections=d.connections||{}"),"the route's connections payload is consumed");
+ assert.ok(websiteStudio.includes('status?.website==="connected"?"Connected"'),"connected status renders as Connected");
+ assert.ok(websiteStudio.includes('useEffect(()=>{void connect()},[])'),"status is checked automatically on mount");
+ assert.ok(!portal.includes("Page Drafts (EN/SW)")&&!portal.includes("saveWebsitePageDraft"),"the duplicate legacy page-draft editor is removed");
+});
+
+test("Website Studio Upload Media retains the full requested media set and destination selector",()=>{
+ for(const ext of [".jpg",".jpeg",".png",".webp",".gif",".svg",".mp4",".mov",".webm",".mp3",".pdf",".docx",".xlsx",".pptx"])assert.ok(websiteStudio.includes(ext),"Upload Media accepts "+ext);
+ for(const destination of ["media-library","attach","featured","cpanel-folder"])assert.ok(websiteStudio.includes('value="'+destination+'"'),"destination "+destination+" is available");
 });
