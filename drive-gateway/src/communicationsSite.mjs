@@ -733,7 +733,8 @@ export function createCommunicationsSiteRouter(deps) {
                 name: cleanText(user.name, 100), role: isDedicatedEditor ? "editor" : "unverified",
                 canEditPosts: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_posts : undefined,
                 canEditPages: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.edit_pages : undefined,
-                canUploadFiles: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.upload_files : undefined
+                canUploadFiles: user.capabilities && typeof user.capabilities === "object" ? !!user.capabilities.upload_files : undefined,
+                uploadFilesCapability: user.capabilities && typeof user.capabilities === "object" ? (user.capabilities.upload_files === true ? "granted" : user.capabilities.upload_files === false ? "missing" : "unknown") : "unknown"
               };
               if (!isDedicatedEditor) result.websiteDiagnosticCode = "wrong_account_role";
             }
@@ -840,6 +841,7 @@ export function createCommunicationsSiteRouter(deps) {
       if(destination!=="media-library"&&!Number.isSafeInteger(Number(input.parentId||input.postId)) )return json({error:"A valid existing page/post ID is required for attachment or featured image."},400,corsHeaders(request));
       if(["image/jpeg","image/png","image/webp","image/gif"].includes(contentType)&&!altText)return json({error:"Descriptive alt text is required for raster images."},400,corsHeaders(request));
       const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
+      if (user?.capabilities?.upload_files !== true) return json({ error: "WordPress media upload is blocked: the configured integration account is missing the upload_files capability. Ask the WordPress administrator to grant upload_files to the dedicated Editor account, then run diagnostics again.", code: "wordpress_upload_files_capability_missing", capability: "upload_files" }, 403, corsHeaders(request));
       const endpoint=wp.root+"/wp-json/wp/v2/media";
       const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+meta.filename.replace(/["\\\r\n]/g,"-")+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
       const uploaded=await response.json().catch(()=>null);
@@ -1277,6 +1279,47 @@ export function createCommunicationsSiteRouter(deps) {
       const auditFields = fields({ action: "COMMUNICATION_MEDIA_PUBLISHED", category: "COMMUNICATIONS", collection: "communicationMediaItems", recordId: itemId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { type: item.type, channel: item.channel, language: item.language || null, wpPostId: post.id, publicUrl: post.link, approvedBeforePublishing: true }, createdAt: now });
       await commitDocumentAndAudit(env, itemId, claims.token, documentFields, Object.keys(documentFields), auditFields, { collectionName: "communicationMediaItems" });
       return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/diagnostics" && request.method === "GET") {
+      await authorised(request, env, true);
+      const cp = cpanelConfig(env);
+      const domain = String(url.searchParams.get("domain") || "").toLowerCase();
+      if (!/^[a-z0-9.-]{1,253}$/.test(domain) || domain.startsWith(".") || domain.endsWith(".")) {
+        return json({ error: "A valid website domain is required for cPanel read-only diagnostics." }, 400, corsHeaders(request));
+      }
+      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null } };
+      const extractRows = value => {
+        const data = value?.data;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.[0]?.data)) return data[0].data;
+        if (Array.isArray(data?.data)) return data.data;
+        return [];
+      };
+      try {
+        const response = await cpanelCall(cp, "Email/list_pops", { domain });
+        result.emailAccounts = { status: "PASS", count: extractRows(response).length, accounts: extractRows(response).map(row => cleanText(row.email || row.login || "", 254)).filter(Boolean) };
+      } catch (error) {
+        result.emailAccounts = { status: "FAIL", diagnosticCode: safeCode(error.diagnosticCode), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+      }
+      try {
+        const response = await cpanelCall(cp, "SSL/installed_hosts");
+        result.ssl = { status: "PASS", hosts: extractRows(response).filter(row => String(row.domain || row.host || "").toLowerCase() === domain).map(row => ({ domain: cleanText(row.domain || row.host, 253), status: cleanText(row.status || row.certificate_status || "installed", 80), issuer: cleanText(row.issuer || "", 120), expiry: cleanText(row.expiry || row.not_after || "", 80) })) };
+        if (!result.ssl.hosts.length) result.ssl.status = "NO_MATCH";
+      } catch (error) {
+        result.ssl = { status: "FAIL", diagnosticCode: safeCode(error.diagnosticCode), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+      }
+      try {
+        const response = await cpanelCall(cp, "LangPHP/php_ini_get_user", { domain });
+        const data = response?.data?.[0] || response?.data || {};
+        const ini = data.ini || data.settings || data;
+        const upload = ini.upload_max_filesize || ini.uploadMaxFilesize;
+        const post = ini.post_max_size || ini.postMaxSize;
+        result.phpLimits = { status: upload || post ? "PASS" : "UNAVAILABLE", upload_max_filesize: cleanText(upload || "", 40) || null, post_max_size: cleanText(post || "", 40) || null, diagnostic: upload || post ? null : "The cPanel UAPI response did not expose upload_max_filesize or post_max_size." };
+      } catch (error) {
+        result.phpLimits = { status: "UNAVAILABLE", upload_max_filesize: null, post_max_size: null, diagnosticCode: safeCode(error.diagnosticCode), error: cleanText(error.message, 240) };
+      }
+      return json(result, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/files" && request.method === "GET") {

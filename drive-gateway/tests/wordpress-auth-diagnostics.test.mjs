@@ -74,6 +74,23 @@ test("WordPress diagnostics probes authenticated users/me and unauthenticated RE
   }
 });
 
+test("WordPress diagnostics report upload_files capability as granted, missing, or unknown", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") return makeResponse({ id: 42, name: "Integration Editor", roles: ["editor"], capabilities: { edit_posts: true, edit_pages: true, upload_files: false } });
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging", routes: {} });
+    throw new Error("Unexpected WordPress request: " + url.pathname);
+  };
+  try {
+    const response = await status(router, env());
+    const data = (await response.json()).connections;
+    assert.equal(data.websiteAccount.canUploadFiles, false);
+    assert.equal(data.websiteAccount.uploadFilesCapability, "missing");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("401 WordPress JSON codes produce a specific credential finding and sanitized raw response", async () => {
   const router = makeRouter();
   const originalFetch = globalThis.fetch;
