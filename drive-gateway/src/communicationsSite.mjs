@@ -1600,7 +1600,7 @@ export function createCommunicationsSiteRouter(deps) {
         return typeof data === "string" ? data : "";
       };
       const parseLimits = iniContent => {
-        const directive = name => iniContent.match(new RegExp("^\\\\s*" + name + "\\\\s*=\\\\s*([^\\\\s;#]+)", "im"))?.[1] || null;
+        const directive = name => iniContent.match(new RegExp("^\\s*" + name + "\\s*=\\s*([^\\s;#]+)", "im"))?.[1] || null;
         return { upload: directive("upload_max_filesize"), post: directive("post_max_size") };
       };
       let limits = { upload: null, post: null }, phpLimitSource = null, phpLimitErrors = [];
