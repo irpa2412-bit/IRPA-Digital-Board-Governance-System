@@ -27,8 +27,8 @@ function classifyFailure(step, error, metadata = {}) {
   const reason = reasonOf(error);
   let classification = "UNKNOWN";
   if (status === 404 || metadata.trashed === true || reason === "notFound") classification = "FILE_MISSING";
+  else if (/quota|ratelimit|rate limit|timeout/i.test(reason) || transient(error) && status !== 403) classification = "TRANSIENT";
   else if (status === 403 || reason === "forbidden") classification = "NO_ACCESS";
-  else if (transient(error)) classification = "TRANSIENT";
   return { classification, step, httpStatus: status, driveErrorReason: reason, error: String(error?.message || "Unknown Drive error") };
 }
 async function sha256(bytes) {
