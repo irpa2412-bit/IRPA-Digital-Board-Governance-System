@@ -24,3 +24,12 @@ test("dark status banners own explicit high-contrast text and opacity tokens",()
  assert.match(css,/\.auth-message\s*\{[^}]*opacity:1/s);
  assert.ok(ratio("#f4f8f6","#0e251b")>=4.5);
 });
+
+
+test("shared governance signing field palette keeps dark text on its light button surface",()=>{
+ const standard=fs.readFileSync(new URL("../src/styles/portal-readability-standard.css",import.meta.url),"utf8");
+ assert.match(standard,/\[data-governance-field-palette\] button[^}]*color:\s*#17372b\s*!important/s);
+ assert.match(standard,/\[data-governance-field-palette\] button[^}]*background-color:\s*#f4f8f5\s*!important/s);
+ assert.match(standard,/\[data-governance-field-palette\] button small[^}]*opacity:\s*1\s*!important/s);
+ assert.ok(ratio("#17372b","#f4f8f5")>=4.5);
+});
