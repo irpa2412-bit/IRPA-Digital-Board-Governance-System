@@ -74,13 +74,14 @@ test("production minified bundle completes authenticated Create Drive file with 
   await page.locator('.auth-card input[type="email"]').fill(fixtureEmail);
   await page.locator('.auth-card input[type="password"]').fill(fixturePassword);
   await page.getByRole("button", { name: "Sign In Securely" }).click();
+  await expect(page.locator(".topbar h2")).toContainText("Authorization", { timeout: 45000 });
+  await expect(page.getByText("CONTROLLED DOCUMENT UPLOAD")).toBeVisible({ timeout: 30000 });
+  await page.getByPlaceholder("Enter document title").press("A");
+  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 15000 });
   await page.getByRole("radio", { name: "Documents, correspondence and files" }).check();
   await page.getByRole("radio", { name: "Trial data — testing and demonstrations" }).check();
   await page.getByRole("button", { name: "Confirm environment and continue" }).click();
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 15000 });
-  await expect(page.locator(".topbar h2")).toContainText("Authorization", { timeout: 45000 });
-  await expect(page.getByText("CONTROLLED DOCUMENT UPLOAD")).toBeVisible({ timeout: 30000 });
-
   await page.getByPlaceholder("Enter document title").fill("Upload Runtime Browser Fixture");
   await page.getByLabel("Document Type").selectOption("Governance");
   await page.getByLabel("Select document file").setInputFiles({
