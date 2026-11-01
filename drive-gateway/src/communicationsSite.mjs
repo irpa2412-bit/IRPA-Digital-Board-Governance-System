@@ -922,6 +922,82 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ categories, tags }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/website/structure" && request.method === "POST") {
+      const { claims } = await websiteEditorAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      await verifyDedicatedWordPressEditor(wp);
+      const pages = [
+        ["Home", "home"], ["About IRPA", "about-irpa"], ["Programmes", "programmes"],
+        ["Rangeland and Livestock", "rangeland-and-livestock"], ["Projects", "projects"],
+        ["News", "news"], ["Resources", "resources"], ["Partners", "partners"],
+        ["Contact", "contact"], ["Donate and Funding", "donate-and-funding"]
+      ];
+      const categoryTerms = [
+        ["News", "news"], ["Events", "events"], ["Programmes", "programmes"],
+        ["Projects", "projects"], ["Publications", "publications"], ["Resources", "resources"],
+        ["Partnerships", "partnerships"], ["Funding Opportunities", "funding-opportunities"]
+      ];
+      const tagTerms = [
+        ["IRPA", "irpa"], ["Rangeland Management", "rangeland-management"],
+        ["Pastoral Communities", "pastoral-communities"], ["Livestock Development", "livestock-development"],
+        ["Market Development", "market-development"], ["Climate Resilience", "climate-resilience"],
+        ["Women and Youth", "women-and-youth"], ["Longido", "longido"]
+      ];
+      const result = { pages: [], categories: [], tags: [], menu: { status: "not_started" }, created: 0, skipped: 0 };
+      const wpJson = async (endpoint, method = "GET", payload) => {
+        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
+          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...(payload ? { "Content-Type": "application/json" } : {}) }),
+          ...(payload ? { body: JSON.stringify(payload) } : {}), signal: AbortSignal.timeout(20000)
+        });
+        const data = await response.json().catch(() => null);
+        return { response, data };
+      };
+      for (const [title, slug] of pages) {
+        const existing = await wpJson("pages?slug=" + encodeURIComponent(slug) + "&context=edit&per_page=10");
+        if (!existing.response.ok || !Array.isArray(existing.data)) throw new Error("Could not check whether the WordPress page slug '" + slug + "' already exists; no replacement was attempted.");
+        if (existing.data.length) { result.pages.push({ title, slug, status: "SKIPPED_EXISTS", id: Number(existing.data[0].id) || null }); result.skipped++; continue; }
+        const created = await wpJson("pages", "POST", { title, slug, status: "draft", content: "<p>DRAFT — IRPA website page structure placeholder. Replace this content through the approved editorial workflow.</p>" });
+        if (!created.response.ok || !Number.isSafeInteger(created.data?.id) || created.data.status !== "draft" || !isAllowedWordPressLink(created.data.link, wp)) {
+          throw new Error("WordPress did not confirm creation of page '" + title + "' as a draft. No page was published or overwritten.");
+        }
+        result.pages.push({ title, slug, status: "CREATED_DRAFT", id: created.data.id }); result.created++;
+        await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_STRUCTURE_PAGE_DRAFT_CREATED", "pages", created.data.id, { title, slug, status: "draft" });
+      }
+      const createTerms = async (taxonomy, terms, output) => {
+        for (const [name, slug] of terms) {
+          const existing = await wpJson(taxonomy + "?slug=" + encodeURIComponent(slug) + "&context=edit&per_page=10");
+          if (!existing.response.ok || !Array.isArray(existing.data)) throw new Error("Could not check existing WordPress " + taxonomy + " term '" + slug + "'; no replacement was attempted.");
+          if (existing.data.length) { output.push({ name, slug, status: "SKIPPED_EXISTS", id: Number(existing.data[0].id) || null }); result.skipped++; continue; }
+          const created = await wpJson(taxonomy, "POST", { name, slug });
+          if (!created.response.ok || !Number.isSafeInteger(created.data?.id)) throw new Error("WordPress could not create " + taxonomy + " term '" + name + "'.");
+          output.push({ name, slug, status: "CREATED", id: created.data.id }); result.created++;
+          await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_STRUCTURE_TERM_CREATED", taxonomy, created.data.id, { name, slug });
+        }
+      };
+      await createTerms("categories", categoryTerms, result.categories);
+      await createTerms("tags", tagTerms, result.tags);
+      const menuSlug = "irpa-primary-navigation-draft";
+      const existingMenu = await wpJson("navigation?slug=" + menuSlug + "&context=edit&per_page=10");
+      if (existingMenu.response.status === 404) {
+        result.menu = { status: "UNAVAILABLE", message: "This WordPress site does not expose the core navigation REST endpoint. No live menu was changed." };
+      } else if (!existingMenu.response.ok || !Array.isArray(existingMenu.data)) {
+        result.menu = { status: "FAILED_READ", message: "Could not safely inspect existing draft navigation; no menu was changed." };
+      } else if (existingMenu.data.length) {
+        result.menu = { status: "SKIPPED_EXISTS", id: Number(existingMenu.data[0].id) || null };
+        result.skipped++;
+      } else {
+        const navigationContent = pages.map(([label, slug]) => '<!-- wp:navigation-link {"label":' + JSON.stringify(label) + ',"type":"custom","url":' + JSON.stringify(slug === "home" ? "/" : "/" + slug + "/") + ',"kind":"custom"} /-->').join("\n");
+        const created = await wpJson("navigation", "POST", { title: "IRPA Primary Navigation — DRAFT", slug: menuSlug, status: "draft", content: navigationContent });
+        if (!created.response.ok || !Number.isSafeInteger(created.data?.id) || created.data.status !== "draft") {
+          result.menu = { status: "FAILED_CREATE", httpStatus: created.response.status, message: "WordPress did not confirm a draft navigation record. The live menu was not touched." };
+        } else {
+          result.menu = { status: "CREATED_DRAFT", id: created.data.id }; result.created++;
+          await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_STRUCTURE_MENU_DRAFT_CREATED", "navigation", created.data.id, { slug: menuSlug, status: "draft" });
+        }
+      }
+      return json({ success: true, draftOnly: true, liveMenuChanged: false, result }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
       await websiteEditorAuthorised(request, env);
       const wp = websiteWordPressConfig(env);
