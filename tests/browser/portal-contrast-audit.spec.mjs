@@ -104,6 +104,16 @@ test("WCAG contrast audit: every administrator portal/page at desktop/mobile in 
   const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},colorScheme:scheme});
   const page=await context.newPage();
   await page.route("**/*",route=>{const url=new URL(route.request().url());if(url.hostname==="localhost"||url.hostname==="127.0.0.1")return route.continue();return route.abort();});
+  await page.route("**/api/signature-pathway/reconcile",route=>route.fulfill({
+   status:200,contentType:"application/json",
+   body:JSON.stringify({ok:true,dryRun:true,autoDiscover:true,results:[{
+    documentId:"fixture-doc-contrast",fileId:"drive-fixture-contrast",title:"Chris.txt",status:"match",classification:"OK",
+    step:"Drive metadata validation",httpStatus:200,driveErrorReason:"(none)",mimeType:"application/pdf",driveSize:1024,storedSize:1024,
+    storedSha256:"fixture-sha256",computedSha256:"fixture-sha256",trashed:false,parents:["fixture-archive"],
+    createdTime:"2026-10-31T10:00:00.000Z",uploadedBy:"fixture-admin",uploadedAt:"2026-10-31T10:00:00.000Z",
+    pdfParses:true,pdfPageCount:1,storedPageCount:1,reason:"Mocked successful controlled-document diagnostic"
+   }],summary:{total:1,match:1,mismatch:0,unreadable:0}})
+  }));
   await page.goto(baseURL+"/");
   await page.locator('.auth-card input[type="email"]').fill(fixtureEmail);
   await page.locator('.auth-card input[type="password"]').fill(fixturePassword);
@@ -130,6 +140,12 @@ test("WCAG contrast audit: every administrator portal/page at desktop/mobile in 
      await expect(button).toBeVisible({timeout:15000});
      await button.click();
      await page.waitForTimeout(100);
+     if(tab==="Signature Pathway Self-Test"){
+      await page.getByRole("button",{name:"Run Self-Test & Drive Diagnostics"}).click();
+      await expect(page.getByText("Chris.txt",{exact:true})).toBeVisible({timeout:15000});
+      await expect(page.getByText(/Firestore ID: fixture-doc-contrast/)).toBeVisible();
+      await expect(page.getByText(/PASS: match/)).toBeVisible();
+     }
      await scanPage(page,"Signature Portal / "+tab+" · "+viewport.name+" · "+scheme);
     }
    }
