@@ -825,7 +825,7 @@ export function createCommunicationsSiteRouter(deps) {
       const encoded = String(input.dataBase64 || "");
       if (!filename || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || !title) return json({error:"A filename, title and valid base64 file are required."},400,corsHeaders(request));
       const estimate = Math.floor(encoded.length*3/4)-(encoded.endsWith("==")?2:encoded.endsWith("=")?1:0);
-      const limit = Math.min(20*1024*1024,Math.max(1024,Number(env.WORDPRESS_MEDIA_MAX_BYTES||8*1024*1024)));
+      const limit = Math.min(20 * 1024 * 1024,Math.max(1024,Number(env.WORDPRESS_MEDIA_MAX_BYTES||8*1024*1024)));
       if(estimate<1||estimate>limit)return json({error:"File exceeds the configured WordPress media limit of "+limit+" bytes."},413,corsHeaders(request));
       let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
       if(contentType==="image/svg+xml"){

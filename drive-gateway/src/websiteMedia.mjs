@@ -10,7 +10,7 @@ const starts=(b,...s)=>s.every((v,i)=>b[i]===v);
 export function sanitizeWebsiteSvg(input) {
   const raw=String(input||"");
   if(raw.length>2*1024*1024||!/^\s*<svg\b/i.test(raw)||/<\s*(script|foreignObject|iframe|object|embed|audio|video)\b/i.test(raw)) throw new Error("SVG contains unsafe or unsupported content.");
-  if(/(?:javascript:|data:|file:|@import|url\s*\()/i.test(raw)||/\bon[a-z]+\s*=/i.test(raw)||/<!DOCTYPE|<!ENTITY/i.test(raw)) throw new Error("SVG external references, entities and event handlers are prohibited.");
+  if(/(?:javascript:|data:|https?:|file:|@import|url\s*\()/i.test(raw)||/\bon[a-z]+\s*=/i.test(raw)||/<!DOCTYPE|<!ENTITY/i.test(raw)) throw new Error("SVG external references, entities and event handlers are prohibited.");
   const allowed=new Set(["svg","g","path","rect","circle","ellipse","line","polyline","polygon","text","tspan","defs","linearGradient","radialGradient","stop","clipPath","mask","title","desc"]);
   const cleaned=raw.replace(/<\/?([A-Za-z][\w:-]*)\b([^>]*)>/g,(whole,name,attrs)=>{
     if(!allowed.has(name)) return "";
