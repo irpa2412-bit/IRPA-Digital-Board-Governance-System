@@ -13,8 +13,8 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
   setBusy(true);setMessage("");setAcceptanceReport([]);
   const rows=[];const cleanup=[];
   const steps=[{kind:"page-lifecycle",name:"Page draft create/edit"},{kind:"post-lifecycle",name:"Post draft create/edit"}];
-  for(const file of ["image","video","pdf","docx"])for(const destination of ["media-library","attach","featured"])steps.push({kind:"wp-media",file,destination,name:file.toUpperCase()+" to WordPress "+destination});
-  for(const file of ["image","video","pdf","docx"])steps.push({kind:"cpanel",file,name:file.toUpperCase()+" to cPanel folder"});
+  for(const file of ["image","video","pdf","docx"])for(const destination of ["media-library","attach","featured"])steps.push({kind:"wp-media",file,destination,name:({image:"PNG",video:"MP4",pdf:"PDF",docx:"DOCX"})[file]+" to WordPress "+destination});
+  for(const file of ["image","video","pdf","docx"])steps.push({kind:"cpanel",file,name:({image:"PNG",video:"MP4",pdf:"PDF",docx:"DOCX"})[file]+" to cPanel folder"});
   let pageId=null,postId=null;
   async function runStep(step,index){
    const label="Step "+(index+1)+"/"+steps.length+" - "+step.name;setMessage(label+" - RUNNING");
