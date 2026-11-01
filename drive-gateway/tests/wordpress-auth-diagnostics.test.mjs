@@ -104,13 +104,45 @@ test("media upload is blocked with a clear error when WordPress upload_files is 
   try {
     const response = await router(new Request("https://gateway.test/api/communications/website/media", {
       method: "POST", headers: { Authorization: "Bearer firebase-token", "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: "test.png", title: "TEST image", contentType: "image/png", dataBase64: "iVBORw0KGgo=" })
+      body: JSON.stringify({ filename: "test.png", title: "TEST image", contentType: "image/png", altText: "TEST image", dataBase64: "iVBORw0KGgo=" })
     }), env());
     const data = await response.json();
     assert.equal(response.status, 403);
     assert.equal(data.code, "wordpress_upload_files_capability_missing");
     assert.match(data.error, /missing the upload_files capability/);
     assert.deepEqual(calls, ["/wp-json/wp/v2/users/me"]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without writes", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    calls.push(url.pathname);
+    const payload = url.pathname.endsWith("/Email/list_pops")
+      ? { status: 1, data: [{ email: "info@staging.irpa.or.tz" }, { email: "contact@staging.irpa.or.tz" }] }
+      : url.pathname.endsWith("/SSL/installed_hosts")
+        ? { status: 1, data: [{ domain: "staging.irpa.or.tz", status: "valid", issuer: "TEST CA" }] }
+        : url.pathname.endsWith("/LangPHP/php_ini_get_user")
+          ? { status: 1, data: [{ upload_max_filesize: "32M", post_max_size: "40M" }] }
+          : null;
+    if (!payload) throw new Error("Unexpected cPanel operation: " + url.pathname);
+    return makeResponse(payload);
+  };
+  try {
+    const response = await router(new Request("https://gateway.test/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { headers: { Authorization: "Bearer firebase-token" } }), env({
+      CPANEL_BASE_URL: "https://cpanel.example.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token", CPANEL_DOCUMENT_ROOT: "public_html/staging"
+    }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.readOnly, true);
+    assert.deepEqual(data.emailAccounts.accounts, ["info@staging.irpa.or.tz", "contact@staging.irpa.or.tz"]);
+    assert.equal(data.ssl.hosts[0].status, "valid");
+    assert.equal(data.phpLimits.upload_max_filesize, "32M");
+    assert.equal(data.phpLimits.post_max_size, "40M");
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/LangPHP/php_ini_get_user"]);
   } finally { globalThis.fetch = originalFetch; }
 });
 
