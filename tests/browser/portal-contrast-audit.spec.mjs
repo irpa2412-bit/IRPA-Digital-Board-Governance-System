@@ -21,6 +21,7 @@ const viewports = [
   {name:"mobile",width:390,height:844}
 ];
 const schemes = ["light","dark"];
+const displayLabels = {"Induction and Orientation":"Induction & Orientation Portal","Induction Applications":"Induction Applications Portal","Board Members Registration":"Board Members Registration Portal","Members & Personnel":"Members & Personnel Portal","Meetings":"Meeting Portal","Meeting Room":"Meeting Room Portal","Participants":"Participants Portal","Resolutions":"Resolutions Portal","Voting":"Voting Portal","Actions":"Actions Portal","Documents":"Documents Portal","Signature Platform":"Signature Portal","Decisions":"Decisions Portal","Risk Register":"Risk Register Portal","Authorization & Approvals":"Authorization & Approvals Portal","Employee Payments":"Employee Payments Portal","Research, Statistics and Knowledge":"Research, Statistics and Knowledge Portal","Finance Portfolio":"Finance Portal","Procurement":"Procurement Portal","Reports":"Reports Portal","Audit Trail":"Audit Trail Portal","Downloads":"Downloads Portal","Settings":"Settings Portal","Add Administrator":"Add Administrator Portal","Department and Archive Registry":"Department and Archive Registry","Department Portal Builder":"Department Portal Builder","Grant Intelligence & Funding Opportunities":"Grant Intelligence & Funding Opportunities","Communication & Media":"Communication & Media Portal","IT Operations":"IT Operations Portal"};
 const contrastFailures = [];
 const pageCounts = [];
 const opacityFindings = [];
@@ -78,7 +79,7 @@ test("WCAG contrast audit: every administrator portal at desktop/mobile in light
       for (const module of modules) {
         const url = baseURL + "/?adminModule=" + encodeURIComponent(module);
         await page.goto(url);
-        await expect(page.locator(".topbar h2")).toContainText(module,{timeout:30000});
+        await expect(page.locator(".topbar h2")).toContainText(displayLabels[module] || module,{timeout:30000});
         await expect(page.locator("[data-active-portal-content]:visible").first()).toBeVisible({timeout:30000});
         await page.addScriptTag({content:axe.source});
         const pageLabel = module + " · " + viewport.name + " · " + scheme;
