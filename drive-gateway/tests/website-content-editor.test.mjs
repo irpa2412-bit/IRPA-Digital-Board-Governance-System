@@ -389,7 +389,7 @@ test("authenticated staging image upload accepts safe image types and records an
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST",
-    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/4QAGRXhpZgAA/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
   });
   assert.equal(result.status, 200);
   const data = await result.json();
@@ -397,7 +397,17 @@ test("authenticated staging image upload accepts safe image types and records an
   assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
   assert.equal(lastMediaUpload.contentType, "image/jpeg");
   assert.match(lastMediaUpload.disposition, /field.jpg/);
+  assert.deepEqual([...lastMediaUpload.bytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_IMAGE_UPLOADED"));
+});
+
+test("image upload requires non-empty alt text", async () => {
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST", body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==" }
+  });
+  assert.equal(result.status, 400);
+  assert.equal(lastMediaUpload, null);
 });
 
 test("image upload rejects unsupported formats and oversized payloads before WordPress writes", async () => {
@@ -435,7 +445,7 @@ test("new website update API rejects a caller-supplied published status", async 
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/posts", {
     method: "POST",
-    body: { title: "Must remain draft", content: "<p>Body</p>", categories: [], tags: [], featuredMedia: 0, status: "publish" }
+    body: { title: "Must remain draft", content: "<p>Body</p>", categories: [], tags: [], featuredMedia: 0, slug: "irpa-status-test-en", status: "publish" }
   });
   assert.equal(result.status, 400);
   assert.equal(postCreateCount, 0);
