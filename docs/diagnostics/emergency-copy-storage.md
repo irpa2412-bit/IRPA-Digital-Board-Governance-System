@@ -7,9 +7,9 @@
 A GitHub Actions job checked out the repository with `fetch-depth: 0`, fetched all currently advertised remote branches and tags using `git fetch --all --tags --prune`, and ran:
 
 ```sh
-git log --all --oneline -S'firestore-emergency'
-git log --all --oneline -S'IRPA-EMG-DOC'
-git log --all --oneline -S'emergency' -- src drive-gateway functions
+git log --all --oneline -S"firestore-emergency"
+git log --all --oneline -S"IRPA-EMG-DOC"
+git log --all --oneline -S"emergency" -- src drive-gateway functions
 ```
 
 Results:
