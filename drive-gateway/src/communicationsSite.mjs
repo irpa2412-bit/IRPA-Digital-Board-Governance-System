@@ -638,7 +638,7 @@ export function createCommunicationsSiteRouter(deps) {
           result.websiteAuthHeaderPresent = true;
           result.websiteWwwAuthenticatePresent = response.headers.has("www-authenticate");
           result.websiteAuthBridgeDiagnostic = authBridgeDiagnostic(response.headers.get("x-irpa-staging-auth-diagnostic"));
-          result.websiteResponseType = safeCode(contentType.split(";")[0]) || "unknown";
+          result.websiteResponseType = String(contentType.split(";")[0] || "unknown").trim().toLowerCase().slice(0, 80);
           result.websiteCloudflareRay = safeCode(response.headers.get("cf-ray")) || undefined;
           result.websiteErrorCode = wpCode;
           result.websiteErrorMessage = wpMessage || undefined;
@@ -688,7 +688,7 @@ export function createCommunicationsSiteRouter(deps) {
             status: publicResponse.status, finalUrl: safeWordPressUrl(publicResponse.url, publicUrl),
             redirectCount: publicResponse.status >= 300 && publicResponse.status < 400 ? 1 : 0,
             redirectTarget: publicLocation ? safeWordPressUrl(new URL(publicLocation, publicUrl).toString()) : null,
-            contentType: safeCode((publicResponse.headers.get("content-type") || "").split(";")[0]) || "unknown",
+            contentType: String((publicResponse.headers.get("content-type") || "unknown").split(";")[0]).trim().toLowerCase().slice(0, 80),
             errorCode: safeCode(publicBody.code),
             errorMessage: cleanText(publicBody.message || publicBody.error || "", 220) || undefined,
             wwwAuthenticatePresent: publicResponse.headers.has("www-authenticate"),
