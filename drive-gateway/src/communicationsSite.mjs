@@ -898,6 +898,7 @@ export function createCommunicationsSiteRouter(deps) {
       const focusKeyphrase = writable("_yoast_wpseo_focuskw");
       return json({
         source: "WordPress REST OPTIONS schema",
+        verified: response.ok,
         yoast: { metaDescription, focusKeyphrase },
         writable: metaDescription || focusKeyphrase,
         message: metaDescription && focusKeyphrase
