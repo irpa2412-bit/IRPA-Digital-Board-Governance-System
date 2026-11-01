@@ -90,7 +90,7 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
     assert.equal(data.nothingDeleted, true);
     assert.equal(data.uploadsRetained, true);
     assert.equal(data.createdDrafts.pageId, 111);
-    assert.equal(data.createdDrafts.postId, 112);\n    assert.ok(data.cleanupItems.some(item => item.kind === "TEST draft page" && item.id === 111 && item.url));\n    assert.ok(data.cleanupItems.some(item => item.kind === "TEST draft post" && item.id === 112 && item.url));\n    assert.equal(data.cleanupItems.filter(item => item.kind === "TEST media").length, 12);
+    assert.equal(data.createdDrafts.postId, 112);\n    assert.ok(data.cleanupItems.some(item => item.kind === "TEST draft page" && item.id === 111 && item.url));\n    assert.ok(data.cleanupItems.some(item => item.kind === "TEST draft post" && item.id === 112 && item.url));\n    assert.equal(data.cleanupItems.filter(item => item.kind === "TEST media").length, 16);
     assert.equal(data.failCount, 0, JSON.stringify(data.report.filter(row => row.status !== "PASS")));
     assert.equal(data.report.filter(row => row.label.includes("URL open")).length, 16);
     assert.equal(data.report.filter(row => row.status === "PASS").length, data.report.length);
