@@ -395,6 +395,7 @@ test("authenticated staging image upload accepts safe image types and records an
   const data = await result.json();
   assert.equal(data.media.id, 88);
   assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
+  assert.equal(data.media.caption, "Community consultation", "WordPress caption metadata must be verified and returned");
   assert.equal(lastMediaUpload.contentType, "image/jpeg");
   assert.match(lastMediaUpload.disposition, /field.jpg/);
   assert.deepEqual([...lastMediaUpload.bytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
