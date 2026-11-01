@@ -32,7 +32,7 @@ test("HASH_MISMATCH reports hash reason and PDF page comparison", async () => {
 test("SIZE_MISMATCH reports byte-count reason and PDF page comparison", async () => {
  const bytes = await validPdf();
  const r = await diagnoseControlledDocument({ item, record: { size: bytes.length + 4, sha256: "", pageCount: 2 }, getMetadata: async () => ({ mimeType: "application/pdf", size: bytes.length }), downloadBytes: async () => bytes });
- assert.equal(r.classification, "SIZE_MISMATCH"); assert.match(r.reason, /byte count/); assert.match(r.pageCountComparison, /pages: 1; stored at upload: 2/);
+ assert.equal(r.classification, "SIZE_MISMATCH"); assert.equal(r.step, "Size check"); assert.match(r.reason, /byte count/); assert.match(r.pageCountComparison, /pages: 1; stored at upload: 2/);
 });
 test("NOT_A_PDF reports actual MIME type and reason", async () => {
  const r = await run({ getMetadata: async () => ({ mimeType: "text/plain", size: 4 }), downloadBytes: async () => new Uint8Array([65,66,67,68]) });
