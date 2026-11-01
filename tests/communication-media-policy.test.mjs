@@ -428,3 +428,21 @@ test("Website Studio exposes approval-ready submission and guarded Yoast metadat
  assert.ok(websiteStudio.includes("Approval-ready website draft"));
  assert.ok(websiteStudio.includes("loadSeoCapabilities"));
 });
+
+
+test("Website Studio provides a searchable, status-filtered page/post target picker before editing or media attachment",()=>{
+ assert.ok(websiteStudio.includes("Search title"));
+ assert.ok(websiteStudio.includes('query.set("search",String(searchValue).trim())'));
+ assert.ok(websiteStudio.includes("Filter by status"));
+ for(const status of ['value="publish"','value="draft"','value="pending"','value="private"','value="future"','value="trash"']) assert.ok(websiteStudio.includes(status),status);
+ assert.ok(websiteStudio.includes("Last modified:"));
+ assert.ok(websiteStudio.includes('content/"+item.type+"/"+item.id'));
+ assert.ok(websiteStudio.includes('full.type!==item.type'));
+ assert.ok(websiteStudio.includes("Select this target"));
+ assert.ok(websiteStudio.includes('onClick={()=>void selectTarget(item)}'));
+ assert.ok(websiteStudio.includes('!selectedTarget){setMessage("Select the exact page or post'));
+ assert.ok(websiteStudio.includes('parentId:Number(mediaParentId),parentType:mediaParentType'));
+ assert.ok(site.includes('const search = cleanText(url.searchParams.get("search"), 101)'));
+ assert.ok(site.includes('orderby: "modified", order: "desc"'));
+ assert.ok(site.includes('modified: String(item.modified || "")'));
+});
