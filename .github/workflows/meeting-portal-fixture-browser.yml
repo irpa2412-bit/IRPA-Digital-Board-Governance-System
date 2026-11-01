@@ -444,7 +444,7 @@ jobs:
           set -euo pipefail
           npm exec vite -- --config vite.meeting-fixture.config.js --host 127.0.0.1 --port 4179 > "$RUNNER_TEMP/meeting-fixture.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/meeting-fixture.pid"
-          for attempt in $(seq 1 40); do
+          for _ in $(seq 1 40); do
             if curl --fail --silent http://127.0.0.1:4179/tests/fixtures/meeting-portal-fixture.html >/dev/null; then
               echo "ISOLATED_FIXTURE_READY=true"
               exit 0
