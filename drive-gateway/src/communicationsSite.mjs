@@ -1083,6 +1083,10 @@ export function createCommunicationsSiteRouter(deps) {
           await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_TEST_DRAFT_CREATED", type, id, { title, slug, status: "draft", test: true });
           const edited = await wpRequest(type + "/" + id, "POST", { title: title + " — EDITED TEST", content: "<p>TEST ONLY — edited and revised by the production acceptance check. Retain as draft.</p>", status: "draft" });
           const editOk = edited.response.ok && Number(edited.data?.id) === id && edited.data?.status === "draft";
+          if (editOk) {
+            const cleanup = cleanupItems.find(item => item.id === id);
+            if (cleanup) cleanup.title = title + " — EDITED TEST";
+          }
           add(type + " draft edit", editOk ? "PASS" : "FAIL", edited.response.status, editOk ? "" : edited.data?.message || "WordPress did not confirm the edited draft.");
           const revisions = await wpRequest(type + "/" + id + "/revisions?context=edit&per_page=20");
           const revisionRows = Array.isArray(revisions.data) ? revisions.data : [];
