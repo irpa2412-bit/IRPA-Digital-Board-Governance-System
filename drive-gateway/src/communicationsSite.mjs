@@ -1049,17 +1049,47 @@ export function createCommunicationsSiteRouter(deps) {
           add(type + " revision history", revisionOk ? "PASS" : "FAIL", revisions.response.status, revisionOk ? "" : revisions.data?.message || "No WordPress revision was returned; the draft remains unchanged and retained.");
         } catch (error) { add(type + " draft lifecycle", "FAIL", 0, error.message); }
       }
+      const encoder = new TextEncoder();
+      const makePdfFixture = () => {
+        const objects = ["1 0 obj\\n<< /Type /Catalog /Pages 2 0 R >>\\nendobj\\n", "2 0 obj\\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\\nendobj\\n", "3 0 obj\\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1 1] >>\\nendobj\\n"];
+        let body = "%PDF-1.4\\n", offsets = [0];
+        for (const object of objects) { offsets.push(encoder.encode(body).length); body += object; }
+        const xref = encoder.encode(body).length;
+        body += "xref\\n0 4\\n0000000000 65535 f \\n" + offsets.slice(1).map(value => String(value).padStart(10, "0") + " 00000 n \\n").join("") + "trailer\\n<< /Size 4 /Root 1 0 R >>\\nstartxref\\n" + xref + "\\n%%EOF\\n";
+        return encoder.encode(body);
+      };
+      const makeDocxFixture = () => {
+        const entries = [
+          ["[Content_Types].xml", "<?xml version=\"1.0\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>"],
+          ["_rels/.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>"],
+          ["word/document.xml", "<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>IRPA acceptance fixture</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"]
+        ];
+        const crc32 = bytes => { let crc = 0xffffffff; for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); } return (crc ^ 0xffffffff) >>> 0; };
+        const u16 = (view, offset, value) => view.setUint16(offset, value, true), u32 = (view, offset, value) => view.setUint32(offset, value, true);
+        const localParts = [], centralParts = []; let offset = 0;
+        for (const [name, content] of entries) {
+          const nameBytes = encoder.encode(name), data = encoder.encode(content), crc = crc32(data);
+          const local = new Uint8Array(30 + nameBytes.length + data.length), lv = new DataView(local.buffer);
+          u32(lv, 0, 0x04034b50); u16(lv, 4, 20); u32(lv, 14, crc); u32(lv, 18, data.length); u32(lv, 22, data.length); u16(lv, 26, nameBytes.length); local.set(nameBytes, 30); local.set(data, 30 + nameBytes.length); localParts.push(local);
+          const central = new Uint8Array(46 + nameBytes.length), cv = new DataView(central.buffer);
+          u32(cv, 0, 0x02014b50); u16(cv, 4, 20); u16(cv, 6, 20); u32(cv, 16, crc); u32(cv, 20, data.length); u32(cv, 24, data.length); u16(cv, 28, nameBytes.length); u32(cv, 42, offset); central.set(nameBytes, 46); centralParts.push(central); offset += local.length;
+        }
+        const centralLength = centralParts.reduce((sum, part) => sum + part.length, 0), end = new Uint8Array(22), ev = new DataView(end.buffer);
+        u32(ev, 0, 0x06054b50); u16(ev, 8, entries.length); u16(ev, 10, entries.length); u32(ev, 12, centralLength); u32(ev, 16, offset);
+        const parts = [...localParts, ...centralParts, end], output = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0)); let cursor = 0;
+        for (const part of parts) { output.set(part, cursor); cursor += part.length; } return output;
+      };
       const mediaTests = [
-        { name: "image", filename: "png", mime: "image/png", b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/k8sAAAAASUVORK5CYII=" },
-        { name: "video", filename: "mp4", mime: "video/mp4", b64: "AAAAGGZ0eXBpc29tAAAAAGlzb20=" },
-        { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKJUVPRgo=" },
-        { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBA==" }
+        { name: "image", filename: "png", mime: "image/png", b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC" },
+        { name: "video", filename: "mp4", mime: "video/mp4", b64: "AAAAHGZ0eXBpc29tAAACAGlzb21pc28yAAAAAAhtZGF0" },
+        { name: "pdf", filename: "pdf", mime: "application/pdf", bytes: makePdfFixture() },
+        { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", bytes: makeDocxFixture() }
       ];
       if (stepKind === "wp-media" && uploadAllowed && testPageId) {
         for (const file of mediaTests.filter(item => item.name === stepFile)) for (const destination of [stepDestination].filter(value => ["media-library", "attach", "featured"].includes(value))) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
           try {
-            const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
+            const bytes = file.bytes || Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
             validateWebsiteMedia({ filename, contentType: file.mime, bytes });
             const upload = await wpRequest("media", "POST", bytes, {
               "Content-Type": file.mime,
