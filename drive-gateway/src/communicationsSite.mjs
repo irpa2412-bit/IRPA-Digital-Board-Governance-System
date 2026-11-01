@@ -1099,7 +1099,22 @@ export function createCommunicationsSiteRouter(deps) {
             });
             const mediaId = Number(upload.data?.id);
             if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(upload.data?.source_url, wp)) {
-              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, [403, 406].includes(upload.response.status) ? "FAIL: blocked by server firewall" : "WordPress media upload failed.", JSON.stringify(upload.diagnostics));
+              const firewallBlocked = [403, 406].includes(upload.response.status);
+              add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, firewallBlocked ? "FAIL: blocked by server firewall" : "WordPress media upload failed.", JSON.stringify(upload.diagnostics));
+              if (firewallBlocked) {
+                try {
+                  const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
+                  const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
+                  const fallback = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(20000) });
+                  const fallbackData = await fallback.json().catch(() => null);
+                  if (!fallback.ok || fallbackData?.status !== 1) throw new Error("cPanel fallback upload failed (HTTP " + fallback.status + ").");
+                  const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename), registerId = crypto.randomUUID(), now = new Date().toISOString(), sha256 = await websiteMediaSha256(bytes);
+                  const mediaRow = { file: filename, title: "TEST " + file.name + " firewall fallback", altText: "TEST acceptance fallback", caption: "TEST ONLY — retained for acceptance evidence", category: "Acceptance Test", tags: ["TEST"], destination: "cpanel-folder", url: publicUrl, uploader: claims.user_id, uploaderEmail: claims.email || "", date: now, size: bytes.byteLength, sha256, status: "Available" };
+                  await commitDocumentAndAudit(env, "communicationMediaAssets/" + registerId, claims.token, fields(mediaRow), Object.keys(mediaRow), fields({ action: "COMMUNICATION_WEBSITE_MEDIA_REGISTERED", category: "COMMUNICATIONS", collection: "communicationMediaAssets", recordId: registerId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { file: filename, destination: "cpanel-folder", url: publicUrl, size: bytes.byteLength, sha256 }, createdAt: now }), { createOnly: true, collectionName: "communicationMediaAssets" });
+                  cleanupList.push({ type: "media", id: registerId, url: publicUrl });
+                  add(file.name + " cPanel media-register firewall fallback", "PASS", fallback.status, "TEST file uploaded and registered; original WordPress firewall failure remains recorded.");
+                } catch (fallbackError) { add(file.name + " cPanel media-register firewall fallback", "FAIL", fallbackError.httpStatus || 0, fallbackError.message); }
+              }
               continue;
             }
             const meta = await wpRequest("media/" + mediaId, "POST", { title: "TEST " + file.name + " " + destination, alt_text: "TEST acceptance upload", caption: "TEST ONLY — retained for acceptance evidence", ...(destination === "media-library" ? {} : { post: testPageId }) });
