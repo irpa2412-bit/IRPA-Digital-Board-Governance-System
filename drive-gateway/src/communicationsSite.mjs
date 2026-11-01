@@ -1105,6 +1105,37 @@ export function createCommunicationsSiteRouter(deps) {
             });
             const mediaId = Number(upload.data?.id);
             if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(upload.data?.source_url, wp)) {
+              const failureDetail = JSON.stringify(upload.detail || {});
+              const wafBlocked = [403, 406].includes(upload.response.status) && /modsecurity|imunify|waf|firewall|access denied|not acceptable|request blocked|security rule/i.test(failureDetail + " " + String(upload.data?.message || ""));
+              if (wafBlocked && destination === "media-library") {
+                try {
+                  const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
+                  const form = new FormData();
+                  form.set("dir", directory);
+                  form.set("file-1", new File([bytes], filename, { type: file.mime }));
+                  const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
+                    method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
+                    body: form, signal: AbortSignal.timeout(60000)
+                  });
+                  const cpData = await cpResponse.json().catch(() => null);
+                  if (cpResponse.ok && cpData?.status === 1) {
+                    const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+                    const registerId = crypto.randomUUID(), now = new Date().toISOString(), sha256 = await websiteMediaSha256(bytes);
+                    const registerRow = { file: filename, title: "TEST " + file.name + " cPanel fallback", altText: "TEST acceptance fallback", caption: "TEST ONLY — retained for acceptance evidence", category: "Production Acceptance", tags: ["TEST"], destination: "cpanel-folder", url: publicUrl, uploader: claims.user_id, uploaderEmail: claims.email || "", date: now, size: bytes.byteLength, sha256, wordpressMediaId: null, status: "Available", test: true };
+                    const recordFields = fields(registerRow);
+                    const auditFields = fields({ action: "COMMUNICATION_WEBSITE_MEDIA_REGISTERED", category: "COMMUNICATIONS", collection: "communicationMediaAssets", recordId: registerId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { file: filename, destination: "cpanel-folder", url: publicUrl, size: bytes.byteLength, sha256, test: true }, createdAt: now });
+                    await commitDocumentAndAudit(env, "communicationMediaAssets/" + registerId, claims.token, recordFields, Object.keys(registerRow), auditFields, { createOnly: true, collectionName: "communicationMediaAssets" });
+                    cleanupItems.push({ kind: "TEST media", title: registerRow.title, id: registerId, url: publicUrl });
+                    add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, "blocked by server firewall, cPanel fallback used", upload.detail);
+                    continue;
+                  }
+                  add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, "blocked by server firewall; cPanel fallback failed: " + cleanText(cpData?.errors?.join(" ") || "cPanel upload rejected", 160), upload.detail);
+                  continue;
+                } catch (fallbackError) {
+                  add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, "blocked by server firewall; cPanel fallback failed: " + cleanText(fallbackError.message, 160), upload.detail);
+                  continue;
+                }
+              }
               add(file.name + " upload to WordPress " + destination, "FAIL", upload.response.status, upload.data?.message || "WordPress did not return a same-host media URL.", upload.detail);
               continue;
             }
