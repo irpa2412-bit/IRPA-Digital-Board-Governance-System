@@ -158,7 +158,19 @@ test("deployment docs require isolated staging and never commit credentials",()=
  assert.ok(docs.includes("Firebase Storage remains deny-by-default"));
 });
 
-\ntest("Website Studio exposes all four administrator tabs and the production acceptance actions",()=>{\n const studio=read("../src/pages/CommunicationsWebsiteStudio.jsx");\n const portal=read("../src/pages/CommunicationMediaPortal.jsx");\n assert.ok(portal.includes("const authorized=isAdmin||roles.some"),"administrators must retain access to the Communication & Media Portal");\n assert.ok(portal.includes("const websiteEditor=isAdmin||roles.some"),"administrator must pass the Website Studio editor gate");\n for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance"]) assert.ok(studio.includes(label),label+" tab must render");\n assert.ok(studio.includes("Run production acceptance"),"acceptance runner action must render");\n assert.ok(studio.includes("Copy Report"),"report copy action must render before a report exists");\n assert.ok(studio.includes("disabled={!acceptanceReport}"),"Copy Report remains visible but disabled until results exist");\n assert.ok(studio.includes("activeTab===\\"media\\"")&&studio.includes("activeTab===\\"structure\\"")&&studio.includes("activeTab===\\"acceptance\\"")&&studio.includes("activeTab===\\"pages\\""),"each tab must select its own rendered panel");\n});\ntest("website editor provides a sandboxed live preview without bypassing live-write controls",()=>{
+test("Website Studio exposes all four administrator tabs and the production acceptance actions",()=>{
+ const studio=read("../src/pages/CommunicationsWebsiteStudio.jsx");
+ const portal=read("../src/pages/CommunicationMediaPortal.jsx");
+ assert.ok(portal.includes("const authorized=isAdmin||roles.some"),"administrators must retain access to the Communication & Media Portal");
+ assert.ok(portal.includes("const websiteEditor=isAdmin||roles.some"),"administrator must pass the Website Studio editor gate");
+ for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance"]) assert.ok(studio.includes(label),label+" tab must render");
+ assert.ok(studio.includes("Run production acceptance"),"acceptance runner action must render");
+ assert.ok(studio.includes("Copy Report"),"report copy action must render before a report exists");
+ assert.ok(studio.includes("disabled={!acceptanceReport}"),"Copy Report remains visible but disabled until results exist");
+ for(const tab of ["pages","media","structure","acceptance"]) assert.ok(studio.includes('activeTab==="'+tab+'"'),tab+" tab must render its panel");
+});
+
+test("website editor provides a sandboxed live preview without bypassing live-write controls",()=>{
  assert.ok(portal.includes("websitePreview"));
  assert.ok(portal.includes('title="IRPA staging website content preview"'));
  assert.ok(portal.includes('sandbox=""'));
