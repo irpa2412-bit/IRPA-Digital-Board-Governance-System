@@ -397,7 +397,9 @@ test("new Website Studio post creation preserves the independent production appr
  assert.ok(portal.includes('gatewayRequest("/api/communications/website/publish"'));
  assert.ok(websiteStudio.includes('collection:"communicationMediaItems",action:"create"'));
  assert.ok(websiteStudio.includes('type:"Website Article",channel:"IRPA Website"'));
- assert.ok(websiteStudio.includes('slug:editorialSlug+"-en"'));
+ assert.ok(websiteStudio.includes('slug:editorialSlug+(newPost.language==="Kiswahili"?"-sw":"-en")'));
+ assert.ok(websiteStudio.includes('Publication language'));
+ assert.ok(websiteStudio.includes('language:newPost.language'));
  const approvalGate=site.indexOf('item.status !== "Approved"');
  const promoteDraft=site.indexOf('else if (String(post.status || "") !== "publish")');
  assert.ok(approvalGate>=0&&promoteDraft>approvalGate,"existing WordPress drafts may be promoted only after the approved-item gate");
