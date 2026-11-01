@@ -790,8 +790,17 @@ export function createCommunicationsSiteRouter(deps) {
       if (!altText) return json({ error: "Alternative text is required for every uploaded image." }, 400, corsHeaders(request));
       const estimatedBytes = Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0);
       if (estimatedBytes < 1 || estimatedBytes > maxBytes) return json({ error: "Images must not exceed " + (maxBytes / 1024 / 1024) + " MiB." }, 413, corsHeaders(request));
+      const extension = filename.toLowerCase().match(/\\.([a-z0-9]+)$/)?.[1] || "";
+      const extensionTypes = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
+      if (extensionTypes[extension] !== contentType) return json({ error: "The image filename extension does not match its permitted image type." }, 400, corsHeaders(request));
       const binary = atob(encoded);
       const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+      const isJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      const isPng = bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((value, index) => bytes[index] === value);
+      const isGif = bytes.length >= 6 && ["GIF87a","GIF89a"].includes(String.fromCharCode(...bytes.slice(0,6)));
+      const isWebp = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0,4)) === "RIFF" && String.fromCharCode(...bytes.slice(8,12)) === "WEBP";
+      const signatureValid = contentType === "image/jpeg" ? isJpeg : contentType === "image/png" ? isPng : contentType === "image/gif" ? isGif : isWebp;
+      if (!signatureValid) return json({ error: "The uploaded file contents do not match the declared image type." }, 400, corsHeaders(request));
       const wp = websiteWordPressConfig(env);
       await verifyDedicatedWordPressEditor(wp);
       const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/media", {
