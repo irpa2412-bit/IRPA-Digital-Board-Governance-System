@@ -183,8 +183,12 @@ test("Website Studio renders all four tabs and acceptance controls through the a
   const {default:WebsiteStudio}=await server.ssrLoadModule("/src/pages/CommunicationsWebsiteStudio.jsx");
   const administrator=true;
   const authorized=administrator||false;
-  const html=renderToStaticMarkup(React.createElement(()=>authorized?React.createElement(WebsiteStudio):null));
-  for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance","Run production acceptance","Copy Report"]) assert.ok(html.includes(label),label+" must appear in administrator render");
+  const renderForAdministrator=initialTab=>renderToStaticMarkup(React.createElement(()=>authorized?React.createElement(WebsiteStudio,{initialTab}):null));
+  const pagesHtml=renderForAdministrator("pages");
+  const acceptanceHtml=renderForAdministrator("acceptance");
+  for(const label of ["Pages and Posts","Upload Media","Site Structure","Production Acceptance"]) assert.ok(pagesHtml.includes(label),label+" tab must appear in administrator render");
+  assert.ok(acceptanceHtml.includes("Run production acceptance"),"Run production acceptance must appear when the administrator opens its tab");
+  assert.ok(acceptanceHtml.includes("Copy Report"),"Copy Report must appear in the acceptance tab");
   const portal=read("../src/pages/CommunicationMediaPortal.jsx");
   assert.ok(portal.includes("const authorized=isAdmin||roles.some"),"real portal must authorize administrators");
   assert.ok(portal.includes("const websiteEditor=isAdmin||roles.some"),"real website editor gate must authorize administrators");
