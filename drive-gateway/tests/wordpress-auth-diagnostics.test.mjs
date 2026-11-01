@@ -104,7 +104,7 @@ test("media upload is blocked with a clear error when WordPress upload_files is 
   try {
     const response = await router(new Request("https://gateway.test/api/communications/website/media", {
       method: "POST", headers: { Authorization: "Bearer firebase-token", "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: "test.png", title: "TEST image", contentType: "image/png", altText: "TEST image", dataBase64: "iVBORw0KGgo=" })
+      body: JSON.stringify({ filename: "test.png", title: "TEST image", contentType: "image/png", altText: "TEST image", dataBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/k8sAAAAASUVORK5CYII=" })
     }), env());
     const data = await response.json();
     assert.equal(response.status, 403);

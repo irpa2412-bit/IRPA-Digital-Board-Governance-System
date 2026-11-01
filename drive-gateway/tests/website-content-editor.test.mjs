@@ -154,7 +154,7 @@ test.beforeEach(() => {
       return response({ id: 321, title: { raw: createdPost.title }, content: { raw: createdPost.content }, excerpt: { raw: createdPost.excerpt }, featured_media: createdPost.featured_media, status: createdPost.status, link: "https://staging.irpa.or.tz/new-update/" });
     }
     if (url.pathname === "/wp-json/wp/v2/users/me") {
-      return response({ id: 7, name: "Staging Editor", roles: wpRoles, capabilities: { edit_posts: true, edit_pages: true } });
+      return response({ id: 7, name: "Staging Editor", roles: wpRoles, capabilities: { edit_posts: true, edit_pages: true, upload_files: true } });
     }
     if (url.pathname === "/wp-json/wp/v2/pages") {
       return response([currentItem()]);
