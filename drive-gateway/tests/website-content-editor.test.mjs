@@ -417,7 +417,7 @@ test("new website updates are created as draft posts with selected taxonomy and 
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/posts", {
     method: "POST",
-    body: { title: "Pastoralist update", content: "<h2>Community action</h2><p>Update text.</p>", excerpt: "A short update", categories: [3], tags: [9], featuredMedia: 88 }
+    body: { title: "Pastoralist update", content: "<h2>Community action</h2><p>Update text.</p>", excerpt: "A short update", categories: [3], tags: [9], featuredMedia: 88, slug: "irpa-test-editorial-en" }
   });
   assert.equal(result.status, 201);
   const data = await result.json();
@@ -426,6 +426,7 @@ test("new website updates are created as draft posts with selected taxonomy and 
   assert.equal(createdPost.status, "draft");
   assert.deepEqual(createdPost.categories, [3]);
   assert.deepEqual(createdPost.tags, [9]);
+  assert.equal(createdPost.slug, "irpa-test-editorial-en");
   assert.equal(postCreateCount, 1);
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_POST_DRAFT_CREATED"));
 });
