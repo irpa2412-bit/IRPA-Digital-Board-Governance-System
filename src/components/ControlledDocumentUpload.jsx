@@ -222,7 +222,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
       }, workflowContext || {});
       documentPayload.recordOrigin = persistedOrigin(documentPayload);
-      const doc = {
+      const documentRecord = {
         id: null,
         title: name,
         reference: documentReference,
@@ -258,7 +258,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         authorizedUids: [auth.currentUser.uid]
       };
       if (deferSave) {
-        setPendingDocument({documentPayload,doc,documentReference,documentId,driveFileId:archive.file?.fileId||null});
+        setPendingDocument({documentPayload,doc:documentRecord,documentReference,documentId,driveFileId:archive.file?.fileId||null});
         setUploadReport({...uploadProgress,origin:persistedOrigin(documentPayload),steps:[["Allocate document ID","PASS"],["Create Drive file","PASS"],["Assign archive destination","PASS"],["Create Firestore documents record","PENDING: click Save Document"],["Store archive registry link","PENDING: click Save Document"]]});
         setGeneratedReference(documentReference);
         setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
@@ -287,7 +287,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         setArchiveCategory("");
         setClassification("Public");
         e.target.reset();
-        onUploaded?.({...doc,id:savedDocumentId});
+        onUploaded?.({...documentRecord,id:savedDocumentId});
       }
     } catch (x) {
       const {message:detail,stack}=describeUploadFailure(x);
