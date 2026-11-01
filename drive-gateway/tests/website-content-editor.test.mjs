@@ -263,6 +263,17 @@ test("an edit saves a snapshot and one-click restore returns all allowed fields 
 });
 
 
+
+test("WordPress terms response exposes the configured per-image limit with an 8 MiB hard ceiling", async () => {
+  const router = makeRouter();
+  const configured = await call(router, makeEnv({ WORDPRESS_MEDIA_MAX_BYTES: "3145728" }), "/api/communications/website/terms");
+  assert.equal(configured.status, 200);
+  assert.equal((await configured.json()).maxImageBytes, 3145728);
+  const capped = await call(router, makeEnv({ WORDPRESS_MEDIA_MAX_BYTES: String(12 * 1024 * 1024) }), "/api/communications/website/terms");
+  assert.equal(capped.status, 200);
+  assert.equal((await capped.json()).maxImageBytes, 8 * 1024 * 1024);
+});
+
 test("new Website Studio posts cannot be created as published and valid requests are draft-only", async () => {
   const router = makeRouter();
   const attemptedPublish = await call(router, makeEnv(), "/api/communications/website/content", {
