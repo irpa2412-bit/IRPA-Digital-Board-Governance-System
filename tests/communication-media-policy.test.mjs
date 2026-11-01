@@ -443,6 +443,9 @@ test("Website Studio provides a searchable, status-filtered page/post target pic
  assert.ok(websiteStudio.includes('!selectedTarget){setMessage("Select the exact page or post'));
  assert.ok(websiteStudio.includes('parentId:Number(mediaParentId),parentType:mediaParentType'));
  assert.ok(site.includes('const search = cleanText(url.searchParams.get("search"), 101)'));
+ assert.ok(site.includes('listParams.append("search_columns[]", "post_title")'));
+ assert.ok(site.includes('const allowedStatuses = new Set(["publish", "draft", "pending", "private", "future", "trash"])'));
+ assert.ok(websiteStudio.includes('query.set("status",statusFilter)'));
  assert.ok(site.includes('orderby: "modified", order: "desc"'));
  assert.ok(site.includes('modified: String(item.modified || "")'));
 });
