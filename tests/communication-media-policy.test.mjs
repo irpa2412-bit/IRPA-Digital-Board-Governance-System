@@ -188,6 +188,7 @@ test("Website Studio renders all four tabs and acceptance controls through the a
   const portal=read("../src/pages/CommunicationMediaPortal.jsx");
   assert.ok(portal.includes("const authorized=isAdmin||roles.some"),"real portal must authorize administrators");
   assert.ok(portal.includes("const websiteEditor=isAdmin||roles.some"),"real website editor gate must authorize administrators");
+  assert.ok(portal.includes('const WEBSITE_EDITOR_ROLES=["Administrator"'),"Administrator must be an explicit Website Studio editor role");
  }finally{await server.close();}
 });
 
