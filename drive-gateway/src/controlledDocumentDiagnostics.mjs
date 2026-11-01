@@ -51,7 +51,7 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
     trashed: null,
     parents: [],
     createdTime: null,
-    uploadedBy: record.uploadedBy || record.uploadedByEmail || record.createdByEmail || record.createdBy || null,
+    uploadedBy: record.uploadedBy || record.uploadedByEmail || record.uploadedByUid || record.createdByEmail || record.createdByUid || record.createdBy || null,
     uploadedAt: record.uploadedAt || record.createdAt || record.createdDate || null,
     storedPageCount: record.pageCount ?? record.pages ?? record.pdfPageCount ?? null,
     pdfParses: null,
