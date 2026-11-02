@@ -319,12 +319,47 @@ jobs:
             !changed.includes("src/pages/Meetings.jsx") &&
             !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
             changed.every(path => allowed.has(path) || communicationMediaArchivePaths.has(path));
+          const signatureLastPageRenderFiles = new Set([
+            ".github/workflows/meeting-portal-fixture-browser.yml",
+            ".github/workflows/no-undef-sweep.yml",
+            ".github/workflows/signature-migration-build-test.yml",
+            "docs/diagnostics/undef-report.md",
+            "docs/diagnostics/last-page-render-20261102.md",
+            "package.json",
+            "scripts/check-production-gateway-bundle.mjs",
+            "scripts/create-signature-realistic-fixtures.py",
+            "src/components/DocumentReader.jsx",
+            "src/components/SignaturePathwaySelfTest.jsx",
+            "src/firebase/gatewayUrl.js",
+            "src/pages/GatewaySigningPortal.jsx",
+            "src/pages/SignaturePlatform.jsx",
+            "src/utils/pdfPageRendering.mjs",
+            "tests/fixtures/signature-envelope-content-harness.jsx",
+            "tests/fixtures/signature-last-page-render-harness.html",
+            "tests/fixtures/signature-last-page-render-harness.jsx",
+            "tests/pdf-page-rendering-diagnostics.test.mjs",
+            "tests/signature-envelope-content.playwright.mjs",
+            "tests/signature-explicit-confirmation.test.mjs",
+            "tests/signature-last-page-render.playwright.mjs",
+            "tests/signature-source-integrity.test.mjs",
+            "vite.config.js"
+          ]);
+          const signatureLastPageRenderRepair =
+            changed.includes("src/utils/pdfPageRendering.mjs") &&
+            changed.includes("src/components/DocumentReader.jsx") &&
+            changed.includes("src/components/SignaturePathwaySelfTest.jsx") &&
+            changed.includes("src/pages/GatewaySigningPortal.jsx") &&
+            changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("tests/signature-last-page-render.playwright.mjs") &&
+            changed.includes("scripts/create-signature-realistic-fixtures.py") &&
+            changed.every(path => signatureLastPageRenderFiles.has(path));
           const unexpected = changed.filter(path =>
             !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
             !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
             !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
             !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
-            !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
+            !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
+            !(signatureLastPageRenderRepair && signatureLastPageRenderFiles.has(path))
           );
           if (unexpected.length) {
             console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
@@ -434,7 +469,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureLastPageRenderRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
