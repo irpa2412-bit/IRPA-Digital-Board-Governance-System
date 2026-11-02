@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: source-integrity-${{ github.head_ref || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   undefined-name-gate:
     name: no-undef and no-use-before-define
@@ -88,6 +92,8 @@ jobs:
         if: always() && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, 'docs(diagnostics):')
         shell: bash
         run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
           mkdir -p docs/diagnostics
           cp docs-undef-report.md docs/diagnostics/undef-report.md
           git add docs/diagnostics/undef-report.md
