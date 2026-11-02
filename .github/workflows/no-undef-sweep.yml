@@ -32,8 +32,6 @@ jobs:
           set +e
           npx eslint --no-eslintrc --no-ignore \
             --env browser,node,es2022 \
-            --global __IRPA_STAGING_BUILD__:readonly \
-            --global __IRPA_DEFAULT_GATEWAY_URL__:readonly \
             --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}' \
             --rule 'no-undef:error' \
             --rule 'no-use-before-define:["error",{"variables":true,"functions":false}]' \
@@ -104,7 +102,7 @@ jobs:
         run: |
           test "${{ steps.lint.outputs.undef_hits }}" = "0"
           test "${{ steps.lint.outputs.use_before_hits }}" = "0"
-          test "${{ steps.lint.outputs.undef_hits }}" = "0"\n          test "${{ steps.lint.outputs.firestore_shadow_hits }}" = "0"
+          test "${{ steps.lint.outputs.firestore_shadow_hits }}" = "0"
       - name: Upload lint diagnostics
         if: always()
         uses: actions/upload-artifact@v4
