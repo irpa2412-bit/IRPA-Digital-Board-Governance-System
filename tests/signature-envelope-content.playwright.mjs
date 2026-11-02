@@ -18,6 +18,7 @@ assert.match(saveDraft,/sha256:sourceSha256,byteLength:sourceByteLength/,"the re
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4175","--strictPort"],{stdio:"ignore"});
 let browser,page;
 const hash=bytes=>createHash("sha256").update(bytes).digest("hex");
+async function waitForStage(page,expected){await page.waitForFunction(value=>document.querySelector("[data-testid=stage]")?.textContent.includes(value),expected);}
 async function waitForServer(){for(let i=0;i<60;i++){try{const r=await fetch("http://127.0.0.1:4175/tests/fixtures/signature-envelope-content-harness.html");if(r.ok)return;}catch{}await delay(500);}throw new Error("Signature Add Signer fixture server did not become ready");}
 async function makeThreePagePdf(){
  const doc=await PDFDocument.create(),font=await doc.embedFont(StandardFonts.Helvetica),bold=await doc.embedFont(StandardFonts.HelveticaBold);
@@ -53,7 +54,7 @@ try{
  assert.match(await page.getByTestId("authenticated-user").textContent(),/fixture-authenticated-signer/);
  const pdfBytes=await makeThreePagePdf(),sourceHash=hash(pdfBytes);
  await page.getByTestId("controlled-pdf-upload").setInputFiles({name:"IRPA-controlled-three-page.pdf",mimeType:"application/pdf",buffer:pdfBytes});
- await page.getByTestId("stage").getByText("CONTROLLED PDF UPLOADED").waitFor();
+ await waitForStage(page,"CONTROLLED PDF UPLOADED");
  assert.equal(await page.getByTestId("source-hash").textContent(),sourceHash,"uploaded source hash must match original PDF bytes");
  assert.equal(Number(await page.getByTestId("source-byte-length").textContent()),pdfBytes.length,"uploaded source byte length must match original PDF bytes");
  assert.match(await page.getByTestId("page3-text").textContent(),/PAGE 3 BODY CONTENT LINE 1/,"uploaded source page 3 text must be extracted");
@@ -67,7 +68,7 @@ try{
  await page.getByRole("button",{name:"Assign Signature Field to Page 3"}).click();
  assert.match(await page.getByTestId("field-assignment").textContent(),/page 3.*fixture-authenticated-signer/);
  await page.getByRole("button",{name:"Create envelope"}).click();
- await page.getByTestId("stage").getByText("ENVELOPE CREATED").waitFor();
+ await waitForStage(page,"ENVELOPE CREATED");
  assert.equal(gatewayCalls.length,2,"Create envelope must finalize through the mocked Gateway");
  assert.equal(gatewayCalls[1].draft.sha256,sourceHash,"final envelope must retain the source SHA-256");
  assert.equal(gatewayCalls[1].draft.fields[0].page,3,"final envelope must retain page-3 field placement");
@@ -75,7 +76,7 @@ try{
  const originalHashAfter=hash(Buffer.from(await page.getByTestId("original-pdf-base64").textContent(),"base64"));
  assert.equal(originalHashAfter,sourceHash,"original PDF bytes must remain unchanged through signer assignment and envelope creation");
  await page.getByRole("button",{name:"Open signing view as assigned signer"}).click();
- await page.getByTestId("stage").getByText("SIGNING VIEW").waitFor();
+ await waitForStage(page,"SIGNING VIEW");
  await page.waitForFunction(()=>document.querySelector('[data-testid="pdf-page-3-canvas"]')?.dataset.rendered==="true");
  await assertOverlayResponsive(page,500);
  assert.match(await page.getByTestId("page3-text").textContent(),/PAGE 3 BODY CONTENT LINE 1/,"page-3 body text must remain available in desktop signer view");
