@@ -5,6 +5,8 @@ on:
     branches:
       - feature/signer-identity-migration
       - fix/last-page-render-20261102
+    paths-ignore:
+      - docs/diagnostics/undef-report.md
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
