@@ -138,12 +138,16 @@ with pikepdf.open(pdf_path) as pdf:
         "/ColorSpace": pikepdf.Name("/DeviceGray"), "/BitsPerComponent": 8
     })
     image["/SMask"] = soft_mask
+    if "/SMask" not in image or image["/SMask"]["/Subtype"] != pikepdf.Name("/Image"):
+        raise RuntimeError("The second fixture must contain an image soft mask.")
     form = pdf.make_stream(b"q\n430 0 0 215 82 315 cm\n/WM Do\nQ\n")
     form.update({
         "/Type": pikepdf.Name("/XObject"), "/Subtype": pikepdf.Name("/Form"),
         "/FormType": 1, "/BBox": pikepdf.Array([0, 0, 595, 842]),
         "/Resources": pikepdf.Dictionary(XObject=pikepdf.Dictionary(WM=image))
     })
+    if form["/Subtype"] != pikepdf.Name("/Form"):
+        raise RuntimeError("The second fixture watermark must be a Form XObject.")
     for page in pdf.pages:
         resources = page.obj.get("/Resources", pikepdf.Dictionary())
         xobjects = resources.get("/XObject", pikepdf.Dictionary())
