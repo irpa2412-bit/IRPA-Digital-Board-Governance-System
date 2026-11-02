@@ -5,6 +5,7 @@ import { PDFDocument } from "pdf-lib";
 import { memoryMeta, memoryStorage } from "../src/adapters.mjs";
 import { generateSignerKeyPair, createSignerKeyProvider } from "../src/cryptographicGate.mjs";
 import { chainEvents, finalizeEnvelope, openSigning, sign, verifyCompletedEnvelope } from "../src/signing.mjs";
+import { route } from "../src/router.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 const drawnPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/fJQAAAAASUVORK5CYII=";
@@ -85,6 +86,18 @@ test("admin verifier fails when the stored source bytes are tampered", async () 
   const result = await verifyCompletedEnvelope(f.ctx, { uid: "admin-1", isAdmin: true }, f.envelope.id);
   assert.equal(result.verified, false);
   assert.equal(result.checks.find(check => check.id === "source_sha256")?.status, "FAIL");
+});
+
+test("administrator Worker route returns PASS/FAIL and rejects non-administrators", async () => {
+  const f = await completedFixture();
+  const request = new Request("https://gateway.test/api/envelopes/" + f.envelope.id + "/verify", { method: "POST", headers: { Authorization: "Bearer test" } });
+  const adminResponse = await route(request, { ...f.ctx, verifyUser: async () => ({ uid: "admin-1", isAdmin: true }) });
+  assert.equal(adminResponse.status, 200);
+  const adminResult = await adminResponse.json();
+  assert.equal(adminResult.verified, true, JSON.stringify(adminResult.checks));
+  assert.ok(adminResult.checks.every(check => check.status === "PASS"));
+  const denied = await route(request, { ...f.ctx, verifyUser: async () => ({ uid: "ordinary-user", isAdmin: false }) });
+  assert.equal(denied.status, 403);
 });
 
 test("verifier is administrator-only", async () => {
