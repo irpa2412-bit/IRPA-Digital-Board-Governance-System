@@ -1,0 +1,54 @@
+# Signature Portal architecture and verification
+
+**Inspection baseline:** `main` at `4147f799568e97f8c95a9029742d2ece0161a480`, inspected 2026-11-02. References below are file:line references in this branch.
+
+## 1. Cryptographic protection
+
+| Mechanism | Finding | Source evidence |
+|---|---|---|
+| Original/source PDF SHA-256 | **Exists.** Upload validates the PDF, computes SHA-256, stores the hash and byte length; signing re-hashes source bytes against the envelope/document record. | `drive-gateway/src/upload.mjs:4-5`; `drive-gateway/src/signing.mjs:16-17,66,71`; `src/firebase/signaturePlatform.js:294-295,353`. |
+| Completed PDF SHA-256 | **Exists.** The completed PDF is hashed; the hash is stored in completion metadata and bound into the ECDSA evidence payload. | `drive-gateway/src/signing.mjs:71`; `drive-gateway/src/cryptographicGate.mjs:333-386`. |
+| HMAC | **Not found.** | The implemented signature algorithm is ECDSA P-256/SHA-256: `drive-gateway/src/cryptographicGate.mjs:4-8,115-134`. |
+| ECDSA | **Exists.** A canonical payload binds envelope ID, signer ID/UID, completed-PDF hash, signature-value hash, signing time, audit-chain head and key ID; Web Crypto signs and verifies it. | `drive-gateway/src/cryptographicGate.mjs:4-8,42-63,78-134,137-208`. |
+| RSA / Ed25519 | **Not found.** Production key import is restricted to EC/P-256. | `drive-gateway/src/cryptographicGate.mjs:50-63,304-319`. |
+| X.509 certificate / CA chain | **Not found.** Evidence contains a public-key JWK and key ID, not an X.509 certificate, issuer chain, policy or revocation material. | `drive-gateway/src/cryptographicGate.mjs:9,66-76,185-208`. |
+| PDF signature dictionary, PKCS#7/CMS, PAdES, `/ByteRange` | **Not found.** The PDF builder draws signature images or typed text and appends a certificate page; it does not create a PDF signature dictionary or CMS/PKCS#7 object. | `drive-gateway/src/pdf.mjs:5-7`; call site `drive-gateway/src/signing.mjs:71`. |
+| Trusted TSA timestamp | **Not found.** Signing/completion times come from the Worker/application clock; no RFC 3161 TSA token or TSA certificate validation is implemented. | `drive-gateway/src/signing.mjs:69,71`; `drive-gateway/src/cryptographicGate.mjs:78-105`. |
+| Envelope/signer audit hash chain | **Exists.** Canonical event JSON includes the previous event hash; verification recomputes the chain from GENESIS. Cryptographic-evidence and completion events are appended during finalization. | `drive-gateway/src/signing.mjs:2-4,69,71`; `drive-gateway/src/cryptographicGate.mjs:237-253,389-402`. |
+| Signature Profile specimen hash | **Exists separately.** Uploaded specimen images are hashed; this is not a cryptographic PDF signature. | `src/firebase/signaturePlatform.js:87-96,165-190,200-205`. |
+
+### Key and secret custody
+
+- Production key names are derived from the authenticated Firebase UID by SHA-256. The Worker reads the matching Cloudflare secret from its `env` binding. The secret JSON contains a PKCS#8 private key, public JWK and key ID; the Worker imports the private key as non-extractable for Web Crypto signing. This code path does not read private signer keys from Firestore. (`drive-gateway/src/cryptographicGate.mjs:275-320`)
+- Cryptographic evidence records, including public JWKs, are persisted through Gateway metadata. In non-mock mode, the metadata adapter uses the `ESIGN_DO` Durable Object binding; this is not a Firestore collection. (`drive-gateway/src/cryptographicGate.mjs:333-402`; `drive-gateway/src/esignContext.mjs:120-126,166-179`; `drive-gateway/wrangler.toml:32-38`)
+- PDF bytes are stored through the Gateway Google Drive adapter; the adapter uses Drive access tokens and Google Drive upload/download APIs. (`drive-gateway/src/esignContext.mjs:148-164,166-179`)
+- The Worker runtime can read bound secret values. Repository code does not reveal which individual Cloudflare account users currently have secret-management privileges. No raw secret values are included here; the Cloudflare account access list must be checked to establish named human access.
+
+## 2. Actual workflow
+
+1. **Upload:** authenticated multipart upload; PDF validation; source SHA-256 and page count; Drive archive write; Gateway document metadata with hash, size and storage ID. (`drive-gateway/src/upload.mjs:4-5`)
+2. **Draft:** client resolves source SHA-256/byte length and sends draft participants and fields to the authenticated Gateway draft route. (`src/firebase/signaturePlatform.js:294-295`; `drive-gateway/src/index.js:289-292,1124`)
+3. **Add Signer:** UI appends the registered officer and persists the updated draft/field assignment. (`src/pages/SignaturePlatform.jsx:529`). Gateway envelope creation validates signer UIDs, creates ordered signer records, hashes invitation secrets and binds field assignments to signer UIDs. (`drive-gateway/src/signing.mjs:21-29,66`)
+4. **Create/start envelope:** the client obtains the source bytes, registers the Gateway document, posts signer/field assignments, and stores the returned Gateway envelope ID and source hash on the linked portal record. (`src/firebase/signaturePlatform.js:296-347`; `src/firebase/signatureStorage.js:417-489`; `drive-gateway/src/signing.mjs:66`)
+5. **Signer opens/confirms:** Gateway Signing Portal checks the token and authenticated Firebase account, renders the PDF, requires explicit field confirmation and consent, checks signing authority, and submits. Its current UI submits a **drawn** signature; the Worker validator also accepts typed signatures, but this UI does not offer a typed-signature input. (`src/pages/GatewaySigningPortal.jsx:32-54,77-98`; `drive-gateway/src/pdf.mjs:5`; `drive-gateway/src/signing.mjs:69`)
+6. **Completion:** Worker checks signer authentication and routing order. A repeat submission by an already-signed signer is idempotent; it does not append a second signer event. The final signer moves the envelope into finalization. (`drive-gateway/src/signing.mjs:5-8,31-65,69-71`)
+7. **PDF build/certificate page:** `buildSignedPdf` overlays assigned fields on their configured original pages, appends an “Electronic Signature Certificate” page, and includes envelope/document IDs, source hash, pre-seal audit head, completion time and signer details. This is visual PDF content plus document metadata, not a PDF digital-signature dictionary. (`drive-gateway/src/pdf.mjs:7`; `drive-gateway/src/signing.mjs:71`)
+8. **Evidence/storage:** after PDF generation, Worker hashes the final PDF, seals one ECDSA evidence record per signer, persists evidence and appends cryptographic audit events. It stores the completed PDF in archive and owner/signer copies through the configured storage adapter. (`drive-gateway/src/signing.mjs:71`; `drive-gateway/src/cryptographicGate.mjs:333-402`; `drive-gateway/src/esignContext.mjs:148-164`)
+9. **Existing signer verification:** `POST /api/sign/verify` checks a PDF supplied by an invited signer against the completion hash; `GET /api/sign/evidence` verifies that signer's persisted ECDSA evidence and audit chain. These are signer-token routes, not whole-envelope administrator verification. (`drive-gateway/src/router.mjs:4`; `drive-gateway/src/signing.mjs:79,132`; `src/firebase/signatureStorage.js:536-542`)
+10. **Administrator verification added in this branch:** `POST /api/envelopes/:id/verify` requires an authenticated administrator and returns PASS/FAIL checks for source hash/length, event chain, final PDF hash, embedded certificate manifest, source/audit binding, appended certificate page, signer records, ECDSA evidence and certificate signature hashes. The Signature Portal now exposes **Verify signed document** to administrators. (`drive-gateway/src/router.mjs:1,4`; `drive-gateway/src/signing.mjs:80-130`; `src/firebase/signatureStorage.js:532-536`; `src/pages/SignaturePlatform.jsx:195-196,537,644-645`)
+
+## 3. Verdict and third-party proof
+
+**The current product is an electronic-signature workflow with SHA-256 integrity checks, an event hash chain, ECDSA P-256 signer evidence and a human-readable certificate page. It is not a PAdES/PKCS#7 digital signature embedded in the PDF.**
+
+A recipient can inspect signer names, signature representations, timestamps, source hash and audit-chain head on the certificate page. An administrator can ask the Gateway to recompute source/completed-PDF hashes, check the chain, compare certificate metadata with signer records, and verify stored ECDSA evidence against its public JWK.
+
+A third party holding the separate evidence record and public JWK can mathematically verify the ECDSA signature over the canonical evidence payload and confirm it names the completed-PDF hash and signer UID. But without a trusted certificate/identity binding, trusted public-key distribution, TSA timestamp, and a PAdES/PKCS#7 signature dictionary with `/ByteRange`, an ordinary PDF reader cannot report standards-based digital-signature validation. The current evidence alone does not independently establish legal identity or trusted signing time to an unknown third party.
+
+## 4. Changes and acceptance boundary in this branch
+
+- The PDF builder embeds a versioned certificate manifest in PDF document metadata and prints signer ID, UID and signature-value SHA-256 on the certificate page. (`drive-gateway/src/pdf.mjs:7`)
+- The admin verifier is `verifyCompletedEnvelope`; it retrieves authoritative stored source and completed bytes itself and is gated by `user.isAdmin === true`. (`drive-gateway/src/signing.mjs:80-130`; `drive-gateway/src/router.mjs:4`)
+- The UI action is shown only when Signature Portal administrator state is true; the Worker independently enforces the administrator check. (`src/pages/SignaturePlatform.jsx:195-196,537,644-645`)
+- Focused acceptance test: `drive-gateway/tests/signature-verifier.test.mjs`. It exercises a three-page PDF, two signer representations (one drawn, one typed), certificate-page text, source tampering, an unassigned account, and replay/idempotency using real Gateway worker modules, in-memory metadata/storage and generated test keys.
+- **Explicit limitation:** this focused test is not a Firebase Emulator end-to-end test of the browser client modules or real Google Drive. It does not prove the complete Firebase-client-to-Worker-to-Drive production path. The new CI workflow runs this focused test, the complete Gateway Node test suite and the application build; unrelated repository workflows and production deployment are not implied to have passed. (`.github/workflows/signature-architecture-verification.yml`)
