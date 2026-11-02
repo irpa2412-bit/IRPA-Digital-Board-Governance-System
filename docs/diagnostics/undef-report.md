@@ -1,9 +1,9 @@
 # Undefined-name and shadowing diagnostic
 
-- Commit: dcfa6ccdd1b824f219e8d2e1628e4d094f6e2c3f
+- Commit: cd99c06cdafa0521364654d337e32f667f2ede78
 - ESLint exit: 1
-- Total reported violations: 937
-- no-undef hits: 10
+- Total reported violations: 930
+- no-undef hits: 3
 - no-use-before-define hits: 918
 - no-shadow hits: 9
 
@@ -922,9 +922,6 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
   607:53  error  'value' is already declared in the upper scope on line 607 column 13  no-shadow
   617:73  error  'authorityDepartment' was used before it was defined                  no-use-before-define
 
-/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/liveMeeting.js
-  372:61  error  'categoryOf' is not defined  no-undef
-
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/scripts/verify-cloudflare-livekit-token-worker.js
   5:17  error  'required' was used before it was defined  no-use-before-define
   6:20  error  'required' was used before it was defined  no-use-before-define
@@ -944,7 +941,6 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
    91:5    error  'getCurrentEmployeeProfile' was used before it was defined  no-use-before-define
   132:19   error  'meetingCreatedAt' was used before it was defined           no-use-before-define
   132:39   error  'meetingCreatedAt' was used before it was defined           no-use-before-define
-  325:28   error  'context' is not defined                                    no-undef
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/gatewayUrl.js
    3:5   error  '__IRPA_STAGING_BUILD__' is not defined        no-undef
@@ -955,13 +951,6 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
   35:16  error  'resolveCategory' was used before it was defined  no-use-before-define
   46:16  error  'resolveCategory' was used before it was defined  no-use-before-define
   51:16  error  'resolveCategory' was used before it was defined  no-use-before-define
-
-/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/meetingRecords.js
-  17:77  error  'call' is not defined  no-undef
-  18:76  error  'call' is not defined  no-undef
-  19:74  error  'call' is not defined  no-undef
-  21:68  error  'call' is not defined  no-undef
-  22:77  error  'call' is not defined  no-undef
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/procurement.js
   91:88  error  'team' was used before it was defined  no-use-before-define
@@ -980,6 +969,6 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
   386:9     error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
   549:5840  error  'releaseNextSigner' was used before it was defined                 no-use-before-define
 
-✖ 937 problems (937 errors, 0 warnings)
+✖ 930 problems (930 errors, 0 warnings)
 
 ~~~
