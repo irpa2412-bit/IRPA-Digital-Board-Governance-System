@@ -55,9 +55,9 @@ inline = watermark_run.add_picture(watermark_path, width=Inches(6.2), height=Inc
 # Convert the python-docx inline drawing to a behind-text floating anchor using
 # raw WordprocessingML. CT_Inline does not expose cNvGraphicFramePr as a
 # Python attribute; preserving the XML avoids depending on private internals.
-inline_xml = inline.xml
-anchor_open = '<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">'
-inline_xml = inline_xml.replace("<wp:inline", anchor_open, 1).replace("</wp:inline>", "</wp:anchor>", 1)
+inline_xml = inline.xml.replace("<wp:inline", "<wp:anchor", 1).replace("</wp:inline>", "</wp:anchor>", 1)
+anchor_attributes = ' distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1"'
+inline_xml = inline_xml.replace("<wp:anchor", "<wp:anchor" + anchor_attributes, 1)
 positioning = (
     '<wp:simplePos x="0" y="0"/>'
     '<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>'
