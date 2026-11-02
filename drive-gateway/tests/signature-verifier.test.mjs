@@ -61,11 +61,12 @@ test("admin verifier passes a two-signer, three-page completed PDF and confirms 
   const f = await completedFixture();
   const result = await verifyCompletedEnvelope(f.ctx, { uid: "admin-1", isAdmin: true }, f.envelope.id);
   assert.equal(result.verified, true, JSON.stringify(result.checks));
+  assert.equal(result.sourceSha256, await sha256Hex(f.sourceBytes));
   assert.ok(result.checks.every(check => check.status === "PASS"));
   const finalBytes = await f.storage.get((await f.meta.get("envelopes", f.envelope.id)).completion.primaryStorageId);
   const extracted = spawnSync("pdftotext", ["-layout", "-", "-"], { input: finalBytes, encoding: "utf8" });
   assert.equal(extracted.status, 0, extracted.stderr);
-  for (const text of ["IRPA SOURCE PAGE 1 UNIQUE TEXT", "IRPA SOURCE PAGE 2 UNIQUE TEXT", "IRPA SOURCE PAGE 3 UNIQUE TEXT", "Drawn Signer", "Typed Signer", "Electronic Signature Certificate"]) {
+  for (const text of ["IRPA SOURCE PAGE 1 UNIQUE TEXT", "IRPA SOURCE PAGE 2 UNIQUE TEXT", "IRPA SOURCE PAGE 3 UNIQUE TEXT", "Typed Signature Example", "Drawn Signer", "Typed Signer", "Electronic Signature Certificate"]) {
     assert.ok(extracted.stdout.includes(text), "missing PDF text: " + text);
   }
   const pages = extracted.stdout.split("\f");
