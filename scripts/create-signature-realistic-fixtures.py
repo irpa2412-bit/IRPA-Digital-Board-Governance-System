@@ -1,8 +1,9 @@
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
-from docx.oxml import parse_xml
+from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from PIL import Image, ImageDraw, ImageFont
+from copy import deepcopy
 import os, subprocess, pikepdf
 
 out = "test-results"
@@ -51,19 +52,24 @@ watermark_paragraph.paragraph_format.space_before = Pt(0)
 watermark_paragraph.paragraph_format.space_after = Pt(0)
 watermark_run = watermark_paragraph.add_run()
 inline = watermark_run.add_picture(watermark_path, width=Inches(6.2), height=Inches(1.5))._inline
+# Convert the python-docx inline drawing to a behind-text floating anchor using
+# raw WordprocessingML. CT_Inline does not expose cNvGraphicFramePr as a
+# Python attribute; preserving the XML avoids depending on private internals.
 inline_xml = inline.xml
-anchor_xml = inline_xml.replace(
-    /^<wp:inline([^>]*)>/,
-    '<wp:anchor$1 simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">'
-).replace("</wp:inline>", "</wp:anchor>")
-anchor_xml = anchor_xml.replace(
-    /(<wp:anchor[^>]*>)/,
-    '$1<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>3657600</wp:posOffset></wp:positionV>'
-).replace(
-    /(<wp:extent[^>]*\/>)/,
-    '$1<wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>'
+anchor_open = '<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">'
+inline_xml = inline_xml.replace("<wp:inline", anchor_open, 1).replace("</wp:inline>", "</wp:anchor>", 1)
+positioning = (
+    '<wp:simplePos x="0" y="0"/>'
+    '<wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH>'
+    f'<wp:positionV relativeFrom="page"><wp:posOffset>{int(4.0 * 914400)}</wp:posOffset></wp:positionV>'
 )
-anchor = parse_xml(anchor_xml)
+inline_xml = inline_xml.replace("<wp:extent", positioning + "<wp:extent", 1)
+inline_xml = inline_xml.replace(
+    "<wp:docPr",
+    '<wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr',
+    1
+)
+anchor = parse_xml(inline_xml)
 inline.addnext(anchor)
 inline.getparent().remove(inline)
 
