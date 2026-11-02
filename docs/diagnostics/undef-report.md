@@ -1,11 +1,11 @@
 # Undefined-name and shadowing diagnostic
 
-- Commit: 2a29462ee643b65262dbd815b5f18c76f619aa84
+- Commit: df93b6e6591516f64fe07be83767e670fe645065
 - ESLint exit: 1
-- Total reported violations: 106
-- no-undef hits: 3
-- no-use-before-define hits: 1
-- no-shadow hits: 102
+- Total reported violations: 101
+- no-undef hits: 0
+- no-use-before-define hits: 0
+- no-shadow hits: 101
 - Firestore API shadowing hits: 0
 
 ## sourceSha256 introduction history
@@ -61,31 +61,29 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
   59:24  error  'name' is already a global variable    no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/index.js
-     9:7    error  'crypto' is already a global variable                                 no-shadow
-    25:38   error  'event' is already a global variable                                  no-shadow
-    53:54   error  'module' is already a global variable                                 no-shadow
-   111:42   error  'event' is already a global variable                                  no-shadow
-   124:127  error  'event' is already a global variable                                  no-shadow
-   125:132  error  'event' is already a global variable                                  no-shadow
-   126:126  error  'event' is already a global variable                                  no-shadow
-   127:122  error  'event' is already a global variable                                  no-shadow
-   128:122  error  'event' is already a global variable                                  no-shadow
-   243:11   error  'status' is already a global variable                                 no-shadow
-   434:37   error  'name' is already a global variable                                   no-shadow
-   488:15   error  'status' is already a global variable                                 no-shadow
-   607:53   error  'value' is already declared in the upper scope on line 607 column 13  no-shadow
-   617:73   error  'authorityDepartment' was used before it was defined                  no-use-before-define
-   676:9    error  'name' is already a global variable                                   no-shadow
-   794:9    error  'name' is already a global variable                                   no-shadow
-   874:9    error  'name' is already a global variable                                   no-shadow
-   909:9    error  'origin' is already a global variable                                 no-shadow
-   952:25   error  'status' is already a global variable                                 no-shadow
-  1202:9    error  'status' is already a global variable                                 no-shadow
-  1285:9    error  'status' is already a global variable                                 no-shadow
-  1360:9    error  'status' is already a global variable                                 no-shadow
-  1391:9    error  'name' is already a global variable                                   no-shadow
-  1476:9    error  'name' is already a global variable                                   no-shadow
-  1809:11   error  'status' is already a global variable                                 no-shadow
+     9:7    error  'crypto' is already a global variable  no-shadow
+    25:38   error  'event' is already a global variable   no-shadow
+    53:54   error  'module' is already a global variable  no-shadow
+   111:42   error  'event' is already a global variable   no-shadow
+   124:127  error  'event' is already a global variable   no-shadow
+   125:132  error  'event' is already a global variable   no-shadow
+   126:126  error  'event' is already a global variable   no-shadow
+   127:122  error  'event' is already a global variable   no-shadow
+   128:122  error  'event' is already a global variable   no-shadow
+   243:11   error  'status' is already a global variable  no-shadow
+   434:37   error  'name' is already a global variable    no-shadow
+   488:15   error  'status' is already a global variable  no-shadow
+   676:9    error  'name' is already a global variable    no-shadow
+   794:9    error  'name' is already a global variable    no-shadow
+   874:9    error  'name' is already a global variable    no-shadow
+   909:9    error  'origin' is already a global variable  no-shadow
+   952:25   error  'status' is already a global variable  no-shadow
+  1202:9    error  'status' is already a global variable  no-shadow
+  1285:9    error  'status' is already a global variable  no-shadow
+  1360:9    error  'status' is already a global variable  no-shadow
+  1391:9    error  'name' is already a global variable    no-shadow
+  1476:9    error  'name' is already a global variable    no-shadow
+  1809:11   error  'status' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/liveMeeting.js
    5:7  error  'crypto' is already a global variable  no-shadow
@@ -151,11 +149,6 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/functions.js
   7:45  error  'name' is already a global variable  no-shadow
 
-/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/gatewayUrl.js
-   3:5   error  '__IRPA_STAGING_BUILD__' is not defined        no-undef
-   8:34  error  '__IRPA_DEFAULT_GATEWAY_URL__' is not defined  no-undef
-  14:10  error  '__IRPA_STAGING_BUILD__' is not defined        no-undef
-
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/meetingRecords.js
   5:14  error  'name' is already a global variable  no-shadow
 
@@ -182,6 +175,6 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/grantPipeline/validity.js
   10:38  error  'closed' is already a global variable  no-shadow
 
-✖ 106 problems (106 errors, 0 warnings)
+✖ 101 problems (101 errors, 0 warnings)
 
 ~~~
