@@ -2,10 +2,13 @@ export async function renderPdfPageToCanvas(pdf, pageNumber, canvas, {
   zoom = 1,
   maxWidth = 760,
   maxPixels = 4000000,
-  maxSide = 4096
+  maxSide = 4096,
+  signal
 } = {}) {
   if (!pdf || !canvas) throw new TypeError("A loaded PDF and canvas are required.");
+  if (signal?.aborted) throw new DOMException("PDF page render was cancelled.", "AbortError");
   const page = await pdf.getPage(pageNumber);
+  if (signal?.aborted) throw new DOMException("PDF page render was cancelled.", "AbortError");
   const base = page.getViewport({ scale: 1 });
   const cssScale = Math.max(0.35, Math.min(1.8, maxWidth / base.width)) * zoom;
   const viewport = page.getViewport({ scale: cssScale });
@@ -29,7 +32,14 @@ export async function renderPdfPageToCanvas(pdf, pageNumber, canvas, {
     viewport,
     transform: [outputScale, 0, 0, outputScale, 0, 0]
   });
-  await renderTask.promise;
+  const cancelRender = () => renderTask.cancel();
+  signal?.addEventListener("abort", cancelRender, { once: true });
+  try {
+    await renderTask.promise;
+  } finally {
+    signal?.removeEventListener("abort", cancelRender);
+  }
+  if (signal?.aborted) throw new DOMException("PDF page render was cancelled.", "AbortError");
 
   const textContent = await page.getTextContent();
   const textCharacters = (textContent.items || []).reduce(
