@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/signer-identity-migration
+      - fix/last-page-render-20261102
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -49,11 +50,62 @@ jobs:
       - name: Run Signature Portal routing and pathway contract tests
         run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs
 
-      - name: Build web application
+      - name: Install LibreOffice and PDF fixture tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice fonts-dejavu-core poppler-utils python3-pip
+          python -m pip install --break-system-packages python-docx pillow pikepdf
+
+      - name: Generate realistic Word and PDF fixtures
+        run: python scripts/create-signature-realistic-fixtures.py
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run PDF page-rendering diagnostics unit tests
+        run: npm run test:pdf-page-rendering
+
+      - name: Run realistic last-page acceptance across all three viewers
+        run: node tests/signature-last-page-render.playwright.mjs
+
+      - name: Run post-merge authenticated Add Signer acceptance
+        run: node tests/signature-envelope-content.playwright.mjs
+
+      - name: Build production web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
         run: npm run build
+
+      - name: Verify production Worker URL and staging guard
+        run: node scripts/check-production-gateway-bundle.mjs
+
+      - name: Verify staging guard rejects missing and incorrect gateways
+        shell: bash
+        run: |
+          set -euo pipefail
+          if env -u VITE_GOOGLE_DRIVE_GATEWAY_URL VITE_IRPA_ENVIRONMENT=staging VITE_FIREBASE_PROJECT_ID=irpa-dbg-staging-a73ec npm run build -- --mode staging > /tmp/irpa-staging-missing-gateway.log 2>&1; then
+            echo "ERROR: staging build unexpectedly accepted a missing gateway URL."
+            exit 1
+          fi
+          grep -Fq "VITE_GOOGLE_DRIVE_GATEWAY_URL is required" /tmp/irpa-staging-missing-gateway.log
+          if VITE_IRPA_ENVIRONMENT=staging VITE_FIREBASE_PROJECT_ID=irpa-dbg-staging-a73ec VITE_GOOGLE_DRIVE_GATEWAY_URL=https://irpa-google-drive-gateway.irpa-governance.workers.dev npm run build -- --mode staging > /tmp/irpa-staging-wrong-gateway.log 2>&1; then
+            echo "ERROR: staging build unexpectedly accepted the production gateway URL."
+            exit 1
+          fi
+          grep -Fq "must point to the isolated staging gateway" /tmp/irpa-staging-wrong-gateway.log
+          echo "STAGING_GUARD_REJECTS_MISSING_AND_PRODUCTION_GATEWAYS=PASS"
+
+      - name: Build isolated staging bundle and verify it
+        env:
+          VITE_IRPA_ENVIRONMENT: staging
+          VITE_FIREBASE_PROJECT_ID: irpa-dbg-staging-a73ec
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev
+        run: |
+          npm run build -- --mode staging
+          node scripts/check-staging-gateway-bundle.mjs
 
 
   staging-isolation-preflight:
