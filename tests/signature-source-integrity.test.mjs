@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { resolveSourceDocumentIntegrity } from "../src/firebase/signatureSourceIntegrity.js";
 
 test("uses SHA-256 and byte length already stored on the controlled document", async () => {
@@ -39,4 +40,17 @@ test("does not block signer assignment when source integrity metadata and source
     async () => { throw new Error("source download unavailable"); }
   );
   assert.deepEqual(result, { sha256: null, byteLength: null });
+});
+
+
+test("Add Signer draft contract persists resolved source SHA-256 and byte length", async () => {
+  const [component, platform] = await Promise.all([
+    readFile(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8")
+  ]);
+  const addSigner = component.slice(component.indexOf("async function addSigner"), component.indexOf("function removeSigner"));
+  const saveDraft = platform.slice(platform.indexOf("export async function saveSignatureWorkflowDraft"), platform.indexOf("export async function finalizeSignatureWorkflowDraft"));
+  assert.match(addSigner, /saveSignatureWorkflowDraft/, "Add Signer must save the workflow draft");
+  assert.match(saveDraft, /resolveSourceDocumentIntegrity/, "draft saving must resolve controlled-document integrity");
+  assert.match(saveDraft, /sha256:sourceSha256,byteLength:sourceByteLength/, "draft payload must persist both integrity fields");
 });
