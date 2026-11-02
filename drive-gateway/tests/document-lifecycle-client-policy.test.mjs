@@ -13,7 +13,7 @@ test("Trial keeps its staging route in production builds while staging builds us
   assert.match(client,/if\(environment==="TRIAL"\)return getTrialGoogleDriveGatewayUrl\(\)/);
   assert.match(client,/if\(environment==="ACTUAL"\)return getGoogleDriveGatewayUrl\(\)/);
   assert.match(gatewayResolver,/import\.meta\.env\.VITE_GOOGLE_DRIVE_GATEWAY_URL/);
-  assert.match(gatewayResolver,/VITE_IRPA_STAGING_BUILD === "true"\)\) && !configuredGatewayUrl/);
+  assert.match(gatewayResolver,/VITE_IRPA_STAGING_BUILD === "true"\) && !configuredGatewayUrl/);
   assert.match(gatewayResolver,/export function getTrialGoogleDriveGatewayUrl\(\)/);
   assert.match(gatewayResolver,/return configuredGatewayUrl \|\| import\.meta\.env\.VITE_IRPA_DEFAULT_GATEWAY_URL/);
   assert.doesNotMatch(client,/irpa-google-drive-gateway\.irpa-governance\.workers\.dev/);
