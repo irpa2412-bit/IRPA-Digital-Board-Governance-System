@@ -42,7 +42,7 @@ function validateFieldValues(fields,signer,values,signature,fieldApplications=[]
     }
     const value=application.value;
     const drawn=typeof value==="string"&&value.startsWith("data:image/png;base64,");
-    const typed=typeof value==="string"&&signature?.type==="typed"&&value===signature.value&&value.trim()===value&&value.length>=2&&value.length<=100&&!/[\\u0000-\\u001f\\u007f<>]/.test(value);
+    const typed=typeof value==="string"&&signature?.type==="typed"&&value===signature.value&&value.trim()===value&&value.length>=2&&value.length<=100;
     if(!drawn&&!typed)throw new HttpError(400,"Confirmed signature fields require a valid drawn PNG or explicitly typed signature value.");
     applications.set(field.fieldId,value);
   }
