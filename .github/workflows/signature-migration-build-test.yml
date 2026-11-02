@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/signer-identity-migration
+      - fix/source-sha256-undefined-20261102
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
