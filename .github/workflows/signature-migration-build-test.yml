@@ -48,7 +48,7 @@ jobs:
           npm test
 
       - name: Run Signature Portal routing and pathway contract tests
-        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs
+        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs tests/signature-source-integrity.test.mjs tests/pdf-page-rendering-diagnostics.test.mjs
 
       - name: Install LibreOffice and PDF fixture tooling
         run: |
