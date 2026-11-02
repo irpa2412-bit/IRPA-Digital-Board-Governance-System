@@ -19,9 +19,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install PDF inspection utility
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
       - name: Install dependencies
         working-directory: drive-gateway
         run: npm ci
-      - name: Run 18 PDF/e-signature tests
+      - name: Run Gateway PDF/e-signature test suite
         working-directory: drive-gateway
         run: npm test
