@@ -58,6 +58,13 @@ try{
    assert.ok(metrics.nonBlankPixelRatio>0,"page 3 must render non-white pixels in "+label);
    assert.ok(metrics.pixelWidth<=4096&&metrics.pixelHeight<=4096,"canvas dimensions must stay within mobile-safe allocation bounds");
    if(view==="signature")await page.getByTestId("page-3-signature-overlay").waitFor({state:"visible"});
+   await page.getByTestId("simulate-render-error").click();
+   const alert=page.getByRole("alert");
+   await alert.waitFor({state:"visible"});
+   assert.match(await alert.textContent(),/Page 3 could not be displayed: SimulatedRenderError: Injected PDF\.js worker failure/);
+   await alert.getByRole("link",{name:"Open original file"}).waitFor({state:"visible"});
+   await alert.getByRole("button",{name:"Retry"}).click();
+   await page.waitForFunction(expected=>{const node=document.querySelector("[data-testid=page-metrics]");if(!node)return false;try{return JSON.parse(node.textContent).view===expected}catch{return false}},view);
    await page.screenshot({path:"test-results/"+fixture.split("/").pop()+"-"+view+"-desktop.png",fullPage:true});
   }
   await page.setViewportSize({width:390,height:844});
