@@ -54,4 +54,13 @@ test("Add Signer draft contract persists resolved source SHA-256 and byte length
   assert.match(saveDraft, /resolveSourceDocumentIntegrity/, "draft saving must resolve controlled-document integrity");
   assert.match(saveDraft, /sha256:sourceSha256,byteLength:sourceByteLength/, "draft payload must persist both integrity fields");
 });
-\n\ntest("post-merge signer authority department fallback is declared after its source record", async () => {\n  const source = await readFile(new URL("../functions/index.js", import.meta.url), "utf8");\n  const match = source.indexOf("const matchingRecords=uniqueRecords.filter");\n  const selected = source.indexOf("const source=matchingRecords[0];", match);\n  const department = source.indexOf("const authorityDepartment=String(source.department||\"\").trim();", selected);\n  const unit = source.indexOf("const authorityUnit=String(source.unit||source.unitName||\"\").trim()||authorityDepartment;", department);\n  assert.ok(match >= 0 && selected > match && department > selected && unit > department, "authorityDepartment must be declared from the selected, validated register record before the unit fallback uses it");\n});\n
+
+
+test("post-merge signer authority department fallback is declared after its source record", async () => {
+  const source = await readFile(new URL("../functions/index.js", import.meta.url), "utf8");
+  const match = source.indexOf("const matchingRecords=uniqueRecords.filter");
+  const selected = source.indexOf("const source=matchingRecords[0];", match);
+  const department = source.indexOf('const authorityDepartment=String(source.department||"").trim();', selected);
+  const unit = source.indexOf('const authorityUnit=String(source.unit||source.unitName||"").trim()||authorityDepartment;', department);
+  assert.ok(match >= 0 && selected > match && department > selected && unit > department, "authorityDepartment must be declared from the selected, validated register record before the unit fallback uses it");
+});
