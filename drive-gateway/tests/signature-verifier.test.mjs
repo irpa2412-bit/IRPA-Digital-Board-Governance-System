@@ -27,20 +27,19 @@ async function completedFixture() {
   const stored = await storage.put({ path: "source.pdf", bytes: sourceBytes, contentType: "application/pdf" });
   const document = { id: "DOC-VERIFY-001", hash: sourceHash, sha256: sourceHash, fileSize: sourceBytes.length, primaryStorageId: stored.id, title: "Three page verification fixture", fileName: "source.pdf" };
   await meta.create("documents", document.id, document);
+  const secrets = { drawn: "c".repeat(64), typed: "d".repeat(64) };
   const signers = [
-    { id: "S1", uid: "signer-drawn", name: "Drawn Signer", email: "drawn@example.test", order: 1, status: "Signed", signedAt: "2026-11-02T10:00:00.000Z", signatureType: "drawn", signatureValue: drawnPng, fieldValues: { field_drawn: drawnPng }, ip: "192.0.2.1" },
-    { id: "S2", uid: "signer-typed", name: "Typed Signer", email: "typed@example.test", order: 2, status: "Signed", signedAt: "2026-11-02T10:05:00.000Z", signatureType: "typed", signatureValue: "Typed Signature Example", fieldValues: { field_typed: "Typed Signature Example" }, ip: "192.0.2.2" },
+    { id: "S1", uid: "signer-drawn", name: "Drawn Signer", email: "drawn@example.test", order: 1, status: "Pending", tokenHash: await sha256Hex(secrets.drawn), invitation: "Sent" },
+    { id: "S2", uid: "signer-typed", name: "Typed Signer", email: "typed@example.test", order: 2, status: "Pending", tokenHash: await sha256Hex(secrets.typed), invitation: "Sent" },
   ];
   const fields = [
-    { fieldId: "field_drawn", type: "Signature", page: 2, x: 10, y: 70, width: 30, height: 10, signerUid: "signer-drawn" },
-    { fieldId: "field_typed", type: "Signature", page: 3, x: 10, y: 70, width: 35, height: 10, signerUid: "signer-typed" },
+    { fieldId: "field_drawn", type: "Signature", page: 2, x: 10, y: 70, width: 30, height: 10, signerUid: "signer-drawn", required: true },
+    { fieldId: "field_typed", type: "Text", page: 3, x: 10, y: 70, width: 35, height: 10, signerUid: "signer-typed", required: true },
   ];
-  let events = await chainEvents([], { type: "envelope.created", at: "2026-11-02T09:00:00.000Z", actor: "admin-1", documentHash: sourceHash, signerCount: 2 });
-  events = await chainEvents(events, { type: "signer.signed", signerId: "S1", at: signers[0].signedAt, signatureType: "drawn", signatureHash: await sha256Hex(drawnPng) });
-  events = await chainEvents(events, { type: "signer.signed", signerId: "S2", at: signers[1].signedAt, signatureType: "typed", signatureHash: await sha256Hex(signers[1].signatureValue) });
+  const events = await chainEvents([], { type: "envelope.created", at: "2026-11-02T09:00:00.000Z", actor: "admin-1", documentHash: sourceHash, signerCount: 2 });
   const envelope = {
     id: "ENV-VERIFY-001", documentId: document.id, documentHash: sourceHash, sha256: sourceHash, byteLength: sourceBytes.length,
-    title: document.title, fileName: document.fileName, classification: "Restricted", createdBy: "admin-1", status: "Completing",
+    title: document.title, fileName: document.fileName, classification: "Restricted", createdBy: "admin-1", status: "Sent",
     signingMode: "Sequential", signers, fields, archiveTargets: ["legal-contracts"],
     createdAt: "2026-11-02T09:00:00.000Z", expiresAt: "2026-11-16T09:00:00.000Z", events, completion: null,
   };
@@ -51,10 +50,35 @@ async function completedFixture() {
     meta, storage, env: { IRPA_ENVIRONMENT: "production", DRIVE_MOCK: "false" },
     crypto: { keyProvider: createSignerKeyProvider(keyRecords) },
     now: () => new Date("2026-11-02T10:10:00.000Z"), config: { ttlDays: 14 },
+    verifySigningAuthority: async () => ({ verified: true, authorityRole: "Test Authority", authorityDepartment: "Test Department" }),
+    verifyUser: async request => ({ uid: String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, ""), isAdmin: false }),
   };
-  const finalized = await finalizeEnvelope(ctx, envelope.id);
-  assert.equal(finalized.completed, true);
-  return { meta, storage, ctx, envelope, document, sourceBytes, finalized };
+  const submit = async (uid, token, body) => {
+    const request = new Request("https://gateway.test/api/sign/submit", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + uid, "x-signing-token": token },
+      body: JSON.stringify(body),
+    });
+    const response = await route(request, ctx);
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  const drawnToken = envelope.id + ".S1." + secrets.drawn;
+  const typedToken = envelope.id + ".S2." + secrets.typed;
+  const first = await submit("signer-drawn", drawnToken, {
+    signature: { type: "drawn", value: drawnPng },
+    fieldValues: { field_drawn: drawnPng },
+    fieldApplications: [{ fieldId: "field_drawn", confirmed: true, page: 2, x: 10, y: 70, width: 30, height: 10, value: drawnPng }],
+    signatureConfirmed: true, consent: true, manualAuthorityIdentification: "Test Authority",
+  });
+  assert.equal(first.status, "InProgress");
+  const second = await submit("signer-typed", typedToken, {
+    signature: { type: "typed", value: "Typed Signature Example" },
+    fieldValues: { field_typed: "Typed Signature Example" },
+    fieldApplications: [], signatureConfirmed: true, consent: true, manualAuthorityIdentification: "Test Authority",
+  });
+  assert.equal(second.status, "Completed");
+  return { meta, storage, ctx, envelope, document, sourceBytes, finalized: second, tokens: { drawn: drawnToken, typed: typedToken } };
 }
 
 test("admin verifier passes a two-signer, three-page completed PDF and confirms certificate bindings", async () => {
