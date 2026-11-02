@@ -21,19 +21,22 @@ function Harness(){
    setBytes(raw);setPdf(loaded);setPageText(content.items.map(item=>item.str).join(" "));setSourceHash(hash);setStage("CONTROLLED PDF UPLOADED");setError("");
   }catch(e){setError(e.message||String(e));}
  }
- async function saveDraft(step){
-  const response=await fetch("/__mock_gateway__/api/signature-workflow/draft",{method:"POST",headers:{Authorization:"Bearer fixture-authenticated-token","Content-Type":"application/json"},body:JSON.stringify({step,draft:{documentId:"controlled-document-3-page",documentUrl:"mock://controlled-document/source.pdf",sha256:sourceHash,byteLength:bytes?.byteLength||0,recipients:signerAdded?[{uid:AUTH_UID,email:"signer@irpa.test",role:"Review"}]:[],fields:field?[field]:[]}})});
+ async function saveDraft(step,recipientsOverride,fieldOverride){
+  const recipients=recipientsOverride??(signerAdded?[{uid:AUTH_UID,email:"signer@irpa.test",role:"Review"}]:[]);
+  const assignedField=fieldOverride===undefined?field:fieldOverride;
+  const response=await fetch("/__mock_gateway__/api/signature-workflow/draft",{method:"POST",headers:{Authorization:"Bearer fixture-authenticated-token","Content-Type":"application/json"},body:JSON.stringify({step,draft:{documentId:"controlled-document-3-page",documentUrl:"mock://controlled-document/source.pdf",sha256:sourceHash,byteLength:bytes?.byteLength||0,recipients,fields:assignedField?[assignedField]:[]}})});
   const result=await response.json();
   if(!response.ok||result.ok!==true)throw new Error(result.error||"Mock Gateway draft save failed.");
   return result.draft;
  }
  async function addSigner(){
-  try{await saveDraft("add-signer");setSignerAdded(true);setStage("SIGNER ADDED");setError("");}
+  try{await saveDraft("add-signer",[{uid:AUTH_UID,email:"signer@irpa.test",role:"Review"}],null);setSignerAdded(true);setStage("SIGNER ADDED");setError("");}
   catch(e){setError(e.message||String(e));}
  }
  function assignField(){
-  setField({fieldId:"fixture-signature-page-3",type:"Signature",page:3,signerUid:AUTH_UID,x:10,y:18,width:80,height:14});
-  setStage("PAGE 3 FIELD ASSIGNED");
+  const selectedPage=Number(document.querySelector("[data-testid=field-page]")?.value||1);
+  setField({fieldId:"fixture-signature-page-3",type:"Signature",page:selectedPage,signerUid:AUTH_UID,x:10,y:18,width:80,height:14});
+  setStage("PAGE "+selectedPage+" FIELD ASSIGNED");
  }
  async function createEnvelope(){
   try{
