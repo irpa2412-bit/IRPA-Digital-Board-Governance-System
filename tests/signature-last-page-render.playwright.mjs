@@ -32,9 +32,9 @@ try{
   const bytes=readFileSync(fixture);
   if(fixture===fixtures[0]){
    const fonts=execFileSync("pdffonts",[fixture],{encoding:"utf8"});
-   assert.ok(fonts.split("\\n").some(line=>/TrueType/.test(line)&&/\\byes\\b/.test(line)),"Word-style PDF must embed at least one TrueType font");
+   assert.ok(fonts.split("\n").some(line=>/TrueType/.test(line)&&/\byes\b/.test(line)),"Word-style PDF must embed at least one TrueType font");
    const images=execFileSync("pdfimages",["-list",fixture],{encoding:"utf8"});
-   const imagePages=new Set(images.split("\\n").map(line=>line.trim().split(/\\s+/)[0]).filter(value=>/^[123]$/.test(value)));
+   const imagePages=new Set(images.split("\n").map(line=>line.trim().split(/\s+/)[0]).filter(value=>/^[123]$/.test(value)));
    assert.deepEqual([...imagePages].sort(),["1","2","3"],"repeating letterhead image must be present on all three pages");
   }
   const extracted=execFileSync("pdftotext",["-f","3","-l","3","-layout",fixture,"-"],{encoding:"utf8"});
