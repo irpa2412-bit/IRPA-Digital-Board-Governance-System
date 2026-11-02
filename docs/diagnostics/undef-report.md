@@ -1,6 +1,6 @@
 # Undefined-name and shadowing diagnostic
 
-- Commit: 6cc4f1774aa5892bc56079870514e9cecc28788d
+- Commit: dcfa6ccdd1b824f219e8d2e1628e4d094f6e2c3f
 - ESLint exit: 1
 - Total reported violations: 937
 - no-undef hits: 10
@@ -9,6 +9,7 @@
 
 ## sourceSha256 introduction history
 ~~~text
+dcfa6ccd fix(signature): persist resolved source integrity on envelopes
 1aa86600 fix(signature): resolve source integrity without blocking signer drafts
 092cc705 fix: require verified source integrity on new envelopes
 aa829105 fix: persist verified source bytes on every new Firebase envelope
@@ -972,9 +973,9 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
   314:31    error  'fetchBytes' was used before it was defined                        no-use-before-define
   341:66    error  'releaseNextSigner' was used before it was defined                 no-use-before-define
   342:9     error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  353:4195  error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  353:4611  error  'releaseViewOnlyRecipient' was used before it was defined          no-use-before-define
-  353:4692  error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
+  353:4243  error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
+  353:4659  error  'releaseViewOnlyRecipient' was used before it was defined          no-use-before-define
+  353:4740  error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
   358:9     error  'ref' is already declared in the upper scope on line 3 column 269  no-shadow
   386:9     error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
   549:5840  error  'releaseNextSigner' was used before it was defined                 no-use-before-define
