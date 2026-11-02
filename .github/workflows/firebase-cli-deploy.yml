@@ -111,20 +111,14 @@ jobs:
             echo "::warning::Firestore deployment attempt $attempt failed; retrying in $delay seconds."
             sleep "$delay"
           done
-      - name: Deploy multilingual transcript translation callable
-        id: translation
-        continue-on-error: true
-        run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only functions:translateMeetingTranscript --non-interactive
-      - name: Report translation callable deployment status
+      - name: Report Cloudflare meeting translation architecture
         if: always()
-        env:
-          TRANSLATION_OUTCOME: ${{ steps.translation.outcome }}
         run: |
-          if [ "$TRANSLATION_OUTCOME" = "success" ]; then
-            echo "TRANSLATION_CALLABLE_DEPLOYED=true"
-          else
-            echo "::warning::Translation callable was not deployed. Firestore deployment can still succeed; check Cloud Functions billing, API enablement and service-account permissions."
-          fi
+          {
+            echo "### Meeting transcript translation: Cloudflare Gateway"
+            echo "The application uses the authenticated Cloudflare Gateway route `/api/meeting-transcripts/translate`. This workflow intentionally does not deploy the legacy Firebase callable, avoiding Cloud Functions, Cloud Build and Artifact Registry billing requirements."
+            echo "The Cloudflare Gateway deployment workflow owns release and smoke verification of this route."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Report Cloudflare crawler cutover status
         if: always()
         env:
