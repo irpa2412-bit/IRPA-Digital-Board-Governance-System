@@ -1,7 +1,8 @@
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
+from docx.oxml.ns import qn, nsmap
+nsmap["v"] = "urn:schemas-microsoft-com:vml"
 from PIL import Image, ImageDraw, ImageFont
 import os, subprocess, pikepdf
 
