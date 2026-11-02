@@ -7,10 +7,10 @@ const stagingGateway = "https://irpa-google-drive-gateway-staging.irpa-governanc
 const source = await readFile("src/firebase/gatewayUrl.js", "utf8");
 const vite = await readFile("vite.config.js", "utf8");
 
-assert.match(source, /__IRPA_STAGING_BUILD__/, "staging build guard must use the Vite-defined immutable constant");
-assert.match(source, /configuredGatewayUrl \\|\\| __IRPA_DEFAULT_GATEWAY_URL__/, "gateway fallback must use the Vite-defined immutable default constant");
-assert.match(vite, /"import\.meta\.env\.VITE_IRPA_STAGING_BUILD": JSON\.stringify\(String\(stagingBuild\)\)/);
-assert.match(vite, /"import\.meta\.env\.VITE_IRPA_DEFAULT_GATEWAY_URL": JSON\.stringify\(stagingBuild \? STAGING_GATEWAY_URL : PRODUCTION_GATEWAY_URL\)/);
+assert.match(source, /__IRPA_STAGING_BUILD__/, "staging guard must use the immutable Vite build constant");
+assert.match(source, /configuredGatewayUrl\s*\|\|\s*__IRPA_DEFAULT_GATEWAY_URL__/, "gateway fallback must use the immutable Vite default constant");
+assert.match(vite, /"__IRPA_STAGING_BUILD__": JSON.stringify\(stagingBuild\)/, "Vite must define the immutable staging constant");
+assert.match(vite, /"__IRPA_DEFAULT_GATEWAY_URL__": JSON.stringify\(stagingBuild \? STAGING_GATEWAY_URL : PRODUCTION_GATEWAY_URL\)/, "Vite must define the immutable default gateway URL");
 
 async function filesUnder(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
