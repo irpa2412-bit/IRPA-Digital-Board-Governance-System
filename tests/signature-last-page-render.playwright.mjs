@@ -18,7 +18,7 @@ for(const [name,source] of [["Controlled Documents reader",readerSource],["Signa
 }
 assert.match(readerSource,/page>=pdf\.numPages/,"Controlled Documents reader must navigate to the actual final PDF page");
 assert.match(signatureSource,/pageNum>=pdf\.numPages/,"Signature Portal viewer must navigate to the actual final PDF page");
-assert.match(gatewaySource,/pageNum>=pdfDocument\.numPages/,"Gateway signing portal must navigate to the actual final PDF page");
+assert.match(gatewaySource,/pageNum>=\(pdfDocument\?\.numPages\|\|1\)/,"Gateway signing portal must disable Next page at the actual final PDF page");
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4176","--strictPort"],{stdio:"ignore"});
 let browser;
 const acceptanceLines=["IRPA LAST-PAGE PDF ACCEPTANCE","Page 3: pdftotext extraction, PDF.js text extraction, non-white pixel ratio, bounded canvas, inline failure message, retry and original-file link"]; 
