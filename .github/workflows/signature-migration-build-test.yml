@@ -73,6 +73,14 @@ jobs:
       - name: Run post-merge authenticated Add Signer acceptance
         run: node tests/signature-envelope-content.playwright.mjs
 
+      - name: Upload realistic PDF acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-last-page-render-evidence
+          path: test-results/
+          if-no-files-found: warn
+
       - name: Build production web application
         env:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
