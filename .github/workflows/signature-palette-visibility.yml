@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Install locked application dependencies
         run: npm ci
       - name: Check syntax and lint every JavaScript test module
@@ -57,10 +60,14 @@ jobs:
         run: npm install --no-save --package-lock=false playwright
       - name: Install Chromium for desktop and mobile viewport emulation
         run: npx playwright install --with-deps chromium
-      - name: Install Poppler for PDF text extraction
+      - name: Install LibreOffice and PDF fixture tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes poppler-utils
+          sudo apt-get install --yes libreoffice fonts-dejavu-core poppler-utils
+      - name: Install Python fixture dependencies
+        run: python -m pip install --break-system-packages python-docx pillow pikepdf
+      - name: Generate realistic Word and PDF fixtures
+        run: python scripts/create-signature-realistic-fixtures.py
       - name: Run existing explicit-confirmation policy tests
         run: node --test tests/signature-explicit-confirmation.test.mjs
       - name: Setup Java for Firestore Emulator
