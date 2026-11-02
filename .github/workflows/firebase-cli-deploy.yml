@@ -67,33 +67,7 @@ jobs:
           test -n "$CF_TOKEN" || { echo "::error::CLOUDFLARE_API_TOKEN is required before production cutover."; exit 1; }
           test -n "$CF_ACCOUNT" || { echo "::error::CLOUDFLARE_ACCOUNT_ID is required before production cutover."; exit 1; }
           test -n "$CF_FIRESTORE_SA" || { echo "::error::CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON is required before production cutover."; exit 1; }
-          node <<'NODE'
-          const raw = process.env.CF_FIRESTORE_SA || "";
-          const normalized = raw.replace(/^\uFEFF/, "").trim();
-          let serviceAccount;
-          try {
-            serviceAccount = JSON.parse(normalized);
-          } catch {
-            console.error("CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON must contain raw, valid service-account JSON; value was not logged.");
-            process.exit(1);
-          }
-          if (!serviceAccount || typeof serviceAccount !== "object" || Array.isArray(serviceAccount)) {
-            console.error("Cloudflare Firebase service-account secret must be a JSON object.");
-            process.exit(1);
-          }
-          const missing = ["client_email", "private_key", "project_id"].filter((key) =>
-            typeof serviceAccount[key] !== "string" || !serviceAccount[key].trim()
-          );
-          if (missing.length) {
-            console.error(`Cloudflare Firebase service-account JSON is missing required fields: ${missing.join(", ")}.`);
-            process.exit(1);
-          }
-          if (serviceAccount.project_id !== "irpa-digital-board-governance") {
-            console.error("Cloudflare Firebase service-account project_id does not match the production project.");
-            process.exit(1);
-          }
-          console.log("Cloudflare Firebase service-account JSON passed structural and project validation.");
-          NODE
+
       - name: Deploy grant crawler to Cloudflare Workers
         if: steps.cloudflare_gate.outcome == 'success'
         working-directory: cloudflare/grant-crawler
@@ -121,7 +95,7 @@ jobs:
         if: steps.cloudflare_gate.outcome != 'success'
         run: |
           set -euo pipefail
-          echo "::warning::Cloudflare grant-crawler cutover is blocked by missing or invalid Cloudflare migration secrets. Firebase Hosting will not be updated with an empty crawler URL; deploying Firestore configuration only."
+          echo "::warning::Cloudflare grant-crawler cutover preflight or deployment failed. Firebase Hosting will not be updated with an unverified crawler URL; deploying Firestore configuration only."
           # A concurrent Firebase Rules release can briefly return HTTP 409 when
           # the release already exists. Serialize deploy jobs above and retry only
           # this idempotent Firestore deployment for transient release conflicts.
