@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: undefined-name-gate-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   undefined-name-gate:
     name: no-undef and no-use-before-define
@@ -30,10 +34,11 @@ jobs:
         shell: bash
         run: |
           set +e
+          cat > "$RUNNER_TEMP/irpa-eslint-config.json" <<'JSON'
+          {"env":{"browser":true,"node":true,"es2022":true},"globals":{"__IRPA_STAGING_BUILD__":"readonly","__IRPA_DEFAULT_GATEWAY_URL__":"readonly"}}
+          JSON
           npx eslint --no-eslintrc --no-ignore \
-            --env browser,node,es2022 \
-            --global '__IRPA_STAGING_BUILD__:readonly' \
-            --global '__IRPA_DEFAULT_GATEWAY_URL__:readonly' \
+            --config "$RUNNER_TEMP/irpa-eslint-config.json" \
             --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}' \
             --rule 'no-undef:error' \
             --rule 'no-use-before-define:["error",{"variables":true,"functions":false}]' \
@@ -90,6 +95,8 @@ jobs:
         if: always() && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, 'docs(diagnostics):')
         shell: bash
         run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
           mkdir -p docs/diagnostics
           cp docs-undef-report.md docs/diagnostics/undef-report.md
           git add docs/diagnostics/undef-report.md
