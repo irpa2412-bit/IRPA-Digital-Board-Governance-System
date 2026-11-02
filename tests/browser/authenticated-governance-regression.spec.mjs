@@ -223,12 +223,14 @@ for (const viewport of [
     await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width);
     await expect(page.getByText("Grant Application Pipeline", { exact: false })).toHaveCount(0);
     await expect(page.getByText("Record submitted and awarded grants", { exact: true })).toHaveCount(0);
-    await expect(page.locator(".grant-intelligence-portal article").filter({ hasText: "Tanzania Rangeland Funding & Livestock" }).locator("summary > div:first-child > strong")).toBeVisible();
-    await expect(page.getByText("Official donor call for Tanzania pastoral communities and sustainable rangeland restoration.", { exact: true })).toBeVisible();
+    const cleanOpportunityCard = page.locator(".grant-intelligence-portal article").filter({ hasText: "Tanzania Rangeland Funding & Livestock" });
+    await expect(cleanOpportunityCard.locator("summary > div:first-child > strong")).toBeVisible();
+    await expect(cleanOpportunityCard.locator("summary p")).toContainText("Official donor call for Tanzania pastoral communities and sustainable rangeland restoration.");
     await expect(page.getByText(/Skip to main content|Home Menu|Contact Us/)).toHaveCount(0);
     const openCallCard = page.getByText("Open calls", { exact: true }).locator("..");
     await expect(openCallCard).toContainText("1");
-    await expect(page.getByText("Unverified news lead", { exact: true })).toBeVisible();
+    const pendingOpportunityCard = page.locator(".grant-intelligence-portal article").filter({ hasText: "Unverified news lead" });
+    await expect(pendingOpportunityCard.locator("summary > div:first-child > strong")).toHaveText("Unverified news lead");
 
     await assertStickyPortalNavigation(page);
 
