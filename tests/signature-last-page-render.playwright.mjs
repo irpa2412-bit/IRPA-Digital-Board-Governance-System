@@ -27,7 +27,7 @@ try{
  browser=await chromium.launch({headless:true});
  const context=await browser.newContext({viewport:{width:1280,height:1100}});
  const page=await context.newPage();
- const errors=[];page.on("pageerror",error=>errors.push(error.message));
+ const errors=[];page.on("pageerror",error=>errors.push(error.message));page.on("console",message=>{if(message.type()==="error")console.error("BROWSER:",message.text())});
  for(const fixture of fixtures){
   const bytes=readFileSync(fixture);
   if(fixture===fixtures[0]){
@@ -42,7 +42,9 @@ try{
   assert.match(extracted,/PAGE 3 SIGNATURE TABLE END/,"pdftotext must extract the page-3 signature table");
   await page.goto("http://127.0.0.1:4176/tests/fixtures/signature-last-page-render-harness.html");
   await page.getByTestId("pdf-upload").setInputFiles({name:fixture.split("/").pop(),mimeType:"application/pdf",buffer:bytes});
-  await page.getByTestId("stage").getByText("CONTROLLED PDF UPLOADED").waitFor();
+  await page.waitForFunction(()=>document.querySelector("[data-testid=stage]")?.textContent.includes("CONTROLLED PDF UPLOADED")||document.querySelector("[role=alert]"));
+  const uploadStage=await page.getByTestId("stage").textContent();
+  assert.match(uploadStage,/CONTROLLED PDF UPLOADED/,"realistic PDF upload must succeed; inline upload diagnostic: "+(await page.getByRole("alert").count()?await page.getByRole("alert").textContent():"none"));
   await page.getByRole("button",{name:"Add Signer"}).click();
   await page.getByTestId("signer-added").waitFor();
   await page.getByRole("button",{name:"Assign signature field to page 3"}).click();
