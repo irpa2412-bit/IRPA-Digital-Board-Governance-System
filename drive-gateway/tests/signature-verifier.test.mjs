@@ -86,6 +86,9 @@ test("admin verifier passes a two-signer, three-page completed PDF and confirms 
   const result = await verifyCompletedEnvelope(f.ctx, { uid: "admin-1", isAdmin: true }, f.envelope.id);
   assert.equal(result.verified, true, JSON.stringify(result.checks));
   assert.equal(result.sourceSha256, await sha256Hex(f.sourceBytes));
+  assert.equal(f.finalized.status, "Completed");
+  const completedEnvelope = await f.meta.get("envelopes", f.envelope.id);
+  assert.deepEqual(completedEnvelope.signers.map(signer => signer.signatureType), ["drawn", "typed"]);
   assert.ok(result.checks.every(check => check.status === "PASS"));
   const finalBytes = await f.storage.get((await f.meta.get("envelopes", f.envelope.id)).completion.primaryStorageId);
   const extracted = spawnSync("pdftotext", ["-layout", "-", "-"], { input: finalBytes, encoding: "utf8" });
@@ -135,7 +138,6 @@ test("verifier is administrator-only", async () => {
 
 test("signer outside the envelope cannot open the signing task", async () => {
   const f = await completedFixture();
-  const env = await f.meta.get("envelopes", f.envelope.id);
   await assert.rejects(
     () => openSigning(f.ctx, f.tokens.drawn, { uid: "not-assigned" }),
     error => error.status === 403,
