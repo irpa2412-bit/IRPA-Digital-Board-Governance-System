@@ -62,7 +62,7 @@ test("signature confirmation palette stays in document flow below the PDF and cl
   assert.doesNotMatch(pad, /position:"fixed"|inset:0|zIndex:1000|rgba\(15,23,42,\.78\)/);
   assert.match(pad, /aria-modal="false"/);
   assert.match(pad, /onClick=\{onCancel\}/);
-  assert.match(platform, /canvasRef\.current\.style\.height="auto"/);
+  assert.match(platform, /height:"auto"/, "the PDF canvas must retain responsive automatic height sizing");
   assert.match(platform, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:6/);
