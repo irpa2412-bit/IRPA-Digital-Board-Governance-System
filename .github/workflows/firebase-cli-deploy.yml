@@ -69,7 +69,7 @@ jobs:
           test -n "$CF_FIRESTORE_SA" || { echo "::error::CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON is required before production cutover."; exit 1; }
           node <<'NODE'
           const raw = process.env.CF_FIRESTORE_SA || "";
-          const normalized = raw.replace(/^\\uFEFF/, "").trim();
+          const normalized = raw.replace(/^\uFEFF/, "").trim();
           let serviceAccount;
           try {
             serviceAccount = JSON.parse(normalized);
