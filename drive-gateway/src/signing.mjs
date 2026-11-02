@@ -41,7 +41,9 @@ function validateFieldValues(fields,signer,values,signature,fieldApplications=[]
       if(!Number.isFinite(submitted)||submitted!==saved)throw new HttpError(409,"The confirmed signature field page or position differs from the saved assignment.");
     }
     const value=application.value;
-    if(typeof value!=="string"||!value.startsWith("data:image/png;base64,"))throw new HttpError(400,"Confirmed signature fields require an explicit PNG signature specimen.");
+    const drawn=typeof value==="string"&&value.startsWith("data:image/png;base64,");
+    const typed=typeof value==="string"&&signature?.type==="typed"&&value===signature.value&&value.trim()===value&&value.length>=2&&value.length<=100&&!/[\\u0000-\\u001f\\u007f<>]/.test(value);
+    if(!drawn&&!typed)throw new HttpError(400,"Confirmed signature fields require a valid drawn PNG or explicitly typed signature value.");
     applications.set(field.fieldId,value);
   }
   for(const f of assigned){
