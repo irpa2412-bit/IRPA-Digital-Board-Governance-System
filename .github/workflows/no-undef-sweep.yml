@@ -2,7 +2,7 @@ name: Source Integrity and Undefined-Name Gate
 
 on:
   push:
-    branches: ["fix/source-sha256-undefined-20261102"]
+    branches: ["fix/source-sha256-undefined-20261102", "fix/last-page-render-20261102"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
