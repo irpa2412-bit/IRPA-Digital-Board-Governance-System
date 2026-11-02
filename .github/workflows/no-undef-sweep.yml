@@ -34,17 +34,18 @@ jobs:
         shell: bash
         run: |
           set +e
-          cat > "$RUNNER_TEMP/irpa-eslint-config.json" <<'JSON'
+          cat > .eslintrc.json <<'JSON'
           {"env":{"browser":true,"node":true,"es2022":true},"globals":{"__IRPA_STAGING_BUILD__":"readonly","__IRPA_DEFAULT_GATEWAY_URL__":"readonly"}}
           JSON
-          npx eslint --no-eslintrc --no-ignore \
-            --config "$RUNNER_TEMP/irpa-eslint-config.json" \
+          cat .eslintrc.json
+          npx eslint --no-ignore \
             --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}' \
             --rule 'no-undef:error' \
             --rule 'no-use-before-define:["error",{"variables":true,"functions":false}]' \
             --rule 'no-shadow:error' \
             src/ drive-gateway/src/ functions/ > undef-eslint.txt 2>&1
           status=$?
+          rm -f .eslintrc.json
           hits=$(grep -Ec '  (error|warning) ' undef-eslint.txt || true)
           undef_hits=$(grep -Ec 'no-undef$' undef-eslint.txt || true)
           use_before_hits=$(grep -Ec 'no-use-before-define$' undef-eslint.txt || true)
