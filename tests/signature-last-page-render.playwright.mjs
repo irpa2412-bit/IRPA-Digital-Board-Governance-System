@@ -39,8 +39,8 @@ try{
    const fonts=execFileSync("pdffonts",[fixture],{encoding:"utf8"});
    assert.ok(fonts.split("\n").some(line=>/TrueType/.test(line)&&/\byes\b/.test(line)),"Word-style PDF must embed at least one TrueType font");
    const images=execFileSync("pdfimages",["-list",fixture],{encoding:"utf8"});
-   const imagePages=new Set(images.split("\n").map(line=>line.trim().split(/\s+/)[0]).filter(value=>/^[123]$/.test(value)));
-   assert.deepEqual([...imagePages].sort(),["1","2","3"],"repeating letterhead image must be present on all three pages");
+   const imageRows=images.split("\n").filter(line=>/^\s*[123]\s+\d+\s+image\s/.test(line));
+   for(const pageNumber of ["1","2","3"])assert.ok(imageRows.filter(line=>line.trim().startsWith(pageNumber+" ")).length>=2,"each Word page must contain the letterhead and transparent watermark image");
   }
   const extracted=execFileSync("pdftotext",["-f","3","-l","3","-layout",fixture,"-"],{encoding:"utf8"});
   assert.match(extracted,/PAGE 3 BODY CONTENT LINE 1/,"pdftotext must extract page-3 minutes");
