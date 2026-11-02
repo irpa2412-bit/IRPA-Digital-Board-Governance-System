@@ -33,8 +33,8 @@ jobs:
           npx eslint --no-eslintrc --no-ignore \
             --env browser,node,es2022 \
             --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}' \
-            --global '__IRPA_STAGING_BUILD__:readonly' \
-            --global '__IRPA_DEFAULT_GATEWAY_URL__:readonly' \
+            --global '__IRPA_STAGING_BUILD__' \
+            --global '__IRPA_DEFAULT_GATEWAY_URL__' \
             --rule 'no-undef:error' \
             --rule 'no-use-before-define:["error",{"variables":true,"functions":false}]' \
             --rule 'no-shadow:error' \
