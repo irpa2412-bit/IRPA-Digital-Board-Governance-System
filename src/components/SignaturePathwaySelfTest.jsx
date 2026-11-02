@@ -3,6 +3,11 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
 import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { downloadControlledDocumentBytes } from "../firebase/signatureStorage";
+import { renderPdfPageToCanvas, describePdfPageError } from "../utils/pdfPageRendering.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function driveFileId(record = {}) {
   return String(record.fileId || record.driveFileId || record.sourceFileId || record.archiveFileId || record.governanceArchiveFileId || record.primaryArchiveFileId || "").trim();
@@ -26,6 +31,10 @@ function diagnosticRow(item, result) {
     "PDF parses: " + (result.pdfParses == null ? "(not checked)" : String(result.pdfParses)),
     "PDF pages: " + (result.pdfPageCount ?? "(not parsed)") + "; stored page count: " + (result.storedPageCount ?? "(not recorded)"),
     result.pageCountComparison || "",
+    "PDF page check: " + (result.pdfPageCheck?.status || "NOT RUN"),
+    "PDF page count: " + (result.pdfPageCheck?.pageCount ?? "(not parsed)"),
+    ...(result.pdfPageCheck?.pages || []).map(page => "Page " + page.pageNumber + ": " + page.textCharacters + " text characters; non-blank pixel ratio " + (page.nonBlankPixelRatio ?? "unavailable") + "; render " + (page.rendered ? "PASS" : "FAIL") + (page.error ? "; error " + page.error.name + ": " + page.error.message : "")),
+    "Last-page check: " + (result.pdfPageCheck?.lastPageFlag || "NOT RUN"),
     "Drive description.documentId: " + (result.previousDescriptionDocumentId || "(not checked)"),
     "Reason: " + (result.reason || "(no reason returned)")
   ].filter(Boolean).join("\n");
@@ -36,6 +45,10 @@ function diagnosticRow(item, result) {
       name: (result.status || "unreadable") + " · " + (result.fileId || driveFileId(item) || "no file ID"),
       status: result.status === "match" ? "PASS" : result.status === "mismatch" ? "NEEDS REVIEW" : "FAIL",
       reason: "Firestore ID: " + item.documentId + "; file ID: " + (result.fileId || driveFileId(item) || "(none)") + "\n" + detail
+    }, {
+      name: "PDF page check",
+      status: result.pdfPageCheck?.status === "PASS" ? "PASS" : "FAIL",
+      reason: result.pdfPageCheck ? "Page count: " + result.pdfPageCheck.pageCount + "\n" + (result.pdfPageCheck.pages || []).map(page => "Page " + page.pageNumber + ": " + page.textCharacters + " text characters; non-blank pixel ratio " + (page.nonBlankPixelRatio ?? "unavailable") + "; " + (page.rendered ? "render PASS" : "render FAIL") + (page.error ? " — " + page.error.name + ": " + page.error.message : "")).join("\n") + "\nLast page: " + result.pdfPageCheck.lastPageFlag : "PDF page check did not complete."
     }],
     diagnostic: result
   };
@@ -67,13 +80,46 @@ export default function SignaturePathwaySelfTest() {
       setProgress({ completed: 0, total: rows.length, active: 0 });
       const diagnostics = await runControlledDocumentDiagnosticBatch(
         rows,
-        (oneDocument, options) => reconcileSignatureDocumentIds(oneDocument, options),
+        async (oneDocument, options) => {
+          const response = await reconcileSignatureDocumentIds(oneDocument, options);
+          const item = oneDocument[0];
+          const result = response.results[0];
+          let pdfPageCheck;
+          try {
+            const fileId = result.fileId || driveFileId(item);
+            if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
+            const bytes = await downloadControlledDocumentBytes(fileId, item.documentId);
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            const pages = [];
+            try {
+              for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+                const canvas = document.createElement("canvas");
+                try {
+                  const metrics = await renderPdfPageToCanvas(pdf, pageNumber, canvas, { maxWidth: 640, maxPixels: 2500000 });
+                  pages.push({ pageNumber, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null });
+                } catch (error) {
+                  console.error("Signature Pathway Self-Test PDF page check failed", { documentId: item.documentId, pageNumber, error });
+                  let textCharacters = 0;
+                  try { const page = await pdf.getPage(pageNumber); const content = await page.getTextContent(); textCharacters = (content.items || []).reduce((sum, entry) => sum + String(entry.str || "").length, 0); } catch {}
+                  pages.push({ pageNumber, textCharacters, nonBlankPixelRatio: 0, rendered: false, error: describePdfPageError(error) });
+                } finally { canvas.width = 1; canvas.height = 1; }
+              }
+            } finally { await pdf.destroy(); }
+            const last = pages[pages.length - 1];
+            const lastPageFlag = !last ? "FAIL: no pages parsed" : last.textCharacters === 0 ? "FLAG: last page has zero extractable text" : !last.rendered ? "FLAG: last page failed to render" : "PASS";
+            pdfPageCheck = { status: last && last.textCharacters > 0 && last.rendered ? "PASS" : "FAIL", pageCount: pages.length, pages, lastPageFlag };
+          } catch (error) {
+            console.error("Signature Pathway Self-Test controlled PDF check failed", { documentId: item.documentId, error });
+            pdfPageCheck = { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: "FAIL: " + (error?.name || "Error") + ": " + (error?.message || String(error)), error: describePdfPageError(error) };
+          }
+          return { ...response, results: [{ ...result, pdfPageCheck }] };
+        },
         { concurrency: 3, maxRetries: 3, onProgress: setProgress }
       );
       const output = rows.map((item, index) => diagnosticRow(item, diagnostics[index]));
       setResults(output);
-      const failed = output.filter(row => row.checks[0].status === "FAIL").length;
-      const review = output.filter(row => row.checks[0].status === "NEEDS REVIEW").length;
+      const failed = output.filter(row => row.checks.some(check => check.status === "FAIL")).length;
+      const review = output.filter(row => row.checks[0].status === "NEEDS REVIEW" && !row.checks.some(check => check.status === "FAIL")).length;
       setMessage("Read-only diagnostics completed. " + rows.length + " document(s) checked using exactly one document per Worker request (maximum concurrency 3; up to 3 retries (4 total attempts) per document); " + (rows.length - failed - review) + " pass, " + review + " need review, " + failed + " fail. No metadata or document was changed.");
     } catch (error) {
       setMessage("Read-only diagnostic failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
