@@ -322,7 +322,7 @@ export async function getCurrentInductionContext(){
     let registerMatches={employees:[],members:[],exactNameMatch:false};
     if(invitation?.id){
       try{
-        const matchingUser=context?.anonymous?applicantAuth.currentUser:auth.currentUser;
+        const matchingUser=isAnonymousApplicant?applicantAuth.currentUser:auth.currentUser;
         if(!matchingUser)throw new Error("Authentication is required to verify the invitation.");
         const token=await matchingUser.getIdToken();
   const gatewayOrigin=getGoogleDriveGatewayUrl();
