@@ -42,3 +42,5 @@ jobs:
           name: signature-realistic-last-page-evidence
           path: test-results/
           if-no-files-found: warn
+
+# Rebased directly on the diagnostics PR head.
