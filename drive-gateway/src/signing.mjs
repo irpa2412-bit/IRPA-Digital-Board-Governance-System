@@ -94,8 +94,9 @@ export async function verifyCompletedEnvelope(ctx,user,envelopeId){
   const finalBytes=envelope.completion?.primaryStorageId?await ctx.storage.get(envelope.completion.primaryStorageId):null;
   const finalHash=finalBytes?await sha256Hex(finalBytes):null;
   add("completed_pdf_sha256",Boolean(envelope.status==="Completed"&&finalBytes&&finalHash===envelope.completion?.finalHash),"Recomputed completed PDF SHA-256 "+(finalBytes&&finalHash===envelope.completion?.finalHash?"matches completion.finalHash.":"does not match the completion record or document is not completed."));
-  let pdf=null,certificate=null;
+  let pdf=null,sourcePdf=null,certificate=null;
   try{
+    if(sourceBytes)sourcePdf=await PDFDocument.load(sourceBytes);
     if(finalBytes){pdf=await PDFDocument.load(finalBytes);const subject=pdf.getSubject()||"";const prefix="IRPA-SIGNATURE-CERTIFICATE-1:";if(subject.startsWith(prefix))certificate=JSON.parse(subject.slice(prefix.length));}
   }catch{}
   add("certificate_manifest",Boolean(certificate?.schema==="IRPA-SIGNATURE-CERTIFICATE-1"&&certificate.envelopeId===envelope.id&&certificate.documentId===envelope.documentId&&certificate.originalHash===expectedSourceHash),"Embedded certificate manifest "+(certificate?"was found; identity/hash fields are checked separately.":"is missing, malformed or uses an unsupported schema."));
@@ -103,25 +104,38 @@ export async function verifyCompletedEnvelope(ctx,user,envelopeId){
   const signedHead=signerEvents.at(-1)?.hash||"";
   add("certificate_source_binding",Boolean(certificate&&certificate.originalHash===sourceHash&&certificate.chainHead===signedHead),"Certificate source hash and pre-seal signing audit head "+(certificate&&certificate.originalHash===sourceHash&&certificate.chainHead===signedHead?"match the recomputed source and last signer event.":"do not match."));
   const sourcePageCount=certificate?.sourcePageCount;
-  add("certificate_page_count",Boolean(pdf&&Number.isInteger(sourcePageCount)&&pdf.getPageCount()===sourcePageCount+1),"PDF page count "+(pdf&&Number.isInteger(sourcePageCount)&&pdf.getPageCount()===sourcePageCount+1?"contains the original pages plus one certificate page.":"does not prove an appended certificate page."));
+  const sourcePageCountMatches=Boolean(sourcePdf&&Number.isInteger(sourcePageCount)&&sourcePdf.getPageCount()===sourcePageCount&&pdf&&pdf.getPageCount()===sourcePdf.getPageCount()+1);
+  add("certificate_page_count",sourcePageCountMatches,"PDF page count "+(sourcePageCountMatches?"matches the actual source PDF page count plus one appended certificate page.":"does not match the actual source page count plus one certificate page."));
   const manifestSigners=Array.isArray(certificate?.signers)?certificate.signers:[];
-  const signerRecordsValid=(envelope.signers||[]).length>0&&(envelope.signers||[]).every(s=>{
+  const signerRecordsValid=(envelope.signers||[]).length>0&&manifestSigners.length===(envelope.signers||[]).length&&(envelope.signers||[]).every(s=>{
     const m=manifestSigners.find(x=>x.id===s.id);
     return Boolean(m&&s.status==="Signed"&&m.uid===String(s.uid||"")&&m.name===String(s.name||"")&&m.email===String(s.email||"")&&m.signedAt===String(s.signedAt||"")&&m.signatureType===String(s.signatureType||""));
   });
   add("certificate_signer_records",signerRecordsValid,"Certificate signer identities, timestamps and signature methods "+(signerRecordsValid?"match every signed envelope signer.":"do not match every signed envelope signer."));
   const evidenceIds=envelope.completion?.cryptographicEvidenceIds||[];
-  const evidenceChecks=[];
+  const evidenceRows=await ctx.meta.list("cryptographicEvidence");
+  const evidenceChecks=[],auditEventChecks=[];
   for(const signer of envelope.signers||[]){
-    
-    const rows=await ctx.meta.list("cryptographicEvidence");
-    const evidence=(rows||[]).find(row=>row?.envelopeId===envelope.id&&row?.signerUid===signer.uid&&evidenceIds.includes(row.evidenceId));
-    let valid=false;
-    try{if(evidence){const publicKey=await importPublicKeyJwk(evidence.publicKeyJwk);valid=await verifyCryptographicEvidence(evidence,{documentHash:finalHash,signerUid:signer.uid,publicKey})&&evidence.signerId===signer.id&&evidence.signatureHash===await sha256Hex(String(signer.signatureValue||""));}}catch{}
+    const evidence=(evidenceRows||[]).find(row=>row?.envelopeId===envelope.id&&row?.signerUid===signer.uid&&evidenceIds.includes(row.evidenceId));
+    let valid=false,auditEventValid=false;
+    try{
+      if(evidence){
+        const publicKey=await importPublicKeyJwk(evidence.publicKeyJwk);
+        valid=await verifyCryptographicEvidence(evidence,{documentHash:finalHash,signerUid:signer.uid,publicKey})&&evidence.signerId===signer.id&&evidence.signatureHash===await sha256Hex(String(signer.signatureValue||""));
+        const auditEvent=(envelope.events||[]).find(event=>event.type==="cryptographic.signature.created"&&event.evidenceId===evidence.evidenceId);
+        auditEventValid=Boolean(auditEvent&&auditEvent.at===evidence.signedAt&&auditEvent.signerUid===evidence.signerUid&&auditEvent.signerId===evidence.signerId&&auditEvent.envelopeId===evidence.envelopeId&&auditEvent.documentHash===evidence.documentHash&&auditEvent.payloadHash===evidence.payloadHash&&auditEvent.keyId===evidence.keyId&&auditEvent.algorithm===evidence.algorithm);
+      }
+    }catch{}
     evidenceChecks.push({signerId:signer.id,valid});
+    auditEventChecks.push({signerId:signer.id,valid:auditEventValid});
   }
   const evidenceValid=evidenceChecks.length===(envelope.signers||[]).length&&evidenceChecks.every(x=>x.valid)&&evidenceIds.length===(envelope.signers||[]).length;
   add("ecdsa_signer_evidence",evidenceValid,evidenceValid?"Every signer has valid ECDSA P-256 evidence bound to this completed PDF hash and signature value.":"One or more signer evidence records are missing, invalid, replayed or bound to different values.");
+  const auditEventsValid=auditEventChecks.length===(envelope.signers||[]).length&&auditEventChecks.every(x=>x.valid);
+  add("cryptographic_audit_events",auditEventsValid,auditEventsValid?"Every persisted ECDSA evidence record has its matching cryptographic event in the verified envelope chain.":"One or more cryptographic audit events are missing or do not match the persisted evidence.");
+  const completionEvent=(envelope.events||[]).find(event=>event.type==="envelope.completed");
+  const completionEventValid=Boolean(completionEvent&&completionEvent.finalHash===finalHash&&completionEvent.cryptographicEvidenceCount===evidenceIds.length);
+  add("completion_event_binding",completionEventValid,completionEventValid?"The envelope-completed event binds the completed PDF hash and evidence count.":"The envelope-completed event is missing or does not match the completion record.");
   if(certificate&&signerRecordsValid){
     const signatureHashes=await Promise.all((envelope.signers||[]).map(s=>sha256Hex(String(s.signatureValue||""))));const hashesMatch=(envelope.signers||[]).every((s,index)=>manifestSigners.find(x=>x.id===s.id)?.signatureHash===signatureHashes[index]);
     add("certificate_signature_hashes",hashesMatch,"Certificate-page signature hashes "+(hashesMatch?"match the stored signature values.":"do not match the stored signature values."));
