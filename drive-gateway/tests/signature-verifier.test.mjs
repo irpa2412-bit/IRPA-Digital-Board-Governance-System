@@ -51,7 +51,7 @@ async function completedFixture() {
     crypto: { keyProvider: createSignerKeyProvider(keyRecords) },
     now: () => new Date("2026-11-02T10:10:00.000Z"), config: { ttlDays: 14 },
     verifySigningAuthority: async () => ({ verified: true, authorityRole: "Test Authority", authorityDepartment: "Test Department" }),
-    verifyUser: async request => ({ uid: String(request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, ""), isAdmin: false }),
+    verifyUser: async request => ({ uid: String(request.headers.get("authorization") || "").replace("Bearer ", ""), isAdmin: false }),
   };
   const submit = async (uid, token, body) => {
     const request = new Request("https://gateway.test/api/sign/submit", {
