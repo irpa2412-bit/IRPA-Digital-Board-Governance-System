@@ -135,12 +135,9 @@ test("verifier is administrator-only", async () => {
 
 test("signer outside the envelope cannot open the signing task", async () => {
   const f = await completedFixture();
-  const signerSecret = "a".repeat(64);
   const env = await f.meta.get("envelopes", f.envelope.id);
-  env.signers[0].tokenHash = await sha256Hex(signerSecret);
-  await f.meta.update("envelopes", env.id, { signers: env.signers });
   await assert.rejects(
-    () => openSigning(f.ctx, env.id + ".S1." + signerSecret, { uid: "not-assigned" }),
+    () => openSigning(f.ctx, f.tokens.drawn, { uid: "not-assigned" }),
     error => error.status === 403,
   );
 });
