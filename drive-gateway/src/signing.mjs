@@ -113,7 +113,7 @@ export async function verifyCompletedEnvelope(ctx,user,envelopeId){
   const evidenceIds=envelope.completion?.cryptographicEvidenceIds||[];
   const evidenceChecks=[];
   for(const signer of envelope.signers||[]){
-    const evidenceId=evidenceIds.find(id=>String(id).startsWith("CRYPTO-"));
+    
     const rows=await ctx.meta.list("cryptographicEvidence");
     const evidence=(rows||[]).find(row=>row?.envelopeId===envelope.id&&row?.signerUid===signer.uid&&evidenceIds.includes(row.evidenceId));
     let valid=false;
@@ -123,7 +123,7 @@ export async function verifyCompletedEnvelope(ctx,user,envelopeId){
   const evidenceValid=evidenceChecks.length===(envelope.signers||[]).length&&evidenceChecks.every(x=>x.valid)&&evidenceIds.length===(envelope.signers||[]).length;
   add("ecdsa_signer_evidence",evidenceValid,evidenceValid?"Every signer has valid ECDSA P-256 evidence bound to this completed PDF hash and signature value.":"One or more signer evidence records are missing, invalid, replayed or bound to different values.");
   if(certificate&&signerRecordsValid){
-    const hashesMatch=(envelope.signers||[]).every(s=>manifestSigners.find(x=>x.id===s.id)?.signatureHash===await sha256Hex(String(s.signatureValue||"")));
+    const signatureHashes=await Promise.all((envelope.signers||[]).map(s=>sha256Hex(String(s.signatureValue||""))));const hashesMatch=(envelope.signers||[]).every((s,index)=>manifestSigners.find(x=>x.id===s.id)?.signatureHash===signatureHashes[index]);
     add("certificate_signature_hashes",hashesMatch,"Certificate-page signature hashes "+(hashesMatch?"match the stored signature values.":"do not match the stored signature values."));
   }else add("certificate_signature_hashes",false,"Cannot compare certificate signature hashes because signer records are invalid or the manifest is unavailable.");
   const verified=checks.every(check=>check.status==="PASS");
