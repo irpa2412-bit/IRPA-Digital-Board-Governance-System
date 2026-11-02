@@ -14,7 +14,11 @@ for(const [name,source] of [["Controlled Documents reader",readerSource],["Signa
  assert.match(source,/could not be displayed/,name+" must show page-scoped rendering failures");
  assert.match(source,/Retry/,name+" must provide a retry action");
  assert.match(source,/Open original file/,name+" must provide an original-file link");
+ assert.doesNotMatch(source,/IntersectionObserver/,name+" must not skip later pages behind an observer threshold");
 }
+assert.match(readerSource,/page>=pdf\.numPages/,"Controlled Documents reader must navigate to the actual final PDF page");
+assert.match(signatureSource,/pageNum>=pdf\.numPages/,"Signature Portal viewer must navigate to the actual final PDF page");
+assert.match(gatewaySource,/pageNum>=pdfDocument\.numPages/,"Gateway signing portal must navigate to the actual final PDF page");
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4176","--strictPort"],{stdio:"ignore"});
 let browser;
 const acceptanceLines=["IRPA LAST-PAGE PDF ACCEPTANCE","Page 3: pdftotext extraction, PDF.js text extraction, non-white pixel ratio, bounded canvas, inline failure message, retry and original-file link"]; 
