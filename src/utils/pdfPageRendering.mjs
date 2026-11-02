@@ -12,7 +12,7 @@ export async function renderPdfPageToCanvas(pdf, pageNumber, canvas, {
   const requestedDpr = Math.max(1, Number(globalThis.devicePixelRatio) || 1);
   const areaScale = Math.sqrt(maxPixels / Math.max(1, viewport.width * viewport.height));
   const sideScale = Math.min(maxSide / viewport.width, maxSide / viewport.height);
-  const outputScale = Math.max(0.5, Math.min(requestedDpr, areaScale, sideScale));
+  const outputScale = Math.max(0.1, Math.min(requestedDpr, areaScale, sideScale));
   const pixelWidth = Math.max(1, Math.floor(viewport.width * outputScale));
   const pixelHeight = Math.max(1, Math.floor(viewport.height * outputScale));
 
