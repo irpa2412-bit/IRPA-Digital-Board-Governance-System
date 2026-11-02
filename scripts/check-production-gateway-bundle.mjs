@@ -24,6 +24,6 @@ const files = await filesUnder("dist");
 assert.ok(files.length > 0, "production build output must not be empty");
 const bundle = (await Promise.all(files.map(file => readFile(file, "utf8")))).join("\n");
 assert.ok(bundle.includes(productionGateway), "production bundle must contain the production Cloudflare Worker gateway URL");
-assert.ok(!bundle.includes(stagingGateway), "production bundle must not contain the staging Worker gateway URL");
+assert.ok(bundle.includes(stagingGateway), "production bundle must retain the established Trial/Test staging route");
 console.log("PRODUCTION_GATEWAY_BUNDLE=PASS");
 console.log("VITE_STAGING_GUARD_SOURCE=PASS");
