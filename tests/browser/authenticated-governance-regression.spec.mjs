@@ -194,12 +194,13 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     const externalRequests = [];
+    const fixtureFulfilledExternalRequests = new Set();
     const successfulExternalRequests = [];
     const uncaughtErrors = [];
     page.on("pageerror", error => uncaughtErrors.push(error.message));
     page.on("requestfinished", request => {
       const url = new URL(request.url());
-      if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") successfulExternalRequests.push(url.href);
+      if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1" && !fixtureFulfilledExternalRequests.has(url.href)) successfulExternalRequests.push(url.href);
     });
     await page.route("**/*", route => {
       const url = new URL(route.request().url());
@@ -208,6 +209,13 @@ for (const viewport of [
       return route.abort();
     });
 
+    await page.route("**/opportunities*", route => {
+      fixtureFulfilledExternalRequests.add(route.request().url());
+      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({count:2,items:[
+        {id:"fixture-clean",title:'<a href="https://news.google.com/rss/articles/example">Tanzania Rangeland Funding &amp; Livestock</a>',description:'<p>Skip to main content</p><nav>Home Menu About Us Contact Us</nav><p>Official donor call for Tanzania pastoral communities and sustainable rangeland restoration.</p>',url:"https://donor.example/call",source_url:"https://donor.example",deadline_at:"2026-12-15",call_status:"open",verification_status:"Verified official call"},
+        {id:"fixture-pending",title:"Unverified news lead",description:"Pending verification",url:"https://news.example/lead",source_url:"https://news.example",deadline_at:null,call_status:"open",verification_status:"Pending official-call verification"}
+      ],hasMore:false,engineRuns:[],engineProvision:[]})});
+    });
     await page.goto("/?adminModule=Grant%20Intelligence%20%26%20Funding%20Opportunities");
     await page.locator('.auth-card input[type="email"]').fill(fixtureEmail);
     await page.locator('.auth-card input[type="password"]').fill(fixturePassword);
@@ -217,6 +225,17 @@ for (const viewport of [
     await expect(page.locator(".topbar h2")).toContainText(/Grant Intelligence.*Funding Opportunities/, { timeout: 45000 });
 
     await assertPortalAndNoOverflow(page, /Grant Intelligence.*Funding Opportunities/, viewport.width);
+    await expect(page.getByText("Grant Application Pipeline", { exact: false })).toHaveCount(0);
+    await expect(page.getByText("Record submitted and awarded grants", { exact: true })).toHaveCount(0);
+    const cleanOpportunityCard = page.locator(".grant-intelligence-portal article").filter({ hasText: "Tanzania Rangeland Funding & Livestock" });
+    await expect(cleanOpportunityCard.locator("summary > div:first-child > strong")).toBeVisible();
+    await expect(cleanOpportunityCard.locator("summary p")).toContainText("Official donor call for Tanzania pastoral communities and sustainable rangeland restoration.");
+    await expect(page.getByText(/Skip to main content|Home Menu|Contact Us/)).toHaveCount(0);
+    const openCallCard = page.getByText("Open calls", { exact: true }).locator("..");
+    await expect(openCallCard).toContainText("1");
+    const pendingOpportunityCard = page.locator(".grant-intelligence-portal article").filter({ hasText: "Unverified news lead" });
+    await expect(pendingOpportunityCard.locator("summary > div:first-child > strong")).toHaveText("Unverified news lead");
+
     await assertStickyPortalNavigation(page);
 
     // Exercise the real international time pad in the authenticated application shell.
