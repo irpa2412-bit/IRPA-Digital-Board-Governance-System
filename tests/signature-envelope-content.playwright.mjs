@@ -62,6 +62,7 @@ try{
  assert.equal(gatewayCalls.length,1,"Add Signer must save the owner section and signer draft through the mocked Gateway");
  assert.equal(gatewayCalls[0].draft.sha256,sourceHash,"Add Signer draft must carry the original SHA-256");
  assert.equal(gatewayCalls[0].draft.byteLength,pdfBytes.length,"Add Signer draft must carry the original byte length");
+ assert.equal(gatewayCalls[0].draft.recipients[0].uid,"fixture-authenticated-signer","Add Signer draft must persist the authenticated signer identity");
  await page.getByTestId("field-page").selectOption("3");
  await page.getByRole("button",{name:"Assign Signature Field to Page 3"}).click();
  assert.match(await page.getByTestId("field-assignment").textContent(),/page 3.*fixture-authenticated-signer/);
