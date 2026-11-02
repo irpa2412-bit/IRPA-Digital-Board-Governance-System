@@ -21,7 +21,9 @@ export default defineConfig(({ mode }) => {
   return {
     define: {
       "import.meta.env.VITE_IRPA_STAGING_BUILD": JSON.stringify(String(stagingBuild)),
-      "import.meta.env.VITE_IRPA_DEFAULT_GATEWAY_URL": JSON.stringify(stagingBuild ? STAGING_GATEWAY_URL : PRODUCTION_GATEWAY_URL)
+      "import.meta.env.VITE_IRPA_DEFAULT_GATEWAY_URL": JSON.stringify(stagingBuild ? STAGING_GATEWAY_URL : PRODUCTION_GATEWAY_URL),
+      "__IRPA_STAGING_BUILD__": JSON.stringify(stagingBuild),
+      "__IRPA_DEFAULT_GATEWAY_URL__": JSON.stringify(stagingBuild ? STAGING_GATEWAY_URL : PRODUCTION_GATEWAY_URL)
     },
     plugins: [react()],
     resolve: {
