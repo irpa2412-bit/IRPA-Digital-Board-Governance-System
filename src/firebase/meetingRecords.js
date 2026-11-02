@@ -1,4 +1,8 @@
 import { callMeetingService } from "./meetingGatewayApi";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import app from "./config";
+
+const call = name => httpsCallable(getFunctions(app, "us-central1"), name);
 
 export async function captureMeetingRecord(payload){return callMeetingService("/api/meeting-records/capture",payload);}
 export async function saveMeetingAssistantDraft(payload){return callMeetingService("/api/meeting-records/draft",payload);}
