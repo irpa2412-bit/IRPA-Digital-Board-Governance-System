@@ -107,7 +107,7 @@ export default function SignaturePathwaySelfTest() {
             } finally { await pdf.destroy(); }
             const last = pages[pages.length - 1];
             const lastPageFlag = !last ? "FAIL: no pages parsed" : last.textCharacters === 0 ? "FLAG: last page has zero extractable text" : !last.rendered ? "FLAG: last page failed to render" : "PASS";
-            pdfPageCheck = { status: last && last.textCharacters > 0 && last.rendered ? "PASS" : "FAIL", pageCount: pages.length, pages, lastPageFlag };
+            pdfPageCheck = { status: last && last.textCharacters > 0 && pages.length === pdf.numPages && pages.every(page => page.rendered) ? "PASS" : "FAIL", pageCount: pages.length, pages, lastPageFlag };
           } catch (error) {
             console.error("Signature Pathway Self-Test controlled PDF check failed", { documentId: item.documentId, error });
             pdfPageCheck = { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: "FAIL: " + (error?.name || "Error") + ": " + (error?.message || String(error)), error: describePdfPageError(error) };
