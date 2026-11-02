@@ -1,11 +1,12 @@
 # Undefined-name and shadowing diagnostic
 
-- Commit: 87f3444420287ebf83c1fa9100eb7ba8b2bdb4dd
+- Commit: 2a29462ee643b65262dbd815b5f18c76f619aa84
 - ESLint exit: 1
-- Total reported violations: 930
+- Total reported violations: 106
 - no-undef hits: 3
-- no-use-before-define hits: 918
-- no-shadow hits: 9
+- no-use-before-define hits: 1
+- no-shadow hits: 102
+- Firestore API shadowing hits: 0
 
 ## sourceSha256 introduction history
 ~~~text
@@ -18,957 +19,169 @@ aa829105 fix: persist verified source bytes on every new Firebase envelope
 ~~~text
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/drive-gateway/src/index.js
-    63:40   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-    65:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-    66:3    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-    67:3    error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-    68:3    error  'driveFetch' was used before it was defined                            no-use-before-define
-    69:3    error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-    70:3    error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-    71:3    error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-    72:27   error  'commitFirestoreDocumentAndAudit' was used before it was defined       no-use-before-define
-    73:27   error  'recordDocumentLifecycleFailure' was used before it was defined        no-use-before-define
-    74:3    error  'json' was used before it was defined                                  no-use-before-define
-    75:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-    80:40   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-    81:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-    82:3    error  'json' was used before it was defined                                  no-use-before-define
-    83:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-    87:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-    89:3    error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-    90:32   error  'smtpSend' was used before it was defined                              no-use-before-define
-    91:3    error  'json' was used before it was defined                                  no-use-before-define
-    92:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-    95:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-    97:3    error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-    98:3    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-    99:3    error  'json' was used before it was defined                                  no-use-before-define
-   100:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-   104:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   106:3    error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   107:3    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   108:3    error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   109:3    error  'json' was used before it was defined                                  no-use-before-define
-   110:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-   120:26   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   124:18   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   129:21   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   135:24   error  'getFirestoreDocumentsByField' was used before it was defined          no-use-before-define
-   175:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   176:3    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   177:3    error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   178:3    error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-   179:3    error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   180:27   error  'commitFirestoreDocumentAndAudit' was used before it was defined       no-use-before-define
-   181:3    error  'json' was used before it was defined                                  no-use-before-define
-   182:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-   186:3    error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   187:3    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   188:3    error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-   189:3    error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   190:3    error  'json' was used before it was defined                                  no-use-before-define
-   191:3    error  'corsHeaders' was used before it was defined                           no-use-before-define
-   199:57   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   218:16   error  'json' was used before it was defined                                  no-use-before-define
-   218:34   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   222:22   error  'startOAuth' was used before it was defined                            no-use-before-define
-   226:22   error  'oauthCallback' was used before it was defined                         no-use-before-define
-   232:100  error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   232:129  error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   232:151  error  'systemDiagnosticsRoute' was used before it was defined                no-use-before-define
-   232:175  error  'actualDataAccessRoute' was used before it was defined                 no-use-before-define
-   232:198  error  'reconcileSignatureDocumentIds' was used before it was defined         no-use-before-define
-   232:229  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   250:86   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   250:115  error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   250:137  error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-   250:169  error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   250:195  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   264:22   error  'provisionCommunicationMediaArchive' was used before it was defined    no-use-before-define
-   268:22   error  'provisionResearchKnowledgeArchive' was used before it was defined     no-use-before-define
-   272:22   error  'upload' was used before it was defined                                no-use-before-define
-   276:22   error  'controlledDocumentUploadPolicyCheck' was used before it was defined   no-use-before-define
-   280:22   error  'registerControlledDocumentRecord' was used before it was defined      no-use-before-define
-   283:22   error  'uploadControlledDocument' was used before it was defined              no-use-before-define
-   287:22   error  'reconcileSignatureDocumentIds' was used before it was defined         no-use-before-define
-   289:97   error  'getSignatureWorkflowListRoute' was used before it was defined         no-use-before-define
-   290:97   error  'getSignatureWorkflowViewRoute' was used before it was defined         no-use-before-define
-   291:112  error  'addSignerDryRunRoute' was used before it was defined                  no-use-before-define
-   292:99   error  'saveSignatureWorkflowDraftRoute' was used before it was defined       no-use-before-define
-   293:92   error  'systemDiagnosticsRoute' was used before it was defined                no-use-before-define
-   294:130  error  'actualDataAccessRoute' was used before it was defined                 no-use-before-define
-   295:117  error  'reconcileRegisteredIdentityUidsRoute' was used before it was defined  no-use-before-define
-   296:94   error  'updateSignerAuthorityRoute' was used before it was defined            no-use-before-define
-   299:22   error  'ensureSignatureProfileFolder' was used before it was defined          no-use-before-define
-   302:22   error  'finalizeSignatureProfileArchives' was used before it was defined      no-use-before-define
-   305:22   error  'ensureDocumentArchiveFolder' was used before it was defined           no-use-before-define
-   308:22   error  'provisionDocumentArchive' was used before it was defined              no-use-before-define
-   311:22   error  'provisionMeetingCategoryArchive' was used before it was defined       no-use-before-define
-   314:22   error  'getMeetingCategoryArchive' was used before it was defined             no-use-before-define
-   317:22   error  'ensureSignedDocumentArchive' was used before it was defined           no-use-before-define
-   320:22   error  'ensureSignatureWorkflowFolder' was used before it was defined         no-use-before-define
-   324:22   error  'downloadSignatureFile' was used before it was defined                 no-use-before-define
-   328:22   error  'download' was used before it was defined                              no-use-before-define
-   332:22   error  'deleteDriveFile' was used before it was defined                       no-use-before-define
-   337:18   error  'json' was used before it was defined                                  no-use-before-define
-   337:29   error  'withInvitationRetry' was used before it was defined                   no-use-before-define
-   337:116  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   341:21   error  'notifyInvitationAdministrator' was used before it was defined         no-use-before-define
-   343:20   error  'json' was used before it was defined                                  no-use-before-define
-   343:71   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   346:18   error  'json' was used before it was defined                                  no-use-before-define
-   346:115  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   352:32   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   353:18   error  'json' was used before it was defined                                  no-use-before-define
-   353:74   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   355:66   error  'json' was used before it was defined                                  no-use-before-define
-   355:117  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   362:32   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   363:18   error  'json' was used before it was defined                                  no-use-before-define
-   363:29   error  'withInvitationRetry' was used before it was defined                   no-use-before-define
-   363:139  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   365:66   error  'json' was used before it was defined                                  no-use-before-define
-   365:117  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   368:20   error  'json' was used before it was defined                                  no-use-before-define
-   368:124  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   371:18   error  'json' was used before it was defined                                  no-use-before-define
-   371:112  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   375:22   error  'sendGatewayInvitationEmail' was used before it was defined            no-use-before-define
-   379:22   error  'sendMemberInvitation' was used before it was defined                  no-use-before-define
-   383:22   error  'sendSignatureInvitation' was used before it was defined               no-use-before-define
-   387:22   error  'lookupInductionRegistration' was used before it was defined           no-use-before-define
-   391:22   error  'getSessionProfile' was used before it was defined                     no-use-before-define
-   396:32   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   397:31   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   398:60   error  'json' was used before it was defined                                  no-use-before-define
-   398:129  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   399:220  error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-   399:240  error  'driveFetch' was used before it was defined                            no-use-before-define
-   400:18   error  'json' was used before it was defined                                  no-use-before-define
-   400:49   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   411:33   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   422:33   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   423:22   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   425:59   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-   436:36   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   437:35   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
+   122:14   error  'document' is already a global variable                                no-shadow
+   440:40   error  'name' is already a global variable                                    no-shadow
    440:138  error  'html' is already declared in the upper scope on line 3484 column 10   no-shadow
-   440:146  error  'smtpSend' was used before it was defined                              no-use-before-define
-   443:28   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-   443:48   error  'driveFetch' was used before it was defined                            no-use-before-define
-   447:46   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   452:14   error  'json' was used before it was defined                                  no-use-before-define
-   452:60   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   458:16   error  'json' was used before it was defined                                  no-use-before-define
-   458:235  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   467:14   error  'json' was used before it was defined                                  no-use-before-define
-   472:67   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   478:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   479:23   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   481:12   error  'json' was used before it was defined                                  no-use-before-define
-   481:88   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   484:17   error  'randomBase64Url' was used before it was defined                       no-use-before-define
-   486:26   error  'sha256Hex' was used before it was defined                             no-use-before-define
-   504:10   error  'json' was used before it was defined                                  no-use-before-define
-   507:11   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   516:21   error  'html' was used before it was defined                                  no-use-before-define
-   517:31   error  'html' was used before it was defined                                  no-use-before-define
-   519:41   error  'sha256Hex' was used before it was defined                             no-use-before-define
-   522:12   error  'html' was used before it was defined                                  no-use-before-define
-   544:23   error  'driveFetch' was used before it was defined                            no-use-before-define
-   547:12   error  'html' was used before it was defined                                  no-use-before-define
-   550:12   error  'html' was used before it was defined                                  no-use-before-define
-   553:27   error  'encryptText' was used before it was defined                           no-use-before-define
-   563:10   error  'html' was used before it was defined                                  no-use-before-define
-   567:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   569:20   error  'cleanName' was used before it was defined                             no-use-before-define
-   573:19   error  'cleanName' was used before it was defined                             no-use-before-define
-   574:52   error  'authorizeCommunicationMediaDownload' was used before it was defined   no-use-before-define
-   575:12   error  'json' was used before it was defined                                  no-use-before-define
-   575:115  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   579:31   error  'cleanId' was used before it was defined                               no-use-before-define
-   580:31   error  'cleanId' was used before it was defined                               no-use-before-define
-   581:30   error  'cleanId' was used before it was defined                               no-use-before-define
-   584:12   error  'json' was used before it was defined                                  no-use-before-define
-   584:115  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   589:14   error  'json' was used before it was defined                                  no-use-before-define
-   589:133  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   592:14   error  'json' was used before it was defined                                  no-use-before-define
-   592:122  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   594:28   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   594:105  error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   595:27   error  'json' was used before it was defined                                  no-use-before-define
-   595:94   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   602:32   error  'firestoreStringArray' was used before it was defined                  no-use-before-define
-   603:19   error  'firestoreStringArray' was used before it was defined                  no-use-before-define
-   607:26   error  'json' was used before it was defined                                  no-use-before-define
-   607:144  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   612:14   error  'json' was used before it was defined                                  no-use-before-define
-   612:104  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   614:52   error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-   615:31   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   615:98   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   617:14   error  'json' was used before it was defined                                  no-use-before-define
-   617:156  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   620:14   error  'json' was used before it was defined                                  no-use-before-define
-   620:88   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   623:80   error  'json' was used before it was defined                                  no-use-before-define
-   623:173  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   624:17   error  'authorizeMeetingArchiveUser' was used before it was defined           no-use-before-define
-   625:28   error  'json' was used before it was defined                                  no-use-before-define
-   625:102  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   627:36   error  'json' was used before it was defined                                  no-use-before-define
-   627:117  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   629:12   error  'json' was used before it was defined                                  no-use-before-define
-   629:116  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   633:12   error  'json' was used before it was defined                                  no-use-before-define
-   633:172  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   637:12   error  'json' was used before it was defined                                  no-use-before-define
-   637:195  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   642:12   error  'json' was used before it was defined                                  no-use-before-define
-   642:88   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   645:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-   646:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-   649:30   error  'driveFetch' was used before it was defined                            no-use-before-define
-   650:31   error  'parseDescription' was used before it was defined                      no-use-before-define
-   652:14   error  'json' was used before it was defined                                  no-use-before-define
-   652:95   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   655:14   error  'json' was used before it was defined                                  no-use-before-define
-   655:123  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   661:16   error  'json' was used before it was defined                                  no-use-before-define
-   661:128  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   665:14   error  'json' was used before it was defined                                  no-use-before-define
-   665:121  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   668:14   error  'json' was used before it was defined                                  no-use-before-define
-   668:120  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   671:14   error  'json' was used before it was defined                                  no-use-before-define
-   671:120  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   675:31   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-   676:23   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-   696:16   error  'buildMultipartBody' was used before it was defined                    no-use-before-define
-   709:10   error  'json' was used before it was defined                                  no-use-before-define
-   717:11   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   732:20   error  'base64UrlEncodeText' was used before it was defined                   no-use-before-define
-   732:94   error  'base64UrlEncodeText' was used before it was defined                   no-use-before-define
-   733:54   error  'pemPrivateKeyBytes' was used before it was defined                    no-use-before-define
-   735:270  error  'base64UrlEncodeBytes' was used before it was defined                  no-use-before-define
-   771:26   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   774:22   error  'json' was used before it was defined                                  no-use-before-define
-   774:91   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   784:32   error  'json' was used before it was defined                                  no-use-before-define
-   784:125  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   785:111  error  'json' was used before it was defined                                  no-use-before-define
-   785:193  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   786:105  error  'json' was used before it was defined                                  no-use-before-define
-   786:211  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   789:25   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   792:27   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   793:91   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   795:31   error  'getFirestoreDocumentsByField' was used before it was defined          no-use-before-define
-   796:99   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   801:39   error  'json' was used before it was defined                                  no-use-before-define
-   801:157  error  'corsHeaders' was used before it was defined                           no-use-before-define
    807:59   error  'value' is already declared in the upper scope on line 807 column 15   no-shadow
-   808:75   error  'json' was used before it was defined                                  no-use-before-define
-   808:203  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   818:41   error  'json' was used before it was defined                                  no-use-before-define
-   818:195  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   824:31   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   824:79   error  'cleanId' was used before it was defined                               no-use-before-define
-   825:38   error  'json' was used before it was defined                                  no-use-before-define
-   825:188  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   828:11   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-   828:62   error  'cleanId' was used before it was defined                               no-use-before-define
-   843:11   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-   856:12   error  'json' was used before it was defined                                  no-use-before-define
-   856:283  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   859:12   error  'json' was used before it was defined                                  no-use-before-define
-   859:142  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   866:26   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   868:34   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   869:27   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   873:40   error  'json' was used before it was defined                                  no-use-before-define
-   873:116  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   889:22   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-   900:19   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-   900:71   error  'cleanId' was used before it was defined                               no-use-before-define
-   917:14   error  'json' was used before it was defined                                  no-use-before-define
-   917:248  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   921:11   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-   934:12   error  'json' was used before it was defined                                  no-use-before-define
-   934:196  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   937:12   error  'json' was used before it was defined                                  no-use-before-define
-   937:152  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   944:26   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-   948:30   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-   950:27   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   953:31   error  'json' was used before it was defined                                  no-use-before-define
-   953:129  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   956:28   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-   958:42   error  'json' was used before it was defined                                  no-use-before-define
-   958:322  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   962:33   error  'json' was used before it was defined                                  no-use-before-define
-   962:99   error  'corsHeaders' was used before it was defined                           no-use-before-define
-   983:12   error  'json' was used before it was defined                                  no-use-before-define
-   983:105  error  'corsHeaders' was used before it was defined                           no-use-before-define
-   986:12   error  'json' was used before it was defined                                  no-use-before-define
-   986:126  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1016:44   error  'pemPrivateKeyBytes' was used before it was defined                    no-use-before-define
-  1027:26   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1030:27   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1032:26   error  'json' was used before it was defined                                  no-use-before-define
-  1032:94   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1034:25   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1035:114  error  'json' was used before it was defined                                  no-use-before-define
-  1035:179  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1037:29   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1040:12   error  'json' was used before it was defined                                  no-use-before-define
-  1040:26   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1041:27   error  'json' was used before it was defined                                  no-use-before-define
-  1041:120  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1045:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1047:25   error  'json' was used before it was defined                                  no-use-before-define
-  1047:89   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1048:23   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1049:30   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1065:30   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1070:10   error  'json' was used before it was defined                                  no-use-before-define
-  1070:43   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1074:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1076:25   error  'json' was used before it was defined                                  no-use-before-define
-  1076:89   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1079:58   error  'json' was used before it was defined                                  no-use-before-define
-  1079:118  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1080:23   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1081:24   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1082:31   error  'json' was used before it was defined                                  no-use-before-define
-  1082:87   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1083:39   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1084:30   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1087:33   error  'json' was used before it was defined                                  no-use-before-define
-  1087:117  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1088:10   error  'json' was used before it was defined                                  no-use-before-define
-  1088:87   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1092:16   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1094:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1095:26   error  'json' was used before it was defined                                  no-use-before-define
-  1100:68   error  'json' was used before it was defined                                  no-use-before-define
-  1101:58   error  'json' was used before it was defined                                  no-use-before-define
-  1102:23   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1105:66   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1106:24   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1107:31   error  'json' was used before it was defined                                  no-use-before-define
-  1108:20   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1109:87   error  'json' was used before it was defined                                  no-use-before-define
-  1121:10   error  'json' was used before it was defined                                  no-use-before-define
-  1127:26   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1130:30   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1132:32   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1134:24   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1135:43   error  'getFirestoreDocumentsByEmail' was used before it was defined          no-use-before-define
-  1138:47   error  'json' was used before it was defined                                  no-use-before-define
-  1138:164  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1144:186  error  'json' was used before it was defined                                  no-use-before-define
-  1144:311  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1145:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1146:43   error  'json' was used before it was defined                                  no-use-before-define
-  1146:124  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1147:24   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1148:28   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1149:26   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1150:99   error  'json' was used before it was defined                                  no-use-before-define
-  1150:196  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1160:48   error  'json' was used before it was defined                                  no-use-before-define
-  1160:152  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1161:118  error  'json' was used before it was defined                                  no-use-before-define
-  1161:219  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1178:12   error  'json' was used before it was defined                                  no-use-before-define
-  1178:102  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1179:407  error  'json' was used before it was defined                                  no-use-before-define
-  1179:573  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1182:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1183:29   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1183:96   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1184:134  error  'json' was used before it was defined                                  no-use-before-define
-  1184:237  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1186:47   error  'json' was used before it was defined                                  no-use-before-define
-  1186:167  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1190:12   error  'json' was used before it was defined                                  no-use-before-define
-  1190:230  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1192:32   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1197:20   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1204:27   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1206:22   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1211:29   error  'json' was used before it was defined                                  no-use-before-define
-  1211:269  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1212:34   error  'json' was used before it was defined                                  no-use-before-define
-  1212:116  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1213:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1235:28   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1235:67   error  'cleanId' was used before it was defined                               no-use-before-define
-  1237:20   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
+   882:64   error  'name' is already a global variable                                    no-shadow
+   887:18   error  'document' is already a global variable                                no-shadow
+   996:307  error  'name' is already a global variable                                    no-shadow
+  1168:11   error  'event' is already a global variable                                   no-shadow
   1251:34   error  'body' is already declared in the upper scope on line 1185 column 9    no-shadow
-  1258:29   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1275:10   error  'json' was used before it was defined                                  no-use-before-define
-  1275:193  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1281:26   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1283:52   error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-  1284:31   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1284:98   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1286:14   error  'json' was used before it was defined                                  no-use-before-define
-  1286:170  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1301:12   error  'json' was used before it was defined                                  no-use-before-define
-  1301:299  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1303:12   error  'json' was used before it was defined                                  no-use-before-define
-  1303:196  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1318:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1319:47   error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-  1320:28   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1321:29   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1323:60   error  'json' was used before it was defined                                  no-use-before-define
-  1323:158  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1325:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  1327:40   error  'json' was used before it was defined                                  no-use-before-define
-  1327:146  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1329:12   error  'json' was used before it was defined                                  no-use-before-define
-  1329:149  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1331:83   error  'json' was used before it was defined                                  no-use-before-define
-  1331:192  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1332:23   error  'cleanId' was used before it was defined                               no-use-before-define
-  1333:27   error  'cleanId' was used before it was defined                               no-use-before-define
-  1334:48   error  'json' was used before it was defined                                  no-use-before-define
-  1334:168  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1335:28   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1336:27   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1340:12   error  'json' was used before it was defined                                  no-use-before-define
-  1340:168  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1342:22   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1349:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1350:24   error  'json' was used before it was defined                                  no-use-before-define
-  1350:125  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1352:9    error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-  1353:27   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1354:34   error  'json' was used before it was defined                                  no-use-before-define
-  1354:150  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1355:10   error  'json' was used before it was defined                                  no-use-before-define
-  1355:82   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1359:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1360:50   error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-  1361:29   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1361:96   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1363:12   error  'json' was used before it was defined                                  no-use-before-define
-  1363:141  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1366:20   error  'cleanName' was used before it was defined                             no-use-before-define
-  1370:17   error  'cleanName' was used before it was defined                             no-use-before-define
-  1371:21   error  'cleanName' was used before it was defined                             no-use-before-define
-  1372:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  1373:27   error  'json' was used before it was defined                                  no-use-before-define
-  1373:153  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1374:24   error  'cleanName' was used before it was defined                             no-use-before-define
-  1381:60   error  'json' was used before it was defined                                  no-use-before-define
-  1381:123  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1382:64   error  'json' was used before it was defined                                  no-use-before-define
-  1382:132  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1383:55   error  'json' was used before it was defined                                  no-use-before-define
-  1383:154  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1384:83   error  'json' was used before it was defined                                  no-use-before-define
-  1384:153  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1387:41   error  'json' was used before it was defined                                  no-use-before-define
-  1387:115  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1389:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1390:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1392:31   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1396:28   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1401:34   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1408:34   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1419:40   error  'ensureAnyoneReaderPermission' was used before it was defined          no-use-before-define
-  1425:30   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1430:40   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1436:32   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1447:42   error  'ensureAnyoneReaderPermission' was used before it was defined          no-use-before-define
-  1470:16   error  'buildMultipartBody' was used before it was defined                    no-use-before-define
-  1479:24   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1480:29   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1483:13   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1484:22   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1485:27   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1503:10   error  'json' was used before it was defined                                  no-use-before-define
-  1528:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
   1534:66   error  'value' is already declared in the upper scope on line 1534 column 30  no-shadow
-  1539:5    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1540:5    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1541:5    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1543:15   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1544:16   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1545:18   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1554:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1556:12   error  'json' was used before it was defined                                  no-use-before-define
-  1556:127  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1558:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1559:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1560:27   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1566:24   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1567:23   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1569:12   error  'json' was used before it was defined                                  no-use-before-define
-  1569:122  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1571:10   error  'json' was used before it was defined                                  no-use-before-define
-  1571:178  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1575:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1581:31   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1582:22   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  1595:12   error  'json' was used before it was defined                                  no-use-before-define
-  1595:170  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1598:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1600:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1602:27   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1610:31   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1611:28   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1629:11   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1633:29   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1634:26   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1643:12   error  'json' was used before it was defined                                  no-use-before-define
-  1643:200  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1655:28   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1663:28   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1664:25   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1669:14   error  'json' was used before it was defined                                  no-use-before-define
-  1669:114  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1674:10   error  'json' was used before it was defined                                  no-use-before-define
-  1683:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1687:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1690:23   error  'json' was used before it was defined                                  no-use-before-define
-  1690:92   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1696:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  1697:32   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1697:89   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1700:25   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1700:92   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1704:7    error  'firestoreStringArray' was used before it was defined                  no-use-before-define
-  1706:26   error  'json' was used before it was defined                                  no-use-before-define
-  1706:641  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1709:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1710:26   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1711:23   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1713:12   error  'json' was used before it was defined                                  no-use-before-define
-  1713:102  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1718:48   error  'cleanId' was used before it was defined                               no-use-before-define
-  1719:11   error  'repairSignatureAssetDescription' was used before it was defined       no-use-before-define
-  1719:82   error  'cleanId' was used before it was defined                               no-use-before-define
-  1722:12   error  'json' was used before it was defined                                  no-use-before-define
-  1722:129  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1725:12   error  'json' was used before it was defined                                  no-use-before-define
-  1725:138  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1729:14   error  'json' was used before it was defined                                  no-use-before-define
-  1729:138  error  'cleanId' was used before it was defined                               no-use-before-define
-  1729:628  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1733:12   error  'json' was used before it was defined                                  no-use-before-define
-  1733:96   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1737:89   error  'json' was used before it was defined                                  no-use-before-define
-  1737:258  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1745:10   error  'json' was used before it was defined                                  no-use-before-define
-  1750:13   error  'uint8ToBase64' was used before it was defined                         no-use-before-define
-  1751:11   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1759:9    error  'driveFetch' was used before it was defined                            no-use-before-define
-  1762:31   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1784:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1787:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  1788:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  1789:23   error  'json' was used before it was defined                                  no-use-before-define
-  1789:85   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1790:42   error  'json' was used before it was defined                                  no-use-before-define
-  1790:132  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1792:37   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1793:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1796:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1799:30   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1806:22   error  'firestoreMapArray' was used before it was defined                     no-use-before-define
-  1807:43   error  'firestoreStringArray' was used before it was defined                  no-use-before-define
-  1807:99   error  'firestoreStringArray' was used before it was defined                  no-use-before-define
-  1813:8    error  'firestoreMapArray' was used before it was defined                     no-use-before-define
-  1822:49   error  'firestoreMapArray' was used before it was defined                     no-use-before-define
-  1825:30   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1826:33   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1827:30   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1830:12   error  'json' was used before it was defined                                  no-use-before-define
-  1830:578  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1832:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1833:26   error  'driveFetch' was used before it was defined                            no-use-before-define
-  1834:23   error  'parseDescription' was used before it was defined                      no-use-before-define
-  1835:44   error  'json' was used before it was defined                                  no-use-before-define
-  1835:127  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1838:32   error  'json' was used before it was defined                                  no-use-before-define
-  1838:104  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1842:10   error  'json' was used before it was defined                                  no-use-before-define
-  1842:91   error  'uint8ToBase64' was used before it was defined                         no-use-before-define
-  1842:118  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1846:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1848:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  1854:12   error  'json' was used before it was defined                                  no-use-before-define
-  1854:88   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1857:37   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1858:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1863:12   error  'json' was used before it was defined                                  no-use-before-define
-  1863:142  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1866:22   error  'firestoreMapArray' was used before it was defined                     no-use-before-define
-  1869:12   error  'json' was used before it was defined                                  no-use-before-define
-  1869:56   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1873:41   error  'json' was used before it was defined                                  no-use-before-define
-  1873:118  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1875:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1876:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1877:30   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1881:17   error  'cleanId' was used before it was defined                               no-use-before-define
-  1885:28   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1891:22   error  'ensureSignatureFolderPermission' was used before it was defined       no-use-before-define
-  1892:37   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1918:18   error  'buildMultipartBody' was used before it was defined                    no-use-before-define
-  1939:10   error  'json' was used before it was defined                                  no-use-before-define
-  1939:51   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1943:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  1944:50   error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-  1945:29   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  1945:96   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  1949:12   error  'json' was used before it was defined                                  no-use-before-define
-  1949:155  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1953:24   error  'cleanId' was used before it was defined                               no-use-before-define
-  1955:29   error  'json' was used before it was defined                                  no-use-before-define
-  1955:88   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1957:12   error  'json' was used before it was defined                                  no-use-before-define
-  1957:116  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1961:12   error  'json' was used before it was defined                                  no-use-before-define
-  1961:97   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  1964:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  1965:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1966:30   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1968:26   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1977:44   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  1992:26   error  'ensureSignatureFolderPermission' was used before it was defined       no-use-before-define
-  1995:10   error  'json' was used before it was defined                                  no-use-before-define
-  2007:11   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2020:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2024:35   error  'json' was used before it was defined                                  no-use-before-define
-  2024:101  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2025:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  2026:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2027:31   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2055:31   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2056:19   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2084:12   error  'json' was used before it was defined                                  no-use-before-define
-  2084:119  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2087:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2092:10   error  'json' was used before it was defined                                  no-use-before-define
-  2098:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2105:109  error  'json' was used before it was defined                                  no-use-before-define
-  2105:183  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2108:22   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2110:25   error  'json' was used before it was defined                                  no-use-before-define
-  2110:196  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2113:88   error  'json' was used before it was defined                                  no-use-before-define
-  2113:194  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2114:10   error  'json' was used before it was defined                                  no-use-before-define
-  2120:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2124:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2126:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  2127:27   error  'json' was used before it was defined                                  no-use-before-define
-  2127:81   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2133:60   error  'json' was used before it was defined                                  no-use-before-define
-  2133:123  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2134:64   error  'json' was used before it was defined                                  no-use-before-define
-  2134:132  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2136:17   error  'cleanName' was used before it was defined                             no-use-before-define
-  2137:21   error  'cleanName' was used before it was defined                             no-use-before-define
-  2139:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  2141:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2142:31   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2146:28   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2151:34   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2158:26   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2170:23   error  'ensureAnyoneReaderPermission' was used before it was defined          no-use-before-define
-  2172:10   error  'json' was used before it was defined                                  no-use-before-define
-  2187:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2191:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2193:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  2194:27   error  'json' was used before it was defined                                  no-use-before-define
-  2194:80   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2195:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2195:85   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2196:25   error  'json' was used before it was defined                                  no-use-before-define
-  2196:93   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2202:31   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  2203:26   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2205:33   error  'cleanName' was used before it was defined                             no-use-before-define
-  2209:64   error  'ensureAnyoneReaderPermission' was used before it was defined          no-use-before-define
-  2211:10   error  'json' was used before it was defined                                  no-use-before-define
-  2211:64   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2215:26   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2223:9    error  'driveFetch' was used before it was defined                            no-use-before-define
-  2232:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2234:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  2235:27   error  'json' was used before it was defined                                  no-use-before-define
-  2235:81   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2236:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2236:85   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2237:25   error  'json' was used before it was defined                                  no-use-before-define
-  2237:93   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2241:17   error  'cleanName' was used before it was defined                             no-use-before-define
-  2242:21   error  'cleanName' was used before it was defined                             no-use-before-define
-  2247:60   error  'json' was used before it was defined                                  no-use-before-define
-  2247:123  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2248:64   error  'json' was used before it was defined                                  no-use-before-define
-  2248:132  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2250:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  2251:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2252:30   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2256:28   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2261:34   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2268:26   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2285:30   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2290:40   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2296:32   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2310:10   error  'json' was used before it was defined                                  no-use-before-define
-  2330:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2334:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2336:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  2337:27   error  'json' was used before it was defined                                  no-use-before-define
-  2337:90   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2338:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  2339:24   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2340:29   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2345:26   error  'findOrCreateFolder' was used before it was defined                    no-use-before-define
-  2351:10   error  'json' was used before it was defined                                  no-use-before-define
-  2351:151  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2355:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2357:5    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2358:5    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2359:5    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2361:17   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  2362:18   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  2363:20   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  2364:10   error  'json' was used before it was defined                                  no-use-before-define
-  2371:9    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2375:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2378:38   error  'json' was used before it was defined                                  no-use-before-define
-  2378:109  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2382:24   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2382:61   error  'cleanId' was used before it was defined                               no-use-before-define
-  2383:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2383:65   error  'cleanId' was used before it was defined                               no-use-before-define
-  2384:32   error  'queryFirestoreByEmail' was used before it was defined                 no-use-before-define
-  2390:17   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  2394:23   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  2395:25   error  'firestoreDocumentToPlain' was used before it was defined              no-use-before-define
-  2399:12   error  'json' was used before it was defined                                  no-use-before-define
-  2399:154  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2424:10   error  'json' was used before it was defined                                  no-use-before-define
-  2424:62   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2428:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2430:15   error  'cleanId' was used before it was defined                               no-use-before-define
-  2431:38   error  'json' was used before it was defined                                  no-use-before-define
-  2431:145  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2432:24   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2433:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2439:23   error  'json' was used before it was defined                                  no-use-before-define
-  2439:134  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2440:22   error  'json' was used before it was defined                                  no-use-before-define
-  2440:107  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2455:163  error  'escapeHtml' was used before it was defined                            no-use-before-define
-  2455:314  error  'escapeHtml' was used before it was defined                            no-use-before-define
-  2456:27   error  'smtpSend' was used before it was defined                              no-use-before-define
-  2457:10   error  'json' was used before it was defined                                  no-use-before-define
-  2457:165  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2463:35   error  'json' was used before it was defined                                  no-use-before-define
-  2463:76   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2467:23   error  'json' was used before it was defined                                  no-use-before-define
-  2467:64   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2468:57   error  'json' was used before it was defined                                  no-use-before-define
-  2468:98   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2470:18   error  'json' was used before it was defined                                  no-use-before-define
-  2470:64   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2472:23   error  'json' was used before it was defined                                  no-use-before-define
-  2472:67   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2473:73   error  'json' was used before it was defined                                  no-use-before-define
-  2473:122  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2475:45   error  'smtpSend' was used before it was defined                              no-use-before-define
-  2476:12   error  'json' was used before it was defined                                  no-use-before-define
-  2476:63   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2479:12   error  'json' was used before it was defined                                  no-use-before-define
-  2479:62   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2488:11   error  'smtpSend' was used before it was defined                              no-use-before-define
-  2515:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2516:23   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2517:9    error  'enforceMailRateLimit' was used before it was defined                  no-use-before-define
-  2519:24   error  'cleanId' was used before it was defined                               no-use-before-define
-  2520:29   error  'json' was used before it was defined                                  no-use-before-define
-  2520:84   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2521:28   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2522:27   error  'json' was used before it was defined                                  no-use-before-define
-  2522:88   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2530:12   error  'json' was used before it was defined                                  no-use-before-define
-  2530:106  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2533:12   error  'json' was used before it was defined                                  no-use-before-define
-  2533:114  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2536:21   error  'json' was used before it was defined                                  no-use-before-define
-  2536:67   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2540:42   error  'cleanId' was used before it was defined                               no-use-before-define
-  2540:121  error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2541:69   error  'json' was used before it was defined                                  no-use-before-define
-  2541:187  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2543:26   error  'randomBase64Url' was used before it was defined                       no-use-before-define
-  2544:35   error  'sha256Hex' was used before it was defined                             no-use-before-define
-  2550:21   error  'cleanId' was used before it was defined                               no-use-before-define
-  2551:25   error  'cleanId' was used before it was defined                               no-use-before-define
-  2555:14   error  'json' was used before it was defined                                  no-use-before-define
-  2555:74   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2558:14   error  'json' was used before it was defined                                  no-use-before-define
-  2558:113  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2561:7    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2562:7    error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2564:44   error  'json' was used before it was defined                                  no-use-before-define
-  2564:129  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2569:14   error  'json' was used before it was defined                                  no-use-before-define
-  2569:119  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2573:14   error  'json' was used before it was defined                                  no-use-before-define
-  2573:107  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2598:9    error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
+  1796:9    error  'document' is already a global variable                                no-shadow
+  1860:9    error  'status' is already a global variable                                  no-shadow
+  2195:9    error  'document' is already a global variable                                no-shadow
+  2236:9    error  'document' is already a global variable                                no-shadow
+  2438:9    error  'name' is already a global variable                                    no-shadow
+  2537:9    error  'name' is already a global variable                                    no-shadow
   2604:123  error  'html' is already declared in the upper scope on line 3484 column 10   no-shadow
-  2604:131  error  'smtpSend' was used before it was defined                              no-use-before-define
-  2607:11   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-  2608:12   error  'json' was used before it was defined                                  no-use-before-define
-  2608:242  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2615:13   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-  2623:12   error  'json' was used before it was defined                                  no-use-before-define
-  2623:101  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2628:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2629:9    error  'enforceMailRateLimit' was used before it was defined                  no-use-before-define
-  2631:22   error  'cleanId' was used before it was defined                               no-use-before-define
-  2632:21   error  'cleanId' was used before it was defined                               no-use-before-define
-  2633:41   error  'json' was used before it was defined                                  no-use-before-define
-  2633:110  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2634:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2634:94   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2635:25   error  'json' was used before it was defined                                  no-use-before-define
-  2635:89   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2637:22   error  'firestoreMapArray' was used before it was defined                     no-use-before-define
-  2639:26   error  'json' was used before it was defined                                  no-use-before-define
-  2639:113  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2643:12   error  'json' was used before it was defined                                  no-use-before-define
-  2643:131  error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2654:9    error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-  2654:80   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2661:13   error  'smtpSend' was used before it was defined                              no-use-before-define
-  2665:11   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-  2665:82   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2673:12   error  'json' was used before it was defined                                  no-use-before-define
-  2673:97   error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2677:11   error  'updateFirestoreDocument' was used before it was defined               no-use-before-define
-  2677:82   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
+  2646:9    error  'name' is already a global variable                                    no-shadow
   2698:46   error  'html' is already declared in the upper scope on line 3484 column 10   no-shadow
-  2781:24   error  'authenticateFirebaseRequest' was used before it was defined           no-use-before-define
-  2788:12   error  'json' was used before it was defined                                  no-use-before-define
-  2791:7    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2796:12   error  'json' was used before it was defined                                  no-use-before-define
-  2799:7    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2803:23   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2806:11   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2810:12   error  'json' was used before it was defined                                  no-use-before-define
-  2813:7    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2817:26   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  2820:11   error  'getFirestoreAdminAccessToken' was used before it was defined          no-use-before-define
-  2824:12   error  'json' was used before it was defined                                  no-use-before-define
-  2827:7    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2834:12   error  'json' was used before it was defined                                  no-use-before-define
-  2837:7    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2841:29   error  'getDriveAccessToken' was used before it was defined                   no-use-before-define
-  2843:26   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2849:23   error  'parseDescription' was used before it was defined                      no-use-before-define
-  2852:12   error  'json' was used before it was defined                                  no-use-before-define
-  2855:7    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2876:10   error  'json' was used before it was defined                                  no-use-before-define
-  2885:5    error  'corsHeaders' was used before it was defined                           no-use-before-define
-  2895:30   error  'decryptText' was used before it was defined                           no-use-before-define
-  2916:26   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2926:11   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2954:24   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2957:25   error  'driveFetch' was used before it was defined                            no-use-before-define
-  2994:33   error  'base64UrlDecode' was used before it was defined                       no-use-before-define
-  2995:30   error  'base64UrlDecode' was used before it was defined                       no-use-before-define
-  3001:22   error  'getFirebaseJwks' was used before it was defined                       no-use-before-define
-  3015:5    error  'base64UrlBytes' was used before it was defined                        no-use-before-define
-  3021:46   error  'assertActivatedPortalUser' was used before it was defined             no-use-before-define
-  3026:23   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  3035:50   error  'getInstitutionalProfileForUser' was used before it was defined        no-use-before-define
-  3180:30   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  3181:32   error  'getFirestoreDocument' was used before it was defined                  no-use-before-define
-  3401:52   error  'base64Bytes' was used before it was defined                           no-use-before-define
-  3405:9    error  'uint8ToBase64' was used before it was defined                         no-use-before-define
-  3406:17   error  'uint8ToBase64' was used before it was defined                         no-use-before-define
-  3412:52   error  'base64Bytes' was used before it was defined                           no-use-before-define
-  3413:72   error  'base64Bytes' was used before it was defined                           no-use-before-define
-  3413:103  error  'base64Bytes' was used before it was defined                           no-use-before-define
-  3440:10   error  'uint8ToBase64' was used before it was defined                         no-use-before-define
-  3449:35   error  'base64UrlBytes' was used before it was defined                        no-use-before-define
-  3485:124  error  'escapeHtml' was used before it was defined                            no-use-before-define
+  2817:9    error  'document' is already a global variable                                no-shadow
+  2946:53   error  'name' is already a global variable                                    no-shadow
+  3105:35   error  'document' is already a global variable                                no-shadow
+  3474:21   error  'status' is already a global variable                                  no-shadow
+  3484:24   error  'status' is already a global variable                                  no-shadow
+  3496:9    error  'origin' is already a global variable                                  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/authorizationPolicy.js
-  63:68  error  'validPermission' was used before it was defined  no-use-before-define
+  91:9  error  'status' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/authorizationService.js
+  1:7  error  'crypto' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/financeAccountingFunctions.js
+   67:19  error  'name' is already a global variable    no-shadow
+  136:62  error  'status' is already a global variable  no-shadow
+  176:63  error  'name' is already a global variable    no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/grantCrawler.js
-   74:12  error  'normalizeCandidate' was used before it was defined  no-use-before-define
-   74:45  error  'resolveUrl' was used before it was defined          no-use-before-define
-  130:38  error  'canonicalUrl' was used before it was defined        no-use-before-define
-  130:71  error  'canonicalUrl' was used before it was defined        no-use-before-define
+   4:7   error  'crypto' is already a global variable  no-shadow
+  59:24  error  'name' is already a global variable    no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/index.js
-  607:53  error  'value' is already declared in the upper scope on line 607 column 13  no-shadow
-  617:73  error  'authorityDepartment' was used before it was defined                  no-use-before-define
+     9:7    error  'crypto' is already a global variable                                 no-shadow
+    25:38   error  'event' is already a global variable                                  no-shadow
+    53:54   error  'module' is already a global variable                                 no-shadow
+   111:42   error  'event' is already a global variable                                  no-shadow
+   124:127  error  'event' is already a global variable                                  no-shadow
+   125:132  error  'event' is already a global variable                                  no-shadow
+   126:126  error  'event' is already a global variable                                  no-shadow
+   127:122  error  'event' is already a global variable                                  no-shadow
+   128:122  error  'event' is already a global variable                                  no-shadow
+   243:11   error  'status' is already a global variable                                 no-shadow
+   434:37   error  'name' is already a global variable                                   no-shadow
+   488:15   error  'status' is already a global variable                                 no-shadow
+   607:53   error  'value' is already declared in the upper scope on line 607 column 13  no-shadow
+   617:73   error  'authorityDepartment' was used before it was defined                  no-use-before-define
+   676:9    error  'name' is already a global variable                                   no-shadow
+   794:9    error  'name' is already a global variable                                   no-shadow
+   874:9    error  'name' is already a global variable                                   no-shadow
+   909:9    error  'origin' is already a global variable                                 no-shadow
+   952:25   error  'status' is already a global variable                                 no-shadow
+  1202:9    error  'status' is already a global variable                                 no-shadow
+  1285:9    error  'status' is already a global variable                                 no-shadow
+  1360:9    error  'status' is already a global variable                                 no-shadow
+  1391:9    error  'name' is already a global variable                                   no-shadow
+  1476:9    error  'name' is already a global variable                                   no-shadow
+  1809:11   error  'status' is already a global variable                                 no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/liveMeeting.js
+   5:7  error  'crypto' is already a global variable  no-shadow
+  19:9  error  'status' is already a global variable  no-shadow
+  63:9  error  'status' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/meetingAttendanceRegister.js
+  3:7  error  'crypto' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/meetingGateway.js
+    4:7   error  'crypto' is already a global variable  no-shadow
+   11:17  error  'status' is already a global variable  no-shadow
+   22:18  error  'status' is already a global variable  no-shadow
+  202:9   error  'status' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/meetingRecords.js
+    3:7   error  'crypto' is already a global variable  no-shadow
+   37:24  error  'status' is already a global variable  no-shadow
+  245:26  error  'name' is already a global variable    no-shadow
+  245:34  error  'status' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/mfaSecurityAudit.js
+  16:9  error  'status' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/passwordSecurity.js
+  4:7  error  'crypto' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/scripts/deploy-staging-firestore-rules.js
+  29:13  error  'status' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/scripts/verify-cloudflare-livekit-token-worker.js
-  5:17  error  'required' was used before it was defined  no-use-before-define
-  6:20  error  'required' was used before it was defined  no-use-before-define
-  7:22  error  'required' was used before it was defined  no-use-before-define
+  2:7   error  'crypto' is already a global variable  no-shadow
+  9:19  error  'name' is already a global variable    no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/scripts/verify-livekit-control-plane.js
+  3:19  error  'name' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/functions/systemControl.js
+  37:29  error  'name' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/auth.js
-  130:31  error  'firebaseErrorMessage' was used before it was defined  no-use-before-define
-  241:21  error  'firebaseErrorMessage' was used before it was defined  no-use-before-define
+  335:9  error  'name' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/authorizationAccess.js
+  56:42  error  'module' is already a global variable  no-shadow
+  64:15  error  'module' is already a global variable  no-shadow
+  65:12  error  'module' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/authorizationWorkflow.js
+   8:10    error  'event' is already a global variable    no-shadow
+   8:16    error  'status' is already a global variable   no-shadow
+  13:2230  error  'history' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/data.js
-   59:144  error  'getRecord' was used before it was defined                  no-use-before-define
-   63:129  error  'getRecord' was used before it was defined                  no-use-before-define
-   64:184  error  'getRecord' was used before it was defined                  no-use-before-define
-   64:865  error  'getRecord' was used before it was defined                  no-use-before-define
-   65:230  error  'getRecord' was used before it was defined                  no-use-before-define
-   90:5    error  'getCurrentMemberProfile' was used before it was defined    no-use-before-define
-   91:5    error  'getCurrentEmployeeProfile' was used before it was defined  no-use-before-define
-  132:19   error  'meetingCreatedAt' was used before it was defined           no-use-before-define
-  132:39   error  'meetingCreatedAt' was used before it was defined           no-use-before-define
+   46:150   error  'name' is already a global variable    no-shadow
+   53:47    error  'status' is already a global variable  no-shadow
+  187:281   error  'origin' is already a global variable  no-shadow
+  187:1079  error  'status' is already a global variable  no-shadow
+  217:11    error  'status' is already a global variable  no-shadow
+  243:1248  error  'name' is already a global variable    no-shadow
+  503:39    error  'alert' is already a global variable   no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/functions.js
+  7:45  error  'name' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/gatewayUrl.js
    3:5   error  '__IRPA_STAGING_BUILD__' is not defined        no-undef
    8:34  error  '__IRPA_DEFAULT_GATEWAY_URL__' is not defined  no-undef
   14:10  error  '__IRPA_STAGING_BUILD__' is not defined        no-undef
 
-/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/meetingPolicy.js
-  35:16  error  'resolveCategory' was used before it was defined  no-use-before-define
-  46:16  error  'resolveCategory' was used before it was defined  no-use-before-define
-  51:16  error  'resolveCategory' was used before it was defined  no-use-before-define
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/meetingRecords.js
+  5:14  error  'name' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/notifications.js
+  28:3  error  'module' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/procurement.js
-  91:88  error  'team' was used before it was defined  no-use-before-define
-  92:66  error  'team' was used before it was defined  no-use-before-define
+  100:81  error  'name' is already a global variable  no-shadow
 
 /home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/signaturePlatform.js
-  100:9     error  'ref' is already declared in the upper scope on line 3 column 269  no-shadow
-  287:9     error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  314:31    error  'fetchBytes' was used before it was defined                        no-use-before-define
-  341:66    error  'releaseNextSigner' was used before it was defined                 no-use-before-define
-  342:9     error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  353:4243  error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  353:4659  error  'releaseViewOnlyRecipient' was used before it was defined          no-use-before-define
-  353:4740  error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  358:9     error  'ref' is already declared in the upper scope on line 3 column 269  no-shadow
-  386:9     error  'recordEnvelopeEvent' was used before it was defined               no-use-before-define
-  549:5840  error  'releaseNextSigner' was used before it was defined                 no-use-before-define
+  100:9   error  'ref' is already declared in the upper scope on line 3 column 269  no-shadow
+  358:9   error  'ref' is already declared in the upper scope on line 3 column 269  no-shadow
+  369:11  error  'status' is already a global variable                              no-shadow
+  396:54  error  'event' is already a global variable                               no-shadow
+  435:9   error  'status' is already a global variable                              no-shadow
 
-✖ 930 problems (930 errors, 0 warnings)
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/firebase/workflowLinks.js
+  37:37  error  'module' is already a global variable  no-shadow
+  62:34  error  'module' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/grantPipeline/eligibility.js
+  15:27  error  'status' is already a global variable  no-shadow
+
+/home/runner/work/IRPA-Digital-Board-Governance-System/IRPA-Digital-Board-Governance-System/src/grantPipeline/validity.js
+  10:38  error  'closed' is already a global variable  no-shadow
+
+✖ 106 problems (106 errors, 0 warnings)
 
 ~~~
