@@ -4,6 +4,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn, nsmap
 nsmap["v"] = "urn:schemas-microsoft-com:vml"
 from PIL import Image, ImageDraw, ImageFont
+from copy import deepcopy
 import os, subprocess, pikepdf
 
 out = "test-results"
@@ -47,22 +48,42 @@ header.is_linked_to_previous = False
 p = header.paragraphs[0]
 p.paragraph_format.space_after = Pt(0)
 p.add_run().add_picture(letterhead_path, width=Inches(6.85))
-rid, _ = header.part.get_or_add_image(watermark_path)
 watermark_paragraph = header.add_paragraph()
-pict = OxmlElement("w:pict")
-shape = OxmlElement("v:shape")
-shape.set("id", "IRPA_Faint_Watermark")
-shape.set("type", "#_x0000_t75")
-shape.set("style", "position:absolute;margin-left:35pt;margin-top:150pt;width:430pt;height:105pt;z-index:-251654144;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin")
-shape.set("stroked", "f")
-image_data = OxmlElement("v:imagedata")
-image_data.set(qn("r:id"), rid)
-shape.append(image_data)
-fill = OxmlElement("v:fill")
-fill.set("opacity", "18%")
-shape.append(fill)
-pict.append(shape)
-watermark_paragraph._p.append(pict)
+watermark_paragraph.paragraph_format.space_before = Pt(0)
+watermark_paragraph.paragraph_format.space_after = Pt(0)
+watermark_run = watermark_paragraph.add_run()
+inline = watermark_run.add_picture(watermark_path, width=Inches(6.2), height=Inches(1.5))._inline
+anchor = OxmlElement("wp:anchor")
+for key, value in {
+    "distT": "0", "distB": "0", "distL": "0", "distR": "0",
+    "simplePos": "0", "relativeHeight": "0", "behindDoc": "1",
+    "locked": "0", "layoutInCell": "1", "allowOverlap": "1"
+}.items():
+    anchor.set(key, value)
+simple_pos = OxmlElement("wp:simplePos")
+simple_pos.set("x", "0")
+simple_pos.set("y", "0")
+position_h = OxmlElement("wp:positionH")
+position_h.set("relativeFrom", "page")
+horizontal_alignment = OxmlElement("wp:align")
+horizontal_alignment.text = "center"
+position_h.append(horizontal_alignment)
+position_v = OxmlElement("wp:positionV")
+position_v.set("relativeFrom", "page")
+vertical_offset = OxmlElement("wp:posOffset")
+vertical_offset.text = str(int(4.0 * 914400))
+position_v.append(vertical_offset)
+effect_extent = OxmlElement("wp:effectExtent")
+for edge in ("l", "t", "r", "b"):
+    effect_extent.set(edge, "0")
+wrap_none = OxmlElement("wp:wrapNone")
+anchor.extend([
+    simple_pos, position_h, position_v, deepcopy(inline.extent),
+    effect_extent, wrap_none, deepcopy(inline.docPr),
+    deepcopy(inline.cNvGraphicFramePr), deepcopy(inline.graphic)
+])
+inline.addnext(anchor)
+inline.getparent().remove(inline)
 
 def paragraph(text, bold=False):
     p = doc.add_paragraph()
