@@ -46,8 +46,16 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
 
-      - name: Run Signature Portal routing and pathway contract tests
-        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs
+      - name: Run Signature Portal routing, source-integrity and Add Signer contract tests
+        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs tests/signature-source-integrity.test.mjs
+
+      - name: Install Playwright Chromium for Signature Portal acceptance
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run authenticated Add Signer Playwright acceptance
+        run: node tests/signature-envelope-content.playwright.mjs
 
       - name: Build web application
         env:
