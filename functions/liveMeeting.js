@@ -369,7 +369,7 @@ exports.startMeetingRecording = onCall({
   const row = {
     meetingId: ctx.meeting.id,
     meetingReference: text(ctx.meeting.meetingReference || ctx.meeting.reference || ctx.meeting.title),
-    meetingTitle: text(ctx.meeting.title), meetingCategory: categoryOf(ctx.meeting), roomName,
+    meetingTitle: text(ctx.meeting.title), meetingCategory: text(ctx.meeting.meetingCategory || ctx.meeting.category || "General"), roomName,
     egressId, outputPath: filepath, recordingStatus: "RECORDING",
     egressStatus: egressState(egress),
     recordingProvider: "LIVEKIT_EGRESS", storageDestination: "LIVEKIT_EGRESS_CONFIGURED_STORAGE",

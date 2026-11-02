@@ -604,7 +604,7 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
     ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
     ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
     ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
-  ].flatMap(value=>String(value||"").split(",").map(value=>value.trim()).filter(Boolean));
+  ].flatMap(roleValue=>String(roleValue||"").split(",").map(part=>part.trim()).filter(Boolean));
 
   const allowedRoles=[...new Set(uniqueRecords.flatMap(valuesFor))];
   if(!allowedRoles.includes(requestedRole))
@@ -614,7 +614,7 @@ exports.updateSignerAuthority = onCall({region:"us-central1"}, async request => 
     if(!valuesFor(record).includes(requestedRole)) return false;
     if(requestedDepartment&&String(record.department||"").trim()!==requestedDepartment) return false;
     if(requestedUnit){
-      const recordUnit=String(record.unit||record.unitName||"").trim()||authorityDepartment||requestedDepartment;
+      const recordUnit=String(record.unit||record.unitName||"").trim()||requestedDepartment;
       if(recordUnit!==requestedUnit) return false;
     }
     return true;
