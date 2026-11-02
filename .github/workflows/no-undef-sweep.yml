@@ -39,13 +39,19 @@ jobs:
             src/ drive-gateway/src/ functions/ > undef-eslint.txt 2>&1
           status=$?
           hits=$(grep -Ec '  (error|warning) ' undef-eslint.txt || true)
-          undef_hits=$(grep -Ec 'no-undef          {
+          undef_hits=$(grep -Ec 'no-undef$' undef-eslint.txt || true)
+          use_before_hits=$(grep -Ec 'no-use-before-define$' undef-eslint.txt || true)
+          shadow_hits=$(grep -Ec 'no-shadow$' undef-eslint.txt || true)
+          history=$(git log -S"sourceSha256" --oneline -- src/firebase/signaturePlatform.js)
+          {
             echo "## Undefined-name / shadowing sweep"
             echo "- ESLint exit: $status"
             echo "- Total reported violations: $hits"
             echo "- no-undef hits: $undef_hits"
             echo "- no-use-before-define hits: $use_before_hits"
             echo "- no-shadow hits: $shadow_hits"
+            echo "- sourceSha256 history:"
+            echo "$history"
             echo '~~~text'
             cat undef-eslint.txt
             echo '~~~'
@@ -56,6 +62,14 @@ jobs:
             echo "- Commit: $GITHUB_SHA"
             echo "- ESLint exit: $status"
             echo "- Total reported violations: $hits"
+            echo "- no-undef hits: $undef_hits"
+            echo "- no-use-before-define hits: $use_before_hits"
+            echo "- no-shadow hits: $shadow_hits"
+            echo
+            echo "## sourceSha256 introduction history"
+            echo '~~~text'
+            echo "$history"
+            echo '~~~'
             echo
             echo '~~~text'
             cat undef-eslint.txt
@@ -63,6 +77,9 @@ jobs:
           } > docs-undef-report.md
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "hits=$hits" >> "$GITHUB_OUTPUT"
+          echo "undef_hits=$undef_hits" >> "$GITHUB_OUTPUT"
+          echo "use_before_hits=$use_before_hits" >> "$GITHUB_OUTPUT"
+          echo "shadow_hits=$shadow_hits" >> "$GITHUB_OUTPUT"
       - name: Commit diagnostic report to branch
         if: always() && github.event_name != 'pull_request' && !contains(github.event.head_commit.message, 'docs(diagnostics):')
         shell: bash
@@ -81,170 +98,19 @@ jobs:
         run: |
           test "${{ steps.lint.outputs.status }}" = "0"
           test "${{ steps.lint.outputs.hits }}" = "0"
-
-  signature-source-integrity-tests:
-    name: Signature source integrity unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: node --test tests/signature-source-integrity.test.mjs
- undef-eslint.txt || true)
-          use_before_hits=$(grep -Ec 'no-use-before-define          {
-            echo "## Undefined-name / shadowing sweep"
-            echo "- ESLint exit: $status"
-            echo "- Total reported violations: $hits"
-            echo '~~~text'
-            cat undef-eslint.txt
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
-          {
-            echo "# Undefined-name and shadowing diagnostic"
-            echo
-            echo "- Commit: $GITHUB_SHA"
-            echo "- ESLint exit: $status"
-            echo "- Total reported violations: $hits"
-            echo
-            echo '~~~text'
-            cat undef-eslint.txt
-            echo '~~~'
-          } > docs-undef-report.md
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          echo "hits=$hits" >> "$GITHUB_OUTPUT"
-      - name: Commit diagnostic report to branch
-        if: always() && github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          mkdir -p docs/diagnostics
-          cp docs-undef-report.md docs/diagnostics/undef-report.md
-          if ! git diff --quiet -- docs/diagnostics/undef-report.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add docs/diagnostics/undef-report.md
-            git commit -m "docs(diagnostics): record undefined-name sweep"
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
-      - name: Enforce zero undefined names and use-before-define violations
-        if: always()
-        run: |
-          test "${{ steps.lint.outputs.status }}" = "0"
-          test "${{ steps.lint.outputs.hits }}" = "0"
-
-  signature-source-integrity-tests:
-    name: Signature source integrity unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: node --test tests/signature-source-integrity.test.mjs
- undef-eslint.txt || true)
-          shadow_hits=$(grep -Ec 'no-shadow          {
-            echo "## Undefined-name / shadowing sweep"
-            echo "- ESLint exit: $status"
-            echo "- Total reported violations: $hits"
-            echo '~~~text'
-            cat undef-eslint.txt
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
-          {
-            echo "# Undefined-name and shadowing diagnostic"
-            echo
-            echo "- Commit: $GITHUB_SHA"
-            echo "- ESLint exit: $status"
-            echo "- Total reported violations: $hits"
-            echo
-            echo '~~~text'
-            cat undef-eslint.txt
-            echo '~~~'
-          } > docs-undef-report.md
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          echo "hits=$hits" >> "$GITHUB_OUTPUT"
-      - name: Commit diagnostic report to branch
-        if: always() && github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          mkdir -p docs/diagnostics
-          cp docs-undef-report.md docs/diagnostics/undef-report.md
-          if ! git diff --quiet -- docs/diagnostics/undef-report.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add docs/diagnostics/undef-report.md
-            git commit -m "docs(diagnostics): record undefined-name sweep"
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
-      - name: Enforce zero undefined names and use-before-define violations
-        if: always()
-        run: |
-          test "${{ steps.lint.outputs.status }}" = "0"
-          test "${{ steps.lint.outputs.hits }}" = "0"
-
-  signature-source-integrity-tests:
-    name: Signature source integrity unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: node --test tests/signature-source-integrity.test.mjs
- undef-eslint.txt || true)
-          {
-            echo "## Undefined-name / shadowing sweep"
-            echo "- ESLint exit: $status"
-            echo "- Total reported violations: $hits"
-            echo '~~~text'
-            cat undef-eslint.txt
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
-          {
-            echo "# Undefined-name and shadowing diagnostic"
-            echo
-            echo "- Commit: $GITHUB_SHA"
-            echo "- ESLint exit: $status"
-            echo "- Total reported violations: $hits"
-            echo
-            echo '~~~text'
-            cat undef-eslint.txt
-            echo '~~~'
-          } > docs-undef-report.md
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          echo "hits=$hits" >> "$GITHUB_OUTPUT"
-      - name: Commit diagnostic report to branch
-        if: always() && github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          mkdir -p docs/diagnostics
-          cp docs-undef-report.md docs/diagnostics/undef-report.md
-          if ! git diff --quiet -- docs/diagnostics/undef-report.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add docs/diagnostics/undef-report.md
-            git commit -m "docs(diagnostics): record undefined-name sweep"
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
-      - name: Enforce zero undefined names and use-before-define violations
-        if: always()
-        run: |
-          test "${{ steps.lint.outputs.status }}" = "0"
-          test "${{ steps.lint.outputs.hits }}" = "0"
-
-  signature-source-integrity-tests:
-    name: Signature source integrity unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: node --test tests/signature-source-integrity.test.mjs
-
       - name: Upload lint diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: undefined-name-sweep
           path: undef-eslint.txt
+
+  signature-source-integrity-tests:
+    name: Signature source integrity unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/signature-source-integrity.test.mjs
