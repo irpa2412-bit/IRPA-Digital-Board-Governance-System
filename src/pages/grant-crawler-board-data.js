@@ -1,10 +1,10 @@
 const ENTITY_MAP = { amp: "&", apos: "'", quot: '"', nbsp: " ", lt: "<", gt: ">", ndash: "–", mdash: "—", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", hellip: "…" };
 export function cleanCrawlerText(value, maxLength = 280) {
- const decoded=String(value??"").replace(/<(script|style|noscript)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi," ").replace(/<[^>]*>/g," ").replace(/&(#x[0-9a-f]+|#\\d+|[a-z][a-z0-9]+);/gi,(entity,key)=>{
+ const decoded=String(value??"").replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi," ").replace(/<[^>]*>/g," ").replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi,(entity,key)=>{
   if(key[0]==="#"){const hex=key[1]?.toLowerCase()==="x";const code=Number.parseInt(key.slice(hex?2:1),hex?16:10);return Number.isFinite(code)&&code>0&&code<=0x10ffff?String.fromCodePoint(code):" ";}
   return ENTITY_MAP[key.toLowerCase()]??" ";
  });
- return decoded.replace(/\\b(skip to main content|skip navigation|main menu|cookie settings|accept all cookies|reject all cookies|manage cookies|privacy policy|terms of use|subscribe to our newsletter|home|menu|about us|contact us|search this site|accessibility statement)\\b/gi," ").replace(/[\\u00a0\\s]+/g," ").trim().slice(0,Math.max(0,Number(maxLength)||280));
+ return decoded.replace(/\b(skip to main content|skip navigation|main menu|cookie settings|accept all cookies|reject all cookies|manage cookies|privacy policy|terms of use|subscribe to our newsletter|home|menu|about us|contact us|search this site|accessibility statement)\b/gi," ").replace(/[\u00a0\s]+/g," ").trim().slice(0,Math.max(0,Number(maxLength)||280));
 }
 export function mapCrawlerOpportunity(item) {
   const parseList = value => {

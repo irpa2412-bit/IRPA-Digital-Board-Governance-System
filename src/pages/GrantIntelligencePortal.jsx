@@ -112,7 +112,7 @@ const isConfirmedOpenCall=record=>{
  const issue=getOpportunityCurrentStatusIssue(record);if(issue)return false;
  const callStatus=text(record?.callStatus||record?.call_status).toLowerCase(),recordStatus=text(record?.status).toLowerCase();
  const opportunityText=[record?.title,record?.summary,record?.description].filter(Boolean).join(" ");
- return callStatus==="open"||recordStatus==="open"||/\\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline|no application deadline)\\b/i.test(opportunityText);
+ return callStatus==="open"||recordStatus==="open"||/\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline|no application deadline)\b/i.test(opportunityText);
 };
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
@@ -274,7 +274,8 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      market:["value chain","market access","value addition","trade"],
      grants:["funding","grant","call for proposals","open call"]
    };
-   const openCalls=currentOpportunityRecords.filter(isConfirmedOpenCall);\n    return openCalls.map(r=>{
+   const openCalls=currentOpportunityRecords.filter(isConfirmedOpenCall);
+    return openCalls.map(r=>{
        const title=text(r.title).toLowerCase();
        const funder=text(r.funder).toLowerCase();
        const summary=text(r.summary||r.description).toLowerCase();
