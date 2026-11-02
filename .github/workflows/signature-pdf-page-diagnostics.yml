@@ -1,0 +1,30 @@
+name: Signature PDF Page Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [fix/last-page-diagnostics-20261102]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pdf-page-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run PDF page-rendering unit tests
+        run: npm run test:pdf-page-rendering
+      - name: Build production application
+        run: npm run build
+      - name: Verify production Worker gateway URL
+        run: node scripts/check-production-gateway-bundle.mjs
