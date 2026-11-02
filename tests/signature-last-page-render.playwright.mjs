@@ -6,6 +6,15 @@ import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
 mkdirSync("test-results",{recursive:true});
+const readerSource=readFileSync("src/components/DocumentReader.jsx","utf8");
+const signatureSource=readFileSync("src/pages/SignaturePlatform.jsx","utf8");
+const gatewaySource=readFileSync("src/pages/GatewaySigningPortal.jsx","utf8");
+for(const [name,source] of [["Controlled Documents reader",readerSource],["Signature Portal",signatureSource],["Gateway signing portal",gatewaySource]]){
+ assert.match(source,/renderPdfPageToCanvas/,name+" must use the bounded PDF page renderer");
+ assert.match(source,/could not be displayed/,name+" must show page-scoped rendering failures");
+ assert.match(source,/Retry/,name+" must provide a retry action");
+ assert.match(source,/Open original file/,name+" must provide an original-file link");
+}
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4176","--strictPort"],{stdio:"ignore"});
 let browser;
 const fixtures=[
@@ -21,6 +30,13 @@ try{
  const errors=[];page.on("pageerror",error=>errors.push(error.message));
  for(const fixture of fixtures){
   const bytes=readFileSync(fixture);
+  if(fixture===fixtures[0]){
+   const fonts=execFileSync("pdffonts",[fixture],{encoding:"utf8"});
+   assert.ok(fonts.split("\\n").some(line=>/TrueType/.test(line)&&/\\byes\\b/.test(line)),"Word-style PDF must embed at least one TrueType font");
+   const images=execFileSync("pdfimages",["-list",fixture],{encoding:"utf8"});
+   const imagePages=new Set(images.split("\\n").map(line=>line.trim().split(/\\s+/)[0]).filter(value=>/^[123]$/.test(value)));
+   assert.deepEqual([...imagePages].sort(),["1","2","3"],"repeating letterhead image must be present on all three pages");
+  }
   const extracted=execFileSync("pdftotext",["-f","3","-l","3","-layout",fixture,"-"],{encoding:"utf8"});
   assert.match(extracted,/PAGE 3 BODY CONTENT LINE 1/,"pdftotext must extract page-3 minutes");
   assert.match(extracted,/PAGE 3 SIGNATURE TABLE END/,"pdftotext must extract the page-3 signature table");
@@ -35,7 +51,7 @@ try{
   await page.getByTestId("envelope-created").waitFor();
   for(const [view,label] of [["signature","Signature Portal viewer"],["controlled","Controlled Documents reader"],["gateway","Gateway signing portal"]]){
    await page.getByRole("button",{name:label}).click();
-   await page.getByTestId("page-metrics").waitFor();
+   await page.waitForFunction(expected=>{const node=document.querySelector("[data-testid=page-metrics]");if(!node)return false;try{return JSON.parse(node.textContent).view===expected}catch{return false}},view);
    const metrics=JSON.parse(await page.getByTestId("page-metrics").textContent());
    assert.equal(metrics.pageNumber,3);
    assert.ok(metrics.textCharacters>0,"page 3 text must be extractable in "+label);
@@ -47,7 +63,7 @@ try{
   await page.setViewportSize({width:390,height:844});
   for(const [view,label] of [["signature","Signature Portal viewer"],["controlled","Controlled Documents reader"],["gateway","Gateway signing portal"]]){
    await page.getByRole("button",{name:label}).click();
-   await page.getByTestId("page-metrics").waitFor();
+   await page.waitForFunction(expected=>{const node=document.querySelector("[data-testid=page-metrics]");if(!node)return false;try{return JSON.parse(node.textContent).view===expected}catch{return false}},view);
    const metrics=JSON.parse(await page.getByTestId("page-metrics").textContent());
    assert.ok(metrics.textCharacters>0&&metrics.nonBlankPixelRatio>0,"page 3 must render on mobile in "+label);
    assert.ok(metrics.pixelWidth*metrics.pixelHeight<=4000000,"mobile canvas must respect the 4MP memory budget");
