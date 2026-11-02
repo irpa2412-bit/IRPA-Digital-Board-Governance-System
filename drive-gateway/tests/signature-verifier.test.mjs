@@ -34,7 +34,7 @@ async function completedFixture() {
   ];
   const fields = [
     { fieldId: "field_drawn", type: "Signature", page: 2, x: 10, y: 70, width: 30, height: 10, signerUid: "signer-drawn", required: true },
-    { fieldId: "field_typed", type: "Text", page: 3, x: 10, y: 70, width: 35, height: 10, signerUid: "signer-typed", required: true },
+    { fieldId: "field_typed", type: "Signature", page: 3, x: 10, y: 70, width: 35, height: 10, signerUid: "signer-typed", required: true },
   ];
   const events = await chainEvents([], { type: "envelope.created", at: "2026-11-02T09:00:00.000Z", actor: "admin-1", documentHash: sourceHash, signerCount: 2 });
   const envelope = {
@@ -75,7 +75,7 @@ async function completedFixture() {
   const second = await submit("signer-typed", typedToken, {
     signature: { type: "typed", value: "Typed Signature Example" },
     fieldValues: { field_typed: "Typed Signature Example" },
-    fieldApplications: [], signatureConfirmed: true, consent: true, manualAuthorityIdentification: "Test Authority",
+    fieldApplications: [{ fieldId: "field_typed", confirmed: true, page: 3, x: 10, y: 70, width: 35, height: 10, value: "Typed Signature Example" }], signatureConfirmed: true, consent: true, manualAuthorityIdentification: "Test Authority",
   });
   assert.equal(second.status, "Completed");
   return { meta, storage, ctx, envelope, document, sourceBytes, finalized: second, tokens: { drawn: drawnToken, typed: typedToken } };
