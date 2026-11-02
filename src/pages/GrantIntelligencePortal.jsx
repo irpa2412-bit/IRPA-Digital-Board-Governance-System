@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from "react";
 import {addDoc,collection,onSnapshot,serverTimestamp,updateDoc,doc,query,where} from "firebase/firestore";
 import app,{auth,db} from "../firebase/config";
 import FundraisingSourceRegistry from "./grant-fundraising/FundraisingSourceRegistry.jsx";
-import { mapCrawlerOpportunity, mergeCrawlerOpportunityPage, summarizeCrawlerSources } from "./grant-crawler-board-data.js";
+import { cleanCrawlerText, mapCrawlerOpportunity, mergeCrawlerOpportunityPage, summarizeCrawlerSources } from "./grant-crawler-board-data.js";
 
 const PILLARS=[
  {id:"rangeland",label:"Sustainable Rangeland Management",short:"Rangeland"},
@@ -65,7 +65,7 @@ const SOURCES=[
  {name:"Africa Climate Change Fund — official information",category:"African and regional institutions",url:"https://www.afdb.org/en/topics-and-sectors/initiatives-partnerships/africa-climate-change-fund"},
 ];
 
-const statusOptions=["Open","Upcoming","Closed","Under review","Application in progress","Submitted","Awarded","Not pursuing"];
+const statusOptions=["Open","Upcoming","Closed","Under review","Not pursuing"];
 const styles={
  page:{color:"var(--text-primary, #e8edf5)",display:"grid",gap:18},
  hero:{padding:24,borderRadius:18,background:"linear-gradient(125deg,#102a43,#174d55)",color:"#fff",display:"flex",justifyContent:"space-between",gap:18,alignItems:"center",flexWrap:"wrap"},
@@ -108,6 +108,12 @@ const getOpportunityCurrentStatusIssue=record=>{
  return "unverified";
 };
 const isNotCurrentOpportunity=record=>["closed","expired"].includes(getOpportunityCurrentStatusIssue(record));
+const isConfirmedOpenCall=record=>{
+ const issue=getOpportunityCurrentStatusIssue(record);if(issue)return false;
+ const callStatus=text(record?.callStatus||record?.call_status).toLowerCase(),recordStatus=text(record?.status).toLowerCase();
+ const opportunityText=[record?.title,record?.summary,record?.description].filter(Boolean).join(" ");
+ return callStatus==="open"||recordStatus==="open"||/\\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline|no application deadline)\\b/i.test(opportunityText);
+};
 export default function GrantIntelligencePortal({profile,employee,isAdmin=false,onNavigate}){
  const [records,setRecords]=useState([]);
  const [crawlerRecords,setCrawlerRecords]=useState([]);
@@ -164,9 +170,6 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
  const [status,setStatus]=useState("all");
  const [showForm,setShowForm]=useState(false);
  const [saving,setSaving]=useState(false);
- const [pipelineFormOpen,setPipelineFormOpen]=useState(false);
- const [pipelineSaving,setPipelineSaving]=useState(false);
- const [pipelineEntry,setPipelineEntry]=useState({title:"",funder:"",status:"Submitted",submissionDate:"",awardDate:"",amount:"",url:"",project:"",notes:""});
  const [draft,setDraft]=useState({title:"",funder:"",url:"",deadline:"",country:"Tanzania",amount:"",summary:"",status:"Open",pillars:["rangeland"],themes:[]});
  const uid=auth.currentUser?.uid||"";
  const roleList=[profile?.role,profile?.roles,employee?.role,employee?.roles].flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim().toLowerCase());
@@ -245,7 +248,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    const hay=[r.title,r.funder,r.summary,r.country,r.amount].join(" ").toLowerCase();
    return (!queryText||hay.includes(queryText.toLowerCase()))&&(pillar==="all"||cleanArray(r.pillars).includes(pillar))&&(theme==="all"||cleanArray(r.themes).includes(theme))&&(status==="all"||r.status===status);
  }),[currentOpportunityRecords,queryText,pillar,theme,status]);
- const counts=useMemo(()=>({open:currentOpportunityRecords.filter(r=>r.status==="Open").length,review:currentOpportunityRecords.filter(r=>["Under review","Application in progress"].includes(r.status)).length,submitted:currentOpportunityRecords.filter(r=>["Submitted","Awarded"].includes(r.status)).length}),[currentOpportunityRecords]);
+ const counts=useMemo(()=>({open:currentOpportunityRecords.filter(isConfirmedOpenCall).length,review:currentOpportunityRecords.filter(r=>r.status==="Under review").length}),[currentOpportunityRecords]);
  const smartKeywordSuggestions=["rangeland restoration","pastoral livelihoods","livestock health","climate resilience","women and youth","digital governance","market access","biodiversity conservation","water security","community grants"];
  const smartAssistantResults=useMemo(()=>{
    // Comma/semicolon/newline separates keyword phrases; a space-only query is treated as individual keywords.
@@ -271,12 +274,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
      market:["value chain","market access","value addition","trade"],
      grants:["funding","grant","call for proposals","open call"]
    };
-   const openCalls=currentOpportunityRecords.filter(r=>{
-     const callStatus=text(r.callStatus||r.call_status).toLowerCase();
-     const pipelineStatus=text(r.status).toLowerCase();
-     return callStatus==="open"||pipelineStatus==="open"||/\b(?:rolling basis|rolling applications?|year[- ]round|no fixed deadline)\b/i.test([r.title,r.summary,r.description].filter(Boolean).join(" "));
-   });
-   return openCalls.map(r=>{
+   const openCalls=currentOpportunityRecords.filter(isConfirmedOpenCall);\n    return openCalls.map(r=>{
        const title=text(r.title).toLowerCase();
        const funder=text(r.funder).toLowerCase();
        const summary=text(r.summary||r.description).toLowerCase();
@@ -522,32 +520,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    try{await updateDoc(doc(db,"grantOpportunities",record.id),{status:nextStatus,updatedAt:serverTimestamp(),lastUpdatedByUid:uid});setNotice("Opportunity status updated.");setTimeout(()=>setNotice(""),4000);}
    catch(err){setError(err?.message||"Status update failed.");}
  }
- async function savePipelineEntry(e){
-    e.preventDefault();
-    if(!canManage){setError("Only designated grant-management and executive roles may record submitted or awarded grants.");return;}
-    if(!text(pipelineEntry.title)||!text(pipelineEntry.funder)){setError("Enter the grant or project title and funder.");return;}
-    if(pipelineEntry.status==="Submitted"&&!pipelineEntry.submissionDate){setError("Enter the submission date for a submitted grant.");return;}
-    if(pipelineEntry.status==="Awarded"&&!pipelineEntry.awardDate){setError("Enter the award date for an awarded grant.");return;}
-    if(pipelineEntry.url&&!/^https:\/\//i.test(pipelineEntry.url)){setError("The source or application URL must start with https://.");return;}
-    try{
-      setPipelineSaving(true);setError("");
-      await addDoc(collection(db,"grantOpportunities"),{
-        title:text(pipelineEntry.title),funder:text(pipelineEntry.funder),status:pipelineEntry.status,
-        url:text(pipelineEntry.url),deadline:null,country:"Tanzania",amount:text(pipelineEntry.amount)||"Not specified",
-        summary:text(pipelineEntry.project)+(text(pipelineEntry.notes)?" — "+text(pipelineEntry.notes):""),
-        pillars:[],themes:[],submissionDate:pipelineEntry.status==="Submitted"?pipelineEntry.submissionDate:null,
-        awardDate:pipelineEntry.status==="Awarded"?pipelineEntry.awardDate:null,
-        project:text(pipelineEntry.project),pipelineNotes:text(pipelineEntry.notes),
-        createdAt:serverTimestamp(),updatedAt:serverTimestamp(),createdByUid:uid,
-        createdByEmail:auth.currentUser?.email||"",lastUpdatedByUid:uid,
-        verificationStatus:"Manually recorded by IRPA",sourceType:"Grant pipeline entry",recordOrigin:"PRODUCTION"
-      });
-      setPipelineEntry({title:"",funder:"",status:"Submitted",submissionDate:"",awardDate:"",amount:"",url:"",project:"",notes:""});
-      setPipelineFormOpen(false);setNotice("Grant pipeline entry saved. The submitted/awarded dashboard total has been updated.");setTimeout(()=>setNotice(""),7000);
-    }catch(err){setError(err?.message||"Could not save the grant pipeline entry. Check your designated grant-management access.");}
-    finally{setPipelineSaving(false);}
-  }
-  function toggleDraftArray(key,value){setDraft(d=>({...d,[key]:d[key].includes(value)?d[key].filter(x=>x!==value):[...d[key],value]}));}
+ function toggleDraftArray(key,value){setDraft(d=>({...d,[key]:d[key].includes(value)?d[key].filter(x=>x!==value):[...d[key],value]}));}
  return <div className="grant-intelligence-portal" style={{...styles.page,width:"100%",minWidth:0,maxWidth:"100%",boxSizing:"border-box"}}>
   <section style={styles.hero}>
    <div style={{maxWidth:760}}>
@@ -592,36 +565,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
    {[["Discovered opportunities",combinedRecords.length,"All geographic eligibility categories included"],["Open calls",counts.open,"Status: Open"],["In preparation",counts.review,"Review / drafting"],["Submitted or awarded",counts.submitted,"Pipeline progress"],["Expired / closed / unverified calls suppressed",expiredExclusionCount,"Past deadlines, explicit closure, or no verified current deadline/status"]].map(([label,value,sub])=><div key={label} style={styles.card}><div style={styles.muted}>{label}</div><div style={{fontSize:28,fontWeight:800,margin:"7px 0"}}>{value}</div><div style={{fontSize:11,color:"#8ba2b8"}}>{sub}</div></div>)}
   </div>
-  <section style={{...styles.card,display:"grid",gap:12,borderColor:"#4e8b91"}} aria-labelledby="grant-pipeline-entry-heading">
-   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:12,flexWrap:"wrap"}}>
-    <div><div style={styles.eyebrow}>GRANT APPLICATION PIPELINE</div><h2 id="grant-pipeline-entry-heading" style={{fontSize:19,margin:"5px 0"}}>Record submitted and awarded grants</h2><p style={{...styles.muted,margin:0}}>Enter grants that IRPA has actually submitted or been formally awarded. Entries are saved in the existing grant register and counted in the dashboard. Saving a record does not submit an application or certify an award.</p></div>
-    {canManage&&<button type="button" style={styles.button} onClick={()=>setPipelineFormOpen(v=>!v)}>{pipelineFormOpen?"Close entry form":"＋ Add grant entry"}</button>}
-   </div>
-   {!canManage&&<p style={styles.muted}>Entry is restricted to designated grant-management and executive roles.</p>}
-   {pipelineFormOpen&&canManage&&<form onSubmit={savePipelineEntry} style={{display:"grid",gap:11}}>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
-     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Grant / project title *<input required maxLength={180} style={styles.input} value={pipelineEntry.title} onChange={e=>setPipelineEntry(v=>({...v,title:e.target.value}))} placeholder="Grant or project title"/></label>
-     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Funder *<input required maxLength={180} style={styles.input} value={pipelineEntry.funder} onChange={e=>setPipelineEntry(v=>({...v,funder:e.target.value}))} placeholder="Funding organisation"/></label>
-     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Pipeline status *<select style={styles.input} value={pipelineEntry.status} onChange={e=>setPipelineEntry(v=>({...v,status:e.target.value}))}><option>Submitted</option><option>Awarded</option></select></label>
-     {pipelineEntry.status==="Submitted"&&<label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Submission date *<input required type="date" style={styles.input} value={pipelineEntry.submissionDate} onChange={e=>setPipelineEntry(v=>({...v,submissionDate:e.target.value}))}/></label>}
-     {pipelineEntry.status==="Awarded"&&<label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Award date *<input required type="date" style={styles.input} value={pipelineEntry.awardDate} onChange={e=>setPipelineEntry(v=>({...v,awardDate:e.target.value}))}/></label>}
-     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Amount / grant value (optional)<input maxLength={100} style={styles.input} value={pipelineEntry.amount} onChange={e=>setPipelineEntry(v=>({...v,amount:e.target.value}))} placeholder="Amount and currency, if confirmed"/></label>
-     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Official call / award URL (optional)<input type="url" maxLength={1000} style={styles.input} value={pipelineEntry.url} onChange={e=>setPipelineEntry(v=>({...v,url:e.target.value}))} placeholder="https://…"/></label>
-     <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>IRPA project / programme (optional)<input maxLength={180} style={styles.input} value={pipelineEntry.project} onChange={e=>setPipelineEntry(v=>({...v,project:e.target.value}))} placeholder="Project linked to this grant"/></label>
-    </div>
-    <label style={{display:"grid",gap:5,fontSize:13,fontWeight:700}}>Notes / reference number (optional)<textarea rows={3} maxLength={3000} style={styles.input} value={pipelineEntry.notes} onChange={e=>setPipelineEntry(v=>({...v,notes:e.target.value}))} placeholder="Submission reference, award conditions, next action, or notes"/></label>
-    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="submit" disabled={pipelineSaving} style={{...styles.button,opacity:pipelineSaving?0.65:1}}>{pipelineSaving?"Saving entry…":"Save grant entry"}</button><span style={styles.muted}>Only record a grant as Awarded after formal award confirmation.</span></div>
-   </form>}
-   <div style={{display:"grid",gap:8}}>
-    <h3 style={{fontSize:15,margin:0}}>Submitted / awarded register ({records.filter(r=>["Submitted","Awarded"].includes(r.status)).length})</h3>
-    {records.filter(r=>["Submitted","Awarded"].includes(r.status)).length===0?<p style={styles.muted}>No submitted or awarded grants have been entered yet.</p>:records.filter(r=>["Submitted","Awarded"].includes(r.status)).map(r=><article key={r.id} style={{border:"1px solid #344255",borderRadius:10,padding:12,display:"grid",gap:5}}>
-     <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><strong>{r.title}</strong><span style={styles.tag}>{r.status}</span></div>
-     <div style={styles.muted}>{r.funder||"Funder not specified"} · {r.status==="Submitted"?"Submitted: "+dateLabel(r.submissionDate||r.updatedAt):"Awarded: "+dateLabel(r.awardDate||r.updatedAt)} · Amount: {r.amount||"Not specified"}</div>
-     {r.project&&<div style={styles.muted}>Project: {r.project}</div>}
-     {r.pipelineNotes&&<div style={styles.muted}>Notes: {r.pipelineNotes}</div>}
-     {r.url&&<a href={r.url} target="_blank" rel="noreferrer" style={{color:"#8fd3df",fontSize:13}}>Open official record ↗</a>}
-    </article>)}
-   </div>
+  <section style={{...styles.card,display:"grid",gap:8}} aria-label="Grant workflow boundary">
+   <strong>Discovery and analysis only</strong>
+   <p style={{...styles.muted,margin:0}}>This portal does not record submitted or awarded grants, approve applications, contact donors or submit applications externally. Authorised management staff prepare opportunity analysis and internal concept-note drafts. Any internal grant approval belongs exclusively to the Executive Director through the separate management approval process; it is never a Board or governance workflow.</p>
   </section>
   <section style={{...styles.card,display:"grid",gap:12}} aria-labelledby="crawler-status-heading">
    <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}>
@@ -692,7 +638,7 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <select style={{...styles.input,marginTop:5}} value={selectedOpportunity?.id||""} onChange={e=>{const next=combinedRecords.find(r=>r.id===e.target.value);setSelectedOpportunity(next||null);setOpportunityDescription(text(next?.summary||""));setDonorRequirements(text(next?.applicationRequirements||""));setAnalysisResult(null);setConceptDraft("");setDraftId("");setWorkspaceNotice("");}}>
      <option value="">Select an opportunity from the register…</option>
      {selectedOpportunity?.id&&!combinedRecords.some(r=>r.id===selectedOpportunity.id)&&<option value={selectedOpportunity.id}>{selectedOpportunity.title} (saved draft)</option>}
-     {currentOpportunityRecords.map(r=><option key={r.id} value={r.id}>{r.title} — {r.country||"Geography unverified"}</option>)}
+     {currentOpportunityRecords.map(r=><option key={r.id} value={r.id}>{cleanCrawlerText(r.title, 180)} — {r.country||"Geography unverified"}</option>)}
     </select>
    </label>
    {selectedOpportunity&&<div style={{...styles.card,display:"grid",gap:5}}>
@@ -791,9 +737,9 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
    {smartKeywords.trim()&&<div aria-live="polite" style={{display:"grid",gap:9}}>
     <div style={styles.muted}>{smartAssistantResults.length} ranked open call{smartAssistantResults.length===1?"":"s"} match these keywords.</div>
     {!smartAssistantResults.length&&<div style={{...styles.card,borderStyle:"dashed"}}><strong>No matching open calls found</strong><p style={{...styles.muted,margin:"5px 0 0"}}>Try a broader keyword such as climate, community, livestock, restoration or grants, or refresh crawler results.</p></div>}
-    {smartAssistantResults.map(r=><article key={r.id} style={{...styles.card,display:"grid",gap:7}}><details><summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}><div style={{minWidth:0}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{r.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(r.summary||r.description).slice(0,180)||"No description supplied."}</p><span style={{...styles.muted,fontSize:12}}>Expand for full details and actions</span></div><div style={{fontSize:12,minWidth:0,textAlign:"right"}}><div style={styles.muted}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{...styles.muted,marginTop:5}}>Keyword score</div><strong>{r._smartScore}</strong></div></summary><div style={{display:"grid",gap:8,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
+    {smartAssistantResults.map(r=><article key={r.id} style={{...styles.card,display:"grid",gap:7}}><details><summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}><div style={{minWidth:0}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{cleanCrawlerText(r.title, 180)}</strong><p style={{...styles.muted,margin:"5px 0"}}>{cleanCrawlerText(r.summary||r.description, 280)||"No description supplied."}</p><span style={{...styles.muted,fontSize:12}}>Expand for full details and actions</span></div><div style={{fontSize:12,minWidth:0,textAlign:"right"}}><div style={styles.muted}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{...styles.muted,marginTop:5}}>Keyword score</div><strong>{r._smartScore}</strong></div></summary><div style={{display:"grid",gap:8,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
      <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"start"}}>
-      <div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{r.title}</strong><p style={{...styles.muted,margin:"5px 0"}}>{text(r.summary||r.description).slice(0,320)||"No description supplied."}</p></div>
+      <div style={{flex:"1 1 300px"}}><div style={styles.eyebrow}>{r.funder||"Funder not verified"} · Open call</div><strong style={{display:"block",fontSize:15,marginTop:4}}>{cleanCrawlerText(r.title, 180)}</strong><p style={{...styles.muted,margin:"5px 0"}}>{cleanCrawlerText(r.summary||r.description, 280)||"No description supplied."}</p></div>
       <div style={{fontSize:12,minWidth:105}}><div style={styles.muted}>Deadline</div><strong>{dateLabel(r.deadline||r.deadline_at)}</strong><div style={{...styles.muted,marginTop:5}}>Keyword score: {r._smartScore}</div></div>
      </div>
      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{r._matchedKeywords.map(term=><span key={term} style={styles.tag}>{term}</span>)}</div>
@@ -804,11 +750,11 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     </div>
     <section aria-label={"Analysis tools for "+r.title} style={{display:"grid",gap:8,borderTop:"1px solid var(--border-color, #344255)",paddingTop:10}}>
      <h4 style={{fontSize:14,margin:0}}>Analysis tools</h4>
-     <div style={styles.muted}>Run the existing IRPA grant pipeline evaluation. AI-generated, verify before use.</div>
+     <div style={styles.muted}>Run the existing IRPA eligibility, IRPA-fit and call-validity analysis. AI-generated; verify before use.</div>
      {pipelineEvaluationBusyId===r.id&&<div role="status" aria-live="polite" style={styles.muted}>Evaluating eligibility, IRPA fit and call validity…</div>}
      {pipelineEvaluationErrors[r.id]&&<div role="alert" style={{...styles.muted,color:"#f0b6a8"}}>{pipelineEvaluationErrors[r.id]} <button type="button" style={{...styles.button,marginLeft:6}} onClick={()=>evaluateOpportunityWithPipeline(r)}>Retry</button></div>}
      {pipelineEvaluationByOpportunity[r.id]&&<div style={{...styles.card,display:"grid",gap:8}}>
-      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><strong>Pipeline evaluation</strong><span style={styles.tag}>{pipelineEvaluationByOpportunity[r.id].eligibility.status}</span><span style={styles.tag}>Fit {pipelineEvaluationByOpportunity[r.id].fit.score}/100</span><span style={styles.tag}>Validity {pipelineEvaluationByOpportunity[r.id].validityStatus}</span></div>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><strong>Eligibility and fit analysis</strong><span style={styles.tag}>{pipelineEvaluationByOpportunity[r.id].eligibility.status}</span><span style={styles.tag}>Fit {pipelineEvaluationByOpportunity[r.id].fit.score}/100</span><span style={styles.tag}>Validity {pipelineEvaluationByOpportunity[r.id].validityStatus}</span></div>
       <div style={styles.muted}>AI-generated, verify before use. Evaluation ID: {pipelineEvaluationByOpportunity[r.id].evaluationId}</div>
       <div><strong style={{fontSize:13}}>Eligibility findings</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{cleanArray(pipelineEvaluationByOpportunity[r.id].eligibility.reasons).map((item,i)=><li key={i}><strong>{item.criterion}: {item.status}</strong> — {item.reason}</li>)}</ul></div>
       {cleanArray(pipelineEvaluationByOpportunity[r.id].eligibility.missing).length>0&&<div><strong style={{fontSize:13}}>Missing information</strong><ul style={{...styles.muted,margin:"5px 0 0 18px"}}>{pipelineEvaluationByOpportunity[r.id].eligibility.missing.map((item,i)=><li key={i}>{item}</li>)}</ul></div>}
@@ -825,14 +771,14 @@ export default function GrantIntelligencePortal({profile,employee,isAdmin=false,
     <input aria-label="Search opportunities" style={styles.input} placeholder="Search title, funder, country…" value={queryText} onChange={e=>setQueryText(e.target.value)}/>
     <select aria-label="Filter by strategic pillar" style={styles.input} value={pillar} onChange={e=>setPillar(e.target.value)}><option value="all">All strategic pillars</option>{PILLARS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select>
     <select aria-label="Filter by cross-cutting theme" style={styles.input} value={theme} onChange={e=>setTheme(e.target.value)}><option value="all">All cross-cutting themes</option>{THEMES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select>
-    <select aria-label="Filter by application status" style={styles.input} value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All statuses</option>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>
+    <select aria-label="Filter by call status" style={styles.input} value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All statuses</option>{statusOptions.map(s=><option key={s}>{s}</option>)}</select>
    </div>
   </section>
   <section style={{display:"grid",gap:12}}>
    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><h2 style={{fontSize:19,margin:0}}>Opportunity register</h2><span style={styles.muted}>{filtered.length} matching records</span></div>
-   {loading&&crawlerResultsBusy?<div style={styles.card} role="status">Loading live opportunity records and Cloudflare crawler results…</div>:filtered.length===0?<div style={styles.card}><strong>No matching opportunities yet</strong><p style={styles.muted}>No records currently match these filters. The dashboard checks both manually registered opportunities and Cloudflare crawler results. Refresh results or run a scan if authorized, then verify each call against the donor’s official guidance.</p></div>:filtered.map(r=><article key={r.id} style={styles.card}><details><summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}><div style={{minWidth:0}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.discoveryEngine&&r.discoveryEngine!=="unknown"?" · Found by "+r.discoveryEngine.replace(/_/g," "):""}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><strong style={{display:"block",fontSize:17,margin:"7px 0"}}>{r.title}</strong><p style={{...styles.muted,margin:"0 0 5px"}}>{text(r.summary||"No summary provided.").slice(0,200)}</p><span style={{...styles.muted,fontSize:12}}>Expand for full record, eligibility screening and source links</span></div><div style={{fontSize:12,textAlign:"right"}}><div style={{color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div></summary><div style={{display:"grid",gap:9,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
+   {loading&&crawlerResultsBusy?<div style={styles.card} role="status">Loading live opportunity records and Cloudflare crawler results…</div>:filtered.length===0?<div style={styles.card}><strong>No matching opportunities yet</strong><p style={styles.muted}>No records currently match these filters. The dashboard checks both manually registered opportunities and Cloudflare crawler results. Refresh results or run a scan if authorized, then verify each call against the donor’s official guidance.</p></div>:filtered.map(r=><article key={r.id} style={styles.card}><details><summary style={{cursor:"pointer",display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10,alignItems:"start"}}><div style={{minWidth:0}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.discoveryEngine&&r.discoveryEngine!=="unknown"?" · Found by "+r.discoveryEngine.replace(/_/g," "):""}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><strong style={{display:"block",fontSize:17,margin:"7px 0"}}>{cleanCrawlerText(r.title, 180)}</strong><p style={{...styles.muted,margin:"0 0 5px"}}>{cleanCrawlerText(r.summary||"No summary provided.", 280)}</p><span style={{...styles.muted,fontSize:12}}>Expand for full record, eligibility screening and source links</span></div><div style={{fontSize:12,textAlign:"right"}}><div style={{color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div></summary><div style={{display:"grid",gap:9,marginTop:12,borderTop:"1px solid var(--border-color, #344255)",paddingTop:12}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-     <div style={{flex:"1 1 380px"}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.discoveryEngine&&r.discoveryEngine!=="unknown"?" · Found by "+r.discoveryEngine.replace(/_/g," "):""}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><h3 style={{fontSize:18,margin:"7px 0"}}>{r.title}</h3><p style={{...styles.muted,margin:"0 0 10px"}}>{r.summary||"No summary provided."}</p></div>
+     <div style={{flex:"1 1 380px"}}><div style={styles.eyebrow}>{r.funder||"Funder not specified"} · {r.verificationStatus||"Verification status unavailable"}{r.discoveryEngine&&r.discoveryEngine!=="unknown"?" · Found by "+r.discoveryEngine.replace(/_/g," "):""}{r.fitScore!==undefined?" · IRPA topic fit "+r.fitScore+"/100":""}</div><h3 style={{fontSize:18,margin:"7px 0"}}>{cleanCrawlerText(r.title, 180)}</h3><p style={{...styles.muted,margin:"0 0 10px"}}>{cleanCrawlerText(r.summary||r.description||"No summary provided.", 280)}</p></div>
      <div style={{minWidth:150}}><div style={{fontSize:12,color:"#9fb0c3"}}>Deadline</div><strong>{dateLabel(r.deadline)}</strong><div style={{fontSize:12,marginTop:8,color:"#9fb0c3"}}>Status</div><strong>{r.status||"Unclassified"}</strong></div>
     </div>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",margin:"8px 0"}}>{cleanArray(r.pillars).map(id=><span key={id} style={styles.tag}>{PILLARS.find(p=>p.id===id)?.label||id}</span>)}{cleanArray(r.themes).map(id=><span key={id} style={{...styles.tag,borderColor:"#6c5b8f"}}>{THEMES.find(t=>t.id===id)?.label||id}</span>)}</div>

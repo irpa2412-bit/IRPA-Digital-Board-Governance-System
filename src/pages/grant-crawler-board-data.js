@@ -1,3 +1,11 @@
+const ENTITY_MAP = { amp: "&", apos: "'", quot: '"', nbsp: " ", lt: "<", gt: ">", ndash: "–", mdash: "—", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", hellip: "…" };
+export function cleanCrawlerText(value, maxLength = 280) {
+ const decoded=String(value??"").replace(/<(script|style|noscript)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi," ").replace(/<[^>]*>/g," ").replace(/&(#x[0-9a-f]+|#\\d+|[a-z][a-z0-9]+);/gi,(entity,key)=>{
+  if(key[0]==="#"){const hex=key[1]?.toLowerCase()==="x";const code=Number.parseInt(key.slice(hex?2:1),hex?16:10);return Number.isFinite(code)&&code>0&&code<=0x10ffff?String.fromCodePoint(code):" ";}
+  return ENTITY_MAP[key.toLowerCase()]??" ";
+ });
+ return decoded.replace(/\\b(skip to main content|skip navigation|main menu|cookie settings|accept all cookies|reject all cookies|manage cookies|privacy policy|terms of use|subscribe to our newsletter|home|menu|about us|contact us|search this site|accessibility statement)\\b/gi," ").replace(/[\\u00a0\\s]+/g," ").trim().slice(0,Math.max(0,Number(maxLength)||280));
+}
 export function mapCrawlerOpportunity(item) {
   const parseList = value => {
     if (Array.isArray(value)) return value;
@@ -9,14 +17,14 @@ export function mapCrawlerOpportunity(item) {
   const callStatus = String(item.call_status || "").toLowerCase();
   return {
     id: "crawler-" + item.id,
-    title: item.title || "Untitled opportunity",
+    title: cleanCrawlerText(item.title, 180) || "Untitled opportunity",
     funder: item.funder || item.source_name || fallbackFunder,
     url: item.url || item.source_url || "",
     source_url: item.source_url || "",
     deadline: item.deadline_at || null,
     country: item.country || (item.geography_assessment === "tanzania_mentioned" ? "Tanzania" : item.geography_assessment === "regional_or_lmic_scope" ? "Regional / LMIC" : "Not verified"),
     amount: item.amount || "Not stated",
-    summary: item.description || "No description supplied by source.",
+    summary: cleanCrawlerText(item.description, 280) || "No description supplied by source.",
     status: ["closed", "expired", "closed_do_not_prioritize"].includes(callStatus) ? "Closed" : callStatus === "open" ? "Open" : "Under review",
     callStatus: item.call_status || "unknown",
     pillars: parseList(item.pillars),
