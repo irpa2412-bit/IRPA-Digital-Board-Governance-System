@@ -1,6 +1,6 @@
 # Undefined-name and shadowing diagnostic
 
-- Commit: a40f62c7de2c59be56b5fb4c087d7af9ddb4ba8c
+- Commit: f36f62311ffbf41e103fce5e71577bbb5058cf02
 - ESLint exit: 1
 - Total reported violations: 8
 - no-undef hits: 0
