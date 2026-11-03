@@ -1,11 +1,7 @@
 name: Diagnose Upload Initialization Cycle
 
 on:
-  push:
-    branches:
-      - fix/upload-and-legacy-signature-integrity-20261031
   workflow_dispatch:
-
 permissions:
   contents: write
 
