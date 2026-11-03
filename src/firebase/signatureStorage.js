@@ -1,4 +1,5 @@
 import { getIdToken } from "firebase/auth";
+import { assertGatewaySigningResponse } from "./signatureGatewayResponse.js";
 import { auth } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 
@@ -524,7 +525,7 @@ export async function submitGatewaySignature({token,signature,fieldValues={},fie
     body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,manualAuthorityIdentification,consent})
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false || data.status === "CompletionFailed" || data.completed === false && data.status === "CompletionFailed") throw new Error(data.error || "Gateway signing was recorded, but final PDF completion failed. Retry completion before treating this signature as complete.");
+  assertGatewaySigningResponse(response,data);
   return data;
 }
 
