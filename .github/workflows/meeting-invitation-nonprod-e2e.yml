@@ -23,6 +23,10 @@ on:
       - ".github/workflows/meeting-invitation-nonprod-e2e.yml"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
