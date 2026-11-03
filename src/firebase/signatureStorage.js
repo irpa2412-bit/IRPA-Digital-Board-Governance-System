@@ -524,7 +524,7 @@ export async function submitGatewaySignature({token,signature,fieldValues={},fie
     body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,manualAuthorityIdentification,consent})
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) throw new Error(data.error || "The Gateway did not accept the signing action.");
+  if (!response.ok || data.ok === false || data.status === "CompletionFailed" || data.completed === false && data.status === "CompletionFailed") throw new Error(data.error || "Gateway signing was recorded, but final PDF completion failed. Retry completion before treating this signature as complete.");
   return data;
 }
 
