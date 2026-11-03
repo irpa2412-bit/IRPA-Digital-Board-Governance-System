@@ -343,11 +343,16 @@ export function createDocumentLifecycleRouter(deps) {
       const document=await getPlainDocument(deps,env,claims,documentId);if(!document)return deps.json({ok:false,error:"Document registry record was not found."},404,deps.corsHeaders(request));
       const access=canRead(identity,document);if(!access.allowed)return deps.json({ok:false,error:access.reason},403,deps.corsHeaders(request));
       if(document.status!=="PENDING_SIGNATURE")return deps.json({ok:false,error:"The document is not awaiting signature."},409,deps.corsHeaders(request));
-      const adminToken=await requireFirestoreAdminToken(deps,env);const envelopeRaw=await deps.getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,adminToken);const envelope=envelopeRaw?deps.firestoreDocumentToPlain(envelopeRaw):null;
-      if(!envelope||clean(envelope.documentId)!==documentId)return deps.json({ok:false,error:"The signature envelope does not belong to this document."},403,deps.corsHeaders(request));
-      if(clean(envelope.status)!=="Completed")return deps.json({ok:false,error:"The signature envelope is not completed."},409,deps.corsHeaders(request));
-      const signedFileId=fileIdFromUrl(envelope.signedDocumentUrl||envelope.ownerCompletedDocumentUrl||envelope.signedDocumentPath||"");
-      const patch={status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:envelopeId,signedAt:nowIso(),signedByUid:envelope.lastSignedByUid||claims.user_id,signedDocumentUrl:envelope.signedDocumentUrl||envelope.ownerCompletedDocumentUrl||null,signedSourceFileId:signedFileId||null,updatedAt:nowIso()};
+      if(typeof deps.verifyCanonicalSignatureEnvelope!=="function")return deps.json({ok:false,error:"Canonical Gateway signature verification is not configured."},503,deps.corsHeaders(request));
+      const verification=await deps.verifyCanonicalSignatureEnvelope(env,envelopeId);
+      if(!verification?.ok)return deps.json({ok:false,error:verification?.error||"Canonical Gateway signature verification failed."},409,deps.corsHeaders(request));
+      const envelope=verification.envelope;
+      if(clean(envelope.externalReference)!==envelopeId||clean(envelope.documentId)!==documentId)return deps.json({ok:false,error:"The canonical Gateway envelope does not belong to this document and Signature Portal envelope."},403,deps.corsHeaders(request));
+      if(clean(envelope.status)!=="Completed"||clean(envelope.completion?.finalHash)!==verification.finalHash)return deps.json({ok:false,error:"The canonical Gateway envelope is not verifiably completed."},409,deps.corsHeaders(request));
+      const signedFileId=clean(envelope.completion?.primaryStorageId);
+      const lastSignedByUid=clean(verification.lastSignedByUid);
+      if(!lastSignedByUid||!envelope.signers.some(s=>s.uid===lastSignedByUid&&s.status==="Signed"))return deps.json({ok:false,error:"The canonical completion record does not identify a required signer."},409,deps.corsHeaders(request));
+      const patch={status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:envelopeId,signedAt:envelope.completion.completedAt||nowIso(),signedByUid:lastSignedByUid,signedDocumentUrl:null,signedSourceFileId:signedFileId,finalSignedPdfSha256:verification.finalHash,cryptographicEvidenceIds:envelope.completion.cryptographicEvidenceIds,updatedAt:nowIso()};
       await commitDocumentAndAudit(deps,env,claims,documentId,patch,"SIGNATURE_COMPLETED",{envelopeId});
       return deps.json({ok:true,documentId,status:"SIGNED",envelopeId,signedSourceFileId:signedFileId||null},200,deps.corsHeaders(request));
     }
