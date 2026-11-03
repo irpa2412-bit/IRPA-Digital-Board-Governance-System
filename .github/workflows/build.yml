@@ -12,7 +12,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-paths:
+    name: Detect relevant changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.paths.outputs.core }}
+      desktop: ${{ steps.paths.outputs.desktop }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${BASE_SHA:-}" || "$BASE_SHA" =~ ^0+$ ]]; then
+            BASE_SHA="$(git rev-parse "$HEAD_SHA^")"
+          fi
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          core=false
+          desktop=false
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              src/*|drive-gateway/*|functions/*|tests/*|package.json|package-lock.json|vite.config.js|index.html|public/*|scripts/*|firebase.json|.github/workflows/build.yml) core=true ;;
+            esac
+            case "$file" in
+              desktop/*|electron/*|electron-builder.yml|.github/workflows/build-desktop.yml) desktop=true ;;
+            esac
+          done <<< "$changed"
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
   build:
+    needs: detect-paths
+    if: needs.detect-paths.outputs.core == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -69,6 +105,8 @@ jobs:
       - name: Independent production readability verification
         run: npm run verify:production-readability
   windows-installer:
+    needs: detect-paths
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || needs.detect-paths.outputs.desktop == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
