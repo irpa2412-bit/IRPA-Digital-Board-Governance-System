@@ -37,8 +37,14 @@ The hard-coded privileged administrator email shortcut was intentionally NOT rem
 | `src/firebase/functions.js` | 77, 96 |
 | `GOOGLE_DRIVE_SETUP.md` | 7 |
 | `drive-gateway/README.md` | 9 |
+| `cloudflare/grant-crawler-parallel/wrangler.toml` | 30, 52 |
+| `firestore.rules` | 28 |
+| `drive-gateway/tests/release-readiness-routes.test.mjs` | 8 |
+| `.github/workflows/firebase-deploy.yml` | 96, 108, 109, 190 |
+| `.github/workflows/provision-meeting-archives.yml` | 52 |
+| `.github/workflows/staging-gateway-e2e.yml` | 281, 1941 |
 
-The code-search result also returned additional files that could not all be independently line-verified in this pass: `cloudflare/grant-crawler-parallel/wrangler.toml`, `firestore.rules`, `drive-gateway/tests/release-readiness-routes.test.mjs`, and three workflow files. These are NOT RETRIEVED at line-level in this inventory.
+Additional line-level occurrences verified after the initial inventory:
 
 ## Proposed single server-side administrator policy — for approval only
 
