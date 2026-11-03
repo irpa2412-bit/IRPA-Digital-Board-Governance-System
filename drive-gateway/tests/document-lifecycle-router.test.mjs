@@ -195,3 +195,12 @@ test("translated derivative upload is denied if client attempts to lower source 
   assert.match(await response.text(),/retain the source document's classification and archive category/i);
   assert.deepEqual(state.writes,[]);
 });
+
+test("generic lifecycle transition cannot mark a document Signed without canonical Gateway completion",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",classification:"Internal",ownerUid:"emp-1",uploadedByUid:"emp-1",authorizedUids:["emp-1"],archiveCategory:"Finance Documents",title:"Test",reference:"IRPA-DOC-1",status:"PENDING_SIGNATURE",signatureStatus:"PENDING"}}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/transition",{documentId:"LIFE-test",targetStage:"SIGNED"}),env);
+  assert.equal(response.status,409);
+  assert.match(await response.text(),/only be set by canonical Gateway signature completion/);
+  assert.equal(state.writes.length,0);
+});
