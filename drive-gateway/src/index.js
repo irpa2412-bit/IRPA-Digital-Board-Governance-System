@@ -132,6 +132,8 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     if(!document?.fields)return;
     const record=firestoreDocumentToPlain(document)||{};
     const id=String(document.name||"").split("/").pop()||fallbackId||user.uid;
+    const existing=records.find(item=>item.sourceCollection===sourceCollection&&item.id===id);
+    if(existing){if(!matchedByEmail)existing.matchedByEmail=false;return;}
     records.push({id,...record,sourceCollection,matchedByEmail});
   };
   const readById=async(collection)=>{
