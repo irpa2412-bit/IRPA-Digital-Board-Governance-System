@@ -290,7 +290,7 @@ export function createDocumentLifecycleRouter(deps) {
       if(!documentId||!target)return deps.json({ok:false,error:"Document ID and target stage are required."},400,deps.corsHeaders(request));
       const document=await getPlainDocument(deps,env,claims,documentId);
       if(!document)return deps.json({ok:false,error:"Document registry record was not found."},404,deps.corsHeaders(request));
-      if(target==="SIGNED")return deps.json({ok:false,error:"The SIGNED stage can only be set by canonical Gateway signature completion."},409,deps.corsHeaders(request));
+      if(String(target).toUpperCase()==="SIGNED")return deps.json({ok:false,error:"The SIGNED stage can only be set by canonical Gateway signature completion."},409,deps.corsHeaders(request));
       const transition=canTransition(identity,document,target);
       if(!transition.allowed)return deps.json({ok:false,error:transition.reason},403,deps.corsHeaders(request));
       const accessToken=await deps.getDriveAccessToken(env);
