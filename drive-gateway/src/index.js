@@ -19,6 +19,8 @@ import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { importPublicKeyJwk, verifyCryptographicEvidence } from "./cryptographicGate.mjs";
+import { isCurrentSigningAuthorityRecord } from "./signingAuthorityPolicy.mjs";
+import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from "./signatureDraftPolicy.mjs";
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
 import { canProvisionSignatureProfileFolder } from "./signatureProfileAuthorization.mjs";
@@ -180,7 +182,7 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
   }
   const uniqueRecords=[...new Map(records.map(record=>[record.sourceCollection+":"+record.id,record])).values()];
   const candidates=record=>[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
-  const active=record=>{const status=String(record.status||record.employmentStatus||"").trim().toLowerCase();if(status!=="active")return false;if(record.authorityStatus!==undefined&&String(record.authorityStatus||"").trim()!=="Current")return false;if(record.matchedByEmail&&String(record.uid||"")!==String(user.uid))return false;const expiry=record.authorityExpiresAt||record.authorityExpiry||record.authorityValidUntil||record.validUntil||record.expiresAt;if(expiry){const timestamp=Date.parse(String(expiry));if(!Number.isFinite(timestamp)||timestamp<=Date.now())return false;}return true;};
+  const active=record=>isCurrentSigningAuthorityRecord(record,user.uid);
   const match=uniqueRecords.find(record=>active(record)&&candidates(record).includes(input));
   if(!match){
     const inactive=uniqueRecords.find(record=>!active(record));
@@ -1177,23 +1179,14 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     const source = await getFirestoreDocument(env, "documents/" + documentId, adminToken);
     if (!source || !source.fields) return json({ok:false,step,error:"The selected controlled document was not found."},404,corsHeaders(request));
     const sourceData = firestoreDocumentToPlain(source) || {};
-    const sourceOwnerUid = String(sourceData.ownerUid || sourceData.createdByUid || sourceData.uploadedByUid || "");
-    if (!activeAdmin && sourceOwnerUid !== uid) return json({ok:false,step,error:"Only the source-document owner or an authorized administrator may create a signing draft."},403,corsHeaders(request));
+    if (!signatureDraftOwnershipAllowed(sourceData,uid,activeAdmin)) return json({ok:false,step,error:"Only the source-document owner or an authorized administrator may create a signing draft."},403,corsHeaders(request));
     const existing = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, adminToken);
     const existingData = firestoreDocumentToPlain(existing) || {};
     if (existing && String(existingData.ownerUid || existingData.senderUid || "") !== uid) return json({ok:false,step,error:"Only the original signing-draft owner may update this envelope."},403,corsHeaders(request));
     const recipients = Array.isArray(draft.recipients) ? draft.recipients : [];
     const signingMode = String(draft.signingMode || "Sequential");
-    if (!["Sequential","Parallel"].includes(signingMode)) return json({ok:false,step,error:"Signing mode must be Sequential or Parallel."},400,corsHeaders(request));
-    const seenSignerUids = new Set(), seenSignerEmails = new Set();
-    for (const recipient of recipients) {
-      const signerUid = String(recipient?.uid || "").trim();
-      const signerEmail = String(recipient?.email || "").trim().toLowerCase();
-      if (signerUid && seenSignerUids.has(signerUid)) return json({ok:false,step,error:"Duplicate signer UID is not permitted."},400,corsHeaders(request));
-      if (signerEmail && seenSignerEmails.has(signerEmail)) return json({ok:false,step,error:"Duplicate signer email is not permitted."},400,corsHeaders(request));
-      if (signerUid) seenSignerUids.add(signerUid);
-      if (signerEmail) seenSignerEmails.add(signerEmail);
-    }
+    const validationError = validateSignatureDraftRecipients(recipients,signingMode);
+    if (validationError) return json({ok:false,step,error:validationError},400,corsHeaders(request));
     const fields = (Array.isArray(draft.fields) ? draft.fields : []).map(field => {
       const page=Number(field?.page||1),x=Number(field?.x??10),y=Number(field?.y??12),width=Number(field?.width??24),height=Number(field?.height??9);
       if(!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100) throw Object.assign(new Error("Every signing field must have a valid page number and position."),{status:400});
