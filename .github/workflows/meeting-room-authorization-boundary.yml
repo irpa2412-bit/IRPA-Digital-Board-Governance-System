@@ -26,6 +26,10 @@ on:
       - "tests/meeting-working-documents-security.test.mjs"
       - ".github/workflows/meeting-room-authorization-boundary.yml"
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

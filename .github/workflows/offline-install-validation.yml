@@ -12,6 +12,10 @@ on:
       - "tests/pwa-install-offline.test.mjs"
       - "tests/offline-build-workflow-policy.test.mjs"
       - ".github/workflows/offline-install-validation.yml"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
