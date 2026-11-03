@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { isCurrentSigningAuthorityRecord } from "../src/signingAuthorityPolicy.mjs";
+import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -24,21 +26,26 @@ test("signer status limits UID disclosure to the caller, owner or administrator"
   assert.match(source, /privileged\|\|s\.id===signer\.id\?\(s\.uid\|\|null\):null/);
 });
 
-test("authority matching is fail-closed and binds email matches to authenticated UID", async () => {
-  const source = await read("../src/index.js");
-  assert.match(source, /status!=="active"/);
-  assert.match(source, /authorityStatus/);
-  assert.match(source, /matchedByEmail/);
-  assert.match(source, /authorityExpiresAt/);
+test("signing authority accepts only Active, current, unexpired UID-bound register records", () => {
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityStatus:"Current",authorityExpiresAt:"2027-01-01T00:00:00Z"}, "u1", Date.parse("2026-11-03T00:00:00Z")), true);
+  for (const status of ["Suspended","Terminated","Disabled","Expired","Unknown","Inactive"]) {
+    assert.equal(isCurrentSigningAuthorityRecord({status,uid:"u1"}, "u1"), false, status+" must fail closed");
+  }
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityStatus:"Expired"}, "u1"), false);
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u2",matchedByEmail:true}, "u1"), false);
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",matchedByEmail:true}, "u1"), true);
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityExpiresAt:"2026-01-01T00:00:00Z"}, "u1", Date.parse("2026-11-03T00:00:00Z")), false);
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityExpiresAt:"not-a-date"}, "u1"), false);
 });
 
-test("draft save validates source ownership, signer uniqueness and signing mode", async () => {
-  const source = await read("../src/index.js");
-  assert.match(source, /sourceOwnerUid !== uid/);
-  assert.match(source, /Only the source-document owner or an authorized administrator/);
-  assert.match(source, /Signing mode must be Sequential or Parallel/);
-  assert.match(source, /Duplicate signer UID is not permitted/);
-  assert.match(source, /Duplicate signer email is not permitted/);
+test("signature draft ownership and recipient policy have positive and negative cases", () => {
+  assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u1"},"u1",false), true);
+  assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u2"},"u1",true), true);
+  assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u2"},"u1",false), false);
+  assert.equal(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u2",email:"two@example.org"}],"Sequential"), null);
+  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u1",email:"two@example.org"}],"Sequential"), /Duplicate signer UID/);
+  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u2",email:"ONE@example.org"}],"Sequential"), /Duplicate signer email/);
+  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"}],"Invalid"), /Signing mode/);
 });
 
 test("lifecycle completion requires canonical Gateway quorum, PDF hash and cryptographic evidence", async () => {
