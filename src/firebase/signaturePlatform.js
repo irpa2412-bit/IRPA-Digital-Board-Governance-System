@@ -370,7 +370,7 @@ export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
     return {...recipient,status,completedAt:signer.signedAt||recipient.completedAt||null};
   });
   const pending=gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order);
-  const overall=gatewayStatus.status==="Completed"?"Completed":gatewayStatus.status==="Declined"?"Declined":gatewayStatus.status==="Voided"?"Cancelled":"In Progress";
+  const overall=String(gatewayStatus.status||"Unknown");
   const patch={
     recipients,
     status:overall,
