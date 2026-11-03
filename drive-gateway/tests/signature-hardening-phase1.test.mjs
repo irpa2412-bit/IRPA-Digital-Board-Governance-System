@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { isCurrentSigningAuthorityRecord } from "../src/signingAuthorityPolicy.mjs";
 import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
+import { verifyCanonicalSignatureEnvelope } from "../src/canonicalSignatureVerification.mjs";
+import { createCryptographicEvidence, exportPublicKeyJwk, generateSignerKeyPair } from "../src/cryptographicGate.mjs";
+import { sha256Hex } from "../src/util.mjs";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -71,4 +74,40 @@ test("mirror retry records a bounded exponential retry deadline", async () => {
   const source = await read("../src/signing.mjs");
   assert.match(source, /mirrorNextRetryAt/);
   assert.match(source, /Math\.min\(60\*60\*1000,30\*1000\*Math\.pow\(2/);
+});
+
+async function canonicalFixture(){
+  const keys=await generateSignerKeyPair(),bytes=new TextEncoder().encode("%PDF-1.7\nIRPA signed PDF");
+  const finalHash=await sha256Hex(bytes),signedAt="2026-11-03T10:00:00.000Z",signatureValue="authenticated-signer-signature";
+  const evidence=await createCryptographicEvidence({keyId:"test-key-1",signer:{uid:"u1",signerId:"S1",envelopeId:"ENV-1",signatureHash:await sha256Hex(signatureValue),signatureType:"typed",privateKey:keys.privateKey,publicKey:keys.publicKey},publicKeyJwk:await exportPublicKeyJwk(keys.publicKey),documentHash:finalHash,chainHead:"a".repeat(64),signedAt});
+  const envelope={id:"ENV-1",externalReference:"IRPA-ENV-1",documentId:"DOC-1",status:"Completed",signers:[{id:"S1",uid:"u1",status:"Signed",signedAt,signatureValue}],completion:{finalHash,primaryStorageId:"signed-pdf",cryptographicEvidenceIds:[evidence.evidenceId],lastSignedByUid:"u1"}};
+  const ctx={meta:{get:async(collection,id)=>collection==="envelopes"&&id==="ENV-1"?envelope:null,list:async collection=>collection==="cryptographicEvidence"?[evidence]:[]},storage:{get:async id=>id==="signed-pdf"?bytes:null}};
+  return{ctx,envelope,evidence,bytes,finalHash};
+}
+
+test("canonical lifecycle verifier accepts a quorum-complete PDF with matching signer evidence", async()=>{
+  const fixture=await canonicalFixture();
+  const result=await verifyCanonicalSignatureEnvelope(fixture.ctx,"ENV-1");
+  assert.equal(result.ok,true);
+  assert.equal(result.finalHash,fixture.finalHash);
+  assert.equal(result.lastSignedByUid,"u1");
+});
+
+test("canonical lifecycle verifier rejects missing signer quorum, missing evidence, bad PDF hash and wrong final signer", async()=>{
+  const quorum=await canonicalFixture();quorum.envelope.signers[0].status="Pending";
+  assert.equal((await verifyCanonicalSignatureEnvelope(quorum.ctx,"ENV-1")).ok,false);
+  const missingEvidence=await canonicalFixture();missingEvidence.ctx.meta.list=async()=>[];
+  assert.equal((await verifyCanonicalSignatureEnvelope(missingEvidence.ctx,"ENV-1")).ok,false);
+  const badHash=await canonicalFixture();badHash.envelope.completion.finalHash="f".repeat(64);
+  assert.equal((await verifyCanonicalSignatureEnvelope(badHash.ctx,"ENV-1")).ok,false);
+  const wrongFinalSigner=await canonicalFixture();wrongFinalSigner.envelope.completion.lastSignedByUid="u2";
+  assert.equal((await verifyCanonicalSignatureEnvelope(wrongFinalSigner.ctx,"ENV-1")).ok,false);
+});
+
+test("canonical lifecycle verifier rejects evidence tampering and signer-signature substitution", async()=>{
+  const fixture=await canonicalFixture();
+  fixture.evidence.signature="AAAA";
+  assert.equal((await verifyCanonicalSignatureEnvelope(fixture.ctx,"ENV-1")).ok,false);
+  const changed=await canonicalFixture();changed.envelope.signers[0].signatureValue="different-signature";
+  assert.equal((await verifyCanonicalSignatureEnvelope(changed.ctx,"ENV-1")).ok,false);
 });
