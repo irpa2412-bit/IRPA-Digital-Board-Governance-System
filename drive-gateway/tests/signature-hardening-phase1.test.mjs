@@ -6,6 +6,7 @@ import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from
 import { verifyCanonicalSignatureEnvelope } from "../src/canonicalSignatureVerification.mjs";
 import { createCryptographicEvidence, exportPublicKeyJwk, generateSignerKeyPair } from "../src/cryptographicGate.mjs";
 import { sha256Hex } from "../src/util.mjs";
+import { assertGatewaySigningResponse } from "../../src/firebase/signatureGatewayResponse.js";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -63,10 +64,11 @@ test("lifecycle completion requires canonical Gateway quorum, PDF hash and crypt
   assert.doesNotMatch(lifecycle, /signedByUid:envelope\.lastSignedByUid\|\|claims\.user_id/);
 });
 
-test("completion failure is surfaced and mirror preserves canonical Worker status", async () => {
-  const storage = await read("../../src/firebase/signatureStorage.js");
+test("CompletionFailed is rejected by the client and successful Gateway completion is accepted", async () => {
+  assert.deepEqual(assertGatewaySigningResponse({ok:true},{ok:true,status:"Completed",completed:true}),{ok:true,status:"Completed",completed:true});
+  assert.throws(()=>assertGatewaySigningResponse({ok:true},{ok:true,status:"CompletionFailed",completed:false}),/final PDF completion failed/);
+  assert.throws(()=>assertGatewaySigningResponse({ok:false},{ok:false,error:"Gateway unavailable"}),/Gateway unavailable/);
   const platform = await read("../../src/firebase/signaturePlatform.js");
-  assert.match(storage, /data\.status === "CompletionFailed"/);
   assert.match(platform, /const overall=String\(gatewayStatus\.status\|\|"Unknown"\)/);
 });
 
