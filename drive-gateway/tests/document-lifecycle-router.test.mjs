@@ -203,4 +203,7 @@ test("generic lifecycle transition cannot mark a document Signed without canonic
   assert.equal(response.status,409);
   assert.match(await response.text(),/only be set by canonical Gateway signature completion/);
   assert.equal(state.writes.length,0);
+  const lowercase=await router(req("/api/document-lifecycle/transition",{documentId:"LIFE-test",targetStage:"signed"}),env);
+  assert.equal(lowercase.status,409);
+  assert.equal(state.writes.length,0);
 });
