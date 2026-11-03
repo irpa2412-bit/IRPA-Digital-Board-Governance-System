@@ -2,7 +2,7 @@
 
 Date: 2026-11-03
 Repository: `irpa2412-bit/IRPA-Digital-Board-Governance-System`
-Observed latest mainline commit from GitHub commit search: `859e649da7e4661b61bee3da89d28578e3ee8843` (merge PR #628). The branch search confirms a branch named `main`; a direct branch-ref SHA endpoint was not available through the connected GitHub operations, so this SHA is the latest commit-search result rather than an independently fetched refs API value.
+Main base SHA recorded by GitHub when PR #629 was created: `859e649da7e4661b61bee3da89d28578e3ee8843` (merge PR #628). This is the exact `base_sha` attached to PR #629 at creation; the PR was opened against `main` at this commit.
 
 ## Frontend cryptographic signing flag
 
