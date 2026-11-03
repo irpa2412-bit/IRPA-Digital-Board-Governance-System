@@ -74,7 +74,8 @@ test("CompletionFailed is rejected by the client and successful Gateway completi
   assert.throws(()=>assertGatewaySigningResponse({ok:true},{ok:true,status:"CompletionFailed",completed:false}),/final PDF completion failed/);
   assert.throws(()=>assertGatewaySigningResponse({ok:false},{ok:false,error:"Gateway unavailable"}),/Gateway unavailable/);
   const platform = await read("../../src/firebase/signaturePlatform.js");
-  assert.match(platform, /const overall=String\(gatewayStatus\.status\|\|"Unknown"\)/);
+  assert.match(platform, /const overall=gatewayStatus\.status==="Completed"/);
+  assert.match(platform, /gatewaySigningStatus:String\(gatewayStatus\.status\|\|"Unknown"\)/);
 });
 
 test("mirror retry records a bounded exponential retry deadline", async () => {
