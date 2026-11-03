@@ -2,6 +2,20 @@ name: Deploy IRPA Governance with Firebase CLI
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/firebase-cli-deploy.yml"
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,15 +1,7 @@
 name: Upload TDZ Mainline Regression Bisect
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "src/components/ControlledDocumentUpload.jsx"
-      - "src/firebase/signatureStorage.js"
-      - "tests/browser/upload-production-bundle.spec.mjs"
-      - ".github/workflows/upload-tdz-mainline-bisect.yml"
   workflow_dispatch:
-
 permissions:
   contents: read
 

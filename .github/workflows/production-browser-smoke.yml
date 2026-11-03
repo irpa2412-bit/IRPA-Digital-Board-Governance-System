@@ -3,7 +3,25 @@ name: Production Browser Smoke Tests
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/production-browser-smoke.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

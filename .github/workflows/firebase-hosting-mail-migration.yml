@@ -2,7 +2,25 @@ name: Verify IRPA Cloudflare frontend (mail migration)
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/firebase-hosting-mail-migration.yml"
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify-cloudflare-frontend:
     runs-on: ubuntu-latest

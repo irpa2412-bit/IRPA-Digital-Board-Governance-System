@@ -17,6 +17,10 @@ on:
       - ".github/workflows/grant-crawler-cloudflare-ci.yml"
       - "package.json"
       - "package-lock.json"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:

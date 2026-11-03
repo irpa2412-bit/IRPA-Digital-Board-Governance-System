@@ -9,6 +9,10 @@ name: Deploy IRPA Governance to Firebase
 # 2026-09-26 document-reference repair: deploy the secure server-side document reference callable together with hosting/firestore so normal portal users are not blocked by admin-only counter rules.
 # 2026-09-26 IT Specialist login gateway release verification: force production deployment of current main.
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   statuses: write
@@ -16,6 +20,21 @@ permissions:
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "storage.rules"
+      - ".github/workflows/firebase-deploy.yml"
   workflow_dispatch:
 
 jobs:
