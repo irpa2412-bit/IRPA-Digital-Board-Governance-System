@@ -9,7 +9,7 @@ The hard-coded privileged administrator email shortcut was intentionally NOT rem
 
 | File | Line(s) | Context |
 |---|---:|---|
-| `drive-gateway/src/index.js` | 903, 984, 1063, 1082, 1117, 1137, 1165, 1229, 1367, 1591, 1847 | Gateway administrator shortcuts across privileged routes, including signature draft/diagnostic and related operations. Line numbers refer to the Phase 1 branch after the authority/draft edits. |
+| `drive-gateway/src/index.js` | 880, 961, 1040, 1059, 1094, 1114, 1142, 1197, 1335, 1559, 1815 | Gateway administrator shortcuts across privileged routes, including signature draft/diagnostic and related operations. Line numbers refer to the Phase 1 branch after the authority/draft edits. |
 | `drive-gateway/src/invitationRemoval.mjs` | 10 | Invitation removal administrator shortcut. |
 | `drive-gateway/src/releaseReadinessRoutes.mjs` | 26 | Release-readiness administrator shortcut. |
 | `drive-gateway/src/meetingPortal.mjs` | 80 | Meeting Portal administrator shortcut. |
