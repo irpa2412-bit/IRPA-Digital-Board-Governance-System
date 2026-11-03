@@ -25,7 +25,7 @@ The following patch is against the retrieved current rules text. It is a proposa
        resource.data.get("actionUids",[]) is list&&resource.data.get("actionUids",[]).hasAny([request.auth.uid])&&
        ((resource.data.get("signingMode","Sequential")=="Sequential"&&resource.data.get("currentSignerUid",null)==request.auth.uid)||
         resource.data.get("signingMode","Sequential")=="Parallel")&&
-       request.resource.data.lastSignedByUid==request.auth.uid&&
+-      request.resource.data.lastSignedByUid==request.auth.uid&&
 -      request.resource.data.status in ["In Progress","Completed"]&&
 -      !request.resource.data.diff(resource.data).affectedKeys().hasAny(["senderUid","ownerUid","ownerEmail","participantUids","actionUids","recipients","fields","documentId","documentUrl","documentReference"]);
 +      request.resource.data.status=="In Progress"&&
