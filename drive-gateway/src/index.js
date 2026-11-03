@@ -18,7 +18,7 @@ import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
-import { importPublicKeyJwk, verifyCryptographicEvidence } from "./cryptographicGate.mjs";
+import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
 import { isCurrentSigningAuthorityRecord } from "./signingAuthorityPolicy.mjs";
 import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from "./signatureDraftPolicy.mjs";
 import { runCleanup } from "./upload.mjs";
@@ -63,32 +63,7 @@ let jwksFetchedAt = 0;
 
 async function verifyCanonicalSignatureEnvelope(env,envelopeId){
   const ctx=buildEsignContext({env,verifyUser:async()=>null,sendInvitation:async()=>{},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
-  const envelope=await ctx.meta.get("envelopes",envelopeId);
-  if(!envelope||envelope.status!=="Completed"||!envelope.completion?.finalHash||!envelope.completion?.primaryStorageId)return{ok:false,error:"Canonical Gateway envelope is not completed."};
-  const signers=Array.isArray(envelope.signers)?envelope.signers:[];
-  if(!signers.length||signers.some(s=>s.status!=="Signed"||!s.uid||!s.signedAt))return{ok:false,error:"Canonical Gateway signer quorum is incomplete."};
-  const bytes=await ctx.storage.get(envelope.completion.primaryStorageId);
-  if(!bytes)return{ok:false,error:"Canonical signed PDF is unavailable."};
-  const digest=await crypto.subtle.digest("SHA-256",bytes);
-  const finalHash=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
-  if(finalHash!==envelope.completion.finalHash)return{ok:false,error:"Canonical signed PDF hash does not match the completion record."};
-  const evidenceIds=Array.isArray(envelope.completion.cryptographicEvidenceIds)?envelope.completion.cryptographicEvidenceIds:[];
-  if(evidenceIds.length!==signers.length)return{ok:false,error:"Cryptographic evidence does not cover every required signer."};
-  const rows=await ctx.meta.list("cryptographicEvidence");
-  for(const signer of signers){
-    const evidence=(rows||[]).find(row=>row?.evidenceId&&evidenceIds.includes(row.evidenceId)&&row.envelopeId===envelope.id&&row.signerUid===signer.uid&&row.documentHash===finalHash);
-    if(!evidence)return{ok:false,error:"A required signer's cryptographic evidence is missing."};
-    try{
-      const publicKey=await importPublicKeyJwk(evidence.publicKeyJwk);
-      if(!await verifyCryptographicEvidence(evidence,{documentHash:finalHash,signerUid:signer.uid,publicKey}))return{ok:false,error:"A required signer's cryptographic evidence failed verification."};
-      const payload=JSON.parse(evidence.canonicalPayload||"{}");
-      const signatureDigest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(signer.signatureValue||"")));
-      const signatureHash=Array.from(new Uint8Array(signatureDigest)).map(b=>b.toString(16).padStart(2,"0")).join("");
-      if(payload.envelopeId!==envelope.id||payload.signerId!==signer.id||payload.signatureHash!==signatureHash)return{ok:false,error:"Cryptographic evidence does not bind to the canonical signer record."};
-    }catch{return{ok:false,error:"A required signer's cryptographic evidence could not be verified."};}
-  }
-  if(!envelope.completion.lastSignedByUid)return{ok:false,error:"Canonical completion does not identify the final signer."};
-  return{ok:true,envelope,finalHash,lastSignedByUid:envelope.completion.lastSignedByUid};
+  return verifyCanonicalSignatureEnvelopeRecord(ctx,envelopeId);
 }
 
 const documentLifecycleRouter = createDocumentLifecycleRouter({
