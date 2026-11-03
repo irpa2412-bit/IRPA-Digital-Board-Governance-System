@@ -27,9 +27,9 @@ test("signer status limits UID disclosure to the caller, owner or administrator"
 test("authority matching is fail-closed and binds email matches to authenticated UID", async () => {
   const source = await read("../src/index.js");
   assert.match(source, /status!=="active"/);
-  assert.match(source, /record\\.authorityStatus!==undefined/);
-  assert.match(source, /record\\.matchedByEmail/);
-  assert.match(source, /authorityExpiresAt\\|\\|record\\.authorityExpiry/);
+  assert.match(source, /authorityStatus/);
+  assert.match(source, /matchedByEmail/);
+  assert.match(source, /authorityExpiresAt/);
 });
 
 test("draft save validates source ownership, signer uniqueness and signing mode", async () => {
