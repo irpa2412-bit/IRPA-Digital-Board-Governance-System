@@ -5,6 +5,16 @@ on:
     branches:
       - feature/signer-identity-migration
   pull_request:
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "firebase.json"
+      - "wrangler*.jsonc"
+      - ".github/workflows/signature-migration-build-test.yml"
     types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
