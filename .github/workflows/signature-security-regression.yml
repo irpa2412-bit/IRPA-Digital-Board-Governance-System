@@ -35,6 +35,12 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Install application dependencies
         run: npm install --no-audit --no-fund
 
@@ -52,9 +58,8 @@ jobs:
       - name: Run root security and document regression suites
         run: |
           set -euo pipefail
-          npm run test:security-rules
+          npx firebase emulators:exec --only firestore --project demo-irpa-signature "npm run test:security-rules && npm run test:meeting-category"
           npm run test:pdf-page-rendering
-          npm run test:meeting-category
           npm run test:fundraising-registry
           npm run test:portal-navigation
           npm run test:meeting-entry-policy
