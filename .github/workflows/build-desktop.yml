@@ -16,6 +16,10 @@ on:
       - "electron-builder.yml"
       - "tests/offline-build-workflow-policy.test.mjs"
       - ".github/workflows/build-desktop.yml"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 jobs:
