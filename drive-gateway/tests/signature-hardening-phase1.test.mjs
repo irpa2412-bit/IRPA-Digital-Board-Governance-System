@@ -54,11 +54,13 @@ test("signature draft ownership and recipient policy have positive and negative 
 
 test("lifecycle completion requires canonical Gateway quorum, PDF hash and cryptographic evidence", async () => {
   const index = await read("../src/index.js");
+  const canonical = await read("../src/canonicalSignatureVerification.mjs");
   const lifecycle = await read("../src/documentLifecycle.mjs");
-  assert.match(index, /envelope\.status!=="Completed"/);
-  assert.match(index, /signers\.some\(s=>s\.status!=="Signed"\|\|!s\.uid\|\|!s\.signedAt\)/);
-  assert.match(index, /finalHash!==envelope\.completion\.finalHash/);
-  assert.match(index, /verifyCryptographicEvidence\(evidence/);
+  assert.match(index, /verifyCanonicalSignatureEnvelopeRecord\(ctx,envelopeId\)/);
+  assert.match(canonical, /envelope\.status!=="Completed"/);
+  assert.match(canonical, /signers\.some\(s=>s\.status!=="Signed"\|\|!s\.uid\|\|!s\.signedAt\)/);
+  assert.match(canonical, /finalHash!==envelope\.completion\.finalHash/);
+  assert.match(canonical, /verifyCryptographicEvidence\(evidence/);
   assert.match(lifecycle, /deps\.verifyCanonicalSignatureEnvelope\(env,envelopeId\)/);
   assert.match(lifecycle, /signedByUid:lastSignedByUid/);
   assert.doesNotMatch(lifecycle, /signedByUid:envelope\.lastSignedByUid\|\|claims\.user_id/);
