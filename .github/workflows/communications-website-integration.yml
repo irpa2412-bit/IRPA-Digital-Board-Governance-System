@@ -44,6 +44,10 @@ on:
       - ".github/workflows/communications-website-integration.yml"
       - ".github/workflows/staging-gateway-e2e.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
