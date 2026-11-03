@@ -100,7 +100,12 @@ export async function createEnvelope(ctx,user,body){
       const reservation=await ctx.meta.get("externalReferences",reservationKey);
       const existing=reservation?.envelopeId?await ctx.meta.get("envelopes",reservation.envelopeId):null;
       if(existing)return{ok:true,existing:true,envelopeId:existing.id,externalReference,status:existing.status,invitations:existing.signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation}))};
-      throw new HttpError(409,"An envelope is already being created for this external reference. Retry after it finishes.");
+      const reservationCreatedAt=Date.parse(String(reservation?.createdAt||""));
+      const reservationAge=ctx.now().getTime()-reservationCreatedAt;
+      if(reservation&&Number.isFinite(reservationAge)&&reservationAge>=5*60*1000&&Number.isInteger(reservation._v)){
+        try{await ctx.meta.update("externalReferences",reservationKey,{ownerUid:user.uid,externalReference,envelopeId:id,createdAt:e.createdAt},{ifVersion:reservation._v});}
+        catch(reclaimError){const current=await ctx.meta.get("externalReferences",reservationKey);const currentEnvelope=current?.envelopeId?await ctx.meta.get("envelopes",current.envelopeId):null;if(currentEnvelope)return{ok:true,existing:true,envelopeId:currentEnvelope.id,externalReference,status:currentEnvelope.status,invitations:currentEnvelope.signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation}))};throw new HttpError(409,"An envelope is already being created for this external reference. Retry after it finishes.");}
+      }else throw new HttpError(409,"An envelope is already being created for this external reference. Retry after it finishes.");
     }
   }
   try{await ctx.meta.create("envelopes",id,e);}
