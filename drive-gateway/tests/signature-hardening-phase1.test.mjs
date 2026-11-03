@@ -39,6 +39,7 @@ test("signing authority accepts only Active, current, unexpired UID-bound regist
   assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u2",matchedByEmail:true}, "u1"), false);
   assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",matchedByEmail:true}, "u1"), true);
   assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityExpiresAt:"2026-01-01T00:00:00Z"}, "u1", Date.parse("2026-11-03T00:00:00Z")), false);
+  assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityExpiresAt:{seconds:1798761600}}, "u1", Date.parse("2026-11-03T00:00:00Z")), true);
   assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityExpiresAt:"not-a-date"}, "u1"), false);
 });
 
