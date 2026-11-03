@@ -51,6 +51,8 @@ test("signature draft ownership and recipient policy have positive and negative 
   assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u1",email:"two@example.org"}],"Sequential"), /Duplicate signer UID/);
   assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u2",email:"ONE@example.org"}],"Sequential"), /Duplicate signer email/);
   assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"}],"Invalid"), /Signing mode/);
+  const source = await read("../src/index.js");
+  assert.match(source, /status:"Draft",signingMode,recipients/);
 });
 
 test("lifecycle completion requires canonical Gateway quorum, PDF hash and cryptographic evidence", async () => {
