@@ -73,7 +73,8 @@ test("document lifecycle fails closed instead of falling back to claims.token", 
   assert.doesNotMatch(lifecycle, /\?\s*await deps\.getFirestoreAdminAccessToken\(env\)\s*:\s*claims\.token/);
   assert.doesNotMatch(lifecycle, /getFirestoreDocument\([^\n]*claims\.token/);
   assert.doesNotMatch(lifecycle, /updateFirestoreDocument\([^\n]*claims\.token/);
-  assert.match(lifecycle, /deps\.verifyCanonicalSignatureEnvelope\(env,envelopeId\)/);\n  assert.match(lifecycle, /Canonical Gateway signature verification is not configured/);
+  assert.match(lifecycle, /deps\.verifyCanonicalSignatureEnvelope\(env,envelopeId\)/);
+  assert.match(lifecycle, /Canonical Gateway signature verification is not configured/);
 });
 
 test("mock Firestore denies caller-token reads and permits Worker-admin reads", async () => {
