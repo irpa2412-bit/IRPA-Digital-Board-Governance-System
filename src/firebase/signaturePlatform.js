@@ -29,6 +29,12 @@ const BOARD_SIGNING_ROLES=["Board Chairperson","Board Vice Chairperson","Board S
 function isBoardSigningRole(role,recipient){const values=[role,recipient?.institutionalRole].map(v=>String(v||"").trim()).filter(Boolean);return values.some(v=>BOARD_SIGNING_ROLES.includes(v));}
 function isViewOnlyRecipient(recipient){return !!recipient?.accessOnly||VIEW_ONLY_ROLES.includes(String(recipient?.role||"").trim());}
 function isActionRecipient(recipient){return !!recipient?.uid&&!isViewOnlyRecipient(recipient)&&recipient?.optionalSigning!==true;}
+function maskSignatureEmail(value){
+  const email=String(value||"").trim();
+  const at=email.lastIndexOf("@");
+  if(at<1)return email?"***":"unavailable";
+  return `${email.slice(0,1)}***@${email.slice(at+1)}`;
+}
 function nextActionRecipient(recipients,currentUid){const list=recipients||[];const index=list.findIndex(r=>r?.uid===currentUid);return list.slice(Math.max(0,index+1)).find(isActionRecipient)||null;}
 
 function user(){if(!auth.currentUser)throw new Error("Authentication is required.");return auth.currentUser;}
@@ -304,8 +310,8 @@ export async function startSignatureWorkflow(envelope){
   if(!envelope?.id)throw new Error("A valid workflow envelope is required.");
   if(envelope.senderUid!==u.uid&&envelope.ownerUid!==u.uid)throw new Error("Only the document owner can start this workflow.");
   if(envelope.status!=="Draft")return envelope;
-  const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid);
   const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);
+  const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid)||actionRecipients[0]||null;
   let gateway=null;
   if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED){
     if(envelope.gatewayEnvelopeId){
@@ -338,7 +344,42 @@ export async function startSignatureWorkflow(envelope){
     }
     throw error;
   }
-  if(!gateway&&current&&current.uid!==u.uid&&current.email)await releaseNextSigner({...envelope,...update},current);
+  if(!gateway&&current){
+    const recipientEmail=String(current.email||"").trim().toLowerCase();
+    const maskedAddress=maskSignatureEmail(recipientEmail);
+    const attemptedAt=new Date().toISOString();
+    if(!recipientEmail){
+      const deliveryError=new Error("The first signer has no registered email address. The workflow status was updated, but no invitation could be sent.");
+      await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Failed",{signerUid:current.uid,signerName:current.name||"",maskedAddress:"unavailable",attemptedAt,deliveryStatus:"Failed",providerResponseId:null,error:deliveryError.message});
+      throw deliveryError;
+    }
+    try{
+      const delivery=await sendSignatureMail({...envelope,...update,id:envelope.id},current);
+      const deliveryStatus=delivery.deliveryStatus||"Sent";
+      await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{
+        currentSignerEmail:recipientEmail,
+        currentSignerName:current.name||"",
+        currentSignerInvitationStatus:deliveryStatus,
+        currentSignerInvitationSentAt:serverTimestamp(),
+        updatedAt:serverTimestamp()
+      });
+      await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Sent",{
+        signerUid:current.uid,signerName:current.name||"",maskedAddress,attemptedAt,
+        deliveryStatus,providerResponseId:delivery.messageId||delivery.providerResponseId||null,error:null
+      });
+    }catch(error){
+      const message=error?.message||"The invitation provider rejected the signing email.";
+      try{
+        await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Failed",{
+          signerUid:current.uid,signerName:current.name||"",maskedAddress,attemptedAt,
+          deliveryStatus:"Failed",providerResponseId:null,error:message
+        });
+      }catch(auditError){
+        throw new Error(`The signing invitation to ${maskedAddress} failed: ${message}. The delivery failure audit also failed: ${auditError?.message||"unknown audit error"}.`);
+      }
+      throw new Error(`The workflow was started, but the signing invitation to ${maskedAddress} failed: ${message}`);
+    }
+  }
   await recordEnvelopeEvent(envelope.id,"Workflow Started",{
     ownerUid:u.uid,
     currentSignerUid:envelope.currentSignerUid||null,
