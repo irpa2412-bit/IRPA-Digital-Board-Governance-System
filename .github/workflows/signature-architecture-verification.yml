@@ -1,0 +1,44 @@
+name: Signature architecture verification
+
+on:
+  push:
+    branches:
+      - docs/signature-architecture-20261102
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "drive-gateway/src/**"
+      - "drive-gateway/tests/signature-verifier.test.mjs"
+      - "src/firebase/signatureStorage.js"
+      - "src/pages/SignaturePlatform.jsx"
+      - ".github/workflows/signature-architecture-verification.yml"
+      - "docs/signature-architecture.md"
+
+permissions:
+  contents: read
+
+jobs:
+  signature-end-to-end:
+    name: Signature end-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install PDF inspection utility
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install Gateway dependencies
+        run: npm ci --prefix drive-gateway
+      - name: Verify completed signature and certificate
+        run: node --test drive-gateway/tests/signature-verifier.test.mjs
+      - name: Run complete Gateway test suite
+        run: npm test --prefix drive-gateway
+      - name: Build application
+        run: npm run build

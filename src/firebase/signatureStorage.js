@@ -529,6 +529,11 @@ export async function submitGatewaySignature({token,signature,fieldValues={},fie
 }
 
 
+export async function verifyGatewayEnvelope(envelopeId) {
+  if (!envelopeId) throw new Error("A Gateway envelope ID is required.");
+  return gatewayPost(`/api/envelopes/${encodeURIComponent(envelopeId)}/verify`, {});
+}
+
 export async function verifyGatewaySignedPdf({token,bytes}={}) {
   if (!token || !bytes?.length) throw new Error("A Gateway token and completed PDF are required for integrity verification.");
   const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);

@@ -33,6 +33,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Install PDF inspection utility
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
       - name: Install application dependencies
         run: npm install --no-audit --no-fund
       - name: Install gateway dependencies

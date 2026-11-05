@@ -1,4 +1,4 @@
-import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {MAX_SIGNERS,buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
+import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {PDFDocument} from "pdf-lib";import {VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {MAX_SIGNERS,buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
 export async function chainEvents(events,e){const body={...e,prevHash:events.length?events.at(-1).hash:"GENESIS"};return[...events,{...body,hash:await sha256Hex(canonicalJson(body))}]}
 export async function verifyChain(events){if(!Array.isArray(events))return false;let p="GENESIS";for(const e of events){const {hash,...b}=e;if(b.prevHash!==p||await sha256Hex(canonicalJson(b))!==hash)return false;p=hash}return true}
 async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get("envelopes",id);if(!c)throw new HttpError(404,"Envelope not found.");if(!await verifyChain(c.events))throw new HttpError(409,"Signing audit chain failed verification.");const {patch,result}=await fn(c);if(!patch)return result;try{await ctx.meta.update("envelopes",id,patch,{ifVersion:c._v});return result}catch(e){if(!(e instanceof VersionConflict))throw e}}throw new HttpError(409,"Please retry.")}
@@ -41,7 +41,9 @@ function validateFieldValues(fields,signer,values,signature,fieldApplications=[]
       if(!Number.isFinite(submitted)||submitted!==saved)throw new HttpError(409,"The confirmed signature field page or position differs from the saved assignment.");
     }
     const value=application.value;
-    if(typeof value!=="string"||!value.startsWith("data:image/png;base64,"))throw new HttpError(400,"Confirmed signature fields require an explicit PNG signature specimen.");
+    const drawn=typeof value==="string"&&value.startsWith("data:image/png;base64,");
+    const typed=typeof value==="string"&&signature?.type==="typed"&&value===signature.value&&value.trim()===value&&value.length>=2&&value.length<=100;
+    if(!drawn&&!typed)throw new HttpError(400,"Confirmed signature fields require a valid drawn PNG or explicitly typed signature value.");
     applications.set(field.fieldId,value);
   }
   for(const f of assigned){
@@ -77,4 +79,70 @@ export async function resyncMirror(ctx,user,id){const e=await ctx.meta.get("enve
 export async function persistMirrorWithStatus(ctx,envelope,completion){const id=envelope.id;const attempts=Number(envelope.mirrorAttempts||0)+1;try{await ctx.persistCompletedSignatureEnvelope({envelope,completion});await ctx.meta.update("envelopes",id,{mirrorStatus:"Completed",mirrorError:null,mirrorAttempts:attempts,mirrorUpdatedAt:ctx.now().toISOString()});return true}catch(error){const message=String(error?.message||error).slice(0,300);try{const latest=await ctx.meta.get("envelopes",id);if(latest)await ctx.meta.update("envelopes",id,{mirrorStatus:"Pending",mirrorError:message,mirrorAttempts:attempts,mirrorUpdatedAt:ctx.now().toISOString()},{ifVersion:latest._v})}catch(statusError){ctx.logger?.error?.("SIGNATURE_MIRROR_STATUS_PERSIST_FAILED",{envelopeId:id,message:String(statusError?.message||statusError).slice(0,200)})}ctx.logger?.error?.("SIGNATURE_PORTAL_COMPLETION_PERSIST_FAILED",{envelopeId:envelope.externalReference,gatewayEnvelopeId:id,message,attempts});return false}}
 export async function getSigningStatus(ctx,token,user=null){const{env,signer}=await load(ctx,token);assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");const completion=env.completion?{finalHash:env.completion.finalHash,completedAt:env.completion.completedAt,primaryStorageId:env.completion.primaryStorageId,fileName:env.completion.fileName,signedFileReference:env.completion.primaryStorageId,files:(env.completion.files||[]).filter(file=>file?.kind==="archive"||(file?.kind==="signer-copy"&&file.signerId===signer.id)),cryptographicEvidenceIds:env.completion.cryptographicEvidenceIds||[]}:null;return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,status:env.status,signingMode:env.signingMode||"Sequential",signer:{id:signer.id,uid:signer.uid||null,status:signer.status},signers:env.signers.map(s=>({id:s.id,uid:s.uid||null,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),completion,eventCount:env.events.length,auditChainValid:await verifyChain(env.events)}}
 export async function verifySigningPdf(ctx,token,user,bytes){const{env,signer}=await load(ctx,token);assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");if(env.status!=="Completed"||!env.completion?.finalHash)throw new HttpError(409,"The signing envelope is not completed.");if(!(bytes instanceof Uint8Array)||!bytes.length||bytes.length>12*1024*1024)throw new HttpError(413,"A completed PDF of at most 12 MB is required.");const actualHash=await sha256Hex(bytes);if(actualHash!==env.completion.finalHash)throw new HttpError(409,"The provided PDF does not match the completed envelope hash.");return{ok:true,verified:true,envelopeId:env.id,externalReference:env.externalReference||null,documentHash:actualHash,cryptographicEvidenceIds:env.completion.cryptographicEvidenceIds||[]}}
+export async function verifyCompletedEnvelope(ctx,user,envelopeId){
+  if(user?.isAdmin!==true)throw new HttpError(403,"Administrator access is required to verify a completed signed document.");
+  const envelope=await ctx.meta.get("envelopes",envelopeId);
+  if(!envelope)throw new HttpError(404,"Envelope not found.");
+  const checks=[];
+  const add=(id,pass,reason)=>checks.push({id,status:pass?"PASS":"FAIL",reason});
+  const source=await ctx.meta.get("documents",envelope.documentId);
+  const sourceBytes=source&&await ctx.storage.get(source.primaryStorageId);
+  const sourceHash=sourceBytes?await sha256Hex(sourceBytes):null;
+  const expectedSourceHash=String(envelope.sha256||envelope.documentHash||envelope.originalHash||source?.sha256||source?.hash||"").toLowerCase();
+  add("source_sha256",Boolean(sourceBytes&&expectedSourceHash&&sourceHash===expectedSourceHash),"Recomputed source PDF SHA-256 "+(sourceBytes&&expectedSourceHash&&sourceHash===expectedSourceHash?"matches the envelope/source record.":"does not match the stored source hash or source bytes are unavailable."));
+  add("source_byte_length",Boolean(sourceBytes&&Number(envelope.byteLength??envelope.documentSize??source?.fileSize??source?.byteLength??source?.size??sourceBytes.byteLength)===sourceBytes.byteLength),"Source byte length "+(sourceBytes&&Number(envelope.byteLength??envelope.documentSize??source?.fileSize??source?.byteLength??source?.size??sourceBytes.byteLength)===sourceBytes.byteLength?"matches.":"does not match."));
+  const chainValid=await verifyChain(envelope.events);
+  add("audit_chain",chainValid,chainValid?"Envelope event hash chain verifies from GENESIS.":"Envelope event hash chain is broken or has been altered.");
+  const finalBytes=envelope.completion?.primaryStorageId?await ctx.storage.get(envelope.completion.primaryStorageId):null;
+  const finalHash=finalBytes?await sha256Hex(finalBytes):null;
+  add("completed_pdf_sha256",Boolean(envelope.status==="Completed"&&finalBytes&&finalHash===envelope.completion?.finalHash),"Recomputed completed PDF SHA-256 "+(finalBytes&&finalHash===envelope.completion?.finalHash?"matches completion.finalHash.":"does not match the completion record or document is not completed."));
+  let pdf=null,sourcePdf=null,certificate=null;
+  try{
+    if(sourceBytes)sourcePdf=await PDFDocument.load(sourceBytes);
+    if(finalBytes){pdf=await PDFDocument.load(finalBytes);const subject=pdf.getSubject()||"";const prefix="IRPA-SIGNATURE-CERTIFICATE-1:";if(subject.startsWith(prefix))certificate=JSON.parse(subject.slice(prefix.length));}
+  }catch{}
+  add("certificate_manifest",Boolean(certificate?.schema==="IRPA-SIGNATURE-CERTIFICATE-1"&&certificate.envelopeId===envelope.id&&certificate.documentId===envelope.documentId&&certificate.originalHash===expectedSourceHash),"Embedded certificate manifest "+(certificate?"was found; identity/hash fields are checked separately.":"is missing, malformed or uses an unsupported schema."));
+  const signerEvents=(envelope.events||[]).filter(event=>event.type==="signer.signed");
+  const signedHead=signerEvents.at(-1)?.hash||"";
+  add("certificate_source_binding",Boolean(certificate&&certificate.originalHash===sourceHash&&certificate.chainHead===signedHead),"Certificate source hash and pre-seal signing audit head "+(certificate&&certificate.originalHash===sourceHash&&certificate.chainHead===signedHead?"match the recomputed source and last signer event.":"do not match."));
+  const sourcePageCount=certificate?.sourcePageCount;
+  const sourcePageCountMatches=Boolean(sourcePdf&&Number.isInteger(sourcePageCount)&&sourcePdf.getPageCount()===sourcePageCount&&pdf&&pdf.getPageCount()===sourcePdf.getPageCount()+1);
+  add("certificate_page_count",sourcePageCountMatches,"PDF page count "+(sourcePageCountMatches?"matches the actual source PDF page count plus one appended certificate page.":"does not match the actual source page count plus one certificate page."));
+  const manifestSigners=Array.isArray(certificate?.signers)?certificate.signers:[];
+  const signerRecordsValid=(envelope.signers||[]).length>0&&manifestSigners.length===(envelope.signers||[]).length&&(envelope.signers||[]).every(s=>{
+    const m=manifestSigners.find(x=>x.id===s.id);
+    return Boolean(m&&s.status==="Signed"&&m.uid===String(s.uid||"")&&m.name===String(s.name||"")&&m.email===String(s.email||"")&&m.signedAt===String(s.signedAt||"")&&m.signatureType===String(s.signatureType||""));
+  });
+  add("certificate_signer_records",signerRecordsValid,"Certificate signer identities, timestamps and signature methods "+(signerRecordsValid?"match every signed envelope signer.":"do not match every signed envelope signer."));
+  const evidenceIds=envelope.completion?.cryptographicEvidenceIds||[];
+  const evidenceRows=await ctx.meta.list("cryptographicEvidence");
+  const evidenceChecks=[],auditEventChecks=[];
+  for(const signer of envelope.signers||[]){
+    const evidence=(evidenceRows||[]).find(row=>row?.envelopeId===envelope.id&&row?.signerUid===signer.uid&&evidenceIds.includes(row.evidenceId));
+    let valid=false,auditEventValid=false;
+    try{
+      if(evidence){
+        const publicKey=await importPublicKeyJwk(evidence.publicKeyJwk);
+        valid=await verifyCryptographicEvidence(evidence,{documentHash:finalHash,signerUid:signer.uid,publicKey})&&evidence.signerId===signer.id&&evidence.signatureHash===await sha256Hex(String(signer.signatureValue||""));
+        const auditEvent=(envelope.events||[]).find(event=>event.type==="cryptographic.signature.created"&&event.evidenceId===evidence.evidenceId);
+        auditEventValid=Boolean(auditEvent&&auditEvent.at===evidence.signedAt&&auditEvent.signerUid===evidence.signerUid&&auditEvent.signerId===evidence.signerId&&auditEvent.envelopeId===evidence.envelopeId&&auditEvent.documentHash===evidence.documentHash&&auditEvent.payloadHash===evidence.payloadHash&&auditEvent.keyId===evidence.keyId&&auditEvent.algorithm===evidence.algorithm);
+      }
+    }catch{}
+    evidenceChecks.push({signerId:signer.id,valid});
+    auditEventChecks.push({signerId:signer.id,valid:auditEventValid});
+  }
+  const evidenceValid=evidenceChecks.length===(envelope.signers||[]).length&&evidenceChecks.every(x=>x.valid)&&evidenceIds.length===(envelope.signers||[]).length;
+  add("ecdsa_signer_evidence",evidenceValid,evidenceValid?"Every signer has valid ECDSA P-256 evidence bound to this completed PDF hash and signature value.":"One or more signer evidence records are missing, invalid, replayed or bound to different values.");
+  const auditEventsValid=auditEventChecks.length===(envelope.signers||[]).length&&auditEventChecks.every(x=>x.valid);
+  add("cryptographic_audit_events",auditEventsValid,auditEventsValid?"Every persisted ECDSA evidence record has its matching cryptographic event in the verified envelope chain.":"One or more cryptographic audit events are missing or do not match the persisted evidence.");
+  const completionEvent=(envelope.events||[]).find(event=>event.type==="envelope.completed");
+  const completionEventValid=Boolean(completionEvent&&completionEvent.finalHash===finalHash&&completionEvent.cryptographicEvidenceCount===evidenceIds.length);
+  add("completion_event_binding",completionEventValid,completionEventValid?"The envelope-completed event binds the completed PDF hash and evidence count.":"The envelope-completed event is missing or does not match the completion record.");
+  if(certificate&&signerRecordsValid){
+    const signatureHashes=await Promise.all((envelope.signers||[]).map(s=>sha256Hex(String(s.signatureValue||""))));const hashesMatch=(envelope.signers||[]).every((s,index)=>manifestSigners.find(x=>x.id===s.id)?.signatureHash===signatureHashes[index]);
+    add("certificate_signature_hashes",hashesMatch,"Certificate-page signature hashes "+(hashesMatch?"match the stored signature values.":"do not match the stored signature values."));
+  }else add("certificate_signature_hashes",false,"Cannot compare certificate signature hashes because signer records are invalid or the manifest is unavailable.");
+  const verified=checks.every(check=>check.status==="PASS");
+  return{ok:true,verified,envelopeId:envelope.id,documentId:envelope.documentId,sourceSha256:sourceHash,completedPdfSha256:finalHash,checks};
+}
 export async function getSigningEvidence(ctx,token,user=null){const{env,signer}=await load(ctx,token);assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");if(env.status!=="Completed"||!env.completion?.finalHash)throw new HttpError(409,"Cryptographic evidence is available only after successful completion.");const rows=await ctx.meta.list("cryptographicEvidence"),matches=(rows||[]).filter(e=>e?.envelopeId===env.id&&e?.signerUid===signer.uid);if(!matches.length)throw new HttpError(404,"Cryptographic signing evidence is not available for this signer.");const verified=[];for(const evidence of matches){let valid=false;try{const publicKey=await importPublicKeyJwk(evidence.publicKeyJwk);valid=await verifyCryptographicEvidence(evidence,{documentHash:env.completion.finalHash,signerUid:signer.uid,publicKey})}catch{}if(!valid)throw new HttpError(409,"Persisted cryptographic evidence failed verification.");verified.push(evidence)}return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentHash:env.completion.finalHash,evidence:verified,auditChainValid:await verifyChain(env.events)}}
