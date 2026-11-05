@@ -1,0 +1,25 @@
+name: Security Rules Main Baseline Diagnostic
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/security-rules-main-baseline.yml"
+      - "firestore.rules"
+      - "tests/finance-portal-policy.test.cjs"
+      - "tests/meeting-category-firestore-rules.test.cjs"
+      - "package.json"
+jobs:
+  security-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npx --yes firebase-tools emulators:exec --only firestore "npm run test:security-rules"
