@@ -1,0 +1,108 @@
+/* IRPA mobile layout stack — 2026-10-30
+   Keep the install/status strip in document flow, reserve one bottom dock for
+   global navigation, and return page controls to normal flow so they cannot
+   cover portal content. Desktop positioning is intentionally unchanged. */
+@media screen and (max-width: 760px) {
+  html body #root .app-shell .main-area {
+    padding-top: 0 !important;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    min-width: 0;
+  }
+
+  /* One persistent navigation control: bottom dock only. */
+  html body #root .app-shell .main-area > .mobile-global-nav {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 3000 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+    min-height: 62px !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
+    box-sizing: border-box !important;
+  }
+
+  html body #root .app-shell .main-area > .mobile-global-nav > button {
+    min-width: 0 !important;
+    height: 62px !important;
+  }
+
+  html body #root .app-shell .mobile-nav-sheet {
+    position: fixed !important;
+    inset: auto 10px calc(70px + env(safe-area-inset-bottom, 0px)) 10px !important;
+    z-index: 3100 !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(70dvh, calc(100dvh - 100px - env(safe-area-inset-top, 0px))) !important;
+    overflow: auto !important;
+  }
+
+  /* These controls now occupy their own rows instead of overlaying content. */
+  html body #root .app-shell .main-area > .topbar,
+  html body #root .app-shell .main-area > .desktop-webapp-navigation-roller,
+  html body #root .app-shell .main-area > .page-back-next-navigation,
+  html body #root .app-shell .main-area .mobile-portal-content-roller {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: auto !important;
+    transform: none !important;
+    float: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  html body #root .app-shell .main-area > .desktop-webapp-navigation-roller {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 8px !important;
+    margin: 8px 0 !important;
+  }
+
+  html body #root .app-shell .main-area > .page-back-next-navigation {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr) !important;
+    gap: 6px !important;
+    margin: 8px 0 12px !important;
+    padding: 8px !important;
+  }
+
+  html body #root .app-shell .main-area .mobile-portal-content-roller {
+    margin: 8px 0 12px !important;
+  }
+
+  /* Sign-out remains accessible without floating over dashboard cards. */
+  html body #root .app-shell .mobile-fixed-signout {
+    position: static !important;
+    inset: auto !important;
+    display: inline-flex !important;
+    width: auto !important;
+    max-width: 100% !important;
+    margin: 12px 10px !important;
+    z-index: auto !important;
+  }
+
+  /* Do not let older sticky action rules cover form fields or cards. */
+  html body #root .app-shell .create-envelope-action,
+  html body #root .app-shell .induction-page .form-actions {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+  }
+
+  html body #root .app-shell .main-area > .content-area {
+    padding-top: 12px !important;
+    padding-bottom: 20px !important;
+    min-width: 0 !important;
+  }
+}
