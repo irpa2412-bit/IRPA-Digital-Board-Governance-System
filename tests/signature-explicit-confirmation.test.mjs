@@ -57,11 +57,17 @@ test("the signing view keeps server-side visibility filtering for later signers"
   assert.match(gatewayPortal, /const fields=opened\.fields\|\|\[\]/);
 });
 
-test("signature confirmation palette stays in document flow below the PDF and closes after explicit action", () => {
-  assert.match(pad, /position:"relative"/);
-  assert.doesNotMatch(pad, /position:"fixed"|inset:0|zIndex:1000|rgba\(15,23,42,\.78\)/);
+test("signature confirmation palette is a fixed bottom sheet and closes only after explicit action", () => {
+  assert.match(pad, /position:"fixed"/);
+  assert.match(pad, /bottom:0/);
+  assert.match(pad, /zIndex:1000/);
+  assert.match(pad, /maxHeight:"70vh"/);
+  assert.match(pad, /overflowY:"auto"/);
+  assert.match(pad, /paddingBottom:"env\(safe-area-inset-bottom\)"/);
   assert.match(pad, /aria-modal="false"/);
-  assert.match(pad, /onClick=\{onCancel\}/);
+  assert.match(pad, /Nothing is applied until you tap Confirm/);
+  assert.match(pad, /onClick=\{onCancel\}/, "Cancel must discard the unconfirmed signature");
+  assert.match(pad, /async function confirm\(\)[\s\S]*?await onConfirm\(dataUrl\)/, "Draw, Type and saved-signature data are applied only by explicit Confirm");
   assert.match(platform, /height:"auto"/, "the PDF canvas must retain responsive automatic height sizing");
   assert.match(platform, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:5/);
