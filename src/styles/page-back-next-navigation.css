@@ -324,3 +324,62 @@ body,
     width: 100%;
   }
 }
+
+
+/* MOBILE APP: prioritize World Time and the current page, without duplicate
+   in-app Back/Next buttons. Native Android/iOS system navigation remains intact.
+   Desktop and tablet layouts retain the existing Back/Next controls. */
+@media (max-width: 760px) {
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0 !important;
+    padding: 8px 12px !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation > .page-back-next-button {
+    display: none !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status {
+    display: grid !important;
+    grid-template-columns: minmax(112px, auto) minmax(0, 1fr) !important;
+    grid-template-areas: "time title" !important;
+    align-items: center !important;
+    justify-items: stretch !important;
+    column-gap: 12px !important;
+    row-gap: 0 !important;
+    text-align: left !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > span,
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > small {
+    display: none !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-status > strong {
+    grid-area: title !important;
+    justify-self: end !important;
+    text-align: right !important;
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+  }
+  #root .app-shell .main-area > .page-back-next-navigation .page-back-next-time-toggle {
+    grid-area: time !important;
+    justify-self: start !important;
+    width: auto !important;
+    min-width: 112px !important;
+    min-height: 44px !important;
+    margin: 0 !important;
+  }
+}
+
+
+/* MOBILE OVERLAP FIX: let page content own the viewport while scrolling.
+   Sticky headers on narrow screens were stacking over and obscuring panels.
+   Keep World Time in normal document flow on phones; desktop/tablet are unchanged. */
+@media (max-width: 760px) {
+  html body #root .app-shell .main-area > .desktop-webapp-navigation-roller,
+  html body #root .app-shell .main-area > .page-back-next-navigation.page-back-next-navigation {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
