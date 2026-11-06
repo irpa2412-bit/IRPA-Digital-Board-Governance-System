@@ -30,7 +30,8 @@ test("unfilled signature placeholders remain transparent overlays and are not dr
 });
  
 test("tapping an assigned signature field opens Draw, Type and saved-signature choices; Confirm applies it", () => {
-  assert.match(platform, /onClick=\{[\s\S]{0,200}?setInkField\(f\)/);
+  assert.match(platform, /const activate=\(f\)=>\{[\s\S]{0,500}?setInkField\(f\);return;\}/);
+  assert.match(platform, /data-signature-field-id=\{f\.fieldId\} onClick=\{\(\)=>activate\(f\)\}/);
   assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
   for (const label of ["Draw", "Type", "Use my saved signature", "Confirm"]) assert.ok(pad.includes(label), label);
   assert.match(pad, /onConfirm\(dataUrl\)/);
