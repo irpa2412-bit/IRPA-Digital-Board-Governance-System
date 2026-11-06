@@ -92,7 +92,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       await onConfirm(dataUrl);
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
   }
-  return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"relative",zIndex:10,width:"100%",maxWidth:720,margin:"16px auto",maxHeight:"min(70vh,620px)",overflowY:"auto",overflowX:"hidden",boxSizing:"border-box",border:"2px solid var(--border)",boxShadow:"0 8px 24px rgba(15,23,42,.18)",background:"var(--surface)",color:"var(--text)"}}>
+  return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,maxHeight:"70vh",overflowY:"auto",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)",paddingBottom:"env(safe-area-inset-bottom)"}}>
       <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. Nothing is applied until you tap Confirm.</p>
       <div role="group" aria-label="Signature method" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
         {["Draw","Type","Use my saved signature"].map(item=><button key={item} type="button" className={mode===item?"":"secondary-button"} onClick={()=>setMode(item)}>{item}</button>)}

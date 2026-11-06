@@ -21,14 +21,19 @@ async function assertPlacedSignatureVisibleAndUncovered(page,testId){
  const exposed=await placed.evaluate(el=>{const r=el.getBoundingClientRect();const top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!top&&(top===el||el.contains(top)||el.parentElement?.contains(top))});
  assert.equal(exposed,true,"confirmed signature must not be covered by another layer");
 }
-async function assertDockDoesNotCoverPdf(page){
+async function assertDockDoesNotCoverPdf(page,fieldTestId){
  const dock=page.getByRole("dialog",{name:/Confirm/});
  const pdf=page.getByTestId("pdf-page");
- const d=await dock.boundingBox(),p=await pdf.boundingBox();
- assert.ok(d&&p,"signature dock and PDF must both be visible");
- const intersects=d.x<p.x+p.width&&d.x+d.width>p.x&&d.y<p.y+p.height&&d.y+d.height>p.y;
- assert.equal(intersects,false,"signature dock must not overlap or cover the PDF page");
- assert.equal(await dock.evaluate(el=>getComputedStyle(el).position),"relative","signature dock must remain in document flow");
+ const field=page.getByTestId(fieldTestId);
+ const d=await dock.boundingBox(),p=await pdf.boundingBox(),f=await field.boundingBox();
+ assert.ok(d&&p&&f,"signature dock, PDF and selected signing field must all be visible");
+ assert.ok(f.x>=p.x&&f.y>=p.y&&f.x+f.width<=p.x+p.width&&f.y+f.height<=p.y+p.height,
+   "selected signing field must remain inside the PDF page");
+ const fieldCovered=d.x<f.x+f.width&&d.x+d.width>f.x&&d.y<f.y+f.height&&d.y+d.height>f.y;
+ assert.equal(fieldCovered,false,"fixed signature dock must not cover the active signing field");
+ const fieldExposed=await field.evaluate(el=>{const r=el.getBoundingClientRect();const top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!top&&(top===el||el.contains(top))});
+ assert.equal(fieldExposed,true,"active signing field must remain reachable while the fixed dock is open");
+ assert.equal(await dock.evaluate(el=>getComputedStyle(el).position),"fixed","signature dock must remain fixed to the viewport bottom");
  assert.equal(await dock.getAttribute("aria-modal"),"false","signature palette must not install a modal backdrop");
 }
 async function runViewport(name,viewport){
@@ -41,7 +46,7 @@ async function runViewport(name,viewport){
  assert.equal(await page.getByTestId("page-number").innerText(),"1");
  // Cancel must close the dock without placing a signature.
  await page.getByTestId("field-sig-page-1").click();
- await assertDockDoesNotCoverPdf(page);
+ await assertDockDoesNotCoverPdf(page,"field-sig-page-1");
  await page.getByRole("button",{name:"Cancel",exact:true}).click();
  assert.equal(await page.getByRole("dialog").count(),0,"Cancel closes the palette");
  assert.equal(await page.getByTestId("placed-sig-page-1").count(),0,"Cancel does not apply a signature");
@@ -54,7 +59,7 @@ async function runViewport(name,viewport){
  console.log("PASS "+name+": Type + explicit Confirm");
  // Draw on the initials field after verifying the canvas is visible and measurable.
  await page.getByTestId("field-initial-page-1").click();
- await assertDockDoesNotCoverPdf(page);
+ await assertDockDoesNotCoverPdf(page,"field-initial-page-1");
  const canvas=page.getByLabel("Draw signature");
  await canvas.waitFor({state:"visible"});
  // A visible element can still be below the viewport. Bring the actual canvas
