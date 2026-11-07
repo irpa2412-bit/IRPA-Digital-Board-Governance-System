@@ -29,6 +29,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Gateway dependencies
+        run: npm ci
+
       - name: Run Cloudflare Gateway tests
         run: npm test
 
