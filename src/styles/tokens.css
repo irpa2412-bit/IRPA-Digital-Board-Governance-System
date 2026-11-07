@@ -1136,3 +1136,46 @@ table td{color:var(--text)}
  .signature-field-palette img{max-height:64px!important;}
  .signature-workflow-grid .panel{min-width:0;max-width:100%;}
 }
+
+
+/* WCAG AA surface-token correction.
+   Portal panels are rendered as white/light surfaces by the shared portal layout,
+   but the legacy .panel token scope above still supplied dark-theme pale text.
+   Rebind the shared semantic tokens at the light surface so every descendant
+   (including span/strong/small status copy) inherits the correct foreground. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page :where(.panel,.module-panel,.welcome-panel,.stat-card,.workflow-stage,.identity-card,.record-details,.detail-grid>div) {
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#405c50;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#526b60;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+
+/* Status banners retain their intentional dark-green brand surface, but own
+   high-contrast light text tokens instead of inheriting a neighbouring panel's
+   dark-theme variables or browser colour-scheme defaults. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page .auth-message {
+  --surface:#0e251b;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#d9e6df;
+  --border:#a5bdb3;
+  --border-strong:#c5d8ce;
+  --focus:#f3c84b;
+  --placeholder:#d9e6df;
+  --error:#ffb4ab;
+  --success:#a7e4c2;
+  background-color:#0e251b;
+  color:#f4f8f6;
+  opacity:1;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page .auth-message :is(h1,h2,h3,h4,h5,h6,p,span,strong,small,em,b,label,li) {
+  color:var(--text)!important;
+  -webkit-text-fill-color:var(--text)!important;
+  opacity:1!important;
+}
