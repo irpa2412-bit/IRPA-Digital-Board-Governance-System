@@ -135,7 +135,7 @@ test("owner signature requirement is separate from explicit signer-field assignm
   assert.match(platform, /ownerSignatureAssigned=.*field\.signerUid===u\.uid/);
   assert.match(worker, /ownerSignatureFields = fields\.filter\(field => field && field\.signerUid === uid && field\.type === "Signature"/);
   assert.match(worker, /Owner Signature field is assigned while the owner signature requirement is disabled/);
-  assert.match(worker, /Owner Signature Assignment Saved/);
+  assert.match(worker, /Owner Section Saved/);\n  assert.match(worker, /assignedOwnerSignatureFieldIds/);
 });
 test("mobile Signature Portal keeps the palette and signer-assignment controls visible", () => {
   const css = fs.readFileSync(new URL("../src/styles/signature-portal.css", import.meta.url), "utf8");
