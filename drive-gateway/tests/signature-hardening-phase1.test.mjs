@@ -114,7 +114,7 @@ test("canonical lifecycle verifier rejects missing signer quorum, missing eviden
 
 test("canonical lifecycle verifier rejects evidence tampering and signer-signature substitution", async()=>{
   const fixture=await canonicalFixture();
-  fixture.evidence.signature="AAAA";
+  fixture.ctx.meta.list=async()=>[{...fixture.evidence,signature:"AAAA"}];
   assert.equal((await verifyCanonicalSignatureEnvelope(fixture.ctx,"ENV-1")).ok,false);
   const changed=await canonicalFixture();changed.envelope.signers[0].signatureValue="different-signature";
   assert.equal((await verifyCanonicalSignatureEnvelope(changed.ctx,"ENV-1")).ok,false);
