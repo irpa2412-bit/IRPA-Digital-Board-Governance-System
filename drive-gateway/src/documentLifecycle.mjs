@@ -344,18 +344,40 @@ export function createDocumentLifecycleRouter(deps) {
       const document=await getPlainDocument(deps,env,claims,documentId);if(!document)return deps.json({ok:false,error:"Document registry record was not found."},404,deps.corsHeaders(request));
       const access=canRead(identity,document);if(!access.allowed)return deps.json({ok:false,error:access.reason},403,deps.corsHeaders(request));
       if(document.status!=="PENDING_SIGNATURE")return deps.json({ok:false,error:"The document is not awaiting signature."},409,deps.corsHeaders(request));
-      if(typeof deps.verifyCanonicalSignatureEnvelope!=="function")return deps.json({ok:false,error:"Canonical Gateway signature verification is not configured."},503,deps.corsHeaders(request));
-      const verification=await deps.verifyCanonicalSignatureEnvelope(env,envelopeId);
-      if(!verification?.ok)return deps.json({ok:false,error:verification?.error||"Canonical Gateway signature verification failed."},409,deps.corsHeaders(request));
-      const envelope=verification.envelope;
-      if(clean(envelope.externalReference)!==envelopeId||clean(envelope.documentId)!==documentId)return deps.json({ok:false,error:"The canonical Gateway envelope does not belong to this document and Signature Portal envelope."},403,deps.corsHeaders(request));
-      if(clean(envelope.status)!=="Completed"||clean(envelope.completion?.finalHash)!==verification.finalHash)return deps.json({ok:false,error:"The canonical Gateway envelope is not verifiably completed."},409,deps.corsHeaders(request));
-      const signedFileId=clean(envelope.completion?.primaryStorageId);
-      const lastSignedByUid=clean(verification.lastSignedByUid);
-      if(!lastSignedByUid||!envelope.signers.some(s=>s.uid===lastSignedByUid&&s.status==="Signed"))return deps.json({ok:false,error:"The canonical completion record does not identify a required signer."},409,deps.corsHeaders(request));
-      const patch={status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:envelopeId,signedAt:envelope.completion.completedAt||nowIso(),signedByUid:lastSignedByUid,signedDocumentUrl:null,signedSourceFileId:signedFileId,finalSignedPdfSha256:verification.finalHash,cryptographicEvidenceIds:envelope.completion.cryptographicEvidenceIds,updatedAt:nowIso()};
-      await commitDocumentAndAudit(deps,env,claims,documentId,patch,"SIGNATURE_COMPLETED",{envelopeId});
-      return deps.json({ok:true,documentId,status:"SIGNED",envelopeId,signedSourceFileId:signedFileId||null},200,deps.corsHeaders(request));
+      const adminToken=await requireFirestoreAdminToken(deps,env);
+      const firebaseEnvelopeRaw=await deps.getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,adminToken);
+      const firebaseEnvelope=deps.firestoreDocumentToPlain(firebaseEnvelopeRaw);
+      if(!firebaseEnvelope)return deps.json({ok:false,error:"The Firebase Signature Portal envelope was not found."},404,deps.corsHeaders(request));
+      const gatewayEnvelopeId=clean(firebaseEnvelope.gatewayEnvelopeId);
+      let verification=null,signedFileId="",lastSignedByUid="",signatureAssurance="ELECTRONIC_UNVERIFIED",signedAt=firebaseEnvelope.completedAt||firebaseEnvelope.lastSignedAt||nowIso();
+      if(gatewayEnvelopeId){
+        if(typeof deps.verifyCanonicalSignatureEnvelope!=="function")return deps.json({ok:false,error:"Canonical Gateway signature verification is not configured."},503,deps.corsHeaders(request));
+        verification=await deps.verifyCanonicalSignatureEnvelope(env,gatewayEnvelopeId);
+        if(!verification?.ok)return deps.json({ok:false,error:verification?.error||"Canonical Gateway signature verification failed."},409,deps.corsHeaders(request));
+        const canonical=verification.envelope;
+        if(clean(canonical.externalReference)!==envelopeId||clean(canonical.documentId)!==documentId)return deps.json({ok:false,error:"The canonical Gateway envelope does not belong to this document and Signature Portal envelope."},403,deps.corsHeaders(request));
+        if(clean(canonical.status)!=="Completed"||clean(canonical.completion?.finalHash)!==verification.finalHash)return deps.json({ok:false,error:"The canonical Gateway envelope is not verifiably completed."},409,deps.corsHeaders(request));
+        signedFileId=clean(canonical.completion?.primaryStorageId);
+        lastSignedByUid=clean(verification.lastSignedByUid);
+        if(!lastSignedByUid||!canonical.signers.some(s=>s.uid===lastSignedByUid&&s.status==="Signed"))return deps.json({ok:false,error:"The canonical completion record does not identify a required signer."},409,deps.corsHeaders(request));
+        signatureAssurance="CRYPTOGRAPHICALLY_VERIFIED";
+        signedAt=canonical.completion.completedAt||signedAt;
+      }else{
+        const recipients=Array.isArray(firebaseEnvelope.recipients)?firebaseEnvelope.recipients:[];
+        lastSignedByUid=clean(firebaseEnvelope.lastSignedByUid);
+        if(clean(firebaseEnvelope.status)!=="Completed"||!lastSignedByUid||!recipients.some(s=>clean(s.uid)===lastSignedByUid&&(clean(s.status)==="Signed"||s.completedAt||s.signedAt))){
+          return deps.json({ok:false,error:"The Firebase-only envelope is not completed with an identifiable signed participant."},409,deps.corsHeaders(request));
+        }
+        signedFileId=fileIdFromUrl(firebaseEnvelope.signedDocumentUrl||firebaseEnvelope.ownerCompletedDocumentUrl);
+      }
+      const patch={status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:envelopeId,signatureAssurance,signedAt,signedByUid:lastSignedByUid,signedDocumentUrl:firebaseEnvelope.signedDocumentUrl||null,signedSourceFileId:signedFileId||null,updatedAt:nowIso()};
+      if(signatureAssurance==="CRYPTOGRAPHICALLY_VERIFIED"){
+        patch.finalSignedPdfSha256=verification.finalHash;
+        patch.cryptographicEvidenceIds=verification.envelope.completion.cryptographicEvidenceIds;
+      }
+      await commitDocumentAndAudit(deps,env,claims,documentId,patch,"SIGNATURE_COMPLETED",{envelopeId,signatureAssurance});
+      await deps.updateFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,adminToken,firestoreFields({signatureAssurance}),["signatureAssurance"]);
+      return deps.json({ok:true,documentId,status:"SIGNED",envelopeId,signedSourceFileId:signedFileId||null,signatureAssurance},200,deps.corsHeaders(request));
     }
 
     if(pathname==="/api/document-lifecycle/share"&&method==="POST"){
