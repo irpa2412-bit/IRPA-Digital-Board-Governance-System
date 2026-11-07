@@ -1171,7 +1171,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
       if(["Signature","Initials"].includes(prepared.type)){delete prepared.value;delete prepared.signatureData;delete prepared.signatureUrl;delete prepared.signatureValue;}
       return prepared;
     });
-    const participantUids = Array.from(new Set(recipients.map(item => String(item && item.uid || "")).filter(Boolean)));
+    const ownerSigningEnabled = body.ownerSigningEnabled === true;\n    const ownerSignatureFields = fields.filter(field => field && field.signerUid === uid && field.type === "Signature" && field.required !== false);\n    if (ownerSigningEnabled && ownerSignatureFields.length === 0) return json({ok:false,step,error:"Owner signature is required, but no required Signature field is explicitly assigned to the authenticated owner."},400,corsHeaders(request));\n    if (!ownerSigningEnabled && fields.some(field => field && field.signerUid === uid && field.type === "Signature")) return json({ok:false,step,error:"An owner Signature field is assigned while the owner signature requirement is disabled."},400,corsHeaders(request));\n    const participantUids = Array.from(new Set(recipients.map(item => String(item && item.uid || "")).filter(Boolean)));
     if (!participantUids.includes(uid)) return json({ok:false,step,error:"The authenticated owner must be a participant in the signing envelope."},400,corsHeaders(request));
     if (fields.some(field => field && field.signerUid && !participantUids.includes(String(field.signerUid)))) return json({ok:false,step,error:"Every assigned field must belong to a participant in this envelope."},400,corsHeaders(request));
     const now = new Date().toISOString();
@@ -1180,7 +1180,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     step = "Commit envelope, source-document link and audit event atomically";
     const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
     const eventId = "signature-draft-" + Date.now() + "-" + crypto.randomUUID().slice(0,10);
-    const event = {envelopeId,event:"Owner Section Saved",details:{ownerUid:uid,fieldCount:fields.filter(field=>field && field.signerUid===uid).length,recipientCount:recipients.length,writePath:"authenticated-worker"},actorUid:uid,actorEmail:email,createdAt:now};
+    const event = {envelopeId,event:"Owner Signature Assignment Saved",details:{ownerUid:uid,ownerSignatureRequired:ownerSigningEnabled,assignedOwnerSignatureFieldIds:ownerSignatureFields.map(field=>String(field.fieldId||"")),fieldCount:fields.filter(field=>field && field.signerUid===uid).length,recipientCount:recipients.length,writePath:"authenticated-worker"},actorUid:uid,actorEmail:email,createdAt:now};
     const docFields = {signatureEnvelopeId:signatureDraftFirestoreValue(envelopeId),signatureReference:signatureDraftFirestoreValue(envelopeId),signatureStatus:signatureDraftFirestoreValue("Draft"),signatureOwnerUid:signatureDraftFirestoreValue(uid),workflowOwnerSectionSaved:signatureDraftFirestoreValue(true),authorizationRequestId:signatureDraftFirestoreValue(draft.authorizationRequestId || null),authorizationReference:signatureDraftFirestoreValue(draft.authorizationReference || null),updatedAt:signatureDraftFirestoreValue(now)};
     const writes = [
       {update:{name:base+"/signatureEnvelopes/"+envelopeId,fields:signatureDraftFirestoreValue(envelope).mapValue.fields},updateMask:{fieldPaths:Object.keys(envelope)},currentDocument:{exists:Boolean(existing)}},
