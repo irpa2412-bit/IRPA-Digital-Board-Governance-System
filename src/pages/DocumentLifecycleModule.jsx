@@ -27,6 +27,7 @@ const STAGES=["WORKING","PENDING_SIGNATURE","SIGNED","POST_SIGNATURE","FINAL_ARC
 function fmt(value){try{return value?new Date(value).toLocaleString():"—"}catch{return String(value||"—")}}
 function badge(status){return String(status||"WORKING").replaceAll("_"," ")}
 function readStatus(doc){return doc?.status||"WORKING"}
+function documentStatusLabel(doc){return doc?.status==="SIGNED"&&doc?.signatureAssurance==="ELECTRONIC_UNVERIFIED"?"Signed - not cryptographically verified":badge(doc?.status)}
 
 export default function DocumentLifecycleModule({profile,employee,admin=false}){
  const[documents,setDocuments]=useState([]),[selected,setSelected]=useState(null),[tab,setTab]=useState("MY_WORK"),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState(""),[reader,setReader]=useState(false),[signing,setSigning]=useState(false),[uploadOpen,setUploadOpen]=useState(false),[shareOpen,setShareOpen]=useState(false),[shareUid,setShareUid]=useState(""),[file,setFile]=useState(null),[title,setTitle]=useState(""),[documentType,setDocumentType]=useState(""),[archiveCategory,setArchiveCategory]=useState("Administrative Documents"),[classification,setClassification]=useState("Internal"),[version,setVersion]=useState("1.0"),[translationRequestOpen,setTranslationRequestOpen]=useState(false),[translationSource,setTranslationSource]=useState("AUTO"),[translationTarget,setTranslationTarget]=useState("sw"),[translationNotes,setTranslationNotes]=useState(""),[translationRequests,setTranslationRequests]=useState([]);
@@ -65,13 +66,13 @@ export default function DocumentLifecycleModule({profile,employee,admin=false}){
     <div style={{minWidth:0}}>
      <div className="panel-header"><div><strong>{filtered.length} document{filtered.length===1?"":"s"}</strong><small style={{display:"block",marginTop:4}}>{busy?"Refreshing…":"Controlled results for the selected workspace."}</small></div><button type="button" className="secondary-button" onClick={load}>Refresh</button></div>
      <div style={{display:"grid",gap:8}}>{filtered.map(doc=><button key={doc.documentId} type="button" onClick={()=>select(doc)} style={{textAlign:"left",padding:12,borderRadius:10,border:selected?.documentId===doc.documentId?"2px solid rgba(109,93,252,.8)":"1px solid rgba(148,163,184,.25)",background:"transparent",color:"inherit"}}>
-       <strong>{doc.title||doc.fileName}</strong><small style={{display:"block",marginTop:5}}>{doc.reference} · {badge(doc.status)} · {doc.classification}</small><small style={{display:"block",marginTop:3,opacity:.78}}>{doc.department||"Institutional"} · updated {fmt(doc.updatedAt)}</small>
+       <strong>{doc.title||doc.fileName}</strong><small style={{display:"block",marginTop:5}}>{doc.reference} · {documentStatusLabel(doc)} · {doc.classification}</small><small style={{display:"block",marginTop:3,opacity:.78}}>{doc.department||"Institutional"} · updated {fmt(doc.updatedAt)}</small>
      </button>)}{!filtered.length&&<div className="auth-message">No documents are visible in this workspace under the current authorization policy.</div>}</div>
     </div>
     <div>
      {!selected?<div className="auth-message"><strong>Select a document.</strong><div style={{marginTop:5}}>The workflow actions will appear only after an authorized document is selected.</div></div>:<div className="panel" style={{margin:0}}>
       <span className="eyebrow">DOCUMENT CONTROL</span><h3 style={{margin:"5px 0"}}>{selected.title}</h3><p className="muted" style={{marginTop:0}}>{selected.reference} · {selected.fileName}</p>
-      <dl style={{display:"grid",gridTemplateColumns:"max-content 1fr",gap:"6px 12px",fontSize:13}}><dt>Stage</dt><dd>{badge(selected.status)}</dd><dt>Classification</dt><dd>{selected.classification}</dd><dt>Owner</dt><dd>{selected.ownerUid}</dd><dt>SHA-256</dt><dd style={{wordBreak:"break-all"}}>{selected.sha256||"—"}</dd><dt>Uploaded</dt><dd>{fmt(selected.uploadedAt)}</dd></dl>
+      <dl style={{display:"grid",gridTemplateColumns:"max-content 1fr",gap:"6px 12px",fontSize:13}}><dt>Stage</dt><dd>{documentStatusLabel(selected)}</dd><dt>Classification</dt><dd>{selected.classification}</dd><dt>Owner</dt><dd>{selected.ownerUid}</dd><dt>SHA-256</dt><dd style={{wordBreak:"break-all"}}>{selected.sha256||"—"}</dd><dt>Uploaded</dt><dd>{fmt(selected.uploadedAt)}</dd></dl>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}>
        <button type="button" onClick={()=>setReader(true)}>Open Document</button>
        {selected.status==="WORKING"&&<button type="button" onClick={()=>action(()=>transitionLifecycleDocument(selected.documentId,"PENDING_SIGNATURE"),"Document moved to Pending Signature.")}>Send to Signature</button>}

@@ -64,7 +64,7 @@ test("lifecycle completion requires canonical Gateway quorum, PDF hash and crypt
   assert.match(canonical, /signers\.some\(s=>s\.status!=="Signed"\|\|!s\.uid\|\|!s\.signedAt\)/);
   assert.match(canonical, /finalHash!==envelope\.completion\.finalHash/);
   assert.match(canonical, /verifyCryptographicEvidence\(evidence/);
-  assert.match(lifecycle, /deps\.verifyCanonicalSignatureEnvelope\(env,envelopeId\)/);
+  assert.match(lifecycle, /deps\.verifyCanonicalSignatureEnvelope\(env,gatewayEnvelopeId\)/);
   assert.match(lifecycle, /signedByUid:lastSignedByUid/);
   assert.doesNotMatch(lifecycle, /signedByUid:envelope\.lastSignedByUid\|\|claims\.user_id/);
 });

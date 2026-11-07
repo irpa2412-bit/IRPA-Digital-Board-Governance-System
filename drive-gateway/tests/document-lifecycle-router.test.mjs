@@ -14,9 +14,12 @@ function makeDeps(state){
       if(path==="members/emp-1")return null;
       if(path==="employees/emp-1")return {fields:{status:{stringValue:"Active"},department:{stringValue:"Finance"},roles:{arrayValue:{values:[{stringValue:"Finance Officer"}]}}}};
       if(path.startsWith("documents/"))return state.docs[path.split("/").pop()]||null;
+      if(path.startsWith("signatureEnvelopes/"))return state.envelopes?.[path.split("/").pop()]?{plain:state.envelopes[path.split("/").pop()]}:null;
       return null;
     },
     firestoreDocumentToPlain:doc=>doc?.plain||plain(doc?.fields),
+    updateFirestoreDocument:async(_env,path,_token,fields)=>{const id=path.split("/").pop();if(path.startsWith("signatureEnvelopes/"))state.envelopes[id]={...(state.envelopes[id]||{}),...plain(fields)};return {ok:true};},
+    verifyCanonicalSignatureEnvelope:state.verifyCanonicalSignatureEnvelope|| (async()=>({ok:false,error:"Canonical verification fixture not configured"})),
     getDriveAccessToken:async()=> "drive-token",
     driveFetch:async(_env,_token,path,options={})=>{
       if(options.method==="DELETE"){state.deletedFiles.push(path);if(state.failDelete)throw new Error("simulated Drive rollback failure");return {};}
@@ -205,5 +208,30 @@ test("generic lifecycle transition cannot mark a document Signed without canonic
   assert.equal(state.writes.length,0);
   const lowercase=await router(req("/api/document-lifecycle/transition",{documentId:"LIFE-test",targetStage:"signed"}),env);
   assert.equal(lowercase.status,409);
+  assert.equal(state.writes.length,0);
+});
+
+
+test("Firebase-only signature completion records ELECTRONIC_UNVERIFIED on document and envelope",async()=>{
+  const envelopeId="firebase-env-1";
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",classification:"Internal",ownerUid:"emp-1",authorizedUids:["emp-1"],archiveCategory:"Finance Documents",title:"Test",reference:"IRPA-DOC-1",status:"PENDING_SIGNATURE"}}},envelopes:{[envelopeId]:{documentId:"LIFE-test",status:"Completed",lastSignedByUid:"signer-9",recipients:[{uid:"signer-9",status:"Signed"}],signedDocumentUrl:"https://drive.google.com/file/d/drive-signed-9/view"}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/signature-complete",{documentId:"LIFE-test",envelopeId}),env);
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.signatureAssurance,"ELECTRONIC_UNVERIFIED");
+  assert.equal(state.docs["LIFE-test"].plain.signatureAssurance,"ELECTRONIC_UNVERIFIED");
+  assert.equal(state.docs["LIFE-test"].plain.signedByUid,"signer-9");
+  assert.equal(state.envelopes[envelopeId].signatureAssurance,"ELECTRONIC_UNVERIFIED");
+  assert.notEqual(state.docs["LIFE-test"].plain.signedByUid,"emp-1");
+});
+
+test("Worker signature completion refuses an envelope without canonical signer quorum",async()=>{
+  const envelopeId="firebase-env-worker";
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",classification:"Internal",ownerUid:"emp-1",authorizedUids:["emp-1"],archiveCategory:"Finance Documents",title:"Test",reference:"IRPA-DOC-1",status:"PENDING_SIGNATURE"}}},envelopes:{[envelopeId]:{documentId:"LIFE-test",status:"Completed",gatewayEnvelopeId:"gateway-env-1",lastSignedByUid:"signer-9",recipients:[{uid:"signer-9",status:"Signed"}]}},writes:[],deletedFiles:[],verifyCanonicalSignatureEnvelope:async()=>({ok:false,error:"Canonical Gateway signer quorum is incomplete."})};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/signature-complete",{documentId:"LIFE-test",envelopeId}),env);
+  assert.equal(response.status,409);
+  assert.match((await response.json()).error,/quorum is incomplete/);
   assert.equal(state.writes.length,0);
 });
