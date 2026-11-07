@@ -1233,13 +1233,27 @@ async function reconcileSignatureDocumentIds(request, env) {
     try {
       if (!documentId) throw new Error("Firestore document ID is missing.");
       const record = await getFirestoreDocument(env, `documents/${cleanId(documentId)}`, firestoreToken);
-      if (!record?.fields) throw new Error("Firestore controlled-document record was not found.");
+      if (!record?.fields) {
+        const communicationAudit = await getFirestoreDocument(env, `communicationWebsiteEdits/${cleanId(documentId)}`, firestoreToken);
+        if (communicationAudit?.fields) {
+          line.collectionPath = "communicationWebsiteEdits/" + documentId;
+          line.classification = "NOT_A_CONTROLLED_DOCUMENT";
+          line.step = "Firestore collection identification";
+          line.reason = "This ID exists in communicationWebsiteEdits, not documents; it is a website-edit audit record and is not eligible for controlled-document PDF repair.";
+          results.push(line);
+          continue;
+        }
+        throw new Error("Firestore controlled-document record was not found in documents or communicationWebsiteEdits.");
+      }
       const data = firestoreDocumentToPlain(record) || {};
       const registeredIds = [data.fileId,data.driveFileId,data.archiveFileId,data.governanceArchiveFileId,data.sourceFileId,data.primaryArchiveFileId].filter(Boolean).map(String);
       fileId = fileId || String(data.fileId || data.driveFileId || data.archiveFileId || data.governanceArchiveFileId || data.sourceFileId || data.primaryArchiveFileId || "").trim();
       line.fileId = fileId || "(missing Drive file ID)";
+      line.collectionPath = "documents/" + documentId;
       if (!fileId) {
-        line.classification="FILE_MISSING"; line.step="Drive metadata call"; line.driveErrorReason="notFound"; line.reason="FILE_MISSING at Drive metadata call: No registered Drive file ID exists on this Firestore document.";
+        line.classification="MISSING_FILE_REFERENCE"; line.step="Firestore relationship"; line.driveErrorReason="(not applicable)"; line.reason="MISSING_FILE_REFERENCE: No Drive file ID is registered on this Firestore document; no Drive request was attempted.";
+      } else if (!/^[A-Za-z0-9_-]+$/.test(fileId)) {
+        line.classification="INVALID_STORAGE_REFERENCE"; line.step="Firestore relationship"; line.driveErrorReason="(not applicable)"; line.reason="INVALID_STORAGE_REFERENCE: Stored file reference is not a Google Drive file ID; no Drive request was attempted.";
       } else if (!registeredIds.includes(fileId)) {
         line.classification="UNKNOWN"; line.step="Firestore document lookup"; line.driveErrorReason="(not applicable)"; line.reason="UNKNOWN at Firestore document lookup: Drive file ID " + fileId + " is not registered on Firestore document " + documentId + ".";
       } else {
@@ -1256,11 +1270,11 @@ async function reconcileSignatureDocumentIds(request, env) {
         if(diagnostic.classification!=="OK"){line.status="unreadable";line.reason=diagnostic.classification+" at "+diagnostic.step+": "+diagnostic.reason;}
         else {
           const description=parseDescription(diagnostic.driveDescription);
-          if(!description?.irpaGovernance){line.status="unreadable";line.classification="UNKNOWN";line.step="Drive metadata validation";line.reason="UNKNOWN at Drive metadata validation: Drive file is not marked as an IRPA governance document.";}
+          if(!description?.irpaGovernance){line.status="unreadable";line.classification="DRIVE_METADATA_MISMATCH";line.step="Drive metadata validation";line.reason="DRIVE_METADATA_MISMATCH: Drive file is not marked as an IRPA governance document."; }
           else {
             const previousDocumentId=String(description.documentId||"");line.previousDescriptionDocumentId=previousDocumentId||"(missing)";
             if(previousDocumentId===documentId){line.status="match";line.classification="OK";line.reason="Drive description.documentId matches Firestore ID "+documentId+"; "+diagnostic.reason;}
-            else {line.status="mismatch";line.classification="OK";line.reason="Drive description.documentId is "+(previousDocumentId||"(missing)")+"; expected Firestore ID "+documentId+". No changes made.";}
+            else {line.status="mismatch";line.classification="DRIVE_METADATA_MISMATCH";line.reason="DRIVE_METADATA_MISMATCH: Drive description.documentId is "+(previousDocumentId||"(missing)")+"; expected Firestore ID "+documentId+". No changes made.";}
           }
         }
       }
@@ -1329,9 +1343,9 @@ async function registerControlledDocumentRecord(request, env) {
     return json({ok:false,error:"STEP Firestore documents record: uploader identity and self-authorization must match the authenticated user."},403,corsHeaders(request));
   }
   if (supplied.status!=="Draft" || supplied.authorizationStatus!=="Draft") return json({ok:false,error:"STEP Firestore documents record: initial controlled documents must remain Draft."},400,corsHeaders(request));
-  const driveFileId = cleanId(supplied.fileId||supplied.archiveFileId||"");
-  const archiveFolderId = cleanId(supplied.archiveFolderId||"");
-  if (!driveFileId || !archiveFolderId) return json({ok:false,error:"STEP Drive file verification: Drive file ID and archive destination folder ID are required."},400,corsHeaders(request));
+  const driveFileId = String(supplied.fileId||supplied.driveFileId||supplied.archiveFileId||"").trim();
+  const archiveFolderId = String(supplied.archiveFolderId||"").trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(driveFileId) || !/^[A-Za-z0-9_-]+$/.test(archiveFolderId)) return json({ok:false,error:"STEP Drive file verification: a valid Google Drive file ID and archive destination folder ID are required; URI schemes and local/emergency references are not accepted."},400,corsHeaders(request));
   const driveToken = await getDriveAccessToken(env);
   const driveFile = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(driveFileId)+"?fields=id,name,parents,description,trashed");
   let driveDescription = {};
