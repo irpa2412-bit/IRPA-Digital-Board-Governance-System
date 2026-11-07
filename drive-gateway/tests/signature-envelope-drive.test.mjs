@@ -9,7 +9,7 @@ async function sha256(value) {
   const digest = await crypto.subtle.digest("SHA-256", value);
   return Array.from(new Uint8Array(digest)).map(x => x.toString(16).padStart(2, "0")).join("");
 }
-function fixture(overrides = {}) {
+async function fixture(overrides = {}) {
   const files = new Map();
   let copyCalls = 0;
   const folders = new Map();
@@ -48,7 +48,7 @@ function fixture(overrides = {}) {
 }
 
 test("creates and verifies envelope PDF copy with expected parent and integrity", async () => {
-  const f = fixture();
+  const f = await fixture();
   const result = await ensureEnvelopePdfCopy(f.options);
   assert.equal(result.envelopeFileMimeType, "application/pdf");
   assert.equal(result.envelopeFileParentId, result.envelopeFolderId);
@@ -68,7 +68,7 @@ test("retry reuses a Drive copy created before a failed Firestore persistence", 
 
 test("rejects copied content whose hash differs from the source", async () => {
   const wrong = new TextEncoder().encode("%PDF-1.7\nchanged");
-  const f = fixture({ bytes: wrong });
+  const f = await fixture({ bytes: wrong });
   await assert.rejects(() => ensureEnvelopePdfCopy(f.options), /byte length|SHA-256/);
 });
 
