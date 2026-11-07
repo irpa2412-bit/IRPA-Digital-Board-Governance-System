@@ -1,0 +1,40 @@
+/* Keep signer assignment controls visible and usable on narrow mobile screens. */
+@media (max-width: 900px) {
+  .signature-workflow-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    min-height: 0 !important;
+    gap: 12px !important;
+  }
+  .signature-workflow-grid > aside,
+  .signature-workflow-grid > main {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .signature-workflow-grid > aside {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .signature-workflow-grid > main {
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .signature-field-palette button,
+  .signature-field-palette select,
+  .signature-workflow-grid aside select,
+  .signature-workflow-grid aside input {
+    max-width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    touch-action: manipulation;
+  }
+  .signature-workflow-grid aside select,
+  .signature-workflow-grid aside input { width: 100%; }
+}
+@media (max-width: 480px) {
+  .signature-workflow-grid { gap: 10px !important; }
+  .signature-workflow-grid > main { padding: 8px !important; }
+  .signature-field-palette { padding: 10px !important; }
+}
