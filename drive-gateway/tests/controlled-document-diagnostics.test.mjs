@@ -18,7 +18,7 @@ const run = (overrides = {}) => diagnoseControlledDocument({
 });
 test("FILE_MISSING reports notFound and metadata step", async () => {
  const r = await run({ getMetadata: async () => { const e = new Error("File not found"); e.status = 404; throw e; } });
- assert.equal(r.classification, "FILE_MISSING"); assert.match(r.reason, /File not found/); assert.equal(r.step, "Drive metadata call");
+ assert.equal(r.classification, "DRIVE_FILE_NOT_FOUND"); assert.match(r.reason, /File not found/); assert.equal(r.step, "Drive metadata call");
 });
 test("NO_ACCESS reports forbidden and content step", async () => {
  const r = await run({ downloadBytes: async () => { const e = new Error("Not shared with service account"); e.status = 403; throw e; } });
@@ -27,20 +27,20 @@ test("NO_ACCESS reports forbidden and content step", async () => {
 test("HASH_MISMATCH reports hash reason and PDF page comparison", async () => {
  const bytes = await validPdf();
  const r = await diagnoseControlledDocument({ item, record: { size: bytes.length, sha256: "bad-hash", pageCount: 3 }, getMetadata: async () => ({ mimeType: "application/pdf", size: bytes.length }), downloadBytes: async () => bytes });
- assert.equal(r.classification, "HASH_MISMATCH"); assert.match(r.reason, /SHA-256 differs/); assert.match(r.pageCountComparison, /PDF parses: yes; pages: 1; stored at upload: 3/);
+ assert.equal(r.classification, "CONTENT_INTEGRITY_FAILURE"); assert.match(r.reason, /SHA-256 differs/); assert.match(r.pageCountComparison, /PDF parses: yes; pages: 1; stored at upload: 3/);
 });
 test("SIZE_MISMATCH reports byte-count reason and PDF page comparison", async () => {
  const bytes = await validPdf();
  const r = await diagnoseControlledDocument({ item, record: { size: bytes.length + 4, sha256: "", pageCount: 2 }, getMetadata: async () => ({ mimeType: "application/pdf", size: bytes.length }), downloadBytes: async () => bytes });
- assert.equal(r.classification, "SIZE_MISMATCH"); assert.equal(r.step, "Size check"); assert.match(r.reason, /byte count/); assert.match(r.pageCountComparison, /pages: 1; stored at upload: 2/);
+ assert.equal(r.classification, "CONTENT_INTEGRITY_FAILURE"); assert.equal(r.step, "Size check"); assert.match(r.reason, /byte count/); assert.match(r.pageCountComparison, /pages: 1; stored at upload: 2/);
 });
 test("NOT_A_PDF reports actual MIME type and reason", async () => {
  const r = await run({ getMetadata: async () => ({ mimeType: "text/plain", size: 4 }), downloadBytes: async () => new Uint8Array([65,66,67,68]) });
- assert.equal(r.classification, "NOT_A_PDF"); assert.match(r.reason, /text\/plain/);
+ assert.equal(r.classification, "PDF_VALIDATION_FAILURE"); assert.match(r.reason, /text\/plain/);
 });
 test("PDF_PARSE_FAILED reports parser failure", async () => {
  const r = await run({ record:{size:9}, getMetadata: async () => ({ mimeType: "application/pdf", size: 9 }), downloadBytes: async () => new Uint8Array([37,80,68,70,45,49,46,55,10]) });
- assert.equal(r.classification, "PDF_PARSE_FAILED"); assert.match(r.reason, /PDF parsing failed/);
+ assert.equal(r.classification, "PDF_VALIDATION_FAILURE"); assert.match(r.reason, /PDF parsing failed/);
 });
 test("TRANSIENT retries three times before final classification", async () => {
  let calls = 0;
@@ -50,4 +50,24 @@ test("TRANSIENT retries three times before final classification", async () => {
 test("UNKNOWN preserves unexpected failure reason", async () => {
  const r = await run({ getMetadata: async () => { throw new Error("Unexpected gateway failure"); } });
  assert.equal(r.classification, "UNKNOWN"); assert.match(r.reason, /Unexpected gateway failure/);
+});
+
+
+test("missing Drive reference is classified without calling Drive", async () => {
+ let calls = 0;
+ const r = await diagnoseControlledDocument({ item: { documentId: "doc-2", fileId: "" }, getMetadata: async () => { calls++; throw new Error("must not run"); }, downloadBytes: async () => { calls++; throw new Error("must not run"); } });
+ assert.equal(r.classification, "MISSING_FILE_REFERENCE");
+ assert.equal(calls, 0);
+});
+test("emergency URI is rejected as an invalid storage reference without calling Drive", async () => {
+ let calls = 0;
+ const r = await diagnoseControlledDocument({ item: { documentId: "doc-3", fileId: "firestore-emergency://legacy/doc-3" }, getMetadata: async () => { calls++; throw new Error("must not run"); }, downloadBytes: async () => { calls++; throw new Error("must not run"); } });
+ assert.equal(r.classification, "INVALID_STORAGE_REFERENCE");
+ assert.equal(calls, 0);
+});
+test("Drive metadata document ID mismatch is classified before content download", async () => {
+ let downloads = 0;
+ const r = await diagnoseControlledDocument({ item, record: {}, getMetadata: async () => ({ mimeType: "application/pdf", size: 15, description: JSON.stringify({ documentId: "other-doc" }) }), downloadBytes: async () => { downloads++; return pdf; } });
+ assert.equal(r.classification, "DRIVE_METADATA_MISMATCH");
+ assert.equal(downloads, 0);
 });
