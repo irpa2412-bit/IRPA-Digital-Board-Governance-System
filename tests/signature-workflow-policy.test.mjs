@@ -134,7 +134,7 @@ test("owner signature requirement is separate from explicit signer-field assignm
   assert.match(platform, /ownerSigningEnabled=false/);
   assert.match(platform, /ownerSignatureAssigned=.*field\.signerUid===u\.uid/);
   assert.match(worker, /ownerSignatureFields = fields\.filter\(field => field && field\.signerUid === uid && field\.type === "Signature"/);
-  assert.match(worker, /Owner Signature field is assigned while the owner signature requirement is disabled/);
+  assert.match(worker, /An owner Signature field is assigned while the owner signature requirement is disabled/);
   assert.match(worker, /Owner Section Saved/);
   assert.match(worker, /assignedOwnerSignatureFieldIds/);
 });
