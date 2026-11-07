@@ -146,3 +146,23 @@ test("mobile Signature Portal keeps the palette and signer-assignment controls v
   assert.match(css, /\.signature-workflow-grid > aside/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
 });
+
+
+
+test("owner signature palette action remains available and explicitly assigns a field to the owner on the current PDF page", () => {
+  assert.ok(portal.includes("ownerSigner=null"));
+  assert.ok(portal.includes("ownerSigner={ownerSigningEnabled?documentOwner:null}"));
+  assert.ok(portal.includes('data-owner-signature-placement="true"'));
+  assert.ok(portal.includes("Place Owner Signature — Page {pageNum}"));
+  assert.ok(portal.includes('const addOwnerSignatureAt=(x=50,y=20)=>{if(!ownerSigner?.uid)'));
+  assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
+  assert.ok(portal.includes("f.required=true"));
+  assert.ok(portal.includes("commit([...fields,f]);setSelectedField(f.fieldId)"));
+});
+
+test("owner remains selectable for field assignment and each signature field remains bound to its PDF page", () => {
+  assert.ok(portal.includes("{recipients.map(r=><option key={r.uid} value={r.uid}>"));
+  assert.ok(portal.includes("const pageFields=fields.filter(f=>Number(f.page)===pageNum)"));
+  assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
+  assert.ok(portal.includes('ownerSigningEnabled?[{...documentOwner,optionalSigning:false,actionRequired:true}]:[]'));
+});
