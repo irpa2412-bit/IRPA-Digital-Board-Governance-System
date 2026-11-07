@@ -416,7 +416,7 @@ export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
     recipients,
     status:overall,
     currentSignerUid:gatewayStatus.signingMode==="Parallel"?null:(pending[0]?.uid||null),
-    gatewaySigningStatus:gatewayStatus.status,
+    gatewaySigningStatus:String(gatewayStatus.status||"Unknown"),
     gatewayFinalHash:gatewayStatus.completion?.finalHash||null,
     gatewayCryptographicEvidenceIds:gatewayStatus.completion?.cryptographicEvidenceIds||[],
     gatewayAuditChainValid:true,

@@ -1,4 +1,5 @@
 import { getIdToken } from "firebase/auth";
+import { assertGatewaySigningResponse } from "./signatureGatewayResponse.js";
 import { auth } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 
@@ -524,7 +525,7 @@ export async function submitGatewaySignature({token,signature,fieldValues={},fie
     body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,manualAuthorityIdentification,consent})
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) throw new Error(data.error || "The Gateway did not accept the signing action.");
+  assertGatewaySigningResponse(response,data);
   return data;
 }
 

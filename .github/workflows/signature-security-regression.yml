@@ -1,0 +1,68 @@
+name: Signature security regression
+
+on:
+  pull_request:
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - ".github/workflows/signature-security-regression.yml"
+  push:
+    branches:
+      - "fix/signature-hardening-phase1-20261102"
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - ".github/workflows/signature-security-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signature-security-regression:
+    name: Signature security regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install application dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build application
+        run: npm run build
+
+      - name: Install Gateway dependencies
+        working-directory: drive-gateway
+        run: npm install --no-audit --no-fund
+
+      - name: Run complete Gateway test suite
+        working-directory: drive-gateway
+        run: npm test
+
+      - name: Run root security and document regression suites
+        run: |
+          set -euo pipefail
+          npx firebase emulators:exec --only firestore --project demo-irpa-signature "npm run test:security-rules && npm run test:meeting-category"
+          npm run test:pdf-page-rendering
+          npm run test:fundraising-registry
+          npm run test:portal-navigation
+          npm run test:meeting-entry-policy
+          npm run test:meeting-invitation-resend
+          npm run test:communication-media
+          npm run test:meta-oauth
