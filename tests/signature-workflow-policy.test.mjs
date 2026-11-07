@@ -124,3 +124,24 @@ test("signature PDF palette uses controlled-document authorization during Draft 
   assert.ok(gateway.includes("Drive.description.documentId="));
   assert.ok(gateway.includes("callerRole="));
 });
+
+test("owner signature requirement is separate from explicit signer-field assignment", () => {
+  const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
+  const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.match(portal, /const f=makeField\(type,fields\.length,"",pageNum\)/);
+  assert.match(portal, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]:\[\]/);
+  assert.match(portal, /ownerSigningEnabled&&!fields\.some\(f=>f\?\.type==="Signature"&&f\.required!==false&&f\.signerUid===documentOwner\.uid\)/);
+  assert.match(platform, /ownerSigningEnabled=false/);
+  assert.match(platform, /ownerSignatureAssigned=.*field\.signerUid===u\.uid/);
+  assert.match(worker, /ownerSignatureFields = fields\.filter\(field => field && field\.signerUid === uid && field\.type === "Signature"/);
+  assert.match(worker, /Owner Signature field is assigned while the owner signature requirement is disabled/);
+  assert.match(worker, /Owner Signature Assignment Saved/);
+});
+test("mobile Signature Portal keeps the palette and signer-assignment controls visible", () => {
+  const css = fs.readFileSync(new URL("../src/styles/signature-portal.css", import.meta.url), "utf8");
+  assert.match(portal, /const\[paletteExpanded,setPaletteExpanded\]=useState\(true\)/);
+  assert.match(css, /@media \(max-width: 900px\)/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) !important/);
+  assert.match(css, /\.signature-workflow-grid > aside/);
+  assert.match(portal, /onPageChange=\{setPreparationPage\}/);
+});
