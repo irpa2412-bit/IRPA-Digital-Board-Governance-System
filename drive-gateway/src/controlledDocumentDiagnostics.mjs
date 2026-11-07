@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 
 const text = value => value == null || value === "" ? "(not recorded)" : String(value);
 const bytesOf = value => value instanceof Uint8Array ? value : new Uint8Array(value || []);
+const isDriveFileId = value => /^[A-Za-z0-9_-]+$/.test(String(value || "").trim());
 const reasonOf = error => {
   const status = Number(error?.httpStatus || error?.status || 0);
   const reason = String(error?.driveReason || error?.reason || error?.code || "").toLowerCase();
@@ -26,7 +27,7 @@ function classifyFailure(step, error, metadata = {}) {
   const status = Number(error?.httpStatus || error?.status || 0) || null;
   const reason = reasonOf(error);
   let classification = "UNKNOWN";
-  if (status === 404 || metadata.trashed === true || reason === "notFound") classification = "FILE_MISSING";
+  if (status === 404 || metadata.trashed === true || reason === "notFound") classification = "DRIVE_FILE_NOT_FOUND";
   else if (/quota|ratelimit|rate limit|timeout/i.test(reason + " " + String(error?.message || "")) || transient(error)) classification = "TRANSIENT";
   else if (status === 403 || reason === "forbidden") classification = "NO_ACCESS";
   return { classification, step, httpStatus: status, driveErrorReason: reason, error: String(error?.message || "Unknown Drive error") };
@@ -58,9 +59,12 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
     pdfPageCount: null,
     attempts: 0
   };
+  const rawFileId = String(item?.fileId || "").trim();
+  if (!rawFileId) return { ...diagnostic, classification: "MISSING_FILE_REFERENCE", step: "Firestore relationship", driveErrorReason: "(not applicable)", reason: "No Drive file ID is registered on the Firestore document; no Drive request was attempted." };
+  if (!isDriveFileId(rawFileId)) return { ...diagnostic, classification: "INVALID_STORAGE_REFERENCE", step: "Firestore relationship", driveErrorReason: "(not applicable)", reason: "The stored file reference is not a valid Google Drive file ID; no Drive request was attempted." };
   let metadata;
   try {
-    const result = await retry(() => getMetadata(item.fileId), maxAttempts);
+    const result = await retry(() => getMetadata(rawFileId), maxAttempts);
     metadata = result.value;
     diagnostic.attempts += result.attempts;
     diagnostic.httpStatus = 200;
@@ -70,17 +74,19 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
     diagnostic.parents = Array.isArray(metadata.parents) ? metadata.parents : [];
     diagnostic.createdTime = metadata.createdTime || null;
     diagnostic.driveDescription = metadata.description || "";
-    if (metadata.trashed) return { ...diagnostic, classification: "FILE_MISSING", step: "Drive metadata call", driveErrorReason: "trashed", reason: "Drive metadata reports trashed=true." };
+    if (metadata.trashed) return { ...diagnostic, classification: "DRIVE_FILE_NOT_FOUND", step: "Drive metadata call", driveErrorReason: "trashed", reason: "Drive metadata reports trashed=true." };
+    let parsedDescription = {};
+    try { parsedDescription = typeof metadata.description === "string" ? JSON.parse(metadata.description || "{}") : (metadata.description || {}); } catch {}
+    if (parsedDescription.documentId && item?.documentId && String(parsedDescription.documentId) !== String(item.documentId)) return { ...diagnostic, classification: "DRIVE_METADATA_MISMATCH", step: "Drive metadata validation", reason: "Drive description.documentId does not match the Firestore document ID." };
   } catch (error) {
     const failure = classifyFailure("Drive metadata call", error);
     diagnostic.attempts = maxAttempts && transient(error) ? maxAttempts : 1;
     return { ...diagnostic, ...failure, reason: failure.error };
   }
-  if (!item?.fileId) return { ...diagnostic, classification: "FILE_MISSING", step: "Drive metadata call", driveErrorReason: "notFound", reason: "No Drive file ID is registered on the Firestore document." };
   let bytes;
   diagnostic.step = "Content download";
   try {
-    const result = await retry(() => downloadBytes(item.fileId), maxAttempts);
+    const result = await retry(() => downloadBytes(rawFileId), maxAttempts);
     bytes = bytesOf(result.value);
     diagnostic.attempts += result.attempts;
     diagnostic.httpStatus = 200;
@@ -98,7 +104,7 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
   const sizeMismatch = Number.isFinite(storedSize) && storedSize > 0 && storedSize !== bytes.byteLength || Number.isFinite(driveSize) && driveSize >= 0 && driveSize !== bytes.byteLength;
   let pdfError = null;
   if (String(metadata.mimeType || "").toLowerCase() !== "application/pdf" || !bytesOf(bytes).slice(0, 5).every((v, i) => v === [0x25,0x50,0x44,0x46,0x2d][i])) {
-    diagnostic.classification = "NOT_A_PDF";
+    diagnostic.classification = "PDF_VALIDATION_FAILURE";
     diagnostic.step = "PDF parse";
     diagnostic.reason = "Drive mimeType is " + text(metadata.mimeType) + " and downloaded bytes do not begin with the PDF signature.";
     return diagnostic;
@@ -114,22 +120,22 @@ export async function diagnoseControlledDocument({ item, record = {}, getMetadat
     diagnostic.pdfParseError = String(error?.message || error);
   }
   if (hashMismatch) {
-    diagnostic.classification = "HASH_MISMATCH";
+    diagnostic.classification = "CONTENT_INTEGRITY_FAILURE";
     diagnostic.step = "Hash check";
     diagnostic.reason = "Downloaded SHA-256 differs from the SHA-256 recorded at upload.";
   } else if (sizeMismatch) {
-    diagnostic.classification = "SIZE_MISMATCH";
+    diagnostic.classification = "CONTENT_INTEGRITY_FAILURE";
     diagnostic.step = "Size check";
     diagnostic.step = "Size check";
     diagnostic.reason = "Downloaded byte count does not match Drive metadata size or the size recorded at upload.";
   } else if (pdfError) {
-    diagnostic.classification = "PDF_PARSE_FAILED";
+    diagnostic.classification = "PDF_VALIDATION_FAILURE";
     diagnostic.reason = "Downloaded bytes are identified as PDF but PDF parsing failed: " + diagnostic.pdfParseError;
   } else {
     diagnostic.classification = "OK";
     diagnostic.reason = "Drive metadata, downloaded bytes, stored size/hash and PDF parsing checks passed.";
   }
-  diagnostic.pageCountComparison = diagnostic.classification === "HASH_MISMATCH" || diagnostic.classification === "SIZE_MISMATCH"
+  diagnostic.pageCountComparison = diagnostic.classification === "CONTENT_INTEGRITY_FAILURE"
     ? "PDF parses: " + (diagnostic.pdfParses ? "yes" : "no") + "; pages: " + text(diagnostic.pdfPageCount) + "; stored at upload: " + text(diagnostic.storedPageCount)
     : null;
   return diagnostic;
