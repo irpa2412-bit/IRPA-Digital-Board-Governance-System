@@ -43,7 +43,7 @@ test("signing authority accepts only Active, current, unexpired UID-bound regist
   assert.equal(isCurrentSigningAuthorityRecord({status:"Active",uid:"u1",authorityExpiresAt:"not-a-date"}, "u1"), false);
 });
 
-test("signature draft ownership and recipient policy have positive and negative cases", () => {
+test("signature draft ownership and recipient policy have positive and negative cases", async () => {
   assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u1"},"u1",false), true);
   assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u2"},"u1",true), true);
   assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u2"},"u1",false), false);
