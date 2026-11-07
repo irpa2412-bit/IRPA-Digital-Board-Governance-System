@@ -1,0 +1,208 @@
+name: Gateway test failure report
+
+on:
+  push:
+    branches:
+      - diagnose/gateway-tests-20261107
+    paths-ignore:
+      - docs/diagnostics/gateway-test-failures.md
+
+permissions:
+  contents: write
+
+jobs:
+  test-main:
+    name: Gateway tests on main
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Install and run Gateway tests (TAP)
+        shell: bash
+        run: |
+          set +e
+          cd drive-gateway
+          npm ci > ../gateway-test-output.log 2>&1
+          install_status=$?
+          if [ "$install_status" -eq 0 ]; then
+            npm test -- --test-reporter=tap >> ../gateway-test-output.log 2>&1
+            test_status=$?
+          else
+            test_status=125
+            echo "TESTS NOT RUN: npm ci exited $install_status" >> ../gateway-test-output.log
+          fi
+          echo "INSTALL_STATUS=$install_status" >> ../gateway-test-output.log
+          echo "TEST_STATUS=$test_status" >> ../gateway-test-output.log
+      - name: Upload main test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-tests-main
+          path: gateway-test-output.log
+          if-no-files-found: warn
+
+  test-branch:
+    name: Gateway tests on diagnostic branch head
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install and run Gateway tests (TAP)
+        shell: bash
+        run: |
+          set +e
+          cd drive-gateway
+          npm ci > ../gateway-test-output.log 2>&1
+          install_status=$?
+          if [ "$install_status" -eq 0 ]; then
+            npm test -- --test-reporter=tap >> ../gateway-test-output.log 2>&1
+            test_status=$?
+          else
+            test_status=125
+            echo "TESTS NOT RUN: npm ci exited $install_status" >> ../gateway-test-output.log
+          fi
+          echo "INSTALL_STATUS=$install_status" >> ../gateway-test-output.log
+          echo "TEST_STATUS=$test_status" >> ../gateway-test-output.log
+      - name: Upload branch test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-tests-branch
+          path: gateway-test-output.log
+          if-no-files-found: warn
+
+  test-pre-pr629:
+    name: Gateway tests before PR #629 (230c2b7)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout pre-PR #629 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 230c2b7e5ed2c8895d68b950fac8590fc2be3dae
+      - name: Install and run Gateway tests (TAP)
+        shell: bash
+        run: |
+          set +e
+          cd drive-gateway
+          npm ci > ../gateway-test-output.log 2>&1
+          install_status=$?
+          if [ "$install_status" -eq 0 ]; then
+            npm test -- --test-reporter=tap >> ../gateway-test-output.log 2>&1
+            test_status=$?
+          else
+            test_status=125
+            echo "TESTS NOT RUN: npm ci exited $install_status" >> ../gateway-test-output.log
+          fi
+          echo "INSTALL_STATUS=$install_status" >> ../gateway-test-output.log
+          echo "TEST_STATUS=$test_status" >> ../gateway-test-output.log
+      - name: Upload pre-PR #629 test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-tests-pre-pr629
+          path: gateway-test-output.log
+          if-no-files-found: warn
+
+  publish-report:
+    name: Build and commit diagnostic report
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - test-main
+      - test-branch
+      - test-pre-pr629
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+        with:
+          ref: diagnose/gateway-tests-20261107
+          fetch-depth: 0
+      - name: Download test outputs
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/gateway-test-results
+          pattern: gateway-tests-*
+          merge-multiple: false
+      - name: Write TAP failure report
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = '/tmp/gateway-test-results';
+          const labels = {
+            'gateway-tests-main': 'main',
+            'gateway-tests-branch': 'diagnostic branch head',
+            'gateway-tests-pre-pr629': 'pre-PR #629 (230c2b7)'
+          };
+          const files = [];
+          function walk(dir) {
+            if (!fs.existsSync(dir)) return;
+            for (const entry of fs.readdirSync(dir, {withFileTypes:true})) {
+              const p = path.join(dir, entry.name);
+              if (entry.isDirectory()) walk(p);
+              else if (entry.name === 'gateway-test-output.log') files.push(p);
+            }
+          }
+          walk(root);
+          const rows = [];
+          const sections = [];
+          for (const file of files) {
+            const name = path.basename(path.dirname(file));
+            const label = labels[name] || name;
+            const raw = fs.readFileSync(file, 'utf8');
+            const lines = raw.split(/\r?\n/);
+            const failures = [];
+            for (let i=0; i<lines.length; i++) {
+              const m = lines[i].match(/^\s*not ok (\d+)(?:\s+-\s+|\s+)(.*)$/);
+              if (!m) continue;
+              let block = [lines[i]];
+              for (let j=i+1; j<lines.length && !/^\s*(?:not ok |ok \d+|# (?:tests|pass|fail|duration_ms)\b|INSTALL_STATUS=|TEST_STATUS=)/.test(lines[j]); j++) block.push(lines[j]);
+              const diagnostic = block.join('\n');
+              const loc = diagnostic.match(/(?:file|location):\s*([^\n]+)/i) || diagnostic.match(/(drive-gateway\/tests\/[^\s:)]+\.test\.mjs(?::\d+(?::\d+)?)?)/);
+              const fileName = loc ? loc[1].trim().replace(/^file:\/\//,'') : 'not reported in TAP output';
+              const firstError = block.find(x => /(?:error|failureType|code|expected|actual|operator|Error:)/i.test(x))?.trim() || block[1]?.trim() || 'No diagnostic line emitted';
+              failures.push({number:m[1], name:m[2].trim(), file:fileName, firstError, block:diagnostic});
+              rows.push({run:label, ...failures[failures.length-1]});
+            }
+            const total = (raw.match(/^# tests\s+(\d+)/m)||[])[1] || 'not reported';
+            const pass = (raw.match(/^# pass\s+(\d+)/m)||[])[1] || 'not reported';
+            const fail = (raw.match(/^# fail\s+(\d+)/m)||[])[1] || String(failures.length);
+            sections.push({label,total,pass,fail,failures,raw});
+          }
+          let md = '# Gateway test failure diagnostics\n\n';
+          md += 'Generated from the three GitHub Actions test jobs. The diagnostic branch head is tested at the triggering workflow commit; main is checked out independently; the historical comparison uses commit 230c2b7e5ed2c8895d68b950fac8590fc2be3dae.\n\n';
+          md += '| Test source | Tests | Pass | Fail |\n|---|---:|---:|---:|\n';
+          for (const s of sections) md += '| '+s.label+' | '+s.total+' | '+s.pass+' | '+s.fail+' |\n';
+          md += '\n## Every TAP failure\n\n';
+          md += '| Source | # | Test name | Test file | First error line |\n|---|---:|---|---|---|\n';
+          for (const r of rows) md += '| '+r.run+' | '+r.number+' | '+r.name.replace(/\|/g,'\\|')+' | '+r.file.replace(/\|/g,'\\|')+' | '+r.firstError.replace(/\|/g,'\\|')+' |\n';
+          for (const s of sections) {
+            md += '\n## Full failure diagnostics — '+s.label+'\n\n';
+            if (!s.failures.length) md += 'No TAP `not ok` records were present.\n';
+            for (const f of s.failures) md += '### '+f.number+'. '+f.name+'\n\n```text\n'+f.block+'\n```\n\n';
+            if (s.failures.length) md += 'Raw test log is available as the corresponding workflow artifact.\n';
+          }
+          fs.mkdirSync('docs/diagnostics', {recursive:true});
+          fs.writeFileSync('docs/diagnostics/gateway-test-failures.md', md);
+          NODE
+      - name: Commit report to diagnostic branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/diagnostics/gateway-test-failures.md
+          if git diff --cached --quiet; then
+            echo "Report unchanged; no report commit required."
+          else
+            git commit -m "docs: publish Gateway test failure diagnostics [skip ci]"
+            git push origin HEAD:diagnose/gateway-tests-20261107
+          fi
