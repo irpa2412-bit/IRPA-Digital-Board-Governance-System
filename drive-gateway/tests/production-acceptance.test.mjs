@@ -215,3 +215,36 @@ test("production WordPress requests retain Authorization and omit staging-only a
     assert.equal(inspected, true);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("media metadata failure returns the already-uploaded media ID and URL", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url);
+    const headers = new Headers(init.headers);
+    assert.equal(headers.get("User-Agent"), "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)");
+    if (url.pathname.endsWith("/users/me")) return response({ id: 7, roles: ["editor"], capabilities: { upload_files: true } });
+    if (url.pathname === "/wp-json/wp/v2/media" && init.method === "POST") {
+      assert.ok(init.body instanceof Uint8Array);
+      return response({ id: 812, source_url: "https://staging.irpa.or.tz/wp-content/uploads/test-812.png" }, 201);
+    }
+    if (url.pathname === "/wp-json/wp/v2/media/812" && init.method === "POST") {
+      return new Response("<html><body>blocked</body></html>", { status: 406, headers: { "Content-Type": "text/html", "CF-Ray": "media406-ray-DAR" } });
+    }
+    throw new Error("Unexpected media metadata failure test request: " + url.pathname);
+  };
+  try {
+    const router = makeRouter();
+    const env = { IRPA_ENVIRONMENT: "staging", IRPA_WORKER_ENVIRONMENT: "staging", WORDPRESS_BASE_URL: "https://staging.irpa.or.tz", WORDPRESS_USERNAME: "editor", WORDPRESS_APPLICATION_PASSWORD: "testpassword" };
+    const result = await router(new Request("https://gateway.test/api/communications/website/media", {
+      method: "POST", headers: { Authorization: "Bearer test", "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: "test.png", title: "TEST image", contentType: "image/png", altText: "Test image", caption: "TEST ONLY", dataBase64: "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAC0lEQVR4nGNgQAYAAA4AAamRc7EAAAAASUVORK5CYII=", destination: "media-library" })
+    }), env);
+    const data = await result.json();
+    assert.equal(result.status, 502);
+    assert.equal(data.media.id, 812);
+    assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/test-812.png");
+    assert.equal(data.detail.classification, "likely_server_firewall_rejection");
+    assert.equal(data.detail.rayId, "media406-ray-DAR");
+    assert.equal("body" in data.detail, false);
+  } finally { globalThis.fetch = originalFetch; }
+});
