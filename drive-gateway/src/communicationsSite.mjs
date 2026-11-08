@@ -210,7 +210,7 @@ export function createCommunicationsSiteRouter(deps) {
       auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))),
       // Retain credentials only in this Worker-local object so every diagnostic
       // response-body sanitizer can redact exact secret values before display.
-      username, password,
+      username, password, rawPassword,
       stagingAuthHeader: host === "staging.irpa.or.tz",
       secretChecks: {
         baseUrl: { present: !!rawEndpoint, https: base.protocol === "https:", hasWpJsonSuffix: /\/wp-json\/?$/i.test(rawEndpoint), canonicalOriginOnly: base.pathname === "/" },
@@ -274,7 +274,7 @@ export function createCommunicationsSiteRouter(deps) {
   function sanitizedWordPressBody(raw, wp) {
     let value = String(raw || "");
     if (wp?.auth) value = value.split(wp.auth).join("[redacted-auth]");
-    for (const secret of [wp?.username, wp?.password].filter(Boolean)) value = value.split(secret).join("[redacted]");
+    for (const secret of [wp?.username, wp?.password, wp?.rawPassword].filter(Boolean)) value = value.split(secret).join("[redacted]");
     value = value.replace(/(authorization\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]")
       .replace(/(application[_ -]?password\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]")
       .replace(/(password\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]");
