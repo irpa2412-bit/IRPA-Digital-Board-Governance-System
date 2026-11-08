@@ -43,6 +43,7 @@ import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summ
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
 import { createLoginContextRoute } from "./loginContext.mjs";
 import { createBootstrapPrimaryAdministratorRoute } from "./adminIdentity.mjs";
+import { createPasswordRecoveryRouter } from "./passwordRecovery.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -136,6 +137,17 @@ const bootstrapPrimaryAdministratorRoute = createBootstrapPrimaryAdministratorRo
   getFirebaseAuthAdminAccessToken,
   getFirestoreAdminAccessToken,
   getFirebaseProjectId,
+  json,
+  corsHeaders
+});
+
+const passwordRecoveryRouter = createPasswordRecoveryRouter({
+  authenticateFirebaseRequest,
+  getFirebaseAuthAdminAccessToken,
+  getFirestoreAdminAccessToken,
+  getFirestoreDocumentsByField,
+  getFirebaseProjectId,
+  firestoreDocumentToPlain,
   json,
   corsHeaders
 });
@@ -261,6 +273,7 @@ export default {
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
+      if (pathname === "/api/auth/password-reset/prepare" || pathname === "/api/auth/password-reset/clear") return await passwordRecoveryRouter(request, env, pathname);
       if (pathname === "/api/auth/bootstrap-primary-administrator") return await bootstrapPrimaryAdministratorRoute(request, env);
       if (pathname === "/api/auth/login-context") return await loginContextRoute(request, env);
 
@@ -3081,7 +3094,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
     firebaseClaims: {
       admin: payload.admin === true,
       irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
-      name: payload.name || ""
+      name: payload.name || "",
+      phoneNumber: payload.phone_number || ""
     }
   };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
