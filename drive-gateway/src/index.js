@@ -251,7 +251,7 @@ export default {
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
-      if (pathname === "/api/auth/login-context" && request.method === "POST") return await loginContextRoute(request, env);
+      if (pathname === "/api/auth/login-context") return await loginContextRoute(request, env);
 
       if (pathname === "/api/system/release-readiness") return await createReleaseReadinessRoute({ authenticateFirebaseRequest, getFirestoreDocument, systemDiagnosticsRoute, actualDataAccessRoute, reconcileSignatureDocumentIds, corsHeaders })(request, env);
 
