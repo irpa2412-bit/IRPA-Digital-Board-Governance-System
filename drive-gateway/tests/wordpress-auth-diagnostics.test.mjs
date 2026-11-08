@@ -53,6 +53,7 @@ test("WordPress diagnostics probes authenticated users/me and unauthenticated RE
     }
     if (url.pathname === "/wp-json/") {
       assert.equal(new Headers(init.headers).has("authorization"), false);
+      assert.equal(new Headers(init.headers).get("user-agent"), "IRPA-DBGS-WordPress-Diagnostic/1.0 (+https://irpa.or.tz)");
       return makeResponse({ name: "IRPA staging", routes: {} });
     }
     throw new Error("Unexpected WordPress request: " + url.pathname);
