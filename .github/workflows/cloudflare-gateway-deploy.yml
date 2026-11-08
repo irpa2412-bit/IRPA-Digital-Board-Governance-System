@@ -29,6 +29,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+
+      - name: Install locked Gateway dependencies
+        run: npm ci
+
       - name: Run Cloudflare Gateway tests
         run: npm test
 
