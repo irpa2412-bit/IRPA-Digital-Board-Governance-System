@@ -220,10 +220,22 @@ export async function bootstrapPrimaryAdministrator() {
   if(!user) throw new Error("Google authentication is required.");
   const email = String(user.email || "").trim().toLowerCase();
   if(email !== "irpa2412@gmail.com") throw new Error("This Google account is not the designated IRPA primary administrator.");
-  const functions = getFunctions(undefined, "us-central1");
-  const call = httpsCallable(functions, "bootstrapPrimaryAdministrator");
-  const result = await call({});
-  return result.data;
+  const token = await user.getIdToken();
+  let response;
+  try {
+    response = await fetch(GOVERNANCE_GATEWAY_ORIGIN + "/api/auth/bootstrap-primary-administrator", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({})
+    });
+  } catch (error) {
+    throw new Error("Cloudflare primary-administrator bootstrap service is unavailable. No Firebase Cloud Function fallback was used.");
+  }
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok !== true) {
+    throw new Error(result.error || "Cloudflare could not complete primary-administrator bootstrap.");
+  }
+  return result;
 }
 
 export async function clearPasswordAttemptState(email) {
