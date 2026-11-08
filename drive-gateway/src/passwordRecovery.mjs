@@ -19,33 +19,23 @@ async function sha256Hex(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
-function firestoreValue(value) {
-  if (!value) return "";
-  const fields = value.fields || {};
-  return fields.phone?.stringValue || fields.mobile?.stringValue || fields.mobileNumber?.stringValue || fields.phoneNumber?.stringValue || "";
-}
-async function durableObjectCall(env, key, operation, state) {
+async function durableObjectCall(env, key, operation, extra = {}) {
   if (!env?.ESIGN_DO) throw new Error("Cloudflare authentication state storage is unavailable.");
   const stub = env.ESIGN_DO.get(env.ESIGN_DO.idFromName(key));
   const response = await stub.fetch("https://irpa-auth.internal", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ operation, key, ...(state ? { state } : {}) })
+    body: JSON.stringify({ operation, key, ...extra })
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || body.ok === false) throw new Error(body.error || "Password recovery rate-limit storage failed.");
   return body;
 }
 async function consumeWindowLimit(env, key, limit, now) {
-  const state = (await durableObjectCall(env, key, "auth-get")).state || {};
-  const attempts = (Array.isArray(state.recoveryAttempts) ? state.recoveryAttempts : [])
-    .map(Number).filter(timestamp => Number.isFinite(timestamp) && timestamp > now - EMAIL_WINDOW_MS);
-  if (attempts.length >= limit) {
-    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((attempts[0] + EMAIL_WINDOW_MS - now) / 1000)) };
-  }
-  attempts.push(now);
-  await durableObjectCall(env, key, "auth-set", { recoveryAttempts: attempts, updatedAt: now });
-  return { allowed: true, retryAfterSeconds: 0 };
+  const result = await durableObjectCall(env, key, "auth-window-consume", {
+    limit, windowMs: EMAIL_WINDOW_MS, now
+  });
+  return { allowed: result.allowed === true, retryAfterSeconds: Number(result.retryAfterSeconds || 0) };
 }
 async function consumeRecoveryRateLimit(env, email, ip, now = Date.now()) {
   const emailKey = "auth-recovery-email:" + await sha256Hex(email);
