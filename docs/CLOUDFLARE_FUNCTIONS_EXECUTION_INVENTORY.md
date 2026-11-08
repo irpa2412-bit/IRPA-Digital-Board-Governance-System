@@ -173,6 +173,7 @@ The financial-reference triggers issue references only after their collection-sp
 ## 4. Existing Cloudflare equivalents — not yet all parity-certified
 
 - Password attempt state, failure recording and clear: `/api/auth/password-attempt-state`, `/api/auth/password-failure`, `/api/auth/password-attempt-clear` in `drive-gateway/src/cloudflareAuth.mjs`; frontend already uses these paths.
+- Login-context resolution: `POST /api/auth/login-context` added in this migration branch. `src/firebase/data.js` now calls the Worker using the signed-in Firebase ID token. The resolver uses the existing server-side Firestore service identity to reproduce the callable's UID-first, email-fallback, administrator-linked Employee, active-record and authority-building behavior. The Firebase callable remains registered for rollback; unit/CI parity tests are pending.
 - Document reference issuance: `/api/documents/next-reference`; client wrapper already calls Gateway.
 - Actual-data gate: `/api/system/actual-data-access`; frontend wrapper already calls Gateway and the Worker policy has an explicit attestation constant.
 - Registered identity UID reconciliation: `/api/members/reconcile-registered-identity-uids`; Worker route and exact-match policy helper exist.
@@ -194,9 +195,12 @@ The financial-reference triggers issue references only after their collection-sp
 - **Frontend caller mapping:** principal direct callable call sites and Worker-oriented wrappers identified above; dynamic call dispatch and less common fallback paths remain subject to targeted call-site searches and tests.
 - **Live Firebase deployment inventory:** NOT RETRIEVED. Source exports do not prove a function is deployed or active.
 - **Live Firebase trigger/schedule inventory:** NOT RETRIEVED. Source declarations do not prove deployed trigger configuration.
-- **Cloudflare staging parity:** NOT RUN in this inventory change.
+- **Login-context migration slice:** IMPLEMENTED on the migration branch; Firebase callable retained for rollback; no production caller cutover.
+- **Login-context unit/CI tests:** QUEUED / IN PROGRESS at the time of this update; no PASS claim yet.
+- **Cloudflare staging parity:** NOT RUN.
 - **Production acceptance:** NOT RUN in this inventory change.
 - **Production code/config/secrets/rules:** UNCHANGED.
+- **Other authentication/identity functions:** PENDING (including primary-administrator bootstrap, password-recovery phone preparation, administrator claim management and other identity operations).
 
 ## 7. Ordered implementation gates
 
