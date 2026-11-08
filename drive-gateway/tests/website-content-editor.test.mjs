@@ -446,7 +446,9 @@ test("cPanel PHP limits fall through to MultiPHP and report INFO when unavailabl
   const unavailable = await call(router, env, "/api/communications/cpanel/diagnostics?domain=staging.irpa.or.tz", { role: "Executive Director" });
   const unavailableData = await unavailable.json();
   assert.equal(unavailableData.phpLimits.status, "INFO");
-  assert.equal(unavailableData.phpLimits.diagnostic, "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor");
+  assert.match(unavailableData.phpLimits.diagnostic, /^INFO: cPanel did not return both directives\./);
+  assert.match(unavailableData.phpLimits.diagnostic, /LangPHP UAPI permission/);
+  assert.match(unavailableData.phpLimits.diagnostic, /MultiPHP INI Editor/);
   assert.equal(unavailableData.ssl.status, "FAIL");
   assert.match(unavailableData.ssl.error, /No installed SSL certificate matched/);
 });
