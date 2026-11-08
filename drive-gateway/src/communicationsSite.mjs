@@ -221,7 +221,7 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   function wordpressHeaders(wp, extra = {}) {
-    const headers = { Authorization: wp.auth, ...extra, "User-Agent": "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)" };
+    const headers = { Authorization: wp.auth, "User-Agent": "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)", ...extra };
     // Staging nginx/FastCGI strips Authorization before PHP; forward it under a
     // staging-only header validated by the isolated staging MU-plugin.
     if (wp.stagingAuthHeader) headers["X-IRPA-Staging-Authorization"] = wp.auth;
