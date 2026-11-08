@@ -141,7 +141,7 @@ The financial-reference triggers issue references only after their collection-sp
 
 | Caller / workflow | Firebase Functions dependency identified | Existing Cloudflare path or disposition |
 |---|---|---|
-| `src/firebase/auth.js` | `bootstrapPrimaryAdministrator`, `preparePasswordResetPhone` | Password-attempt state/failure/clear already call the Gateway. Invitation redemption/session/password setup use Gateway endpoints. Primary-admin bootstrap now calls `POST /api/auth/bootstrap-primary-administrator` on this branch; phone-recovery preparation remains a callable dependency. |
+| `src/firebase/auth.js` | `bootstrapPrimaryAdministrator`, `preparePasswordResetPhone` | Password-attempt state/failure/clear already call the Gateway. Invitation redemption/session/password setup use Gateway endpoints. Both primary-admin bootstrap and phone-recovery preparation now call Cloudflare routes on this branch; the Firebase callable exports remain registered for rollback. |
 | `src/firebase/data.js`, `src/App.jsx` | `resolveAuthenticatedLoginContext` | App calls the resolver during login/authority selection. The existing `/api/session/profile` route is not yet proven to have full response/authorization parity. |
 | Members and Employees pages via `src/firebase/data.js` | `synchronizeRegisteredIdentityUids` | A Cloudflare reconciliation route/helper exists; frontend wrapper is already Gateway-oriented. Verify the live route, role enforcement and exact-email/no-overwrite behavior. |
 | `src/firebase/functions.js`, Credential Interview page | `submitCredentialInterview`, `getCredentialInterviewRequests`, `approveCredentialInterview` | No complete Worker parity established yet. |
@@ -174,7 +174,8 @@ The financial-reference triggers issue references only after their collection-sp
 
 - Password attempt state, failure recording and clear: `/api/auth/password-attempt-state`, `/api/auth/password-failure`, `/api/auth/password-attempt-clear` in `drive-gateway/src/cloudflareAuth.mjs`; frontend already uses these paths.
 - Login-context resolution: `POST /api/auth/login-context` added in this migration branch. `src/firebase/data.js` now calls the Worker using the signed-in Firebase ID token. The resolver uses the existing server-side Firestore service identity to reproduce the callable's UID-first, email-fallback, administrator-linked Employee, active-record and authority-building behavior. The Firebase callable remains registered for rollback; unit/CI parity tests are pending.
-- Primary-administrator bootstrap: `POST /api/auth/bootstrap-primary-administrator` added in this migration branch. The frontend now calls the Worker; the Worker requires the signed-in token to identify the designated primary email, preserves existing custom claims, updates the `admin` claim through the existing Identity Toolkit service identity, and atomically commits the admin profile plus audit event. If the Firestore commit fails, the Worker attempts to roll back the custom-claims change. The Firebase callable remains registered for rollback; unit/CI parity tests are pending.
+- Primary-administrator bootstrap: `POST /api/auth/bootstrap-primary-administrator` added in this migration branch. The frontend now calls the Worker; the Worker requires the signed-in token to identify the designated primary email, preserves existing custom claims, updates the `admin` claim through the existing Identity Toolkit service identity, and atomically commits the admin profile plus audit event. If the Firestore commit fails, the Worker attempts to roll back the custom-claims change. The Firebase callable remains registered for rollback.
+- Password-recovery phone preparation: `POST /api/auth/password-reset/prepare` and `POST /api/auth/password-reset/clear` added in this migration branch. The Worker uses the existing Identity Toolkit and Firestore service identities to resolve the Auth account and the exact registered Member/Employee mobile number, refuses ambiguous or mismatched phone records, and updates Firebase Auth only when its phone is absent. Recovery preparation is rate-limited by email (3 per 15 minutes) and source IP (10 per 15 minutes) using the existing Durable Object; the email limit is cleared only after a Firebase phone-auth ID token proves the registered phone number. The frontend no longer imports or calls Firebase Functions for this recovery path. The original callable remains registered for rollback.
 - Document reference issuance: `/api/documents/next-reference`; client wrapper already calls Gateway.
 - Actual-data gate: `/api/system/actual-data-access`; frontend wrapper already calls Gateway and the Worker policy has an explicit attestation constant.
 - Registered identity UID reconciliation: `/api/members/reconcile-registered-identity-uids`; Worker route and exact-match policy helper exist.
@@ -197,11 +198,11 @@ The financial-reference triggers issue references only after their collection-sp
 - **Live Firebase deployment inventory:** NOT RETRIEVED. Source exports do not prove a function is deployed or active.
 - **Live Firebase trigger/schedule inventory:** NOT RETRIEVED. Source declarations do not prove deployed trigger configuration.
 - **Login-context migration slice:** IMPLEMENTED on the migration branch; Firebase callable retained for rollback; no production caller cutover.
-- **Login-context unit/CI tests:** QUEUED / IN PROGRESS at the time of this update; no PASS claim yet.
+- **Login-context, primary-admin bootstrap and password-recovery unit/CI tests:** QUEUED / IN PROGRESS at the time of this update; no PASS claim yet.
 - **Cloudflare staging parity:** NOT RUN.
 - **Production acceptance:** NOT RUN in this inventory change.
 - **Production code/config/secrets/rules:** UNCHANGED.
-- **Other authentication/identity functions:** PENDING (including password-recovery phone preparation, administrator access grant/revoke, signer authority update parity, and remaining identity operations).
+- **Remaining authentication/identity disposition:** the active frontend callers for login context, primary-admin bootstrap, password-recovery phone preparation, password-attempt state, signer-authority update and registered-identity reconciliation now use Cloudflare routes in source. `setAdministratorAccess` has no frontend caller found in the repository search and remains registered until live Firebase inventory confirms whether it is deployed or externally invoked. Other dormant/legacy exports also remain pending live inventory.
 
 ## 7. Ordered implementation gates
 
