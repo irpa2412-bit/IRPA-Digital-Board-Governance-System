@@ -50,7 +50,7 @@ test("password recovery preparation resolves registered phone and updates Fireba
   const result = await route(req("/api/auth/password-reset/prepare", { email: "Member@Example.Test" }), {}, "/api/auth/password-reset/prepare");
   const body = await result.json();
   assert.equal(result.status, 200);
-  assert.deepEqual(body, { ok: true, phoneNumber: "+255712345678", maskedPhone: "+255••••5678", uid: "member-uid", otpProvider: "Firebase Authentication SMS" });
+  assert.deepEqual(body, { ok: true, phoneNumber: "+255712345678", maskedPhone: "+255••••678", uid: "member-uid", otpProvider: "Firebase Authentication SMS" });
   assert.equal(calls.length, 2);
   assert.equal(calls[1].body.phoneNumber, "+255712345678");
 });
