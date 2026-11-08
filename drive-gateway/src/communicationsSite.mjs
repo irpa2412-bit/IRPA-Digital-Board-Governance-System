@@ -838,7 +838,7 @@ export function createCommunicationsSiteRouter(deps) {
           const publicUrl = wp.root + "/wp-json/";
           const publicResponse = await fetch(publicUrl, {
             method: "GET", headers: { Accept: "application/json", "Cache-Control": "no-cache" },
-            redirect: "manual", signal: AbortSignal.timeout(8000)
+            redirect: "manual", signal: AbortSignal.timeout(5000)
           });
           const publicRaw = await publicResponse.clone().text().catch(() => "");
           let publicBody = {};
