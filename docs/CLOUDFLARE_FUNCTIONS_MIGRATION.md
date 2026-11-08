@@ -43,6 +43,6 @@ The repository contains or references these Firebase Functions categories. Each 
 
 ## Status
 
-**Partially implemented; not production-verified.** The invitation-register removal callable has a Cloudflare implementation at `POST /api/invitations/remove`, the frontend caller now uses that endpoint, and the dedicated Firebase Functions deployment step for this callable has been removed. Gateway behavior tests cover administrator authorization, protected invitation records, atomic delete-plus-audit writes, and failed commits.
+**Partially implemented; not production-verified.** The invitation-register removal callable has a Cloudflare implementation at `POST /api/invitations/remove`, the frontend caller now uses that endpoint, and the dedicated Firebase Functions deployment step for this callable has been removed. Gateway behavior tests cover administrator authorization, protected invitation records, atomic delete-plus-audit writes, and failed commits. This execution branch adds `POST /api/auth/login-context` and switches `src/firebase/data.js` to the Gateway using the verified Firebase ID token; the original callable remains registered for rollback while parity tests and staging acceptance are pending.
 
 All other Firebase callable functions, schedules, and Firestore triggers remain in scope. Firebase Authentication and Firestore remain dependencies. The new endpoint has not been deployed or verified in production, and no Firebase Function should be disabled solely to make the billing-blocked workflow appear green.
