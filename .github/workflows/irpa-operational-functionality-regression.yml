@@ -1,0 +1,89 @@
+name: IRPA Operational Functionality Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "drive-gateway/src/**"
+      - "drive-gateway/tests/**"
+      - "drive-gateway/package.json"
+      - "drive-gateway/package-lock.json"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/CommunicationsWebsiteStudio.jsx"
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/ResearchStatisticsKnowledgePortal.jsx"
+      - "src/components/ResearchDataCollectionStudio.jsx"
+      - "src/components/ResearchInformationGovernance.jsx"
+      - "cloudflare/grant-crawler-parallel/**"
+      - "tests/meeting-invitation-resend-quorum.test.mjs"
+      - "tests/communication-media-policy.test.mjs"
+      - "tests/research-portal-security.test.mjs"
+      - "tests/meeting-isolation-guard.test.mjs"
+      - "scripts/ci/meeting-fixture-isolation.mjs"
+      - "scripts/check-meeting-media-governance.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/irpa-operational-functionality-regression.yml"
+  push:
+    branches:
+      - feat/irpa-operational-functionality-consolidation-20261108
+    paths:
+      - "docs/IRPA_DBGS_OPERATIONAL_FUNCTIONALITY_CONSOLIDATION.md"
+      - ".github/workflows/irpa-operational-functionality-regression.yml"
+      - "drive-gateway/src/**"
+      - "drive-gateway/tests/**"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/CommunicationsWebsiteStudio.jsx"
+      - "src/pages/ResearchStatisticsKnowledgePortal.jsx"
+      - "cloudflare/grant-crawler-parallel/**"
+      - "tests/meeting-invitation-resend-quorum.test.mjs"
+      - "tests/communication-media-policy.test.mjs"
+      - "tests/research-portal-security.test.mjs"
+      - "tests/meeting-isolation-guard.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-operational-functionality-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  consolidated-regression:
+    name: Consolidated portal regression and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install locked Gateway dependencies
+        run: npm --prefix drive-gateway ci
+      - name: Verify meeting media governance
+        run: npm run check:meeting-media
+      - name: Verify meeting source-isolation guard
+        run: node --test tests/meeting-isolation-guard.test.mjs
+      - name: Verify invitation resend and quorum exclusion
+        run: npm run test:meeting-invitation-resend
+      - name: Verify communications and media policy
+        run: npm run test:communication-media
+      - name: Verify Research Portal security
+        run: node --test tests/research-portal-security.test.mjs
+      - name: Verify all Gateway signature, document and meeting tests
+        run: npm --prefix drive-gateway test
+      - name: Verify Grant Intelligence Worker tests (no crawl)
+        run: npm --prefix cloudflare/grant-crawler-parallel test
+      - name: Build production frontend bundle
+        run: npm run build
