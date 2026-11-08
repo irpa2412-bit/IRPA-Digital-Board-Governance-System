@@ -141,7 +141,7 @@ The financial-reference triggers issue references only after their collection-sp
 
 | Caller / workflow | Firebase Functions dependency identified | Existing Cloudflare path or disposition |
 |---|---|---|
-| `src/firebase/auth.js` | `bootstrapPrimaryAdministrator`, `preparePasswordResetPhone` | Password-attempt state/failure/clear already call the Gateway. Invitation redemption/session/password setup use Gateway endpoints. Primary-admin bootstrap and phone-recovery preparation remain callable dependencies. |
+| `src/firebase/auth.js` | `bootstrapPrimaryAdministrator`, `preparePasswordResetPhone` | Password-attempt state/failure/clear already call the Gateway. Invitation redemption/session/password setup use Gateway endpoints. Primary-admin bootstrap now calls `POST /api/auth/bootstrap-primary-administrator` on this branch; phone-recovery preparation remains a callable dependency. |
 | `src/firebase/data.js`, `src/App.jsx` | `resolveAuthenticatedLoginContext` | App calls the resolver during login/authority selection. The existing `/api/session/profile` route is not yet proven to have full response/authorization parity. |
 | Members and Employees pages via `src/firebase/data.js` | `synchronizeRegisteredIdentityUids` | A Cloudflare reconciliation route/helper exists; frontend wrapper is already Gateway-oriented. Verify the live route, role enforcement and exact-email/no-overwrite behavior. |
 | `src/firebase/functions.js`, Credential Interview page | `submitCredentialInterview`, `getCredentialInterviewRequests`, `approveCredentialInterview` | No complete Worker parity established yet. |
@@ -174,6 +174,7 @@ The financial-reference triggers issue references only after their collection-sp
 
 - Password attempt state, failure recording and clear: `/api/auth/password-attempt-state`, `/api/auth/password-failure`, `/api/auth/password-attempt-clear` in `drive-gateway/src/cloudflareAuth.mjs`; frontend already uses these paths.
 - Login-context resolution: `POST /api/auth/login-context` added in this migration branch. `src/firebase/data.js` now calls the Worker using the signed-in Firebase ID token. The resolver uses the existing server-side Firestore service identity to reproduce the callable's UID-first, email-fallback, administrator-linked Employee, active-record and authority-building behavior. The Firebase callable remains registered for rollback; unit/CI parity tests are pending.
+- Primary-administrator bootstrap: `POST /api/auth/bootstrap-primary-administrator` added in this migration branch. The frontend now calls the Worker; the Worker requires the signed-in token to identify the designated primary email, preserves existing custom claims, updates the `admin` claim through the existing Identity Toolkit service identity, and atomically commits the admin profile plus audit event. If the Firestore commit fails, the Worker attempts to roll back the custom-claims change. The Firebase callable remains registered for rollback; unit/CI parity tests are pending.
 - Document reference issuance: `/api/documents/next-reference`; client wrapper already calls Gateway.
 - Actual-data gate: `/api/system/actual-data-access`; frontend wrapper already calls Gateway and the Worker policy has an explicit attestation constant.
 - Registered identity UID reconciliation: `/api/members/reconcile-registered-identity-uids`; Worker route and exact-match policy helper exist.
@@ -200,7 +201,7 @@ The financial-reference triggers issue references only after their collection-sp
 - **Cloudflare staging parity:** NOT RUN.
 - **Production acceptance:** NOT RUN in this inventory change.
 - **Production code/config/secrets/rules:** UNCHANGED.
-- **Other authentication/identity functions:** PENDING (including primary-administrator bootstrap, password-recovery phone preparation, administrator claim management and other identity operations).
+- **Other authentication/identity functions:** PENDING (including password-recovery phone preparation, administrator access grant/revoke, signer authority update parity, and remaining identity operations).
 
 ## 7. Ordered implementation gates
 
