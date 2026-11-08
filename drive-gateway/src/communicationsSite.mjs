@@ -295,7 +295,7 @@ export function createCommunicationsSiteRouter(deps) {
     }
     const raw = await response.clone().text().catch(() => "");
     const contentType = cleanText(headers.get("content-type") || "", 120);
-    const isHtml = /text\\/html|application\\/xhtml\\+xml/i.test(contentType) || /^\\s*(?:<!doctype\\s+html|<html[\\s>])/i.test(raw);
+    const isHtml = /text\/html|application\/xhtml\+xml/i.test(contentType) || /^\s*(?:<!doctype\s+html|<html[\s>])/i.test(raw);
     return {
       step, status: response.status, rayId: cleanText(headers.get("cf-ray") || "", 120) || null,
       classification: isHtml ? "likely_server_firewall_rejection" : "wordpress_or_http_error",
