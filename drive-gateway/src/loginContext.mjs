@@ -153,7 +153,19 @@ export function createLoginContextRoute(dependencies) {
 
   return async function loginContextRoute(request, env) {
     if (request.method !== "POST") return json({ ok: false, error: "Method not allowed." }, 405, corsHeaders(request));
-    const claims = await authenticateFirebaseRequest(request, env, { skipActivation: true });
+    let claims;
+    try {
+      claims = await authenticateFirebaseRequest(request, env, { skipActivation: true });
+    } catch (error) {
+      const message = String(error?.message || error);
+      const authenticationFailure = message === "Firebase authentication is required." ||
+        message.startsWith("Invalid Firebase") || message === "Firebase token is expired." ||
+        message === "Firebase token signing key not found.";
+      if (authenticationFailure) {
+        return json({ ok: false, error: "Authentication is required to resolve the IRPA login context." }, 401, corsHeaders(request));
+      }
+      throw error;
+    }
     const uid = String(claims?.user_id || "").trim();
     if (!uid) return json({ ok: false, error: "Authentication is required to resolve the IRPA login context." }, 401, corsHeaders(request));
 
