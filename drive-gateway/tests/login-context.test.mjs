@@ -97,3 +97,17 @@ test("login context route resolves linked administrator Employee record and uses
   assert.equal(body.employee.id, "linked-employee");
   assert.ok(calls.some(item => item.field === "administratorUid" && item.limit === 10));
 });
+
+test("login context route rejects non-POST methods", async () => {
+  const route = createLoginContextRoute({
+    authenticateFirebaseRequest: async () => { throw new Error("Should not authenticate GET."); },
+    getFirestoreAdminAccessToken: async () => "unused",
+    getFirestoreDocument: async () => null,
+    getFirestoreDocumentsByField: async () => [],
+    firestoreDocumentToPlain: plain,
+    json: (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }),
+    corsHeaders: () => ({})
+  });
+  const response = await route(new Request("https://gateway.test/api/auth/login-context", { method: "GET" }), {});
+  assert.equal(response.status, 405);
+});
