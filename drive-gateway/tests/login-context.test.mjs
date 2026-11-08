@@ -63,7 +63,9 @@ test("login context route returns 401 when Firebase authentication fails", async
     json: (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }),
     corsHeaders: () => ({})
   });
-  await assert.rejects(() => route(new Request("https://gateway.test/api/auth/login-context", { method: "POST" }), {}), /Firebase authentication is required/);
+  const response = await route(new Request("https://gateway.test/api/auth/login-context", { method: "POST" }), {});
+  assert.equal(response.status, 401);
+  assert.match((await response.json()).error, /Authentication is required/);
 });
 
 test("login context route resolves linked administrator Employee record and uses server-side Firestore identity", async () => {
