@@ -40,6 +40,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Configure Gradle dependency and distribution cache
+        uses: gradle/actions/setup-gradle@v4
       - name: Verify build workflow isolation policy
         run: node --test tests/offline-build-workflow-policy.test.mjs
       - name: Install locked root application and Capacitor dependencies
@@ -48,6 +50,17 @@ jobs:
         run: npm run build
       - name: Create and synchronize native Android wrapper
         run: npx cap add android && npx cap sync android
+      - name: Increase Gradle Wrapper download timeout
+        working-directory: android
+        shell: bash
+        run: |
+          wrapper_properties="gradle/wrapper/gradle-wrapper.properties"
+          if grep -q '^networkTimeout=' "$wrapper_properties"; then
+            sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$wrapper_properties"
+          else
+            printf '\\nnetworkTimeout=120000\\n' >> "$wrapper_properties"
+          fi
+          grep '^networkTimeout=' "$wrapper_properties"
       - name: Build debug APK only (no deployment or publishing)
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
