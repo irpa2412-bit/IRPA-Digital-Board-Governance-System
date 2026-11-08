@@ -1,0 +1,38 @@
+name: Authentication and Identity Parity Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/auth.js"
+      - "src/firebase/data.js"
+      - ".github/workflows/auth-identity-parity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-parity:
+    name: Gateway unit and authentication parity suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: drive-gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+      - name: Install locked Gateway dependencies
+        run: npm ci
+      - name: Run focused authentication and identity tests
+        run: node --test tests/cloudflare-auth.test.mjs
+      - name: Run complete Gateway regression suite
+        run: npm test
