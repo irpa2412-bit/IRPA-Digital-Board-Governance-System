@@ -27,6 +27,24 @@ export class EsignRecordDurableObject {
         return Response.json({ok:true,state:await this.state.storage.get("authState") || {}});
       }
 
+      if (body.operation === "auth-window-consume") {
+        const now = Number(body.now) || Date.now();
+        const limit = Math.max(1, Math.min(100, Number(body.limit) || 3));
+        const windowMs = Math.max(1000, Math.min(24 * 60 * 60 * 1000, Number(body.windowMs) || 15 * 60 * 1000));
+        const result = await this.state.storage.transaction(async transaction => {
+          const current = await transaction.get("authState") || {};
+          const attempts = (Array.isArray(current.recoveryAttempts) ? current.recoveryAttempts : [])
+            .map(Number).filter(timestamp => Number.isFinite(timestamp) && timestamp > now - windowMs);
+          if (attempts.length >= limit) {
+            return { allowed:false, retryAfterSeconds:Math.max(1,Math.ceil((attempts[0] + windowMs - now) / 1000)) };
+          }
+          attempts.push(now);
+          await transaction.put("authState",{recoveryAttempts:attempts,updatedAt:now});
+          return { allowed:true, retryAfterSeconds:0 };
+        });
+        return Response.json({ok:true,...result});
+      }
+
       if (body.operation === "auth-set") {
         await this.state.storage.put("authState", body.state || {});
         return Response.json({ok:true});
