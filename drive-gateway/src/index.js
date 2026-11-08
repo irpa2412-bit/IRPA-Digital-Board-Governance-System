@@ -41,6 +41,7 @@ import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./s
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
+import { createLoginContextRoute } from "./loginContext.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -114,6 +115,16 @@ const invitationRemovalRouter = createInvitationRemovalRouter({
   getFirebaseProjectId,
   getFirestoreAdminAccessToken,
   getFirestoreDocument,
+  firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
+
+const loginContextRoute = createLoginContextRoute({
+  authenticateFirebaseRequest,
+  getFirestoreAdminAccessToken,
+  getFirestoreDocument,
+  getFirestoreDocumentsByField,
   firestoreDocumentToPlain,
   json,
   corsHeaders
@@ -239,6 +250,8 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (pathname === "/api/auth/login-context" && request.method === "POST") return await loginContextRoute(request, env);
 
       if (pathname === "/api/system/release-readiness") return await createReleaseReadinessRoute({ authenticateFirebaseRequest, getFirestoreDocument, systemDiagnosticsRoute, actualDataAccessRoute, reconcileSignatureDocumentIds, corsHeaders })(request, env);
 
@@ -3050,7 +3063,16 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
   );
   if (!valid) throw new Error("Invalid Firebase ID token signature.");
 
-  const claims = { token, user_id: payload.user_id || payload.sub, email: payload.email || null };
+  const claims = {
+    token,
+    user_id: payload.user_id || payload.sub,
+    email: payload.email || null,
+    firebaseClaims: {
+      admin: payload.admin === true,
+      irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
+      name: payload.name || ""
+    }
+  };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
   return claims;
 }
@@ -3152,7 +3174,7 @@ function firestoreDocumentToPlain(document) {
   return Object.fromEntries(Object.entries(document.fields).map(([k,v])=>[k,convert(v)]));
 }
  
-async function getFirestoreDocumentsByField(env, collectionName, fieldName, value, firebaseToken) {
+async function getFirestoreDocumentsByField(env, collectionName, fieldName, value, firebaseToken, limit = 100) {
   if (value === null || value === undefined || String(value) === "") return [];
   const response = await fetch(
     `https://firestore.googleapis.com/v1/projects/${getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`,
@@ -3162,7 +3184,7 @@ async function getFirestoreDocumentsByField(env, collectionName, fieldName, valu
       body: JSON.stringify({ structuredQuery: {
         from: [{ collectionId: collectionName }],
         where: { fieldFilter: { field: { fieldPath: fieldName }, op: "EQUAL", value: { stringValue: String(value) } } },
-        limit: 100
+        limit: Math.min(100, Math.max(1, Number(limit) || 100))
       }})
     }
   );
