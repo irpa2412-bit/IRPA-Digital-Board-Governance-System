@@ -42,6 +42,7 @@ import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actua
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
 import { createLoginContextRoute } from "./loginContext.mjs";
+import { createBootstrapPrimaryAdministratorRoute } from "./adminIdentity.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -126,6 +127,15 @@ const loginContextRoute = createLoginContextRoute({
   getFirestoreDocument,
   getFirestoreDocumentsByField,
   firestoreDocumentToPlain,
+  json,
+  corsHeaders
+});
+
+const bootstrapPrimaryAdministratorRoute = createBootstrapPrimaryAdministratorRoute({
+  authenticateFirebaseRequest,
+  getFirebaseAuthAdminAccessToken,
+  getFirestoreAdminAccessToken,
+  getFirebaseProjectId,
   json,
   corsHeaders
 });
@@ -251,6 +261,7 @@ export default {
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
+      if (pathname === "/api/auth/bootstrap-primary-administrator") return await bootstrapPrimaryAdministratorRoute(request, env);
       if (pathname === "/api/auth/login-context") return await loginContextRoute(request, env);
 
       if (pathname === "/api/system/release-readiness") return await createReleaseReadinessRoute({ authenticateFirebaseRequest, getFirestoreDocument, systemDiagnosticsRoute, actualDataAccessRoute, reconcileSignatureDocumentIds, corsHeaders })(request, env);
