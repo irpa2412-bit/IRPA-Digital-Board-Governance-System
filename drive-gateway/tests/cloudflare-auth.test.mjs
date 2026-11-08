@@ -8,6 +8,7 @@ class MemoryStorage {
   async get(key) { return this.data.get(key); }
   async put(key, value) { this.data.set(key, value); }
   async delete(key) { this.data.delete(key); }
+  async transaction(callback) { return callback(this); }
 }
 
 class MemoryNamespace {
@@ -160,4 +161,32 @@ test("invalid email is rejected without creating state", async () => {
   const response = await call("/api/auth/password-failure", { email: "not-an-email" }, env());
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /valid registered email/);
+});
+
+test("password recovery Durable Object rate limit is atomic and expires after its window", async () => {
+  const environment = env();
+  const key = "auth-recovery-test";
+  for (let index = 0; index < 3; index++) {
+    const response = await environment.ESIGN_DO.get(environment.ESIGN_DO.idFromName(key)).fetch("https://irpa-auth.internal", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "auth-window-consume", key, limit: 3, windowMs: 900000, now: 1000000 + index })
+    });
+    const result = await response.json();
+    assert.equal(result.allowed, true);
+  }
+  const blocked = await environment.ESIGN_DO.get(environment.ESIGN_DO.idFromName(key)).fetch("https://irpa-auth.internal", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ operation: "auth-window-consume", key, limit: 3, windowMs: 900000, now: 1000004 })
+  });
+  const blockedBody = await blocked.json();
+  assert.equal(blockedBody.allowed, false);
+  assert.ok(blockedBody.retryAfterSeconds > 0);
+  const afterWindow = await environment.ESIGN_DO.get(environment.ESIGN_DO.idFromName(key)).fetch("https://irpa-auth.internal", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ operation: "auth-window-consume", key, limit: 3, windowMs: 900000, now: 1900000 })
+  });
+  assert.equal((await afterWindow.json()).allowed, true);
 });

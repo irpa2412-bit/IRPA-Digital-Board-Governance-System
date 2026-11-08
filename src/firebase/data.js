@@ -253,7 +253,26 @@ export async function getCurrentAuditorProfile(){
  return active;
 }
 
-export async function resolveAuthenticatedLoginContext(){if(!auth.currentUser?.uid)throw new Error("Authentication is required.");const call=httpsCallable(getFunctions(undefined,"us-central1"),"resolveAuthenticatedLoginContext");const result=await call({});return result.data||null;}
+export async function resolveAuthenticatedLoginContext(){
+  const user=auth.currentUser;
+  if(!user?.uid)throw new Error("Authentication is required.");
+  const token=await user.getIdToken();
+  let response;
+  try{
+    response=await fetch(getGoogleDriveGatewayUrl()+"/api/auth/login-context",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({})
+    });
+  }catch(error){
+    throw new Error("Cloudflare login-context service is unavailable. No Firebase Cloud Function fallback was used.");
+  }
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||result.ok!==true){
+    throw new Error(result.error||"Cloudflare could not verify the authenticated IRPA login context.");
+  }
+  return result;
+}
 
 // Returns every active institutional register entry linked to the authenticated
 // member, including separate Member and Employee records. This is intentionally
