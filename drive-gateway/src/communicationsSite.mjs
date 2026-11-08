@@ -208,6 +208,9 @@ export function createCommunicationsSiteRouter(deps) {
     return {
       root: base.origin, hostname: host, environment,
       auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))),
+      // Retain credentials only in this Worker-local object so every diagnostic
+      // response-body sanitizer can redact exact secret values before display.
+      username, password, rawPassword,
       stagingAuthHeader: host === "staging.irpa.or.tz",
       secretChecks: {
         baseUrl: { present: !!rawEndpoint, https: base.protocol === "https:", hasWpJsonSuffix: /\/wp-json\/?$/i.test(rawEndpoint), canonicalOriginOnly: base.pathname === "/" },
@@ -271,7 +274,7 @@ export function createCommunicationsSiteRouter(deps) {
   function sanitizedWordPressBody(raw, wp) {
     let value = String(raw || "");
     if (wp?.auth) value = value.split(wp.auth).join("[redacted-auth]");
-    for (const secret of [wp?.username, wp?.password].filter(Boolean)) value = value.split(secret).join("[redacted]");
+    for (const secret of [wp?.username, wp?.password, wp?.rawPassword].filter(Boolean)) value = value.split(secret).join("[redacted]");
     value = value.replace(/(authorization\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]")
       .replace(/(application[_ -]?password\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]")
       .replace(/(password\s*[:=]\s*)([^,\s]+)/gi, "$1[redacted]");
@@ -702,21 +705,65 @@ export function createCommunicationsSiteRouter(deps) {
             Object.values(result.secretChecks).every(item => item.present)
         };
         const authUrl = wp.root + "/wp-json/wp/v2/users/me?context=edit";
-        let response;
-        try {
-          response = await wordpressEditorFetch(wp, authUrl, {
-            headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
-            signal: AbortSignal.timeout(12000)
-          });
-        } catch (error) {
-          const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+        let response, probeError = null, probeAttempts = 0;
+        const probeStartedAt = performance.now();
+        let responseHeadersMs = null, bodyReadMs = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          probeAttempts = attempt;
+          const attemptStartedAt = performance.now();
+          try {
+            response = await wordpressEditorFetch(wp, authUrl, {
+              headers: wordpressHeaders(wp, {
+                Accept: "application/json",
+                "Cache-Control": "no-cache",
+                "User-Agent": "IRPA-DBGS-WordPress-Diagnostic/1.0 (+https://irpa.or.tz)"
+              }),
+              signal: AbortSignal.timeout(12000)
+            });
+            responseHeadersMs = Math.round(performance.now() - attemptStartedAt);
+            if (response.status >= 500 && attempt < 2) {
+              await response.body?.cancel().catch(() => {});
+              response = null;
+              await new Promise(resolve => setTimeout(resolve, 250));
+              continue;
+            }
+            probeError = null;
+            break;
+          } catch (error) {
+            probeError = error;
+            const retryable = error?.name === "TimeoutError" || error?.name === "AbortError" || error?.name === "TypeError";
+            if (attempt < 2 && retryable) {
+              await new Promise(resolve => setTimeout(resolve, 250));
+              continue;
+            }
+            break;
+          }
+        }
+        result.websiteTimingMs = {
+          total: Math.round(performance.now() - probeStartedAt),
+          attempts: probeAttempts,
+          responseHeaders: responseHeadersMs,
+          bodyRead: bodyReadMs,
+          dns: null, connect: null, tls: null,
+          phaseTimingNote: "Cloudflare Workers fetch does not expose separate DNS, TCP-connect or TLS-handshake timings."
+        };
+        if (!response && probeError) {
+          const timedOut = probeError?.name === "TimeoutError" || probeError?.name === "AbortError";
           result.website = "unavailable";
-          result.websiteDiagnosticCode = timedOut ? "timeout" : error?.name === "TypeError" ? "network_error" : "request_failed";
-          result.websiteDiagnosticMessage = timedOut ? "WordPress did not respond before the probe deadline." :
-            error?.name === "TypeError" ? "The Worker could not establish a WordPress response." : "The WordPress probe failed before receiving an HTTP response.";
+          result.websiteDiagnosticCategory = timedOut ? "timeout" : "network_error";
+          result.websiteDiagnosticCode = timedOut ? "timeout" : probeError?.name === "TypeError" ? "network_error" : "request_failed";
+          result.websiteDiagnosticMessage = timedOut
+            ? "WordPress timed out twice. Check origin load, hosting resource limits and firewall/WAF logs for the Cloudflare request."
+            : probeError?.name === "TypeError"
+              ? "The Worker could not establish a WordPress response. Ask the hosting provider to check DNS, outbound connectivity and origin TLS."
+              : "The WordPress probe failed before receiving an HTTP response. Check the hosting error log and Cloudflare request trace.";
         }
         if (response) {
+          const bodyStartedAt = performance.now();
           const raw = await response.clone().text().catch(() => "");
+          bodyReadMs = Math.round(performance.now() - bodyStartedAt);
+          result.websiteTimingMs.bodyRead = bodyReadMs;
+          result.websiteTimingMs.total = Math.round(performance.now() - probeStartedAt);
           const contentType = response.headers.get("content-type") || "unknown";
           let detail = {};
           try { detail = JSON.parse(raw); } catch {}
@@ -740,7 +787,26 @@ export function createCommunicationsSiteRouter(deps) {
             ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(),
             password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "")
           }) || "(empty response body)";
-          if (response.ok) {
+          if (response.status >= 500) {
+            result.website = "unavailable";
+            result.websiteDiagnosticCategory = "origin_error";
+            result.websiteDiagnosticCode = "wordpress_origin_" + response.status;
+            result.websiteDiagnosticMessage = "WordPress origin returned HTTP " + response.status + ". Ask the hosting provider to inspect PHP-FPM, web-server and application error logs.";
+          } else if (response.status === 403) {
+            result.websiteDiagnosticCategory = /text\/html/i.test(contentType) || /cloudflare|challenge|captcha|access denied|security check/i.test(raw)
+              ? "blocked_challenge" : "blocked";
+            result.websiteDiagnosticCode = "wordpress_blocked_403";
+            result.websiteDiagnosticMessage = result.websiteDiagnosticCategory === "blocked_challenge"
+              ? "A firewall or security challenge blocked the diagnostic. Ask the hosting provider to allow the Cloudflare Worker request and review WAF events."
+              : "WordPress returned HTTP 403. Check REST permissions, security-plugin rules and hosting firewall allowlists.";
+            result.website = "unavailable";
+          } else if (response.status === 404) {
+            result.websiteDiagnosticCategory = "rest_api_disabled";
+            result.websiteDiagnosticCode = "wordpress_rest_api_not_found";
+            result.websiteDiagnosticMessage = "The WordPress REST endpoint returned HTTP 404. Ask the site administrator to confirm REST API routes are enabled and permalinks are refreshed.";
+            result.website = "unavailable";
+          } else if (response.ok) {
+            result.websiteDiagnosticCategory = "wordpress_authenticated";
             let user = null;
             try { user = JSON.parse(raw); } catch {}
             if (!user || !Number.isSafeInteger(user.id) || !Array.isArray(user.roles)) {
@@ -762,10 +828,11 @@ export function createCommunicationsSiteRouter(deps) {
             }
           } else {
             const finding = wordpressErrorFinding(response.status, wpCode, wpMessage, raw);
-            result.website = response.status === 401 || response.status === 403 ? "authentication_failed" : "unavailable";
+            result.website = response.status === 401 ? "authentication_failed" : "unavailable";
+            result.websiteDiagnosticCategory = redirected ? "redirect" : response.status === 401 ? "auth_failed" : "wordpress_http_error";
             result.websiteDiagnosticCode = redirected ? "unexpected_redirect" : finding.code;
             result.websiteDiagnosticMessage = redirected
-              ? "The authenticated endpoint redirected to " + (result.websiteRedirectTarget || "an undisclosed location") + ". Configure the canonical HTTPS hostname; the Authorization header was not forwarded."
+              ? "The authenticated endpoint redirected. Configure WORDPRESS_BASE_URL to the canonical HTTPS hostname; authorization is intentionally not forwarded to another host."
               : finding.finding;
           }
         }
@@ -773,8 +840,11 @@ export function createCommunicationsSiteRouter(deps) {
         try {
           const publicUrl = wp.root + "/wp-json/";
           const publicResponse = await fetch(publicUrl, {
-            method: "GET", headers: { Accept: "application/json", "Cache-Control": "no-cache" },
-            redirect: "manual", signal: AbortSignal.timeout(8000)
+            method: "GET", headers: {
+              Accept: "application/json", "Cache-Control": "no-cache",
+              "User-Agent": "IRPA-DBGS-WordPress-Diagnostic/1.0 (+https://irpa.or.tz)"
+            },
+            redirect: "manual", signal: AbortSignal.timeout(5000)
           });
           const publicRaw = await publicResponse.clone().text().catch(() => "");
           let publicBody = {};
@@ -791,7 +861,12 @@ export function createCommunicationsSiteRouter(deps) {
             rawResponse: sanitizedWordPressBody(publicRaw, wp) || "(empty response body)"
           };
         } catch (error) {
-          result.websitePublicRest = { error: error?.name === "TimeoutError" ? "timeout" : "request_failed" };
+          result.websitePublicRest = { error: error?.name === "TimeoutError" || error?.name === "AbortError" ? "timeout" : "request_failed" };
+          if (result.websiteDiagnosticCategory === "not_checked" && result.websitePublicRest.error === "timeout") {
+            result.websiteDiagnosticCategory = "timeout";
+            result.websiteDiagnosticCode = "public_rest_timeout";
+            result.websiteDiagnosticMessage = "The public WordPress REST discovery endpoint also timed out. Ask the hosting provider to check origin availability and firewall/WAF logs.";
+          }
         }
       } catch (error) {
         const message = String(error?.message || "");
@@ -1621,8 +1696,22 @@ export function createCommunicationsSiteRouter(deps) {
       if (!limits.upload || !limits.post) {
         try {
           const response = await cpanelCall(cp, "LangPHP/php_ini_get_user_content", { type: "vhost", vhost: domain });
-          const data = response?.[0] || response?.data?.[0] || response?.data || response || {};
-          const iniContent = typeof data === "string" ? data : String(data.content || data.ini || data.php_ini || "");
+          const data = response?.data ?? response;
+          const extractIniContent = (value, depth = 0) => {
+            if (depth > 5 || value == null) return "";
+            if (typeof value === "string") return value;
+            if (Array.isArray(value)) return value.map(item => extractIniContent(item, depth + 1)).find(Boolean) || "";
+            if (typeof value !== "object") return "";
+            for (const key of ["content", "ini", "php_ini", "raw", "value"]) {
+              if (typeof value[key] === "string" && value[key].trim()) return value[key];
+            }
+            for (const key of ["data", "result", "output", "items"]) {
+              const nested = extractIniContent(value[key], depth + 1);
+              if (nested) return nested;
+            }
+            return "";
+          };
+          const iniContent = extractIniContent(data);
           const parsed = parseLimits(iniContent);
           if (parsed.upload && parsed.post) { limits = parsed; phpLimitSource = "MultiPHP INI"; }
         } catch (error) { phpLimitErrors.push(cleanText(error.message, 160)); }
@@ -1632,7 +1721,7 @@ export function createCommunicationsSiteRouter(deps) {
         upload_max_filesize: cleanText(limits.upload || "", 40) || null,
         post_max_size: cleanText(limits.post || "", 40) || null,
         source: phpLimitSource,
-        diagnostic: limits.upload && limits.post ? null : "INFO: not exposed by cPanel; check cPanel MultiPHP INI Editor",
+        diagnostic: limits.upload && limits.post ? null : "INFO: cPanel did not return both directives. Verify the account's LangPHP UAPI permission and the domain's MultiPHP INI Editor configuration; if the provider restricts this API, confirm the values in cPanel manually.",
         detail: phpLimitErrors.length ? phpLimitErrors.join("; ").slice(0, 200) : null
       };
       return json(result, 200, corsHeaders(request));
