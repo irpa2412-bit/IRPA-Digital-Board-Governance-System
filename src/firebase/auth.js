@@ -27,7 +27,6 @@ import { auth, db, firebaseConfig, googleProvider, applicantAuth } from "./confi
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { provisionCurrentMemberFromInvitationV2 } from "./invitationWorkflow";
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { sendEmployeeRegistrationEmail, sendMemberInvitationEmail } from "./employeeRegistrationEmail";
 export { sendEmployeeRegistrationEmail, sendMemberInvitationEmail } from "./employeeRegistrationEmail";
 
@@ -64,6 +63,22 @@ async function passwordSecurityRequest(path, email) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) {
     throw new Error(data.error || "Cloudflare password-security service is unavailable.");
+  }
+  return data;
+}
+
+async function passwordRecoveryRequest(path, email, token = "") {
+  const response = await fetch(GOVERNANCE_GATEWAY_ORIGIN + path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": "Bearer " + token } : {})
+    },
+    body: JSON.stringify({ email })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok !== true) {
+    throw new Error(data.error || "Cloudflare password-recovery service is unavailable.");
   }
   return data;
 }
@@ -255,26 +270,34 @@ export async function sendPasswordReset(email) {
 }
 
 let passwordRecoveryRecaptcha = null;
+let passwordRecoveryEmail = "";
 
 export async function beginPasswordResetMobileVerification(email) {
   const cleanEmail = String(email || "").trim().toLowerCase();
   if (!cleanEmail) throw new Error("Enter your registered IRPA email address first.");
-  const prepare = httpsCallable(getFunctions(undefined, "us-central1"), "preparePasswordResetPhone");
-  const result = await prepare({ email: cleanEmail });
+  const result = await passwordRecoveryRequest("/api/auth/password-reset/prepare", cleanEmail);
+  passwordRecoveryEmail = cleanEmail;
   if (passwordRecoveryRecaptcha) {
     try { passwordRecoveryRecaptcha.clear(); } catch (_) {}
     passwordRecoveryRecaptcha = null;
   }
   passwordRecoveryRecaptcha = new RecaptchaVerifier(recoveryPhoneAuth, "password-reset-recaptcha", { size: "invisible" });
-  const confirmation = await signInWithPhoneNumber(recoveryPhoneAuth, result.data.phoneNumber, passwordRecoveryRecaptcha);
-  return { confirmation, maskedPhone: result.data.maskedPhone, email: cleanEmail };
+  const confirmation = await signInWithPhoneNumber(recoveryPhoneAuth, result.phoneNumber, passwordRecoveryRecaptcha);
+  return { confirmation, maskedPhone: result.maskedPhone, email: cleanEmail };
 }
 
 export async function verifyPasswordResetMobileOtp(confirmation, code) {
   const cleanCode = String(code || "").trim();
   if (!confirmation || !/^\d{6}$/.test(cleanCode)) throw new Error("Enter the six-digit mobile verification code.");
-  await confirmation.confirm(cleanCode);
+  const verified = await confirmation.confirm(cleanCode);
+  try {
+    const token = await verified.user.getIdToken();
+    await passwordRecoveryRequest("/api/auth/password-reset/clear", passwordRecoveryEmail, token);
+  } catch (error) {
+    console.warn("Verified password recovery succeeded but the rate-limit state could not be cleared.", error);
+  }
   try { await signOut(recoveryPhoneAuth); } catch (_) {}
+  passwordRecoveryEmail = "";
   if (passwordRecoveryRecaptcha) {
     try { passwordRecoveryRecaptcha.clear(); } catch (_) {}
     passwordRecoveryRecaptcha = null;
