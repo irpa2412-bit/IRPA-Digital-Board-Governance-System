@@ -40,6 +40,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Cache Gradle wrapper distribution
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: ${{ runner.os }}-gradle-wrapper-8.14.3-v1
       - name: Verify build workflow isolation policy
         run: node --test tests/offline-build-workflow-policy.test.mjs
       - name: Install locked root application and Capacitor dependencies
@@ -48,6 +53,22 @@ jobs:
         run: npm run build
       - name: Create and synchronize native Android wrapper
         run: npx cap add android && npx cap sync android
+      - name: Verify Gradle wrapper with bounded retry
+        working-directory: android
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt * 10))
+              echo "Gradle wrapper bootstrap failed on attempt $attempt; retrying in $delay seconds."
+              sleep "$delay"
+            fi
+          done
+          echo "Gradle wrapper bootstrap failed after 3 attempts."
+          exit 1
       - name: Build debug APK only (no deployment or publishing)
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
