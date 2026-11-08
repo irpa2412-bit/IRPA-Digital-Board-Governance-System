@@ -104,20 +104,60 @@ jobs:
         run: |
           set -euo pipefail
           url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
-          curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/cloudflare-live.html"
-          grep -qi '<html' "$RUNNER_TEMP/cloudflare-live.html"
-          grep -R -Fq "$GITHUB_SHA" dist/assets --include="*.js"
-          cmp -s dist/index.html "$RUNNER_TEMP/cloudflare-live.html"
-          for local in dist/assets/*.js; do
-            name="${local##*/}"
-            curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/assets/$name" -o "$RUNNER_TEMP/cloudflare-$name"
-            cmp -s "$local" "$RUNNER_TEMP/cloudflare-$name"
-          done
-          echo "Cloudflare index and every JavaScript asset exactly match build $GITHUB_SHA"
-          health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 "$url/__irpa_health")"
+          live_html="$RUNNER_TEMP/cloudflare-live.html"
+
+          echo "Checking deployed frontend HTML and build identity..."
+          curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 \
+            -H "Cache-Control: no-cache" "$url/?__irpa_verify=$GITHUB_SHA" -o "$live_html"
+          if ! grep -qi '<html' "$live_html"; then
+            echo "FAIL: production frontend root did not return HTML." >&2
+            head -c 500 "$live_html" >&2 || true
+            exit 1
+          fi
+          if ! grep -Fq "content=\"$GITHUB_SHA\"" "$live_html"; then
+            echo "FAIL: live frontend HTML does not identify expected commit $GITHUB_SHA." >&2
+            grep -Eo 'name="irpa-build-version"[^>]*' "$live_html" >&2 || true
+            exit 1
+          fi
+          if ! grep -Eq 'name="irpa-build-time" content="[0-9]{4}-[0-9]{2}-[0-9]{2}T' "$live_html"; then
+            echo "FAIL: live frontend HTML is missing its UTC build-time marker." >&2
+            exit 1
+          fi
+          echo "PASS: live frontend HTML identifies expected build $GITHUB_SHA."
+
+          echo "Checking every emitted static asset against the build output..."
+          asset_count=0
+          while IFS= read -r -d '' local_asset; do
+            name="${local_asset##*/}"
+            remote_asset="$RUNNER_TEMP/cloudflare-$name"
+            if ! curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 30 \
+              "$url/assets/$name?__irpa_verify=$GITHUB_SHA" -o "$remote_asset"; then
+              echo "FAIL: production asset request failed: /assets/$name" >&2
+              exit 1
+            fi
+            if ! cmp -s "$local_asset" "$remote_asset"; then
+              echo "FAIL: production asset content differs from this build: /assets/$name" >&2
+              echo "Local SHA-256:  $(sha256sum "$local_asset" | cut -d ' ' -f 1)" >&2
+              echo "Remote SHA-256: $(sha256sum "$remote_asset" | cut -d ' ' -f 1)" >&2
+              exit 1
+            fi
+            asset_count=$((asset_count + 1))
+          done < <(find dist/assets -maxdepth 1 -type f -print0)
+          if [ "$asset_count" -eq 0 ]; then
+            echo "FAIL: no built static assets were found to verify." >&2
+            exit 1
+          fi
+          echo "PASS: all $asset_count emitted static assets exactly match the build output."
+
+          echo "Checking frontend Worker health endpoint..."
+          health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 \
+            "$url/__irpa_health?__irpa_verify=$GITHUB_SHA")"
           echo "$health"
-          echo "$health" | grep -q '"ok":true'
-          echo "Cloudflare Workers static-asset endpoint and health gate passed."
+          node -e 'const h=JSON.parse(process.argv[1]); if(h.ok!==true || h.service!=="IRPA-DBGS frontend static assets") process.exit(1);' "$health" || {
+            echo "FAIL: frontend Worker health response was not the expected healthy service payload." >&2
+            exit 1
+          }
+          echo "PASS: Cloudflare frontend endpoint, deployed build identity, static assets and Worker health."
       - name: Publish migration boundary
         run: |
           echo "Cloudflare Pages hosts the frontend. Firebase Authentication and Firestore remain the authoritative identity/data services during this safe migration."
