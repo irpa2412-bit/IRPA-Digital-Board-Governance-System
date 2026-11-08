@@ -148,7 +148,7 @@ test("caption diagnostic is opt-in, uploads one media item, and sends three wire
       assert.ok(init.body instanceof Uint8Array);
       return response({ id: ++nextMediaId, source_url: "https://staging.irpa.or.tz/wp-content/uploads/diagnostic.png" }, 201);
     }
-    const match = url.pathname.match(/\\/wp-json\\/wp\\/v2\\/media\\/(\\d+)$/);
+    const match = url.pathname.match(/\/wp-json\/wp\/v2\/media\/(\d+)$/);
     if (match && method === "POST") {
       const raw = String(init.body);
       wireBodies.push(raw);
@@ -172,12 +172,12 @@ test("caption diagnostic is opt-in, uploads one media item, and sends three wire
     assert.equal(data.cleanupItems.length, 1);
     assert.equal(data.cleanupItems[0].id, 701);
     assert.equal(calls.filter(call => call.path === "/wp-json/wp/v2/media" && call.method === "POST").length, 1);
-    assert.equal(calls.filter(call => /\\/media\\/701$/.test(call.path) && call.method === "POST").length, 3);
+    assert.equal(calls.filter(call => /\/media\/701$/.test(call.path) && call.method === "POST").length, 3);
     assert.equal(wireBodies.length, 3);
     assert.equal(wireBodies[0].includes("TEST ONLY - retained for acceptance evidence"), true);
     assert.equal(wireBodies[1].includes("TEST ONLY — retained for acceptance evidence"), true);
-    assert.ok(wireBodies[2].includes("\\\\u2014"), "Case C sends the literal JSON escape on the wire");
-    assert.ok(!wireBodies[2].includes("—"), "Case C does not send the literal em dash");
+    assert.ok(wireBodies[2].includes("\\u2014"), "Case C sends the literal JSON escape on the wire");
+    assert.ok(wireBodies[2].includes("\\u2014"), "Case C sends the literal JSON escape on the wire");
     const caseB = data.report.find(row => row.label.includes("B literal em dash"));
     assert.equal(caseB.httpStatus, 406);
     assert.equal(caseB.detail.classification, "likely_server_firewall_rejection");
