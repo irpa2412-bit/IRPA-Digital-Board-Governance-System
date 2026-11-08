@@ -1,6 +1,13 @@
 name: Authentication and Identity Parity Tests
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "drive-gateway/**"
+      - "src/firebase/auth.js"
+      - "src/firebase/data.js"
+      - ".github/workflows/auth-identity-parity.yml"
   pull_request:
     branches: [main]
     paths:
