@@ -88,7 +88,7 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-irpa-research-security "node --test tests/research-portal-security.test.mjs"
       - name: Verify all Gateway signature, document and meeting tests
         run: npm --prefix drive-gateway test
-      - name: Verify Grant Intelligence Worker tests (no crawl)
-        run: npm --prefix cloudflare/grant-crawler-parallel test
+      - name: Verify Grant Intelligence Worker and Firestore rules tests in an isolated emulator (no crawl)
+        run: npx firebase emulators:exec --config cloudflare/grant-crawler-parallel/firebase-staging/firebase.json --only firestore --project demo-irpa-grant-crawler-staging-test "npm --prefix cloudflare/grant-crawler-parallel test"
       - name: Build production frontend bundle
         run: npm run build
