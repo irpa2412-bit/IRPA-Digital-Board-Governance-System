@@ -490,7 +490,9 @@ test("WordPress media HTTP 406 returns sanitised step-level server and WAF diagn
   assert.equal(data.detail.step, "media_upload");
   assert.equal(data.detail.status, 406);
   assert.equal(data.detail.contentType, "text/html");
-  assert.match(data.detail.body, /ModSecurity/);
+  assert.equal(data.detail.classification, "likely_server_firewall_rejection");
+  assert.equal(data.detail.rayId, "test-ray-123");
+  assert.equal(Object.prototype.hasOwnProperty.call(data.detail, "body"), false, "raw HTML must not be returned");
   assert.equal(data.detail.headers.server, "LiteSpeed");
   assert.equal(data.detail.headers["cf-ray"], "test-ray-123");
   assert.equal(data.detail.headers["x-powered-by"], "PHP/8");
