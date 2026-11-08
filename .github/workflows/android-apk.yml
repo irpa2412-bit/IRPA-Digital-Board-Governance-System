@@ -58,7 +58,7 @@ jobs:
           if grep -q '^networkTimeout=' "$wrapper_properties"; then
             sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$wrapper_properties"
           else
-            printf '\\nnetworkTimeout=120000\\n' >> "$wrapper_properties"
+            printf '\nnetworkTimeout=120000\n' >> "$wrapper_properties"
           fi
           grep '^networkTimeout=' "$wrapper_properties"
       - name: Build debug APK only (no deployment or publishing)
