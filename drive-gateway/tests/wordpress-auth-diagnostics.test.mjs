@@ -207,7 +207,7 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
         : url.pathname.endsWith("/Fileman/get_file_content")
           ? { status: 1, data: { content: "" } }
           : url.pathname.endsWith("/LangPHP/php_ini_get_user_content")
-            ? { status: 1, data: [{ content: "upload_max_filesize = 32M\npost_max_size = 40M\n" }] }
+            ? (assert.equal(url.searchParams.get("type"), "vhost"), assert.equal(url.searchParams.get("vhost"), "staging.irpa.or.tz"), { status: 1, data: [{ content: "upload_max_filesize = 32M\npost_max_size = 40M\n" }] })
             : null;
     if (!payload) throw new Error("Unexpected cPanel operation: " + url.pathname);
     return makeResponse(payload);
