@@ -840,7 +840,10 @@ export function createCommunicationsSiteRouter(deps) {
         try {
           const publicUrl = wp.root + "/wp-json/";
           const publicResponse = await fetch(publicUrl, {
-            method: "GET", headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+            method: "GET", headers: {
+              Accept: "application/json", "Cache-Control": "no-cache",
+              "User-Agent": "IRPA-DBGS-WordPress-Diagnostic/1.0 (+https://irpa.or.tz)"
+            },
             redirect: "manual", signal: AbortSignal.timeout(5000)
           });
           const publicRaw = await publicResponse.clone().text().catch(() => "");
