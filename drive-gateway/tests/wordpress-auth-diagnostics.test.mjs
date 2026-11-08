@@ -125,6 +125,24 @@ test("two WordPress probe timeouts produce timeout classification even when publ
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test("WordPress REST route 404 is classified as REST API unavailable", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") return makeResponse({ code: "rest_no_route", message: "No route was found matching the URL and request method." }, 404);
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging", routes: {} });
+    throw new Error("Unexpected WordPress request: " + url.pathname);
+  };
+  try {
+    const response = await status(router, env());
+    const data = (await response.json()).connections;
+    assert.equal(data.websiteDiagnosticCategory, "rest_api_disabled");
+    assert.equal(data.websiteDiagnosticCode, "wordpress_rest_api_not_found");
+    assert.match(data.websiteDiagnosticMessage, /REST API routes are enabled/i);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("WordPress 403 challenge and 5xx origin failures receive distinct classifications", async () => {
   const router = makeRouter();
   const originalFetch = globalThis.fetch;
@@ -233,7 +251,7 @@ test("401 WordPress JSON codes produce a specific credential finding and sanitiz
   globalThis.fetch = async input => {
     const url = new URL(input instanceof URL ? input.href : String(input));
     if (url.pathname === "/wp-json/wp/v2/users/me") {
-      return makeResponse({ code: "incorrect_password", message: "The application password is incorrect." }, 401, {
+      return makeResponse({ code: "incorrect_password", message: "The application password " + APP_PASSWORD + " is incorrect. " + "x".repeat(1400) }, 401, {
         "Content-Type": "application/json; charset=UTF-8", "WWW-Authenticate": 'Basic realm="WordPress"'
       });
     }
@@ -249,6 +267,7 @@ test("401 WordPress JSON codes produce a specific credential finding and sanitiz
     assert.equal(data.websiteWwwAuthenticatePresent, true);
     assert.equal(data.websiteResponseType, "application/json");
     assert.match(data.websiteRawResponse, /incorrect_password/);
+    assert.ok(data.websiteRawResponse.length <= 1024);
     assert.equal(JSON.stringify(data).includes(APP_PASSWORD), false);
   } finally {
     globalThis.fetch = originalFetch;
