@@ -1692,7 +1692,7 @@ export function createCommunicationsSiteRouter(deps) {
       }
       if (!limits.upload || !limits.post) {
         try {
-          const response = await cpanelCall(cp, "LangPHP/php_ini_get_user_content", { vhost: domain });
+          const response = await cpanelCall(cp, "LangPHP/php_ini_get_user_content", { type: "vhost", vhost: domain });
           const data = response?.data ?? response;
           const extractIniContent = (value, depth = 0) => {
             if (depth > 5 || value == null) return "";
