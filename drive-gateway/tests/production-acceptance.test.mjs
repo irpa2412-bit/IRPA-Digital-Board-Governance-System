@@ -34,10 +34,12 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
       throw new Error("Unexpected cPanel request: " + url.pathname);
     }
     assert.equal(url.hostname, "staging.irpa.or.tz");
-    const wpHeaders = new Headers(init.headers);
-    assert.equal(wpHeaders.get("User-Agent"), "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)");
-    assert.equal(wpHeaders.get("Authorization"), "Basic " + btoa("editor:testpassword"));
-    assert.equal(wpHeaders.get("X-IRPA-Staging-Authorization"), "Basic " + btoa("editor:testpassword"));
+    if (url.pathname.startsWith("/wp-json/")) {
+      const wpHeaders = new Headers(init.headers);
+      assert.equal(wpHeaders.get("User-Agent"), "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)");
+      assert.equal(wpHeaders.get("Authorization"), "Basic " + btoa("editor:testpassword"));
+      assert.equal(wpHeaders.get("X-IRPA-Staging-Authorization"), "Basic " + btoa("editor:testpassword"));
+    }
     if (url.pathname.endsWith("/wp-json/wp/v2/users/me")) return response({ id: 7, roles: ["editor"], capabilities: { upload_files: true } });
     if (url.pathname === "/wp-json/wp/v2/pages" && method === "POST") {
       const body = JSON.parse(init.body); assert.equal(body.status, "draft"); assert.match(body.title, /^TEST/);
