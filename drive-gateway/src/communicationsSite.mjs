@@ -208,6 +208,9 @@ export function createCommunicationsSiteRouter(deps) {
     return {
       root: base.origin, hostname: host, environment,
       auth: "Basic " + btoa(unescape(encodeURIComponent(username + ":" + password))),
+      // Retain credentials only in this Worker-local object so every diagnostic
+      // response-body sanitizer can redact exact secret values before display.
+      username, password,
       stagingAuthHeader: host === "staging.irpa.or.tz",
       secretChecks: {
         baseUrl: { present: !!rawEndpoint, https: base.protocol === "https:", hasWpJsonSuffix: /\/wp-json\/?$/i.test(rawEndpoint), canonicalOriginOnly: base.pathname === "/" },
