@@ -74,6 +74,85 @@ test("WordPress diagnostics probes authenticated users/me and unauthenticated RE
   }
 });
 
+test("WordPress diagnostic retries a transient timeout once and records timing and User-Agent", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  let authenticatedCalls = 0;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") {
+      authenticatedCalls++;
+      assert.equal(new Headers(init.headers).get("user-agent"), "IRPA-DBGS-WordPress-Diagnostic/1.0 (+https://irpa.or.tz)");
+      if (authenticatedCalls === 1) throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+      return makeResponse({ id: 42, name: "Integration Editor", roles: ["editor"], capabilities: { edit_posts: true, edit_pages: true } });
+    }
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging", routes: {} });
+    throw new Error("Unexpected WordPress request: " + url.pathname);
+  };
+  try {
+    const response = await status(router, env());
+    const data = (await response.json()).connections;
+    assert.equal(data.website, "connected");
+    assert.equal(authenticatedCalls, 2);
+    assert.equal(data.websiteTimingMs.attempts, 2);
+    assert.equal(typeof data.websiteTimingMs.total, "number");
+    assert.equal(data.websiteTimingMs.dns, null);
+    assert.match(data.websiteTimingMs.phaseTimingNote, /does not expose separate DNS/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("two WordPress probe timeouts produce timeout classification even when public REST discovery responds", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  let authenticatedCalls = 0;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") {
+      authenticatedCalls++;
+      throw Object.assign(new Error("origin deadline"), { name: "TimeoutError" });
+    }
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging", routes: {} });
+    throw new Error("Unexpected WordPress request: " + url.pathname);
+  };
+  try {
+    const response = await status(router, env());
+    const data = (await response.json()).connections;
+    assert.equal(authenticatedCalls, 2);
+    assert.equal(data.website, "unavailable");
+    assert.equal(data.websiteDiagnosticCategory, "timeout");
+    assert.equal(data.websiteDiagnosticCode, "timeout");
+    assert.match(data.websiteDiagnosticMessage, /origin load.*firewall\/WAF logs/i);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("WordPress 403 challenge and 5xx origin failures receive distinct classifications", async () => {
+  const router = makeRouter();
+  const originalFetch = globalThis.fetch;
+  let mode = "challenge";
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof URL ? input.href : String(input));
+    if (url.pathname === "/wp-json/wp/v2/users/me") {
+      return mode === "challenge"
+        ? makeResponse("<html>Cloudflare challenge</html>", 403, { "Content-Type": "text/html", "cf-ray": "test-ray" })
+        : makeResponse({ message: "origin unavailable" }, 503);
+    }
+    if (url.pathname === "/wp-json/") return makeResponse({ name: "IRPA staging", routes: {} });
+    throw new Error("Unexpected WordPress request: " + url.pathname);
+  };
+  try {
+    let response = await status(router, env());
+    let data = (await response.json()).connections;
+    assert.equal(data.websiteDiagnosticCategory, "blocked_challenge");
+    assert.match(data.websiteDiagnosticMessage, /firewall|security challenge/i);
+    mode = "origin";
+    response = await status(router, env());
+    data = (await response.json()).connections;
+    assert.equal(data.websiteDiagnosticCategory, "origin_error");
+    assert.equal(data.websiteDiagnosticCode, "wordpress_origin_503");
+    assert.match(data.websiteDiagnosticMessage, /PHP-FPM|web-server/i);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("WordPress diagnostics report upload_files capability as granted, missing, or unknown", async () => {
   const router = makeRouter();
   const originalFetch = globalThis.fetch;
