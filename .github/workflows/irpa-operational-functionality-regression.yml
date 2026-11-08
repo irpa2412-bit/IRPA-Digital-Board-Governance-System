@@ -79,8 +79,13 @@ jobs:
         run: npm run test:meeting-invitation-resend
       - name: Verify communications and media policy
         run: npm run test:communication-media
-      - name: Verify Research Portal security
-        run: node --test tests/research-portal-security.test.mjs
+      - name: Set up Java for the Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify Research Portal security in an isolated Firestore Emulator
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-research-security "node --test tests/research-portal-security.test.mjs"
       - name: Verify all Gateway signature, document and meeting tests
         run: npm --prefix drive-gateway test
       - name: Verify Grant Intelligence Worker tests (no crawl)
