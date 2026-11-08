@@ -221,7 +221,7 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   function wordpressHeaders(wp, extra = {}) {
-    const headers = { Authorization: wp.auth, ...extra };
+    const headers = { Authorization: wp.auth, ...extra, "User-Agent": "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)" };
     // Staging nginx/FastCGI strips Authorization before PHP; forward it under a
     // staging-only header validated by the isolated staging MU-plugin.
     if (wp.stagingAuthHeader) headers["X-IRPA-Staging-Authorization"] = wp.auth;
@@ -294,11 +294,12 @@ export function createCommunicationsSiteRouter(deps) {
       }
     }
     const raw = await response.clone().text().catch(() => "");
+    const contentType = cleanText(headers.get("content-type") || "", 120);
+    const isHtml = /text\\/html|application\\/xhtml\\+xml/i.test(contentType) || /^\\s*(?:<!doctype\\s+html|<html[\\s>])/i.test(raw);
     return {
-      step, status: response.status,
-      contentType: cleanText(headers.get("content-type") || "", 120),
-      body: sanitizedWordPressBody(raw, wp).slice(0, 300),
-      headers: headerDetails
+      step, status: response.status, rayId: cleanText(headers.get("cf-ray") || "", 120) || null,
+      classification: isHtml ? "likely_server_firewall_rejection" : "wordpress_or_http_error",
+      contentType, ...(isHtml ? {} : { body: sanitizedWordPressBody(raw, wp).slice(0, 300) }), headers: headerDetails
     };
   }
 
@@ -955,7 +956,7 @@ export function createCommunicationsSiteRouter(deps) {
       const media=await metadata.json().catch(()=>null);
       if(!metadata.ok||Number(media?.id)!==uploaded.id){
         const detail=metadataDetail;
-        return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status,detail},502,corsHeaders(request));
+        return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status,detail,media:{id:uploaded.id,url:uploaded.source_url,metadataStatus:"failed"}},502,corsHeaders(request));
       }
       if(destination==="featured"){
         const kind=String(input.parentType||"posts")==="pages"?"pages":"posts",id=Number(input.parentId||input.postId);
@@ -1111,27 +1112,17 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/production-acceptance" && request.method === "POST") {
       const { claims } = await authorised(request, env, true);
       const wp = websiteWordPressConfig(env);
+      const requestInput = await request.json().catch(() => ({}));
+      const diagnosticMode = requestInput?.diagnosticMode === true;
       const report = [];
       const add = (label, status, httpStatus, error = "", detail = null) => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail });
-      const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint) => {
+      const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint, rawJsonBody = null) => {
         const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
-          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
-          ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
+          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload || rawJsonBody !== null ? { "Content-Type": "application/json" } : {}) }),
+          ...(payload instanceof Uint8Array ? { body: payload } : rawJsonBody !== null ? { body: rawJsonBody } : payload ? { body: JSON.stringify(payload) } : {}),
           signal: AbortSignal.timeout(30000)
         });
-        const rawBody = response.ok ? "" : await response.clone().text().catch(() => "");
-        const responseHeaders = {};
-        for (const name of ["server", "cf-ray", "x-powered-by"]) {
-          const value = response.headers.get(name);
-          if (value) responseHeaders[name] = sanitizedWordPressBody(value, wp).slice(0, 200);
-        }
-        for (const [name, value] of response.headers.entries()) {
-          if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) responseHeaders[name] = /token|secret|authorization|cookie/i.test(name) ? "[redacted]" : sanitizedWordPressBody(value, wp).slice(0, 200);
-        }
-        const detail = response.ok ? null : {
-          step, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120),
-          body: sanitizedWordPressBody(rawBody, wp).slice(0, 300), headers: responseHeaders
-        };
+        const detail = response.ok ? null : await wordpressResponseDetail(response, wp, step);
         const data = await response.json().catch(() => null);
         return { response, data, detail };
       };
@@ -1144,6 +1135,42 @@ export function createCommunicationsSiteRouter(deps) {
         add("WordPress authenticated user read", user.response.ok ? "PASS" : "FAIL", user.response.status, user.response.ok ? "" : user.data?.message || "WordPress user endpoint failed.");
         add("WordPress upload_files capability", uploadAllowed ? "PASS" : "FAIL", user.response.status, uploadAllowed ? "" : "Missing or unverified upload_files capability; TEST media uploads are blocked.");
       } catch (error) { add("WordPress authenticated user read", "FAIL", 0, error.message); add("WordPress upload_files capability", "FAIL", 0, "Capability could not be verified; uploads were not attempted."); }
+      if (diagnosticMode) {
+        const filename = "TEST-IRPA-CAPTION-DIAGNOSTIC-" + stamp + ".png";
+        const bytes = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAC0lEQVR4nGNgQAYAAA4AAamRc7EAAAAASUVORK5CYII="), c => c.charCodeAt(0));
+        let mediaId = null, mediaUrl = null;
+        try {
+          if (!uploadAllowed) throw new Error("WordPress upload_files capability was not verified; diagnostic upload was blocked.");
+          validateWebsiteMedia({ filename, contentType: "image/png", bytes });
+          const upload = await wpRequest("media", "POST", bytes, { "Content-Type": "image/png", "Content-Disposition": 'attachment; filename="' + filename + '"' }, "caption_diagnostic_upload");
+          mediaId = Number(upload.data?.id); mediaUrl = upload.data?.source_url;
+          if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(mediaUrl, wp)) {
+            add("caption diagnostic single media upload", "FAIL", upload.response.status, "WordPress did not confirm one same-host media item.", upload.detail);
+          } else {
+            cleanupItems.push({ kind: "TEST diagnostic media", title: filename, id: mediaId, url: mediaUrl });
+            await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_DIAGNOSTIC_MEDIA_CREATED", "media", mediaId, { filename, url: mediaUrl, retained: true });
+            const captionA = "TEST ONLY - retained for acceptance evidence";
+            const captionB = "TEST ONLY — retained for acceptance evidence";
+            const cases = [
+              { name: "A ASCII", caption: captionA, body: JSON.stringify({ title: "TEST caption diagnostic", alt_text: "TEST caption diagnostic", caption: captionA }) },
+              { name: "B literal em dash", caption: captionB, body: JSON.stringify({ title: "TEST caption diagnostic", alt_text: "TEST caption diagnostic", caption: captionB }) },
+              { name: "C escaped em dash", caption: captionB, body: JSON.stringify({ title: "TEST caption diagnostic", alt_text: "TEST caption diagnostic", caption: captionB }).replace(/—/g, "\\u2014") }
+            ];
+            for (const item of cases) {
+              const result = await wpRequest("media/" + mediaId, "POST", undefined, {}, "caption_diagnostic_" + item.name, item.body);
+              const matches = result.data?.caption?.raw === item.caption;
+              const ok = result.response.ok && Number(result.data?.id) === mediaId && matches;
+              const detail = result.detail || { step: "caption_diagnostic_" + item.name, status: result.response.status, rayId: result.response.headers.get("cf-ray") || null, classification: "none" };
+              add("caption diagnostic " + item.name, ok ? "PASS" : "FAIL", result.response.status, ok ? "" : result.data?.message || "WordPress did not return the expected decoded caption.", { ...detail, mediaId, mediaUrl, decodedCaptionMatches: matches, wireEscapeVerified: item.name !== "C escaped em dash" || (item.body.includes("\\u2014") && !item.body.includes("—")) });
+            }
+          }
+        } catch (error) {
+          add("caption diagnostic", "FAIL", error.httpStatus || 0, error.message || "Diagnostic failed.", error.detail || null);
+          if (mediaId && mediaUrl && !cleanupItems.some(item => item.id === mediaId)) cleanupItems.push({ kind: "TEST diagnostic media", title: filename, id: mediaId, url: mediaUrl });
+        }
+        const passCount = report.filter(row => row.status === "PASS").length, failCount = report.filter(row => row.status === "FAIL").length;
+        return json({ testRun: true, diagnosticMode: true, createdDrafts: { pageId: null, postId: null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      }
       for (const type of ["pages", "posts"]) {
         const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
