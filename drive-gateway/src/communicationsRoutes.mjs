@@ -24,7 +24,7 @@ async function roleContext(request,env,deps){
   roles=[...(active(member)?asRoles(member):[]),...(active(employee)?asRoles(employee):[])];
  }
  if(!roles.length)throw Object.assign(new Error("An active IRPA member/employee profile or administrator role is required."),{status:403});
- return {uid,roles,claims};
+ return {uid,roles,claims,admin};
 }
 async function readItems(env){try{return JSON.parse(await env.DRIVE_KV.get(KEY)||"[]")}catch{return []}}
 async function writeItems(env,items){await env.DRIVE_KV.put(KEY,JSON.stringify(items))}
@@ -32,7 +32,12 @@ async function audit(env,event){let rows=[];try{rows=JSON.parse(await env.DRIVE_
 export async function communicationsRoutes(request,env,deps){
  const url=new URL(request.url), path=url.pathname, cors=deps.corsHeaders(request);
  if(!path.startsWith("/api/communications/editorial/")&&!path.startsWith("/api/communications/publishing/pause")&&!path.startsWith("/api/communications/social/"))return null;
- const social=createSocialPublishingRouter({authenticateFirebaseRequest:deps.authenticateFirebaseRequest,json:(body,status=200,headers={})=>response(body,status,headers),corsHeaders:deps.corsHeaders});
+ const social=createSocialPublishingRouter({
+   authorize:async(req,workerEnv)=>{const actor=await roleContext(req,workerEnv,deps);return {...actor,canApproveOwnContent:actor.admin&&workerEnv.IRPA_ENVIRONMENT==="staging"};},
+   publishMetaContent:deps.publishMetaContent,
+   json:(body,status=200,headers={})=>response(body,status,headers),
+   corsHeaders:deps.corsHeaders
+  });
  if(path.startsWith("/api/communications/social/"))return social(request,env,path);
  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
  try{
@@ -79,13 +84,14 @@ export async function communicationsRoutes(request,env,deps){
     item.status="Pending Approval";item.submittedAt=now();item.submittedBy=actor.uid;
    }else if(request.method==="POST"&&(decision==="approve"||decision==="reject")){
     if(!canApprove&&!admin)throw Object.assign(new Error("Approver role required."),{status:403});
-    if(item.authorUid===actor.uid)throw Object.assign(new Error("The author cannot approve or reject their own item."),{status:403});
     if(item.status!=="Pending Approval")throw Object.assign(new Error("Only items pending approval can be decided."),{status:409});
     const body=await readJson(request);
-    if(decision==="approve"){item.status="Approved";item.approvedBy=actor.uid;item.approvedAt=now();item.approvedRevision=item.revision;}
+    const stagingAdminOverride=decision==="approve"&&admin&&env.IRPA_ENVIRONMENT==="staging"&&body.stagingAdminOverride===true;
+    if(item.authorUid===actor.uid&&!stagingAdminOverride)throw Object.assign(new Error("The author cannot approve or reject their own item. In staging, an administrator may use the explicit initial-setup override."),{status:403});
+    if(decision==="approve"){item.status="Approved";item.approvedBy=actor.uid;item.approvedAt=now();item.approvedRevision=item.revision;item.approvalMode=stagingAdminOverride?"STAGING_ADMIN_OVERRIDE":"INDEPENDENT_REVIEW";}
     else{item.status="Returned";item.rejectionReason=String(body.reason||"Changes requested").slice(0,500);item.rejectedBy=actor.uid;item.rejectedAt=now();}
    }else throw Object.assign(new Error("Unsupported editorial action."),{status:405});
-   items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:decision?decision.toUpperCase():"UPDATED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),status:item.status,revision:item.revision});
+   items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:decision?decision.toUpperCase():"UPDATED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),status:item.status,revision:item.revision,approvalMode:item.approvalMode||null});
    return response({ok:true,item},200,cors);
   }
   return response({ok:false,error:"Editorial route not found."},404,cors);
