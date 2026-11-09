@@ -48,7 +48,7 @@ The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social
 
 ## Staging social publishing
 
-The Social Studio uses the existing authenticated Cloudflare Worker and existing staging KV namespace. Meta OAuth requests `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` and `instagram_content_publish`. User and Page access tokens are AES-256-GCM encrypted server-side; the frontend receives account metadata only.
+The Social Studio uses the existing authenticated Cloudflare Worker and existing staging KV namespace. Meta OAuth requests `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` and `instagram_content_publish`. User and Page access tokens are AES-256-GCM encrypted server-side; the frontend receives account metadata only. Publishing is fail-closed until the staging Worker has explicit allowlists for approved test Page IDs and Instagram Professional account IDs (`META_STAGING_ALLOWED_PAGE_IDS` and `META_STAGING_ALLOWED_INSTAGRAM_IDS`).
 
 Publishing is OFF by default. The Worker verifies the saved editorial record, current approval revision, selected destination membership in the signed-in user's Meta connection and global pause state before sending a post. Successful and failed attempts are audited. The administrator may use a clearly marked self-approval override during staging establishment only; independent review is the production rule.
 
