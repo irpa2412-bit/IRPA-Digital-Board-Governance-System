@@ -942,11 +942,11 @@ export function createCommunicationsSiteRouter(deps) {
       if (user?.capabilities?.upload_files !== true) return json({ error: "WordPress media upload is blocked: the configured integration account is missing the upload_files capability. Ask the WordPress administrator to grant upload_files to the dedicated Editor account, then run diagnostics again.", code: "wordpress_upload_files_capability_missing", capability: "upload_files" }, 403, corsHeaders(request));
       const endpoint=wp.root+"/wp-json/wp/v2/media";
       const mediaPath=new URL(endpoint).pathname;
-      const safeFilename=meta.filename.normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
+      const safeFilename=meta.filename.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
       const parentId=destination!=="media-library"?Number(input.parentId||input.postId):null;
       const requestDetail=(method,path,headers,bodyFields)=>({
         method,path,
-        contentType:String(headers.get("Content-Type")||((bodyFields.includes("file")&&!headers.has("Content-Type"))?"multipart/form-data":"")).replace(/;\\s*boundary=.*/i,""),
+        contentType:String(headers.get("Content-Type")||((bodyFields.includes("file")&&!headers.has("Content-Type"))?"multipart/form-data":"")).replace(/;\s*boundary=.*/i,""),
         accept:headers.get("Accept")||null,
         bodyFields:[...bodyFields]
       });
