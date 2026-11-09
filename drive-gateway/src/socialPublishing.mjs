@@ -117,7 +117,7 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       let publishingEvents = [], editorialEvents = [];
       try { publishingEvents = JSON.parse(await env.DRIVE_KV.get("communications:publishing:audit") || "[]"); } catch {}
       try { editorialEvents = JSON.parse(await env.DRIVE_KV.get("communications:editorial:audit") || "[]"); } catch {}
-      const governance = editorialEvents.filter(event => ["PUBLISHING_PAUSE_CHANGED", "APPROVE", "REJECT", "SUBMIT"].includes(String(event.action || "").toUpperCase()));
+      const governance = editorialEvents;
       const events = [...governance.map(event => ({ ...event, source: "editorial-governance" })), ...publishingEvents.map(event => ({ ...event, source: "platform-publishing" }))];
       events.sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
       return jsonResponse({ ok: true, events: events.slice(0, 200) }, 200, cors);
