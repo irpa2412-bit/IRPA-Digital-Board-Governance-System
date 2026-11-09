@@ -406,6 +406,8 @@ test("communications draft and approval writes are Worker-routed and approval is
 
 test("single Social Studio replaces the legacy duplicate editor while retaining the account register and funding view",()=>{
  assert.ok(portal.includes('tab==="Social Studio"&&<CommunicationsSocialStudio/>'));
+ const nav=portal.slice(portal.indexOf('{["Website Studio"'),portal.indexOf(".map(t=>"));
+ assert.ok(nav.indexOf("Social Studio")>=0&&nav.indexOf("Social Studio")<nav.indexOf("Social Account Register"),"administrator social navigation lists Social Studio before the account register");
  assert.ok(!portal.includes('tab==="Social Media Studio"'),"duplicate editor tab is removed");
  assert.ok(portal.includes('tab==="Social Account Register"&&<SocialMediaAccounts'));
  assert.ok(socialStudio.includes("Social Studio"));
