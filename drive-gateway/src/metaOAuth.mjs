@@ -169,15 +169,17 @@ async function requirePublishingScopes(version, token, appSecret) {
   if (missing.length) throw new Error("Required Meta publishing permissions were not granted.");
 }
 function publicAccounts(pages) {
-  return (Array.isArray(pages?.data) ? pages.data : []).map(page => ({
-    facebookPageId: String(page.id || ""),
-    facebookPageName: String(page.name || "").slice(0, 180),
-    instagram: page.instagram_business_account ? [{
+  return (Array.isArray(pages?.data) ? pages.data : []).map(page => {
+    const tasks = Array.isArray(page.tasks) ? page.tasks.map(String) : [];
+    const canPublish = tasks.includes("CREATE_CONTENT") || tasks.includes("MANAGE");
+    const instagram = page.instagram_business_account ? [{
       instagramAccountId: String(page.instagram_business_account.id || ""),
       username: String(page.instagram_business_account.username || "").slice(0, 180),
-      accountType: String(page.instagram_business_account.account_type || "").slice(0, 80)
-    }] : []
-  }));
+      accountType: String(page.instagram_business_account.account_type || "").slice(0, 80),
+      canPublish: canPublish && ["BUSINESS", "MEDIA_CREATOR"].includes(String(page.instagram_business_account.account_type || "").toUpperCase())
+    }] : [];
+    return { facebookPageId: String(page.id || ""), facebookPageName: String(page.name || "").slice(0, 180), canPublish, instagram };
+  });
 }
 
 export function createMetaOAuthRouter(deps) {
@@ -243,8 +245,8 @@ export function createMetaOAuthRouter(deps) {
         await env.DRIVE_KV.put(TOKEN_KEY_PREFIX + stateRecord.uid, encrypted);
         await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + stateRecord.uid);
         return json({ ok: true, status: "verified", postingEnabled: true, message: "Meta publishing permissions verified. Publishing remains subject to approval and the global pause.",
-          facebookPages: connection.accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
-          instagramAccounts: connection.accounts.filter(a => a.instagramAccountId).map(a => ({ id: a.instagramAccountId, username: a.instagramUsername, accountType: a.instagramAccountType })),
+          facebookPages: connection.accounts.map(a => ({ id: a.facebookPageId, name: a.facebookPageName, canPublish: a.tasks.includes("CREATE_CONTENT") || a.tasks.includes("MANAGE") })),
+          instagramAccounts: connection.accounts.filter(a => a.instagramAccountId).map(a => ({ id: a.instagramAccountId, username: a.instagramUsername, accountType: a.instagramAccountType, canPublish: (a.tasks.includes("CREATE_CONTENT") || a.tasks.includes("MANAGE")) && ["BUSINESS", "MEDIA_CREATOR"].includes(String(a.instagramAccountType).toUpperCase()) })),
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, requestedScopes: REQUIRED_SCOPES
         }, 200, corsHeaders(request));
       } catch (error) {
@@ -292,12 +294,12 @@ export function createMetaOAuthRouter(deps) {
         await requirePublishingScopes(cfg.version, connection.accessToken, cfg.appSecret);
         const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: connection.accessToken }).toString(), {}, cfg.appSecret);
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
-          fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: connection.accessToken
+          fields: "id,name,tasks,instagram_business_account{id,username,account_type}", limit: 100, access_token: connection.accessToken
         }).toString(), {}, cfg.appSecret);
         const accounts = publicAccounts(pages);
         return json({ ok: true, status: "verified", user: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
-          facebookPages: accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
-          instagramAccounts: accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType }))),
+          facebookPages: accounts.map(a => ({ id: a.facebookPageId, name: a.facebookPageName, canPublish: a.canPublish })),
+          instagramAccounts: accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType, canPublish: i.canPublish }))),
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, postingEnabled: true,
           requestedScopes: REQUIRED_SCOPES }, 200, corsHeaders(request));
       } catch (error) {
