@@ -1,10 +1,12 @@
 const PLATFORM_CONFIG = Object.freeze({
-  facebook: { label: "Facebook Pages", required: ["META_APP_ID", "META_APP_SECRET", "META_TOKEN_ENCRYPTION_KEY"], maxText: 63206, mode: "manual-export" },
-  instagram: { label: "Instagram", required: ["META_APP_ID", "META_APP_SECRET", "META_TOKEN_ENCRYPTION_KEY"], maxText: 2200, mode: "manual-export" },
+  facebook: { label: "Facebook Pages", required: ["META_APP_ID", "META_APP_SECRET", "META_TOKEN_ENCRYPTION_KEY"], maxText: 63206, mode: "meta-api" },
+  instagram: { label: "Instagram Professional", required: ["META_APP_ID", "META_APP_SECRET", "META_TOKEN_ENCRYPTION_KEY"], maxText: 2200, mode: "meta-api" },
   linkedin: { label: "LinkedIn", required: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"], maxText: 3000, mode: "manual-export" },
   x: { label: "X", required: ["X_CLIENT_ID", "X_CLIENT_SECRET"], maxText: 280, mode: "manual-export" },
   youtube: { label: "YouTube", required: ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"], maxText: 5000, mode: "manual-export" },
-  whatsapp: { label: "WhatsApp", required: ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"], maxText: 4096, mode: "manual-export" }
+  tiktok: { label: "TikTok", required: [], maxText: 2200, mode: "manual-export" },
+  whatsapp: { label: "WhatsApp", required: ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"], maxText: 4096, mode: "manual-export" },
+  telegram: { label: "Telegram", required: [], maxText: 4096, mode: "manual-export" }
 });
 
 const jsonResponse = (body, status, cors) => new Response(JSON.stringify(body), {
@@ -20,15 +22,15 @@ function statusFor(env, platform) {
     status: missing.length ? "not_connected" : "credentials_configured_unverified",
     reason: missing.length ? "Required Worker secrets are not configured." : "Credentials exist but account authorization and API publishing have not been verified.",
     missingSecrets: missing,
-    mode: "manual-export",
-    automaticPublishing: false
+    mode: config.mode,
+    automaticPublishing: config.mode === "meta-api" && missing.length === 0
   };
 }
 
 function validateApprovedItem(item, user) {
   if (!item || typeof item !== "object") return "A content item is required.";
   if (item.status !== "Approved") return "Publishing blocked: item must be approved.";
-  if (!item.approvedBy || !item.approvedAt) return "Publishing blocked: approver and approval time are required.";
+  if (!item.approvedBy || !item.approvedAt || Number(item.approvedRevision || 0) !== Number(item.revision || 0)) return "Publishing blocked: a current approval and revision are required.";
   if (!user?.uid) return "Publishing blocked: authenticated identity is required.";
   if (item.authorUid && item.authorUid === user.uid && !user.canApproveOwnContent) {
     return "Publishing blocked: the author cannot approve their own content.";
@@ -50,28 +52,26 @@ export function getSocialPublishingSelfTest(env = {}) {
     const result = statusFor(env, platform);
     return {
       name: result.label + " adapter",
-      status: "FAIL",
-      reason: result.reason + " No automatic publishing adapter is enabled in this release.",
+      status: result.mode === "meta-api" && result.automaticPublishing ? "NOT_VERIFIED" : "BLOCKED",
+      reason: result.mode === "meta-api" && result.automaticPublishing ? "Meta app credentials are configured; complete staging OAuth and destination-account verification before publishing." : result.reason + " This platform remains manual-export only in this release.",
       missingSecrets: result.missingSecrets
     };
   });
 }
 
-export function createSocialPublishingRouter({ authenticateFirebaseRequest, json, corsHeaders }) {
+export function createSocialPublishingRouter({ authorize, publishMetaContent, json, corsHeaders }) {
   return async function route(request, env, pathname) {
     if (!pathname.startsWith("/api/communications/social/")) return null;
     const cors = corsHeaders(request);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     let identity;
     try {
-      identity = await authenticateFirebaseRequest(request, env);
-      // The shared Worker verifier returns Firebase claims as user_id (and token),
-      // not uid. Normalize the identity here instead of rejecting valid sessions.
-      const uid = String(identity?.uid || identity?.user_id || identity?.sub || "").trim();
-      if (!uid) throw new Error("Authenticated identity required.");
-      identity = { ...identity, uid };
-    } catch {
-      return jsonResponse({ ok: false, error: "Authentication required." }, 401, cors);
+      identity = await authorize(request, env);
+      if (!identity?.uid || !Array.isArray(identity.roles) || !identity.roles.length) throw new Error("An authorized IRPA role is required.");
+      const allowed = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer"];
+      if (!identity.roles.some(role => allowed.includes(role))) throw Object.assign(new Error("Your IRPA role does not permit publishing operations."), { status: 403 });
+    } catch (error) {
+      return jsonResponse({ ok: false, error: error.status === 403 ? error.message : "Authentication required." }, error.status || 401, cors);
     }
 
     if (request.method === "GET" && pathname === "/api/communications/social/status") {
@@ -110,17 +110,42 @@ export function createSocialPublishingRouter({ authenticateFirebaseRequest, json
       try { body = await request.json(); } catch {
         return jsonResponse({ ok: false, error: "A JSON request body is required." }, 400, cors);
       }
-      const gate = validateApprovedItem(body.item, identity);
+      const platform = String(body.platform || "").toLowerCase();
+      if (!["facebook", "instagram"].includes(platform)) {
+        return jsonResponse({ ok: false, mode: "manual-export", error: "Automatic publishing is currently implemented only for Facebook Pages and Instagram professional accounts.", platform }, 501, cors);
+      }
+      const itemId = String(body.itemId || body.item?.id || "").trim();
+      if (!itemId || itemId.length > 100) return jsonResponse({ ok: false, error: "A saved editorial item ID is required." }, 400, cors);
+      let items = [];
+      try { items = JSON.parse(await env.DRIVE_KV.get("communications:editorial:items") || "[]"); } catch {}
+      const item = Array.isArray(items) ? items.find(row => row.id === itemId) : null;
+      if (!item) return jsonResponse({ ok: false, error: "The saved editorial item was not found." }, 404, cors);
+      const gate = validateApprovedItem(item, identity);
       if (gate) return jsonResponse({ ok: false, error: gate }, 403, cors);
       const paused = String(await env?.DRIVE_KV?.get("communications:publishing:paused") || "true") !== "false";
       if (paused) return jsonResponse({ ok: false, error: "Publishing is paused. No external post was sent." }, 423, cors);
-      return jsonResponse({
-        ok: false, mode: "manual-export",
-        error: "Automatic publishing is disabled until a verified platform adapter and account connection are implemented.",
-        platform: String(body.platform || "")
-      }, 501, cors);
+      if (typeof publishMetaContent !== "function") return jsonResponse({ ok: false, error: "The staging Meta publisher is not wired into the Worker." }, 503, cors);
+      const accountId = String(body.accountId || "").trim();
+      try {
+        const result = await publishMetaContent(env, {
+          uid: identity.uid, platform, accountId,
+          text: String(item.content || item.body || "").trim(),
+          link: String(item.link || ""), imageUrl: String(item.imageUrl || "")
+        });
+        const auditKey = "communications:publishing:audit";
+        let events = [];
+        try { events = JSON.parse(await env.DRIVE_KV.get(auditKey) || "[]"); } catch {}
+        events.push({ id: crypto.randomUUID(), action: "PUBLISHED", itemId, platform, accountId, postId: result.postId, actorUid: identity.uid, at: result.publishedAt, status: "Published" });
+        await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
+        return jsonResponse({ ok: true, published: true, mode: "meta-api", result }, 200, cors);
+      } catch (error) {
+        let events = [];
+        try { events = JSON.parse(await env.DRIVE_KV.get("communications:publishing:audit") || "[]"); } catch {}
+        events.push({ id: crypto.randomUUID(), action: "PUBLISH_FAILED", itemId, platform, accountId, actorUid: identity.uid, at: new Date().toISOString(), status: "Failed", error: String(error?.message || "Meta publishing failed.").slice(0, 300) });
+        await env.DRIVE_KV.put("communications:publishing:audit", JSON.stringify(events.slice(-1000)));
+        return jsonResponse({ ok: false, published: false, error: error.message || "Meta publishing failed." }, error.status || 502, cors);
+      }
     }
-
     return jsonResponse({ ok: false, error: "Social publishing route not found." }, 404, cors);
   };
 }
