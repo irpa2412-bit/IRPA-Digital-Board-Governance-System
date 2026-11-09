@@ -19,7 +19,7 @@ function harness({ role = "Communications Officer", envOverrides = {} } = {}) {
   const kv = makeKv();
   const env = {
     IRPA_ENVIRONMENT: "staging", FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec", IRPA_PRODUCTION_CUTOVER: "false",
-    META_APP_ID: "12345678901234", META_APP_SECRET: "test-only-not-a-real-secret", META_TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY,
+    META_APP_ID: "12345678901234", META_APP_SECRET: "test-only-not-a-real-secret", META_TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY, META_STAGING_ALLOWED_PAGE_IDS: "page-123", META_STAGING_ALLOWED_INSTAGRAM_IDS: "ig-456",
     META_REDIRECT_URI: REDIRECT, META_GRAPH_API_VERSION: "v26.0", DRIVE_KV: kv, ...envOverrides
   };
   const router = createMetaOAuthRouter({
@@ -98,6 +98,8 @@ test("callback verifies publishing scopes, stores encrypted Page tokens and retu
     assert.equal(body.postingEnabled, true);
     assert.equal(body.facebookPages[0].name, "IRPA Test Page");
     assert.equal(body.instagramAccounts[0].username, "irpa_test");
+    assert.equal(body.facebookPages[0].canPublish, true);
+    assert.equal(body.instagramAccounts[0].canPublish, true);
     assert.ok(!JSON.stringify(body).includes("long-token-fixture"));
     assert.ok(!JSON.stringify(body).includes("page-token-fixture"));
     const encrypted = await h.kv.get("meta:publishing:connection:user-1");
@@ -143,4 +145,14 @@ test("missing publishing scopes fail closed and production publisher calls are r
   } finally { globalThis.fetch = previousFetch; }
   const production = harness({ envOverrides: { IRPA_ENVIRONMENT: "production", FIREBASE_PROJECT_ID: "irpa-digital-board-governance", IRPA_PRODUCTION_CUTOVER: "true" } });
   await assert.rejects(() => publishMetaContent(production.env, { uid: "user-1", platform: "facebook", accountId: "page-123", text: "Do not publish" }), /isolated staging/i);
+});
+
+test("Meta publishing refuses a connected Page not explicitly allowlisted for staging", async () => {
+  const h = harness(), previousFetch = globalThis.fetch;
+  globalThis.fetch = mockMetaFetch();
+  try {
+    await connectAndCallback(h, "E".repeat(43));
+    h.env.META_STAGING_ALLOWED_PAGE_IDS = "";
+    await assert.rejects(() => publishMetaContent(h.env, { uid: "user-1", platform: "facebook", accountId: "page-123", text: "Must not publish to public Page" }), /not approved as an IRPA staging test destination/i);
+  } finally { globalThis.fetch = previousFetch; }
 });
