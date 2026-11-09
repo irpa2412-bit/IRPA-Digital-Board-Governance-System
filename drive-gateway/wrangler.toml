@@ -60,6 +60,8 @@ CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
 IRPA_PRODUCTION_CUTOVER = "false"
 META_REDIRECT_URI = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback"
 META_GRAPH_API_VERSION = "v26.0"
+META_STAGING_ALLOWED_PAGE_IDS = ""
+META_STAGING_ALLOWED_INSTAGRAM_IDS = ""
 
 [[env.staging.kv_namespaces]]
 binding = "DRIVE_KV"
