@@ -91,7 +91,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
     {metaStatus.instagramAccounts&&<div><strong>Linked Instagram professional accounts</strong>{metaStatus.instagramAccounts.length?metaStatus.instagramAccounts.map(a=><div key={a.id}>@{a.username||"(username unavailable)"} · ID {a.id} · {a.accountType||"type unavailable"} · {a.canPublish?"Publishing eligible":"Not eligible"}</div>):<div>No eligible linked Instagram professional accounts were returned.</div>}</div>}
     {metaStatus.expiresAt&&<small>Reported token expiry: {new Date(metaStatus.expiresAt).toLocaleString()}</small>}
     {(metaStatus.missingPermissions||[]).length>0&&<small role="alert">Missing required publishing permissions: {metaStatus.missingPermissions.join(", ")}</small>}
-    <small>Publishing permission: {metaStatus.postingEnabled?"Granted for staging":"Not verified"}. Production publishing is not enabled by this integration.</small>
+    <small>Meta scopes: {metaStatus.postingEnabled?"Granted":"Not verified"}. Eligible staging test destinations: Facebook {metaStatus.eligibleFacebookPageCount??0}, Instagram {metaStatus.eligibleInstagramAccountCount??0}. Production publishing is not enabled by this integration.</small>
    </div>}
   </section>}
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
