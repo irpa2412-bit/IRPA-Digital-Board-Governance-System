@@ -959,6 +959,7 @@ export function createCommunicationsSiteRouter(deps) {
       if(parentId!==null)multipart.append("post",String(parentId));
       const multipartHeaders=wordpressHeaders(wp,{Accept:"application/json"});
       let upload=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:multipartHeaders,body:multipart,signal:AbortSignal.timeout(45000)});
+      let uploadDetail=upload.ok?null:await wordpressResponseDetail(upload,wp,"media_upload");
       let uploaded=await upload.json().catch(()=>null);
       let media=null;
       let detail=null;
@@ -966,7 +967,6 @@ export function createCommunicationsSiteRouter(deps) {
       if(upload.ok&&Number.isSafeInteger(uploaded?.id)&&isAllowedWordPressLink(uploaded?.source_url,wp)){
         media=uploaded;
       }else{
-        const uploadDetail=await wordpressResponseDetail(upload,wp,"media_upload");
         uploadDetail.request=requestDetail("POST",mediaPath,new Headers(multipartHeaders),["file","title","alt_text","caption",...(parentId!==null?["post"]:[])]);
         failedAttempts.push({variant:"multipart/form-data",status:upload.status,detail:uploadDetail});
         if(upload.status!==406){
@@ -974,9 +974,9 @@ export function createCommunicationsSiteRouter(deps) {
         }
         const binaryHeaders=wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"});
         upload=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:binaryHeaders,body:bytes,signal:AbortSignal.timeout(45000)});
+        const binaryDetail=upload.ok?null:await wordpressResponseDetail(upload,wp,"media_upload_fallback");
         uploaded=await upload.json().catch(()=>null);
         if(!upload.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
-          const binaryDetail=await wordpressResponseDetail(upload,wp,"media_upload_fallback");
           binaryDetail.request=requestDetail("POST",mediaPath,new Headers(binaryHeaders),["file"]);
           failedAttempts.push({variant:"binary-file-upload",status:upload.status,detail:binaryDetail});
           if(upload.status===406){
@@ -994,6 +994,7 @@ export function createCommunicationsSiteRouter(deps) {
         for(const variant of metadataVariants){
           const headers=wordpressHeaders(wp,variant.headers);
           const metadata=await wordpressEditorFetch(wp,metadataEndpoint,{method:"POST",headers,body:variant.body,signal:AbortSignal.timeout(20000)});
+          const attemptDetail=metadata.ok?null:await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
           const metadataData=await metadata.json().catch(()=>null);
           const requestInfo=requestDetail("POST",new URL(metadataEndpoint).pathname,new Headers(headers),variant.fields);
           if(metadata.ok&&Number(metadataData?.id)===uploaded.id){
@@ -1003,7 +1004,6 @@ export function createCommunicationsSiteRouter(deps) {
             metadataSucceeded=true;
             break;
           }
-          const attemptDetail=await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
           attemptDetail.request=requestInfo;
           failedAttempts.push({variant:variant.name,status:metadata.status,detail:attemptDetail});
           if(metadata.status!==406){
