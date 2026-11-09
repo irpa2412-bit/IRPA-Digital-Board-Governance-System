@@ -221,7 +221,7 @@ export function createCommunicationsSiteRouter(deps) {
   }
 
   function wordpressHeaders(wp, extra = {}) {
-    const headers = { Authorization: wp.auth, ...extra };
+    const headers = { Authorization: wp.auth, "User-Agent": "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)", ...extra };
     // Staging nginx/FastCGI strips Authorization before PHP; forward it under a
     // staging-only header validated by the isolated staging MU-plugin.
     if (wp.stagingAuthHeader) headers["X-IRPA-Staging-Authorization"] = wp.auth;
@@ -294,11 +294,12 @@ export function createCommunicationsSiteRouter(deps) {
       }
     }
     const raw = await response.clone().text().catch(() => "");
+    const contentType = cleanText(headers.get("content-type") || "", 120);
+    const isHtml = /text\/html|application\/xhtml\+xml/i.test(contentType) || /^\s*(?:<!doctype\s+html|<html[\s>])/i.test(raw);
     return {
-      step, status: response.status,
-      contentType: cleanText(headers.get("content-type") || "", 120),
-      body: sanitizedWordPressBody(raw, wp).slice(0, 300),
-      headers: headerDetails
+      step, status: response.status, rayId: cleanText(headers.get("cf-ray") || "", 120) || null,
+      classification: isHtml ? "likely_server_firewall_rejection" : "wordpress_or_http_error",
+      contentType, ...(isHtml ? {} : { body: sanitizedWordPressBody(raw, wp).slice(0, 300) }), headers: headerDetails
     };
   }
 
@@ -940,23 +941,81 @@ export function createCommunicationsSiteRouter(deps) {
       const wp=websiteWordPressConfig(env); const user=await verifyDedicatedWordPressEditor(wp);
       if (user?.capabilities?.upload_files !== true) return json({ error: "WordPress media upload is blocked: the configured integration account is missing the upload_files capability. Ask the WordPress administrator to grant upload_files to the dedicated Editor account, then run diagnostics again.", code: "wordpress_upload_files_capability_missing", capability: "upload_files" }, 403, corsHeaders(request));
       const endpoint=wp.root+"/wp-json/wp/v2/media";
+      const mediaPath=new URL(endpoint).pathname;
       const safeFilename=meta.filename.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9._-]/g,"-").replace(/-+/g,"-").slice(0,120)||"upload.bin";
-      const response=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"}),body:bytes,signal:AbortSignal.timeout(45000)});
-      const responseDetail = response.ok ? null : await wordpressResponseDetail(response,wp,"media_upload");
-      const uploaded=await response.json().catch(()=>null);
-      if(!response.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
-        const detail=responseDetail;
-        return json({error:"WordPress media upload failed (HTTP "+response.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:response.status,detail},response.status||502,corsHeaders(request));
+      const parentId=destination!=="media-library"?Number(input.parentId||input.postId):null;
+      const requestDetail=(method,path,headers,bodyFields)=>({
+        method,path,
+        contentType:String(headers.get("Content-Type")||((bodyFields.includes("file")&&!headers.has("Content-Type"))?"multipart/form-data":"")).replace(/;\s*boundary=.*/i,""),
+        accept:headers.get("Accept")||null,
+        bodyFields:[...bodyFields]
+      });
+      const failedAttempts=[];
+      const multipart=new FormData();
+      multipart.append("file",new Blob([bytes],{type:contentType}),safeFilename);
+      multipart.append("title",title);
+      multipart.append("alt_text",altText);
+      multipart.append("caption",caption);
+      if(parentId!==null)multipart.append("post",String(parentId));
+      const multipartHeaders=wordpressHeaders(wp,{Accept:"application/json"});
+      let upload=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:multipartHeaders,body:multipart,signal:AbortSignal.timeout(45000)});
+      let uploadDetail=await wordpressResponseDetail(upload.clone(),wp,"media_upload");
+      let uploaded=await upload.json().catch(()=>null);
+      let media=null;
+      let detail=null;
+      let variantPassed="multipart/form-data";
+      if(upload.ok&&Number.isSafeInteger(uploaded?.id)&&isAllowedWordPressLink(uploaded?.source_url,wp)){
+        media=uploaded;
+      }else{
+        uploadDetail.request=requestDetail("POST",mediaPath,new Headers(multipartHeaders),["file","title","alt_text","caption",...(parentId!==null?["post"]:[])]);
+        failedAttempts.push({variant:"multipart/form-data",status:upload.status,detail:uploadDetail});
+        if(upload.status!==406){
+          return json({error:"WordPress media upload failed (HTTP "+upload.status+"): "+cleanText(uploaded?.message||"media endpoint rejected the upload",240),httpStatus:upload.status,detail:uploadDetail},upload.status||502,corsHeaders(request));
+        }
+        const binaryHeaders=wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"});
+        upload=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:binaryHeaders,body:bytes,signal:AbortSignal.timeout(45000)});
+        const binaryDetail=await wordpressResponseDetail(upload.clone(),wp,"media_upload_fallback");
+        uploaded=await upload.json().catch(()=>null);
+        if(!upload.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
+          binaryDetail.request=requestDetail("POST",mediaPath,new Headers(binaryHeaders),["file"]);
+          failedAttempts.push({variant:"binary-file-upload",status:upload.status,detail:binaryDetail});
+          if(upload.status===406){
+            return json({error:"FAIL: blocked by server firewall; ModSecurity exemption needed for /wp-json/wp/v2/media",code:"wordpress_media_firewall_blocked",httpStatus:406,detail:{...binaryDetail,requestPath:mediaPath,rayId:binaryDetail.rayId},cpanelFallback:{available:true,mediaRegisterRecord:true}},502,corsHeaders(request));
+          }
+          return json({error:"WordPress media upload fallback failed (HTTP "+upload.status+").",httpStatus:upload.status,detail:binaryDetail,cpanelFallback:{available:true,mediaRegisterRecord:true}},502,corsHeaders(request));
+        }
+        const metadataEndpoint=endpoint+"/"+uploaded.id;
+        const metadataVariants=[
+          {name:"application/x-www-form-urlencoded",headers:{"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:new URLSearchParams({title,alt_text:altText,caption,...(parentId!==null?{post:String(parentId)}:{})}).toString(),fields:["title","alt_text","caption",...(parentId!==null?["post"]:[])]},
+          {name:"X-HTTP-Method-Override: PUT",headers:{"Content-Type":"application/json",Accept:"application/json","X-HTTP-Method-Override":"PUT"},body:JSON.stringify({title,alt_text:altText,caption,...(parentId!==null?{post:parentId}:{})}),fields:["title","alt_text","caption",...(parentId!==null?["post"]:[])]},
+          {name:"minimal alt_text + title",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({alt_text:altText,title}),fields:["alt_text","title"]}
+        ];
+        let metadataSucceeded=false;
+        for(const variant of metadataVariants){
+          const headers=wordpressHeaders(wp,variant.headers);
+          const metadata=await wordpressEditorFetch(wp,metadataEndpoint,{method:"POST",headers,body:variant.body,signal:AbortSignal.timeout(20000)});
+          const attemptDetail=await wordpressResponseDetail(metadata.clone(),wp,"media_metadata_attach");
+          const metadataData=await metadata.json().catch(()=>null);
+          const requestInfo=requestDetail("POST",new URL(metadataEndpoint).pathname,new Headers(headers),variant.fields);
+          if(metadata.ok&&Number(metadataData?.id)===uploaded.id){
+            media=metadataData;
+            variantPassed=variant.name;
+            detail={variantPassed,failedAttempts};
+            metadataSucceeded=true;
+            break;
+          }
+          attemptDetail.request=requestInfo;
+          failedAttempts.push({variant:variant.name,status:metadata.status,detail:attemptDetail});
+          if(metadata.status!==406){
+            return json({error:"Media uploaded, but WordPress metadata/attachment update failed (HTTP "+metadata.status+").",httpStatus:metadata.status,detail:attemptDetail,media:{id:uploaded.id,url:uploaded.source_url,metadataStatus:"failed"},cpanelFallback:{available:true,mediaRegisterRecord:true}},502,corsHeaders(request));
+          }
+        }
+        if(!metadataSucceeded){
+          const lastAttempt=failedAttempts[failedAttempts.length-1];
+          return json({error:"FAIL: blocked by server firewall; ModSecurity exemption needed for /wp-json/wp/v2/media",code:"wordpress_media_firewall_blocked",httpStatus:406,detail:{...lastAttempt.detail,requestPath:mediaPath,rayId:lastAttempt.detail.rayId,attempts:failedAttempts.map(x=>({variant:x.variant,status:x.status,request:x.detail.request}))},media:{id:uploaded.id,url:uploaded.source_url,metadataStatus:"failed"},cpanelFallback:{available:true,mediaRegisterRecord:true}},502,corsHeaders(request));
+        }
       }
-      const update={title,alt_text:altText,caption};
-      if(destination!=="media-library")update.post=Number(input.parentId||input.postId);
-      const metadata=await wordpressEditorFetch(wp,endpoint+"/"+uploaded.id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify(update),signal:AbortSignal.timeout(20000)});
-      const metadataDetail = metadata.ok ? null : await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
-      const media=await metadata.json().catch(()=>null);
-      if(!metadata.ok||Number(media?.id)!==uploaded.id){
-        const detail=metadataDetail;
-        return json({error:"Media uploaded, but WordPress metadata/attachment verification failed (HTTP "+metadata.status+").",httpStatus:metadata.status,detail},502,corsHeaders(request));
-      }
+      if(!detail)detail={variantPassed,failedAttempts};
       if(destination==="featured"){
         const kind=String(input.parentType||"posts")==="pages"?"pages":"posts",id=Number(input.parentId||input.postId);
         const parent=await wordpressEditorFetch(wp,wp.root+"/wp-json/wp/v2/"+kind+"/"+id,{method:"POST",headers:wordpressHeaders(wp,{"Content-Type":"application/json",Accept:"application/json"}),body:JSON.stringify({featured_media:uploaded.id}),signal:AbortSignal.timeout(20000)});
@@ -971,7 +1030,7 @@ export function createCommunicationsSiteRouter(deps) {
       const recordFields=fields(row),auditFields=fields({action:"COMMUNICATION_WEBSITE_MEDIA_REGISTERED",category:"COMMUNICATIONS",collection:"communicationMediaAssets",recordId:id,actorUid:claims.user_id,actorEmail:claims.email||"",details:{file:meta.filename,destination,url:media.source_url,size:bytes.byteLength,sha256},createdAt:now});
       await commitDocumentAndAudit(env,"communicationMediaAssets/"+id,claims.token,recordFields,Object.keys(row),auditFields,{createOnly:true,collectionName:"communicationMediaAssets"});
       await recordWebsiteAudit(env,claims,"COMMUNICATION_WEBSITE_MEDIA_UPLOADED","media",uploaded.id,{filename:meta.filename,contentType,size:bytes.byteLength,sha256,destination});
-      return json({success:true,media:{id:uploaded.id,url:media.source_url,title,altText,caption,sha256,size:bytes.byteLength,destination,registerId:id}},200,corsHeaders(request));
+      return json({success:true,detail,media:{id:uploaded.id,url:media.source_url,title,altText,caption,sha256,size:bytes.byteLength,destination,registerId:id}},200,corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/media/chunk" && request.method === "POST") {
@@ -1111,26 +1170,32 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/website/production-acceptance" && request.method === "POST") {
       const { claims } = await authorised(request, env, true);
       const wp = websiteWordPressConfig(env);
+      const requestInput = await request.json().catch(() => ({}));
+      const diagnosticMode = requestInput?.diagnosticMode === true;
       const report = [];
       const add = (label, status, httpStatus, error = "", detail = null) => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail });
-      const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint) => {
-        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
-          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload ? { "Content-Type": "application/json" } : {}) }),
-          ...(payload instanceof Uint8Array ? { body: payload } : payload ? { body: JSON.stringify(payload) } : {}),
+      const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint, rawJsonBody = null) => {
+        const url = wp.root + "/wp-json/wp/v2/" + endpoint;
+        const isForm = payload instanceof FormData;
+        const isUrlEncoded = payload instanceof URLSearchParams;
+        const isRawBody = payload instanceof Uint8Array || isForm || isUrlEncoded;
+        const requestHeaders = wordpressHeaders(wp, {
+          Accept: "application/json", ...headers,
+          ...(!isRawBody && (payload || rawJsonBody !== null) ? { "Content-Type": "application/json" } : {})
+        });
+        const headerView = new Headers(requestHeaders);
+        const bodyFields = isForm ? [...payload.keys()] : isUrlEncoded ? [...payload.keys()] : payload instanceof Uint8Array ? ["file"] :
+          rawJsonBody !== null ? Object.keys(JSON.parse(rawJsonBody || "{}")) : payload && typeof payload === "object" ? Object.keys(payload) : [];
+        const response = await wordpressEditorFetch(wp, url, {
+          method, headers: requestHeaders,
+          ...(isRawBody ? { body: payload } : rawJsonBody !== null ? { body: rawJsonBody } : payload ? { body: JSON.stringify(payload) } : {}),
           signal: AbortSignal.timeout(30000)
         });
-        const rawBody = response.ok ? "" : await response.clone().text().catch(() => "");
-        const responseHeaders = {};
-        for (const name of ["server", "cf-ray", "x-powered-by"]) {
-          const value = response.headers.get(name);
-          if (value) responseHeaders[name] = sanitizedWordPressBody(value, wp).slice(0, 200);
-        }
-        for (const [name, value] of response.headers.entries()) {
-          if (/(waf|modsecurity|imunify|firewall|sucuri|wordfence|cloudflare)/i.test(name)) responseHeaders[name] = /token|secret|authorization|cookie/i.test(name) ? "[redacted]" : sanitizedWordPressBody(value, wp).slice(0, 200);
-        }
-        const detail = response.ok ? null : {
-          step, status: response.status, contentType: cleanText(response.headers.get("content-type") || "", 120),
-          body: sanitizedWordPressBody(rawBody, wp).slice(0, 300), headers: responseHeaders
+        const detail = response.ok ? null : await wordpressResponseDetail(response.clone(), wp, step);
+        if (detail) detail.request = {
+          method, path: new URL(url).pathname,
+          contentType: headerView.get("Content-Type") || (isForm ? "multipart/form-data" : isUrlEncoded ? "application/x-www-form-urlencoded" : null),
+          accept: headerView.get("Accept") || "application/json", bodyFields
         };
         const data = await response.json().catch(() => null);
         return { response, data, detail };
@@ -1144,6 +1209,42 @@ export function createCommunicationsSiteRouter(deps) {
         add("WordPress authenticated user read", user.response.ok ? "PASS" : "FAIL", user.response.status, user.response.ok ? "" : user.data?.message || "WordPress user endpoint failed.");
         add("WordPress upload_files capability", uploadAllowed ? "PASS" : "FAIL", user.response.status, uploadAllowed ? "" : "Missing or unverified upload_files capability; TEST media uploads are blocked.");
       } catch (error) { add("WordPress authenticated user read", "FAIL", 0, error.message); add("WordPress upload_files capability", "FAIL", 0, "Capability could not be verified; uploads were not attempted."); }
+      if (diagnosticMode) {
+        const filename = "TEST-IRPA-CAPTION-DIAGNOSTIC-" + stamp + ".png";
+        const bytes = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAC0lEQVR4nGNgQAYAAA4AAamRc7EAAAAASUVORK5CYII="), c => c.charCodeAt(0));
+        let mediaId = null, mediaUrl = null;
+        try {
+          if (!uploadAllowed) throw new Error("WordPress upload_files capability was not verified; diagnostic upload was blocked.");
+          validateWebsiteMedia({ filename, contentType: "image/png", bytes });
+          const upload = await wpRequest("media", "POST", bytes, { "Content-Type": "image/png", "Content-Disposition": 'attachment; filename="' + filename + '"' }, "caption_diagnostic_upload");
+          mediaId = Number(upload.data?.id); mediaUrl = upload.data?.source_url;
+          if (!upload.response.ok || !Number.isSafeInteger(mediaId) || !isAllowedWordPressLink(mediaUrl, wp)) {
+            add("caption diagnostic single media upload", "FAIL", upload.response.status, "WordPress did not confirm one same-host media item.", upload.detail);
+          } else {
+            cleanupItems.push({ kind: "TEST diagnostic media", title: filename, id: mediaId, url: mediaUrl });
+            await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_ACCEPTANCE_DIAGNOSTIC_MEDIA_CREATED", "media", mediaId, { filename, url: mediaUrl, retained: true });
+            const captionA = "TEST ONLY - retained for acceptance evidence";
+            const captionB = "TEST ONLY — retained for acceptance evidence";
+            const cases = [
+              { name: "A ASCII", caption: captionA, body: JSON.stringify({ title: "TEST caption diagnostic", alt_text: "TEST caption diagnostic", caption: captionA }) },
+              { name: "B literal em dash", caption: captionB, body: JSON.stringify({ title: "TEST caption diagnostic", alt_text: "TEST caption diagnostic", caption: captionB }) },
+              { name: "C escaped em dash", caption: captionB, body: JSON.stringify({ title: "TEST caption diagnostic", alt_text: "TEST caption diagnostic", caption: captionB }).replace(/—/g, "\\u2014") }
+            ];
+            for (const item of cases) {
+              const result = await wpRequest("media/" + mediaId, "POST", undefined, {}, "caption_diagnostic_" + item.name, item.body);
+              const matches = result.data?.caption?.raw === item.caption;
+              const ok = result.response.ok && Number(result.data?.id) === mediaId && matches;
+              const detail = result.detail || { step: "caption_diagnostic_" + item.name, status: result.response.status, rayId: result.response.headers.get("cf-ray") || null, classification: "none" };
+              add("caption diagnostic " + item.name, ok ? "PASS" : "FAIL", result.response.status, ok ? "" : result.data?.message || "WordPress did not return the expected decoded caption.", { ...detail, mediaId, mediaUrl, decodedCaptionMatches: matches, wireEscapeVerified: item.name !== "C escaped em dash" || (item.body.includes("\\u2014") && !item.body.includes("—")) });
+            }
+          }
+        } catch (error) {
+          add("caption diagnostic", "FAIL", error.httpStatus || 0, error.message || "Diagnostic failed.", error.detail || null);
+          if (mediaId && mediaUrl && !cleanupItems.some(item => item.id === mediaId)) cleanupItems.push({ kind: "TEST diagnostic media", title: filename, id: mediaId, url: mediaUrl });
+        }
+        const passCount = report.filter(row => row.status === "PASS").length, failCount = report.filter(row => row.status === "FAIL").length;
+        return json({ testRun: true, diagnosticMode: true, createdDrafts: { pageId: null, postId: null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      }
       for (const type of ["pages", "posts"]) {
         const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
@@ -1175,6 +1276,26 @@ export function createCommunicationsSiteRouter(deps) {
         { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAxMCAxMF0gL1Jlc291cmNlcyA8PCA+PiAvQ29udGVudHMgNCAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAwID4+CnN0cmVhbQoKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyMTcgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA1IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoyNjYKJSVFT0YK" },
         { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBBQAAAAIAONjYV15bjPX6AAAAK0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH1QyU7DMBD9FWuuKHHggBCK0wPLETiUDxjZk8SqN3nc0v49Tlt6QIXjzFv1+tXeO7GjzDYGBbdtB4KCjsaGScHn+rV5AMEFg0EXAyk4EMNq6NeHRCyqNrCCuZT0KCXrmTxyGxOFiowxeyz1zJNMqDc4kbzrunupYygUSlMWDxj6Zxpx64p42df3qUcmxyCeTsQlSwGm5KzGUnG5C+ZXSnNOaKvyyOHZJr6pBJBXExbk74Cz7r0Ok60h8YG5vKGvLPkVs5Em6q2vyvZ/mys94zhaTRf94pZy1MRcF/euvSAebfjpL49zD99QSwMEFAAAAAgA42NhXZv9N+qtAAAAKQEAAAsAAABfcmVscy8ucmVsc43POw7CMAwG4KtE3mlaBoRQ0y4IqSsqB7ASN61oHkrCo7cnAwNFDIy2f3+W6/ZpZnanECdnBVRFCYysdGqyWsClP232wGJCq3B2lgQsFKFt6jPNmPJKHCcfWTZsFDCm5A+cRzmSwVg4TzZPBhcMplwGzT3KK2ri27Lc8fBpwNpknRIQOlUB6xdP/9huGCZJRydvhmz6ceIrkWUMmpKAhwuKq3e7yCzwpuarF5sXUEsDBBQAAAAIAONjYV1lJT7+rgAAAOsAAAARAAAAd29yZC9kb2N1bWVudC54bWxFjsEKwjAMhl+l9O46PYiMbeJF8CaiD1DbqIM1KUl1+va28+DlC8lPPv52+w6jegHLQNjpZVVrBejID3jv9OW8X2y0kmTR25EQOv0B0du+nRpP7hkAk8oClGbq9COl2Bgj7gHBSkURMGc34mBTXvluJmIfmRyIZH8Yzaqu1ybYAXVRXsl/yowFXJD6w+m4U9Y5iLmEA3Ub3unJ0JoSFvLM+UXApSOb+fBzmX/P/gtQSwECFAMUAAAACADjY2FdeW4z1+gAAACtAQAAEwAAAAAAAAAAAAAAgAEAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAxQAAAAIAONjYV2b/TfqrQAAACkBAAALAAAAAAAAAAAAAACAARkBAABfcmVscy8ucmVsc1BLAQIUAxQAAAAIAONjYV1lJT7+rgAAAOsAAAARAAAAAAAAAAAAAACAAe8BAAB3b3JkL2RvY3VtZW50LnhtbFBLBQYAAAAAAwADALkAAADMAgAAAAA=" }
       ];
+      const registerCpanelMediaFallback = async (file, filename, bytes) => {
+        const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
+        const form = new FormData();
+        form.set("dir", directory);
+        form.set("file-1", new File([bytes], filename, { type: file.mime }));
+        const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
+          method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
+          body: form, signal: AbortSignal.timeout(60000)
+        });
+        const cpData = await cpResponse.json().catch(() => null);
+        if (!cpResponse.ok || cpData?.status !== 1) throw new Error(cleanText(cpData?.errors?.join(" ") || "cPanel upload rejected", 160));
+        const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+        const registerId = crypto.randomUUID(), now = new Date().toISOString(), sha256 = await websiteMediaSha256(bytes);
+        const registerRow = { file: filename, title: "TEST " + file.name + " cPanel fallback", altText: "TEST acceptance fallback", caption: "TEST ONLY — retained for acceptance evidence", category: "Production Acceptance", tags: ["TEST"], destination: "cpanel-folder", url: publicUrl, uploader: claims.user_id, uploaderEmail: claims.email || "", date: now, size: bytes.byteLength, sha256, wordpressMediaId: null, status: "Available", test: true };
+        const recordFields = fields(registerRow);
+        const auditFields = fields({ action: "COMMUNICATION_WEBSITE_MEDIA_REGISTERED", category: "COMMUNICATIONS", collection: "communicationMediaAssets", recordId: registerId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { file: filename, destination: "cpanel-folder", url: publicUrl, size: bytes.byteLength, sha256, test: true }, createdAt: now });
+        await commitDocumentAndAudit(env, "communicationMediaAssets/" + registerId, claims.token, recordFields, Object.keys(registerRow), auditFields, { createOnly: true, collectionName: "communicationMediaAssets" });
+        cleanupItems.push({ kind: "TEST media", title: registerRow.title, id: registerId, url: publicUrl });
+        return { registerId, publicUrl };
+      };
       if (uploadAllowed && testPageId) {
         for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
