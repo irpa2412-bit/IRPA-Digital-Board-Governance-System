@@ -1175,12 +1175,28 @@ export function createCommunicationsSiteRouter(deps) {
       const report = [];
       const add = (label, status, httpStatus, error = "", detail = null) => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail });
       const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint, rawJsonBody = null) => {
-        const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + endpoint, {
-          method, headers: wordpressHeaders(wp, { Accept: "application/json", ...headers, ...(payload instanceof Uint8Array ? {} : payload || rawJsonBody !== null ? { "Content-Type": "application/json" } : {}) }),
-          ...(payload instanceof Uint8Array ? { body: payload } : rawJsonBody !== null ? { body: rawJsonBody } : payload ? { body: JSON.stringify(payload) } : {}),
+        const url = wp.root + "/wp-json/wp/v2/" + endpoint;
+        const isForm = payload instanceof FormData;
+        const isUrlEncoded = payload instanceof URLSearchParams;
+        const isRawBody = payload instanceof Uint8Array || isForm || isUrlEncoded;
+        const requestHeaders = wordpressHeaders(wp, {
+          Accept: "application/json", ...headers,
+          ...(!isRawBody && (payload || rawJsonBody !== null) ? { "Content-Type": "application/json" } : {})
+        });
+        const headerView = new Headers(requestHeaders);
+        const bodyFields = isForm ? [...payload.keys()] : isUrlEncoded ? [...payload.keys()] : payload instanceof Uint8Array ? ["file"] :
+          rawJsonBody !== null ? Object.keys(JSON.parse(rawJsonBody || "{}")) : payload && typeof payload === "object" ? Object.keys(payload) : [];
+        const response = await wordpressEditorFetch(wp, url, {
+          method, headers: requestHeaders,
+          ...(isRawBody ? { body: payload } : rawJsonBody !== null ? { body: rawJsonBody } : payload ? { body: JSON.stringify(payload) } : {}),
           signal: AbortSignal.timeout(30000)
         });
-        const detail = response.ok ? null : await wordpressResponseDetail(response, wp, step);
+        const detail = response.ok ? null : await wordpressResponseDetail(response.clone(), wp, step);
+        if (detail) detail.request = {
+          method, path: new URL(url).pathname,
+          contentType: headerView.get("Content-Type") || (isForm ? "multipart/form-data" : isUrlEncoded ? "application/x-www-form-urlencoded" : null),
+          accept: headerView.get("Accept") || "application/json", bodyFields
+        };
         const data = await response.json().catch(() => null);
         return { response, data, detail };
       };
