@@ -12,6 +12,7 @@ const studio=read("../src/pages/CommunicationMediaStudio.jsx");
 const websiteStudio=read("../src/pages/CommunicationsWebsiteStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
+const socialStudio=read("../src/pages/CommunicationsSocialStudio.jsx");
 const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
 const stagingWorkflow=read("../.github/workflows/staging-gateway-e2e.yml");
 const rules=read("../firestore.rules");
@@ -266,8 +267,8 @@ test("communications operations registers provide campaigns, media contacts, bra
 
 test("social account enrolment is integrated, metadata-only, role-scoped and audited",()=>{
  assert.ok(portal.includes('import SocialMediaAccounts from "./SocialMediaAccounts"'));
- assert.ok(portal.includes('"Social Accounts"'));
- assert.ok(portal.includes('tab==="Social Accounts"&&<SocialMediaAccounts'));
+ assert.ok(portal.includes('"Social Account Register"'));
+ assert.ok(portal.includes('tab==="Social Account Register"&&<SocialMediaAccounts'));
  for(const term of ['Facebook','Instagram','LinkedIn','YouTube','TikTok','Pending Verification','authorizationReference','custodian','reviewDate','writeBatch(db)','socialMediaAccountsAudit','noopener noreferrer','does not publish posts']) assert.ok(social.includes(term),term);
  assert.ok(!social.includes('accessToken'));
  assert.ok(!social.includes('clientSecret'));
@@ -403,9 +404,16 @@ test("communications draft and approval writes are Worker-routed and approval is
  assert.ok(site.includes('commitDocumentAndAudit(env, id, claims.token'));
 });
 
-test("social media studio provides a manual export fallback and funding view without claiming live API publishing",()=>{
- for(const term of ["Social Media Studio","Facebook","Instagram","LinkedIn","YouTube","WhatsApp Channel","exportSocialPost","Export ready-to-paste TXT","Use funder update template","Use donor thank-you template","Use project story template","Funding View","Platform reach and engagement are unavailable","Not connected in production"]) assert.ok(portal.includes(term),term);
- assert.ok(portal.includes('collection:"communicationMediaItems",action:"create"'));
+test("single Social Studio replaces the legacy duplicate editor while retaining the account register and funding view",()=>{
+ assert.ok(portal.includes('tab==="Social Studio"&&<CommunicationsSocialStudio/>'));
+ const nav=portal.slice(portal.indexOf('{["Website Studio"'),portal.indexOf(".map(t=>"));
+ assert.ok(nav.indexOf("Social Studio")>=0&&nav.indexOf("Social Studio")<nav.indexOf("Social Account Register"),"administrator social navigation lists Social Studio before the account register");
+ assert.ok(!portal.includes('tab==="Social Media Studio"'),"duplicate editor tab is removed");
+ assert.ok(portal.includes('tab==="Social Account Register"&&<SocialMediaAccounts'));
+ assert.ok(socialStudio.includes("Social Studio"));
+ for(const term of ["Facebook","Instagram","LinkedIn","YouTube","WhatsApp Business","Download calendar CSV","Posted manually"]) assert.ok(socialStudio.includes(term),term);
+ assert.ok(portal.includes("Funding View"));
+ assert.ok(portal.includes("Platform reach and engagement are unavailable"));
 });
 
 
