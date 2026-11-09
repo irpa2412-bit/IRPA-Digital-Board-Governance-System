@@ -218,18 +218,25 @@ test("production WordPress requests retain Authorization and omit staging-only a
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test("media metadata failure returns the already-uploaded media ID and URL", async () => {
+test("all metadata fallback variants blocked retain the uploaded media ID and sanitised WAF diagnostics", async () => {
   const originalFetch = globalThis.fetch;
+  const metadataCalls = [];
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url);
     const headers = new Headers(init.headers);
     assert.equal(headers.get("User-Agent"), "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)");
     if (url.pathname.endsWith("/users/me")) return response({ id: 7, roles: ["editor"], capabilities: { upload_files: true } });
     if (url.pathname === "/wp-json/wp/v2/media" && init.method === "POST") {
-      assert.ok(init.body instanceof Uint8Array);
+      if (init.body instanceof FormData) {
+        assert.equal(init.body.get("title"), "TEST image");
+        assert.equal(init.body.get("alt_text"), "Test image");
+        return new Response("<html><body>multipart blocked</body></html>", { status: 406, headers: { "Content-Type": "text/html", "CF-Ray": "multipart-ray-DAR" } });
+      }
+      assert.ok(init.body instanceof Uint8Array, "binary upload is the first fallback after multipart 406");
       return response({ id: 812, source_url: "https://staging.irpa.or.tz/wp-content/uploads/test-812.png" }, 201);
     }
     if (url.pathname === "/wp-json/wp/v2/media/812" && init.method === "POST") {
+      metadataCalls.push({ contentType: headers.get("Content-Type"), override: headers.get("X-HTTP-Method-Override") });
       return new Response("<html><body>blocked</body></html>", { status: 406, headers: { "Content-Type": "text/html", "CF-Ray": "media406-ray-DAR" } });
     }
     throw new Error("Unexpected media metadata failure test request: " + url.pathname);
@@ -243,10 +250,22 @@ test("media metadata failure returns the already-uploaded media ID and URL", asy
     }), env);
     const data = await result.json();
     assert.equal(result.status, 502);
+    assert.equal(data.code, "wordpress_media_firewall_blocked");
     assert.equal(data.media.id, 812);
     assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/test-812.png");
+    assert.equal(data.media.metadataStatus, "failed");
+    assert.equal(data.error, "FAIL: blocked by server firewall; ModSecurity exemption needed for /wp-json/wp/v2/media");
     assert.equal(data.detail.classification, "likely_server_firewall_rejection");
     assert.equal(data.detail.rayId, "media406-ray-DAR");
+    assert.equal(data.detail.request.method, "POST");
+    assert.equal(data.detail.request.path, "/wp-json/wp/v2/media/812");
+    assert.equal(data.detail.request.contentType, "application/json");
+    assert.equal(data.detail.request.accept, "application/json");
+    assert.deepEqual(data.detail.request.bodyFields, ["alt_text", "title"]);
+    assert.equal(metadataCalls.length, 3);
+    assert.equal(metadataCalls[0].contentType, "application/x-www-form-urlencoded");
+    assert.equal(metadataCalls[1].override, "PUT");
+    assert.equal(metadataCalls[2].contentType, "application/json");
     assert.equal("body" in data.detail, false);
   } finally { globalThis.fetch = originalFetch; }
 });
