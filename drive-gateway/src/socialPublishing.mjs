@@ -17,6 +17,7 @@ function statusFor(env, platform) {
   const config = PLATFORM_CONFIG[platform];
   if (!config) return { platform, status: "unsupported", reason: "Unknown platform." };
   const missing = config.required.filter(name => !String(env?.[name] || "").trim());
+  if (config.mode !== "meta-api") return { platform, label: config.label, status: "manual_export_only", reason: "No automatic publishing adapter is enabled for this platform in this release.", missingSecrets: missing, mode: config.mode, automaticPublishing: false };
   return {
     platform, label: config.label,
     status: missing.length ? "not_connected" : "credentials_configured_unverified",
@@ -32,7 +33,7 @@ function validateApprovedItem(item, user) {
   if (item.status !== "Approved") return "Publishing blocked: item must be approved.";
   if (!item.approvedBy || !item.approvedAt || Number(item.approvedRevision || 0) !== Number(item.revision || 0)) return "Publishing blocked: a current approval and revision are required.";
   if (!user?.uid) return "Publishing blocked: authenticated identity is required.";
-  if (item.authorUid && item.authorUid === user.uid && !user.canApproveOwnContent) {
+  if (item.authorUid && item.authorUid === user.uid && (!user.canApproveOwnContent || item.approvalMode !== "STAGING_ADMIN_OVERRIDE")) {
     return "Publishing blocked: the author cannot approve their own content.";
   }
   return "";
