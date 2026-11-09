@@ -33,7 +33,7 @@ export async function communicationsRoutes(request,env,deps){
  const url=new URL(request.url), path=url.pathname, cors=deps.corsHeaders(request);
  if(!path.startsWith("/api/communications/editorial/")&&!path.startsWith("/api/communications/publishing/pause")&&!path.startsWith("/api/communications/social/"))return null;
  const social=createSocialPublishingRouter({
-   authorize:async(req,workerEnv)=>{const actor=await roleContext(req,workerEnv,deps);return {...actor,canApproveOwnContent:actor.admin&&workerEnv.IRPA_ENVIRONMENT==="staging"};},
+   authorize:async(req,workerEnv)=>{const actor=await roleContext(req,workerEnv,deps);return {...actor,canApproveOwnContent:actor.admin&&workerEnv.IRPA_ENVIRONMENT==="staging"&&workerEnv.FIREBASE_PROJECT_ID==="irpa-dbg-staging-a73ec"&&workerEnv.IRPA_PRODUCTION_CUTOVER==="false"};},
    publishMetaContent:deps.publishMetaContent,
    json:(body,status=200,headers={})=>response(body,status,headers),
    corsHeaders:deps.corsHeaders
@@ -86,7 +86,7 @@ export async function communicationsRoutes(request,env,deps){
     if(!canApprove&&!admin)throw Object.assign(new Error("Approver role required."),{status:403});
     if(item.status!=="Pending Approval")throw Object.assign(new Error("Only items pending approval can be decided."),{status:409});
     const body=await readJson(request);
-    const stagingAdminOverride=decision==="approve"&&admin&&env.IRPA_ENVIRONMENT==="staging"&&body.stagingAdminOverride===true;
+    const stagingAdminOverride=decision==="approve"&&admin&&env.IRPA_ENVIRONMENT==="staging"&&env.FIREBASE_PROJECT_ID==="irpa-dbg-staging-a73ec"&&env.IRPA_PRODUCTION_CUTOVER==="false"&&body.stagingAdminOverride===true;
     if(item.authorUid===actor.uid&&!stagingAdminOverride)throw Object.assign(new Error("The author cannot approve or reject their own item. In staging, an administrator may use the explicit initial-setup override."),{status:403});
     if(decision==="approve"){item.status="Approved";item.approvedBy=actor.uid;item.approvedAt=now();item.approvedRevision=item.revision;item.approvalMode=stagingAdminOverride?"STAGING_ADMIN_OVERRIDE":"INDEPENDENT_REVIEW";}
     else{item.status="Returned";item.rejectionReason=String(body.reason||"Changes requested").slice(0,500);item.rejectedBy=actor.uid;item.rejectedAt=now();}
