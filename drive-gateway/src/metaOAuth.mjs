@@ -312,6 +312,7 @@ export function createMetaOAuthRouter(deps) {
     if (request.method === "POST" && path === "/api/communications/meta/disconnect") {
       try {
         if (url.origin !== STAGING_GATEWAY) throw new Error("Meta disconnect is available only on the approved staging gateway.");
+        safeConfig(env);
         const claims = await authorizeUser(request, env, deps, false);
         await env.DRIVE_KV.delete(TOKEN_KEY_PREFIX + claims.user_id);
         await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + claims.user_id);
