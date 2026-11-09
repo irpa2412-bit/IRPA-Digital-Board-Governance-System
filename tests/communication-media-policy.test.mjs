@@ -268,7 +268,7 @@ test("social account enrolment is integrated, metadata-only, role-scoped and aud
  assert.ok(portal.includes('import SocialMediaAccounts from "./SocialMediaAccounts"'));
  assert.ok(portal.includes('"Social Accounts"'));
  assert.ok(portal.includes('tab==="Social Accounts"&&<SocialMediaAccounts'));
- for(const term of ['Facebook','Instagram','LinkedIn','YouTube','TikTok','Pending Verification','authorizationReference','custodian','reviewDate','writeBatch(db)','socialMediaAccountsAudit','noopener noreferrer','does not publish posts']) assert.ok(social.includes(term),term);
+ for(const term of ['Facebook','Instagram','LinkedIn','YouTube','TikTok','Pending Verification','authorizationReference','custodian','reviewDate','writeBatch(db)','socialMediaAccountsAudit','noopener noreferrer','Meta publishing authorization is handled separately by the staging Worker']) assert.ok(social.includes(term),term);
  assert.ok(!social.includes('accessToken'));
  assert.ok(!social.includes('clientSecret'));
  assert.ok(!/\bpassword\s*[:=]/i.test(social));
@@ -310,7 +310,8 @@ test("Meta API uses isolated staging publishing scopes, encrypted tokens and ser
  assert.ok(metaOAuth.includes('account.facebookPageId + "/feed"'));
  assert.ok(metaOAuth.includes('account.instagramAccountId + "/media_publish"'));
  assert.ok(metaOAuth.includes("pageAccessToken"));
- assert.ok(!metaOAuth.includes("meta:readonly:connection:"));
+ assert.ok(metaOAuth.includes("LEGACY_TOKEN_KEY_PREFIX"));
+ assert.ok(metaOAuth.includes("await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + stateRecord.uid)"));
  assert.ok(gateway.includes('import { createMetaOAuthRouter, publishMetaContent } from "./metaOAuth.mjs"'));
  assert.ok(gateway.includes("publishMetaContent, corsHeaders"));
  assert.ok(gateway.includes('const metaOAuthRouter = createMetaOAuthRouter'));
