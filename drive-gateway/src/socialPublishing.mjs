@@ -70,7 +70,10 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
     let identity;
     try {
       identity = await authorize(request, env);
-      if (!identity?.uid || !Array.isArray(identity.roles) || !identity.roles.length) throw new Error("An authorized IRPA role is required.");
+      const uid = identity?.uid || identity?.user_id || identity?.sub;
+      if (!uid) throw new Error("Authenticated identity required.");
+      identity = { ...identity, uid };
+      if (!Array.isArray(identity.roles) || !identity.roles.length) throw new Error("An authorized IRPA role is required.");
       const allowed = ["Administrator", "Executive Director", "Approver", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
       if (!identity.roles.some(role => allowed.includes(role))) throw Object.assign(new Error("Your IRPA role does not permit communications publishing or audit access."), { status: 403 });
     } catch (error) {
@@ -198,7 +201,6 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       return jsonResponse({ ok: true, published: true, mode: "meta-api", result, itemStatePersisted, auditPersisted,
         warning: !itemStatePersisted || !auditPersisted ? "The platform confirmed publication, but one or more local audit/state writes did not complete. Do not retry; reconcile the publishing audit first." : "" }, 200, cors);
       }
-    }
     return jsonResponse({ ok: false, error: "Social publishing route not found." }, 404, cors);
   };
 }
