@@ -113,3 +113,14 @@ test("duplicate and unresolved publishing attempts are blocked before another pl
  assert.equal(r.status,409);
  assert.equal(calls,0);
 });
+
+test("administrator self-approval override also requires the exact staging Firebase project and cutover flag",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ h.env.FIREBASE_PROJECT_ID="irpa-digital-board-governance";
+ h.env.IRPA_PRODUCTION_CUTOVER="true";
+ let r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"Misconfigured environment",content:"Must not self approve"});
+ const item=(await r.json()).item;
+ await h.call("/api/communications/editorial/items/"+item.id+"/submit","POST",{});
+ r=await h.call("/api/communications/editorial/items/"+item.id+"/approve","POST",{stagingAdminOverride:true});
+ assert.equal(r.status,403);
+});
