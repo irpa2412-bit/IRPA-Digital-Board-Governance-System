@@ -156,3 +156,15 @@ test("Meta publishing refuses a connected Page not explicitly allowlisted for st
     await assert.rejects(() => publishMetaContent(h.env, { uid: "user-1", platform: "facebook", accountId: "123456789012345", text: "Must not publish to public Page" }), /not approved as an IRPA staging test destination/i);
   } finally { globalThis.fetch = previousFetch; }
 });
+
+test("staging disconnect removes current and legacy encrypted tokens without requiring Meta app secrets", async () => {
+  const h = harness();
+  await h.kv.put("meta:publishing:connection:user-1", "encrypted-current-token-record");
+  await h.kv.put("meta:readonly:connection:user-1", "encrypted-legacy-token-record");
+  h.env.META_APP_SECRET = "";
+  h.env.META_TOKEN_ENCRYPTION_KEY = "";
+  const response = await h.router(new Request(GATEWAY + "/api/communications/meta/disconnect", { method: "POST" }), h.env);
+  assert.equal(response.status, 200);
+  assert.equal(await h.kv.get("meta:publishing:connection:user-1"), null);
+  assert.equal(await h.kv.get("meta:readonly:connection:user-1"), null);
+});
