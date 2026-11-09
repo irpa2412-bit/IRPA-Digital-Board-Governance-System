@@ -94,8 +94,6 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       try { body = await request.json(); } catch {
         return jsonResponse({ ok: false, error: "A JSON request body is required." }, 400, cors);
       }
-      const publisherRoles = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer"];
-      if (!identity.roles.some(role => publisherRoles.includes(role))) return jsonResponse({ ok: false, error: "Publishing authority is not assigned to this IRPA role." }, 403, cors);
       const platform = String(body.platform || "").toLowerCase();
       try {
         const text = formatSocialContent(platform, body.content || {});
@@ -125,6 +123,8 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       try { body = await request.json(); } catch {
         return jsonResponse({ ok: false, error: "A JSON request body is required." }, 400, cors);
       }
+      const publisherRoles = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer"];
+      if (!identity.roles.some(role => publisherRoles.includes(role))) return jsonResponse({ ok: false, error: "Publishing authority is not assigned to this IRPA role." }, 403, cors);
       const platform = String(body.platform || "").toLowerCase();
       if (!["facebook", "instagram"].includes(platform)) {
         return jsonResponse({ ok: false, mode: "manual-export", error: "Automatic publishing is currently implemented only for Facebook Pages and Instagram professional accounts.", platform }, 501, cors);
