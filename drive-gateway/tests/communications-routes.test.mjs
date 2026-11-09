@@ -67,7 +67,7 @@ test("publishing rejects client-forged approval data and does not call the platf
 });
 test("global publishing pause blocks the platform adapter",async()=>{
  const h=harness("Administrator","admin",{admin:true,environment:"staging"});
- h.values.set("communications:editorial:items",JSON.stringify([{id:"approved-1",status:"Approved",approvedBy:"reviewer",approvedAt:"now",approvedRevision:1,revision:1,authorUid:"author",content:"Test"}]));
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"approved-1",status:"Approved",approvedBy:"reviewer",approvedAt:"now",approvedRevision:1,revision:1,authorUid:"author",content:"Test",platforms:["facebook"]}]));
  let calls=0;h.deps.publishMetaContent=async()=>{calls++;return {postId:"should-not-exist"};};
  const r=await h.call("/api/communications/social/publish","POST",{itemId:"approved-1",platform:"facebook",accountId:"page-1"});
  assert.equal(r.status,423);
