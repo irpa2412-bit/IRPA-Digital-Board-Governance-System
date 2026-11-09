@@ -60,7 +60,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  }
  async function checkMeta(){
   setError("");setNotice("");setMetaBusy(true);
-  try{const result=await metaRequest("/api/communications/meta/status","GET");setMetaStatus(result);setNotice(result.status==="verified"?"Meta read-only API access verified. Posting remains disabled.":result.status==="not_connected"?"No Meta connection is registered for this signed-in staging user.":"Meta connection needs attention.");}
+  try{const result=await metaRequest("/api/communications/meta/status","GET");setMetaStatus(result);setNotice(result.status==="verified"?"Meta publishing permissions verified. Publishing still requires approval and an unpaused staging workflow.":result.status==="not_connected"?"No Meta connection is registered for this signed-in staging user.":"Meta connection needs attention.");}
   catch(e){setError(e.message||"Unable to verify Meta API access.");setMetaStatus(null);}
   finally{setMetaBusy(false);}
  }
@@ -73,14 +73,14 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
  }
  if(!allowed)return <section style={panel} role="alert"><h3>Social-media accounts</h3><p>Your assigned role does not permit account management.</p></section>;
  return <section style={{display:"grid",gap:14,color:"var(--text-primary, #172033)"}}>
-  <header style={{...panel,display:"grid",gap:8}}><h3 style={{margin:0}}>Social-media account enrolment &amp; management</h3><p style={{margin:0}}>Register IRPA's official accounts, custodians, purpose, authorization and review dates. Account records are audited and archived rather than deleted.</p><p style={{margin:0,fontSize:13}}>This is an account register, not an OAuth connection. It never asks for or stores passwords, recovery codes, access tokens or API secrets; it does not publish posts, read private messages, or revoke platform access.</p></header>
+  <header style={{...panel,display:"grid",gap:8}}><h3 style={{margin:0}}>Social-media account enrolment &amp; management</h3><p style={{margin:0}}>Register IRPA's official accounts, custodians, purpose, authorization and review dates. Account records are audited and archived rather than deleted.</p><p style={{margin:0,fontSize:13}}>This register stores account metadata only. Platform credentials and access tokens are never entered here or exposed to the browser. Meta publishing authorization is handled separately by the staging Worker.</p></header>
   {error&&<div role="alert" aria-live="assertive" style={{...panel,borderColor:"#dc2626",color:"#b91c1c"}}>{error}</div>}
   {notice&&<div role="status" aria-live="polite" style={{...panel,borderColor:"#16a34a"}}>{notice}</div>}
-  {metaStagingEnabled&&<section style={{...panel,display:"grid",gap:10}} aria-label="Meta read-only API connection">
-   <h4 style={{margin:0}}>Meta API connection · staging only</h4>
-   <p style={{margin:0,fontSize:13}}>Connect an authorized Facebook account and verify its eligible Pages and linked Instagram professional accounts. Requested access is read-only; publishing, scheduling, messaging and analytics are not enabled. OAuth tokens remain encrypted in the staging gateway and are never returned to this page.</p>
+  {metaStagingEnabled&&<section style={{...panel,display:"grid",gap:10}} aria-label="Meta staging publishing connection">
+   <h4 style={{margin:0}}>Meta publishing connection · staging only</h4>
+   <p style={{margin:0,fontSize:13}}>Connect an authorized Meta account, verify eligible Facebook Pages and linked Instagram professional accounts, and authorize organic feed publishing. Tokens remain encrypted in the staging gateway and are never returned to this page. Publishing still requires an approved content item and the global pause to be off.</p>
    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-    <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer",fontWeight:700}} onClick={connectMeta}>{metaBusy?"Working…":"Connect Meta (read-only)"}</button>
+    <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer",fontWeight:700}} onClick={connectMeta}>{metaBusy?"Working…":"Connect Meta for publishing"}</button>
     <button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={checkMeta}>{metaBusy?"Checking…":"Verify API access"}</button>
     {metaStatus?.status==="verified"&&<button type="button" disabled={metaBusy} style={{...input,width:"auto",cursor:"pointer"}} onClick={disconnectMeta}>Disconnect staging</button>}
    </div>
@@ -91,7 +91,7 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
     {metaStatus.instagramAccounts&&<div><strong>Linked Instagram professional accounts</strong>{metaStatus.instagramAccounts.length?metaStatus.instagramAccounts.map(a=><div key={a.id}>@{a.username||"(username unavailable)"} · ID {a.id} · {a.accountType||"type unavailable"}</div>):<div>No eligible linked Instagram professional accounts were returned.</div>}</div>}
     {metaStatus.expiresAt&&<small>Reported token expiry: {new Date(metaStatus.expiresAt).toLocaleString()}</small>}
     {(metaStatus.missingPermissions||[]).length>0&&<small role="alert">Missing required read permissions: {metaStatus.missingPermissions.join(", ")}</small>}
-    <small>Posting enabled: No. Only read-only access is in scope.</small>
+    <small>Publishing permission: {metaStatus.postingEnabled?"Granted for staging":"Not verified"}. Production publishing is not enabled by this integration.</small>
    </div>}
   </section>}
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
