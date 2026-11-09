@@ -22,7 +22,8 @@
     "test:communication-media": "node --test tests/communication-media-policy.test.mjs",
     "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs",
     "check:staging-gateway-bundle": "node scripts/check-staging-gateway-bundle.mjs",
-    "test:pdf-page-rendering": "node --test tests/pdf-page-rendering-diagnostics.test.mjs"
+    "test:pdf-page-rendering": "node --test tests/pdf-page-rendering-diagnostics.test.mjs",
+    "test:social-studio": "node --test tests/social-studio-policy.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
