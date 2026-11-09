@@ -4,7 +4,7 @@ import { communicationsRoutes } from "../src/communicationsRoutes.mjs";
 
 function harness(role="Communications Officer",uid="author",options={}){
  const values=new Map();
- const env={IRPA_ENVIRONMENT:options.environment||"staging",DRIVE_KV:{get:async k=>values.get(k)??null,put:async(k,v)=>values.set(k,v)}};
+ const env={IRPA_ENVIRONMENT:options.environment||"staging",FIREBASE_PROJECT_ID:"irpa-dbg-staging-a73ec",IRPA_PRODUCTION_CUTOVER:"false",DRIVE_KV:{get:async k=>values.get(k)??null,put:async(k,v)=>values.set(k,v)}};
  const deps={
   authenticateFirebaseRequest:async()=>({uid,user_id:uid,token:"test"}),
   getFirestoreDocument:async(_env,path)=>options.admin&&path==="adminProfiles/"+uid?{active:true}:null,
