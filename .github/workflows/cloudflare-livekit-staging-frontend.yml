@@ -63,7 +63,7 @@ jobs:
           VITE_FIREBASE_MEASUREMENT_ID: ""
           VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
           VITE_META_STAGING_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
-          VITE_META_OAUTH_ENABLED: "${{ secrets.STAGING_META_APP_ID != '' && secrets.STAGING_META_APP_SECRET != '' && secrets.STAGING_META_TOKEN_ENCRYPTION_KEY != '' }}"
+          VITE_META_OAUTH_ENABLED: "${{ vars.STAGING_META_APP_ID != '' && secrets.STAGING_META_APP_SECRET != '' && secrets.STAGING_META_TOKEN_ENCRYPTION_KEY != '' }}"
           VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
           # Keep disabled until the isolated staging Gateway runtime acceptance workflow passes.
