@@ -111,6 +111,29 @@ function graphUrl(version, path, params = {}) {
   for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   return url;
 }
+
+async function graphPost(version, path, token, appSecret, params = {}) {
+  const url = graphUrl(version, path);
+  const headers = new Headers({ "content-type": "application/x-www-form-urlencoded" });
+  headers.set("Authorization", "Bearer " + token);
+  if (appSecret) {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(appSecret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)));
+    url.searchParams.set("appsecret_proof", Array.from(signature, byte => byte.toString(16).padStart(2, "0")).join(""));
+  }
+  const response = await fetch(url.toString(), {
+    method: "POST", headers, body: new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== null).map(([key, value]) => [key, String(value)])),
+    redirect: "error", signal: AbortSignal.timeout(12000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) {
+    const error = new Error(Number(data?.error?.code || 0) === 190 ? "Meta access token is invalid or expired." : "Meta publishing request failed.");
+    error.status = response.status || 502;
+    throw error;
+  }
+  return data;
+}
 async function authorizeUser(request, env, deps, reviewer = false) {
   const claims = await deps.authenticateFirebaseRequest(request, env);
   const adminDoc = await deps.getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
@@ -317,7 +340,7 @@ export async function publishMetaContent(env, { uid, platform, accountId, text, 
   if (!account) throw Object.assign(new Error("The selected destination is not part of this user's verified Meta connection."), { status: 403 });
   const pageToken = String(account.pageAccessToken || "");
   if (!pageToken) throw Object.assign(new Error("A Page access token was not returned for this destination. Reconnect Meta and verify Page permissions."), { status: 409 });
-  const post = async (path, params) => graphJson(graphUrl(cfg.version, path, { ...params, access_token: pageToken }).toString(), { method: "POST" }, cfg.appSecret);
+  const post = async (path, params) => graphPost(cfg.version, path, pageToken, cfg.appSecret, params);
   if (selectedPlatform === "facebook") {
     if (!account.tasks?.includes("CREATE_CONTENT") && !account.tasks?.includes("MANAGE")) {
       throw Object.assign(new Error("The connected Meta user does not have the Page CREATE_CONTENT task."), { status: 403 });
