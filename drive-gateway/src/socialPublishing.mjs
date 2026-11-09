@@ -69,8 +69,8 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
     try {
       identity = await authorize(request, env);
       if (!identity?.uid || !Array.isArray(identity.roles) || !identity.roles.length) throw new Error("An authorized IRPA role is required.");
-      const allowed = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer"];
-      if (!identity.roles.some(role => allowed.includes(role))) throw Object.assign(new Error("Your IRPA role does not permit publishing operations."), { status: 403 });
+      const allowed = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
+      if (!identity.roles.some(role => allowed.includes(role))) throw Object.assign(new Error("Your IRPA role does not permit communications publishing or audit access."), { status: 403 });
     } catch (error) {
       return jsonResponse({ ok: false, error: error.status === 403 ? error.message : "Authentication required." }, error.status || 401, cors);
     }
@@ -94,6 +94,8 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       try { body = await request.json(); } catch {
         return jsonResponse({ ok: false, error: "A JSON request body is required." }, 400, cors);
       }
+      const publisherRoles = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer"];
+      if (!identity.roles.some(role => publisherRoles.includes(role))) return jsonResponse({ ok: false, error: "Publishing authority is not assigned to this IRPA role." }, 403, cors);
       const platform = String(body.platform || "").toLowerCase();
       try {
         const text = formatSocialContent(platform, body.content || {});
@@ -104,6 +106,18 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       } catch (error) {
         return jsonResponse({ ok: false, error: error.message || "Unable to format content." }, 400, cors);
       }
+    }
+
+    if (request.method === "GET" && pathname === "/api/communications/social/audit") {
+      const reviewerRoles = ["Administrator", "Executive Director", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
+      if (!identity.roles.some(role => reviewerRoles.includes(role))) return jsonResponse({ ok: false, error: "Reviewer or administrator role required to read publishing audit." }, 403, cors);
+      let publishingEvents = [], editorialEvents = [];
+      try { publishingEvents = JSON.parse(await env.DRIVE_KV.get("communications:publishing:audit") || "[]"); } catch {}
+      try { editorialEvents = JSON.parse(await env.DRIVE_KV.get("communications:editorial:audit") || "[]"); } catch {}
+      const governance = editorialEvents.filter(event => ["PUBLISHING_PAUSE_CHANGED", "APPROVE", "REJECT", "SUBMIT"].includes(String(event.action || "").toUpperCase()));
+      const events = [...governance.map(event => ({ ...event, source: "editorial-governance" })), ...publishingEvents.map(event => ({ ...event, source: "platform-publishing" }))];
+      events.sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+      return jsonResponse({ ok: true, events: events.slice(0, 200) }, 200, cors);
     }
 
     if (request.method === "POST" && pathname === "/api/communications/social/publish") {
