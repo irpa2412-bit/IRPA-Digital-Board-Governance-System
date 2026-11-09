@@ -63,7 +63,7 @@ export async function communicationsRoutes(request,env,deps){
    const body=await readJson(request),kind=["post","website-page"].includes(body.kind)?body.kind:"";
    const title=String(body.title||"").trim(),content=String(body.content||"").trim();
    if(!kind||!title||!content)throw Object.assign(new Error("kind (post or website-page), title and content are required."),{status:400});
-   const item={id:crypto.randomUUID(),kind,title,content,language:body.language==="sw"?"sw":"en",platforms:Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[],imageUrl:String(body.imageUrl||""),link:String(body.link||""),scheduledAt:String(body.scheduledAt||""),status:"Draft",authorUid:actor.uid,authorRoles:actor.roles,createdAt:now(),updatedAt:now(),revision:1};
+   const item={id:crypto.randomUUID(),kind,title,content,language:body.language==="sw"?"sw":"en",platforms:Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp","tiktok","telegram"].includes(p)):[],imageUrl:String(body.imageUrl||""),link:String(body.link||""),scheduledAt:String(body.scheduledAt||""),status:"Draft",authorUid:actor.uid,authorRoles:actor.roles,createdAt:now(),updatedAt:now(),revision:1};
    items.push(item);await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:"CREATED",itemId:item.id,actorUid:actor.uid,roles:actor.roles,at:now(),revision:1});
    return response({ok:true,item},201,cors);
   }
