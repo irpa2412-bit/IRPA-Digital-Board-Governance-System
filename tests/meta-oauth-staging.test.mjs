@@ -16,7 +16,7 @@ function harness(overrides = {}) {
     META_GRAPH_API_VERSION: "v26.0",
     META_APP_ID: "test-app-id",
     META_APP_SECRET: "test-secret-not-real",
-    META_TOKEN_ENCRYPTION_KEY: key,
+    META_TOKEN_ENCRYPTION_KEY: key, META_STAGING_ALLOWED_PAGE_IDS: "page-1", META_STAGING_ALLOWED_INSTAGRAM_IDS: "ig-1",
     DRIVE_KV: {
       async put(k, v, options) { values.set(k, v); if (options) values.set(k + ":ttl", options.expirationTtl); },
       async get(k) { return values.get(k) ?? null; },
@@ -112,6 +112,8 @@ test("Meta callback stores encrypted Page credentials and Facebook publishing us
     assert.equal(callback.status, 200);
     assert.equal(callback.body.status, "verified");
     assert.equal(callback.body.postingEnabled, true);
+    assert.equal(callback.body.facebookPages[0].canPublish, true);
+    assert.equal(callback.body.instagramAccounts[0].canPublish, true);
     assert.equal(callback.body.accessToken, undefined);
     assert.equal(JSON.stringify(callback.body).includes("page-secret-token"), false);
     const encrypted = values.get("meta:publishing:connection:staging-user");
