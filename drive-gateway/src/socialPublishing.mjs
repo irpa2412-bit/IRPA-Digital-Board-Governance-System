@@ -69,7 +69,7 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
     try {
       identity = await authorize(request, env);
       if (!identity?.uid || !Array.isArray(identity.roles) || !identity.roles.length) throw new Error("An authorized IRPA role is required.");
-      const allowed = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
+      const allowed = ["Administrator", "Executive Director", "Approver", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
       if (!identity.roles.some(role => allowed.includes(role))) throw Object.assign(new Error("Your IRPA role does not permit communications publishing or audit access."), { status: 403 });
     } catch (error) {
       return jsonResponse({ ok: false, error: error.status === 403 ? error.message : "Authentication required." }, error.status || 401, cors);
@@ -109,7 +109,7 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
     }
 
     if (request.method === "GET" && pathname === "/api/communications/social/audit") {
-      const reviewerRoles = ["Administrator", "Executive Director", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
+      const reviewerRoles = ["Administrator", "Executive Director", "Approver", "Director Outreach", "Outreach Director", "Director Community Development", "Community Development Director"];
       if (!identity.roles.some(role => reviewerRoles.includes(role))) return jsonResponse({ ok: false, error: "Reviewer or administrator role required to read publishing audit." }, 403, cors);
       let publishingEvents = [], editorialEvents = [];
       try { publishingEvents = JSON.parse(await env.DRIVE_KV.get("communications:publishing:audit") || "[]"); } catch {}
