@@ -73,7 +73,7 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
       return response({ id, source_url: "https://staging.irpa.or.tz/wp-content/uploads/test-" + id + ".bin" }, 201);
     }
     const mediaMatch = url.pathname.match(/\/wp-json\/wp\/v2\/media\/(\d+)$/);
-    if (mediaMatch && method === "POST") return response({ id: Number(mediaMatch[1]) });
+    if (mediaMatch && method === "POST") { metadataCalls.push({ contentType: new Headers(init.headers).get("Content-Type"), override: new Headers(init.headers).get("X-HTTP-Method-Override") }); return new Response("<html><body>blocked</body></html>", { status: 406, headers: { "Content-Type": "text/html", "CF-Ray": "media406-ray-DAR" } }); }
     if (url.pathname === "/wp-json/wp/v2/pages/111" && method === "POST") return response({ id: 111, status: "draft" });
     if (url.pathname.startsWith("/wp-content/uploads/") && method === "GET") return response(new Uint8Array([1, 2, 3]), 200, { "Content-Type": "application/octet-stream" });
     throw new Error("Unexpected WordPress request: " + method + " " + url.pathname);
@@ -250,7 +250,7 @@ test("all metadata fallback variants blocked retain the uploaded media ID and sa
     }), env);
     const data = await result.json();
     assert.equal(result.status, 502);
-    assert.equal(data.code, "wordpress_media_firewall_blocked");
+    assert.equal(data.code, "wordpress_media_firewall_blocked", JSON.stringify(data));
     assert.equal(data.media.id, 812);
     assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/test-812.png");
     assert.equal(data.media.metadataStatus, "failed");
