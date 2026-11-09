@@ -487,7 +487,7 @@ test("authenticated staging image upload sends file and metadata in one multipar
   assert.equal(data.media.id, 88);
   assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
   assert.equal(data.media.caption, "Community consultation");
-  assert.match(lastMediaUpload.contentType, /^multipart\\/form-data; boundary=/);
+  assert.equal(lastMediaUpload.contentType.startsWith("multipart/form-data; boundary="), true);
   assert.equal(lastMediaUpload.body.get("title"), "Field meeting");
   assert.equal(lastMediaUpload.body.get("alt_text"), "Pastoralist meeting");
   assert.equal(lastMediaUpload.body.get("caption"), "Community consultation");
@@ -527,7 +527,7 @@ test("metadata fallback tries form encoding before method override and stops at 
   const data = await result.json();
   assert.equal(data.detail.variantPassed, "X-HTTP-Method-Override: PUT");
   assert.equal(mediaMetadataRequests.length, 2);
-  assert.match(mediaMetadataRequests[0].contentType, /^application\\/x-www-form-urlencoded/);
+  assert.equal(mediaMetadataRequests[0].contentType, "application/x-www-form-urlencoded");
   assert.equal(mediaMetadataRequests[1].override, "PUT");
 });
 
