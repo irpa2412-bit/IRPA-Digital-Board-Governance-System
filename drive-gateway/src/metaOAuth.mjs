@@ -19,12 +19,14 @@ function isActive(record) {
   return !!record && (["Active", "Activated"].includes(String(record.status || "")) ||
     record.registrationStatus === "Activated" || record.employmentStatus === "Active");
 }
-function safeConfig(env) {
-  if (env?.IRPA_ENVIRONMENT !== "staging" ||
-      env?.FIREBASE_PROJECT_ID !== STAGING_PROJECT ||
-      env?.IRPA_PRODUCTION_CUTOVER !== "false") {
+function assertStagingEnvironment(env) {
+  if (env?.IRPA_ENVIRONMENT !== "staging" || env?.FIREBASE_PROJECT_ID !== STAGING_PROJECT || env?.IRPA_PRODUCTION_CUTOVER !== "false") {
     throw new Error("Meta integration is disabled unless the gateway is verified as isolated staging.");
   }
+  if (!env.DRIVE_KV || typeof env.DRIVE_KV.delete !== "function") throw new Error("The existing staging KV binding is unavailable.");
+}
+function safeConfig(env) {
+  assertStagingEnvironment(env);
   const redirect = String(env.META_REDIRECT_URI || "");
   if (redirect !== STAGING_GATEWAY + "/api/communications/meta/callback") {
     throw new Error("Meta staging redirect URI is not configured to the approved staging gateway.");
@@ -312,7 +314,7 @@ export function createMetaOAuthRouter(deps) {
     if (request.method === "POST" && path === "/api/communications/meta/disconnect") {
       try {
         if (url.origin !== STAGING_GATEWAY) throw new Error("Meta disconnect is available only on the approved staging gateway.");
-        safeConfig(env);
+        assertStagingEnvironment(env);
         const claims = await authorizeUser(request, env, deps, false);
         await env.DRIVE_KV.delete(TOKEN_KEY_PREFIX + claims.user_id);
         await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + claims.user_id);
