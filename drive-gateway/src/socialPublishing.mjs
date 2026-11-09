@@ -17,6 +17,8 @@ function statusFor(env, platform) {
   const config = PLATFORM_CONFIG[platform];
   if (!config) return { platform, status: "unsupported", reason: "Unknown platform." };
   const missing = config.required.filter(name => !String(env?.[name] || "").trim());
+  const stagingAllowed = env?.IRPA_ENVIRONMENT === "staging" && env?.FIREBASE_PROJECT_ID === "irpa-dbg-staging-a73ec" && env?.IRPA_PRODUCTION_CUTOVER === "false";
+  if (config.mode === "meta-api" && !stagingAllowed) return { platform, label: config.label, status: "staging_only", reason: "Meta automatic publishing is restricted to the isolated staging Worker.", missingSecrets: [], mode: config.mode, automaticPublishing: false };
   if (config.mode !== "meta-api") return { platform, label: config.label, status: "manual_export_only", reason: "No automatic publishing adapter is enabled for this platform in this release.", missingSecrets: missing, mode: config.mode, automaticPublishing: false };
   return {
     platform, label: config.label,
@@ -125,6 +127,7 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       }
       const publisherRoles = ["Administrator", "Executive Director", "Communications Officer", "Communications Manager", "Media Officer", "Public Relations Officer"];
       if (!identity.roles.some(role => publisherRoles.includes(role))) return jsonResponse({ ok: false, error: "Publishing authority is not assigned to this IRPA role." }, 403, cors);
+      if (env?.IRPA_ENVIRONMENT !== "staging" || env?.FIREBASE_PROJECT_ID !== "irpa-dbg-staging-a73ec" || env?.IRPA_PRODUCTION_CUTOVER !== "false") return jsonResponse({ ok: false, error: "Social API publishing is disabled outside the isolated staging environment." }, 403, cors);
       const platform = String(body.platform || "").toLowerCase();
       if (!["facebook", "instagram"].includes(platform)) {
         return jsonResponse({ ok: false, mode: "manual-export", error: "Automatic publishing is currently implemented only for Facebook Pages and Instagram professional accounts.", platform }, 501, cors);
