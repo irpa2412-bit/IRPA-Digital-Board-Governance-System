@@ -602,7 +602,7 @@ service cloud.firestore {
         &&data.get("reviewDate","") is string&&data.get("reviewDate","").size()<=20
         &&data.get("notes","") is string&&data.get("notes","").size()<=1500
         &&data.get("connectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected","Archived"]
-        &&data.get("recordOrigin","")=="PRODUCTION"
+        &&communicationMediaRecordOriginMatches(data)
         &&data.keys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","connectionStatus","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
     }
     allow read:if communicationMediaUser();
@@ -649,7 +649,7 @@ service cloud.firestore {
       &&existsAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))
       &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("platform","")==request.resource.data.get("platform","")
       &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("accountName","")==request.resource.data.get("accountName","")
-      &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
+      &&communicationMediaRecordOriginMatches(request.resource.data)
       &&request.resource.data.get("createdAt",null)==request.time
       &&request.resource.data.keys().hasOnly(["recordId","platform","accountName","action","actorUid","actorEmail","createdAt","recordOrigin"]);
     allow update,delete:if false;
