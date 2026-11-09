@@ -147,7 +147,10 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       if (typeof publishMetaContent !== "function") return jsonResponse({ ok: false, error: "The staging Meta publisher is not wired into the Worker." }, 503, cors);
       const accountId = String(body.accountId || "").trim();
       let text;
-      try { text = formatSocialContent(platform, { text: String(item.content || item.body || "").trim() }); }
+      try {
+        text = String(item.content || item.body || "").trim();
+        formatSocialContent(platform, { text, url: String(item.link || "") });
+      }
       catch (error) { return jsonResponse({ ok: false, error: error.message || "The content is not valid for this platform." }, 400, cors); }
       const auditKey = "communications:publishing:audit";
       let events = [];
