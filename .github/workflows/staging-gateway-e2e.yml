@@ -275,7 +275,8 @@ jobs:
           const metaReady=/^\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;
           const metaAppId=metaReady?metaAppIdRaw:"";
           console.log("META_OAUTH_DEPLOYMENT_STATE="+(metaReady?"enabled":"disabled"));
-          console.log("META_STAGING_TEST_DESTINATIONS_CONFIGURED="+(allowedPageIds.length&&allowedInstagramIds.length?"true":"false"));
+          console.log("META_STAGING_FACEBOOK_TEST_DESTINATIONS_CONFIGURED="+(allowedPageIds.length?"true":"false"));
+          console.log("META_STAGING_INSTAGRAM_TEST_DESTINATIONS_CONFIGURED="+(allowedInstagramIds.length?"true":"false"));
           const c={
             name:"irpa-google-drive-gateway-staging",main:"src/index.js",
             compatibility_date:"2026-09-29",workers_dev:true,
