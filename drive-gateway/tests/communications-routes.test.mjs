@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { communicationsRoutes } from "../src/communicationsRoutes.mjs";
+import { getSocialPublishingSelfTest } from "../src/socialPublishing.mjs";
 
 function harness(role="Communications Officer",uid="author",options={}){
  const values=new Map();
@@ -137,4 +138,14 @@ test("designated approver can inspect audit but cannot publish without publishin
  const publish=await h.call("/api/communications/social/publish","POST",{itemId:"approved-for-reviewer",platform:"facebook",accountId:"page-1"});
  assert.equal(publish.status,403);
  assert.equal(calls,0);
+});
+
+test("social publishing self-test reports Meta automation as staging-only outside the staging project",()=>{
+ const result=getSocialPublishingSelfTest({IRPA_ENVIRONMENT:"production",FIREBASE_PROJECT_ID:"irpa-digital-board-governance",IRPA_PRODUCTION_CUTOVER:"true",META_APP_ID:"12345678901234",META_APP_SECRET:"configured",META_TOKEN_ENCRYPTION_KEY:"configured"});
+ const facebook=result.platforms.find(platform=>platform.platform==="facebook");
+ const instagram=result.platforms.find(platform=>platform.platform==="instagram");
+ assert.equal(facebook.status,"staging_only");
+ assert.equal(instagram.status,"staging_only");
+ assert.equal(facebook.automaticPublishing,false);
+ assert.equal(instagram.automaticPublishing,false);
 });
