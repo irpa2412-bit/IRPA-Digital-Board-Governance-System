@@ -291,27 +291,31 @@ test("social-account enrolment always displays accessible success and failure fe
  assert.ok(social.includes("Unable to save the account record."));
 });
 
-test("Meta API uses the existing staging-only OAuth router, minimal read permissions, encrypted tokens and no publishing",()=>{
+test("Meta API uses isolated staging publishing scopes, encrypted tokens and server-side Page publishers",()=>{
  assert.ok(social.includes("metaStagingEnabled"));
  assert.ok(social.includes("/api/communications/meta/connect"));
  assert.ok(social.includes("/api/communications/meta/status"));
  assert.ok(social.includes("/api/communications/meta/disconnect"));
- assert.ok(social.includes("Posting enabled: No"));
+ assert.ok(social.includes("Publishing permission:"));
  assert.ok(metaOAuth.includes('env?.IRPA_ENVIRONMENT !== "staging"'));
  assert.ok(metaOAuth.includes('FIREBASE_PROJECT_ID !== STAGING_PROJECT'));
  assert.ok(metaOAuth.includes('IRPA_PRODUCTION_CUTOVER !== "false"'));
- assert.ok(metaOAuth.includes('META_TOKEN_ENCRYPTION_KEY'));
- assert.ok(metaOAuth.includes('meta:readonly:oauth-state:'));
- assert.ok(metaOAuth.includes('await env.DRIVE_KV.delete(stateKey)'));
- assert.ok(metaOAuth.includes('"pages_show_list", "pages_read_engagement", "instagram_basic"'));
- assert.ok(metaOAuth.includes('postingEnabled: false'));
- assert.ok(!metaOAuth.includes('instagram_content_publish'));
- assert.ok(!metaOAuth.includes('pages_manage_posts'));
- assert.ok(metaOAuth.includes('/api/communications/meta/disconnect'));
- assert.ok(gateway.includes('import { createMetaOAuthRouter } from "./metaOAuth.mjs"'));
+ assert.ok(metaOAuth.includes("META_TOKEN_ENCRYPTION_KEY"));
+ assert.ok(metaOAuth.includes("meta:publishing:oauth-state:"));
+ assert.ok(metaOAuth.includes("meta:publishing:connection:"));
+ assert.ok(metaOAuth.includes("await env.DRIVE_KV.delete(stateKey)"));
+ assert.ok(metaOAuth.includes("pages_manage_posts"));
+ assert.ok(metaOAuth.includes("instagram_content_publish"));
+ assert.ok(metaOAuth.includes("export async function publishMetaContent"));
+ assert.ok(metaOAuth.includes('account.facebookPageId + "/feed"'));
+ assert.ok(metaOAuth.includes('account.instagramAccountId + "/media_publish"'));
+ assert.ok(metaOAuth.includes("pageAccessToken"));
+ assert.ok(!metaOAuth.includes("meta:readonly:connection:"));
+ assert.ok(gateway.includes('import { createMetaOAuthRouter, publishMetaContent } from "./metaOAuth.mjs"'));
+ assert.ok(gateway.includes("publishMetaContent, corsHeaders"));
  assert.ok(gateway.includes('const metaOAuthRouter = createMetaOAuthRouter'));
  assert.ok(gateway.includes('const metaResponse = await metaOAuthRouter(request, env)'));
- assert.ok(docs.includes("Meta (Facebook and Instagram) API — staging-only connection and access verification"));
+ assert.ok(docs.includes("Staging social publishing"));
  assert.ok(stagingWorkflow.includes("STAGING_META_APP_ID"));
  assert.ok(stagingWorkflow.includes("STAGING_META_APP_SECRET"));
  assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
