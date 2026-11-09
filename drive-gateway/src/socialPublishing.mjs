@@ -156,9 +156,10 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
           return jsonResponse({ ok: false, published: false, outcome: "unconfirmed", error: "The platform did not return a confirmed post ID. Verify the destination before retrying." }, 502, cors);
         }
       } catch (error) {
-        events.push({ id: crypto.randomUUID(), attemptId, action: "PUBLISH_FAILED", itemId, platform, accountId, actorUid: identity.uid, at: new Date().toISOString(), status: "Failed", error: String(error?.message || "Meta publishing failed.").slice(0, 300) });
+        const knownRejection = Number(error?.status || 0) >= 400 && Number(error?.status || 0) < 500;
+        events.push({ id: crypto.randomUUID(), attemptId, action: knownRejection ? "PUBLISH_FAILED" : "PUBLISH_UNCONFIRMED", itemId, platform, accountId, actorUid: identity.uid, at: new Date().toISOString(), status: knownRejection ? "Failed" : "Outcome Unconfirmed", error: String(error?.message || "Meta publishing outcome is unknown.").slice(0, 300) });
         await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
-        return jsonResponse({ ok: false, published: false, error: error.message || "Meta publishing failed." }, error.status || 502, cors);
+        return jsonResponse({ ok: false, published: false, outcome: knownRejection ? "failed" : "unconfirmed", error: error.message || "Meta publishing failed. Verify the destination before retrying." }, error.status || 502, cors);
       }
       item.publishedPlatforms = [...new Set([...(Array.isArray(item.publishedPlatforms) ? item.publishedPlatforms : []), platform])];
       item.platformPublicationResults = [...(Array.isArray(item.platformPublicationResults) ? item.platformPublicationResults : []), { platform, accountId, postId: result.postId, publishedAt: result.publishedAt, publishedByUid: identity.uid }];
