@@ -32,7 +32,7 @@ async function audit(env,event){let rows=[];try{rows=JSON.parse(await env.DRIVE_
 function socialTextSafetyError(value){
  const text=String(value||"");
  if(/\b(password|passwd|passcode|api[_ -]?key|access[_ -]?token|secret)\s*[:=]/i.test(text))return "Remove passwords, credentials and access tokens before saving.";
- if(/\b(?:\\+?\d[\d ()-]{7,}\d)\b/.test(text))return "Remove private telephone numbers before saving.";
+ if(/\b(?:\+?\d[\d ()-]{7,}\d)\b/.test(text))return "Remove private telephone numbers before saving.";
  const emails=text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi)||[];
  if(emails.some(e=>!["info@irpa.or.tz","complaints@irpa.or.tz"].includes(e.toLowerCase())))return "Remove private email addresses before saving; use approved public IRPA contact channels.";
  if(/\b(confidential|strictly confidential|private record|medical record|national id|passport number)\b/i.test(text))return "Confidential or personal records cannot be included in public posts.";
