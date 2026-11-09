@@ -19,7 +19,7 @@ function harness({ role = "Communications Officer", envOverrides = {} } = {}) {
   const kv = makeKv();
   const env = {
     IRPA_ENVIRONMENT: "staging", FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec", IRPA_PRODUCTION_CUTOVER: "false",
-    META_APP_ID: "12345678901234", META_APP_SECRET: "test-only-not-a-real-secret", META_TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY, META_STAGING_ALLOWED_PAGE_IDS: "page-123", META_STAGING_ALLOWED_INSTAGRAM_IDS: "ig-456",
+    META_APP_ID: "12345678901234", META_APP_SECRET: "test-only-not-a-real-secret", META_TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY, META_STAGING_ALLOWED_PAGE_IDS: "123456789012345", META_STAGING_ALLOWED_INSTAGRAM_IDS: "123456789012346",
     META_REDIRECT_URI: REDIRECT, META_GRAPH_API_VERSION: "v26.0", DRIVE_KV: kv, ...envOverrides
   };
   const router = createMetaOAuthRouter({
@@ -42,14 +42,14 @@ function mockMetaFetch({ missingScopes = false } = {}) {
     }
     if (url.pathname.endsWith("/me/permissions")) return Response.json({ data: (missingScopes ? REQUIRED_SCOPES.slice(0, 1) : REQUIRED_SCOPES).map(permission => ({ permission, status: "granted" })) });
     if (url.pathname.endsWith("/me/accounts")) return Response.json({ data: [{
-      id: "page-123", name: "IRPA Test Page", access_token: "page-token-fixture", tasks: ["CREATE_CONTENT"],
-      instagram_business_account: { id: "ig-456", username: "irpa_test", account_type: "BUSINESS" }
+      id: "123456789012345", name: "IRPA Test Page", access_token: "page-token-fixture", tasks: ["CREATE_CONTENT"],
+      instagram_business_account: { id: "123456789012346", username: "irpa_test", account_type: "BUSINESS" }
     }] });
     if (url.pathname.endsWith("/me")) return Response.json({ id: "meta-user-1", name: "IRPA Test User" });
-    if (url.pathname.endsWith("/page-123/feed")) return Response.json({ id: "page-123_post-1" });
-    if (url.pathname.endsWith("/ig-456/media")) return Response.json({ id: "ig-container-1" });
+    if (url.pathname.endsWith("/123456789012345/feed")) return Response.json({ id: "123456789012345_post-1" });
+    if (url.pathname.endsWith("/123456789012346/media")) return Response.json({ id: "ig-container-1" });
     if (url.pathname.endsWith("/ig-container-1")) return Response.json({ status_code: "FINISHED" });
-    if (url.pathname.endsWith("/ig-456/media_publish")) return Response.json({ id: "ig-media-1" });
+    if (url.pathname.endsWith("/123456789012346/media_publish")) return Response.json({ id: "ig-media-1" });
     return Response.json({ error: { message: "Unexpected Meta test request" } }, { status: 404 });
   };
 }
@@ -122,16 +122,16 @@ test("Facebook and Instagram publishing use encrypted server-side Page tokens", 
   globalThis.fetch = async (input, init = {}) => { calls.push({ url: new URL(String(input)), init }); return base(input, init); };
   try {
     await connectAndCallback(h, "C".repeat(43));
-    const facebook = await publishMetaContent(h.env, { uid: "user-1", platform: "facebook", accountId: "page-123", text: "Staging Facebook test" });
-    assert.equal(facebook.postId, "page-123_post-1");
-    const pagePost = calls.find(call => call.url.pathname.endsWith("/page-123/feed"));
+    const facebook = await publishMetaContent(h.env, { uid: "user-1", platform: "facebook", accountId: "123456789012345", text: "Staging Facebook test" });
+    assert.equal(facebook.postId, "123456789012345_post-1");
+    const pagePost = calls.find(call => call.url.pathname.endsWith("/123456789012345/feed"));
     assert.equal(pagePost.init.method, "POST");
     assert.equal(pagePost.init.headers.get("Authorization"), "Bearer page-token-fixture");
     assert.equal(new URLSearchParams(pagePost.init.body).get("message"), "Staging Facebook test");
     assert.equal(pagePost.url.searchParams.has("access_token"), false);
-    const instagram = await publishMetaContent(h.env, { uid: "user-1", platform: "instagram", accountId: "ig-456", text: "Staging Instagram test", imageUrl: "https://cdn.example.test/test.jpg" });
+    const instagram = await publishMetaContent(h.env, { uid: "user-1", platform: "instagram", accountId: "123456789012346", text: "Staging Instagram test", imageUrl: "https://cdn.example.test/test.jpg" });
     assert.equal(instagram.postId, "ig-media-1");
-    assert.ok(calls.some(call => call.url.pathname.endsWith("/ig-456/media_publish")));
+    assert.ok(calls.some(call => call.url.pathname.endsWith("/123456789012346/media_publish")));
   } finally { globalThis.fetch = previousFetch; }
 });
 
@@ -144,7 +144,7 @@ test("missing publishing scopes fail closed and production publisher calls are r
     assert.equal(await h.kv.get("meta:publishing:connection:user-1"), null);
   } finally { globalThis.fetch = previousFetch; }
   const production = harness({ envOverrides: { IRPA_ENVIRONMENT: "production", FIREBASE_PROJECT_ID: "irpa-digital-board-governance", IRPA_PRODUCTION_CUTOVER: "true" } });
-  await assert.rejects(() => publishMetaContent(production.env, { uid: "user-1", platform: "facebook", accountId: "page-123", text: "Do not publish" }), /isolated staging/i);
+  await assert.rejects(() => publishMetaContent(production.env, { uid: "user-1", platform: "facebook", accountId: "123456789012345", text: "Do not publish" }), /isolated staging/i);
 });
 
 test("Meta publishing refuses a connected Page not explicitly allowlisted for staging", async () => {
@@ -153,6 +153,6 @@ test("Meta publishing refuses a connected Page not explicitly allowlisted for st
   try {
     await connectAndCallback(h, "E".repeat(43));
     h.env.META_STAGING_ALLOWED_PAGE_IDS = "";
-    await assert.rejects(() => publishMetaContent(h.env, { uid: "user-1", platform: "facebook", accountId: "page-123", text: "Must not publish to public Page" }), /not approved as an IRPA staging test destination/i);
+    await assert.rejects(() => publishMetaContent(h.env, { uid: "user-1", platform: "facebook", accountId: "123456789012345", text: "Must not publish to public Page" }), /not approved as an IRPA staging test destination/i);
   } finally { globalThis.fetch = previousFetch; }
 });
