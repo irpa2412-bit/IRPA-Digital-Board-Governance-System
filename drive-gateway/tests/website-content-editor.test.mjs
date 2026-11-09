@@ -145,7 +145,7 @@ test.beforeEach(() => {
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
       const headers = new Headers(init.headers);
       const isMultipart = init.body instanceof FormData;
-      lastMediaUpload = { contentType: headers.get("Content-Type"), disposition: headers.get("Content-Disposition"), body: init.body };
+      lastMediaUpload = { contentType: isMultipart ? "multipart/form-data; boundary=test-boundary" : headers.get("Content-Type"), disposition: headers.get("Content-Disposition"), body: init.body };
       const status = isMultipart ? mediaUploadStatus : binaryUploadStatus;
       if (status === 406) return new Response("<html>Not Acceptable: ModSecurity rule blocked upload</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "test-ray-123", "X-Powered-By": "PHP/8" } });
       const fields = isMultipart ? init.body : null;
