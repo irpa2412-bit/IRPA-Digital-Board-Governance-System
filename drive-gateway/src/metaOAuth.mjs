@@ -346,6 +346,7 @@ export async function publishMetaContent(env, { uid, platform, accountId, text, 
   if (!account) throw Object.assign(new Error("The selected destination is not part of this user's verified Meta connection."), { status: 403 });
   const pageToken = String(account.pageAccessToken || "");
   if (!pageToken) throw Object.assign(new Error("A Page access token was not returned for this destination. Reconnect Meta and verify Page permissions."), { status: 409 });
+  if (link && !/^https:\/\//i.test(String(link))) throw Object.assign(new Error("Publishing links must use HTTPS."), { status: 400 });
   const post = async (path, params) => graphPost(cfg.version, path, pageToken, cfg.appSecret, params);
   if (!account.tasks?.includes("CREATE_CONTENT") && !account.tasks?.includes("MANAGE")) {
     throw Object.assign(new Error("The connected Meta user does not have the Page CREATE_CONTENT task."), { status: 403 });
