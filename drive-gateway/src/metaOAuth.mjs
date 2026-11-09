@@ -1,9 +1,9 @@
 const STAGING_PROJECT = "irpa-dbg-staging-a73ec";
 const STAGING_GATEWAY = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev";
-// Read-only connection verification only; this router intentionally exposes no social publishing or messaging operations.
-const REQUIRED_SCOPES = ["pages_show_list", "pages_read_engagement", "instagram_basic"];
-const TOKEN_KEY_PREFIX = "meta:readonly:connection:";
-const STATE_KEY_PREFIX = "meta:readonly:oauth-state:";
+// Publishing is available only on the isolated staging gateway; no production credentials or routes are used.
+export const REQUIRED_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "instagram_basic", "instagram_content_publish"];
+const TOKEN_KEY_PREFIX = "meta:publishing:connection:";
+const STATE_KEY_PREFIX = "meta:publishing:oauth-state:";
 const STATE_TTL_SECONDS = 600;
 
 function roleValues(record) {
@@ -137,12 +137,12 @@ async function authorizeUser(request, env, deps, reviewer = false) {
   }
   return claims;
 }
-async function requireReadOnlyScopes(version, token, appSecret) {
+async function requirePublishingScopes(version, token, appSecret) {
   const response = await graphJson(graphUrl(version, "me/permissions", { access_token: token }).toString(), {}, appSecret);
   const granted = new Set((Array.isArray(response.data) ? response.data : [])
     .filter(item => item?.status === "granted").map(item => String(item.permission || "")));
   const missing = REQUIRED_SCOPES.filter(scope => !granted.has(scope));
-  if (missing.length) throw new Error("Required Meta read-only permissions were not granted.");
+  if (missing.length) throw new Error("Required Meta publishing permissions were not granted.");
 }
 function publicAccounts(pages) {
   return (Array.isArray(pages?.data) ? pages.data : []).map(page => ({
@@ -203,21 +203,21 @@ export function createMetaOAuthRouter(deps) {
             client_secret: cfg.appSecret, fb_exchange_token: shortToken.access_token }).toString()
         });
         const token = longToken.access_token || shortToken.access_token;
-        await requireReadOnlyScopes(cfg.version, token, cfg.appSecret);
+        await requirePublishingScopes(cfg.version, token, cfg.appSecret);
         const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: token }).toString(), {}, cfg.appSecret);
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
-          fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: token
+          fields: "id,name,access_token,tasks,instagram_business_account{id,username,account_type}", limit: 100, access_token: token
         }).toString(), {}, cfg.appSecret);
         const connection = {
           userId: String(me.id || ""), userName: String(me.name || "").slice(0, 180),
-          accounts: publicAccounts(pages), connectedAt: new Date().toISOString(),
+          accounts: (Array.isArray(pages.data) ? pages.data : []).map(page => ({ facebookPageId: String(page.id || ""), facebookPageName: String(page.name || "").slice(0, 180), pageAccessToken: String(page.access_token || ""), tasks: Array.isArray(page.tasks) ? page.tasks.map(String) : [], instagramAccountId: String(page.instagram_business_account?.id || ""), instagramUsername: String(page.instagram_business_account?.username || ""), instagramAccountType: String(page.instagram_business_account?.account_type || "") })), connectedAt: new Date().toISOString(),
           expiresAt: Number(longToken.expires_in || shortToken.expires_in || 0) > 0
             ? new Date(Date.now() + Number(longToken.expires_in || shortToken.expires_in) * 1000).toISOString() : null,
           accessToken: token
         };
         const encrypted = await encryptJson(env, connection);
         await env.DRIVE_KV.put(TOKEN_KEY_PREFIX + stateRecord.uid, encrypted);
-        return json({ ok: true, status: "verified", postingEnabled: false, message: "Meta read-only API access verified. No posting permissions were requested.",
+        return json({ ok: true, status: "verified", postingEnabled: true, message: "Meta publishing permissions verified. Publishing remains subject to approval and the global pause.",
           facebookPages: connection.accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
           instagramAccounts: connection.accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType }))),
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, requestedScopes: REQUIRED_SCOPES
@@ -248,7 +248,7 @@ export function createMetaOAuthRouter(deps) {
         state, scope: REQUIRED_SCOPES.join(",")
       }).toString();
       return json({ ok: true, authorizationUrl: authUrl.toString(), requestedScopes: REQUIRED_SCOPES,
-        postingEnabled: false }, 200, corsHeaders(request));
+        postingEnabled: true }, 200, corsHeaders(request));
     }
 
     if (request.method === "GET" && path === "/api/communications/meta/status") {
@@ -264,7 +264,7 @@ export function createMetaOAuthRouter(deps) {
       if (!encrypted) return json({ ok: true, status: "not_connected", postingEnabled: false }, 200, corsHeaders(request));
       try {
         const connection = await decryptJson(env, encrypted);
-        await requireReadOnlyScopes(cfg.version, connection.accessToken, cfg.appSecret);
+        await requirePublishingScopes(cfg.version, connection.accessToken, cfg.appSecret);
         const me = await graphJson(graphUrl(cfg.version, "me", { fields: "id,name", access_token: connection.accessToken }).toString(), {}, cfg.appSecret);
         const pages = await graphJson(graphUrl(cfg.version, "me/accounts", {
           fields: "id,name,instagram_business_account{id,username,account_type}", limit: 100, access_token: connection.accessToken
@@ -273,7 +273,7 @@ export function createMetaOAuthRouter(deps) {
         return json({ ok: true, status: "verified", user: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
           facebookPages: accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
           instagramAccounts: accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType }))),
-          connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, postingEnabled: false,
+          connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, postingEnabled: true,
           requestedScopes: REQUIRED_SCOPES }, 200, corsHeaders(request));
       } catch (error) {
         return json({ ok: false, status: "verification_failed", postingEnabled: false,
@@ -296,4 +296,55 @@ export function createMetaOAuthRouter(deps) {
 
     return jsonError(json, corsHeaders, request, 404, "Meta endpoint not found.");
   };
+}
+
+ 
+// Server-side Meta publisher. Tokens and Page access tokens are read only from encrypted staging KV.
+export async function publishMetaContent(env, { uid, platform, accountId, text, link = "", imageUrl = "" } = {}) {
+  const cfg = safeConfig(env);
+  const safeUid = String(uid || "").trim();
+  if (!safeUid) throw Object.assign(new Error("Authenticated staging user is required."), { status: 401 });
+  const encrypted = await env.DRIVE_KV.get(TOKEN_KEY_PREFIX + safeUid);
+  if (!encrypted) throw Object.assign(new Error("Connect Meta in the staging portal before publishing."), { status: 409 });
+  const connection = await decryptJson(env, encrypted);
+  await requirePublishingScopes(cfg.version, connection.accessToken, cfg.appSecret);
+  const selectedPlatform = String(platform || "").toLowerCase();
+  const selectedId = String(accountId || "").trim();
+  if (!selectedId) throw Object.assign(new Error("Select a connected destination account."), { status: 400 });
+  const account = (Array.isArray(connection.accounts) ? connection.accounts : []).find(item =>
+    selectedPlatform === "facebook" ? item.facebookPageId === selectedId :
+    selectedPlatform === "instagram" ? item.instagramAccountId === selectedId : false);
+  if (!account) throw Object.assign(new Error("The selected destination is not part of this user's verified Meta connection."), { status: 403 });
+  const pageToken = String(account.pageAccessToken || "");
+  if (!pageToken) throw Object.assign(new Error("A Page access token was not returned for this destination. Reconnect Meta and verify Page permissions."), { status: 409 });
+  const post = async (path, params) => graphJson(graphUrl(cfg.version, path, { ...params, access_token: pageToken }).toString(), { method: "POST" }, cfg.appSecret);
+  if (selectedPlatform === "facebook") {
+    if (!account.tasks?.includes("CREATE_CONTENT") && !account.tasks?.includes("MANAGE")) {
+      throw Object.assign(new Error("The connected Meta user does not have the Page CREATE_CONTENT task."), { status: 403 });
+    }
+    const payload = { message: String(text || "").trim() };
+    if (link) payload.link = String(link);
+    if (!payload.message && !payload.link) throw Object.assign(new Error("Facebook publishing requires text or a link."), { status: 400 });
+    const result = await post(account.facebookPageId + "/feed", payload);
+    return { platform: "facebook", accountId: selectedId, postId: String(result.id || ""), publishedAt: new Date().toISOString() };
+  }
+  if (selectedPlatform === "instagram") {
+    if (!account.instagramAccountId) throw Object.assign(new Error("This Page has no linked Instagram professional account."), { status: 409 });
+    if (!/^https:\/\//i.test(String(imageUrl || ""))) throw Object.assign(new Error("Instagram feed publishing requires a publicly accessible HTTPS image URL."), { status: 400 });
+    const caption = String(text || "").trim() + (link ? (String(text || "").trim() ? "\\n\\n" : "") + String(link) : "");
+    const container = await post(account.instagramAccountId + "/media", { image_url: imageUrl, caption });
+    if (!container.id) throw Object.assign(new Error("Meta did not return an Instagram media container ID."), { status: 502 });
+    let state = {};
+    for (let attempt = 0; attempt < 6; attempt++) {
+      state = await graphJson(graphUrl(cfg.version, String(container.id), { fields: "status_code,status", access_token: pageToken }).toString(), {}, cfg.appSecret);
+      if (state.status_code === "FINISHED") break;
+      if (state.status_code === "ERROR" || state.status_code === "EXPIRED") throw Object.assign(new Error("Instagram rejected or expired the media container before publication."), { status: 502 });
+      if (attempt < 5) await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    if (state.status_code !== "FINISHED") throw Object.assign(new Error("Instagram media is still processing. Retry publication after checking the container status."), { status: 409 });
+    const result = await post(account.instagramAccountId + "/media_publish", { creation_id: container.id });
+    if (!result.id) throw Object.assign(new Error("Meta did not confirm the Instagram publication."), { status: 502 });
+    return { platform: "instagram", accountId: selectedId, postId: String(result.id), publishedAt: new Date().toISOString() };
+  }
+  throw Object.assign(new Error("Automatic Meta publishing supports Facebook Pages and Instagram professional accounts only."), { status: 400 });
 }
