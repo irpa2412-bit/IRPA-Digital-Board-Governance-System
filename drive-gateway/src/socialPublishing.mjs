@@ -141,11 +141,12 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       const gate = validateApprovedItem(item, identity);
       if (gate) return jsonResponse({ ok: false, error: gate }, 403, cors);
       if (!Array.isArray(item.platforms) || !item.platforms.includes(platform)) return jsonResponse({ ok: false, error: "The selected platform is not included in the saved approved content item." }, 403, cors);
-      if (Array.isArray(item.publishedPlatforms) && item.publishedPlatforms.includes(platform)) return jsonResponse({ ok: false, error: "This approved item has already been published to the selected platform." }, 409, cors);
+      const accountId = String(body.accountId || "").trim();
+      if (!accountId) return jsonResponse({ ok: false, error: "A verified destination account ID is required." }, 400, cors);
+      if (Array.isArray(item.platformPublicationResults) && item.platformPublicationResults.some(row => row.platform === platform && row.accountId === accountId)) return jsonResponse({ ok: false, error: "This approved item has already been published to the selected destination." }, 409, cors);
       const paused = String(await env?.DRIVE_KV?.get("communications:publishing:paused") || "true") !== "false";
       if (paused) return jsonResponse({ ok: false, error: "Publishing is paused. No external post was sent." }, 423, cors);
       if (typeof publishMetaContent !== "function") return jsonResponse({ ok: false, error: "The staging Meta publisher is not wired into the Worker." }, 503, cors);
-      const accountId = String(body.accountId || "").trim();
       let text;
       try {
         text = String(item.content || item.body || "").trim();
@@ -155,7 +156,7 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       const auditKey = "communications:publishing:audit";
       let events = [];
       try { events = JSON.parse(await env.DRIVE_KV.get(auditKey) || "[]"); } catch {}
-      const priorAttempts = events.filter(event => event.itemId === itemId && event.platform === platform);
+      const priorAttempts = events.filter(event => event.itemId === itemId && event.platform === platform && event.accountId === accountId);
       if (priorAttempts.some(event => event.action === "PUBLISHED")) return jsonResponse({ ok: false, error: "This item already has a confirmed publication record for the selected platform." }, 409, cors);
       const terminalAttempts = new Set(priorAttempts.filter(event => ["PUBLISHED", "PUBLISH_FAILED"].includes(event.action)).map(event => event.attemptId).filter(Boolean));
       if (priorAttempts.some(event => event.action === "PUBLISH_REQUESTED" && !terminalAttempts.has(event.id))) {
