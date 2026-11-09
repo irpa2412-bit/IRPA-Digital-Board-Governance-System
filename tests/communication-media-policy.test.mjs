@@ -14,6 +14,7 @@ const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
 const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
 const stagingWorkflow=read("../.github/workflows/staging-gateway-e2e.yml");
+const firestoreApproval=read("../.github/workflows/firestore-rules-approval.yml");
 const rules=read("../firestore.rules");
 const gateway=read("../drive-gateway/src/index.js");
 const wrangler=read("../drive-gateway/wrangler.toml");
@@ -299,7 +300,8 @@ test("Meta API uses isolated staging publishing scopes, encrypted tokens and ser
  assert.ok(social.includes("/api/communications/meta/connect"));
  assert.ok(social.includes("/api/communications/meta/status"));
  assert.ok(social.includes("/api/communications/meta/disconnect"));
- assert.ok(social.includes("Publishing permission:"));
+ assert.ok(social.includes("Meta scopes:"));
+ assert.ok(social.includes("Eligible staging test destinations:"));
  assert.ok(metaOAuth.includes('env?.IRPA_ENVIRONMENT !== "staging"'));
  assert.ok(metaOAuth.includes('FIREBASE_PROJECT_ID !== STAGING_PROJECT'));
  assert.ok(metaOAuth.includes('IRPA_PRODUCTION_CUTOVER !== "false"'));
@@ -334,7 +336,7 @@ test("Meta API uses isolated staging publishing scopes, encrypted tokens and ser
  assert.ok(stagingWorkflow.includes('IRPA_PRODUCTION_CUTOVER:"false"'));
  assert.ok(stagingWorkflow.includes("STAGING_COMMUNICATION_MEDIA_ARCHIVE_PROVISION=PASS"));
  assert.ok(stagingWorkflow.includes("STAGING_CONTROLLED_PDF_UPLOAD=PASS"));
- assert.ok(stagingWorkflow.includes("firestore-rules-approved"));
+ assert.ok(firestoreApproval.includes("firestore-rules-approved"));
  assert.ok(stagingWorkflow.includes("refusing to configure Worker secrets"));
 });
 
