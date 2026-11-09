@@ -341,18 +341,19 @@ export async function publishMetaContent(env, { uid, platform, accountId, text, 
   const pageToken = String(account.pageAccessToken || "");
   if (!pageToken) throw Object.assign(new Error("A Page access token was not returned for this destination. Reconnect Meta and verify Page permissions."), { status: 409 });
   const post = async (path, params) => graphPost(cfg.version, path, pageToken, cfg.appSecret, params);
+  if (!account.tasks?.includes("CREATE_CONTENT") && !account.tasks?.includes("MANAGE")) {
+    throw Object.assign(new Error("The connected Meta user does not have the Page CREATE_CONTENT task."), { status: 403 });
+  }
   if (selectedPlatform === "facebook") {
-    if (!account.tasks?.includes("CREATE_CONTENT") && !account.tasks?.includes("MANAGE")) {
-      throw Object.assign(new Error("The connected Meta user does not have the Page CREATE_CONTENT task."), { status: 403 });
-    }
     const payload = { message: String(text || "").trim() };
     if (link) payload.link = String(link);
     if (!payload.message && !payload.link) throw Object.assign(new Error("Facebook publishing requires text or a link."), { status: 400 });
     const result = await post(account.facebookPageId + "/feed", payload);
-    return { platform: "facebook", accountId: selectedId, postId: String(result.id || ""), publishedAt: new Date().toISOString() };
+    if (!result.id) throw Object.assign(new Error("Meta did not confirm the Facebook Page publication."), { status: 502 });
+    return { platform: "facebook", accountId: selectedId, postId: String(result.id), publishedAt: new Date().toISOString() };
   }
   if (selectedPlatform === "instagram") {
-    if (!account.instagramAccountId) throw Object.assign(new Error("This Page has no linked Instagram professional account."), { status: 409 });
+    if (!account.instagramAccountId || !["BUSINESS", "MEDIA_CREATOR"].includes(String(account.instagramAccountType || "").toUpperCase())) throw Object.assign(new Error("This Page has no eligible linked Instagram Professional account."), { status: 409 });
     if (!/^https:\/\//i.test(String(imageUrl || ""))) throw Object.assign(new Error("Instagram feed publishing requires a publicly accessible HTTPS image URL."), { status: 400 });
     const caption = String(text || "").trim() + (link ? (String(text || "").trim() ? "\\n\\n" : "") + String(link) : "");
     const container = await post(account.instagramAccountId + "/media", { image_url: imageUrl, caption });
