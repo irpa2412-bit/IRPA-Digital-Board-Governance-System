@@ -140,12 +140,12 @@ test("designated approver can inspect audit but cannot publish without publishin
  assert.equal(calls,0);
 });
 
-test("social publishing self-test reports Meta automation as staging-only outside the staging project",()=>{
+test("social publishing self-test blocks Meta automatic publishing outside the staging project",()=>{
  const result=getSocialPublishingSelfTest({IRPA_ENVIRONMENT:"production",FIREBASE_PROJECT_ID:"irpa-digital-board-governance",IRPA_PRODUCTION_CUTOVER:"true",META_APP_ID:"12345678901234",META_APP_SECRET:"configured",META_TOKEN_ENCRYPTION_KEY:"configured"});
- const facebook=result.platforms.find(platform=>platform.platform==="facebook");
- const instagram=result.platforms.find(platform=>platform.platform==="instagram");
- assert.equal(facebook.status,"staging_only");
- assert.equal(instagram.status,"staging_only");
- assert.equal(facebook.automaticPublishing,false);
- assert.equal(instagram.automaticPublishing,false);
+ const facebook=result.find(platform=>platform.name.startsWith("Facebook"));
+ const instagram=result.find(platform=>platform.name.startsWith("Instagram"));
+ assert.equal(facebook.status,"BLOCKED");
+ assert.equal(instagram.status,"BLOCKED");
+ assert.match(facebook.reason,/isolated staging/i);
+ assert.match(instagram.reason,/isolated staging/i);
 });
