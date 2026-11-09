@@ -135,25 +135,46 @@ export function createSocialPublishingRouter({ authorize, publishMetaContent, js
       const auditKey = "communications:publishing:audit";
       let events = [];
       try { events = JSON.parse(await env.DRIVE_KV.get(auditKey) || "[]"); } catch {}
+      const priorAttempts = events.filter(event => event.itemId === itemId && event.platform === platform);
+      if (priorAttempts.some(event => event.action === "PUBLISHED")) return jsonResponse({ ok: false, error: "This item already has a confirmed publication record for the selected platform." }, 409, cors);
+      const terminalAttempts = new Set(priorAttempts.filter(event => ["PUBLISHED", "PUBLISH_FAILED"].includes(event.action)).map(event => event.attemptId).filter(Boolean));
+      if (priorAttempts.some(event => event.action === "PUBLISH_REQUESTED" && !terminalAttempts.has(event.id))) {
+        return jsonResponse({ ok: false, error: "A previous publishing attempt has no confirmed outcome. Check the publishing audit and destination before retrying." }, 409, cors);
+      }
       const attemptId = crypto.randomUUID();
       events.push({ id: attemptId, action: "PUBLISH_REQUESTED", itemId, platform, accountId, actorUid: identity.uid, at: new Date().toISOString(), status: "In Progress" });
       await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
+      let result;
       try {
-        const result = await publishMetaContent(env, {
+        result = await publishMetaContent(env, {
           uid: identity.uid, platform, accountId, text,
           link: String(item.link || ""), imageUrl: String(item.imageUrl || "")
         });
-        if (!result?.postId) throw Object.assign(new Error("The platform did not return a confirmed post ID."), { status: 502 });
-        item.publishedPlatforms = [...new Set([...(Array.isArray(item.publishedPlatforms) ? item.publishedPlatforms : []), platform])];
-        item.platformPublicationResults = [...(Array.isArray(item.platformPublicationResults) ? item.platformPublicationResults : []), { platform, accountId, postId: result.postId, publishedAt: result.publishedAt, publishedByUid: identity.uid }];
-        await env.DRIVE_KV.put("communications:editorial:items", JSON.stringify(items));
-        events.push({ id: crypto.randomUUID(), attemptId, action: "PUBLISHED", itemId, platform, accountId, postId: result.postId, actorUid: identity.uid, at: result.publishedAt, status: "Published" });
-        await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
-        return jsonResponse({ ok: true, published: true, mode: "meta-api", result }, 200, cors);
+        if (!result?.postId) {
+          events.push({ id: crypto.randomUUID(), attemptId, action: "PUBLISH_UNCONFIRMED", itemId, platform, accountId, actorUid: identity.uid, at: new Date().toISOString(), status: "Outcome Unconfirmed" });
+          await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
+          return jsonResponse({ ok: false, published: false, outcome: "unconfirmed", error: "The platform did not return a confirmed post ID. Verify the destination before retrying." }, 502, cors);
+        }
       } catch (error) {
         events.push({ id: crypto.randomUUID(), attemptId, action: "PUBLISH_FAILED", itemId, platform, accountId, actorUid: identity.uid, at: new Date().toISOString(), status: "Failed", error: String(error?.message || "Meta publishing failed.").slice(0, 300) });
         await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
         return jsonResponse({ ok: false, published: false, error: error.message || "Meta publishing failed." }, error.status || 502, cors);
+      }
+      item.publishedPlatforms = [...new Set([...(Array.isArray(item.publishedPlatforms) ? item.publishedPlatforms : []), platform])];
+      item.platformPublicationResults = [...(Array.isArray(item.platformPublicationResults) ? item.platformPublicationResults : []), { platform, accountId, postId: result.postId, publishedAt: result.publishedAt, publishedByUid: identity.uid }];
+      let itemStatePersisted = false;
+      try {
+        await env.DRIVE_KV.put("communications:editorial:items", JSON.stringify(items));
+        itemStatePersisted = true;
+      } catch {}
+      events.push({ id: crypto.randomUUID(), attemptId, action: "PUBLISHED", itemId, platform, accountId, postId: result.postId, actorUid: identity.uid, at: result.publishedAt, status: "Published", itemStatePersisted });
+      let auditPersisted = false;
+      try {
+        await env.DRIVE_KV.put(auditKey, JSON.stringify(events.slice(-1000)));
+        auditPersisted = true;
+      } catch {}
+      return jsonResponse({ ok: true, published: true, mode: "meta-api", result, itemStatePersisted, auditPersisted,
+        warning: !itemStatePersisted || !auditPersisted ? "The platform confirmed publication, but one or more local audit/state writes did not complete. Do not retry; reconcile the publishing audit first." : "" }, 200, cors);
       }
     }
     return jsonResponse({ ok: false, error: "Social publishing route not found." }, 404, cors);
