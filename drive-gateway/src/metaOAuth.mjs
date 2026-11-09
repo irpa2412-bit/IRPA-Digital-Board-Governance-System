@@ -260,6 +260,8 @@ export function createMetaOAuthRouter(deps) {
         return json({ ok: true, status: "verified", postingEnabled: true, message: "Meta publishing permissions verified. Publishing remains subject to approval and the global pause.",
           facebookPages: connection.accounts.map(a => ({ id: a.facebookPageId, name: a.facebookPageName, canPublish: a.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task)) && stagingDestinationAllowlist(env).facebookPageIds.has(a.facebookPageId) })),
           instagramAccounts: connection.accounts.filter(a => a.instagramAccountId).map(a => ({ id: a.instagramAccountId, username: a.instagramUsername, accountType: a.instagramAccountType, canPublish: a.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task)) && stagingDestinationAllowlist(env).instagramAccountIds.has(a.instagramAccountId) && ["BUSINESS", "MEDIA_CREATOR"].includes(String(a.instagramAccountType).toUpperCase()) })),
+          eligibleFacebookPageCount: connection.accounts.filter(a => a.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task)) && stagingDestinationAllowlist(env).facebookPageIds.has(a.facebookPageId)).length,
+          eligibleInstagramAccountCount: connection.accounts.filter(a => a.instagramAccountId && a.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task)) && stagingDestinationAllowlist(env).instagramAccountIds.has(a.instagramAccountId) && ["BUSINESS", "MEDIA_CREATOR"].includes(String(a.instagramAccountType).toUpperCase())).length,
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, requestedScopes: REQUIRED_SCOPES
         }, 200, corsHeaders(request));
       } catch (error) {
@@ -313,6 +315,8 @@ export function createMetaOAuthRouter(deps) {
         return json({ ok: true, status: "verified", user: { id: String(me.id || ""), name: String(me.name || "").slice(0, 180) },
           facebookPages: accounts.map(a => ({ id: a.facebookPageId, name: a.facebookPageName, canPublish: a.canPublish })),
           instagramAccounts: accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType, canPublish: i.canPublish }))),
+          eligibleFacebookPageCount: accounts.filter(a => a.canPublish).length,
+          eligibleInstagramAccountCount: accounts.flatMap(a => a.instagram).filter(i => i.canPublish).length,
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, postingEnabled: true,
           requestedScopes: REQUIRED_SCOPES }, 200, corsHeaders(request));
       } catch (error) {
