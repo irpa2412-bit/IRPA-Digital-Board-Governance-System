@@ -244,7 +244,7 @@ export function createMetaOAuthRouter(deps) {
         await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + stateRecord.uid);
         return json({ ok: true, status: "verified", postingEnabled: true, message: "Meta publishing permissions verified. Publishing remains subject to approval and the global pause.",
           facebookPages: connection.accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
-          instagramAccounts: connection.accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType }))),
+          instagramAccounts: connection.accounts.filter(a => a.instagramAccountId).map(a => ({ id: a.instagramAccountId, username: a.instagramUsername, accountType: a.instagramAccountType })),
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, requestedScopes: REQUIRED_SCOPES
         }, 200, corsHeaders(request));
       } catch (error) {
