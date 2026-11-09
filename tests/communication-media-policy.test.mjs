@@ -12,6 +12,7 @@ const studio=read("../src/pages/CommunicationMediaStudio.jsx");
 const websiteStudio=read("../src/pages/CommunicationsWebsiteStudio.jsx");
 const operations=read("../src/pages/CommunicationMediaOperations.jsx");
 const social=read("../src/pages/SocialMediaAccounts.jsx");
+const socialStudio=read("../src/pages/CommunicationsSocialStudio.jsx");
 const metaOAuth=read("../drive-gateway/src/metaOAuth.mjs");
 const stagingWorkflow=read("../.github/workflows/staging-gateway-e2e.yml");
 const rules=read("../firestore.rules");
