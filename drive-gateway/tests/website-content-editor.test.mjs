@@ -507,7 +507,7 @@ test("when multipart and binary media uploads are both blocked, report firewall 
   });
   assert.equal(result.status, 502);
   const data = await result.json();
-  assert.equal(data.code, "wordpress_media_firewall_blocked");
+  assert.equal(data.code, "wordpress_media_firewall_blocked", JSON.stringify(data));
   assert.equal(data.detail.requestPath, "/wp-json/wp/v2/media");
   assert.equal(data.detail.rayId, "test-ray-123");
   assert.equal(data.cpanelFallback.available, true);
@@ -523,7 +523,7 @@ test("metadata fallback tries form encoding before method override and stops at 
     method: "POST",
     body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
   });
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 200, JSON.stringify(await result.clone().json()));
   const data = await result.json();
   assert.equal(data.detail.variantPassed, "X-HTTP-Method-Override: PUT");
   assert.equal(mediaMetadataRequests.length, 2);
@@ -539,7 +539,7 @@ test("metadata fallback reaches minimal alt_text/title only after both earlier v
     method: "POST",
     body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", title: "Field meeting" }
   });
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 200, JSON.stringify(await result.clone().json()));
   assert.equal((await result.json()).detail.variantPassed, "minimal alt_text + title");
   assert.deepEqual(mediaMetadataRequests[2].fields.sort(), ["alt_text", "title"]);
 });
