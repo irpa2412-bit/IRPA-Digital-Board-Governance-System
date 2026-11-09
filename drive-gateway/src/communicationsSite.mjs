@@ -1276,6 +1276,26 @@ export function createCommunicationsSiteRouter(deps) {
         { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAxMCAxMF0gL1Jlc291cmNlcyA8PCA+PiAvQ29udGVudHMgNCAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAwID4+CnN0cmVhbQoKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyMTcgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA1IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoyNjYKJSVFT0YK" },
         { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBBQAAAAIAONjYV15bjPX6AAAAK0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH1QyU7DMBD9FWuuKHHggBCK0wPLETiUDxjZk8SqN3nc0v49Tlt6QIXjzFv1+tXeO7GjzDYGBbdtB4KCjsaGScHn+rV5AMEFg0EXAyk4EMNq6NeHRCyqNrCCuZT0KCXrmTxyGxOFiowxeyz1zJNMqDc4kbzrunupYygUSlMWDxj6Zxpx64p42df3qUcmxyCeTsQlSwGm5KzGUnG5C+ZXSnNOaKvyyOHZJr6pBJBXExbk74Cz7r0Ok60h8YG5vKGvLPkVs5Em6q2vyvZ/mys94zhaTRf94pZy1MRcF/euvSAebfjpL49zD99QSwMEFAAAAAgA42NhXZv9N+qtAAAAKQEAAAsAAABfcmVscy8ucmVsc43POw7CMAwG4KtE3mlaBoRQ0y4IqSsqB7ASN61oHkrCo7cnAwNFDIy2f3+W6/ZpZnanECdnBVRFCYysdGqyWsClP232wGJCq3B2lgQsFKFt6jPNmPJKHCcfWTZsFDCm5A+cRzmSwVg4TzZPBhcMplwGzT3KK2ri27Lc8fBpwNpknRIQOlUB6xdP/9huGCZJRydvhmz6ceIrkWUMmpKAhwuKq3e7yCzwpuarF5sXUEsDBBQAAAAIAONjYV1lJT7+rgAAAOsAAAARAAAAd29yZC9kb2N1bWVudC54bWxFjsEKwjAMhl+l9O46PYiMbeJF8CaiD1DbqIM1KUl1+va28+DlC8lPPv52+w6jegHLQNjpZVVrBejID3jv9OW8X2y0kmTR25EQOv0B0du+nRpP7hkAk8oClGbq9COl2Bgj7gHBSkURMGc34mBTXvluJmIfmRyIZH8Yzaqu1ybYAXVRXsl/yowFXJD6w+m4U9Y5iLmEA3Ub3unJ0JoSFvLM+UXApSOb+fBzmX/P/gtQSwECFAMUAAAACADjY2FdeW4z1+gAAACtAQAAEwAAAAAAAAAAAAAAgAEAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAxQAAAAIAONjYV2b/TfqrQAAACkBAAALAAAAAAAAAAAAAACAARkBAABfcmVscy8ucmVsc1BLAQIUAxQAAAAIAONjYV1lJT7+rgAAAOsAAAARAAAAAAAAAAAAAACAAe8BAAB3b3JkL2RvY3VtZW50LnhtbFBLBQYAAAAAAwADALkAAADMAgAAAAA=" }
       ];
+      const registerCpanelMediaFallback = async (file, filename, bytes) => {
+        const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
+        const form = new FormData();
+        form.set("dir", directory);
+        form.set("file-1", new File([bytes], filename, { type: file.mime }));
+        const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
+          method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
+          body: form, signal: AbortSignal.timeout(60000)
+        });
+        const cpData = await cpResponse.json().catch(() => null);
+        if (!cpResponse.ok || cpData?.status !== 1) throw new Error(cleanText(cpData?.errors?.join(" ") || "cPanel upload rejected", 160));
+        const publicUrl = wp.root + "/wp-content/uploads/" + encodeURIComponent(filename);
+        const registerId = crypto.randomUUID(), now = new Date().toISOString(), sha256 = await websiteMediaSha256(bytes);
+        const registerRow = { file: filename, title: "TEST " + file.name + " cPanel fallback", altText: "TEST acceptance fallback", caption: "TEST ONLY — retained for acceptance evidence", category: "Production Acceptance", tags: ["TEST"], destination: "cpanel-folder", url: publicUrl, uploader: claims.user_id, uploaderEmail: claims.email || "", date: now, size: bytes.byteLength, sha256, wordpressMediaId: null, status: "Available", test: true };
+        const recordFields = fields(registerRow);
+        const auditFields = fields({ action: "COMMUNICATION_WEBSITE_MEDIA_REGISTERED", category: "COMMUNICATIONS", collection: "communicationMediaAssets", recordId: registerId, actorUid: claims.user_id, actorEmail: claims.email || "", details: { file: filename, destination: "cpanel-folder", url: publicUrl, size: bytes.byteLength, sha256, test: true }, createdAt: now });
+        await commitDocumentAndAudit(env, "communicationMediaAssets/" + registerId, claims.token, recordFields, Object.keys(registerRow), auditFields, { createOnly: true, collectionName: "communicationMediaAssets" });
+        cleanupItems.push({ kind: "TEST media", title: registerRow.title, id: registerId, url: publicUrl });
+        return { registerId, publicUrl };
+      };
       if (uploadAllowed && testPageId) {
         for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
