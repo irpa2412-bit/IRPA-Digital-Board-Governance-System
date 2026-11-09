@@ -73,3 +73,20 @@ test("global publishing pause blocks the platform adapter",async()=>{
  assert.equal(r.status,423);
  assert.equal(calls,0);
 });
+
+test("publishing audit combines platform outcomes with governance pause and approval events",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ h.values.set("communications:publishing:audit",JSON.stringify([{id:"p1",action:"PUBLISHED",itemId:"item-1",platform:"facebook",postId:"page_post_1",at:"2026-11-09T10:00:00.000Z"}]));
+ h.values.set("communications:editorial:audit",JSON.stringify([{id:"g1",action:"PUBLISHING_PAUSE_CHANGED",paused:true,at:"2026-11-09T09:00:00.000Z"}]));
+ const r=await h.call("/api/communications/social/audit");
+ const data=await r.json();
+ assert.equal(r.status,200);
+ assert.equal(data.events.length,2);
+ assert.equal(data.events[0].action,"PUBLISHED");
+ assert.equal(data.events[1].action,"PUBLISHING_PAUSE_CHANGED");
+});
+test("publishing audit is denied to a non-reviewer communications author",async()=>{
+ const h=harness("Communications Officer","author");
+ const r=await h.call("/api/communications/social/audit");
+ assert.equal(r.status,403);
+});
