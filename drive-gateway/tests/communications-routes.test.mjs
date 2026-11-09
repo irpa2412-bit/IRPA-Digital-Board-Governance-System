@@ -2,20 +2,74 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { communicationsRoutes } from "../src/communicationsRoutes.mjs";
 
-function harness(role="Communications Officer",uid="author"){
- const values=new Map();const env={DRIVE_KV:{get:async k=>values.get(k)??null,put:async(k,v)=>values.set(k,v)}};
+function harness(role="Communications Officer",uid="author",options={}){
+ const values=new Map();
+ const env={IRPA_ENVIRONMENT:options.environment||"staging",DRIVE_KV:{get:async k=>values.get(k)??null,put:async(k,v)=>values.set(k,v)}};
  const deps={
   authenticateFirebaseRequest:async()=>({uid,user_id:uid,token:"test"}),
-  getFirestoreDocument:async()=>null,
+  getFirestoreDocument:async(_env,path)=>options.admin&&path==="adminProfiles/"+uid?{active:true}:null,
   getInstitutionalProfileForUser:async()=>({memberRecord:{role,status:"Active"}}),
   firestoreDocumentToPlain:v=>v,
+  publishMetaContent:async(_env,args)=>({platform:args.platform,accountId:args.accountId,postId:"page_post_123",publishedAt:"2026-11-09T10:00:00.000Z"}),
   corsHeaders:()=>({"Content-Type":"application/json"})
  };
  const call=async(path,method="GET",body)=>communicationsRoutes(new Request("https://worker.test"+path,{method,headers:{"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,deps);
- return {call,env,values};
+ return {call,env,values,deps};
 }
 test("editorial routes require authenticated active role",async()=>{const h=harness();const r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"Title",content:"Body"});assert.equal(r.status,201)});
 test("create, submit, and approve require a distinct approver",async()=>{const a=harness("Communications Officer","author");let r=await a.call("/api/communications/editorial/items","POST",{kind:"post",title:"T",content:"B"});const id=(await r.json()).item.id;r=await a.call("/api/communications/editorial/items/"+id+"/submit","POST",{});assert.equal(r.status,200);r=await a.call("/api/communications/editorial/items/"+id+"/approve","POST",{});assert.equal(r.status,403);const p=harness("Approver","reviewer");p.values.set("communications:editorial:items",a.values.get("communications:editorial:items"));r=await p.call("/api/communications/editorial/items/"+id+"/approve","POST",{});assert.equal(r.status,200);assert.equal((await r.json()).item.status,"Approved")});
 test("pause-all defaults to paused and only admin may change it",async()=>{const h=harness();let r=await h.call("/api/communications/publishing/pause");assert.equal((await r.json()).paused,true);r=await h.call("/api/communications/publishing/pause","POST",{paused:false});assert.equal(r.status,403)});
 test("audit log is approver-only",async()=>{const h=harness();const r=await h.call("/api/communications/editorial/audit");assert.equal(r.status,403)});
 test("social publishing router is included and manual export never publishes",async()=>{const h=harness();const r=await h.call("/api/communications/social/export","POST",{platform:"x",content:{text:"Draft for review"}});assert.equal(r.status,200);const data=await r.json();assert.equal(data.mode,"manual-export");assert.equal(data.published,undefined)});
+test("administrator can use the explicit self-approval override in staging only",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ let r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"Staging test",content:"Approved test content",platforms:["facebook"]});
+ const item=(await r.json()).item;
+ await h.call("/api/communications/editorial/items/"+item.id+"/submit","POST",{});
+ r=await h.call("/api/communications/editorial/items/"+item.id+"/approve","POST",{stagingAdminOverride:true});
+ const result=await r.json();
+ assert.equal(r.status,200);
+ assert.equal(result.item.status,"Approved");
+ assert.equal(result.item.approvalMode,"STAGING_ADMIN_OVERRIDE");
+ assert.equal(result.item.approvedRevision,result.item.revision);
+});
+test("administrator self-approval override is rejected outside staging",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"production"});
+ let r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"Production test",content:"Must not self approve"});
+ const item=(await r.json()).item;
+ await h.call("/api/communications/editorial/items/"+item.id+"/submit","POST",{});
+ r=await h.call("/api/communications/editorial/items/"+item.id+"/approve","POST",{stagingAdminOverride:true});
+ assert.equal(r.status,403);
+});
+test("publishing uses the saved approved item and writes a publishing audit event",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ h.values.set("communications:publishing:paused","false");
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"saved-1",kind:"post",status:"Approved",approvedBy:"reviewer",approvedAt:"2026-11-09T09:00:00.000Z",approvedRevision:2,revision:2,authorUid:"author",content:"Verified test content",platforms:["facebook"]}]));
+ let called=null;h.deps.publishMetaContent=async(_env,args)=>{called=args;return {platform:"facebook",accountId:args.accountId,postId:"page_post_456",publishedAt:"2026-11-09T10:00:00.000Z"};};
+ const r=await h.call("/api/communications/social/publish","POST",{itemId:"saved-1",platform:"facebook",accountId:"page-1"});
+ const result=await r.json();
+ assert.equal(r.status,200);
+ assert.equal(result.published,true);
+ assert.equal(called.uid,"admin");
+ assert.equal(called.text,"Verified test content");
+ const audit=JSON.parse(h.values.get("communications:publishing:audit"));
+ assert.equal(audit[0].action,"PUBLISHED");
+ assert.equal(audit[0].postId,"page_post_456");
+});
+test("publishing rejects client-forged approval data and does not call the platform",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ h.values.set("communications:publishing:paused","false");
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"saved-draft",status:"Draft",revision:1,authorUid:"admin",content:"Draft"}]));
+ let calls=0;h.deps.publishMetaContent=async()=>{calls++;return {postId:"should-not-exist"};};
+ const r=await h.call("/api/communications/social/publish","POST",{platform:"facebook",accountId:"page-1",item:{id:"saved-draft",status:"Approved",approvedBy:"fake",approvedAt:"now",approvedRevision:1,revision:1}});
+ assert.equal(r.status,403);
+ assert.equal(calls,0);
+});
+test("global publishing pause blocks the platform adapter",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"approved-1",status:"Approved",approvedBy:"reviewer",approvedAt:"now",approvedRevision:1,revision:1,authorUid:"author",content:"Test"}]));
+ let calls=0;h.deps.publishMetaContent=async()=>{calls++;return {postId:"should-not-exist"};};
+ const r=await h.call("/api/communications/social/publish","POST",{itemId:"approved-1",platform:"facebook",accountId:"page-1"});
+ assert.equal(r.status,423);
+ assert.equal(calls,0);
+});
