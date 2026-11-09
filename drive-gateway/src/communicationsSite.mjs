@@ -946,7 +946,7 @@ export function createCommunicationsSiteRouter(deps) {
       const parentId=destination!=="media-library"?Number(input.parentId||input.postId):null;
       const requestDetail=(method,path,headers,bodyFields)=>({
         method,path,
-        contentType:String(headers.get("Content-Type")||"").replace(/;\\s*boundary=.*/i,""),
+        contentType:String(headers.get("Content-Type")||((bodyFields.includes("file")&&!headers.has("Content-Type"))?"multipart/form-data":"")).replace(/;\\s*boundary=.*/i,""),
         accept:headers.get("Accept")||null,
         bodyFields:[...bodyFields]
       });
@@ -1030,7 +1030,7 @@ export function createCommunicationsSiteRouter(deps) {
       const recordFields=fields(row),auditFields=fields({action:"COMMUNICATION_WEBSITE_MEDIA_REGISTERED",category:"COMMUNICATIONS",collection:"communicationMediaAssets",recordId:id,actorUid:claims.user_id,actorEmail:claims.email||"",details:{file:meta.filename,destination,url:media.source_url,size:bytes.byteLength,sha256},createdAt:now});
       await commitDocumentAndAudit(env,"communicationMediaAssets/"+id,claims.token,recordFields,Object.keys(row),auditFields,{createOnly:true,collectionName:"communicationMediaAssets"});
       await recordWebsiteAudit(env,claims,"COMMUNICATION_WEBSITE_MEDIA_UPLOADED","media",uploaded.id,{filename:meta.filename,contentType,size:bytes.byteLength,sha256,destination});
-      return json({success:true,media:{id:uploaded.id,url:media.source_url,title,altText,caption,sha256,size:bytes.byteLength,destination,registerId:id}},200,corsHeaders(request));
+      return json({success:true,detail,media:{id:uploaded.id,url:media.source_url,title,altText,caption,sha256,size:bytes.byteLength,destination,registerId:id}},200,corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/media/chunk" && request.method === "POST") {
