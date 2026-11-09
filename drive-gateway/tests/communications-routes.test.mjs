@@ -124,3 +124,15 @@ test("administrator self-approval override also requires the exact staging Fireb
  r=await h.call("/api/communications/editorial/items/"+item.id+"/approve","POST",{stagingAdminOverride:true});
  assert.equal(r.status,403);
 });
+
+test("designated approver can inspect audit but cannot publish without publishing authority",async()=>{
+ const h=harness("Approver","reviewer");
+ h.values.set("communications:publishing:paused","false");
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"approved-for-reviewer",status:"Approved",approvedBy:"author",approvedAt:"now",approvedRevision:1,revision:1,authorUid:"author",content:"Test",platforms:["facebook"]}]));
+ let calls=0;h.deps.publishMetaContent=async()=>{calls++;return {postId:"not-allowed"};};
+ const audit=await h.call("/api/communications/social/audit");
+ assert.equal(audit.status,200);
+ const publish=await h.call("/api/communications/social/publish","POST",{itemId:"approved-for-reviewer",platform:"facebook",accountId:"page-1"});
+ assert.equal(publish.status,403);
+ assert.equal(calls,0);
+});
