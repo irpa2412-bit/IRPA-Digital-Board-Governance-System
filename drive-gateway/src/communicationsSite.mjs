@@ -959,7 +959,7 @@ export function createCommunicationsSiteRouter(deps) {
       if(parentId!==null)multipart.append("post",String(parentId));
       const multipartHeaders=wordpressHeaders(wp,{Accept:"application/json"});
       let upload=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:multipartHeaders,body:multipart,signal:AbortSignal.timeout(45000)});
-      let uploadDetail=upload.ok?null:await wordpressResponseDetail(upload,wp,"media_upload");
+      let uploadDetail=await wordpressResponseDetail(upload.clone(),wp,"media_upload");
       let uploaded=await upload.json().catch(()=>null);
       let media=null;
       let detail=null;
@@ -974,7 +974,7 @@ export function createCommunicationsSiteRouter(deps) {
         }
         const binaryHeaders=wordpressHeaders(wp,{"Content-Type":contentType,"Content-Disposition":'attachment; filename="'+safeFilename+'"',Accept:"application/json"});
         upload=await wordpressEditorFetch(wp,endpoint,{method:"POST",headers:binaryHeaders,body:bytes,signal:AbortSignal.timeout(45000)});
-        const binaryDetail=upload.ok?null:await wordpressResponseDetail(upload,wp,"media_upload_fallback");
+        const binaryDetail=await wordpressResponseDetail(upload.clone(),wp,"media_upload_fallback");
         uploaded=await upload.json().catch(()=>null);
         if(!upload.ok||!Number.isSafeInteger(uploaded?.id)||!isAllowedWordPressLink(uploaded?.source_url,wp)){
           binaryDetail.request=requestDetail("POST",mediaPath,new Headers(binaryHeaders),["file"]);
@@ -994,7 +994,7 @@ export function createCommunicationsSiteRouter(deps) {
         for(const variant of metadataVariants){
           const headers=wordpressHeaders(wp,variant.headers);
           const metadata=await wordpressEditorFetch(wp,metadataEndpoint,{method:"POST",headers,body:variant.body,signal:AbortSignal.timeout(20000)});
-          const attemptDetail=metadata.ok?null:await wordpressResponseDetail(metadata,wp,"media_metadata_attach");
+          const attemptDetail=await wordpressResponseDetail(metadata.clone(),wp,"media_metadata_attach");
           const metadataData=await metadata.json().catch(()=>null);
           const requestInfo=requestDetail("POST",new URL(metadataEndpoint).pathname,new Headers(headers),variant.fields);
           if(metadata.ok&&Number(metadataData?.id)===uploaded.id){
