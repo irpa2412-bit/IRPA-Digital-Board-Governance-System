@@ -90,3 +90,26 @@ test("publishing audit is denied to a non-reviewer communications author",async(
  const r=await h.call("/api/communications/social/audit");
  assert.equal(r.status,403);
 });
+
+test("social API publishing is disabled outside isolated staging",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"production"});
+ h.values.set("communications:publishing:paused","false");
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"prod-item",status:"Approved",approvedBy:"reviewer",approvedAt:"now",approvedRevision:1,revision:1,authorUid:"author",content:"Must not publish",platforms:["facebook"]}]));
+ let calls=0;h.deps.publishMetaContent=async()=>{calls++;return {postId:"not-allowed"};};
+ const r=await h.call("/api/communications/social/publish","POST",{itemId:"prod-item",platform:"facebook",accountId:"page-1"});
+ assert.equal(r.status,403);
+ assert.equal(calls,0);
+});
+test("duplicate and unresolved publishing attempts are blocked before another platform call",async()=>{
+ const h=harness("Administrator","admin",{admin:true,environment:"staging"});
+ h.values.set("communications:publishing:paused","false");
+ h.values.set("communications:editorial:items",JSON.stringify([{id:"published-1",status:"Approved",approvedBy:"reviewer",approvedAt:"now",approvedRevision:1,revision:1,authorUid:"author",content:"Test",platforms:["facebook"]}]));
+ h.values.set("communications:publishing:audit",JSON.stringify([{id:"a1",attemptId:"a1",action:"PUBLISHED",itemId:"published-1",platform:"facebook"}]));
+ let calls=0;h.deps.publishMetaContent=async()=>{calls++;return {postId:"another-post"};};
+ let r=await h.call("/api/communications/social/publish","POST",{itemId:"published-1",platform:"facebook",accountId:"page-1"});
+ assert.equal(r.status,409);
+ h.values.set("communications:publishing:audit",JSON.stringify([{id:"a2",action:"PUBLISH_REQUESTED",itemId:"published-1",platform:"facebook"}]));
+ r=await h.call("/api/communications/social/publish","POST",{itemId:"published-1",platform:"facebook",accountId:"page-1"});
+ assert.equal(r.status,409);
+ assert.equal(calls,0);
+});
