@@ -313,6 +313,9 @@ test("Meta API uses isolated staging publishing scopes, encrypted tokens and ser
  assert.ok(metaOAuth.includes('account.facebookPageId + "/feed"'));
  assert.ok(metaOAuth.includes('account.instagramAccountId + "/media_publish"'));
  assert.ok(metaOAuth.includes("pageAccessToken"));
+ assert.ok(metaOAuth.includes("META_STAGING_ALLOWED_PAGE_IDS"));
+ assert.ok(metaOAuth.includes("META_STAGING_ALLOWED_INSTAGRAM_IDS"));
+ assert.ok(metaOAuth.includes("not approved as an IRPA staging test destination"));
  assert.ok(metaOAuth.includes("LEGACY_TOKEN_KEY_PREFIX"));
  assert.ok(metaOAuth.includes("await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + stateRecord.uid)"));
  assert.ok(gateway.includes('import { createMetaOAuthRouter, publishMetaContent } from "./metaOAuth.mjs"'));
@@ -323,6 +326,10 @@ test("Meta API uses isolated staging publishing scopes, encrypted tokens and ser
  assert.ok(stagingWorkflow.includes("STAGING_META_APP_ID"));
  assert.ok(stagingWorkflow.includes("STAGING_META_APP_SECRET"));
  assert.ok(stagingWorkflow.includes("STAGING_META_TOKEN_ENCRYPTION_KEY"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_ALLOWED_PAGE_IDS"));
+ assert.ok(stagingWorkflow.includes("STAGING_META_ALLOWED_INSTAGRAM_IDS"));
+ assert.ok(stagingWorkflow.includes("META_STAGING_FACEBOOK_TEST_DESTINATIONS_CONFIGURED"));
+ assert.ok(stagingWorkflow.includes("META_STAGING_INSTAGRAM_TEST_DESTINATIONS_CONFIGURED"));
  assert.ok(stagingWorkflow.includes("META_OAUTH_CONFIGURATION_SHAPE=VALID"));
  assert.ok(stagingWorkflow.includes('IRPA_PRODUCTION_CUTOVER:"false"'));
  assert.ok(stagingWorkflow.includes("STAGING_COMMUNICATION_MEDIA_ARCHIVE_PROVISION=PASS"));
