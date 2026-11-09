@@ -13,6 +13,9 @@ let wpRoles;
 let wpItemLink;
 let lastMediaUpload;
 let mediaUploadStatus;
+let binaryUploadStatus;
+let mediaMetadataStatuses;
+let mediaMetadataRequests;
 let createdPost;
 let postCreateCount;
 let consoleMessages;
@@ -122,6 +125,9 @@ test.beforeEach(() => {
   wpItemLink = "https://staging.irpa.or.tz/test-page/";
   lastMediaUpload = null;
   mediaUploadStatus = 201;
+  binaryUploadStatus = 201;
+  mediaMetadataStatuses = [];
+  mediaMetadataRequests = [];
   createdPost = null;
   postCreateCount = 0;
   consoleMessages = [];
@@ -137,13 +143,22 @@ test.beforeEach(() => {
     const method = init.method || "GET";
     if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
-      lastMediaUpload = { contentType: new Headers(init.headers).get("Content-Type"), disposition: new Headers(init.headers).get("Content-Disposition"), bytes: new Uint8Array(init.body) };
-      if (mediaUploadStatus === 406) return new Response("<html>Not Acceptable: ModSecurity rule blocked upload</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "test-ray-123", "X-Powered-By": "PHP/8" } });
-      return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: "" }, 201);
+      const headers = new Headers(init.headers);
+      const isMultipart = init.body instanceof FormData;
+      lastMediaUpload = { contentType: headers.get("Content-Type"), disposition: headers.get("Content-Disposition"), body: init.body };
+      const status = isMultipart ? mediaUploadStatus : binaryUploadStatus;
+      if (status === 406) return new Response("<html>Not Acceptable: ModSecurity rule blocked upload</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "test-ray-123", "X-Powered-By": "PHP/8" } });
+      const fields = isMultipart ? init.body : null;
+      return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: fields?.get("title") || "field.jpg" }, alt_text: fields?.get("alt_text") || "", caption: { raw: fields?.get("caption") || "" } }, 201);
     }
     if (url.pathname === "/wp-json/wp/v2/media/88" && method === "POST") {
-      const metadata = JSON.parse(init.body || "{}");
-      return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: "field.jpg" }, alt_text: metadata.alt_text, caption: { raw: metadata.caption } });
+      const headers = new Headers(init.headers);
+      const contentType = headers.get("Content-Type") || "";
+      mediaMetadataRequests.push({ contentType, override: headers.get("X-HTTP-Method-Override"), fields: contentType.includes("application/x-www-form-urlencoded") ? [...new URLSearchParams(init.body).keys()] : Object.keys(JSON.parse(init.body || "{}")) });
+      const status = mediaMetadataStatuses.length ? mediaMetadataStatuses.shift() : 200;
+      if (status === 406) return new Response("<html>Not Acceptable: ModSecurity metadata rule blocked update</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "metadata-ray-456" } });
+      const metadata = contentType.includes("application/x-www-form-urlencoded") ? Object.fromEntries(new URLSearchParams(init.body)) : JSON.parse(init.body || "{}");
+      return response({ id: 88, source_url: "https://staging.irpa.or.tz/wp-content/uploads/field.jpg", title: { raw: metadata.title || "field.jpg" }, alt_text: metadata.alt_text || "", caption: { raw: metadata.caption || "" } }, status);
     }
     if (url.pathname === "/wp-json/wp/v2/categories") return response([{ id: 3, name: "News" }]);
     if (url.pathname === "/wp-json/wp/v2/tags") return response([{ id: 9, name: "Rangelands" }]);
@@ -461,41 +476,93 @@ test("WordPress Administrator credentials are rejected even when authentication 
   assert.equal(requestCount, 1);
 });
 
-test("authenticated staging image upload accepts safe image types and records an audit event", async () => {
+test("authenticated staging image upload sends file and metadata in one multipart request", async () => {
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST",
-    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/4QAHRXhpZgD/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/4QAHRXhpZgD/2Q==", altText: "Pastoralist meeting", caption: "Community consultation", title: "Field meeting" }
   });
   assert.equal(result.status, 200);
   const data = await result.json();
   assert.equal(data.media.id, 88);
   assert.equal(data.media.url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
-  assert.equal(data.media.caption, "Community consultation", "WordPress caption metadata must be verified and returned");
-  assert.equal(lastMediaUpload.contentType, "image/jpeg");
-  assert.match(lastMediaUpload.disposition, /field.jpg/);
-  assert.deepEqual([...lastMediaUpload.bytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
+  assert.equal(data.media.caption, "Community consultation");
+  assert.match(lastMediaUpload.contentType, /^multipart\\/form-data; boundary=/);
+  assert.equal(lastMediaUpload.body.get("title"), "Field meeting");
+  assert.equal(lastMediaUpload.body.get("alt_text"), "Pastoralist meeting");
+  assert.equal(lastMediaUpload.body.get("caption"), "Community consultation");
+  assert.equal(mediaMetadataRequests.length, 0, "successful multipart upload must not make a second metadata call");
+  const fileBytes = new Uint8Array(await lastMediaUpload.body.get("file").arrayBuffer());
+  assert.deepEqual([...fileBytes], [0xff, 0xd8, 0xff, 0xd9], "JPEG EXIF APP1 metadata must be stripped before upload");
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
 });
 
-test("WordPress media HTTP 406 returns sanitised step-level server and WAF diagnostics", async () => {
+test("metadata fallback tries form encoding before method override and stops at first success", async () => {
+  mediaUploadStatus = 406;
+  mediaMetadataStatuses = [406, 200];
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", caption: "Community consultation" }
+  });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.detail.variantPassed, "X-HTTP-Method-Override: PUT");
+  assert.equal(mediaMetadataRequests.length, 2);
+  assert.match(mediaMetadataRequests[0].contentType, /^application\\/x-www-form-urlencoded/);
+  assert.equal(mediaMetadataRequests[1].override, "PUT");
+});
+
+test("metadata fallback reaches minimal alt_text/title only after both earlier variants return 406", async () => {
+  mediaUploadStatus = 406;
+  mediaMetadataStatuses = [406, 406, 200];
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", title: "Field meeting" }
+  });
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).detail.variantPassed, "minimal alt_text + title");
+  assert.deepEqual(mediaMetadataRequests[2].fields.sort(), ["alt_text", "title"]);
+});
+
+test("all 406 metadata variants fail closed and retain cPanel media-register fallback diagnostics", async () => {
+  mediaUploadStatus = 406;
+  mediaMetadataStatuses = [406, 406, 406];
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting", title: "Field meeting" }
+  });
+  assert.equal(result.status, 502);
+  const data = await result.json();
+  assert.equal(data.code, "wordpress_media_firewall_blocked");
+  assert.match(data.error, /ModSecurity exemption needed for \/wp-json\/wp\/v2\/media/);
+  assert.equal(data.cpanelFallback.available, true);
+  assert.equal(data.cpanelFallback.mediaRegisterRecord, true);
+  assert.equal(data.detail.request.method, "POST");
+  assert.equal(data.detail.request.path, "/wp-json/wp/v2/media/88");
+  assert.equal(data.detail.request.contentType, "application/json");
+  assert.equal(data.detail.request.accept, "application/json");
+  assert.deepEqual(data.detail.request.bodyFields, ["alt_text", "title"]);
+  assert.equal(data.detail.rayId, "metadata-ray-456");
+});
+
+test("multipart HTTP 406 is sanitised and the binary fallback is attempted before metadata variants", async () => {
   mediaUploadStatus = 406;
   const router = makeRouter();
   const result = await call(router, makeEnv(), "/api/communications/website/media", {
     method: "POST",
     body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting" }
   });
-  assert.equal(result.status, 406);
+  assert.equal(result.status, 200);
   const data = await result.json();
-  assert.equal(data.detail.step, "media_upload");
-  assert.equal(data.detail.status, 406);
-  assert.equal(data.detail.contentType, "text/html");
-  assert.equal(data.detail.classification, "likely_server_firewall_rejection");
-  assert.equal(data.detail.rayId, "test-ray-123");
-  assert.equal(Object.prototype.hasOwnProperty.call(data.detail, "body"), false, "raw HTML must not be returned");
-  assert.equal(data.detail.headers.server, "LiteSpeed");
-  assert.equal(data.detail.headers["cf-ray"], "test-ray-123");
-  assert.equal(data.detail.headers["x-powered-by"], "PHP/8");
+  assert.equal(data.detail.variantPassed, "application/x-www-form-urlencoded");
+  assert.equal(data.detail.failedAttempts[0].detail.request.method, "POST");
+  assert.equal(data.detail.failedAttempts[0].detail.request.path, "/wp-json/wp/v2/media");
+  assert.equal(data.detail.failedAttempts[0].detail.request.contentType, "multipart/form-data");
+  assert.equal(data.detail.failedAttempts[0].detail.request.accept, "application/json");
+  assert.deepEqual(data.detail.failedAttempts[0].detail.request.bodyFields, ["file", "title", "alt_text", "caption"]);
   assert.equal(JSON.stringify(data).includes(TEST_PASSWORD), false);
 });
 
