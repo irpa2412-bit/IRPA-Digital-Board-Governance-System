@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {SOCIAL_PLATFORMS,validateSocialDraft,inspectSocialText,canTransitionSocialStatus,socialCalendarCsv} from "../src/utils/socialStudioPolicy.js";
+import {SOCIAL_PLATFORMS,validateSocialDraft,inspectSocialText,canTransitionSocialStatus,socialCalendarCsv,socialCalendarRange,socialCalendarDocxXml} from "../src/utils/socialStudioPolicy.js";
 
 test("platform text and hashtag limits are enforced",()=>{
  assert.ok(validateSocialDraft({title:"T",body:"x".repeat(281),platforms:["x"]}).some(x=>x.includes("280")));
@@ -26,4 +26,13 @@ test("status flow requires a different approver or administrator",()=>{
 test("calendar CSV quotes fields and preserves embedded commas",()=>{
  const csv=socialCalendarCsv([{title:"A, B",platforms:["facebook"],status:"Draft"}]);
  assert.match(csv,/"A, B"/);
+});
+
+test("day and week calendar views filter planned items and DOCX XML escapes content",()=>{
+ const items=[{title:"Monday",scheduledAt:"2026-11-09T09:00:00",updatedAt:"2026-11-09T10:00:00",platforms:["facebook"],status:"Draft",content:"A & B <C>"},{title:"Next week",scheduledAt:"2026-11-16T09:00:00"}];
+ assert.equal(socialCalendarRange(items,"2026-11-09","day").length,1);
+ assert.equal(socialCalendarRange(items,"2026-11-09","week").length,1);
+ const xml=socialCalendarDocxXml(items.slice(0,1),"2026-11-09","day");
+ assert.ok(xml.includes("A &amp; B &lt;C&gt;"));
+ assert.ok(xml.includes("Last modified: 2026-11-09T10:00:00"));
 });

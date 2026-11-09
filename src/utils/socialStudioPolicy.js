@@ -47,3 +47,17 @@ export function socialCalendarCsv(items){
  const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
  return ["title,platforms,status,campaign,plannedAt,lastModified",...(items||[]).map(x=>[x.title,(x.platforms||[]).join(";"),x.status,x.campaignTag,x.scheduledAt,x.updatedAt].map(quote).join(","))].join("\r\n");
 }
+
+export function socialCalendarRange(items,date,view="week"){
+ const target=new Date(date+"T00:00:00");
+ if(Number.isNaN(target.getTime()))return [];
+ const start=new Date(target);
+ if(view==="week"){const day=(start.getDay()+6)%7;start.setDate(start.getDate()-day);}
+ const end=new Date(start);end.setDate(end.getDate()+(view==="day"?1:7));
+ return (items||[]).filter(item=>{const value=item.scheduledAt||item.updatedAt;if(!value)return false;const d=new Date(value);return !Number.isNaN(d.getTime())&&d>=start&&d<end;});
+}
+export function socialCalendarDocxXml(items,date,view){
+ const esc=value=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+ const paragraphs=["IRPA Social Editorial Calendar",view==="day"?"Day view":"Week view",date,...(items||[]).flatMap(item=>[item.title||"Untitled","Platforms: "+(item.platforms||[]).join(", ")+" | Status: "+(item.status||"")+" | Planned: "+(item.scheduledAt||"Not scheduled")+" | Last modified: "+(item.updatedAt||"Not recorded"),item.content||""])].map(value=>'<w:p><w:r><w:t xml:space="preserve">'+esc(value)+'</w:t></w:r></w:p>').join("");
+ return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+paragraphs+'<w:sectPr/></w:body></w:document>';
+}
