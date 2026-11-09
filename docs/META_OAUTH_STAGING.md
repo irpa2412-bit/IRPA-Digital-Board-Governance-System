@@ -8,7 +8,7 @@ The existing Meta integration is being extended from read-only account verificat
 
 This capability is limited to the isolated staging Worker and staging Firebase project. It does not authorize publication to IRPA's public production accounts. Use only IRPA-owned or explicitly authorized test Pages and Instagram Professional accounts.
 
-The current adapter does not implement Facebook video/Reels, Instagram video/Reels/Stories, scheduled publication, comments, direct messages, analytics or ad operations. Those remain out of scope until separately implemented and accepted.
+The current adapter does not implement Facebook video/Reels, Instagram video/Reels/Stories, scheduled publication, comments, direct messages, analytics or ad operations. Those remain out of scope until separately implemented and accepted. A destination must also appear in the explicit staging allowlist; an account returned by `/me/accounts` is not automatically authorized for publishing.
 
 ## Environment isolation
 
@@ -46,7 +46,7 @@ Staging Worker secrets:
 - `META_APP_SECRET`
 - `META_TOKEN_ENCRYPTION_KEY`: separately generated random 32-byte key encoded as Base64.
 
-For automated staging deployment, use GitHub repository variable `STAGING_META_APP_ID` and GitHub Actions secrets `STAGING_META_APP_SECRET` plus `STAGING_META_TOKEN_ENCRYPTION_KEY`. The workflow validates their shape and provisions only the staging Worker. It must never print their values or copy production credentials into staging. The frontend feature flag must read the App ID from the repository variable, not from a secret.
+For automated staging deployment, use GitHub repository variable `STAGING_META_APP_ID` and GitHub Actions secrets `STAGING_META_APP_SECRET` plus `STAGING_META_TOKEN_ENCRYPTION_KEY`. Also set GitHub repository variables `STAGING_META_ALLOWED_PAGE_IDS` and `STAGING_META_ALLOWED_INSTAGRAM_IDS` to comma-separated numeric IDs for authorized test destinations only. The workflow maps them to `META_STAGING_ALLOWED_PAGE_IDS` and `META_STAGING_ALLOWED_INSTAGRAM_IDS` on the staging Worker. If either allowlist is empty, account connection can be verified but all publishing attempts are rejected. Never include IRPA public production Page or Instagram IDs in these staging allowlists. The workflow validates configuration shape and provisions only the staging Worker. It must never print secret values or copy production credentials into staging. The frontend feature flag must read the App ID from the repository variable, not from a secret.
 
 ## Token custody
 
