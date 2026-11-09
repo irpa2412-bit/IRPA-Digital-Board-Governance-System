@@ -76,7 +76,7 @@ export async function communicationsRoutes(request,env,deps){
     if(item.status!=="Draft"&&item.status!=="Returned")throw Object.assign(new Error("Only drafts or returned items can be edited."),{status:409});
     const body=await readJson(request);for(const k of ["title","content","imageUrl","link","scheduledAt"])if(body[k]!==undefined)item[k]=String(body[k]);
     if(body.language!==undefined)item.language=body.language==="sw"?"sw":"en";
-    if(body.platforms!==undefined)item.platforms=Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[];
+    if(body.platforms!==undefined)item.platforms=Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp","tiktok","telegram"].includes(p)):[];
     item.revision++;item.updatedAt=now();item.status="Draft";item.approvedBy=null;item.approvedAt=null;
    }else if(request.method==="POST"&&decision==="submit"){
     if(item.authorUid!==actor.uid&&!admin)throw Object.assign(new Error("Only the author or an administrator may submit this item."),{status:403});
