@@ -53,8 +53,9 @@ test("publishing uses the saved approved item and writes a publishing audit even
  assert.equal(called.uid,"admin");
  assert.equal(called.text,"Verified test content");
  const audit=JSON.parse(h.values.get("communications:publishing:audit"));
- assert.equal(audit[0].action,"PUBLISHED");
- assert.equal(audit[0].postId,"page_post_456");
+ const publishedEvent=audit.find(event=>event.action==="PUBLISHED");
+ assert.ok(audit.some(event=>event.action==="PUBLISH_REQUESTED"));
+ assert.equal(publishedEvent.postId,"page_post_456");
 });
 test("publishing rejects client-forged approval data and does not call the platform",async()=>{
  const h=harness("Administrator","admin",{admin:true,environment:"staging"});
