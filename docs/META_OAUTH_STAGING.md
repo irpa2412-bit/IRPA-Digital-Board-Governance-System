@@ -33,7 +33,7 @@ The Facebook Login OAuth flow requests only the permissions needed for the suppo
 
 Meta may require app review / Advanced Access before accounts outside the app's authorized roles can grant these permissions. Do not request broader permissions such as messaging, insights or business-management access unless a later approved feature needs them.
 
-Facebook Page publishing requires the connected user to have the Page's `CREATE_CONTENT` task (or the Page's `MANAGE` task). Instagram publishing requires a Professional account linked to the selected Facebook Page and a publicly accessible HTTPS image URL. The current Instagram adapter publishes feed images only.
+Facebook Page publishing requires a Page content-management task: `CREATE_CONTENT`, `MANAGE`, `PROFILE_PLUS_CREATE_CONTENT` or `PROFILE_PLUS_FULL_CONTROL`, depending on the Page experience and Graph API response. Instagram publishing requires a Professional account linked to the selected Facebook Page and a publicly accessible HTTPS image URL. The current Instagram adapter publishes feed images only.
 
 ## Staging configuration
 
