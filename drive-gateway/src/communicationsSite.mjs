@@ -1012,7 +1012,7 @@ export function createCommunicationsSiteRouter(deps) {
         }
         if(!metadataSucceeded){
           const lastAttempt=failedAttempts[failedAttempts.length-1];
-          return json({error:"FAIL: blocked by server firewall; ModSecurity exemption needed for /wp-json/wp/v2/media",code:"wordpress_media_firewall_blocked",httpStatus:406,detail:{...lastAttempt.detail,requestPath:mediaPath,rayId:lastAttempt.detail.rayId,attempts:failedAttempts.map(x=>({variant:x.variant,status:x.status,request:x.detail.request}))},cpanelFallback:{available:true,mediaRegisterRecord:true}},502,corsHeaders(request));
+          return json({error:"FAIL: blocked by server firewall; ModSecurity exemption needed for /wp-json/wp/v2/media",code:"wordpress_media_firewall_blocked",httpStatus:406,detail:{...lastAttempt.detail,requestPath:mediaPath,rayId:lastAttempt.detail.rayId,attempts:failedAttempts.map(x=>({variant:x.variant,status:x.status,request:x.detail.request}))},media:{id:uploaded.id,url:uploaded.source_url,metadataStatus:"failed"},cpanelFallback:{available:true,mediaRegisterRecord:true}},502,corsHeaders(request));
         }
       }
       if(!detail)detail={variantPassed,failedAttempts};
