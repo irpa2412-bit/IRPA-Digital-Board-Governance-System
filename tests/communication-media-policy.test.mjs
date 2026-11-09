@@ -278,6 +278,9 @@ test("social account enrolment is integrated, metadata-only, role-scoped and aud
  assert.ok(rules.includes('allow update,delete:if false;'));
  assert.ok(rules.includes('getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))'));
  assert.ok(rules.includes('"Pending Verification","Active","Suspended","Disconnected","Archived"'));
+ assert.ok(rules.includes("communicationMediaRecordOriginMatches(data)"));
+ assert.ok(rules.includes("communicationMediaRecordOriginMatches(request.resource.data)"));
+ assert.ok(social.includes('recordOrigin:auth.app?.options?.projectId==="irpa-dbg-staging-a73ec"?"STAGING":"PRODUCTION"'));
 });
 
 
@@ -353,7 +356,7 @@ test("media asset register is authenticated, size-limited, immutable and deny-by
 test("media asset and item record origins are restricted to the authenticated Firebase project",()=>{
  assert.ok(rules.includes('function communicationMediaRecordOriginMatches(data)'));
  assert.ok(rules.includes('request.auth.token.get("aud","")=="irpa-dbg-staging-a73ec"'));
- assert.equal(rules.split("communicationMediaRecordOriginMatches(request.resource.data)").length-1,2);
+ assert.equal(rules.split("communicationMediaRecordOriginMatches(request.resource.data)").length-1,3);
 });
 
 test("staging gateway is isolated from production Firebase, app URL and Drive archive root",()=>{
