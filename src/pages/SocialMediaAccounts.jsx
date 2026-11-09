@@ -87,8 +87,8 @@ export default function SocialMediaAccounts({profile,employee,selectedAuthority,
    {metaStatus&&<div role="status" style={{border:"1px solid var(--border-color, #d6dee8)",borderRadius:9,padding:10,display:"grid",gap:6}}>
     <strong>Connection status: {metaStatus.status||"unknown"}</strong>
     {metaStatus.user?.name&&<span>Authorized Meta user: {metaStatus.user.name}</span>}
-    {metaStatus.facebookPages&&<div><strong>Facebook Pages</strong>{metaStatus.facebookPages.length?metaStatus.facebookPages.map(a=><div key={a.id}>{a.name} · ID {a.id}</div>):<div>No Pages were returned for the granted permissions.</div>}</div>}
-    {metaStatus.instagramAccounts&&<div><strong>Linked Instagram professional accounts</strong>{metaStatus.instagramAccounts.length?metaStatus.instagramAccounts.map(a=><div key={a.id}>@{a.username||"(username unavailable)"} · ID {a.id} · {a.accountType||"type unavailable"}</div>):<div>No eligible linked Instagram professional accounts were returned.</div>}</div>}
+    {metaStatus.facebookPages&&<div><strong>Facebook Pages</strong>{metaStatus.facebookPages.length?metaStatus.facebookPages.map(a=><div key={a.id}>{a.name} · ID {a.id} · {a.canPublish?"Publishing eligible":"No Page publishing task"}</div>):<div>No Pages were returned for the granted permissions.</div>}</div>}
+    {metaStatus.instagramAccounts&&<div><strong>Linked Instagram professional accounts</strong>{metaStatus.instagramAccounts.length?metaStatus.instagramAccounts.map(a=><div key={a.id}>@{a.username||"(username unavailable)"} · ID {a.id} · {a.accountType||"type unavailable"} · {a.canPublish?"Publishing eligible":"Not eligible"}</div>):<div>No eligible linked Instagram professional accounts were returned.</div>}</div>}
     {metaStatus.expiresAt&&<small>Reported token expiry: {new Date(metaStatus.expiresAt).toLocaleString()}</small>}
     {(metaStatus.missingPermissions||[]).length>0&&<small role="alert">Missing required publishing permissions: {metaStatus.missingPermissions.join(", ")}</small>}
     <small>Publishing permission: {metaStatus.postingEnabled?"Granted for staging":"Not verified"}. Production publishing is not enabled by this integration.</small>
