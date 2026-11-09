@@ -497,6 +497,24 @@ test("authenticated staging image upload sends file and metadata in one multipar
   assert.ok(auditEvents.some(event => event.auditFields?.action?.stringValue === "COMMUNICATION_WEBSITE_MEDIA_UPLOADED"));
 });
 
+test("when multipart and binary media uploads are both blocked, report firewall path and cf-ray and preserve cPanel fallback", async () => {
+  mediaUploadStatus = 406;
+  binaryUploadStatus = 406;
+  const router = makeRouter();
+  const result = await call(router, makeEnv(), "/api/communications/website/media", {
+    method: "POST",
+    body: { filename: "field.jpg", contentType: "image/jpeg", dataBase64: "/9j/2Q==", altText: "Pastoralist meeting" }
+  });
+  assert.equal(result.status, 502);
+  const data = await result.json();
+  assert.equal(data.code, "wordpress_media_firewall_blocked");
+  assert.equal(data.detail.requestPath, "/wp-json/wp/v2/media");
+  assert.equal(data.detail.rayId, "test-ray-123");
+  assert.equal(data.cpanelFallback.available, true);
+  assert.equal(data.cpanelFallback.mediaRegisterRecord, true);
+  assert.equal(mediaMetadataRequests.length, 0, "metadata variants cannot run until WordPress returns a media ID");
+});
+
 test("metadata fallback tries form encoding before method override and stops at first success", async () => {
   mediaUploadStatus = 406;
   mediaMetadataStatuses = [406, 200];
