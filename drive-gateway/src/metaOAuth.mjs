@@ -3,6 +3,7 @@ const STAGING_GATEWAY = "https://irpa-google-drive-gateway-staging.irpa-governan
 // Publishing is available only on the isolated staging gateway; no production credentials or routes are used.
 export const REQUIRED_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "instagram_basic", "instagram_content_publish"];
 const TOKEN_KEY_PREFIX = "meta:publishing:connection:";
+const LEGACY_TOKEN_KEY_PREFIX = "meta:readonly:connection:";
 const STATE_KEY_PREFIX = "meta:publishing:oauth-state:";
 const STATE_TTL_SECONDS = 600;
 
@@ -240,6 +241,7 @@ export function createMetaOAuthRouter(deps) {
         };
         const encrypted = await encryptJson(env, connection);
         await env.DRIVE_KV.put(TOKEN_KEY_PREFIX + stateRecord.uid, encrypted);
+        await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + stateRecord.uid);
         return json({ ok: true, status: "verified", postingEnabled: true, message: "Meta publishing permissions verified. Publishing remains subject to approval and the global pause.",
           facebookPages: connection.accounts.map(({ facebookPageId, facebookPageName }) => ({ id: facebookPageId, name: facebookPageName })),
           instagramAccounts: connection.accounts.flatMap(a => a.instagram.map(i => ({ id: i.instagramAccountId, username: i.username, accountType: i.accountType }))),
@@ -310,6 +312,7 @@ export function createMetaOAuthRouter(deps) {
         if (url.origin !== STAGING_GATEWAY) throw new Error("Meta disconnect is available only on the approved staging gateway.");
         const claims = await authorizeUser(request, env, deps, false);
         await env.DRIVE_KV.delete(TOKEN_KEY_PREFIX + claims.user_id);
+        await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + claims.user_id);
         return json({ ok: true, status: "disconnected", postingEnabled: false,
           note: "The local encrypted connection was removed. Revoke the app in Meta settings to revoke platform authorization." }, 200, corsHeaders(request));
       } catch (error) {
