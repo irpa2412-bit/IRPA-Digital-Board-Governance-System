@@ -5,7 +5,7 @@ An integrated communications workspace inside the existing IRPA Digital Board Go
 
 ## Included capabilities
 - Website article, press-release and social-media draft creation.
-- Content library, editorial planning calendar, review, approval, return-for-revision and archival workflow.
+- Content library, editorial planning calendar, review, approval, return-for-revision and archival workflow, including administrator-led initial staging setup.
 - Approved website publishing through the existing Cloudflare Worker.
 - Read and update WordPress pages/posts through the WordPress REST API.
 - cPanel connection verification and restricted static-file editing through cPanel UAPI.
@@ -32,7 +32,7 @@ The Communications Operations workspace is available alongside the editorial wor
 
 Records are retained and archived rather than hard-deleted. Operations changes are committed together with an audit event using a Firestore batch. The dedicated `communicationOperations` collection has an explicit field allowlist and role-scoped create/read/update rules; `communicationOperationsAudit` is reviewer-readable and immutable after creation. A browser success message is shown only after the batch commits. If the batch fails, the interface reports failure and does not claim that the record or audit entry was saved.
 
-The workspace intentionally does not auto-publish social posts, send messages to media contacts, infer analytics, or trigger crisis communications. Those integrations require separate authorized design and acceptance. It is intended to be usable for planning and record keeping while website integration is pending.
+The workspace does not send messages to media contacts, infer analytics, or trigger crisis communications. Social publishing is restricted to the staging Meta adapter described below; scheduled publication and all non-Meta platform publishing remain unavailable until their own adapters and acceptance are complete.
 
 ## Social-media account enrolment and management
 
@@ -44,9 +44,9 @@ The **Social Accounts** workspace registers IRPA-owned or IRPA-authorized social
 - Firestore rules enforce field allowlists, HTTPS profile links, role checks, permitted status transitions and matching audit records. No credentials or API tokens are accepted in the schema.
 - Use only accounts IRPA owns or has documented authorization to manage. Keep the custodian and authorization reference current, review access periodically, and use the platform's own security controls to remove former staff.
 
-**Important boundary:** this is secure account inventory and governance, not a live platform connection. It does not perform OAuth authorization, store passwords/recovery codes/access tokens, publish or schedule posts, read private messages, retrieve live analytics, or revoke access on a social network. Status is a manually reviewed register state, not a claim that an API connection is working. Direct publishing or analytics would require a separate platform-by-platform integration with approved OAuth scopes, server-side token custody, revocation/expiry handling, consent, and independent security and staging acceptance. Do not put credentials in the account notes or profile URL.
+**Important boundary:** this is the metadata register, not the token store. It does not accept passwords, recovery codes, access tokens or API secrets. Meta OAuth is handled by the existing Cloudflare Worker. In the isolated staging environment, the current publisher supports Facebook Page text/link feed posts and Instagram Professional image-feed posts. It does not yet support production publishing, scheduling, videos/Reels/Stories, messaging, analytics or revocation of platform permissions. LinkedIn, X, YouTube, TikTok, WhatsApp and Telegram remain manual-export / not-yet-integrated until their platform-specific adapters and acceptance are complete. Do not put credentials in account notes or profile URLs.
 
-## Website and cPanel access
+\n## Staging social publishing\n\nThe Social Studio uses the existing authenticated Cloudflare Worker and existing staging KV namespace. Meta OAuth requests `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` and `instagram_content_publish`. User and Page access tokens are AES-256-GCM encrypted server-side; the frontend receives account metadata only.\n\nPublishing is OFF by default. The Worker verifies the saved editorial record, current approval revision, selected destination membership in the signed-in user's Meta connection and global pause state before sending a post. Successful and failed attempts are audited. The administrator may use a clearly marked self-approval override during staging establishment only; independent review is the production rule.\n\nSee [META_OAUTH_STAGING.md](META_OAUTH_STAGING.md) for staging configuration, platform limitations and live acceptance steps. Local automated tests do not establish live Meta publishing; the acceptance status remains NOT VERIFIED until a real post is confirmed on an authorized test destination.\n\n## Website and cPanel access
 
 WordPress page/post editing uses a dedicated WordPress account whose role is exactly `Editor`, with an application password and only the permissions needed to edit pages/posts. The Worker checks `/users/me` and refuses an account carrying the `administrator` role. Never use a personal or main administrator account/password. The Worker permits only `staging.irpa.or.tz` in staging and only `irpa.or.tz` or `www.irpa.or.tz` in production. The production allowlist is intentional; a `/staging` path does not make a production hostname a staging host.
 The portal calls the existing Cloudflare Worker routes:
