@@ -2,7 +2,7 @@ name: Staging Gateway E2E and Deploy
 
 on:
   push:
-    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024, fix/signature-pathway-20261025]
+    branches: [main, fix/member-signature-invitation-email-20261004, fix/signature-gateway-cryptographic-bridge-20261015, fix/communications-cloudflare-website-integration, fix/communication-media-archive-drive-oauth, fix/signature-trail-20261024, fix/signature-pathway-20261025, feat/communications-staging-publishing-20261109-final]
   pull_request:
     branches: [main]
     paths:
@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025'))
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || github.ref == 'refs/heads/feat/communications-staging-publishing-20261109-final' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025' || github.event.pull_request.head.ref == 'feat/communications-staging-publishing-20261109-final'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -51,7 +51,7 @@ jobs:
         id: firestore-e2e
         run: |
           set -o pipefail
-          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test && node --test functions/meetingGateway.emulator.test.cjs" 2>&1 | tee e2e.log
+          npx firebase emulators:exec --project demo-irpa-staging --only firestore "npm --prefix drive-gateway test && npm run test:communication-media && npm run test:meta-oauth && npm run build && node --test functions/meetingGateway.emulator.test.cjs" 2>&1 | tee e2e.log
       - name: Write redacted local E2E summary
         if: always()
         env:
@@ -239,6 +239,8 @@ jobs:
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+          META_ALLOWED_PAGE_IDS: ${{ vars.STAGING_META_ALLOWED_PAGE_IDS }}
+          META_ALLOWED_INSTAGRAM_IDS: ${{ vars.STAGING_META_ALLOWED_INSTAGRAM_IDS }}
           GIT_SHA: ${{ github.sha }}
         working-directory: drive-gateway
         run: |
@@ -267,10 +269,14 @@ jobs:
           const appUrl=new URL(String(process.env.APP_URL||""));
           if(appUrl.protocol!=="https:"||appUrl.hostname!=="irpa-dbg-staging-a73ec.web.app"||appUrl.username||appUrl.password||appUrl.search||appUrl.hash||appUrl.pathname!=="/") throw new Error("Staging application URL must be the approved HTTPS staging frontend origin.");
           const metaAppIdRaw=String(process.env.META_APP_ID||"").trim();
+          const allowedPageIds=String(process.env.META_ALLOWED_PAGE_IDS||"").split(",").map(v=>v.trim()).filter(v=>/^[0-9]{5,30}$/.test(v));
+          const allowedInstagramIds=String(process.env.META_ALLOWED_INSTAGRAM_IDS||"").split(",").map(v=>v.trim()).filter(v=>/^[0-9]{5,30}$/.test(v));
           const metaKey=Buffer.from(String(process.env.META_TOKEN_ENCRYPTION_KEY||""),"base64");
           const metaReady=/^\d+$/.test(metaAppIdRaw)&&Boolean(String(process.env.META_APP_SECRET||"").trim())&&metaKey.length===32;
           const metaAppId=metaReady?metaAppIdRaw:"";
           console.log("META_OAUTH_DEPLOYMENT_STATE="+(metaReady?"enabled":"disabled"));
+          console.log("META_STAGING_FACEBOOK_TEST_DESTINATIONS_CONFIGURED="+(allowedPageIds.length?"true":"false"));
+          console.log("META_STAGING_INSTAGRAM_TEST_DESTINATIONS_CONFIGURED="+(allowedInstagramIds.length?"true":"false"));
           const c={
             name:"irpa-google-drive-gateway-staging",main:"src/index.js",
             compatibility_date:"2026-09-29",workers_dev:true,
@@ -284,6 +290,8 @@ jobs:
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
               IRPA_ENVIRONMENT:"staging",IRPA_PRODUCTION_CUTOVER:"false",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
               META_APP_ID:metaAppId,
+              META_STAGING_ALLOWED_PAGE_IDS:allowedPageIds.join(","),
+              META_STAGING_ALLOWED_INSTAGRAM_IDS:allowedInstagramIds.join(","),
               META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
               META_GRAPH_API_VERSION:"v26.0"
             },
@@ -988,6 +996,8 @@ jobs:
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+          META_ALLOWED_PAGE_IDS: ${{ vars.STAGING_META_ALLOWED_PAGE_IDS }}
+          META_ALLOWED_INSTAGRAM_IDS: ${{ vars.STAGING_META_ALLOWED_INSTAGRAM_IDS }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -1905,6 +1915,8 @@ jobs:
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+          META_ALLOWED_PAGE_IDS: ${{ vars.STAGING_META_ALLOWED_PAGE_IDS }}
+          META_ALLOWED_INSTAGRAM_IDS: ${{ vars.STAGING_META_ALLOWED_INSTAGRAM_IDS }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail
@@ -1945,6 +1957,8 @@ jobs:
               FIRESTORE_COLLECTION_PREFIX:"staging_",DRIVE_MOCK:"false",LOCAL_TEST_MODE:"false",
               IRPA_PRODUCTION_CUTOVER:"false",CPANEL_DOCUMENT_ROOT:process.env.CP_ROOT,
               META_APP_ID:process.env.META_APP_ID||"",
+              META_STAGING_ALLOWED_PAGE_IDS:String(process.env.META_ALLOWED_PAGE_IDS||"").split(",").map(v=>v.trim()).filter(v=>/^[0-9]{5,30}$/.test(v)).join(","),
+              META_STAGING_ALLOWED_INSTAGRAM_IDS:String(process.env.META_ALLOWED_INSTAGRAM_IDS||"").split(",").map(v=>v.trim()).filter(v=>/^[0-9]{5,30}$/.test(v)).join(","),
               META_REDIRECT_URI:"https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback",
               META_GRAPH_API_VERSION:"v26.0"
             },
@@ -1981,6 +1995,8 @@ jobs:
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+          META_ALLOWED_PAGE_IDS: ${{ vars.STAGING_META_ALLOWED_PAGE_IDS }}
+          META_ALLOWED_INSTAGRAM_IDS: ${{ vars.STAGING_META_ALLOWED_INSTAGRAM_IDS }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -2004,6 +2020,8 @@ jobs:
           META_APP_ID: ${{ vars.STAGING_META_APP_ID }}
           META_APP_SECRET: ${{ secrets.STAGING_META_APP_SECRET }}
           META_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_META_TOKEN_ENCRYPTION_KEY }}
+          META_ALLOWED_PAGE_IDS: ${{ vars.STAGING_META_ALLOWED_PAGE_IDS }}
+          META_ALLOWED_INSTAGRAM_IDS: ${{ vars.STAGING_META_ALLOWED_INSTAGRAM_IDS }}
         working-directory: drive-gateway
         run: |
           set -euo pipefail

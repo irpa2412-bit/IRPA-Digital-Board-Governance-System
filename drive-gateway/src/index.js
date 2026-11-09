@@ -31,7 +31,7 @@ import { InvitationRedemptionError, redeemInvitationToken, confirmInvitationPass
 import { buildGoogleDriveAuthorizationParams } from "./googleDriveOAuth.mjs";
 import { createCommunicationsSiteRouter } from "./communicationsSite.mjs";
 import { communicationsRoutes } from "./communicationsRoutes.mjs";
-import { createMetaOAuthRouter } from "./metaOAuth.mjs";
+import { createMetaOAuthRouter, publishMetaContent } from "./metaOAuth.mjs";
 import { createMeetingPortalRouter } from "./meetingPortal.mjs";
 import { createMeetingServicesRouter } from "./meetingServices.mjs";
 import { createInductionMatchingRouter } from "./inductionMatching.mjs";
@@ -295,7 +295,7 @@ export default {
         if (metaResponse) return metaResponse;
       }
 
-      const communicationsRouteResponse = await communicationsRoutes(request, env, { authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser, firestoreDocumentToPlain, corsHeaders });
+      const communicationsRouteResponse = await communicationsRoutes(request, env, { authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser, firestoreDocumentToPlain, publishMetaContent, corsHeaders });
       if (communicationsRouteResponse) return communicationsRouteResponse;
 
       if (pathname.startsWith("/api/communications/")) {
