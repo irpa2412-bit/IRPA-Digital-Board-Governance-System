@@ -173,7 +173,7 @@ async function requirePublishingScopes(version, token, appSecret) {
 function publicAccounts(pages) {
   return (Array.isArray(pages?.data) ? pages.data : []).map(page => {
     const tasks = Array.isArray(page.tasks) ? page.tasks.map(String) : [];
-    const canPublish = tasks.includes("CREATE_CONTENT") || tasks.includes("MANAGE");
+    const canPublish = tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task));
     const instagram = page.instagram_business_account ? [{
       instagramAccountId: String(page.instagram_business_account.id || ""),
       username: String(page.instagram_business_account.username || "").slice(0, 180),
@@ -247,8 +247,8 @@ export function createMetaOAuthRouter(deps) {
         await env.DRIVE_KV.put(TOKEN_KEY_PREFIX + stateRecord.uid, encrypted);
         await env.DRIVE_KV.delete(LEGACY_TOKEN_KEY_PREFIX + stateRecord.uid);
         return json({ ok: true, status: "verified", postingEnabled: true, message: "Meta publishing permissions verified. Publishing remains subject to approval and the global pause.",
-          facebookPages: connection.accounts.map(a => ({ id: a.facebookPageId, name: a.facebookPageName, canPublish: a.tasks.includes("CREATE_CONTENT") || a.tasks.includes("MANAGE") })),
-          instagramAccounts: connection.accounts.filter(a => a.instagramAccountId).map(a => ({ id: a.instagramAccountId, username: a.instagramUsername, accountType: a.instagramAccountType, canPublish: (a.tasks.includes("CREATE_CONTENT") || a.tasks.includes("MANAGE")) && ["BUSINESS", "MEDIA_CREATOR"].includes(String(a.instagramAccountType).toUpperCase()) })),
+          facebookPages: connection.accounts.map(a => ({ id: a.facebookPageId, name: a.facebookPageName, canPublish: a.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task)) })),
+          instagramAccounts: connection.accounts.filter(a => a.instagramAccountId).map(a => ({ id: a.instagramAccountId, username: a.instagramUsername, accountType: a.instagramAccountType, canPublish: (a.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task))) && ["BUSINESS", "MEDIA_CREATOR"].includes(String(a.instagramAccountType).toUpperCase()) })),
           connectedAt: connection.connectedAt, expiresAt: connection.expiresAt, requestedScopes: REQUIRED_SCOPES
         }, 200, corsHeaders(request));
       } catch (error) {
@@ -350,7 +350,7 @@ export async function publishMetaContent(env, { uid, platform, accountId, text, 
   if (!pageToken) throw Object.assign(new Error("A Page access token was not returned for this destination. Reconnect Meta and verify Page permissions."), { status: 409 });
   if (link && !/^https:\/\//i.test(String(link))) throw Object.assign(new Error("Publishing links must use HTTPS."), { status: 400 });
   const post = async (path, params) => graphPost(cfg.version, path, pageToken, cfg.appSecret, params);
-  if (!account.tasks?.includes("CREATE_CONTENT") && !account.tasks?.includes("MANAGE")) {
+  if (!Array.isArray(account.tasks) || !account.tasks.some(task => ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_FULL_CONTROL"].includes(task))) {
     throw Object.assign(new Error("The connected Meta user does not have the Page CREATE_CONTENT task."), { status: 403 });
   }
   if (selectedPlatform === "facebook") {
