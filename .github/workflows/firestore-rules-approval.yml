@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  issues: read
 
 jobs:
   firestore-rules-approval:
@@ -20,6 +21,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      issues: read
     steps:
       - name: Checkout PR source for the read-only gate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
