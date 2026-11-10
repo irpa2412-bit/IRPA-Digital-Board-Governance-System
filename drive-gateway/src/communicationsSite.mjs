@@ -1497,11 +1497,15 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      const runId = crypto.randomUUID();
-      if (env.DRIVE_KV) await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify({
-        runId, createdAt: new Date().toISOString(), items: cleanupItems.map(item => ({ ...item, testInventory: true }))
-      }), { expirationTtl: 2592000 });
-      return json({ testRun: true, runId, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      if (env.DRIVE_KV) {
+        const inventoryKey = "website-maintenance-test-inventory:" + runId;
+        const priorInventory = await env.DRIVE_KV.get(inventoryKey, "json");
+        const priorItems = Array.isArray(priorInventory?.items) ? priorInventory.items : [];
+        const mergedItems = [...priorItems, ...cleanupItems.map(item => ({ ...item, testInventory: true }))];
+        const uniqueItems = [...new Map(mergedItems.map(item => [String(item.kind) + "|" + String(item.id) + "|" + String(item.title), item])).values()];
+        await env.DRIVE_KV.put(inventoryKey, JSON.stringify({ runId, createdAt: priorInventory?.createdAt || new Date().toISOString(), items: uniqueItems }), { expirationTtl: 2592000 });
+      }
+      return json({ testRun: true, runId, step: requestedStep, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
