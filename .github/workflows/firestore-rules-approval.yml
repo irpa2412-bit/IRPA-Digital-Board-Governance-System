@@ -43,8 +43,7 @@ jobs:
     timeout-minutes: 3
     permissions:
       actions: read
-      issues: write
-      pull-requests: read
+      pull-requests: write
     steps:
       - name: Find PR and upsert one explanatory comment
         env:
