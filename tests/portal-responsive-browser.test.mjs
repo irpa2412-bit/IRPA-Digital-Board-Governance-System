@@ -6,8 +6,12 @@ const viewports = [
   { name: "small-mobile-320", width: 320, height: 740 },
   { name: "mobile-360", width: 360, height: 800 },
   { name: "mobile-390", width: 390, height: 844 },
+  { name: "mobile-breakpoint-760", width: 760, height: 900 },
+  { name: "tablet-breakpoint-761", width: 761, height: 900 },
   { name: "tablet-768", width: 768, height: 1024 },
   { name: "tablet-1024", width: 1024, height: 768 },
+  { name: "tablet-breakpoint-1100", width: 1100, height: 900 },
+  { name: "desktop-breakpoint-1101", width: 1101, height: 900 },
   { name: "desktop-1280", width: 1280, height: 900 },
   { name: "desktop-1440", width: 1440, height: 900 }
 ];
