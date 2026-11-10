@@ -396,10 +396,45 @@ export function createCommunicationsSiteRouter(deps) {
     return { root: base.origin + "/execute", username, token, documentRoot };
   }
 
+  const cpanelHomeCache = new Map();
+  async function cpanelAbsoluteDirectory(config, relativeDirectory) {
+    const supplied = String(relativeDirectory || "").replace(/\\\\/g, "/");
+    if (supplied.startsWith("/home/")) return supplied.replace(/\\/+$/g, "");
+    const cacheKey = config.root + "|" + config.username;
+    let home = cpanelHomeCache.get(cacheKey);
+    if (!home) {
+      const variablesUrl = new URL(config.root + "/Variables/get_user_information");
+      const response = await fetch(variablesUrl, {
+        headers: { Authorization: authHeader(config.username, config.token), Accept: "application/json" },
+        signal: AbortSignal.timeout(15000)
+      });
+      const payload = await response.json().catch(() => null);
+      const rows = [payload?.data, payload?.data?.[0], payload?.data?.data, payload?.data?.data?.[0], payload?.result, payload?.result?.data];
+      home = rows.map(row => row && typeof row === "object" ? row.home : null).find(value => typeof value === "string" && /^\\/home\\/[^/]+$/.test(value));
+      if (!response.ok || !payload || payload.status !== 1 || !home) {
+        const errors = Array.isArray(payload?.errors) ? payload.errors.join(" ") : "";
+        const safeErrors = errors.split(config.token).join("[REDACTED]").slice(0, 500);
+        throw Object.assign(new Error("cPanel Variables/get_user_information failed to resolve account home" +
+          (safeErrors ? ": " + safeErrors : "; UAPI field home was not returned.")),
+          { diagnosticCode: "cpanel_home_not_resolved", httpStatus: response.status, uapiStatus: payload?.status ?? "unknown", uapiErrors: safeErrors });
+      }
+      cpanelHomeCache.set(cacheKey, home.replace(/\\/+$/g, ""));
+    }
+    const relative = supplied.replace(/^\\/+/, "");
+    if (!relative || relative.split("/").some(part => !part || part === "." || part === "..")) {
+      throw Object.assign(new Error("Invalid relative cPanel directory."), { diagnosticCode: "cpanel_invalid_relative_directory" });
+    }
+    return home.replace(/\\/+$/g, "") + "/" + relative;
+  }
+
   async function cpanelCall(config, operation, params = {}, method = "GET") {
+    const requestParams = { ...params };
+    if (operation.startsWith("Fileman/") && Object.prototype.hasOwnProperty.call(requestParams, "dir")) {
+      requestParams.dir = await cpanelAbsoluteDirectory(config, requestParams.dir);
+    }
     const url = new URL(config.root + "/" + operation);
     const body = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) body.set(key, String(value));
+    for (const [key, value] of Object.entries(requestParams)) body.set(key, String(value));
     const response = await fetch(method === "GET" ? (url.search = body.toString(), url) : url, {
       method, headers: {
         Authorization: authHeader(config.username, config.token),
@@ -414,15 +449,18 @@ export function createCommunicationsSiteRouter(deps) {
       const status = Number.isInteger(response.status) ? response.status : 0;
       const uapiStatus = data && Number.isInteger(data.status) ? data.status : "unknown";
       const errorCount = Array.isArray(data?.errors) ? data.errors.length : 0;
-      const errorText = Array.isArray(data?.errors) ? data.errors.join(" ").toLowerCase() : "";
-      const category = /permission|access denied|not authorized|not allowed/.test(errorText) ? "permission_denied" :
-        /not found|does not exist|no such file|cannot find/.test(errorText) ? "not_found" :
-        /invalid|unsupported|unknown function|unknown api/.test(errorText) ? "invalid_operation" :
-        /auth|token|login/.test(errorText) ? "authentication_rejected" : "uapi_error";
+      const exactErrors = Array.isArray(data?.errors) ? data.errors.join(" ") : "";
+      const safeErrors = exactErrors.split(config.token).join("[REDACTED]").slice(0, 500);
+      const categoryText = exactErrors.toLowerCase();
+      const category = /permission|access denied|not authorized|not allowed/.test(categoryText) ? "permission_denied" :
+        /not found|does not exist|no such file|cannot find/.test(categoryText) ? "not_found" :
+        /invalid|unsupported|unknown function|unknown api/.test(categoryText) ? "invalid_operation" :
+        /auth|token|login/.test(categoryText) ? "authentication_rejected" : "uapi_error";
       const diagnosticCode = "cpanel_" + category;
       throw Object.assign(new Error("cPanel " + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
-        " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category + "."),
-        { diagnosticCode, httpStatus: status, uapiStatus, errorCount });
+        " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category +
+        (safeErrors ? ". UAPI error: " + safeErrors : ".")),
+        { diagnosticCode, httpStatus: status, uapiStatus, errorCount, uapiErrors: safeErrors });
     }
     Object.defineProperty(data, "__httpStatus", { value: response.status, enumerable: false });
     return data;
