@@ -1335,7 +1335,7 @@ export function createCommunicationsSiteRouter(deps) {
         return json({ testRun: true, diagnosticMode: true, createdDrafts: { pageId: null, postId: null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
       }
       for (const type of ["pages", "posts"]) {
-        const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
+        const title = "TEST: IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
         try {
           const created = await wpRequest(type, "POST", { title, slug, status: "draft", content: "<p>TEST ONLY — IRPA production acceptance. This draft is intentionally retained and will not be published.</p>" });
@@ -1480,7 +1480,11 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      const runId = crypto.randomUUID();
+      if (env.DRIVE_KV) await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify({
+        runId, createdAt: new Date().toISOString(), items: cleanupItems.map(item => ({ ...item, testInventory: true }))
+      }), { expirationTtl: 2592000 });
+      return json({ testRun: true, runId, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
