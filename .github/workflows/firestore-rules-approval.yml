@@ -3,18 +3,28 @@ name: Firestore Rules Change Approval
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  workflow_run:
+    workflows: ["Firestore Rules Change Approval"]
+    types: [completed]
 
 permissions:
   contents: read
   pull-requests: read
-  issues: write
 
 jobs:
   firestore-rules-approval:
+    if: github.event_name == 'pull_request'
     name: firestore-rules-approval
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
+      - name: Checkout PR source for the read-only gate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Run offline approval decision fixtures
         run: node --test tests/firestore-rules-approval.test.mjs
       - name: Evaluate owner-applied, current Firestore rules approval
@@ -23,3 +33,49 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/firestore-rules-approval.mjs
+
+  firestore-rules-approval-comment:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'failure'
+    name: firestore-rules-approval-comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Find PR and upsert one explanatory comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          prs="$(gh api --paginate "/repos/$REPO/actions/runs/$RUN_ID/pull_requests" --jq '.[].number')"
+          count="$(awk '/^[0-9]+$/{n++} END{print n+0}' <<< "$prs")"
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Expected exactly one associated PR; got $count. No comment was posted."
+            exit 1
+          fi
+          pr_number="$(awk '/^[0-9]+$/{print; exit}' <<< "$prs")"
+          marker='<!-- firestore-rules-approval-gate -->'
+          body="$marker
+          firestore.rules changed. Production security rules deploy on merge to main. Owner approval is required: the repository owner adds the 'firestore-rules-approved' label after reviewing the diff. This label is the only approval.
+
+          Rules diff: https://github.com/$REPO/pull/$pr_number/files
+
+          Gate failed. Review the firestore-rules-approval job log for the exact reason."
+          comments="$(gh api --paginate "/repos/$REPO/issues/$pr_number/comments?per_page=100" --jq '.[] | select(.body | contains("<!-- firestore-rules-approval-gate -->")) | .id')"
+          comment_count="$(awk '/^[0-9]+$/{n++} END{print n+0}' <<< "$comments")"
+          if [ "$comment_count" -gt 1 ]; then
+            echo "::error::More than one marked approval comment exists; refusing to create another."
+            exit 1
+          elif [ "$comment_count" -eq 1 ]; then
+            comment_id="$(awk '/^[0-9]+$/{print; exit}' <<< "$comments")"
+            gh api --method PATCH "/repos/$REPO/issues/comments/$comment_id" -f body="$body" >/dev/null
+            echo "Updated the existing Firestore rules approval comment."
+          else
+            gh api --method POST "/repos/$REPO/issues/$pr_number/comments" -f body="$body" >/dev/null
+            echo "Created the Firestore rules approval comment."
+          fi
