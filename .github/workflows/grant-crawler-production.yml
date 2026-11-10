@@ -49,8 +49,16 @@ jobs:
       - name: Build production dashboard
         run: npm run build
 
+  production-approval:
+    # A required reviewer on the protected production Environment must approve before the crawler release can proceed.
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm production approval gate
+        run: echo "Production Environment approval granted; crawler deployment remains separately protected."
+
   deploy-production:
-    needs: [test, dashboard-build]
+    needs: [test, dashboard-build, production-approval]
     # Main-branch release workflow deploys only the isolated crawler and never targets the Drive Gateway.
     runs-on: ubuntu-latest
     timeout-minutes: 25
