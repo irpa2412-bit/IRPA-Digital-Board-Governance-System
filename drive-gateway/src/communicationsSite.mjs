@@ -2182,6 +2182,8 @@ export function createCommunicationsSiteRouter(deps) {
 
     if (path === "/api/communications/cpanel/maintenance/self-test" && request.method === "POST") {
       const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const runId = /^[0-9a-f-]{36}$/i.test(String(input.runId || "")) ? String(input.runId) : crypto.randomUUID();
       const cp = cpanelConfig(env);
       const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
       if (environment !== "staging" || cp.documentRoot !== "public_html/staging") {
@@ -2279,9 +2281,11 @@ export function createCommunicationsSiteRouter(deps) {
         const testFiles = parseRows(listing).map(row => String(row.file || row.name || "")).filter(name => name.startsWith("TEST") || name === "maintenance-test.txt");
         add("List TEST files", "PASS", listing.__httpStatus, testFiles.join(", ") || "No TEST files found.");
       } catch (error) { add("List TEST files", "FAIL", error.httpStatus || 0, error.message || "TEST file listing failed."); }
-      const runId = crypto.randomUUID();
-      const inventory = { runId, createdAt: new Date().toISOString(), items: [{ kind: "cpanel-file", path: relativeFile, title: "TEST maintenance-test.txt", createdByRun: true }] };
-      await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify(inventory), { expirationTtl: 2592000 });
+      const inventoryKey = "website-maintenance-test-inventory:" + runId;
+      const priorInventory = await env.DRIVE_KV.get(inventoryKey, "json");
+      const priorItems = Array.isArray(priorInventory?.items) ? priorInventory.items : [];
+      const inventory = { runId, createdAt: priorInventory?.createdAt || new Date().toISOString(), items: [...priorItems, { kind: "cpanel-file", path: relativeFile, title: "TEST maintenance-test.txt", createdByRun: true, testInventory: true }] };
+      await env.DRIVE_KV.put(inventoryKey, JSON.stringify(inventory), { expirationTtl: 2592000 });
       const audit = fields({ action: "CPANEL_MAINTENANCE_TEST_RUN", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: relativeFile, actorUid: claims.user_id, actorEmail: claims.email || "", details: { runId, path: relativeFile, snapshotId, report: report.map(row => ({ name: row.name, status: row.status, httpStatus: row.httpStatus })) }, createdAt: new Date().toISOString() });
       await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: relativeFile, updatedByUid: claims.user_id, updatedAt: new Date().toISOString(), runId, snapshotId, test: true }), ["path", "updatedByUid", "updatedAt", "runId", "snapshotId", "test"], audit, { createOnly: true });
       return json({ configuredDocumentRoot: cp.configuredDocumentRoot, relativeAllowlistPath: relativeFile, absoluteFilePath: await cpanelAbsoluteDirectory(cp, safe.dir) + "/" + safe.file, snapshotId, runId, report }, 200, corsHeaders(request));
