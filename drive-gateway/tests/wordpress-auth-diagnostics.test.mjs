@@ -257,7 +257,7 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
     assert.match(data.errorLog.lines[0], /line 6/);
     assert.equal(JSON.stringify(data.errorLog).includes("redacted-marker"), false);
     assert.equal(JSON.stringify(data.errorLog).includes("test@example.invalid"), false);
-    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Variables/get_user_information", "/execute/Variables/get_user_information", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content", "/execute/LangPHP/php_get_vhost_versions", "/execute/Quota/get_quota_info", "/execute/Stats/get_error_log"]);
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Variables/get_user_information", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content", "/execute/LangPHP/php_get_vhost_versions", "/execute/Quota/get_quota_info", "/execute/Stats/get_error_log"]);
     assert.ok(methods.every(method => method === "GET"), "all cPanel diagnostics must remain read-only");
   } finally { globalThis.fetch = originalFetch; }
 });
