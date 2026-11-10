@@ -524,6 +524,20 @@ test("Website Studio Upload Media retains the full requested media set and desti
 });
 
 
+
+test("administrator Website Maintenance navigation and shortcut survive failed health, live-root and auto-run checks",()=>{
+ assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio isAdmin={isAdmin}/>'),"administrator status is passed into Website Studio");
+ assert.ok(websiteStudio.includes('...(isAdmin?[["maintenance","Website Maintenance"]]:[])'),"administrator maintenance tab is independent of backend health");
+ assert.ok(websiteStudio.includes("Open Website Maintenance"),"top-of-studio shortcut is visible to administrators");
+ assert.ok(websiteStudio.includes('activeTab==="maintenance"&&isAdmin&&<MaintenanceErrorBoundary>'),"maintenance panel is isolated by an error boundary");
+ assert.ok(websiteStudio.includes('role="alert"'),"initial read-only failures are shown inside the tab");
+ assert.ok(websiteStudio.includes("maintenanceError"),"automatic file-list failures remain visible instead of hiding navigation");
+ assert.ok(!websiteStudio.includes('...(maintenanceAllowed?[["maintenance","Website Maintenance"]]:[])'),"tab visibility is not gated by a successful health check");
+ assert.ok(!websiteStudio.includes('activeTab==="maintenance"&&maintenanceAllowed'),"panel visibility is not gated by the initial auto-run");
+ assert.ok(websiteStudio.includes('onClick={()=>setActiveTab("maintenance")}'),"shortcut opens the maintenance panel");
+ assert.ok(websiteStudio.includes('maintenanceConfirmation!=="PROMOTE TO LIVE"'),"typed promote-to-live confirmation remains enforced");
+});
+
 test("Website Maintenance requires an explicit live root and exposes read-only update acceptance", () => {
  assert.ok(site.includes("CPANEL_LIVE_DOCUMENT_ROOT"));
  assert.ok(site.includes("/api/communications/cpanel/maintenance/live-root-status"));
