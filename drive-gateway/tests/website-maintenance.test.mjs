@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createCommunicationsSiteRouter } from "../src/communicationsSite.mjs";
 
 function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "" } = {}) {
-  const stored = new Map(), events = [], writes = [], wordpressMethods = [];
+  const stored = new Map(), events = [], writes = [], wordpressMethods = [], filemanRequests = [];
   let current = initial;
   const router = createCommunicationsSiteRouter({
     authenticateFirebaseRequest: async () => ({ user_id: "maintenance-user", email: "maintenance@example.test", token: "test-token" }),
@@ -19,6 +19,9 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
     const url = new URL(input instanceof URL ? input.href : String(input));
     const params = new URLSearchParams(url.search);
     const method = init.method || "GET";
+    if (url.pathname.endsWith("/Variables/get_user_information")) return new Response(JSON.stringify({ status: 1, data: { home: "/home/testcp" } }), { status: 200 });
+    if (url.pathname.startsWith("/execute/Fileman/")) filemanRequests.push({ operation: url.pathname.split("/").pop(), dir: params.get("dir") || new URLSearchParams(init.body || "").get("dir"), path: params.get("path") || new URLSearchParams(init.body || "").get("path") });
+    if (url.pathname.endsWith("/Fileman/list_files")) return new Response(JSON.stringify({ status: 1, data: [{ file: "acceptance.txt", type: "file", file_size: 12 }] }), { status: 200 });
     if (url.pathname.includes("/wp-json/wp/v2/")) {
       wordpressMethods.push(method);
       if (url.pathname.endsWith("/plugins")) return new Response(JSON.stringify([{ version: "1.0", update_available: true }]), { status: 200 });
@@ -53,8 +56,26 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
       ...(body ? { body: JSON.stringify(body) } : {})
     }), env);
   }
-  return { request, stored, events, writes, wordpressMethods, get current() { return current; }, restore() { globalThis.fetch = originalFetch; } };
+  return { request, stored, events, writes, wordpressMethods, filemanRequests, get current() { return current; }, restore() { globalThis.fetch = originalFetch; } };
 }
+
+
+test("Fileman list, read and save calls resolve the cPanel home and use absolute paths", async () => {
+  const h = makeHarness({ initial: "absolute path test" });
+  try {
+    const listed = await h.request("/api/communications/cpanel/maintenance/files?dir=portal-test");
+    assert.equal(listed.status, 200);
+    const read = await h.request("/api/communications/cpanel/maintenance/files?path=portal-test/acceptance.txt");
+    assert.equal(read.status, 200);
+    const saved = await h.request("/api/communications/cpanel/maintenance/files", "PUT", {
+      path: "portal-test/acceptance.txt", content: "updated", reason: "Verify absolute Fileman paths"
+    });
+    assert.equal(saved.status, 200);
+    const calls = h.filemanRequests.filter(row => ["list_files", "get_file_content", "save_file_content"].includes(row.operation));
+    assert.ok(calls.length >= 3);
+    for (const call of calls) assert.match(call.dir, /^\\/home\\/testcp\\/public_html\\/staging(?:\\/|$)/, call.operation);
+  } finally { h.restore(); }
+});
 
 test("website maintenance rejects path traversal and blocked paths with HTTP 400", async () => {
   const h = makeHarness();
