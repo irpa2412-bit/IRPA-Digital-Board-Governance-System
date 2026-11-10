@@ -46,6 +46,7 @@ beforeEach(async () => {
       archivedRecord({ previousConnectionStatus: "Suspended" })
     );
     await context.firestore().doc("socialMediaAccounts/legacy-archived").set(archivedRecord());
+    await context.firestore().doc("socialMediaAccounts/archived-active").set(archivedRecord({ previousConnectionStatus: "Active" }));
     await context.firestore().doc("socialMediaAccounts/to-be-archived").set(archivedRecord({ connectionStatus: "Suspended" }));
   });
 });
@@ -109,6 +110,49 @@ test("reviewer restores to the stored previous status and appends a reasoned aud
   assert.equal(snapshot.data().restoreReason, "Registration was only partially completed; review before activation.");
   assert.ok(snapshot.data().restoredAt);
   assert.equal(snapshot.data().previousConnectionStatus, "Suspended");
+});
+
+test("restoring an account previously Active returns it to Pending Verification", async () => {
+  const db = env.authenticatedContext("reviewer", {
+    email: "reviewer@example.test", admin: true
+  }).firestore();
+  await assertSucceeds(restoreBatch(db, "archived-active", "Pending Verification", "Reverification is required before activation."));
+  const snapshot = await getDoc(doc(db, "socialMediaAccounts", "archived-active"));
+  assert.equal(snapshot.data().connectionStatus, "Pending Verification");
+  assert.equal(snapshot.data().restoredBy, "reviewer");
+  assert.equal(snapshot.data().restoreReason, "Reverification is required before activation.");
+});
+
+test("restoration cannot return a previously Active account directly to Active", async () => {
+  const db = env.authenticatedContext("reviewer", {
+    email: "reviewer@example.test", admin: true
+  }).firestore();
+  await assertFails(restoreBatch(db, "archived-active", "Active", "Do not automatically reactivate."));
+});
+
+test("audit reason, when present on any audit action, must be a string of 1 to 500 characters", async () => {
+  const db = env.authenticatedContext("reviewer", {
+    email: "reviewer@example.test", admin: true
+  }).firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "socialMediaAccounts", "to-be-archived"), {
+    connectionStatus: "Archived",
+    previousConnectionStatus: "Suspended",
+    updatedByUid: "reviewer",
+    updatedAt: serverTimestamp()
+  });
+  batch.set(doc(db, "socialMediaAccountsAudit", "invalid-audit-reason"), {
+    recordId: "to-be-archived",
+    platform: "Facebook",
+    accountName: "IRPA official Facebook Page — acceptance record",
+    action: "STATUS_ARCHIVED",
+    actorUid: "reviewer",
+    actorEmail: "reviewer@example.test",
+    reason: "x".repeat(501),
+    createdAt: serverTimestamp(),
+    recordOrigin: "PRODUCTION"
+  });
+  await assertFails(batch.commit());
 });
 
 test("reviewer cannot append STATUS_RESTORED without restoring the account in the same batch", async () => {
