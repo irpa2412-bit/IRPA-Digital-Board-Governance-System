@@ -522,3 +522,22 @@ test("Website Studio Upload Media retains the full requested media set and desti
  for(const ext of [".jpg",".jpeg",".png",".webp",".gif",".svg",".mp4",".mov",".webm",".mp3",".pdf",".docx",".xlsx",".pptx"])assert.ok(websiteStudio.includes(ext),"Upload Media accepts "+ext);
  for(const destination of ["media-library","attach","featured","cpanel-folder"])assert.ok(websiteStudio.includes('value="'+destination+'"'),"destination "+destination+" is available");
 });
+
+
+test("Website Maintenance requires an explicit live root and exposes read-only update acceptance", () => {
+ assert.ok(site.includes("CPANEL_LIVE_DOCUMENT_ROOT"));
+ assert.ok(site.includes("/api/communications/cpanel/maintenance/live-root-status"));
+ assert.ok(site.includes("/api/communications/website/maintenance/updates"));
+ assert.ok(websiteStudio.includes("TEST live document-root configuration gate"));
+ assert.ok(websiteStudio.includes("TEST read-only WordPress core/plugin/theme update checks"));
+ assert.ok(websiteStudio.includes("Authenticated GET probes only"));
+ assert.ok(site.includes("not exposed"));
+});
+
+
+test("website media path and content separators do not contain over-escaped sequences", () => {
+ const slash=String.fromCharCode(92);
+ assert.ok(site.includes("relative.replace(/"+slash+slash+"/g"));
+ assert.ok(!site.includes("relative.replace(/"+slash.repeat(4)+"/g"));
+ assert.ok(!websiteStudio.includes('"'+slash+slash+"n"+slash+slash+"n"+'"'));
+});
