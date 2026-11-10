@@ -142,3 +142,13 @@ test("legacy cPanel file PUT returns HTTP 400 for an invalid website path", asyn
     assert.equal(h.writes.length, 0);
   } finally { h.restore(); }
 });
+
+test("website maintenance refuses to overwrite an existing file larger than 512 KiB", async () => {
+  const h = makeHarness({ initial: "x".repeat(512 * 1024 + 1) });
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/files", "PUT", { path: "portal-test/large-existing.txt", content: "small replacement", reason: "Do not overwrite oversized source" });
+    assert.equal(response.status, 413);
+    assert.equal(h.writes.length, 0);
+    assert.equal(h.stored.size, 0);
+  } finally { h.restore(); }
+});
