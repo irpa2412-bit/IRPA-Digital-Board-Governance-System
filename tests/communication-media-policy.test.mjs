@@ -533,3 +533,10 @@ test("Website Maintenance requires an explicit live root and exposes read-only u
  assert.ok(site.includes("Authenticated GET probes only"));
  assert.ok(site.includes("not exposed"));
 });
+
+
+test("website media path and content separators do not contain over-escaped sequences", () => {
+ assert.ok(site.includes(String.raw`relative.replace(/\\/g`));
+ assert.ok(!site.includes(String.raw`relative.replace(/\\\\/g`));
+ assert.ok(!websiteStudio.includes(String.raw`"\\n\\n"`));
+});
