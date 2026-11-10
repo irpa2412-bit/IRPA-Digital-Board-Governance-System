@@ -676,7 +676,15 @@ service cloud.firestore {
       &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("accountName","")==request.resource.data.get("accountName","")
       &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
       &&request.resource.data.get("createdAt",null)==request.time
-      &&(request.resource.data.get("action","")!="STATUS_RESTORED"||(request.resource.data.get("reason","") is string&&request.resource.data.get("reason","").size()>0&&request.resource.data.get("reason","").size()<=500))
+      &&(request.resource.data.get("action","")!="STATUS_RESTORED"||(communicationMediaReviewer()
+        &&request.resource.data.get("reason","") is string
+        &&request.resource.data.get("reason","").size()>0
+        &&request.resource.data.get("reason","").size()<=500
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoredBy","")==request.resource.data.get("actorUid","")
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoredBy","")==request.auth.uid
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoreReason","")==request.resource.data.get("reason","")
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoredAt",null)==request.time
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("connectionStatus","")!="Archived"))
       &&request.resource.data.keys().hasOnly(["recordId","platform","accountName","action","actorUid","actorEmail","createdAt","recordOrigin","reason"]);
     allow update,delete:if false;
   }
