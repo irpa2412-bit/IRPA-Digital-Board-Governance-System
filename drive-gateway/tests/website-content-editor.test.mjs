@@ -303,7 +303,7 @@ test("production hostname with a staging path is rejected before any WordPress r
   assert.equal(requestCount, before);
 });
 
-test("cPanel Fileman reads use the relative path for the exact staging document root", async () => {
+test("cPanel Fileman reads use the resolved absolute path for the exact staging document root", async () => {
   const router = makeRouter();
   const env = makeEnv({
     CPANEL_BASE_URL: "https://cpanel.example.test:2083/",
@@ -315,13 +315,14 @@ test("cPanel Fileman reads use the relative path for the exact staging document 
   globalThis.fetch = async input => {
     requestedUrl = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url);
     assert.equal(requestedUrl.hostname, "cpanel.example.test");
+    if (requestedUrl.pathname.endsWith("/Variables/get_user_information")) return response({ status: 1, data: { home: "/home/irpaortz" } });
     return response({ status: 1, data: { data: { content: "staging-only content" } } });
   };
   const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt", { role: "Executive Director" });
   assert.equal(result.status, 200);
   assert.equal((await result.json()).content, "staging-only content");
   assert.equal(requestedUrl.pathname, "/execute/Fileman/get_file_content");
-  assert.equal(requestedUrl.searchParams.get("dir"), "public_html/staging");
+  assert.equal(requestedUrl.searchParams.get("dir"), "/home/irpaortz/public_html/staging");
   assert.equal(requestedUrl.searchParams.get("file"), "probe.txt");
 });
 
@@ -409,6 +410,7 @@ test("cPanel diagnostics match SSL certificate subject and read .user.ini before
   globalThis.fetch = async input => {
     const url = new URL(input instanceof URL ? input.href : String(input));
     requests.push(url.pathname + url.search);
+    if (url.pathname.endsWith("/Variables/get_user_information")) return response({ status: 1, data: { home: "/home/irpaortz" } });
     if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
     if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: { certificates: [{ subject: "CN=staging.irpa.or.tz", not_after: "2027-12-31T23:59:59Z", issuer: "Test CA" }] } });
     if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "upload_max_filesize=64M\npost_max_size=64M\n" } });

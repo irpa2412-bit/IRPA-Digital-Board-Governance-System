@@ -219,7 +219,9 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(input instanceof URL ? input.href : String(input));
     calls.push(url.pathname); methods.push(init.method || "GET");
-    const payload = url.pathname.endsWith("/Email/list_pops")
+    const payload = url.pathname.endsWith("/Variables/get_user_information")
+      ? { status: 1, data: { home: "/home/testcp" } }
+      : url.pathname.endsWith("/Email/list_pops")
       ? { status: 1, data: [{ email: "info@staging.irpa.or.tz" }, { email: "contact@staging.irpa.or.tz" }] }
       : url.pathname.endsWith("/SSL/installed_hosts")
         ? { status: 1, data: [{ domain: "staging.irpa.or.tz", status: "valid", issuer: "TEST CA" }] }
@@ -255,7 +257,7 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
     assert.match(data.errorLog.lines[0], /line 6/);
     assert.equal(JSON.stringify(data.errorLog).includes("redacted-marker"), false);
     assert.equal(JSON.stringify(data.errorLog).includes("test@example.invalid"), false);
-    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content", "/execute/LangPHP/php_get_vhost_versions", "/execute/Quota/get_quota_info", "/execute/Stats/get_error_log"]);
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Variables/get_user_information", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content", "/execute/LangPHP/php_get_vhost_versions", "/execute/Quota/get_quota_info", "/execute/Stats/get_error_log"]);
     assert.ok(methods.every(method => method === "GET"), "all cPanel diagnostics must remain read-only");
   } finally { globalThis.fetch = originalFetch; }
 });

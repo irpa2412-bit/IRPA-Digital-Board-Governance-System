@@ -25,7 +25,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages",isAdmin=
  async function runProductionAcceptance(){
   setBusy(true);setMessage("");setAcceptanceReport(null);
   const rows=[];
-  const add=(label,status,httpStatus,error="",detail="")=>rows.push({label,status,httpStatus,error,detail});
+  const add=(label,status,httpStatus,error="",detail="")=>{rows.push({label,status,httpStatus,error,detail});setAcceptanceReport([...rows]);};
   let connections=null;
   try{
    const health=await call("/health","GET",undefined,true);
@@ -97,42 +97,14 @@ export default function CommunicationsWebsiteStudio({initialTab="pages",isAdmin=
      if(path.endsWith("/cpanel/files"))cpanelEntries=result.data?.entries||[];
     }catch(error){add(label,"FAIL",error.httpStatus||0,error.message||"Read route failed.");}
    }
-   const readableFile=cpanelEntries.find(entry=>entry.type==="file");
-   if(readableFile){
-    try{const result=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);add("TEST cPanel website file content read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
-    catch(error){add("TEST cPanel website file content read","FAIL",error.httpStatus||0,error.message||"File read failed.");}
-   }else add("TEST cPanel website file content read","FAIL",null,"No safe HTML/CSS/TXT/JSON file was returned by the read-only directory listing.");
-   const maintenanceTestPath="portal-test/TEST-IRPA-MAINTENANCE.txt";
-   let maintenanceBackupId="";
-   if(readableFile){
-    try{
-     const read=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);
-     add("Step 1/5 TEST read staging file",read.httpStatus>=200&&read.httpStatus<300?"PASS":"FAIL",read.httpStatus,read.error||read.data?.error||"", "Read staging/"+readableFile.name);
-    }catch(error){add("Step 1/5 TEST read staging file","FAIL",error.httpStatus||0,error.message||"Staging read failed.","Read-only request.");}
-   }else add("Step 1/5 TEST read staging file","FAIL",null,"No safe staging file was listed.","Read-only request.");
+   if(cpanelEntries.length===0)add("TEST staging empty","INFO",200,"No safe staging file was listed; the dedicated maintenance-test.txt file is used instead.","No existing staging file was modified.");
+   add("TEST staging/portal-test self-provisioning","RUNNING",null,"","Creates the dedicated TEST folder only if missing, then creates/reads/edits/snapshots/rolls back maintenance-test.txt.");
    try{
-    const edited=await call("/api/communications/cpanel/maintenance/files","PUT",{path:maintenanceTestPath,content:"TEST ONLY — Website Maintenance acceptance file; retained after rollback.",reason:"TEST acceptance: verify snapshot, write and rollback workflow."},true);
-    maintenanceBackupId=edited.data?.backupId||"";
-    add("Step 2/5 TEST edit staging/portal-test file",edited.httpStatus===200&&Boolean(maintenanceBackupId)?"PASS":"FAIL",edited.httpStatus,edited.error||edited.data?.error||"", "TEST file written; snapshot ID returned="+String(Boolean(maintenanceBackupId)));
-   }catch(error){add("Step 2/5 TEST edit staging/portal-test file","FAIL",error.httpStatus||0,error.message||"TEST edit failed.");}
-   if(maintenanceBackupId){
-    try{
-     const snapshot=await call("/api/communications/cpanel/maintenance/snapshot?path="+encodeURIComponent(maintenanceTestPath)+"&backupId="+encodeURIComponent(maintenanceBackupId),"GET",undefined,true);
-     add("Step 3/5 TEST snapshot exists",snapshot.httpStatus===200&&snapshot.data?.exists===true?"PASS":"FAIL",snapshot.httpStatus,snapshot.error||snapshot.data?.error||"", "Snapshot exists="+String(snapshot.data?.exists));
-    }catch(error){add("Step 3/5 TEST snapshot exists","FAIL",error.httpStatus||0,error.message||"Snapshot verification failed.");}
-    try{
-     const rolled=await call("/api/communications/cpanel/maintenance/rollback","POST",{path:maintenanceTestPath,backupId:maintenanceBackupId,reason:"TEST acceptance: verify exact rollback."},true);
-     add("Step 4/5 TEST roll back staging file",rolled.httpStatus===200?"PASS":"FAIL",rolled.httpStatus,rolled.error||rolled.data?.error||"", "Rollback restores the pre-edit bytes; no file deletion.");
-    }catch(error){add("Step 4/5 TEST roll back staging file","FAIL",error.httpStatus||0,error.message||"Rollback failed.");}
-   }else{
-    add("Step 3/5 TEST snapshot exists","FAIL",null,"No snapshot ID was returned.");
-    add("Step 4/5 TEST roll back staging file","FAIL",null,"Skipped because no snapshot was created.");
-   }
-   try{
-    const listed=await call("/api/communications/cpanel/maintenance/files?dir=portal-test","GET",undefined,true);
-    const testFiles=(listed.data?.entries||[]).filter(entry=>entry.type==="file"&&/^TEST/i.test(entry.name));
-    add("Step 5/5 TEST list TEST files",listed.httpStatus===200&&testFiles.some(entry=>entry.name==="TEST-IRPA-MAINTENANCE.txt")?"PASS":"FAIL",listed.httpStatus,listed.error||listed.data?.error||"", "TEST files returned="+testFiles.map(entry=>entry.name).join(", "));
-   }catch(error){add("Step 5/5 TEST list TEST files","FAIL",error.httpStatus||0,error.message||"TEST file listing failed.");}
+    const selfTest=await call("/api/communications/cpanel/maintenance/self-test","POST",{},true);
+    const result=selfTest.data||{};
+    for(const step of result.report||[])add("TEST "+step.name,step.status,step.httpStatus,step.status==="PASS"?"":step.detail||selfTest.error||"Maintenance self-test step failed.",step.detail||"");
+    add("TEST cPanel absolute path diagnostics",selfTest.httpStatus===200&&Boolean(result.absoluteFilePath)?"PASS":"FAIL",selfTest.httpStatus,selfTest.error||result.error||"Absolute cPanel path was not returned.","CPANEL_DOCUMENT_ROOT="+String(result.configuredDocumentRoot||"not returned")+"; relative allowlist path="+String(result.relativeAllowlistPath||"not returned")+"; absolute path="+String(result.absoluteFilePath||"not returned")+"; snapshot ID="+String(result.snapshotId||"not returned"));
+   }catch(error){add("TEST staging/portal-test self-provisioning","FAIL",error.httpStatus||0,error.message||"Maintenance self-test failed.");}
    try{
     const domain=connections?.configuredWordPressHost||"irpa.or.tz";
     const probe=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain),"GET",undefined,true);
