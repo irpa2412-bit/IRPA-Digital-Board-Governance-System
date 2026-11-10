@@ -393,7 +393,7 @@ export function createCommunicationsSiteRouter(deps) {
       throw configurationError("cpanel_document_root_invalid_for_environment", variable + " does not match the permitted " + environment + " document root.");
     }
     const documentRoot = "public_html" + (environment === "staging" ? "/staging" : "");
-    return { root: base.origin + "/execute", username, token, documentRoot };
+    return { root: base.origin + "/execute", username, token, documentRoot, configuredDocumentRoot: configuredRoot };
   }
 
   const cpanelHomeCache = new Map();
@@ -457,10 +457,14 @@ export function createCommunicationsSiteRouter(deps) {
         /invalid|unsupported|unknown function|unknown api/.test(categoryText) ? "invalid_operation" :
         /auth|token|login/.test(categoryText) ? "authentication_rejected" : "uapi_error";
       const diagnosticCode = "cpanel_" + category;
+      const requestedPath = [requestParams.dir, requestParams.file].filter(Boolean).join("/");
+      const pathDetail = operation.startsWith("Fileman/") ?
+        "; CPANEL_DOCUMENT_ROOT=" + String(config.configuredDocumentRoot || config.documentRoot) +
+        "; Fileman path=" + (requestedPath || String(requestParams.path || "(not supplied)")) : "";
       throw Object.assign(new Error("cPanel " + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
         " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category +
-        (safeErrors ? ". UAPI error: " + safeErrors : ".")),
-        { diagnosticCode, httpStatus: status, uapiStatus, errorCount, uapiErrors: safeErrors });
+        pathDetail + (safeErrors ? ". Exact UAPI error: " + safeErrors : ".")),
+        { diagnosticCode, httpStatus: status, uapiStatus, errorCount, uapiErrors: safeErrors, requestedPath });
     }
     Object.defineProperty(data, "__httpStatus", { value: response.status, enumerable: false });
     return data;
