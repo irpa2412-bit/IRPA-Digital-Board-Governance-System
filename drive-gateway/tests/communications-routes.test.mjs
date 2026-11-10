@@ -7,8 +7,9 @@ function harness(role="Communications Officer",uid="author"){
  const deps={
   authenticateFirebaseRequest:async()=>({uid,user_id:uid,token:"test"}),
   getFirestoreDocument:async()=>null,
+  getFirestoreCollectionDocuments:async(_env,name)=>name==="members"&&role!=="Administrator"?[{name:"members/"+uid,data:{status:"Active",role}}]:name==="adminProfiles"&&role==="Administrator"?[{name:"adminProfiles/"+uid,data:{active:true}}]:[],
   getInstitutionalProfileForUser:async()=>({memberRecord:{role,status:"Active"}}),
-  firestoreDocumentToPlain:v=>v,
+  firestoreDocumentToPlain:v=>v?.data||v,
   corsHeaders:()=>({"Content-Type":"application/json"})
  };
  const call=async(path,method="GET",body)=>communicationsRoutes(new Request("https://worker.test"+path,{method,headers:{"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,deps);
