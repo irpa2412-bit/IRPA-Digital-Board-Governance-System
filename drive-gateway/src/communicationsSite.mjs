@@ -1797,6 +1797,45 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/website/maintenance/updates" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      const inspectUpdates = async endpoint => {
+        try {
+          const response = await wordpressEditorFetch(wp, wp.root + endpoint, {
+            headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
+            signal: AbortSignal.timeout(12000)
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) {
+            return { status: "not exposed", reason: "WordPress REST endpoint returned HTTP " + response.status + "; update metadata is not readable by the integration account." };
+          }
+          const records = Array.isArray(payload) ? payload :
+            Array.isArray(payload?.items) ? payload.items : [payload].filter(Boolean);
+          const metadata = records.filter(record => record && typeof record === "object" && (
+            Object.prototype.hasOwnProperty.call(record, "update_available") ||
+            Object.prototype.hasOwnProperty.call(record, "updateAvailable") ||
+            (record.update && typeof record.update === "object")
+          ));
+          if (!metadata.length) {
+            return { status: "not exposed", reason: "The REST endpoint responded without explicit update metadata; version numbers alone are not treated as an update check." };
+          }
+          const updates = metadata.filter(record => record.update_available === true || record.updateAvailable === true ||
+            record.update?.available === true ||
+            (record.update?.new_version && record.version && record.update.new_version !== record.version));
+          return { status: updates.length ? "updates_available" : "current", updatesAvailable: updates.length, itemsChecked: records.length };
+        } catch {
+          return { status: "not exposed", reason: "The WordPress REST endpoint could not be reached; no update operation was attempted." };
+        }
+      };
+      const [core, plugins, themes] = await Promise.all([
+        inspectUpdates("/wp-json/wp/v2/core?context=edit"),
+        inspectUpdates("/wp-json/wp/v2/plugins?context=edit"),
+        inspectUpdates("/wp-json/wp/v2/themes?context=edit")
+      ]);
+      return json({ readOnly: true, checkedAt: new Date().toISOString(), core, plugins, themes }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/cpanel/diagnostics" && request.method === "GET") {
       await authorised(request, env, true);
       const cp = cpanelConfig(env);
