@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const { before, after, beforeEach, test } = require("node:test");
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
-const { doc, writeBatch, serverTimestamp, getDoc } = require("firebase/firestore");
+const { doc, writeBatch, serverTimestamp, getDoc, setDoc } = require("firebase/firestore");
 const fs = require("node:fs");
 
 let env;
@@ -109,6 +109,67 @@ test("reviewer restores to the stored previous status and appends a reasoned aud
   assert.equal(snapshot.data().restoreReason, "Registration was only partially completed; review before activation.");
   assert.ok(snapshot.data().restoredAt);
   assert.equal(snapshot.data().previousConnectionStatus, "Suspended");
+});
+
+test("reviewer cannot append STATUS_RESTORED without restoring the account in the same batch", async () => {
+  const db = env.authenticatedContext("reviewer", {
+    email: "reviewer@example.test", admin: true
+  }).firestore();
+  const audit = doc(db, "socialMediaAccountsAudit", "standalone-reviewer-restore");
+  await assertFails(setDoc(audit, {
+    recordId: "archived-with-status",
+    platform: "Facebook",
+    accountName: "IRPA official Facebook Page — acceptance record",
+    action: "STATUS_RESTORED",
+    actorUid: "reviewer",
+    actorEmail: "reviewer@example.test",
+    reason: "Attempted standalone restoration audit.",
+    createdAt: serverTimestamp(),
+    recordOrigin: "PRODUCTION"
+  }));
+});
+
+test("restoration audit reason must exactly match the same-batch account restoration", async () => {
+  const db = env.authenticatedContext("reviewer", {
+    email: "reviewer@example.test", admin: true
+  }).firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "socialMediaAccounts", "archived-with-status"), {
+    connectionStatus: "Suspended",
+    restoredAt: serverTimestamp(),
+    restoredBy: "reviewer",
+    restoreReason: "Reason recorded on the account."
+  });
+  batch.set(doc(db, "socialMediaAccountsAudit", "restore-reason-mismatch"), {
+    recordId: "archived-with-status",
+    platform: "Facebook",
+    accountName: "IRPA official Facebook Page — acceptance record",
+    action: "STATUS_RESTORED",
+    actorUid: "reviewer",
+    actorEmail: "reviewer@example.test",
+    reason: "Different reason in the audit event.",
+    createdAt: serverTimestamp(),
+    recordOrigin: "PRODUCTION"
+  });
+  await assertFails(batch.commit());
+});
+
+test("non-reviewer cannot write a standalone STATUS_RESTORED audit event", async () => {
+  const db = env.authenticatedContext("communications-editor", {
+    email: "editor@example.test",
+    irpaRoles: ["Communications Officer"]
+  }).firestore();
+  await assertFails(setDoc(doc(db, "socialMediaAccountsAudit", "non-reviewer-standalone-restore"), {
+    recordId: "archived-with-status",
+    platform: "Facebook",
+    accountName: "IRPA official Facebook Page — acceptance record",
+    action: "STATUS_RESTORED",
+    actorUid: "communications-editor",
+    actorEmail: "editor@example.test",
+    reason: "Unauthorized standalone restoration event.",
+    createdAt: serverTimestamp(),
+    recordOrigin: "PRODUCTION"
+  }));
 });
 
 test("legacy archived record without previous status restores only to Pending Verification", async () => {
