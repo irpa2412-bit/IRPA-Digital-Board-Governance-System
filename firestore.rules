@@ -631,8 +631,7 @@ service cloud.firestore {
           &&((resource.data.get("connectionStatus","")=="Pending Verification"&&request.resource.data.get("connectionStatus","") in ["Active","Suspended","Disconnected","Archived"])
             ||(resource.data.get("connectionStatus","")=="Active"&&request.resource.data.get("connectionStatus","") in ["Suspended","Disconnected","Archived"])
             ||(resource.data.get("connectionStatus","")=="Suspended"&&request.resource.data.get("connectionStatus","") in ["Active","Disconnected","Archived"])
-            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived")
-            ||(resource.data.get("connectionStatus","")=="Archived"&&request.resource.data.get("connectionStatus","")=="Active"))
+            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived"))
           &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
         ||(communicationMediaReviewer()
           &&resource.data.get("connectionStatus","")=="Archived"
