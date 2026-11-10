@@ -114,7 +114,7 @@ test("Fileman list, read and save calls resolve the cPanel home and use absolute
     assert.equal(saved.status, 200);
     const calls = h.filemanRequests.filter(row => ["list_files", "get_file_content", "save_file_content"].includes(row.operation));
     assert.ok(calls.length >= 3);
-    for (const call of calls) assert.match(call.dir, /^\\/home\\/testcp\\/public_html\\/staging(?:\\/|$)/, call.operation);
+    for (const call of calls) assert.match(call.dir, /^\/home\/testcp\/public_html\/staging(?:\/|$)/, call.operation);
   } finally { h.restore(); }
 });
 
