@@ -27,8 +27,9 @@
     "check:no-billing-deps": "node scripts/check-no-billing-deps.mjs",
     "test:no-billing-deps": "node --test tests/no-billing-deps.test.mjs",
     "test:workflow-deployment-policy": "node --test tests/workflow-production-deploy-policy.test.mjs",
-    "test:all": "npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio && npm run test:social-accounts-restore-rules",
-    "test:social-accounts-restore-rules": "firebase emulators:exec --project demo-irpa-social-restore --only firestore \"node --test tests/social-media-accounts-restore.rules.test.cjs\""
+    "test:all": "npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio && npm run test:social-accounts-restore-rules && npm run test:social-accounts-restore-layout",
+    "test:social-accounts-restore-rules": "firebase emulators:exec --project demo-irpa-social-restore --only firestore \"node --test tests/social-media-accounts-restore.rules.test.cjs\"",
+    "test:social-accounts-restore-layout": "playwright test --config=playwright.social-accounts-restore.config.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
