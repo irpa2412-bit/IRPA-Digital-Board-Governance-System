@@ -92,6 +92,27 @@ export default function ReleaseReadiness({ admin = false }) {
           const needsConfiguration = probeResponse.status === 503 && /Missing required Worker secrets:/i.test(detail);
           const passed = expected.includes(probeResponse.status) && !needsConfiguration;
           add("Portal Self-Test: " + name, needsConfiguration ? "NEEDS CONFIGURATION" : passed, "HTTP " + probeResponse.status + "; expected " + expected.join("/") + ". " + detail);
+          if (name === "Social connection status" && probeResponse.ok) {
+            const expectedPlatforms = [
+              ["facebook", "Facebook"], ["instagram", "Instagram"], ["linkedin", "LinkedIn"],
+              ["x", "X"], ["youtube", "YouTube"], ["whatsapp", "WhatsApp Business"]
+            ];
+            const platformRows = Array.isArray(responseData.platforms) ? responseData.platforms : [];
+            expectedPlatforms.forEach(([platform, label], index) => {
+              const row = platformRows.find(item => item.platform === platform);
+              const passed = Boolean(row && row.mode === "manual-export" && row.automaticPublishing === false);
+              const detail = row
+                ? "Detail: " + String(row.status || "unknown") + "; mode=" + String(row.mode || "unknown") +
+                  "; automaticPublishing=" + String(row.automaticPublishing) + "; " + String(row.reason || "No platform detail returned.")
+                : "Detail: platform status was not returned.";
+              add("Portal Self-Test: Step " + (index + 1) + "/6 TEST Social Studio " + label,
+                passed, "HTTP " + probeResponse.status + "; " + detail);
+            });
+            add("Portal Self-Test: TEST Social Studio global publishing pause",
+              responseData.pauseAllPublishing === true,
+              "HTTP " + probeResponse.status + "; Detail: pauseAllPublishing=" + String(responseData.pauseAllPublishing) +
+              (responseData.pauseAllPublishing === true ? "; publishing remains OFF." : "; publishing pause is not confirmed."));
+          }
           if (name === "WordPress connection status" && probeResponse.ok) {
             const websiteState = String(responseData.website || "unknown");
             const diagnosticCode = String(responseData.websiteDiagnosticCode || "");
