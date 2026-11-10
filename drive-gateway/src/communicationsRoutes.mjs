@@ -24,11 +24,27 @@ async function roleContext(request,env,deps){
   roles=[...(active(member)?asRoles(member):[]),...(active(employee)?asRoles(employee):[])];
  }
  if(!roles.length)throw Object.assign(new Error("An active IRPA member/employee profile or administrator role is required."),{status:403});
- return {uid,roles,claims};
+ return {uid,roles,claims,admin};
 }
 async function readItems(env){try{return JSON.parse(await env.DRIVE_KV.get(KEY)||"[]")}catch{return []}}
 async function writeItems(env,items){await env.DRIVE_KV.put(KEY,JSON.stringify(items))}
 async function audit(env,event){let rows=[];try{rows=JSON.parse(await env.DRIVE_KV.get(AUDIT_KEY)||"[]")}catch{} rows.push(event);await env.DRIVE_KV.put(AUDIT_KEY,JSON.stringify(rows.slice(-1000)))}
+async function countEnrolledUsers(env,deps,claims){
+ if(typeof deps.getFirestoreCollectionDocuments!=="function")throw new Error("Enrolled-user register is unavailable.");
+ const token=await deps.getFirestoreAdminAccessToken?.(env)||claims.token;
+ if(!token)throw new Error("Enrolled-user register authorization is unavailable.");
+ const names=["adminProfiles","members","employees"];
+ const rows=await Promise.all(names.map(name=>deps.getFirestoreCollectionDocuments(env,name,token)));
+ const enrolled=new Set();
+ for(let i=0;i<names.length;i++)for(const doc of rows[i]||[]){
+  const data=deps.firestoreDocumentToPlain(doc)||{};
+  const uid=String(data.uid||data.userId||data.user_id||String(doc.name||"").split("/").pop()||"");
+  const active=names[i]==="adminProfiles"?data.active===true:
+   ["Active","Activated"].includes(String(data.status||""))||data.registrationStatus==="Activated"||data.employmentStatus==="Active";
+  if(uid&&active)enrolled.add(uid);
+ }
+ return enrolled.size;
+}
 function socialTextSafetyError(value){
  const text=String(value||"");
  if(/\b(password|passwd|passcode|api[_ -]?key|access[_ -]?token|secret)\s*[:=]/i.test(text))return "Remove passwords, credentials and access tokens before saving.";
@@ -95,20 +111,28 @@ export async function communicationsRoutes(request,env,deps){
     if(body.platforms!==undefined)item.platforms=Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[];
     if(item.link&&!/^https:\/\//i.test(item.link))throw Object.assign(new Error("Post links must use HTTPS."),{status:400});
     if(item.imageUrl&&!/^https:\/\//i.test(item.imageUrl))throw Object.assign(new Error("Media links must use HTTPS."),{status:400});
-    item.revision++;item.updatedAt=now();item.status="Draft";item.approvedBy=null;item.approvedAt=null;
+    item.revision++;item.updatedAt=now();item.status="Draft";item.approvedBy=null;item.approvedAt=null;delete item.approvalReason;
    }else if(request.method==="POST"&&decision==="submit"){
     if(item.authorUid!==actor.uid&&!admin)throw Object.assign(new Error("Only the author or an administrator may submit this item."),{status:403});
     if(!["Draft","Returned"].includes(item.status))throw Object.assign(new Error("Only a draft or returned item can be submitted."),{status:409});
-    item.status="Pending Approval";item.submittedAt=now();item.submittedBy=actor.uid;
+    item.status="Pending Approval";item.submittedAt=now();item.submittedBy=actor.uid;delete item.approvalReason;
    }else if(request.method==="POST"&&(decision==="approve"||decision==="reject")){
     if(!canApprove&&!admin)throw Object.assign(new Error("Approver role required."),{status:403});
-    if(item.authorUid===actor.uid)throw Object.assign(new Error("The author cannot approve or reject their own item."),{status:403});
     if(item.status!=="Pending Approval")throw Object.assign(new Error("Only items pending approval can be decided."),{status:409});
     const body=await readJson(request);
-    if(decision==="approve"){item.status="Approved";item.approvedBy=actor.uid;item.approvedAt=now();item.approvedRevision=item.revision;}
+    let approvalReason="";
+    if(item.authorUid===actor.uid){
+     if(decision!=="approve"||!admin)throw Object.assign(new Error("An author cannot approve or reject their own item."),{status:403});
+     let enrolledCount;
+     try{enrolledCount=await countEnrolledUsers(env,deps,actor.claims)}catch{throw Object.assign(new Error("Sole-administrator approval is unavailable because the enrolled-user register could not be verified."),{status:503})}
+     approvalReason=String(body.reason||"").trim();
+     if(enrolledCount!==1)throw Object.assign(new Error("Self-approval is prohibited while another enrolled user exists; use a separate approver."),{status:403});
+     if(approvalReason.length<10||approvalReason.length>500)throw Object.assign(new Error("A typed sole-administrator approval reason of 10–500 characters is required."),{status:400});
+    }
+    if(decision==="approve"){item.status="Approved";item.approvedBy=actor.uid;item.approvedAt=now();item.approvedRevision=item.revision;if(approvalReason)item.approvalReason=approvalReason;}
     else{item.status="Returned";item.rejectionReason=String(body.reason||"Changes requested").slice(0,500);item.rejectedBy=actor.uid;item.rejectedAt=now();}
    }else throw Object.assign(new Error("Unsupported editorial action."),{status:405});
-   items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:decision?decision.toUpperCase():"UPDATED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),status:item.status,revision:item.revision});
+   items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:decision?decision.toUpperCase():"UPDATED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),status:item.status,revision:item.revision,...(decision==="approve"&&item.authorUid===actor.uid&&item.approvalReason?{reason:item.approvalReason,approvalMode:"SOLE_ADMINISTRATOR"}:{})});
    return response({ok:true,item},200,cors);
   }
   return response({ok:false,error:"Editorial route not found."},404,cors);

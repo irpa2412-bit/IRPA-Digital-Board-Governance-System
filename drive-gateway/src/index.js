@@ -295,7 +295,7 @@ export default {
         if (metaResponse) return metaResponse;
       }
 
-      const communicationsRouteResponse = await communicationsRoutes(request, env, { authenticateFirebaseRequest, getFirestoreDocument, getInstitutionalProfileForUser, firestoreDocumentToPlain, corsHeaders });
+      const communicationsRouteResponse = await communicationsRoutes(request, env, { authenticateFirebaseRequest, getFirestoreDocument, getFirestoreCollectionDocuments, getFirestoreAdminAccessToken, getInstitutionalProfileForUser, firestoreDocumentToPlain, corsHeaders });
       if (communicationsRouteResponse) return communicationsRouteResponse;
 
       if (pathname.startsWith("/api/communications/")) {

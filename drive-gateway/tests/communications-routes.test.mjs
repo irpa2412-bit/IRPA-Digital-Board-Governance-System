@@ -7,8 +7,9 @@ function harness(role="Communications Officer",uid="author"){
  const deps={
   authenticateFirebaseRequest:async()=>({uid,user_id:uid,token:"test"}),
   getFirestoreDocument:async()=>null,
+  getFirestoreCollectionDocuments:async(_env,name)=>name==="members"&&role!=="Administrator"?[{name:"members/"+uid,data:{status:"Active",role}}]:name==="adminProfiles"&&role==="Administrator"?[{name:"adminProfiles/"+uid,data:{active:true}}]:[],
   getInstitutionalProfileForUser:async()=>({memberRecord:{role,status:"Active"}}),
-  firestoreDocumentToPlain:v=>v,
+  firestoreDocumentToPlain:v=>v?.data||v,
   corsHeaders:()=>({"Content-Type":"application/json"})
  };
  const call=async(path,method="GET",body)=>communicationsRoutes(new Request("https://worker.test"+path,{method,headers:{"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,deps);
@@ -37,4 +38,48 @@ test("social post creation blocks credentials, private contacts, confidential re
  }
  let r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"TEST",content:"Safe content",link:"http://example.org"});assert.equal(r.status,400);
  r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"TEST",content:"Safe content",imageUrl:"https://example.org/a.jpg"});assert.equal(r.status,400);
+});
+
+test("sole enrolled administrator may approve own item only with typed reason and audit evidence",async()=>{
+ const h=harness("Administrator","only-admin");
+ let r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"TEST",content:"Verified TEST content"});
+ const id=(await r.json()).item.id;
+ await h.call("/api/communications/editorial/items/"+id+"/submit","POST",{});
+ r=await h.call("/api/communications/editorial/items/"+id+"/approve","POST",{reason:""});
+ assert.equal(r.status,400);
+ r=await h.call("/api/communications/editorial/items/"+id+"/approve","POST",{reason:"Reviewed evidence and verified the TEST content."});
+ assert.equal(r.status,200);
+ const approved=(await r.json()).item;
+ assert.equal(approved.status,"Approved");
+ assert.equal(approved.approvalReason,"Reviewed evidence and verified the TEST content.");
+ const events=JSON.parse(h.values.get("communications:editorial:audit"));
+ const event=events.find(x=>x.action==="APPROVE");
+ assert.equal(event.actorUid,"only-admin");
+ assert.equal(event.approvalMode,"SOLE_ADMINISTRATOR");
+ assert.equal(event.reason,approved.approvalReason);
+ assert.ok(event.at);
+});
+test("administrator self-approval is denied when any second enrolled user exists",async()=>{
+ const h=harness("Administrator","admin");
+ const call=async(path,method="GET",body)=>communicationsRoutes(new Request("https://worker.test"+path,{method,headers:{"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})}),h.env,{
+  authenticateFirebaseRequest:async()=>({uid:"admin",user_id:"admin",token:"test"}),
+  getFirestoreDocument:async()=>null,
+  getFirestoreCollectionDocuments:async(_env,name)=>name==="adminProfiles"?[{name:"adminProfiles/admin",data:{active:true}}]:name==="members"?[{name:"members/second-user",data:{status:"Active",role:"Communications Officer"}}]:[],
+  getInstitutionalProfileForUser:async()=>({memberRecord:{role:"Administrator",status:"Active"}}),
+  firestoreDocumentToPlain:v=>v?.data||v,corsHeaders:()=>({"Content-Type":"application/json"})
+ });
+ let r=await call("/api/communications/editorial/items","POST",{kind:"post",title:"TEST",content:"Verified TEST content"});
+ const id=(await r.json()).item.id;
+ await call("/api/communications/editorial/items/"+id+"/submit","POST",{});
+ r=await call("/api/communications/editorial/items/"+id+"/approve","POST",{reason:"I reviewed the content and evidence."});
+ assert.equal(r.status,403);
+ assert.match((await r.json()).error,/another enrolled user exists/);
+});
+test("non-administrator author cannot use sole-administrator self-approval",async()=>{
+ const h=harness("Communications Officer","author");
+ let r=await h.call("/api/communications/editorial/items","POST",{kind:"post",title:"TEST",content:"Verified TEST content"});
+ const id=(await r.json()).item.id;
+ await h.call("/api/communications/editorial/items/"+id+"/submit","POST",{});
+ r=await h.call("/api/communications/editorial/items/"+id+"/approve","POST",{reason:"I approve this myself with a reason."});
+ assert.equal(r.status,403);
 });

@@ -5,6 +5,9 @@ on:
     branches: [fix/communications-cloudflare-website-integration]
     paths:
       - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/CommunicationsSocialStudio.jsx"
+      - "src/utils/socialStudioPolicy.js"
+      - "tests/social-studio-policy.test.mjs"
       - "src/pages/CommunicationMediaOperations.jsx"
       - "src/pages/SocialMediaAccounts.jsx"
       - "firestore.rules"
@@ -71,6 +74,8 @@ jobs:
         run: npx firebase emulators:exec --project demo-irpa-rules --only firestore "node -e 'process.exit(0)'"
       - name: Run communications portal security and integration regression tests
         run: npm run test:communication-media
+      - name: Run Social Studio media and approval policy tests
+        run: npm run test:social-studio
       - name: Run Meta OAuth staging security regression tests
         run: npm run test:meta-oauth
       - name: Verify Meta OAuth router syntax
