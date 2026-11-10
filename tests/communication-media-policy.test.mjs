@@ -501,8 +501,10 @@ test("administrator Communication & Media navigation opens the single Website St
  assert.ok(portal.includes('{["Website Studio","Workspace"'),"Website Studio remains first in the tab bar");
  assert.ok(portal.includes('const authorized=isAdmin||roles.some'),"administrators retain the existing portal authorization path");
  assert.ok(portal.includes('if(!authorized)return'),"unauthorized users remain blocked by the existing portal gate");
- assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio/>'),"Website Studio opens the four-tab CommunicationsWebsiteStudio component");
- assert.ok(!portal.includes("Page Drafts (EN/SW)")&&!portal.includes("saveWebsitePageDraft"),"duplicate legacy bilingual page-draft editor is removed");
+ const websiteStudioEntry=portal.match(/\{tab==="Website Studio"&&(<CommunicationsWebsiteStudio\b[^>]*\/>)\}/);
+ assert.ok(websiteStudioEntry,"Website Studio entry renders the CommunicationsWebsiteStudio component");
+ assert.equal((portal.match(/<CommunicationsWebsiteStudio\b/g)||[]).length,1,"Website Studio has exactly one component mount and no duplicate editor mount");
+ assert.ok(!/Page Drafts \(EN\/SW\)|saveWebsitePageDraft/.test(portal),"no legacy duplicate page editor renders under Website Studio");
 });
 
 
@@ -523,6 +525,20 @@ test("Website Studio Upload Media retains the full requested media set and desti
  for(const destination of ["media-library","attach","featured","cpanel-folder"])assert.ok(websiteStudio.includes('value="'+destination+'"'),"destination "+destination+" is available");
 });
 
+
+
+test("administrator Website Maintenance navigation and shortcut survive failed health, live-root and auto-run checks",()=>{
+ assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio isAdmin={isAdmin}/>'),"administrator status is passed into Website Studio");
+ assert.ok(websiteStudio.includes('...(isAdmin?[["maintenance","Website Maintenance"]]:[])'),"administrator maintenance tab is independent of backend health");
+ assert.ok(websiteStudio.includes("Open Website Maintenance"),"top-of-studio shortcut is visible to administrators");
+ assert.ok(websiteStudio.includes('activeTab==="maintenance"&&isAdmin&&<MaintenanceErrorBoundary>'),"maintenance panel is isolated by an error boundary");
+ assert.ok(websiteStudio.includes('role="alert"'),"initial read-only failures are shown inside the tab");
+ assert.ok(websiteStudio.includes("maintenanceError"),"automatic file-list failures remain visible instead of hiding navigation");
+ assert.ok(!websiteStudio.includes('...(maintenanceAllowed?[["maintenance","Website Maintenance"]]:[])'),"tab visibility is not gated by a successful health check");
+ assert.ok(!websiteStudio.includes('activeTab==="maintenance"&&maintenanceAllowed'),"panel visibility is not gated by the initial auto-run");
+ assert.ok(websiteStudio.includes('onClick={()=>setActiveTab("maintenance")}'),"shortcut opens the maintenance panel");
+ assert.ok(websiteStudio.includes('maintenanceConfirmation!=="PROMOTE TO LIVE"'),"typed promote-to-live confirmation remains enforced");
+});
 
 test("Website Maintenance requires an explicit live root and exposes read-only update acceptance", () => {
  assert.ok(site.includes("CPANEL_LIVE_DOCUMENT_ROOT"));
