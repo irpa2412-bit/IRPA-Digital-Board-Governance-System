@@ -45,7 +45,7 @@ jobs:
         run: npm install --no-save --package-lock=false @playwright/test
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Run report-only responsive audit
+      - name: Run responsive shell layout regression
         run: npx playwright test --config=playwright.responsive-audit.config.mjs
       - name: Upload responsive audit report and screenshots
         if: always()
