@@ -501,8 +501,10 @@ test("administrator Communication & Media navigation opens the single Website St
  assert.ok(portal.includes('{["Website Studio","Workspace"'),"Website Studio remains first in the tab bar");
  assert.ok(portal.includes('const authorized=isAdmin||roles.some'),"administrators retain the existing portal authorization path");
  assert.ok(portal.includes('if(!authorized)return'),"unauthorized users remain blocked by the existing portal gate");
- assert.ok(portal.includes('tab==="Website Studio"&&<CommunicationsWebsiteStudio/>'),"Website Studio opens the four-tab CommunicationsWebsiteStudio component");
- assert.ok(!portal.includes("Page Drafts (EN/SW)")&&!portal.includes("saveWebsitePageDraft"),"duplicate legacy bilingual page-draft editor is removed");
+ const websiteStudioEntry=portal.match(/\{tab==="Website Studio"&&(<CommunicationsWebsiteStudio\b[^>]*\/>)\}/);
+ assert.ok(websiteStudioEntry,"Website Studio entry renders the CommunicationsWebsiteStudio component");
+ assert.equal((portal.match(/<CommunicationsWebsiteStudio\b/g)||[]).length,1,"Website Studio has exactly one component mount and no duplicate editor mount");
+ assert.ok(!/Page Drafts \(EN\/SW\)|saveWebsitePageDraft/.test(portal),"no legacy duplicate page editor renders under Website Studio");
 });
 
 
