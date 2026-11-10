@@ -10,6 +10,8 @@ on:
       - "tests/social-studio-policy.test.mjs"
       - "src/pages/CommunicationMediaOperations.jsx"
       - "src/pages/SocialMediaAccounts.jsx"
+      - "src/styles/social-media-accounts.css"
+      - "tests/social-media-accounts-restore.rules.test.cjs"
       - "firestore.rules"
       - "drive-gateway/src/communicationsSite.mjs"
       - "drive-gateway/src/index.js"
@@ -74,6 +76,8 @@ jobs:
         run: npx firebase emulators:exec --project demo-irpa-rules --only firestore "node -e 'process.exit(0)'"
       - name: Run communications portal security and integration regression tests
         run: npm run test:communication-media
+      - name: Test supervised social account restoration rules in the Firestore emulator
+        run: npm run test:social-accounts-restore-rules
       - name: Run Social Studio media and approval policy tests
         run: npm run test:social-studio
       - name: Run Meta OAuth staging security regression tests
