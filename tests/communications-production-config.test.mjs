@@ -12,8 +12,12 @@ test("production publishing remains approval-gated and WordPress URLs cannot esc
  assert.match(source,/Production publishing requires the approved communication-media workflow/);
  assert.match(source,/target\.hostname\.toLowerCase\(\) !== wp\.hostname/);
 });
-test("cPanel production root is public_html and missing secrets are named",()=>{
- assert.match(source,/environment === "production" \? "public_html" : "public_html\/staging"/);
+test("cPanel production root requires the explicit live-root variable and fails closed when unset",()=>{
+ assert.match(source,/environment === "production" \? env\.CPANEL_LIVE_DOCUMENT_ROOT \|\| ""/);
+ assert.match(source,/cpanel_live_document_root_missing/);
+ assert.match(source,/Live root not configured/);
+ assert.match(source,/\["public_html", "home\/" \+ username \+ "\/public_html", "\/home\/" \+ username \+ "\/public_html"\]/);
  assert.match(source,/CPANEL_BASE_URL, CPANEL_USERNAME, CPANEL_API_TOKEN/);
  assert.match(source,/CPANEL_DOCUMENT_ROOT/);
+ assert.match(source,/CPANEL_LIVE_DOCUMENT_ROOT/);
 });
