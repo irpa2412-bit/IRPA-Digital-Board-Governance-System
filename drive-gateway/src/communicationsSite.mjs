@@ -410,6 +410,7 @@ export function createCommunicationsSiteRouter(deps) {
       });
       const payload = await response.json().catch(() => null);
       const rows = [payload?.data, payload?.data?.[0], payload?.data?.data, payload?.data?.data?.[0], payload?.result, payload?.result?.data];
+      // Accept only the canonical /home/<account> value before building absolute Fileman paths.
       home = rows.map(row => row && typeof row === "object" ? row.home : null).find(value => typeof value === "string" && /^\/home\/[^/]+$/.test(value));
       if (!response.ok || !payload || payload.status !== 1 || !home) {
         const errors = Array.isArray(payload?.errors) ? payload.errors.join(" ") : "";
