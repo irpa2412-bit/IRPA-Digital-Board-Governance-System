@@ -1,6 +1,7 @@
 name: Firebase-free governance migration checks
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     paths:
@@ -8,6 +9,8 @@ on:
       - "drive-gateway/**"
       - "functions/**"
       - "tests/**"
+      - "vite.responsive-fixture.config.js"
+      - "playwright.responsive-audit.config.mjs"
       - "scripts/check-no-billing-deps.mjs"
       - "package.json"
       - "package-lock.json"
@@ -23,6 +26,36 @@ permissions:
   contents: read
 
 jobs:
+  responsive-audit:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    name: Report-only responsive portal layout audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright without changing the lockfile
+        run: npm install --no-save --package-lock=false @playwright/test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run report-only responsive audit
+        run: npx playwright test --config=playwright.responsive-audit.config.mjs
+      - name: Upload responsive audit report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-portal-responsive-audit-${{ github.sha }}
+          path: artifacts/portal-responsive-audit/
+          if-no-files-found: warn
+          retention-days: 14
+
   build-and-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 20
