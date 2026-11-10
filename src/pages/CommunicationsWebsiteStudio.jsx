@@ -9,7 +9,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
  const LOCAL_DRAFT_KEY="irpaWebsiteStudioDraft:v1";
  const [status,setStatus]=useState(null),[type,setType]=useState("pages"),[items,setItems]=useState([]),[edit,setEdit]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(LOCAL_DRAFT_KEY)||"null")?.edit||null}catch{return null}}),[newPost,setNewPost]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(LOCAL_DRAFT_KEY)||"null")?.newPost||null}catch{return null}}),[taxonomies,setTaxonomies]=useState({categories:[],tags:[]}),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[uploadProgress,setUploadProgress]=useState([]),[approvalReady,setApprovalReady]=useState(null),[seoCapabilities,setSeoCapabilities]=useState(null),[mediaDestination,setMediaDestination]=useState("media-library"),[mediaParentId,setMediaParentId]=useState(""),[mediaParentType,setMediaParentType]=useState("posts"),[mediaFolder,setMediaFolder]=useState("uploads/irpa-media"),[mediaResults,setMediaResults]=useState([]),[acceptanceReport,setAcceptanceReport]=useState(null),[captionDiagnostic,setCaptionDiagnostic]=useState(false),[activeTab,setActiveTab]=useState(initialTab);
  useEffect(()=>{try{if(newPost||edit)sessionStorage.setItem(LOCAL_DRAFT_KEY,JSON.stringify({newPost,edit,savedAt:Date.now()}));else sessionStorage.removeItem(LOCAL_DRAFT_KEY)}catch{}},[newPost,edit]);
- async function call(path,method="GET",payload,withStatus=false){if(!auth.currentUser)throw Error("Sign in to use Website Studio.");let tokenTimer;const token=await Promise.race([auth.currentUser.getIdToken(),new Promise((_,reject)=>{tokenTimer=setTimeout(()=>reject(new Error("Sign-in token request timed out. Please sign in again.")),8000)})]).finally(()=>clearTimeout(tokenTimer));let r;try{r=await fetch(GATEWAY+path,{method,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(payload?{"Content-Type":"application/json"}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:AbortSignal.timeout(32000)})}catch(e){if(e?.name==="TimeoutError"||e?.name==="AbortError")throw Error("The gateway did not respond within 32 seconds. The request was stopped; retry once and inspect the gateway health if it repeats.");throw Error("Could not reach the Cloudflare gateway: "+(e?.message||"network error"))}const data=await r.json().catch(()=>({}));if(withStatus)return {httpStatus:r.status,data,error:r.ok?"":data.error||"Request failed ("+r.status+")."};if(!r.ok){const error=new Error(data.error||"Request failed ("+r.status+").");error.data=data;error.httpStatus=r.status;throw error;}return data}
+ async function call(path,method="GET",payload,withStatus=false,timeoutMs=32000){if(!auth.currentUser)throw Error("Sign in to use Website Studio.");let tokenTimer;const token=await Promise.race([auth.currentUser.getIdToken(),new Promise((_,reject)=>{tokenTimer=setTimeout(()=>reject(new Error("Sign-in token request timed out. Please sign in again.")),8000)})]).finally(()=>clearTimeout(tokenTimer));let r;try{r=await fetch(GATEWAY+path,{method,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(payload?{"Content-Type":"application/json"}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:AbortSignal.timeout(timeoutMs)})}catch(e){if(e?.name==="TimeoutError"||e?.name==="AbortError")throw Error("The gateway did not respond within "+Math.round(timeoutMs/1000)+" seconds. The request was stopped; retry once and inspect the gateway health if it repeats.");throw Error("Could not reach the Cloudflare gateway: "+(e?.message||"network error"))}const data=await r.json().catch(()=>({}));if(withStatus)return {httpStatus:r.status,data,error:r.ok?"":data.error||"Request failed ("+r.status+")."};if(!r.ok){const error=new Error(data.error||"Request failed ("+r.status+").");error.data=data;error.httpStatus=r.status;throw error;}return data}
  async function connect(){setBusy(true);setMessage("");try{const d=await call("/api/communications/site/status");const connections=d.connections||{};let cpanelDiagnostics=null;if(connections.cpanel==="connected"){try{cpanelDiagnostics=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(connections.configuredWordPressHost||"irpa.or.tz"));}catch(error){cpanelDiagnostics={readOnly:true,error:error.message||"cPanel diagnostics unavailable."};}}setStatus({...connections,cpanelDiagnostics});const website=String(connections.website||"unavailable");const cpanel=String(connections.cpanel||"unavailable");setMessage("Connection diagnostics received. WordPress: "+website.replace(/_/g," ")+". cPanel: "+cpanel.replace(/_/g," ")+".");}catch(e){setStatus(null);setMessage(e.message||"Connection check failed.")}finally{setBusy(false)}}
  useEffect(()=>{void connect()},[]);
  useEffect(()=>{let alive=true;call("/api/communications/cpanel/maintenance/files").then(data=>{if(alive){setMaintenanceAllowed(true);setMaintenanceEntries(data.entries||[]);}}).catch(()=>{if(alive)setMaintenanceAllowed(false)});return()=>{alive=false}},[]);
@@ -112,14 +112,50 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
     add("TEST cPanel SSL status",diag.ssl?.status==="PASS"?"PASS":"FAIL",diag.ssl?.httpStatus??probe.httpStatus,diag.ssl?.error||diag.ssl?.status||"",diag.ssl?.detail||"");
     add("TEST PHP upload_max_filesize and post_max_size",diag.phpLimits?.status==="PASS"?"PASS":diag.phpLimits?.status==="INFO"?"INFO":"FAIL",diag.phpLimits?.httpStatus??probe.httpStatus,diag.phpLimits?.error||diag.phpLimits?.diagnostic||"The configured cPanel UAPI did not expose both PHP upload limits.",diag.phpLimits?.detail||"");
    }catch(error){add("TEST cPanel diagnostics route","FAIL",error.httpStatus||0,error.message||"cPanel diagnostics failed.");}
-   let acceptance=null;
-   try{
-    const result=await call("/api/communications/website/production-acceptance","POST",{diagnosticMode:captionDiagnostic},true);
-    add("TEST draft lifecycle and destination upload suite",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||"");
-    acceptance=result.data||null;
-    for(const row of acceptance?.report||[])rows.push(row);
-    if(Array.isArray(acceptance?.cleanupItems))rows.push({label:"TEST cleanup inventory",status:"INFO",httpStatus:null,error:"Retained test drafts and media; remove manually if no longer needed.",detail:"See cleanup list below.",cleanupItems:acceptance.cleanupItems});
-   }catch(error){add("TEST draft lifecycle and destination upload suite","FAIL",error.httpStatus||0,error.message||"Acceptance run failed.");}
+   let acceptance={runId:"",createdDrafts:{pageId:null,postId:null}};
+   const runId=crypto.randomUUID();
+   acceptance.runId=runId;
+   setMaintenanceRunId(runId);
+   const acceptanceSteps=[
+    {name:"WordPress page create/edit/revise",step:"page-lifecycle"},
+    {name:"WordPress post create/edit/revise",step:"post-lifecycle"},
+    ...["png","mp4","pdf","docx"].flatMap(file=>["media-library","attach","featured","cpanel-folder"].map(destination=>({
+      name:file.toUpperCase()+" upload to "+destination,step:"media:"+file+":"+destination
+    })))
+   ];
+   const totalSteps=acceptanceSteps.length;
+   for(let index=0;index<acceptanceSteps.length;index++){
+    const item=acceptanceSteps[index],label="Step "+(index+1)+"/"+totalSteps+" - "+item.name;
+    add(label,"RUNNING",null,"","Request started; 60-second timeout, one retry on timeout or Failed to fetch.");
+    let result=null,lastError=null;
+    for(let attempt=0;attempt<2;attempt++){
+     try{
+      result=await call("/api/communications/website/production-acceptance","POST",{
+       step:item.step,runId,pageId:acceptance.createdDrafts.pageId,postId:acceptance.createdDrafts.postId
+      },true,60000);
+      if((result.httpStatus===0||/Failed to fetch/i.test(String(result.error||"")))&&attempt===0)continue;
+      break;
+     }catch(error){
+      lastError=error;
+      const retryable=/timeout|timed out|Failed to fetch|network error/i.test(String(error.message||""));
+      if(!retryable||attempt===1)break;
+     }
+    }
+    if(!result){
+     add(label,"FAIL",lastError?.httpStatus||0,lastError?.message||"Request failed after one permitted retry.","The remaining acceptance steps continue.");
+     continue;
+    }
+    const payload=result.data||{};
+    if(item.step==="page-lifecycle"&&payload.createdDrafts?.pageId)acceptance.createdDrafts.pageId=payload.createdDrafts.pageId;
+    if(item.step==="post-lifecycle"&&payload.createdDrafts?.postId)acceptance.createdDrafts.postId=payload.createdDrafts.postId;
+    if(payload.runId)acceptance.runId=payload.runId;
+    const passed=result.httpStatus>=200&&result.httpStatus<300&&Number(payload.failCount||0)===0;
+    const detail=(payload.report||[]).map(row=>[row.label||row.name,row.status,"HTTP "+String(row.httpStatus??"N/A"),row.error||row.detail||""].filter(Boolean).join(" · ")).join("\n");
+    add(label,passed?"PASS":"FAIL",result.httpStatus,result.error||(!passed?"One or more checks in this request failed.":""),detail||"No detailed report returned.");
+    for(const row of payload.report||[])rows.push(row);
+    setAcceptanceReport([...rows]);
+   }
+   rows.push({label:"TEST cleanup inventory",status:"INFO",httpStatus:200,error:"TEST items are retained until explicitly removed using the typed cleanup confirmation.",detail:"Inventory run ID: "+acceptance.runId});
    for(const [type,id] of [["pages",acceptance?.createdDrafts?.pageId],["posts",acceptance?.createdDrafts?.postId]]){
     if(!id)continue;
     try{const result=await call("/api/communications/website/content/"+type+"/"+id,"GET",undefined,true);add("TEST WordPress "+type+" single-item read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
