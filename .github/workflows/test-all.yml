@@ -1,0 +1,49 @@
+name: Root test:all and billing dependency audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/check-no-billing-deps.mjs"
+      - "tests/no-billing-deps.test.mjs"
+      - "tests/workflow-production-deploy-policy.test.mjs"
+      - ".github/workflows/test-all.yml"
+  push:
+    branches: [main]
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/check-no-billing-deps.mjs"
+      - "tests/no-billing-deps.test.mjs"
+      - "tests/workflow-production-deploy-policy.test.mjs"
+      - ".github/workflows/test-all.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: root-test-all-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-all:
+    name: Run complete declared root test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run all declared root tests and billing audit
+        run: npm run test:all
