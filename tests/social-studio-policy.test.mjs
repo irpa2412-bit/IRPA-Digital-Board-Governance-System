@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {SOCIAL_PLATFORMS,validateSocialDraft,inspectSocialText,canTransitionSocialStatus,socialCalendarCsv,socialCalendarRange,socialCalendarDocxXml} from "../src/utils/socialStudioPolicy.js";
+import {SOCIAL_PLATFORMS,validateSocialDraft,validateSocialMediaUpload,inspectSocialText,canTransitionSocialStatus,socialCalendarCsv,socialCalendarRange,socialCalendarDocxXml} from "../src/utils/socialStudioPolicy.js";
 
 test("platform text and hashtag limits are enforced",()=>{
  assert.ok(validateSocialDraft({title:"T",body:"x".repeat(281),platforms:["x"]}).some(x=>x.includes("280")));
@@ -35,4 +35,24 @@ test("day and week calendar views filter planned items and DOCX XML escapes cont
  const xml=socialCalendarDocxXml(items.slice(0,1),"2026-11-09","day");
  assert.ok(xml.includes("A &amp; B &lt;C&gt;"));
  assert.ok(xml.includes("Last modified: 2026-11-09T10:00:00"));
+});
+
+test("Social Studio media upload accepts only JPG PNG WebP MP4 and PDF with required alt text",()=>{
+ for(const file of [
+  {name:"photo.jpg",type:"image/jpeg",size:1024},
+  {name:"photo.png",type:"image/png",size:1024},
+  {name:"photo.webp",type:"image/webp",size:1024},
+  {name:"clip.mp4",type:"video/mp4",size:1024},
+  {name:"brief.pdf",type:"application/pdf",size:1024}
+ ])assert.deepEqual(validateSocialMediaUpload(file,"Accessible description"),[]);
+ assert.ok(validateSocialMediaUpload({name:"bad.exe",type:"application/octet-stream",size:100},"Description").length);
+ assert.ok(validateSocialMediaUpload({name:"photo.jpg",type:"image/jpeg",size:1024},"").some(x=>x.includes("Alternative text")));
+ assert.ok(validateSocialMediaUpload({name:"large.jpg",type:"image/jpeg",size:21*1024*1024},"Description").some(x=>x.includes("20 MB")));
+});
+test("Social Studio wires media upload to the authenticated WordPress Media Library route and attaches its URL to the draft",()=>{
+ const fsSource = require("node:fs").readFileSync(new URL("../src/pages/CommunicationsSocialStudio.jsx", import.meta.url),"utf8");
+ assert.ok(fsSource.includes("/api/communications/website/media"));
+ assert.ok(fsSource.includes("destination:\"media-library\""));
+ assert.ok(fsSource.includes("setImageUrl(result.media.url)"));
+ assert.ok(fsSource.includes("Alternative text is required"));
 });

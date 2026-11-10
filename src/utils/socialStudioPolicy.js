@@ -6,6 +6,16 @@ export const SOCIAL_PLATFORMS = {
  youtube:{label:"YouTube",characters:5000,hashtags:15,imageBytes:2*1024*1024,videoBytes:256*1024*1024*1024},
  whatsapp:{label:"WhatsApp",characters:4096,hashtags:30,imageBytes:16*1024*1024,videoBytes:16*1024*1024}
 };
+export const SOCIAL_MEDIA_UPLOAD_TYPES=Object.freeze({"image/jpeg":[".jpg",".jpeg"],"image/png":[".png"],"image/webp":[".webp"],"video/mp4":[".mp4"],"application/pdf":[".pdf"]});
+export function validateSocialMediaUpload(file,altText){
+ const errors=[];
+ if(!file)return ["Choose a JPG, PNG, WebP, MP4 or PDF file."];
+ const name=String(file.name||"").toLowerCase(),type=String(file.type||"").toLowerCase(),ext=name.slice(name.lastIndexOf("."));
+ if(!Object.hasOwn(SOCIAL_MEDIA_UPLOAD_TYPES,type)||!SOCIAL_MEDIA_UPLOAD_TYPES[type].includes(ext))errors.push("Only matching JPG, PNG, WebP, MP4 and PDF files are allowed.");
+ if(!Number.isFinite(file.size)||file.size<1||file.size>20*1024*1024)errors.push("Media must be between 1 byte and 20 MB.");
+ if(!String(altText||"").trim())errors.push("Alternative text is required before media upload.");
+ return errors;
+}
 export const SOCIAL_STATUSES=["Draft","In review","Approved","Exported"];
 export const SOCIAL_TEMPLATES={
  "Project update":["Project update: [verified activity, location, reporting period, evidence and next steps]","Taarifa ya mradi: [shughuli iliyothibitishwa, eneo, kipindi cha taarifa, ushahidi na hatua zinazofuata]"],
