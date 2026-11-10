@@ -46,6 +46,6 @@ test("billing dependency audit rejects server SDK imports from browser source", 
   const source = [
     'import { onCall } from "firebase-functions/v2/https";',
     'const admin = require("@google-cloud/functions-framework");'
-  ].join("\n");
+  ].join(String.fromCharCode(10));
   assert.equal(findBillingImportViolations(source).length, 2);
 });
