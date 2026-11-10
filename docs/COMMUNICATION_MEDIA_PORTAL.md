@@ -74,7 +74,8 @@ Set these as Worker secrets in the correct environment; never commit them or pas
 - `CPANEL_BASE_URL`: HTTPS cPanel hostname with port 2083, for example the actual hosting provider hostname; do not guess the host.
 - `CPANEL_USERNAME`: the cPanel account username.
 - `CPANEL_API_TOKEN`: a cPanel API token with only the required account-level permissions.
-- `CPANEL_DOCUMENT_ROOT` (optional non-secret Worker variable): document-root-relative directory, default `public_html`.
+- `CPANEL_DOCUMENT_ROOT` (optional non-secret Worker variable): staging document-root-relative directory; defaults to `public_html/staging` in the staging Worker.
+- `CPANEL_LIVE_DOCUMENT_ROOT` (optional non-secret Worker variable): explicit production/live document root. Accepted values are exactly `public_html`, `home/<cPanel-username>/public_html`, or `/home/<cPanel-username>/public_html`. Do not set this to the staging path. There is deliberately no production default: when unset, live-root checks and live promotion return HTTP `409` with `Live root not configured`; no live file is written.
 
 Use the Cloudflare dashboard or Wrangler's interactive secret prompt for the intended environment. Example commands (run only in the repository's authorised Cloudflare environment):
 ```sh
@@ -88,6 +89,16 @@ npx wrangler secret put CPANEL_API_TOKEN
 For staging, explicitly target the staging Worker environment using the supported Wrangler `--env staging` option. Do not copy production credentials into staging. Do not log or print secret values.
 
 Production deployment is gated on six GitHub Actions secrets being configured for the production workflow: `PRODUCTION_WORDPRESS_BASE_URL`, `PRODUCTION_WORDPRESS_USERNAME`, `PRODUCTION_WORDPRESS_APPLICATION_PASSWORD`, `PRODUCTION_CPANEL_BASE_URL`, `PRODUCTION_CPANEL_USERNAME`, and `PRODUCTION_CPANEL_API_TOKEN`. The production workflow validates their presence and endpoint formats before changing the Worker, then transfers the values into Cloudflare Worker secrets without printing them. Do not put these values in source control or paste them into chat.
+
+## Website Maintenance live-root and read-only health checks
+
+The administrator-only Website Maintenance panel keeps staging file browsing and editing separate from live promotion. The staging Worker continues to use `CPANEL_DOCUMENT_ROOT`; production/live operations require the explicit non-secret `CPANEL_LIVE_DOCUMENT_ROOT` value above. The read-only `GET /api/communications/cpanel/maintenance/live-root-status` endpoint reports whether that root is configured. An unset value returns HTTP `409` and the exact message `Live root not configured`. Promotion also fails closed with that same response before writing to the live document root.
+
+Website health fields that cannot be retrieved are returned as `status: "not exposed"` with a human-readable `reason`. This applies to PHP version, disk usage and error-log content when the cPanel account/API does not expose those values; SSL and PHP-limit diagnostics also explain unavailable evidence. The UI must not turn an unavailable value into a healthy or verified status.
+
+WordPress update checks use authenticated REST `GET` probes only for core, plugin and theme update metadata. An endpoint that is unavailable, denied or returns no explicit update metadata is labelled `not exposed` with a reason. A version listing alone is not interpreted as an update result. No WordPress update, plugin/theme installation, activation, deletion or configuration change is performed by these checks.
+
+Production Acceptance includes TEST-labelled read-only checks for the live-root configuration gate and WordPress core/plugin/theme update metadata. A missing live root is a passing fail-closed safety outcome, not permission to promote. These checks do not deploy, write to cPanel or execute WordPress updates.
 
 ## Automated staging acceptance prerequisites
 
