@@ -465,7 +465,15 @@ test("cPanel PHP limits fall through to MultiPHP and report INFO when unavailabl
   assert.match(unavailableData.phpLimits.diagnostic, /^INFO: cPanel did not return both directives\./);
   assert.match(unavailableData.phpLimits.diagnostic, /LangPHP UAPI permission/);
   assert.match(unavailableData.phpLimits.diagnostic, /MultiPHP INI Editor/);
+  assert.match(unavailableData.phpLimits.reason, /not exposed/);
+  assert.equal(unavailableData.phpVersion.status, "not exposed");
+  assert.match(unavailableData.phpVersion.reason, /endpoint/);
+  assert.equal(unavailableData.diskUsage.status, "not exposed");
+  assert.match(unavailableData.diskUsage.reason, /quota/);
+  assert.equal(unavailableData.errorLog.status, "not exposed");
+  assert.match(unavailableData.errorLog.reason, /error-log/);
   assert.equal(unavailableData.ssl.status, "FAIL");
+  assert.match(unavailableData.ssl.reason, /certificate/);
   assert.match(unavailableData.ssl.error, /No installed SSL certificate matched/);
 });
 
