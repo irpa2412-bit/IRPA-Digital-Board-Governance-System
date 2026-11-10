@@ -2338,9 +2338,10 @@ export function createCommunicationsSiteRouter(deps) {
     try { return await handle(request, env); }
     catch (error) {
       const status = Number.isInteger(error?.status) ? error.status :
+        error?.diagnosticCode === "cpanel_not_found" ? 404 :
         /authentication|token/i.test(String(error.message)) ? 401 :
         /role does not permit|authorised|authorized|restricted to active administrators/i.test(String(error.message)) ? 403 :
-        /not found/i.test(String(error.message)) ? 404 : 502;
+        /not found|no such file or directory/i.test(String(error.message)) ? 404 : 502;
       return json({ error: error.message || "Website management request failed." }, status, corsHeaders(request));
     }
   };
