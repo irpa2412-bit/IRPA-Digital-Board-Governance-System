@@ -299,7 +299,7 @@ test("production hostname with a staging path is rejected before any WordPress r
   const router = makeRouter();
   const before = requestCount;
   const result = await call(router, makeEnv({ WORDPRESS_BASE_URL: "https://irpa.or.tz/staging" }), "/api/communications/website/content/pages/123");
-  assert.equal(result.status, 502);
+  assert.equal(result.status, 503);
   assert.equal(requestCount, before);
 });
 
@@ -339,7 +339,8 @@ test("cPanel file access refuses any document root other than the exact staging 
     return response({ status: 1, data: { data: { content: "must not be read" } } });
   };
   const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt", { role: "Executive Director" });
-  assert.equal(result.status, 502);
+  assert.equal(result.status, 503);
+  assert.deepEqual(await result.json(), { error: "CPANEL_DOCUMENT_ROOT does not match the permitted staging document root." });
   assert.equal(cpanelRequests, 0);
 });
 
