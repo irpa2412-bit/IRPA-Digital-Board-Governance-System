@@ -71,6 +71,32 @@ function restoreBatch(db, id, status, reason) {
   return batch.commit();
 }
 
+test("archiving records the status that must be restored later", async () => {
+  const db = env.authenticatedContext("reviewer", {
+    email: "reviewer@example.test", admin: true
+  }).firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "socialMediaAccounts/archived-with-status"), {
+    connectionStatus: "Archived",
+    previousConnectionStatus: "Suspended",
+    updatedByUid: "reviewer",
+    updatedAt: serverTimestamp()
+  });
+  batch.set(doc(db, "socialMediaAccountsAudit", "archive-status-test"), {
+    recordId: "archived-with-status",
+    platform: "Facebook",
+    accountName: "IRPA official Facebook Page — acceptance record",
+    action: "STATUS_ARCHIVED",
+    actorUid: "reviewer",
+    actorEmail: "reviewer@example.test",
+    createdAt: serverTimestamp(),
+    recordOrigin: "PRODUCTION"
+  });
+  await assertSucceeds(batch.commit());
+  const snapshot = await getDoc(doc(db, "socialMediaAccounts", "archived-with-status"));
+  assert.equal(snapshot.data().previousConnectionStatus, "Suspended");
+});
+
 test("reviewer restores to the stored previous status and appends a reasoned audit event", async () => {
   const db = env.authenticatedContext("reviewer", {
     email: "reviewer@example.test", admin: true
