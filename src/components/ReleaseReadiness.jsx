@@ -92,24 +92,35 @@ export default function ReleaseReadiness({ admin = false }) {
           const needsConfiguration = probeResponse.status === 503 && /Missing required Worker secrets:/i.test(detail);
           const passed = expected.includes(probeResponse.status) && !needsConfiguration;
           add("Portal Self-Test: " + name, needsConfiguration ? "NEEDS CONFIGURATION" : passed, "HTTP " + probeResponse.status + "; expected " + expected.join("/") + ". " + detail);
-          if (name === "Social connection status" && probeResponse.ok) {
+          if (name === "Social connection status") {
             const expectedPlatforms = [
               ["facebook", "Facebook"], ["instagram", "Instagram"], ["linkedin", "LinkedIn"],
               ["x", "X"], ["youtube", "YouTube"], ["whatsapp", "WhatsApp Business"]
             ];
             const platformRows = Array.isArray(responseData.platforms) ? responseData.platforms : [];
-            expectedPlatforms.forEach(([platform, label], index) => {
+            for (const [index, [platform, label]] of expectedPlatforms.entries()) {
               const row = platformRows.find(item => item.platform === platform);
-              const passed = Boolean(row && row.mode === "manual-export" && row.automaticPublishing === false);
-              const detail = row
-                ? "Detail: " + String(row.status || "unknown") + "; mode=" + String(row.mode || "unknown") +
-                  "; automaticPublishing=" + String(row.automaticPublishing) + "; " + String(row.reason || "No platform detail returned.")
-                : "Detail: platform status was not returned.";
-              add("Portal Self-Test: Step " + (index + 1) + "/6 TEST Social Studio " + label,
-                passed, "HTTP " + probeResponse.status + "; " + detail);
-            });
+              try {
+                const exportResponse = await fetch(gateway + "/api/communications/social/export", {
+                  method: "POST",
+                  headers: { Authorization: "Bearer " + token, Accept: "application/json", "Content-Type": "application/json" },
+                  body: JSON.stringify({ platform, content: { text: "TEST — IRPA Social Studio self-test", url: "https://irpa.or.tz", hashtags: ["#IRPA"] } })
+                });
+                const exportData = await exportResponse.json().catch(() => ({}));
+                const passed = probeResponse.status === 200 && Boolean(row && row.mode === "manual-export" && row.automaticPublishing === false) &&
+                  exportResponse.status === 200 && exportData.ok === true && exportData.mode === "manual-export" && exportData.platform === platform;
+                const detail = "Detail: status HTTP " + probeResponse.status + "; " +
+                  (row ? "adapter mode=" + String(row.mode) + "; automaticPublishing=" + String(row.automaticPublishing) + "; connection=" + String(row.status) : "platform status missing") +
+                  "; export=" + String(exportData.reason || exportData.error || "No export detail returned.");
+                add("Portal Self-Test: Step " + (index + 1) + "/6 TEST Social Studio " + label,
+                  passed, "HTTP " + exportResponse.status + "; " + detail);
+              } catch (exportError) {
+                add("Portal Self-Test: Step " + (index + 1) + "/6 TEST Social Studio " + label,
+                  false, "HTTP " + (exportError?.httpStatus || 0) + "; Detail: " + String(exportError?.message || exportError));
+              }
+            }
             add("Portal Self-Test: TEST Social Studio global publishing pause",
-              responseData.pauseAllPublishing === true,
+              probeResponse.status === 200 && responseData.pauseAllPublishing === true,
               "HTTP " + probeResponse.status + "; Detail: pauseAllPublishing=" + String(responseData.pauseAllPublishing) +
               (responseData.pauseAllPublishing === true ? "; publishing remains OFF." : "; publishing pause is not confirmed."));
           }
