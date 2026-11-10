@@ -46,6 +46,7 @@ beforeEach(async () => {
       archivedRecord({ previousConnectionStatus: "Suspended" })
     );
     await context.firestore().doc("socialMediaAccounts/legacy-archived").set(archivedRecord());
+    await context.firestore().doc("socialMediaAccounts/to-be-archived").set(archivedRecord({ connectionStatus: "Suspended" }));
   });
 });
 
@@ -76,14 +77,14 @@ test("archiving records the status that must be restored later", async () => {
     email: "reviewer@example.test", admin: true
   }).firestore();
   const batch = writeBatch(db);
-  batch.update(doc(db, "socialMediaAccounts/archived-with-status"), {
+  batch.update(doc(db, "socialMediaAccounts/to-be-archived"), {
     connectionStatus: "Archived",
     previousConnectionStatus: "Suspended",
     updatedByUid: "reviewer",
     updatedAt: serverTimestamp()
   });
   batch.set(doc(db, "socialMediaAccountsAudit", "archive-status-test"), {
-    recordId: "archived-with-status",
+    recordId: "to-be-archived",
     platform: "Facebook",
     accountName: "IRPA official Facebook Page — acceptance record",
     action: "STATUS_ARCHIVED",
@@ -93,7 +94,7 @@ test("archiving records the status that must be restored later", async () => {
     recordOrigin: "PRODUCTION"
   });
   await assertSucceeds(batch.commit());
-  const snapshot = await getDoc(doc(db, "socialMediaAccounts", "archived-with-status"));
+  const snapshot = await getDoc(doc(db, "socialMediaAccounts", "to-be-archived"));
   assert.equal(snapshot.data().previousConnectionStatus, "Suspended");
 });
 
