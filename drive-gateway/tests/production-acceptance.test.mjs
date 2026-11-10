@@ -27,6 +27,7 @@ test("production acceptance runs TEST-only draft lifecycle and uploads without p
     calls.push({ host: url.hostname, path: url.pathname, method, headers: new Headers(init.headers) });
     if (url.hostname === "cpanel.test") {
       if (url.pathname.endsWith("/Variables/get_user_information")) return response({ status: 1, data: { home: "/home/testcp" } });
+      if (url.pathname.endsWith("/Variables/get_user_information")) return response({ status: 1, data: { home: "/home/testcp" } });
       if (url.pathname.endsWith("/Fileman/list_files")) return response({ status: 1, data: [] });
       if (url.pathname.endsWith("/Fileman/upload_files")) {
         assert.ok(init.body instanceof FormData);
