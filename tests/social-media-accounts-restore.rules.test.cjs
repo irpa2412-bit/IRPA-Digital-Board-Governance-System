@@ -134,25 +134,27 @@ test("audit reason, when present on any audit action, must be a string of 1 to 5
   const db = env.authenticatedContext("reviewer", {
     email: "reviewer@example.test", admin: true
   }).firestore();
-  const batch = writeBatch(db);
-  batch.update(doc(db, "socialMediaAccounts", "to-be-archived"), {
-    connectionStatus: "Archived",
-    previousConnectionStatus: "Suspended",
-    updatedByUid: "reviewer",
-    updatedAt: serverTimestamp()
-  });
-  batch.set(doc(db, "socialMediaAccountsAudit", "invalid-audit-reason"), {
-    recordId: "to-be-archived",
-    platform: "Facebook",
-    accountName: "IRPA official Facebook Page — acceptance record",
-    action: "STATUS_ARCHIVED",
-    actorUid: "reviewer",
-    actorEmail: "reviewer@example.test",
-    reason: "x".repeat(501),
-    createdAt: serverTimestamp(),
-    recordOrigin: "PRODUCTION"
-  });
-  await assertFails(batch.commit());
+  for (const [index, reason] of ["", 42, "x".repeat(501)].entries()) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, "socialMediaAccounts", "to-be-archived"), {
+      connectionStatus: "Archived",
+      previousConnectionStatus: "Suspended",
+      updatedByUid: "reviewer",
+      updatedAt: serverTimestamp()
+    });
+    batch.set(doc(db, "socialMediaAccountsAudit", "invalid-audit-reason-" + index), {
+      recordId: "to-be-archived",
+      platform: "Facebook",
+      accountName: "IRPA official Facebook Page — acceptance record",
+      action: "STATUS_ARCHIVED",
+      actorUid: "reviewer",
+      actorEmail: "reviewer@example.test",
+      reason,
+      createdAt: serverTimestamp(),
+      recordOrigin: "PRODUCTION"
+    });
+    await assertFails(batch.commit());
+  }
 });
 
 test("reviewer cannot append STATUS_RESTORED without restoring the account in the same batch", async () => {
