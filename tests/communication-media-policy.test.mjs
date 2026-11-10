@@ -561,6 +561,7 @@ test("website media path and content separators do not contain over-escaped sequ
 
 test("archived social account restoration is supervised, status-preserving, reasoned and reviewer-only",()=>{
  assert.ok(social.includes('item.connectionStatus==="Archived"')&&social.includes('>Unarchive</button>'),"archived account cards expose the Unarchive action");
+ assert.ok(social.includes('{reviewer&&item.connectionStatus==="Archived"'),"only reviewers see the Unarchive action");
  assert.ok(social.includes("async function restoreArchivedAccount()"),"restoration has a dedicated operation");
  assert.ok(social.includes('RESTORABLE_STATES.includes(restoreTarget?.previousConnectionStatus)?restoreTarget.previousConnectionStatus:"Pending Verification"'),"missing previous status falls back to Pending Verification");
  assert.ok(social.includes('connectionStatus:restoreStatus,restoredAt:serverTimestamp(),restoredBy:user.uid,restoreReason:reason'),"restore updates only the status and required restoration metadata");
