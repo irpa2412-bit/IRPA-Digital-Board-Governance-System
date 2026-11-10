@@ -115,6 +115,8 @@ test("website publishing enforces Firebase authentication, registered reviewer r
 test("cPanel access is secret-backed and static-file editor denies executable or traversal paths",()=>{
  for(const secret of ["CPANEL_BASE_URL","CPANEL_USERNAME","CPANEL_API_TOKEN"]) assert.ok(site.includes(secret),secret);
  assert.ok(site.includes('new Set([".html", ".htm", ".css", ".txt", ".json", ".xml"])'));
+ assert.ok(site.includes('new Set(["wp-admin", "wp-includes", "uploads"])'));
+ assert.ok(site.includes('["wp-config.php", ".htaccess", ".user.ini"]'));
  assert.ok(site.includes('p === ".."'));
  assert.ok(site.includes("safeCpanelDirectory"));
  assert.ok(site.includes("Fileman/list_files"));
