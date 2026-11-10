@@ -676,3 +676,60 @@ test("production website editor still rejects direct publishing through the exis
   assert.equal(state.title, "Original test page");
   assert.equal(kvStore.size, 0);
 });
+
+
+test("cPanel file PUT returns HTTP 400 and the exact validation message for path traversal", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
+  });
+  const result = await call(router, env, "/api/communications/cpanel/files", {
+    method: "PUT",
+    body: { path: "../probe.txt", content: "TEST" },
+    role: "Executive Director"
+  });
+  assert.equal(result.status, 400);
+  assert.deepEqual(await result.json(), { error: "Invalid website file path." });
+});
+
+test("cPanel file PUT rejects protected WordPress paths and configuration files before any cPanel request", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
+  });
+  let cpanelRequests = 0;
+  globalThis.fetch = async () => { cpanelRequests++; throw new Error("Unexpected cPanel request"); };
+  for (const path of ["wp-admin/probe.txt", "wp-includes/probe.txt", "uploads/probe.txt", "wp-config.php", ".htaccess", ".user.ini"]) {
+    const result = await call(router, env, "/api/communications/cpanel/files", {
+      method: "PUT",
+      body: { path, content: "TEST" },
+      role: "Executive Director"
+    });
+    assert.equal(result.status, 400, path);
+    assert.deepEqual(await result.json(), { error: "Invalid website file path." }, path);
+  }
+  assert.equal(cpanelRequests, 0);
+});
+
+test("cPanel file PUT rejects executable and unsupported extensions as invalid paths", async () => {
+  const router = makeRouter();
+  const env = makeEnv({
+    CPANEL_BASE_URL: "https://cpanel.example.test:2083",
+    CPANEL_USERNAME: "irpaortz",
+    CPANEL_API_TOKEN: "test-only-cpanel-token",
+    CPANEL_DOCUMENT_ROOT: "public_html/staging"
+  });
+  const result = await call(router, env, "/api/communications/cpanel/files", {
+    method: "PUT",
+    body: { path: "portal-test/probe.php", content: "TEST" },
+    role: "Executive Director"
+  });
+  assert.equal(result.status, 400);
+  assert.deepEqual(await result.json(), { error: "Invalid website file path." });
+});
