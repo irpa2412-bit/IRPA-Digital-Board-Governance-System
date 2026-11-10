@@ -215,10 +215,10 @@ test("media upload is blocked with a clear error when WordPress upload_files is 
 test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without writes", async () => {
   const router = makeRouter("Executive Director");
   const originalFetch = globalThis.fetch;
-  const calls = [];
-  globalThis.fetch = async input => {
+  const calls = [], methods = [];
+  globalThis.fetch = async (input, init = {}) => {
     const url = new URL(input instanceof URL ? input.href : String(input));
-    calls.push(url.pathname);
+    calls.push(url.pathname); methods.push(init.method || "GET");
     const payload = url.pathname.endsWith("/Email/list_pops")
       ? { status: 1, data: [{ email: "info@staging.irpa.or.tz" }, { email: "contact@staging.irpa.or.tz" }] }
       : url.pathname.endsWith("/SSL/installed_hosts")
@@ -227,7 +227,13 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
           ? { status: 1, data: { content: "" } }
           : url.pathname.endsWith("/LangPHP/php_ini_get_user_content")
             ? (assert.equal(url.searchParams.get("type"), "vhost"), assert.equal(url.searchParams.get("vhost"), "staging.irpa.or.tz"), { status: 1, data: [{ content: "upload_max_filesize = 32M\npost_max_size = 40M\n" }] })
-            : null;
+            : url.pathname.endsWith("/LangPHP/php_get_vhost_versions")
+              ? { status: 1, data: { phpversion: "8.2.3" } }
+              : url.pathname.endsWith("/Quota/get_quota_info")
+                ? { status: 1, data: { diskused: "512MB" } }
+                : url.pathname.endsWith("/Stats/get_error_log")
+                  ? { status: 1, data: { log: Array.from({ length: 55 }, (_, index) => "line " + (index + 1) + " test@example.invalid token=redacted-marker").join("\n") } }
+                  : null;
     if (!payload) throw new Error("Unexpected cPanel operation: " + url.pathname);
     return makeResponse(payload);
   };
@@ -242,7 +248,15 @@ test("cPanel diagnostics read email accounts, SSL hosts and PHP limits without w
     assert.equal(data.ssl.hosts[0].status, "valid");
     assert.equal(data.phpLimits.upload_max_filesize, "32M");
     assert.equal(data.phpLimits.post_max_size, "40M");
-    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content"]);
+    assert.equal(data.phpVersion.value, "8.2.3");
+    assert.equal(data.diskUsage.value, "512MB");
+    assert.equal(data.errorLog.status, "available");
+    assert.equal(data.errorLog.lines.length, 50);
+    assert.match(data.errorLog.lines[0], /line 6/);
+    assert.equal(JSON.stringify(data.errorLog).includes("redacted-marker"), false);
+    assert.equal(JSON.stringify(data.errorLog).includes("test@example.invalid"), false);
+    assert.deepEqual(calls, ["/execute/Email/list_pops", "/execute/SSL/installed_hosts", "/execute/Fileman/get_file_content", "/execute/Fileman/get_file_content", "/execute/LangPHP/php_ini_get_user_content", "/execute/LangPHP/php_get_vhost_versions", "/execute/Quota/get_quota_info", "/execute/Stats/get_error_log"]);
+    assert.ok(methods.every(method => method === "GET"), "all cPanel diagnostics must remain read-only");
   } finally { globalThis.fetch = originalFetch; }
 });
 
