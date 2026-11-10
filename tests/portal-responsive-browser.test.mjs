@@ -66,7 +66,26 @@ test("collects portal responsive layout metrics without enforcing thresholds", a
           clientWidth: element.clientWidth
         }));
       const tableRegion = document.querySelector("[data-audit-scroll-region]");
+      const sidebar = document.querySelector(".sidebar");
+      const sidebarNav = sidebar?.querySelector("nav");
+      const mainArea = document.querySelector(".main-area");
+      const sidebarRect = sidebar?.getBoundingClientRect();
+      const mainRect = mainArea?.getBoundingClientRect();
       return {
+        shellLayout: {
+          sidebar: {
+            display: sidebar ? getComputedStyle(sidebar).display : "missing",
+            position: sidebar ? getComputedStyle(sidebar).position : "missing",
+            width: sidebar ? getComputedStyle(sidebar).width : "missing",
+            right: sidebarRect ? sidebarRect.right : null,
+            navOverflowY: sidebarNav ? getComputedStyle(sidebarNav).overflowY : "missing"
+          },
+          main: {
+            marginLeft: mainArea ? getComputedStyle(mainArea).marginLeft : "missing",
+            left: mainRect ? mainRect.left : null,
+            top: mainRect ? mainRect.top : null
+          }
+        },
         viewport: { width, height },
         document: {
           clientWidth: document.documentElement.clientWidth,
@@ -79,6 +98,17 @@ test("collects portal responsive layout metrics without enforcing thresholds", a
         containedTableOverflow: tableRegion ? tableRegion.scrollWidth > tableRegion.clientWidth : false
       };
     });
+
+    if (viewport.width > 760) {
+      expect(metrics.shellLayout.sidebar.position, viewport.name + " sidebar position").toBe("fixed");
+      expect(metrics.shellLayout.main.marginLeft, viewport.name + " main left offset").toBe("180px");
+      expect(Math.abs(metrics.shellLayout.sidebar.right - metrics.shellLayout.main.left), viewport.name + " sidebar/main horizontal alignment").toBeLessThanOrEqual(1);
+      expect(metrics.shellLayout.main.top, viewport.name + " main starts at viewport top").toBeLessThanOrEqual(1);
+      expect(metrics.shellLayout.sidebar.navOverflowY, viewport.name + " sidebar independent scroll").toBe("auto");
+    } else {
+      expect(metrics.shellLayout.sidebar.display, viewport.name + " mobile sidebar visibility").toBe("none");
+      expect(metrics.shellLayout.main.marginLeft, viewport.name + " mobile main offset").toBe("0px");
+    }
 
     results.push({ name: viewport.name, ...metrics });
     await page.screenshot({
