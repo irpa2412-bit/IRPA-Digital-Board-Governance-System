@@ -29,6 +29,15 @@ async function roleContext(request,env,deps){
 async function readItems(env){try{return JSON.parse(await env.DRIVE_KV.get(KEY)||"[]")}catch{return []}}
 async function writeItems(env,items){await env.DRIVE_KV.put(KEY,JSON.stringify(items))}
 async function audit(env,event){let rows=[];try{rows=JSON.parse(await env.DRIVE_KV.get(AUDIT_KEY)||"[]")}catch{} rows.push(event);await env.DRIVE_KV.put(AUDIT_KEY,JSON.stringify(rows.slice(-1000)))}
+function socialTextSafetyError(value){
+ const text=String(value||"");
+ if(/\b(password|passwd|passcode|api[_ -]?key|access[_ -]?token|secret)\s*[:=]/i.test(text))return "Remove passwords, credentials and access tokens before saving.";
+ if(/\b(?:\+?\d[\d ()-]{7,}\d)\b/.test(text))return "Remove private telephone numbers before saving.";
+ const emails=text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi)||[];
+ if(emails.some(e=>!["info@irpa.or.tz","complaints@irpa.or.tz"].includes(e.toLowerCase())))return "Remove private email addresses before saving; use approved public IRPA contact channels.";
+ if(/\b(confidential|strictly confidential|private record|medical record|national id|passport number)\b/i.test(text))return "Confidential or personal records cannot be included in public posts.";
+ return "";
+}
 export async function communicationsRoutes(request,env,deps){
  const url=new URL(request.url), path=url.pathname, cors=deps.corsHeaders(request);
  if(!path.startsWith("/api/communications/editorial/")&&!path.startsWith("/api/communications/publishing/pause")&&!path.startsWith("/api/communications/social/"))return null;
@@ -53,15 +62,23 @@ export async function communicationsRoutes(request,env,deps){
   if(!path.startsWith("/api/communications/editorial/"))return null;
   const action=path.slice("/api/communications/editorial/".length),items=await readItems(env);
   if(action==="items"&&request.method==="GET")return response({ok:true,items:items.filter(i=>admin||i.authorUid===actor.uid||canApprove)},200,cors);
+  const revisionMatch=action.match(/^items\/([^/]+)\/revisions$/);
+  if(revisionMatch&&request.method==="GET"){const item=items.find(i=>i.id===revisionMatch[1]);if(!item)throw Object.assign(new Error("Content item not found."),{status:404});if(!admin&&item.authorUid!==actor.uid&&!canApprove)throw Object.assign(new Error("You cannot access this content item."),{status:403});return response({ok:true,revisions:item.revisionHistory||[]},200,cors)}
   if(action==="items"&&request.method==="POST"){
    if(!canAuthor&&!admin)throw Object.assign(new Error("Communications Officer role required to create content."),{status:403});
    const body=await readJson(request),kind=["post","website-page"].includes(body.kind)?body.kind:"";
    const title=String(body.title||"").trim(),content=String(body.content||"").trim();
+   const safetyError=socialTextSafetyError(content+"\n"+String(body.contentSw||""));if(safetyError)throw Object.assign(new Error(safetyError),{status:400});
+   if(body.link&&!/^https:\/\//i.test(String(body.link)))throw Object.assign(new Error("Post links must use HTTPS."),{status:400});
+   if(body.imageUrl&&!/^https:\/\//i.test(String(body.imageUrl)))throw Object.assign(new Error("Media links must use HTTPS."),{status:400});
+   if(body.imageUrl&&!String(body.altText||"").trim())throw Object.assign(new Error("Alternative text is required for attached media."),{status:400});
    if(!kind||!title||!content)throw Object.assign(new Error("kind (post or website-page), title and content are required."),{status:400});
-   const item={id:crypto.randomUUID(),kind,title,content,language:body.language==="sw"?"sw":"en",platforms:Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[],imageUrl:String(body.imageUrl||""),link:String(body.link||""),scheduledAt:String(body.scheduledAt||""),status:"Draft",authorUid:actor.uid,authorRoles:actor.roles,createdAt:now(),updatedAt:now(),revision:1};
+   const item={id:crypto.randomUUID(),kind,title,content,contentSw:String(body.contentSw||""),language:body.language==="sw"?"sw":"en",platforms:Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[],imageUrl:String(body.imageUrl||""),altText:String(body.altText||""),link:String(body.link||""),hashtags:String(body.hashtags||""),callToAction:String(body.callToAction||""),campaignTag:String(body.campaignTag||""),scheduledAt:String(body.scheduledAt||""),status:"Draft",authorUid:actor.uid,authorRoles:actor.roles,createdAt:now(),updatedAt:now(),revision:1,revisionHistory:[]};
    items.push(item);await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:"CREATED",itemId:item.id,actorUid:actor.uid,roles:actor.roles,at:now(),revision:1});
    return response({ok:true,item},201,cors);
   }
+  const manualMatch=action.match(/^items\/([^/]+)\/(posted|exported)$/);
+  if(manualMatch&&request.method==="POST"){const [,id,kind]=manualMatch,index=items.findIndex(i=>i.id===id);if(index<0)throw Object.assign(new Error("Content item not found."),{status:404});const item=items[index];if(!admin&&item.authorUid!==actor.uid&&!canApprove)throw Object.assign(new Error("You cannot update this content item."),{status:403});const body=await readJson(request);if(kind==="posted"){const liveUrl=String(body.liveUrl||"").trim();if(!/^https:\/\//i.test(liveUrl))throw Object.assign(new Error("A valid HTTPS live URL is required."),{status:400});item.liveUrl=liveUrl;item.manuallyPostedAt=String(body.postedAt||now());item.status="Exported";}else item.status="Exported";item.updatedAt=now();items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:kind==="posted"?"MANUALLY_POSTED":"EXPORTED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),liveUrl:item.liveUrl||""});return response({ok:true,item},200,cors)}
   const match=action.match(/^items\/([^/]+)(?:\/(submit|approve|reject))?$/);
   if(match){
    const [,id,decision]=match,index=items.findIndex(i=>i.id===id);if(index<0)throw Object.assign(new Error("Content item not found."),{status:404});
@@ -69,9 +86,15 @@ export async function communicationsRoutes(request,env,deps){
    if(request.method==="PATCH"&&!decision){
     if(!admin&&!canAuthor)throw Object.assign(new Error("Communications Officer role required to edit content."),{status:403});
     if(item.status!=="Draft"&&item.status!=="Returned")throw Object.assign(new Error("Only drafts or returned items can be edited."),{status:409});
-    const body=await readJson(request);for(const k of ["title","content","imageUrl","link","scheduledAt"])if(body[k]!==undefined)item[k]=String(body[k]);
+    const body=await readJson(request);
+    const safetyError=socialTextSafetyError(String(body.content??item.content)+"\n"+String(body.contentSw??item.contentSw??""));if(safetyError)throw Object.assign(new Error(safetyError),{status:400});
+    const snapshot={revision:item.revision,title:item.title,content:item.content,contentSw:item.contentSw||"",imageUrl:item.imageUrl||"",altText:item.altText||"",link:item.link||"",hashtags:item.hashtags||"",callToAction:item.callToAction||"",campaignTag:item.campaignTag||"",scheduledAt:item.scheduledAt||"",savedAt:now(),savedBy:actor.uid};
+    item.revisionHistory=[...(item.revisionHistory||[]),snapshot].slice(-50);
+    for(const k of ["title","content","contentSw","imageUrl","altText","link","hashtags","callToAction","campaignTag","scheduledAt"])if(body[k]!==undefined)item[k]=String(body[k]);
     if(body.language!==undefined)item.language=body.language==="sw"?"sw":"en";
     if(body.platforms!==undefined)item.platforms=Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[];
+    if(item.link&&!/^https:\/\//i.test(item.link))throw Object.assign(new Error("Post links must use HTTPS."),{status:400});
+    if(item.imageUrl&&!/^https:\/\//i.test(item.imageUrl))throw Object.assign(new Error("Media links must use HTTPS."),{status:400});
     item.revision++;item.updatedAt=now();item.status="Draft";item.approvedBy=null;item.approvedAt=null;
    }else if(request.method==="POST"&&decision==="submit"){
     if(item.authorUid!==actor.uid&&!admin)throw Object.assign(new Error("Only the author or an administrator may submit this item."),{status:403});
