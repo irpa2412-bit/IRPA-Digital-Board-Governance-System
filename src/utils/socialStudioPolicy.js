@@ -12,7 +12,7 @@ export function validateSocialMediaUpload(file,altText){
  if(!file)return ["Choose a JPG, PNG, WebP, MP4 or PDF file."];
  const name=String(file.name||"").toLowerCase(),type=String(file.type||"").toLowerCase(),ext=name.slice(name.lastIndexOf("."));
  if(!Object.hasOwn(SOCIAL_MEDIA_UPLOAD_TYPES,type)||!SOCIAL_MEDIA_UPLOAD_TYPES[type].includes(ext))errors.push("Only matching JPG, PNG, WebP, MP4 and PDF files are allowed.");
- if(!Number.isFinite(file.size)||file.size<1||file.size>20*1024*1024)errors.push("Media must be between 1 byte and 20 MB.");
+ if(!Number.isFinite(file.size)||file.size<1||file.size>8*1024*1024)errors.push("Media must be between 1 byte and 20 MB.");
  if(!String(altText||"").trim())errors.push("Alternative text is required before media upload.");
  return errors;
 }

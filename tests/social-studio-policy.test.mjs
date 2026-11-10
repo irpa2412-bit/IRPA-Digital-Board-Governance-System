@@ -48,7 +48,7 @@ test("Social Studio media upload accepts only JPG PNG WebP MP4 and PDF with requ
  ])assert.deepEqual(validateSocialMediaUpload(file,"Accessible description"),[]);
  assert.ok(validateSocialMediaUpload({name:"bad.exe",type:"application/octet-stream",size:100},"Description").length);
  assert.ok(validateSocialMediaUpload({name:"photo.jpg",type:"image/jpeg",size:1024},"").some(x=>x.includes("Alternative text")));
- assert.ok(validateSocialMediaUpload({name:"large.jpg",type:"image/jpeg",size:21*1024*1024},"Description").some(x=>x.includes("20 MB")));
+ assert.ok(validateSocialMediaUpload({name:"large.jpg",type:"image/jpeg",size:9*1024*1024},"Description").some(x=>x.includes("8 MB")));
 });
 test("Social Studio wires media upload to the authenticated WordPress Media Library route and attaches its URL to the draft",()=>{
  const fsSource = readFileSync(new URL("../src/pages/CommunicationsSocialStudio.jsx", import.meta.url),"utf8");
