@@ -37,6 +37,8 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
  async function runProductionAcceptance(){
   setBusy(true);setMessage("");setAcceptanceReport(null);
   const rows=[];
+  const runId=crypto.randomUUID();
+  setMaintenanceRunId(runId);
   const add=(label,status,httpStatus,error="",detail="")=>{rows.push({label,status,httpStatus,error,detail});setAcceptanceReport([...rows]);};
   let connections=null;
   try{
@@ -112,7 +114,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
    if(cpanelEntries.length===0)add("TEST staging empty","INFO",200,"No safe staging file was listed; the dedicated maintenance-test.txt file is used instead.","No existing staging file was modified.");
    add("TEST staging/portal-test self-provisioning","RUNNING",null,"","Creates the dedicated TEST folder only if missing, then creates/reads/edits/snapshots/rolls back maintenance-test.txt.");
    try{
-    const selfTest=await call("/api/communications/cpanel/maintenance/self-test","POST",{},true);
+    const selfTest=await call("/api/communications/cpanel/maintenance/self-test","POST",{runId},true,60000);
     const result=selfTest.data||{};
     for(const step of result.report||[])add("TEST "+step.name,step.status,step.httpStatus,step.status==="PASS"?"":step.detail||selfTest.error||"Maintenance self-test step failed.",step.detail||"");
     add("TEST cPanel absolute path diagnostics",selfTest.httpStatus===200&&Boolean(result.absoluteFilePath)?"PASS":"FAIL",selfTest.httpStatus,selfTest.error||result.error||"Absolute cPanel path was not returned.","CPANEL_DOCUMENT_ROOT="+String(result.configuredDocumentRoot||"not returned")+"; relative allowlist path="+String(result.relativeAllowlistPath||"not returned")+"; absolute path="+String(result.absoluteFilePath||"not returned")+"; snapshot ID="+String(result.snapshotId||"not returned"));
@@ -127,9 +129,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
     add("TEST PHP upload_max_filesize and post_max_size",diag.phpLimits?.status==="PASS"?"PASS":diag.phpLimits?.status==="INFO"?"INFO":"FAIL",diag.phpLimits?.httpStatus??probe.httpStatus,diag.phpLimits?.error||diag.phpLimits?.diagnostic||"The configured cPanel UAPI did not expose both PHP upload limits.",diag.phpLimits?.detail||"");
    }catch(error){add("TEST cPanel diagnostics route","FAIL",error.httpStatus||0,error.message||"cPanel diagnostics failed.");}
    let acceptance={runId:"",createdDrafts:{pageId:null,postId:null}};
-   const runId=crypto.randomUUID();
    acceptance.runId=runId;
-   setMaintenanceRunId(runId);
    const acceptanceSteps=[
     {name:"WordPress page create/edit/revise",step:"page-lifecycle"},
     {name:"WordPress post create/edit/revise",step:"post-lifecycle"},
