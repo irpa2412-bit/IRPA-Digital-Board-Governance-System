@@ -813,7 +813,7 @@ export function createCommunicationsSiteRouter(deps) {
           let detail = {};
           try { detail = JSON.parse(raw); } catch {}
           const wpCode = safeCode(detail.code);
-          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }).replace(/[\\r\\n]/g, " ");
+          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }).replace(/[\r\n]/g, " ");
           const location = response.headers.get("location");
           const redirected = response.status >= 300 && response.status < 400;
           result.websiteHttpStatus = response.status;
@@ -1093,10 +1093,10 @@ export function createCommunicationsSiteRouter(deps) {
       const input=await request.json().catch(()=>({})),uploadId=String(input.uploadId||"");
       if(!/^[a-f0-9-]{36}$/i.test(uploadId)||!Number.isInteger(input.total)||input.total<1||input.total>512)return json({error:"Invalid chunk upload manifest."},400,corsHeaders(request));
       const cp=cpanelConfig(env),relative=String(input.path||"");
-      const parts=relative.replace(/\\\\/g,"/").split("/");
+      const parts=relative.replace(/\\/g,"/").split("/");
       const filename=parts.pop();
       if(!filename||filename.startsWith(".")||parts.some(p=>!p||p==="."||p===".."||p.startsWith(".")))return json({error:"Invalid cPanel media destination path."},400,corsHeaders(request));
-      const safe={dir:safeCpanelDirectory(parts.join("/"),cp.documentRoot),file:filename,relative:relative.replace(/\\\\/g,"/")};
+      const safe={dir:safeCpanelDirectory(parts.join("/"),cp.documentRoot),file:filename,relative:relative.replace(/\\/g,"/")};
       const chunks=[];
       for(let i=0;i<input.total;i++){const chunk=await env.DRIVE_KV.get("irpa:website-media-chunk:"+uploadId+":"+i);if(!chunk)return json({error:"Upload is incomplete; missing chunk "+i+"."},409,corsHeaders(request));chunks.push(chunk);}
       const encoded=chunks.join("");const size=Math.floor(encoded.length*3/4);
