@@ -27,8 +27,8 @@ permissions:
 
 jobs:
   responsive-audit:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    name: Report-only responsive portal layout audit
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    name: Responsive dashboard shell layout regression
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
