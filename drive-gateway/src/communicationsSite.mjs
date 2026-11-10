@@ -1143,7 +1143,7 @@ export function createCommunicationsSiteRouter(deps) {
       let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
       if(String(input.contentType||"")==="image/svg+xml")bytes=new TextEncoder().encode(sanitizeWebsiteSvg(new TextDecoder().decode(bytes)));
       const meta=validateWebsiteMedia({filename:safe.file,contentType:String(input.contentType||""),bytes});
-      const form=new FormData();form.set("dir",safe.dir);form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
+      const form=new FormData();form.set("dir",await cpanelAbsoluteDirectory(cp,safe.dir));form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
       const target=new URL(cp.root+"/Fileman/upload_files");
       const response=await fetch(target,{method:"POST",headers:{Authorization:authHeader(cp.username,cp.token),Accept:"application/json"},body:form,signal:AbortSignal.timeout(60000)});
       const result=await response.json().catch(()=>null);
@@ -1361,7 +1361,7 @@ export function createCommunicationsSiteRouter(deps) {
       const registerCpanelMediaFallback = async (file, filename, bytes) => {
         const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
         const form = new FormData();
-        form.set("dir", directory);
+        form.set("dir", await cpanelAbsoluteDirectory(cp, directory));
         form.set("file-1", new File([bytes], filename, { type: file.mime }));
         const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
           method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
@@ -1396,7 +1396,7 @@ export function createCommunicationsSiteRouter(deps) {
                 try {
                   const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
                   const form = new FormData();
-                  form.set("dir", directory);
+                  form.set("dir", await cpanelAbsoluteDirectory(cp, directory));
                   form.set("file-1", new File([bytes], filename, { type: file.mime }));
                   const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
                     method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
@@ -1452,7 +1452,7 @@ export function createCommunicationsSiteRouter(deps) {
           try {
             const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
             validateWebsiteMedia({ filename, contentType: file.mime, bytes });
-            const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
+            const form = new FormData(); form.set("dir", await cpanelAbsoluteDirectory(cp, directory)); form.set("file-1", new File([bytes], filename, { type: file.mime }));
             const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(60000) });
             const data = await response.json().catch(() => null);
             if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
