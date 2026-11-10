@@ -557,3 +557,12 @@ test("website media path and content separators do not contain over-escaped sequ
  assert.ok(!site.includes("relative.replace(/"+slash.repeat(4)+"/g"));
  assert.ok(!websiteStudio.includes('"'+slash+slash+"n"+slash+slash+"n"+'"'));
 });
+
+
+test("archived social accounts can be restored only by reviewers with an immutable restoration audit event",()=>{
+ assert.ok(social.includes('item.connectionStatus==="Archived"')&&social.includes('>Unarchive</button>'),"archived account cards expose a reviewer-only Unarchive action");
+ assert.ok(social.includes('item.connectionStatus==="Archived"?"STATUS_RESTORED"'),"restoration records a distinct STATUS_RESTORED event");
+ assert.ok(rules.includes('resource.data.get("connectionStatus","")=="Archived"')&&rules.includes('request.resource.data.get("connectionStatus","")=="Active"'),"rules permit only Archived-to-Active restoration");
+ assert.ok(rules.includes('"STATUS_RESTORED"'),"the audit action allowlist includes STATUS_RESTORED");
+ assert.ok(rules.includes('allow update,delete:if false;'),"social-account audit records remain immutable");
+});
