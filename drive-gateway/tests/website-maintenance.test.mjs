@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createCommunicationsSiteRouter } from "../src/communicationsSite.mjs";
 
-function makeHarness({ administrator = true, initial = "<p>original</p>" } = {}) {
+function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "" } = {}) {
   const stored = new Map(), events = [], writes = [];
   let current = initial;
   const router = createCommunicationsSiteRouter({
@@ -29,9 +29,10 @@ function makeHarness({ administrator = true, initial = "<p>original</p>" } = {})
     throw new Error("Unexpected cPanel request: " + url.pathname);
   };
   const env = {
-    IRPA_ENVIRONMENT: "staging", IRPA_WORKER_ENVIRONMENT: "staging",
+    IRPA_ENVIRONMENT: environment, IRPA_WORKER_ENVIRONMENT: environment,
     CPANEL_BASE_URL: "https://cpanel.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token",
     CPANEL_DOCUMENT_ROOT: "public_html/staging",
+    ...(liveRoot ? { CPANEL_LIVE_DOCUMENT_ROOT: liveRoot } : {}),
     DRIVE_KV: {
       async put(key, value) { stored.set(key, JSON.parse(value)); },
       async get(key) { return stored.get(key) || null; }
@@ -122,7 +123,7 @@ test("non-administrator cannot edit website files", async () => {
 });
 
 test("website maintenance promotion snapshots live bytes before the confirmed copy", async () => {
-  const h = makeHarness({ initial: "live original" });
+  const h = makeHarness({ initial: "live original", liveRoot: "public_html" });
   try {
     const response = await h.request("/api/communications/cpanel/maintenance/promote", "POST", { path: "portal-test/promote.txt", reason: "Promote verified staging file", confirmation: "PROMOTE TO LIVE" });
     const data = await response.json();
@@ -150,5 +151,29 @@ test("website maintenance refuses to overwrite an existing file larger than 512 
     assert.equal(response.status, 413);
     assert.equal(h.writes.length, 0);
     assert.equal(h.stored.size, 0);
+  } finally { h.restore(); }
+});
+
+test("production cPanel diagnostics fail closed with HTTP 409 when the live root is unset", async () => {
+  const h = makeHarness({ environment: "production" });
+  try {
+    const response = await h.request("/api/communications/cpanel/diagnostics?domain=irpa.or.tz");
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: "Live root not configured" });
+    assert.equal(h.writes.length, 0);
+  } finally { h.restore(); }
+});
+
+test("staging-to-live promotion fails closed with HTTP 409 when the live root is unset", async () => {
+  const h = makeHarness();
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/promote", "POST", {
+      path: "portal-test/acceptance.txt",
+      reason: "Promote verified staging file",
+      confirmation: "PROMOTE TO LIVE"
+    });
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: "Live root not configured" });
+    assert.equal(h.writes.length, 0);
   } finally { h.restore(); }
 });
