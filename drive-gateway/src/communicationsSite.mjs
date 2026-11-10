@@ -381,10 +381,17 @@ export function createCommunicationsSiteRouter(deps) {
     if (!username || !token) throw configurationError("cpanel_credentials_missing", "Required cPanel settings are missing: " + [!username && "CPANEL_USERNAME", !token && "CPANEL_API_TOKEN"].filter(Boolean).join(", "));
     const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
     if (!["production", "staging"].includes(environment)) throw configurationError("worker_environment_missing_or_invalid", "Set IRPA_WORKER_ENVIRONMENT to exactly production or staging.");
-    const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || (environment === "production" ? "public_html" : "public_html/staging")).trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    const configuredRoot = String(environment === "production" ? env.CPANEL_LIVE_DOCUMENT_ROOT || "" :
+      env.CPANEL_DOCUMENT_ROOT || "public_html/staging").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    if (environment === "production" && !configuredRoot) {
+      throw configurationError("cpanel_live_document_root_missing", "Live root not configured", 409);
+    }
     const allowedRoots = environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"] :
       ["public_html/staging", "home/" + username + "/public_html/staging", "/home/" + username + "/public_html/staging"];
-    if (!allowedRoots.includes(configuredRoot)) throw configurationError("cpanel_document_root_invalid_for_environment", "CPANEL_DOCUMENT_ROOT does not match the permitted " + environment + " document root.");
+    if (!allowedRoots.includes(configuredRoot)) {
+      const variable = environment === "production" ? "CPANEL_LIVE_DOCUMENT_ROOT" : "CPANEL_DOCUMENT_ROOT";
+      throw configurationError("cpanel_document_root_invalid_for_environment", variable + " does not match the permitted " + environment + " document root.");
+    }
     const documentRoot = "public_html" + (environment === "staging" ? "/staging" : "");
     return { root: base.origin + "/execute", username, token, documentRoot };
   }
@@ -2092,6 +2099,10 @@ export function createCommunicationsSiteRouter(deps) {
       const staging = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
       const content = staging.data?.content ?? staging.data?.[0]?.content ?? staging.data?.data?.content ?? staging.data?.data?.[0]?.content ?? staging.data?.result?.data?.content;
       if (typeof content !== "string" || new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES) return json({ error: "Staging file is unavailable or exceeds 512 KiB." }, 400, corsHeaders(request));
+      const configuredLiveRoot = String(env.CPANEL_LIVE_DOCUMENT_ROOT || "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+      if (!configuredLiveRoot) throw configurationError("cpanel_live_document_root_missing", "Live root not configured", 409);
+      const allowedLiveRoots = ["public_html", "home/" + cp.username + "/public_html", "/home/" + cp.username + "/public_html"];
+      if (!allowedLiveRoots.includes(configuredLiveRoot)) throw configurationError("cpanel_live_document_root_invalid", "CPANEL_LIVE_DOCUMENT_ROOT does not match the permitted production document root.", 409);
       const live = safeWebsiteMaintenancePath(safe.relative, "public_html");
       const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: live.dir, file: live.file });
       const prior = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content ?? "";
