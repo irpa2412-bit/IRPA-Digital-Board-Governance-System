@@ -19,6 +19,33 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
   try{
    const health=await call("/health","GET",undefined,true);
    add("TEST Worker health",health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",health.httpStatus,health.error||health.data?.status||"");
+   const socialPlatforms=[
+    ["facebook","Facebook"],["instagram","Instagram"],["linkedin","LinkedIn"],
+    ["x","X"],["youtube","YouTube"],["whatsapp","WhatsApp Business"]
+   ];
+   try{
+    const social=await call("/api/communications/social/status","GET",undefined,true);
+    const socialData=social.data||{};
+    const platformRows=Array.isArray(socialData.platforms)?socialData.platforms:[];
+    for(let index=0;index<socialPlatforms.length;index++){
+     const [platform,label]=socialPlatforms[index];
+     const row=platformRows.find(item=>item.platform===platform);
+     const passed=social.httpStatus===200&&Boolean(row&&row.mode==="manual-export"&&row.automaticPublishing===false);
+     const detail=row
+      ?"Detail: "+String(row.status||"unknown")+"; mode="+String(row.mode||"unknown")+"; automaticPublishing="+String(row.automaticPublishing)+"; "+String(row.reason||"No platform detail returned.")
+      :"Detail: platform status was not returned.";
+     add("Step "+(index+1)+"/6 TEST Social Studio "+label,passed?"PASS":"FAIL",social.httpStatus,passed?"":"Social platform self-test failed.",detail);
+    }
+    const pausePassed=social.httpStatus===200&&socialData.pauseAllPublishing===true;
+    add("TEST Social Studio global publishing pause",pausePassed?"PASS":"FAIL",social.httpStatus,
+     pausePassed?"":"Publishing pause is not confirmed.",
+     "Detail: pauseAllPublishing="+String(socialData.pauseAllPublishing)+"; no external publishing request was made.");
+   }catch(error){
+    for(let index=0;index<socialPlatforms.length;index++){
+     add("Step "+(index+1)+"/6 TEST Social Studio "+socialPlatforms[index][1],"FAIL",error.httpStatus||0,error.message||"Social status request failed.","Detail: authenticated status route could not be read.");
+    }
+    add("TEST Social Studio global publishing pause","FAIL",error.httpStatus||0,error.message||"Social status request failed.","Detail: pause state could not be verified.");
+   }
    const reads=[
     ["TEST WordPress connection and capability read","/api/communications/site/status"],
     ["TEST WordPress pages read","/api/communications/website/content?type=pages"],
