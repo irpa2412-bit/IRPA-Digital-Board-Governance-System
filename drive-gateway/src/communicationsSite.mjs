@@ -460,10 +460,13 @@ export function createCommunicationsSiteRouter(deps) {
         /invalid|unsupported|unknown function|unknown api/.test(categoryText) ? "invalid_operation" :
         /auth|token|login/.test(categoryText) ? "authentication_rejected" : "uapi_error";
       const diagnosticCode = "cpanel_" + category;
-      const requestedPath = [requestParams.dir, requestParams.file].filter(Boolean).join("/");
+      const detectedHome = cpanelHomeCache.get(config.root + "|" + config.username) || "";
+      const requestedPath = [requestParams.dir || requestParams.path, requestParams.file].filter(Boolean).join("/");
+      const displayPath = detectedHome && requestedPath.startsWith(detectedHome)
+        ? "<home>" + requestedPath.slice(detectedHome.length) : requestedPath || "(not supplied)";
       const pathDetail = operation.startsWith("Fileman/") ?
-        "; CPANEL_DOCUMENT_ROOT=" + String(config.configuredDocumentRoot || config.documentRoot) +
-        "; Fileman path=" + (requestedPath || String(requestParams.path || "(not supplied)")) : "";
+        "; Fileman function=" + operation + "; CPANEL_DOCUMENT_ROOT=" + String(config.configuredDocumentRoot || config.documentRoot) +
+        "; Fileman path=" + displayPath : "";
       throw Object.assign(new Error("cPanel " + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
         " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category +
         pathDetail + (safeErrors ? ". Exact UAPI error: " + safeErrors : ".")),
@@ -685,6 +688,35 @@ export function createCommunicationsSiteRouter(deps) {
       editorRaw(actual, "excerpt") === String(expected.excerpt || "") &&
       Number(actual.featured_media || 0) === Number(expected.featured_media || 0) &&
       String(actual.status || "draft") === String(expected.status || "draft");
+  }
+
+  async function cpanelLiveRootStatusForPromotion(env) {
+    const cp = cpanelConfig(env);
+    const username = String(env.CPANEL_USERNAME || "").trim();
+    const configuredRoot = String(env.CPANEL_LIVE_DOCUMENT_ROOT || "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    const allowedRoots = ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"];
+    if (!configuredRoot || !allowedRoots.includes(configuredRoot)) return null;
+    const home = await cpanelAbsoluteDirectory(cp, "public_html");
+    const response = await cpanelCall(cp, "DomainInfo/domains_data");
+    const targetDomain = String(env.CPANEL_LIVE_DOMAIN || (() => { try { return new URL(env.WORDPRESS_BASE_URL).hostname; } catch { return ""; } })()).toLowerCase();
+    const matches = [];
+    const visit = (value, depth = 0) => {
+      if (depth > 6 || value == null) return;
+      if (Array.isArray(value)) { for (const item of value) visit(item, depth + 1); return; }
+      if (typeof value !== "object") return;
+      const domain = String(value.domain || value.domain_name || value.name || "").toLowerCase();
+      const root = value.documentroot || value.document_root || value.documentRoot || value.docroot;
+      if (typeof root === "string" && root.trim() && (!targetDomain || domain === targetDomain)) matches.push({ domain, root: root.trim() });
+      for (const [key, item] of Object.entries(value)) {
+        if (!["documentroot", "document_root", "documentRoot", "docroot"].includes(key)) visit(item, depth + 1);
+      }
+    };
+    visit(response.data ?? response);
+    const detected = matches[0]?.root || "";
+    const absoluteDetected = detected.startsWith("/home/") ? detected : detected.replace(/^\\/+/, "").startsWith("home/")
+      ? "/" + detected.replace(/^\\/+/, "") : detected ? home.replace(/\\/public_html$/, "") + "/" + detected.replace(/^\\/+/, "") : "";
+    if (!absoluteDetected || absoluteDetected.replace(/\\/+$/g, "") !== home.replace(/\\/+$/g, "")) return null;
+    return { absoluteDocumentRoot: absoluteDetected, detectedHome: cpanelHomeCache.get(cp.root + "|" + cp.username) || "", configuredDocumentRoot: configuredRoot, domain: matches[0]?.domain || targetDomain || null };
   }
 
   async function handle(request, env) {
@@ -1869,6 +1901,7 @@ export function createCommunicationsSiteRouter(deps) {
 
     if (path === "/api/communications/cpanel/maintenance/live-root-status" && request.method === "GET") {
       await websiteMaintenanceAdminAuthorised(request, env);
+      const cp = cpanelConfig(env);
       const username = String(env.CPANEL_USERNAME || "").trim();
       const configuredRoot = String(env.CPANEL_LIVE_DOCUMENT_ROOT || "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
       if (!configuredRoot) {
@@ -1878,7 +1911,35 @@ export function createCommunicationsSiteRouter(deps) {
       if (!allowedRoots.includes(configuredRoot)) {
         return json({ readOnly: true, configured: false, status: "invalid", reason: "CPANEL_LIVE_DOCUMENT_ROOT does not match the permitted production document root." }, 409, corsHeaders(request));
       }
-      return json({ readOnly: true, configured: true, status: "configured", documentRoot: "public_html" }, 200, corsHeaders(request));
+      try {
+        const home = await cpanelAbsoluteDirectory(cp, "public_html");
+        const detectedHome = cpanelHomeCache.get(cp.root + "|" + cp.username) || "";
+        const response = await cpanelCall(cp, "DomainInfo/domains_data");
+        const targetDomain = String(env.CPANEL_LIVE_DOMAIN || (() => { try { return new URL(env.WORDPRESS_BASE_URL).hostname; } catch { return ""; } })()).toLowerCase();
+        const matches = [];
+        const visit = (value, depth = 0) => {
+          if (depth > 6 || value == null) return;
+          if (Array.isArray(value)) { for (const item of value) visit(item, depth + 1); return; }
+          if (typeof value !== "object") return;
+          const domain = String(value.domain || value.domain_name || value.name || "").toLowerCase();
+          const root = value.documentroot || value.document_root || value.documentRoot || value.docroot;
+          if (typeof root === "string" && root.trim() && (!targetDomain || domain === targetDomain)) matches.push({ domain, root: root.trim() });
+          for (const [key, item] of Object.entries(value)) {
+            if (key === "documentroot" || key === "document_root" || key === "documentRoot" || key === "docroot") continue;
+            visit(item, depth + 1);
+          }
+        };
+        visit(response.data ?? response);
+        const detected = matches[0]?.root || "";
+        const absoluteDetected = detected.startsWith("/home/") ? detected : detected.replace(/^\/+/, "").startsWith("home/")
+          ? "/" + detected.replace(/^\/+/, "") : detected ? home.replace(/\/public_html$/, "") + "/" + detected.replace(/^\/+/, "") : "";
+        if (!absoluteDetected || absoluteDetected.replace(/\/+$/g, "") !== home.replace(/\/+$/g, "")) {
+          return json({ readOnly: true, configured: false, status: "not verified", detectedHome, configuredDocumentRoot: configuredRoot, detectedDocumentRoot: absoluteDetected || null, domain: matches[0]?.domain || targetDomain || null, reason: "DomainInfo did not confirm the configured live document root; promotion remains blocked." }, 409, corsHeaders(request));
+        }
+        return json({ readOnly: true, configured: true, status: "verified", detectedHome, configuredDocumentRoot: configuredRoot, documentRoot: "public_html", absoluteDocumentRoot: absoluteDetected, domain: matches[0]?.domain || targetDomain || null }, 200, corsHeaders(request));
+      } catch (error) {
+        return json({ readOnly: true, configured: false, status: "not verified", reason: "DomainInfo live-root detection failed: " + cleanText(error.message || "cPanel API unavailable", 220) }, 502, corsHeaders(request));
+      }
     }
 
     if (path === "/api/communications/website/maintenance/updates" && request.method === "GET") {
@@ -2288,7 +2349,9 @@ export function createCommunicationsSiteRouter(deps) {
       await env.DRIVE_KV.put(inventoryKey, JSON.stringify(inventory), { expirationTtl: 2592000 });
       const audit = fields({ action: "CPANEL_MAINTENANCE_TEST_RUN", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: relativeFile, actorUid: claims.user_id, actorEmail: claims.email || "", details: { runId, path: relativeFile, snapshotId, report: report.map(row => ({ name: row.name, status: row.status, httpStatus: row.httpStatus })) }, createdAt: new Date().toISOString() });
       await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: relativeFile, updatedByUid: claims.user_id, updatedAt: new Date().toISOString(), runId, snapshotId, test: true }), ["path", "updatedByUid", "updatedAt", "runId", "snapshotId", "test"], audit, { createOnly: true });
-      return json({ configuredDocumentRoot: cp.configuredDocumentRoot, relativeAllowlistPath: relativeFile, absoluteFilePath: await cpanelAbsoluteDirectory(cp, safe.dir) + "/" + safe.file, snapshotId, runId, report }, 200, corsHeaders(request));
+      const absoluteTestDirectory = await cpanelAbsoluteDirectory(cp, safe.dir);
+      const detectedHome = cpanelHomeCache.get(cp.root + "|" + cp.username) || null;
+      return json({ detectedHome, configuredDocumentRoot: cp.configuredDocumentRoot, relativeAllowlistPath: relativeFile, absoluteFilePath: absoluteTestDirectory + "/" + safe.file, snapshotId, runId, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/cpanel/maintenance/files" && request.method === "GET") {
@@ -2399,7 +2462,10 @@ export function createCommunicationsSiteRouter(deps) {
       const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
       const input = await request.json().catch(() => ({}));
       let safe; try { safe = safeWebsiteMaintenancePath(input.path, cpanelConfig(env).documentRoot); } catch { return json({ error: "Invalid website file path." }, 400, corsHeaders(request)); }
-      if (String(input.confirmation || "") !== "PROMOTE TO LIVE") return json({ error: "Type PROMOTE TO LIVE to confirm this action." }, 400, corsHeaders(request));
+      const liveEvidence = await cpanelLiveRootStatusForPromotion(env);
+      if (!liveEvidence?.absoluteDocumentRoot) return json({ error: "DomainInfo has not verified the live document root; promotion is blocked." }, 409, corsHeaders(request));
+      const requiredConfirmation = "PROMOTE TO LIVE " + liveEvidence.absoluteDocumentRoot;
+      if (String(input.confirmation || "") !== requiredConfirmation) return json({ error: "Type " + requiredConfirmation + " to confirm this exact live destination." }, 400, corsHeaders(request));
       const reason = String(input.reason || "").trim();
       if (reason.length < 10 || reason.length > 500) return json({ error: "Change reason must be 10 to 500 characters." }, 400, corsHeaders(request));
       const cp = cpanelConfig(env);
