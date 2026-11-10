@@ -602,8 +602,12 @@ service cloud.firestore {
         &&data.get("reviewDate","") is string&&data.get("reviewDate","").size()<=20
         &&data.get("notes","") is string&&data.get("notes","").size()<=1500
         &&data.get("connectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected","Archived"]
+        &&(!data.keys().hasAny(["previousConnectionStatus"])||data.get("previousConnectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected"])
+        &&(!data.keys().hasAny(["restoredAt"])||data.get("restoredAt",null) is timestamp)
+        &&(!data.keys().hasAny(["restoredBy"])||data.get("restoredBy","") is string)
+        &&(!data.keys().hasAny(["restoreReason"])||(data.get("restoreReason","") is string&&data.get("restoreReason","").size()>0&&data.get("restoreReason","").size()<=500))
         &&data.get("recordOrigin","")=="PRODUCTION"
-        &&data.keys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","connectionStatus","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin"]);
+        &&data.keys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","connectionStatus","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin","previousConnectionStatus","restoredAt","restoredBy","restoreReason"]);
     }
     allow read:if communicationMediaUser();
     allow create:if communicationMediaUser()&&validSocialAccount(request.resource.data)
@@ -611,33 +615,50 @@ service cloud.firestore {
       &&request.resource.data.get("updatedByUid","")==request.auth.uid
       &&request.resource.data.get("connectionStatus","")=="Pending Verification"
       &&request.resource.data.get("createdAt",null)==request.time
-      &&request.resource.data.get("updatedAt",null)==request.time;
-    allow update:if communicationMediaUser()&&validSocialAccount(request.resource.data)
-      &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
-      &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
-      &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
-      &&request.resource.data.get("updatedByUid","")==request.auth.uid
       &&request.resource.data.get("updatedAt",null)==request.time
-      &&(
-        (resource.data.get("connectionStatus","")=="Pending Verification"
-          &&resource.data.get("createdByUid","")==request.auth.uid
-          &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
-          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
-        ||(communicationMediaReviewer()
-          &&resource.data.get("connectionStatus","")!="Archived"
-          &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
-          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
-        ||(communicationMediaReviewer()
-          &&((resource.data.get("connectionStatus","")=="Pending Verification"&&request.resource.data.get("connectionStatus","") in ["Active","Suspended","Disconnected","Archived"])
-            ||(resource.data.get("connectionStatus","")=="Active"&&request.resource.data.get("connectionStatus","") in ["Suspended","Disconnected","Archived"])
-            ||(resource.data.get("connectionStatus","")=="Suspended"&&request.resource.data.get("connectionStatus","") in ["Active","Disconnected","Archived"])
-            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived"))
-          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
-        ||(communicationMediaReviewer()
-          &&resource.data.get("connectionStatus","")=="Archived"
-          &&request.resource.data.get("connectionStatus","")=="Active"
-          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
-      );
+      &&!request.resource.data.keys().hasAny(["previousConnectionStatus","restoredAt","restoredBy","restoreReason"]);
+    allow update:if communicationMediaUser()&&(
+      (validSocialAccount(request.resource.data)
+        &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
+        &&request.resource.data.get("createdAt",null)==resource.data.get("createdAt",null)
+        &&request.resource.data.get("recordOrigin","")==resource.data.get("recordOrigin","")
+        &&request.resource.data.get("updatedByUid","")==request.auth.uid
+        &&request.resource.data.get("updatedAt",null)==request.time
+        &&(
+          (resource.data.get("connectionStatus","")=="Pending Verification"
+            &&resource.data.get("createdByUid","")==request.auth.uid
+            &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
+            &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
+          ||(communicationMediaReviewer()
+            &&resource.data.get("connectionStatus","")!="Archived"
+            &&request.resource.data.get("connectionStatus","")==resource.data.get("connectionStatus","")
+            &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","updatedByUid","updatedAt"]))
+          ||(communicationMediaReviewer()
+            &&((resource.data.get("connectionStatus","")=="Pending Verification"&&request.resource.data.get("connectionStatus","") in ["Active","Suspended","Disconnected"])
+              ||(resource.data.get("connectionStatus","")=="Active"&&request.resource.data.get("connectionStatus","") in ["Suspended","Disconnected"])
+              ||(resource.data.get("connectionStatus","")=="Suspended"&&request.resource.data.get("connectionStatus","") in ["Active","Disconnected"]))
+            &&request.resource.data.get("previousConnectionStatus",null)==resource.data.get("previousConnectionStatus",null)
+            &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
+          ||(communicationMediaReviewer()
+            &&resource.data.get("connectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected"]
+            &&request.resource.data.get("connectionStatus","")=="Archived"
+            &&request.resource.data.get("previousConnectionStatus","")==resource.data.get("connectionStatus","")
+            &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","previousConnectionStatus","updatedByUid","updatedAt"]))
+        ))
+      ||(communicationMediaReviewer()
+        &&resource.data.get("connectionStatus","")=="Archived"
+        &&request.resource.data.get("connectionStatus","")==(
+          resource.data.get("previousConnectionStatus","") in ["Pending Verification","Suspended","Disconnected"]
+            ? resource.data.get("previousConnectionStatus","")
+            : "Pending Verification")
+        &&request.resource.data.get("restoredAt",null)==request.time
+        &&request.resource.data.get("restoredBy","")==request.auth.uid
+        &&request.resource.data.get("restoreReason","") is string
+        &&request.resource.data.get("restoreReason","").size()>0
+        &&request.resource.data.get("restoreReason","").size()<=500
+        &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","restoredAt","restoredBy","restoreReason"])
+        &&request.resource.data.keys().hasOnly(["platform","accountName","handle","profileUrl","accountType","owner","custodian","purpose","audience","authorizationReference","reviewDate","notes","connectionStatus","createdByUid","createdByEmail","createdAt","updatedByUid","updatedAt","recordOrigin","previousConnectionStatus","restoredAt","restoredBy","restoreReason"])
+      ));
     allow delete:if false;
   }
   match /socialMediaAccountsAudit/{id}{
@@ -655,7 +676,19 @@ service cloud.firestore {
       &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("accountName","")==request.resource.data.get("accountName","")
       &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
       &&request.resource.data.get("createdAt",null)==request.time
-      &&request.resource.data.keys().hasOnly(["recordId","platform","accountName","action","actorUid","actorEmail","createdAt","recordOrigin"]);
+      &&(!request.resource.data.keys().hasAny(["reason"])||(request.resource.data.get("reason","") is string
+        &&request.resource.data.get("reason","").size()>0
+        &&request.resource.data.get("reason","").size()<=500))
+      &&(request.resource.data.get("action","")!="STATUS_RESTORED"||(communicationMediaReviewer()
+        &&request.resource.data.get("reason","") is string
+        &&request.resource.data.get("reason","").size()>0
+        &&request.resource.data.get("reason","").size()<=500
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoredBy","")==request.resource.data.get("actorUid","")
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoredBy","")==request.auth.uid
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoreReason","")==request.resource.data.get("reason","")
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("restoredAt",null)==request.time
+        &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("connectionStatus","")!="Archived"))
+      &&request.resource.data.keys().hasOnly(["recordId","platform","accountName","action","actorUid","actorEmail","createdAt","recordOrigin","reason"]);
     allow update,delete:if false;
   }
 
