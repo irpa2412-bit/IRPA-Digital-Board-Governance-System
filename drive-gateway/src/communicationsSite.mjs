@@ -1335,7 +1335,7 @@ export function createCommunicationsSiteRouter(deps) {
         return json({ testRun: true, diagnosticMode: true, createdDrafts: { pageId: null, postId: null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
       }
       for (const type of ["pages", "posts"]) {
-        const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
+        const title = "TEST: IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
         try {
           const created = await wpRequest(type, "POST", { title, slug, status: "draft", content: "<p>TEST ONLY — IRPA production acceptance. This draft is intentionally retained and will not be published.</p>" });
@@ -1480,7 +1480,11 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      const runId = crypto.randomUUID();
+      if (env.DRIVE_KV) await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify({
+        runId, createdAt: new Date().toISOString(), items: cleanupItems.map(item => ({ ...item, testInventory: true }))
+      }), { expirationTtl: 2592000 });
+      return json({ testRun: true, runId, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
@@ -2338,9 +2342,10 @@ export function createCommunicationsSiteRouter(deps) {
     try { return await handle(request, env); }
     catch (error) {
       const status = Number.isInteger(error?.status) ? error.status :
+        error?.diagnosticCode === "cpanel_not_found" ? 404 :
         /authentication|token/i.test(String(error.message)) ? 401 :
         /role does not permit|authorised|authorized|restricted to active administrators/i.test(String(error.message)) ? 403 :
-        /not found/i.test(String(error.message)) ? 404 : 502;
+        /not found|no such file or directory/i.test(String(error.message)) ? 404 : 502;
       return json({ error: error.message || "Website management request failed." }, status, corsHeaders(request));
     }
   };
