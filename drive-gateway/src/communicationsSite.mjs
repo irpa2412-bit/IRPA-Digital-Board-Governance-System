@@ -11,7 +11,7 @@ const REVIEW_ROLES = new Set([
   "Executive Director", "Director Outreach", "Outreach Director",
   "Director Community Development", "Community Development Director", "Approver", "Administrator"
 ]);
-const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
+const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json", ".xml"]);
 const MAX_EDIT_BYTES = 512 * 1024;
 const WEBSITE_EDITOR_ROLES = new Set(["Administrator", "Communications Officer", "Executive Director"]);
 const WEBSITE_EDITOR_ROLE_ALIASES = new Map([
@@ -94,16 +94,25 @@ function sanitizeWordPressContent(value) {
     return "<" + tag + attrs.join("") + ">";
   });
 }
+function invalidWebsiteFilePath() {
+  return Object.assign(new Error("Invalid website file path."), { status: 400 });
+}
+
 function safeCpanelPath(input, root) {
   const raw = String(input || "").replace(/\\/g, "/").trim();
   if (!raw || raw.startsWith("/") || raw.includes("\0") || raw.split("/").some(p => !p || p === "." || p === ".." || p.startsWith("."))) {
-    throw new Error("Invalid website file path.");
+    throw invalidWebsiteFilePath();
   }
-  const filename = raw.split("/").pop();
+  const segments = raw.split("/");
+  const filename = segments[segments.length - 1];
+  const blockedDirectories = new Set(["wp-admin", "wp-includes", "uploads"]);
+  if (segments.some(segment => blockedDirectories.has(segment.toLowerCase())) || ["wp-config.php", ".htaccess", ".user.ini"].includes(filename.toLowerCase())) {
+    throw invalidWebsiteFilePath();
+  }
   const dot = filename.lastIndexOf(".");
   const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : "";
   if (!EDITABLE_EXTENSIONS.has(ext) || /\.(php\d*|phtml|phar|cgi|pl|sh|htaccess|ini)$/i.test(filename)) {
-    throw new Error("Only HTML, CSS, TXT and JSON website files can be edited through this portal.");
+    throw invalidWebsiteFilePath();
   }
   const base = String(root || "public_html").replace(/^\/+|\/+$/g, "");
   return { dir: base + (raw.includes("/") ? "/" + raw.split("/").slice(0, -1).join("/") : ""), file: filename, relative: raw };
@@ -1924,7 +1933,8 @@ export function createCommunicationsSiteRouter(deps) {
   return async (request, env) => {
     try { return await handle(request, env); }
     catch (error) {
-      const status = /authentication|token/i.test(String(error.message)) ? 401 :
+      const status = Number.isInteger(error?.status) ? error.status :
+        /authentication|token/i.test(String(error.message)) ? 401 :
         /role does not permit|authorised|authorized/i.test(String(error.message)) ? 403 :
         /not found/i.test(String(error.message)) ? 404 : 502;
       return json({ error: error.message || "Website management request failed." }, status, corsHeaders(request));
