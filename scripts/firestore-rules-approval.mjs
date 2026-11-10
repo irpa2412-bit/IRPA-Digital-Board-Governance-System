@@ -9,10 +9,10 @@ function latestByTime(items) {
   return [...items].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)).at(-1);
 }
 
-export function evaluateApproval({ changedFiles, labels, labelEvents, rulesCommitEvents, allowedActors, apiError }) {
+export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, rulesCommitIds, allowedActors, apiError }) {
   if (apiError) return { pass: false, reason: `GitHub API verification failed closed: ${apiError}` };
   if (!Array.isArray(changedFiles) || !Array.isArray(labels) || !Array.isArray(labelEvents) ||
-      !Array.isArray(rulesCommitEvents) || !Array.isArray(allowedActors)) {
+      !Array.isArray(timeline) || !Array.isArray(rulesCommitIds) || !Array.isArray(allowedActors)) {
     return { pass: false, reason: "Required approval evidence is incomplete; failing closed." };
   }
   if (!changedFiles.includes("firestore.rules")) return { pass: true, reason: "firestore.rules unchanged." };
@@ -27,11 +27,15 @@ export function evaluateApproval({ changedFiles, labels, labelEvents, rulesCommi
   if (!actor || !allowedActors.includes(actor)) {
     return { pass: false, reason: `Approval label was applied by unauthorized actor: ${actor || "unknown"}.` };
   }
-  if (rulesCommitEvents.length === 0 || rulesCommitEvents.some(e => !e.created_at || !e.commit_id)) {
-    return { pass: false, reason: "Cannot establish the server-recorded time of every rules-changing commit; failing closed." };
+  if (!latestLabelEvent.id || rulesCommitIds.length === 0) {
+    return { pass: false, reason: "Cannot establish the PR event order for the approval and rules commits; failing closed." };
   }
-  const latestRulesCommit = latestByTime(rulesCommitEvents);
-  if (Date.parse(latestLabelEvent.created_at) <= Date.parse(latestRulesCommit.created_at)) {
+  const labelIndex = timeline.findIndex(event => event.id === latestLabelEvent.id && event.event === "labeled");
+  const rulesCommitIndexes = rulesCommitIds.map(sha => timeline.findIndex(event => event.event === "committed" && event.sha === sha));
+  if (labelIndex < 0 || rulesCommitIndexes.some(index => index < 0)) {
+    return { pass: false, reason: "GitHub timeline is missing the approval event or a rules-changing commit; failing closed." };
+  }
+  if (labelIndex <= Math.max(...rulesCommitIndexes)) {
     return { pass: false, reason: "approval is stale; re-apply the label after reviewing the latest diff" };
   }
   return { pass: true, reason: `Valid approval by @${actor} after the latest firestore.rules commit.` };
@@ -122,15 +126,9 @@ async function main() {
       }
       if (detail.files.some(file => file.filename === "firestore.rules")) rulesCommitIds.push(commit.sha);
     }
-    const rulesCommitEvents = timeline
-      .filter(event => event.event === "committed" && rulesCommitIds.includes(event.commit_id))
-      .map(event => ({ commit_id: event.commit_id, created_at: event.created_at }));
-    if (rulesCommitEvents.length !== rulesCommitIds.length) {
-      throw new Error("GitHub PR timeline did not provide a server-timestamped committed event for every firestore.rules-changing commit.");
-    }
     const result = evaluateApproval({
       changedFiles, labels: (pr.labels || []).map(label => label.name),
-      labelEvents: events, rulesCommitEvents, allowedActors
+      labelEvents: events, timeline, rulesCommitIds, allowedActors
     });
     if (result.pass) { console.log(`PASS: ${result.reason}`); return; }
     console.error(`FAIL: ${result.reason}`);
