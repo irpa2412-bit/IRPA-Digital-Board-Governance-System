@@ -2,7 +2,10 @@ const API = "https://api.github.com";
 const LABEL = "firestore-rules-approved";
 
 function latestByTime(items) {
-  return [...items].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)).at(-1);
+  return [...items].sort((a, b) => {
+    const timeOrder = Date.parse(a.created_at) - Date.parse(b.created_at);
+    return timeOrder || Number(a.id || 0) - Number(b.id || 0);
+  }).at(-1);
 }
 
 export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, rulesCommitIds, allowedActors, apiError }) {
@@ -98,14 +101,14 @@ async function main() {
       apiJson(`${base}/issues/${prNumber}`, token),
       apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
       apiPages(`${base}/pulls/${prNumber}/commits?per_page=100`, token),
-      apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token),
-      loadApprovers(base, token)
+      apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token)
     ]);
     const changedFiles = changed.map(file => file.filename);
     if (!changedFiles.includes("firestore.rules")) {
       console.log("PASS: firestore.rules unchanged.");
       return;
     }
+    const allowedActors = await loadApprovers(base, token);
     const rulesCommitIds = [];
     for (const commit of commits) {
       const detail = await apiJson(`${base}/commits/${commit.sha}`, token);
