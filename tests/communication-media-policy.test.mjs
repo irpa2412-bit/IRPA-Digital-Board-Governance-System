@@ -528,15 +528,16 @@ test("Website Maintenance requires an explicit live root and exposes read-only u
  assert.ok(site.includes("CPANEL_LIVE_DOCUMENT_ROOT"));
  assert.ok(site.includes("/api/communications/cpanel/maintenance/live-root-status"));
  assert.ok(site.includes("/api/communications/website/maintenance/updates"));
- assert.ok(site.includes("TEST live document-root configuration gate"));
- assert.ok(site.includes("TEST read-only WordPress core/plugin/theme update checks"));
+ assert.ok(websiteStudio.includes("TEST live document-root configuration gate"));
+ assert.ok(websiteStudio.includes("TEST read-only WordPress core/plugin/theme update checks"));
  assert.ok(site.includes("Authenticated GET probes only"));
  assert.ok(site.includes("not exposed"));
 });
 
 
 test("website media path and content separators do not contain over-escaped sequences", () => {
- assert.ok(site.includes(String.raw`relative.replace(/\\/g`));
- assert.ok(!site.includes(String.raw`relative.replace(/\\\\/g`));
- assert.ok(!websiteStudio.includes(String.raw`"\\n\\n"`));
+ const slash=String.fromCharCode(92);
+ assert.ok(site.includes("relative.replace(/"+slash+slash+"/g"));
+ assert.ok(!site.includes("relative.replace(/"+slash.repeat(4)+"/g"));
+ assert.ok(!websiteStudio.includes('"'+slash+slash+"n"+slash+slash+"n"+'"'));
 });
