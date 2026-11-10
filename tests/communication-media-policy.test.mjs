@@ -559,10 +559,23 @@ test("website media path and content separators do not contain over-escaped sequ
 });
 
 
-test("archived social accounts can be restored only by reviewers with an immutable restoration audit event",()=>{
- assert.ok(social.includes('item.connectionStatus==="Archived"')&&social.includes('>Unarchive</button>'),"archived account cards expose a reviewer-only Unarchive action");
- assert.ok(social.includes('item.connectionStatus==="Archived"?"STATUS_RESTORED"'),"restoration records a distinct STATUS_RESTORED event");
- assert.ok(rules.includes('resource.data.get("connectionStatus","")=="Archived"')&&rules.includes('request.resource.data.get("connectionStatus","")=="Active"'),"rules permit only Archived-to-Active restoration");
- assert.ok(rules.includes('"STATUS_RESTORED"'),"the audit action allowlist includes STATUS_RESTORED");
+test("archived social account restoration is supervised, status-preserving, reasoned and reviewer-only",()=>{
+ assert.ok(social.includes('item.connectionStatus==="Archived"')&&social.includes('>Unarchive</button>'),"archived account cards expose the Unarchive action");
+ assert.ok(social.includes("async function restoreArchivedAccount()"),"restoration has a dedicated operation");
+ assert.ok(social.includes('RESTORABLE_STATES.includes(restoreTarget?.previousConnectionStatus)?restoreTarget.previousConnectionStatus:"Pending Verification"'),"missing previous status falls back to Pending Verification");
+ assert.ok(social.includes('connectionStatus:restoreStatus,restoredAt:serverTimestamp(),restoredBy:user.uid,restoreReason:reason'),"restore updates only the status and required restoration metadata");
+ assert.ok(social.includes('action:"STATUS_RESTORED"')&&social.includes('reason,createdAt:serverTimestamp()'),"restoration writes an immutable reasoned audit event");
+ assert.ok(social.includes('role="dialog"')&&social.includes('aria-modal="true"'),"restoration uses an accessible confirmation dialog");
+ assert.ok(social.includes('{restoreTarget.accountName}')&&social.includes('{restoreTarget.platform}'),"dialog names the account and platform");
+ assert.ok(social.includes('Reason for restoration (required)')&&social.includes('disabled={restoreBusy||!clean(restoreReason)}'),"confirmation requires a reason and has a busy/disabled state");
+ assert.ok(social.includes('previousConnectionStatus=item.connectionStatus'),"archiving stores the previous account status");
+ assert.ok(social.includes('activeCount=items.filter(x=>x.connectionStatus==="Active").length'),"active count excludes archived records");
+ assert.ok(social.includes('className="social-media-accounts"'),"component has a scoped root class");
+ assert.ok(social.includes('className="social-media-accounts__record"'),"account cards have a scoped class for wrapping");
+ assert.ok(rules.includes('"previousConnectionStatus"')&&rules.includes('"restoredAt"')&&rules.includes('"restoredBy"')&&rules.includes('"restoreReason"'),"rules permit only the explicit restoration metadata fields");
+ assert.ok(rules.includes('request.resource.data.get("restoredBy","")==request.auth.uid'),"rules bind restoredBy to the signed-in reviewer");
+ assert.ok(rules.includes('request.resource.data.get("restoreReason","").size()>0'),"rules require a non-empty reason");
+ assert.ok(rules.includes('request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","restoredAt","restoredBy","restoreReason"])'),"rules restrict restoration to four fields");
+ assert.ok(rules.includes('request.resource.data.get("action","")!="STATUS_RESTORED"||'),"rules require a reason for restoration audit events");
  assert.ok(rules.includes('allow update,delete:if false;'),"social-account audit records remain immutable");
 });
