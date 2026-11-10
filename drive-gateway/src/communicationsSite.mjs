@@ -381,10 +381,17 @@ export function createCommunicationsSiteRouter(deps) {
     if (!username || !token) throw configurationError("cpanel_credentials_missing", "Required cPanel settings are missing: " + [!username && "CPANEL_USERNAME", !token && "CPANEL_API_TOKEN"].filter(Boolean).join(", "));
     const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
     if (!["production", "staging"].includes(environment)) throw configurationError("worker_environment_missing_or_invalid", "Set IRPA_WORKER_ENVIRONMENT to exactly production or staging.");
-    const configuredRoot = String(env.CPANEL_DOCUMENT_ROOT || (environment === "production" ? "public_html" : "public_html/staging")).trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    const configuredRoot = String(environment === "production" ? env.CPANEL_LIVE_DOCUMENT_ROOT || "" :
+      env.CPANEL_DOCUMENT_ROOT || "public_html/staging").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+    if (environment === "production" && !configuredRoot) {
+      throw configurationError("cpanel_live_document_root_missing", "Live root not configured", 409);
+    }
     const allowedRoots = environment === "production" ? ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"] :
       ["public_html/staging", "home/" + username + "/public_html/staging", "/home/" + username + "/public_html/staging"];
-    if (!allowedRoots.includes(configuredRoot)) throw configurationError("cpanel_document_root_invalid_for_environment", "CPANEL_DOCUMENT_ROOT does not match the permitted " + environment + " document root.");
+    if (!allowedRoots.includes(configuredRoot)) {
+      const variable = environment === "production" ? "CPANEL_LIVE_DOCUMENT_ROOT" : "CPANEL_DOCUMENT_ROOT";
+      throw configurationError("cpanel_document_root_invalid_for_environment", variable + " does not match the permitted " + environment + " document root.");
+    }
     const documentRoot = "public_html" + (environment === "staging" ? "/staging" : "");
     return { root: base.origin + "/execute", username, token, documentRoot };
   }
@@ -806,7 +813,7 @@ export function createCommunicationsSiteRouter(deps) {
           let detail = {};
           try { detail = JSON.parse(raw); } catch {}
           const wpCode = safeCode(detail.code);
-          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }).replace(/[\\r\\n]/g, " ");
+          const wpMessage = sanitizedWordPressBody(cleanText(detail.message || detail.error || "", 220), { ...wp, username: String(env.WORDPRESS_USERNAME || "").trim(), password: String(env.WORDPRESS_APPLICATION_PASSWORD || "").replace(/\s/g, "") }).replace(/[\r\n]/g, " ");
           const location = response.headers.get("location");
           const redirected = response.status >= 300 && response.status < 400;
           result.websiteHttpStatus = response.status;
@@ -1086,10 +1093,10 @@ export function createCommunicationsSiteRouter(deps) {
       const input=await request.json().catch(()=>({})),uploadId=String(input.uploadId||"");
       if(!/^[a-f0-9-]{36}$/i.test(uploadId)||!Number.isInteger(input.total)||input.total<1||input.total>512)return json({error:"Invalid chunk upload manifest."},400,corsHeaders(request));
       const cp=cpanelConfig(env),relative=String(input.path||"");
-      const parts=relative.replace(/\\\\/g,"/").split("/");
+      const parts=relative.replace(/\\/g,"/").split("/");
       const filename=parts.pop();
       if(!filename||filename.startsWith(".")||parts.some(p=>!p||p==="."||p===".."||p.startsWith(".")))return json({error:"Invalid cPanel media destination path."},400,corsHeaders(request));
-      const safe={dir:safeCpanelDirectory(parts.join("/"),cp.documentRoot),file:filename,relative:relative.replace(/\\\\/g,"/")};
+      const safe={dir:safeCpanelDirectory(parts.join("/"),cp.documentRoot),file:filename,relative:relative.replace(/\\/g,"/")};
       const chunks=[];
       for(let i=0;i<input.total;i++){const chunk=await env.DRIVE_KV.get("irpa:website-media-chunk:"+uploadId+":"+i);if(!chunk)return json({error:"Upload is incomplete; missing chunk "+i+"."},409,corsHeaders(request));chunks.push(chunk);}
       const encoded=chunks.join("");const size=Math.floor(encoded.length*3/4);
@@ -1790,6 +1797,59 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/cpanel/maintenance/live-root-status" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const username = String(env.CPANEL_USERNAME || "").trim();
+      const configuredRoot = String(env.CPANEL_LIVE_DOCUMENT_ROOT || "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+      if (!configuredRoot) {
+        return json({ readOnly: true, configured: false, status: "not exposed", reason: "Live root not configured" }, 409, corsHeaders(request));
+      }
+      const allowedRoots = ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"];
+      if (!allowedRoots.includes(configuredRoot)) {
+        return json({ readOnly: true, configured: false, status: "invalid", reason: "CPANEL_LIVE_DOCUMENT_ROOT does not match the permitted production document root." }, 409, corsHeaders(request));
+      }
+      return json({ readOnly: true, configured: true, status: "configured", documentRoot: "public_html" }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/website/maintenance/updates" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const wp = websiteWordPressConfig(env);
+      const inspectUpdates = async endpoint => {
+        try {
+          const response = await wordpressEditorFetch(wp, wp.root + endpoint, {
+            headers: wordpressHeaders(wp, { Accept: "application/json", "Cache-Control": "no-cache" }),
+            signal: AbortSignal.timeout(12000)
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) {
+            return { status: "not exposed", reason: "WordPress REST endpoint returned HTTP " + response.status + "; update metadata is not readable by the integration account." };
+          }
+          const records = Array.isArray(payload) ? payload :
+            Array.isArray(payload?.items) ? payload.items : [payload].filter(Boolean);
+          const metadata = records.filter(record => record && typeof record === "object" && (
+            Object.prototype.hasOwnProperty.call(record, "update_available") ||
+            Object.prototype.hasOwnProperty.call(record, "updateAvailable") ||
+            (record.update && typeof record.update === "object")
+          ));
+          if (!metadata.length) {
+            return { status: "not exposed", reason: "The REST endpoint responded without explicit update metadata; version numbers alone are not treated as an update check." };
+          }
+          const updates = metadata.filter(record => record.update_available === true || record.updateAvailable === true ||
+            record.update?.available === true ||
+            (record.update?.new_version && record.version && record.update.new_version !== record.version));
+          return { status: updates.length ? "updates_available" : "current", updatesAvailable: updates.length, itemsChecked: records.length };
+        } catch {
+          return { status: "not exposed", reason: "The WordPress REST endpoint could not be reached; no update operation was attempted." };
+        }
+      };
+      const [core, plugins, themes] = await Promise.all([
+        inspectUpdates("/wp-json/wp/v2/core?context=edit"),
+        inspectUpdates("/wp-json/wp/v2/plugins?context=edit"),
+        inspectUpdates("/wp-json/wp/v2/themes?context=edit")
+      ]);
+      return json({ readOnly: true, checkedAt: new Date().toISOString(), core, plugins, themes }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/cpanel/diagnostics" && request.method === "GET") {
       await authorised(request, env, true);
       const cp = cpanelConfig(env);
@@ -1797,7 +1857,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (!/^[a-z0-9.-]{1,253}$/.test(domain) || domain.startsWith(".") || domain.endsWith(".")) {
         return json({ error: "A valid website domain is required for cPanel read-only diagnostics." }, 400, corsHeaders(request));
       }
-      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null }, phpVersion: { value: null, status: "not exposed" }, diskUsage: { value: null, status: "not exposed" }, errorLog: { lines: [], status: "not exposed" } };
+      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null }, phpVersion: { value: null, status: "not exposed", reason: "The cPanel PHP-version API has not returned a version for this domain." }, diskUsage: { value: null, status: "not exposed", reason: "The cPanel quota API has not returned disk-usage data." }, errorLog: { lines: [], status: "not exposed", reason: "The cPanel error-log API has not returned readable log lines." } };
       const extractRows = value => {
         const candidates = [value, value?.data, value?.data?.certificates, value?.certificates, value?.data?.[0]?.data, value?.data?.data];
         return candidates.filter(Array.isArray).flatMap(rows => rows).filter(row => row && typeof row === "object");
@@ -1829,10 +1889,11 @@ export function createCommunicationsSiteRouter(deps) {
         result.ssl = {
           status: hosts.length ? "PASS" : "FAIL", httpStatus: response.__httpStatus, hosts,
           error: hosts.length ? null : "No installed SSL certificate matched " + domain + ".",
+          reason: hosts.length ? null : "The SSL inventory was returned, but it contained no certificate matching the requested domain.",
           detail: hosts.length ? null : sanitisedCpanelDetail(response)
         };
       } catch (error) {
-        result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+        result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240), reason: "The cPanel SSL inventory request failed; certificate expiry could not be verified." };
       }
       const readIniFile = async filename => {
         const response = await cpanelCall(cp, "Fileman/get_file_content", { dir: cp.documentRoot, file: filename });
@@ -1880,18 +1941,25 @@ export function createCommunicationsSiteRouter(deps) {
         post_max_size: cleanText(limits.post || "", 40) || null,
         source: phpLimitSource,
         diagnostic: limits.upload && limits.post ? null : "INFO: cPanel did not return both directives. Verify the account's LangPHP UAPI permission and the domain's MultiPHP INI Editor configuration; if the provider restricts this API, confirm the values in cPanel manually.",
+        reason: limits.upload && limits.post ? null : "PHP upload/post limits were not exposed by either the account INI files or the MultiPHP UAPI response.",
         detail: phpLimitErrors.length ? phpLimitErrors.join("; ").slice(0, 200) : null
       };
       try {
         const response = await cpanelCall(cp, "LangPHP/php_get_vhost_versions", { vhost: domain });
         const match = JSON.stringify(response.data || response).match(/(?:phpversion|version)[^0-9]*(\d+\.\d+(?:\.\d+)?)/i);
         if (match) result.phpVersion = { value: match[1], status: "available", httpStatus: response.__httpStatus };
-      } catch {}
+        else result.phpVersion = { value: null, status: "not exposed", reason: "The cPanel PHP-version endpoint responded without a version value for this domain." };
+      } catch {
+        result.phpVersion = { value: null, status: "not exposed", reason: "The cPanel PHP-version endpoint is unavailable or its permission is not granted." };
+      }
       try {
         const response = await cpanelCall(cp, "Quota/get_quota_info");
         const match = JSON.stringify(response.data || response).match(/(?:diskused|disk_used|used)[^0-9]*(\d+(?:\.\d+)?\s*(?:MB|GB|KB|bytes?)?)/i);
         if (match) result.diskUsage = { value: match[1], status: "available", httpStatus: response.__httpStatus };
-      } catch {}
+        else result.diskUsage = { value: null, status: "not exposed", reason: "The cPanel quota response did not contain a recognised disk-usage value." };
+      } catch {
+        result.diskUsage = { value: null, status: "not exposed", reason: "The cPanel quota endpoint is unavailable or its permission is not granted." };
+      }
       try {
         const response = await cpanelCall(cp, "Stats/get_error_log", { domain });
         const raw = response.data?.log || response.data?.error_log || response.data?.content || "";
@@ -1899,7 +1967,10 @@ export function createCommunicationsSiteRouter(deps) {
           .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
           .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED EMAIL]");
         if (safeLog) result.errorLog = { lines: safeLog.split(/\r?\n/).slice(-50), status: "available" };
-      } catch {}
+        else result.errorLog = { lines: [], status: "not exposed", reason: "The cPanel error-log response did not contain readable log content." };
+      } catch {
+        result.errorLog = { lines: [], status: "not exposed", reason: "The cPanel error-log endpoint is unavailable or its permission is not granted." };
+      }
       return json(result, 200, corsHeaders(request));
     }
 
@@ -2092,6 +2163,10 @@ export function createCommunicationsSiteRouter(deps) {
       const staging = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
       const content = staging.data?.content ?? staging.data?.[0]?.content ?? staging.data?.data?.content ?? staging.data?.data?.[0]?.content ?? staging.data?.result?.data?.content;
       if (typeof content !== "string" || new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES) return json({ error: "Staging file is unavailable or exceeds 512 KiB." }, 400, corsHeaders(request));
+      const configuredLiveRoot = String(env.CPANEL_LIVE_DOCUMENT_ROOT || "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+      if (!configuredLiveRoot) throw configurationError("cpanel_live_document_root_missing", "Live root not configured", 409);
+      const allowedLiveRoots = ["public_html", "home/" + cp.username + "/public_html", "/home/" + cp.username + "/public_html"];
+      if (!allowedLiveRoots.includes(configuredLiveRoot)) throw configurationError("cpanel_live_document_root_invalid", "CPANEL_LIVE_DOCUMENT_ROOT does not match the permitted production document root.", 409);
       const live = safeWebsiteMaintenancePath(safe.relative, "public_html");
       const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: live.dir, file: live.file });
       const prior = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content ?? "";
