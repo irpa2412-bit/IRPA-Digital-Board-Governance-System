@@ -111,11 +111,11 @@ export async function communicationsRoutes(request,env,deps){
     if(body.platforms!==undefined)item.platforms=Array.isArray(body.platforms)?body.platforms.filter(p=>["facebook","instagram","linkedin","x","youtube","whatsapp"].includes(p)):[];
     if(item.link&&!/^https:\/\//i.test(item.link))throw Object.assign(new Error("Post links must use HTTPS."),{status:400});
     if(item.imageUrl&&!/^https:\/\//i.test(item.imageUrl))throw Object.assign(new Error("Media links must use HTTPS."),{status:400});
-    item.revision++;item.updatedAt=now();item.status="Draft";item.approvedBy=null;item.approvedAt=null;
+    item.revision++;item.updatedAt=now();item.status="Draft";item.approvedBy=null;item.approvedAt=null;delete item.approvalReason;
    }else if(request.method==="POST"&&decision==="submit"){
     if(item.authorUid!==actor.uid&&!admin)throw Object.assign(new Error("Only the author or an administrator may submit this item."),{status:403});
     if(!["Draft","Returned"].includes(item.status))throw Object.assign(new Error("Only a draft or returned item can be submitted."),{status:409});
-    item.status="Pending Approval";item.submittedAt=now();item.submittedBy=actor.uid;
+    item.status="Pending Approval";item.submittedAt=now();item.submittedBy=actor.uid;delete item.approvalReason;
    }else if(request.method==="POST"&&(decision==="approve"||decision==="reject")){
     if(!canApprove&&!admin)throw Object.assign(new Error("Approver role required."),{status:403});
     if(item.status!=="Pending Approval")throw Object.assign(new Error("Only items pending approval can be decided."),{status:409});
@@ -132,7 +132,7 @@ export async function communicationsRoutes(request,env,deps){
     if(decision==="approve"){item.status="Approved";item.approvedBy=actor.uid;item.approvedAt=now();item.approvedRevision=item.revision;if(approvalReason)item.approvalReason=approvalReason;}
     else{item.status="Returned";item.rejectionReason=String(body.reason||"Changes requested").slice(0,500);item.rejectedBy=actor.uid;item.rejectedAt=now();}
    }else throw Object.assign(new Error("Unsupported editorial action."),{status:405});
-   items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:decision?decision.toUpperCase():"UPDATED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),status:item.status,revision:item.revision,...(decision==="approve"&&item.approvalReason?{reason:item.approvalReason,approvalMode:"SOLE_ADMINISTRATOR"}:{})});
+   items[index]=item;await writeItems(env,items);await audit(env,{id:crypto.randomUUID(),action:decision?decision.toUpperCase():"UPDATED",itemId:id,actorUid:actor.uid,roles:actor.roles,at:now(),status:item.status,revision:item.revision,...(decision==="approve"&&item.authorUid===actor.uid&&item.approvalReason?{reason:item.approvalReason,approvalMode:"SOLE_ADMINISTRATOR"}:{})});
    return response({ok:true,item},200,cors);
   }
   return response({ok:false,error:"Editorial route not found."},404,cors);
