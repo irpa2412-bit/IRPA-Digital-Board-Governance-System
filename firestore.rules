@@ -615,7 +615,8 @@ service cloud.firestore {
       &&request.resource.data.get("updatedByUid","")==request.auth.uid
       &&request.resource.data.get("connectionStatus","")=="Pending Verification"
       &&request.resource.data.get("createdAt",null)==request.time
-      &&request.resource.data.get("updatedAt",null)==request.time;
+      &&request.resource.data.get("updatedAt",null)==request.time
+      &&!request.resource.data.keys().hasAny(["previousConnectionStatus","restoredAt","restoredBy","restoreReason"]);
     allow update:if communicationMediaUser()&&(
       (validSocialAccount(request.resource.data)
         &&request.resource.data.get("createdByUid","")==resource.data.get("createdByUid","")
