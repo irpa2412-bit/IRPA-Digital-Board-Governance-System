@@ -1,2 +1,11 @@
-# Require review from the repository owner for every source change.
+# Default ownership retained.
 * @irpa2412-bit
+
+# Explicitly protect the approval mechanism and its ownership definition.
+firestore.rules @irpa2412-bit
+.github/workflows/firestore-rules-approval.yml @irpa2412-bit
+.github/CODEOWNERS @irpa2412-bit
+.github/firestore-rules-approvers.txt @irpa2412-bit
+scripts/firestore-rules-approval.mjs @irpa2412-bit
+tests/firestore-rules-approval.test.mjs @irpa2412-bit
+docs/FIRESTORE_RULES_APPROVAL.md @irpa2412-bit

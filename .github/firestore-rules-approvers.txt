@@ -1,0 +1,3 @@
+# One GitHub login per line. Changes to this file require repository-owner review.
+# The repository owner is the only currently authorized label applier.
+irpa2412-bit
