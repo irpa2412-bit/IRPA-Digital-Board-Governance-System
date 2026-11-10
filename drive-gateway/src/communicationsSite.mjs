@@ -2096,6 +2096,69 @@ export function createCommunicationsSiteRouter(deps) {
       await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId"], auditFields, { createOnly: true });
       return json({ success: true, path: safe.relative, backupId, message: "Website file saved through cPanel. A rollback snapshot is retained for seven days; verify the public page before considering the edit complete." }, 200, corsHeaders(request));
     }
+    if (path === "/api/communications/cpanel/maintenance/remove-test-items" && request.method === "POST") {
+      const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      if (String(input.confirmation || "") !== "REMOVE TEST ITEMS") {
+        return json({ error: "Type REMOVE TEST ITEMS to confirm TEST-only cleanup." }, 400, corsHeaders(request));
+      }
+      const runId = String(input.runId || "");
+      if (!/^[0-9a-f-]{36}$/i.test(runId)) return json({ error: "A valid TEST inventory run ID is required." }, 400, corsHeaders(request));
+      if (!env.DRIVE_KV) return json({ error: "TEST inventory storage is unavailable; nothing was removed." }, 503, corsHeaders(request));
+      const inventory = await env.DRIVE_KV.get("website-maintenance-test-inventory:" + runId, "json");
+      if (!inventory || inventory.runId !== runId || !Array.isArray(inventory.items)) {
+        return json({ error: "The TEST inventory was not found; nothing was removed." }, 404, corsHeaders(request));
+      }
+      const wp = websiteWordPressConfig(env);
+      const report = [];
+      const add = (item, status, httpStatus, detail) => report.push({ kind: item?.kind || "unknown", title: item?.title || "", id: item?.id ?? null, status, httpStatus, detail });
+      for (const item of inventory.items) {
+        const title = String(item?.title || "");
+        const kind = String(item?.kind || "");
+        if (kind.startsWith("TEST draft ") && title.startsWith("TEST:") && Number.isSafeInteger(Number(item.id)) && Number(item.id) > 0) {
+          const type = kind.includes("page") ? "pages" : "posts";
+          try {
+            const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/" + type + "/" + Number(item.id), {
+              method: "DELETE", headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(60000)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.status !== "trash") throw Object.assign(new Error(data.message || "WordPress did not confirm trash status."), { httpStatus: response.status });
+            await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_TEST_ITEM_TRASHED", type, Number(item.id), { title, runId, testOnly: true });
+            add(item, "PASS", response.status, "TEST draft moved to WordPress Trash.");
+          } catch (error) { add(item, "FAIL", error.httpStatus || 0, error.message || "TEST draft cleanup failed."); }
+          continue;
+        }
+        if ((kind === "TEST media" || kind === "TEST diagnostic media") && /^(TEST-|TEST:)/.test(title) && Number.isSafeInteger(Number(item.id)) && Number(item.id) > 0) {
+          try {
+            const response = await wordpressEditorFetch(wp, wp.root + "/wp-json/wp/v2/media/" + Number(item.id) + "?force=true", {
+              method: "DELETE", headers: wordpressHeaders(wp, { Accept: "application/json" }), signal: AbortSignal.timeout(60000)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.deleted !== true) throw Object.assign(new Error(data.message || "WordPress did not confirm permanent media deletion."), { httpStatus: response.status });
+            await recordWebsiteAudit(env, claims, "COMMUNICATION_WEBSITE_TEST_MEDIA_DELETED", "media", Number(item.id), { title, runId, force: true, testOnly: true });
+            add(item, "PASS", response.status, "TEST media force-deleted from WordPress.");
+          } catch (error) { add(item, "FAIL", error.httpStatus || 0, error.message || "TEST media cleanup failed."); }
+          continue;
+        }
+        if (kind === "cpanel-file" && title.startsWith("TEST") && /^portal-test\\/[A-Za-z0-9 _.-]+\\.(?:html?|css|txt|json|xml)$/i.test(String(item.path || ""))) {
+          try {
+            const cp = cpanelConfig(env);
+            if (String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase() !== "staging" || cp.documentRoot !== "public_html/staging") {
+              throw new Error("cPanel TEST file removal is restricted to staging/portal-test.");
+            }
+            const safe = safeWebsiteMaintenancePath(item.path, cp.documentRoot);
+            const response = await cpanelCall(cp, "Fileman/delete_file", { dir: safe.dir, file: safe.file }, "POST");
+            const audit = fields({ action: "CPANEL_MAINTENANCE_TEST_FILE_REMOVED", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { runId, path: safe.relative, title, testOnly: true }, createdAt: new Date().toISOString() });
+            await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: new Date().toISOString(), runId, testCleanup: true }), ["path", "updatedByUid", "updatedAt", "runId", "testCleanup"], audit, { createOnly: true });
+            add(item, "PASS", response.__httpStatus || 200, "TEST file removed from staging/portal-test and audit event recorded.");
+          } catch (error) { add(item, "FAIL", error.httpStatus || 0, error.message || "TEST file cleanup failed."); }
+          continue;
+        }
+        add(item, "REFUSED", 0, "Item did not satisfy the TEST inventory, exact title/filename prefix, type and allowed-path checks; no deletion request was sent.");
+      }
+      return json({ runId, removed: report.filter(row => row.status === "PASS").length, refused: report.filter(row => row.status === "REFUSED").length, failed: report.filter(row => row.status === "FAIL").length, report }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/cpanel/maintenance/self-test" && request.method === "POST") {
       const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
       const cp = cpanelConfig(env);
