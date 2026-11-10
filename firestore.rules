@@ -648,7 +648,7 @@ service cloud.firestore {
       ||(communicationMediaReviewer()
         &&resource.data.get("connectionStatus","")=="Archived"
         &&request.resource.data.get("connectionStatus","")==(
-          resource.data.get("previousConnectionStatus","") in ["Pending Verification","Active","Suspended","Disconnected"]
+          resource.data.get("previousConnectionStatus","") in ["Pending Verification","Suspended","Disconnected"]
             ? resource.data.get("previousConnectionStatus","")
             : "Pending Verification")
         &&request.resource.data.get("restoredAt",null)==request.time
@@ -676,6 +676,9 @@ service cloud.firestore {
       &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("accountName","")==request.resource.data.get("accountName","")
       &&request.resource.data.get("recordOrigin","")=="PRODUCTION"
       &&request.resource.data.get("createdAt",null)==request.time
+      &&(!request.resource.data.keys().hasAny(["reason"])||(request.resource.data.get("reason","") is string
+        &&request.resource.data.get("reason","").size()>0
+        &&request.resource.data.get("reason","").size()<=500))
       &&(request.resource.data.get("action","")!="STATUS_RESTORED"||(communicationMediaReviewer()
         &&request.resource.data.get("reason","") is string
         &&request.resource.data.get("reason","").size()>0
