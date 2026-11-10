@@ -58,3 +58,23 @@ test("Social Studio wires media upload to the authenticated WordPress Media Libr
  assert.ok(fsSource.includes("validateSocialMediaUpload(mediaFile,altText)"));
  assert.ok(fsSource.includes("disabled={mediaBusy||!altText.trim()}"));
 });
+
+test("six-platform Social Studio TEST self-test runs safe manual exports in Portal Self-Test and Production Acceptance",()=>{
+ const portalSelfTest=readFileSync(new URL("../src/components/ReleaseReadiness.jsx",import.meta.url),"utf8");
+ const productionAcceptance=readFileSync(new URL("../src/pages/CommunicationsWebsiteStudio.jsx",import.meta.url),"utf8");
+ const platforms=["facebook","instagram","linkedin","x","youtube","whatsapp"];
+ for(const platform of platforms){
+  assert.ok(portalSelfTest.includes('"'+platform+'"'),"Portal Self-Test must include "+platform);
+  assert.ok(productionAcceptance.includes('"'+platform+'"'),"Production Acceptance must include "+platform);
+ }
+ for(const source of [portalSelfTest,productionAcceptance]){
+  assert.ok(source.includes("/api/communications/social/status"),"read-only Social Studio status route is required");
+  assert.ok(source.includes("/api/communications/social/export"),"each platform must exercise manual export");
+  assert.ok(source.includes("manual-export"),"the test must verify manual-export mode");
+  assert.ok(source.includes("automaticPublishing"),"the test must verify automatic publishing remains disabled");
+  assert.ok(source.includes("pauseAllPublishing"),"the test must verify the global publishing pause");
+  assert.ok(source.includes("Step "),"each platform result must identify its step");
+  assert.ok(source.includes("/6 TEST Social Studio"),"each result must identify the six-step TEST sequence");
+ }
+ assert.ok(productionAcceptance.includes("no external post was sent"),"acceptance must explicitly confirm no external post is sent");
+});
