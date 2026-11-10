@@ -1,20 +1,29 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import "../../src/styles/tokens.css";
+import "../../src/styles/readability-harmony.css";
+import "../../src/styles/finance-readability.css";
+import "../../src/styles/finance-platform-uniform.css";
 import "../../src/styles/app.css";
-import "../../src/styles/page-layout-stability.css";
+import "../../src/styles/workflow.css";
 import "../../src/styles/mobile-viewport-containment.css";
-import "../../src/styles/portal-readability-standard.css";
+import "../../src/styles/tokens.css";
+import "../../src/styles/portal-typography.css";
+import "../../src/styles/shared-header-hero.css";
+import "../../src/styles/mobile-app-enhancement.css";
+import "../../src/styles/page-back-next-navigation.css";
+import "../../src/styles/grant-intelligence-layout.css";
 
 function PortalLayoutFixture() {
   return (
     <div className="app-shell" data-audit-root>
       <aside className="sidebar" aria-label="Primary portal navigation">
-        <h2>IRPA Governance</h2>
-        <button type="button">Dashboard</button>
-        <button type="button">Meetings and decisions</button>
-        <button type="button">Documents and records</button>
-        <button type="button">Communications and media</button>
+        <div className="sidebar-brand"><strong>IRPA Governance</strong></div>
+        <nav aria-label="Primary navigation">
+          <button type="button">Dashboard</button>
+          <button type="button">Meetings and decisions</button>
+          <button type="button">Documents and records</button>
+          <button type="button">Communications and media</button>
+        </nav>
       </aside>
       <div className="main-area">
         <header className="topbar">
