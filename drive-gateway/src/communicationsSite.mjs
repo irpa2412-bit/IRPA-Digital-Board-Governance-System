@@ -2015,6 +2015,7 @@ export function createCommunicationsSiteRouter(deps) {
         priorContent = prior.data?.content ?? prior.data?.[0]?.content ?? prior.data?.data?.content ?? prior.data?.data?.[0]?.content ?? prior.data?.result?.data?.content ?? "";
       } catch (error) { if (error?.diagnosticCode !== "cpanel_not_found") throw error; }
       if (typeof priorContent !== "string") throw new Error("The current file could not be read; the file was not changed.");
+      if (new TextEncoder().encode(priorContent).byteLength > MAX_EDIT_BYTES) return json({ error: "Existing website file exceeds the 512 KiB edit limit." }, 413, corsHeaders(request));
       const backupId = "cpanel-backup:" + crypto.randomUUID();
       await env.DRIVE_KV.put(backupId, JSON.stringify({ path: safe.relative, content: priorContent }), { expirationTtl: 604800 });
       await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content, charset: "utf-8" }, "POST");
