@@ -5,13 +5,14 @@ import { evaluateApproval } from "../scripts/firestore-rules-approval.mjs";
 const base = {
   changedFiles: ["src/example.js", "firestore.rules"],
   labels: ["firestore-rules-approved"],
-  labelEvents: [{ event: "labeled", label: { name: "firestore-rules-approved" }, actor: { login: "irpa2412-bit" }, created_at: "2026-11-10T18:00:00Z" }],
-  rulesCommitEvents: [{ commit_id: "abc123", created_at: "2026-11-10T17:00:00Z" }],
+  labelEvents: [{ id: 22, event: "labeled", label: { name: "firestore-rules-approved" }, actor: { login: "irpa2412-bit" }, created_at: "2026-11-10T18:00:00Z" }],
+  timeline: [{ event: "committed", sha: "abc123" }, { id: 22, event: "labeled" }],
+  rulesCommitIds: ["abc123"],
   allowedActors: ["irpa2412-bit"]
 };
 
 test("unchanged firestore.rules passes without requiring a label", () => {
-  const result = evaluateApproval({ ...base, changedFiles: ["src/example.js"], labels: [], labelEvents: [], rulesCommitEvents: [] });
+  const result = evaluateApproval({ ...base, changedFiles: ["src/example.js"], labels: [], labelEvents: [], timeline: [], rulesCommitIds: [] });
   assert.equal(result.pass, true);
 });
 
@@ -32,7 +33,7 @@ test("non-allow-listed label actor fails", () => {
 });
 
 test("new rules commit after label makes approval stale", () => {
-  const result = evaluateApproval({ ...base, rulesCommitEvents: [{ commit_id: "def456", created_at: "2026-11-10T19:00:00Z" }] });
+  const result = evaluateApproval({ ...base, timeline: [{ id: 22, event: "labeled" }, { event: "committed", sha: "def456" }], rulesCommitIds: ["def456"] });
   assert.equal(result.pass, false);
   assert.match(result.reason, /approval is stale; re-apply the label after reviewing the latest diff/);
 });
