@@ -1464,12 +1464,13 @@ export function createCommunicationsSiteRouter(deps) {
       } else {
         for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) add(file.name + " upload to WordPress " + destination, "FAIL", null, "Skipped because upload_files capability or TEST page creation was not confirmed.");
       }
+      if (requestedStep === "all" || selectedDestination === "cpanel-folder") {
       try {
         const cp = cpanelConfig(env);
         const directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
         const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
         add("cPanel upload directory read", "PASS", listing.__httpStatus, "");
-        for (const file of mediaTests) {
+        for (const file of selectedMediaTests) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "." + file.filename;
           try {
             const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
@@ -1491,7 +1492,8 @@ export function createCommunicationsSiteRouter(deps) {
         }
       } catch (error) {
         add("cPanel upload directory read", "FAIL", error.httpStatus || 0, error.message);
-        for (const file of mediaTests) add(file.name + " upload to cPanel folder", "FAIL", null, "Skipped because the existing cPanel uploads directory could not be read.");
+        for (const file of selectedMediaTests) add(file.name + " upload to cPanel folder", "FAIL", null, "Skipped because the existing cPanel uploads directory could not be read.");
+      }
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
