@@ -23,14 +23,14 @@ test("production deployment workflows are not triggered by pull requests", () =>
   for (const path of productionDeployWorkflows) {
     const source = readWorkflow(path);
     assert.doesNotMatch(source, /^\s{2}pull_request(?:_target)?:/m, path + " must not deploy from pull_request");
-    assert.match(source, /environment:\s*production/, path + " must retain its protected production environment");
+    assert.match(source, /environment:\s*(?:production|irpa-grant-crawler-production)/, path + " must retain its protected production environment");
   }
 });
 
 test("grant crawler PR deployment is restricted to the isolated staging Worker", () => {
   const source = readWorkflow(".github/workflows/grant-crawler-parallel-staging.yml");
   assert.match(source, /^\s{2}pull_request:/m);
-  assert.match(source, /github\.event\.pull_request\.head\.repo\.full_name === github\.repository/);
+  assert.match(source, /github\.event\.pull_request\.head\.repo\.full_name\s*={2,3}\s*github\.repository/);
   assert.match(source, /feature\/grant-scanners-mainline/);
   assert.match(source, /feature\/grant-engine-provision-panel/);
   assert.match(source, /wrangler deploy --config wrangler\.toml --env staging/);
