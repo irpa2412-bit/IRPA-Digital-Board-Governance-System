@@ -6,8 +6,11 @@ on:
     paths:
       - "src/pages/CommunicationMediaPortal.jsx"
       - "src/pages/CommunicationsSocialStudio.jsx"
+      - "src/pages/CommunicationsWebsiteStudio.jsx"
       - "src/utils/socialStudioPolicy.js"
+      - "src/utils/socialAcceptanceRunner.js"
       - "tests/social-studio-policy.test.mjs"
+      - "tests/social-acceptance-runner.test.mjs"
       - "src/pages/CommunicationMediaOperations.jsx"
       - "src/pages/SocialMediaAccounts.jsx"
       - "firestore.rules"
@@ -29,6 +32,12 @@ on:
     branches: [main]
     paths:
       - "src/pages/CommunicationMediaPortal.jsx"
+      - "src/pages/CommunicationsSocialStudio.jsx"
+      - "src/pages/CommunicationsWebsiteStudio.jsx"
+      - "src/utils/socialStudioPolicy.js"
+      - "src/utils/socialAcceptanceRunner.js"
+      - "tests/social-studio-policy.test.mjs"
+      - "tests/social-acceptance-runner.test.mjs"
       - "src/pages/CommunicationMediaOperations.jsx"
       - "src/pages/SocialMediaAccounts.jsx"
       - "firestore.rules"
