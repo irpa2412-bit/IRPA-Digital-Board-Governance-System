@@ -1,0 +1,56 @@
+name: Social Studio Six-Platform Self-Test CI
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/ReleaseReadiness.jsx"
+      - "src/pages/CommunicationsWebsiteStudio.jsx"
+      - "src/pages/CommunicationsSocialStudio.jsx"
+      - "drive-gateway/src/socialPublishing.mjs"
+      - "drive-gateway/src/communicationsRoutes.mjs"
+      - "src/utils/socialStudioPolicy.js"
+      - "tests/social-studio-policy.test.mjs"
+      - "tests/communication-media-policy.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/social-studio-self-test.yml"
+  push:
+    branches:
+      - "test/social-studio-six-platform-self-test-20261110"
+    paths:
+      - "src/components/ReleaseReadiness.jsx"
+      - "src/pages/CommunicationsWebsiteStudio.jsx"
+      - "src/pages/CommunicationsSocialStudio.jsx"
+      - "drive-gateway/src/socialPublishing.mjs"
+      - "drive-gateway/src/communicationsRoutes.mjs"
+      - "src/utils/socialStudioPolicy.js"
+      - "tests/social-studio-policy.test.mjs"
+      - "tests/communication-media-policy.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/social-studio-self-test.yml"
+permissions:
+  contents: read
+concurrency:
+  group: social-studio-self-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  social-studio-self-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run Social Studio policy and six-platform self-test contract
+        run: npm run test:social-studio
+      - name: Run Communication & Media regression tests
+        run: npm run test:communication-media
+      - name: Build application
+        run: npm run build

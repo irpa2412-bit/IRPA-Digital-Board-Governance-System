@@ -19,6 +19,39 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
   try{
    const health=await call("/health","GET",undefined,true);
    add("TEST Worker health",health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",health.httpStatus,health.error||health.data?.status||"");
+   const socialPlatforms=[
+    ["facebook","Facebook"],["instagram","Instagram"],["linkedin","LinkedIn"],
+    ["x","X"],["youtube","YouTube"],["whatsapp","WhatsApp Business"]
+   ];
+   let socialStatus={httpStatus:0,data:{}};
+   try{socialStatus=await call("/api/communications/social/status","GET",undefined,true);}
+   catch(error){socialStatus={httpStatus:error.httpStatus||0,data:{},error:error.message||"Social status request failed."};}
+   const socialData=socialStatus.data||{};
+   const platformRows=Array.isArray(socialData.platforms)?socialData.platforms:[];
+   for(let index=0;index<socialPlatforms.length;index++){
+    const [platform,label]=socialPlatforms[index];
+    const row=platformRows.find(item=>item.platform===platform);
+    try{
+     const exported=await call("/api/communications/social/export","POST",{
+      platform,content:{text:"TEST — IRPA Social Studio self-test",url:"https://irpa.or.tz",hashtags:["#IRPA"]}
+     },true);
+     const data=exported.data||{};
+     const passed=socialStatus.httpStatus===200&&Boolean(row&&row.mode==="manual-export"&&row.automaticPublishing===false)&&
+      exported.httpStatus===200&&data.ok===true&&data.mode==="manual-export"&&data.platform===platform;
+     const detail="Detail: status HTTP "+socialStatus.httpStatus+"; "+
+      (row?"adapter mode="+String(row.mode)+"; automaticPublishing="+String(row.automaticPublishing)+"; connection="+String(row.status):"platform status missing")+
+      "; export="+String(data.reason||data.error||"No export detail returned.")+
+      "; no external post was sent.";
+     add("Step "+(index+1)+"/6 TEST Social Studio "+label,passed?"PASS":"FAIL",exported.httpStatus,
+      passed?"":String(data.error||socialStatus.error||"Platform manual-export self-test failed."),detail);
+    }catch(error){
+     add("Step "+(index+1)+"/6 TEST Social Studio "+label,"FAIL",error.httpStatus||0,error.message||"Social export test failed.","Detail: authenticated manual-export route could not be verified.");
+    }
+   }
+   const pausePassed=socialStatus.httpStatus===200&&socialData.pauseAllPublishing===true;
+   add("TEST Social Studio global publishing pause",pausePassed?"PASS":"FAIL",socialStatus.httpStatus,
+    pausePassed?"":String(socialStatus.error||"Publishing pause is not confirmed."),
+    "Detail: pauseAllPublishing="+String(socialData.pauseAllPublishing)+"; no external publishing request was made.");
    const reads=[
     ["TEST WordPress connection and capability read","/api/communications/site/status"],
     ["TEST WordPress pages read","/api/communications/website/content?type=pages"],
