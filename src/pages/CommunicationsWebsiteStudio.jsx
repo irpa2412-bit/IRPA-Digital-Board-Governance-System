@@ -5,12 +5,21 @@ const GATEWAY=getGoogleDriveGatewayUrl();
 const SECRETS=["WORDPRESS_BASE_URL","WORDPRESS_USERNAME","WORDPRESS_APPLICATION_PASSWORD"];
 const styles={panel:{border:"1px solid var(--border-color,#d5dce5)",borderRadius:12,padding:14,display:"grid",gap:10,background:"var(--surface,#fff)"},field:{width:"100%",boxSizing:"border-box",padding:10,border:"1px solid var(--border-color,#cbd5e1)",borderRadius:8,font:"inherit",background:"var(--input-bg,#fff)",color:"var(--text-primary,#172033)"},button:{padding:"10px 12px",borderRadius:8,border:"1px solid var(--border-color,#cbd5e1)",font:"inherit",fontWeight:650,background:"var(--surface-elevated,#f8fafc)",color:"var(--text-primary,#172033)"},primary:{padding:"10px 12px",borderRadius:8,border:"1px solid #1d4ed8",font:"inherit",fontWeight:700,background:"#1d4ed8",color:"#fff"}};
 export default function CommunicationsWebsiteStudio({initialTab="pages"}){
+ const [maintenanceAllowed,setMaintenanceAllowed]=useState(false),[maintenanceDir,setMaintenanceDir]=useState(""),[maintenanceEntries,setMaintenanceEntries]=useState([]),[maintenancePath,setMaintenancePath]=useState(""),[maintenanceOriginal,setMaintenanceOriginal]=useState(""),[maintenanceContent,setMaintenanceContent]=useState(""),[maintenanceReason,setMaintenanceReason]=useState(""),[maintenanceBackup,setMaintenanceBackup]=useState(""),[maintenanceHistory,setMaintenanceHistory]=useState([]),[maintenanceConfirmation,setMaintenanceConfirmation]=useState(""),[maintenanceDiff,setMaintenanceDiff]=useState(false),[maintenanceHealth,setMaintenanceHealth]=useState(null);
  const LOCAL_DRAFT_KEY="irpaWebsiteStudioDraft:v1";
  const [status,setStatus]=useState(null),[type,setType]=useState("pages"),[items,setItems]=useState([]),[edit,setEdit]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(LOCAL_DRAFT_KEY)||"null")?.edit||null}catch{return null}}),[newPost,setNewPost]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(LOCAL_DRAFT_KEY)||"null")?.newPost||null}catch{return null}}),[taxonomies,setTaxonomies]=useState({categories:[],tags:[]}),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[uploadProgress,setUploadProgress]=useState([]),[approvalReady,setApprovalReady]=useState(null),[seoCapabilities,setSeoCapabilities]=useState(null),[mediaDestination,setMediaDestination]=useState("media-library"),[mediaParentId,setMediaParentId]=useState(""),[mediaParentType,setMediaParentType]=useState("posts"),[mediaFolder,setMediaFolder]=useState("uploads/irpa-media"),[mediaResults,setMediaResults]=useState([]),[acceptanceReport,setAcceptanceReport]=useState(null),[captionDiagnostic,setCaptionDiagnostic]=useState(false),[activeTab,setActiveTab]=useState(initialTab);
  useEffect(()=>{try{if(newPost||edit)sessionStorage.setItem(LOCAL_DRAFT_KEY,JSON.stringify({newPost,edit,savedAt:Date.now()}));else sessionStorage.removeItem(LOCAL_DRAFT_KEY)}catch{}},[newPost,edit]);
  async function call(path,method="GET",payload,withStatus=false){if(!auth.currentUser)throw Error("Sign in to use Website Studio.");let tokenTimer;const token=await Promise.race([auth.currentUser.getIdToken(),new Promise((_,reject)=>{tokenTimer=setTimeout(()=>reject(new Error("Sign-in token request timed out. Please sign in again.")),8000)})]).finally(()=>clearTimeout(tokenTimer));let r;try{r=await fetch(GATEWAY+path,{method,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(payload?{"Content-Type":"application/json"}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:AbortSignal.timeout(32000)})}catch(e){if(e?.name==="TimeoutError"||e?.name==="AbortError")throw Error("The gateway did not respond within 32 seconds. The request was stopped; retry once and inspect the gateway health if it repeats.");throw Error("Could not reach the Cloudflare gateway: "+(e?.message||"network error"))}const data=await r.json().catch(()=>({}));if(withStatus)return {httpStatus:r.status,data,error:r.ok?"":data.error||"Request failed ("+r.status+")."};if(!r.ok){const error=new Error(data.error||"Request failed ("+r.status+").");error.data=data;error.httpStatus=r.status;throw error;}return data}
  async function connect(){setBusy(true);setMessage("");try{const d=await call("/api/communications/site/status");const connections=d.connections||{};let cpanelDiagnostics=null;if(connections.cpanel==="connected"){try{cpanelDiagnostics=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(connections.configuredWordPressHost||"irpa.or.tz"));}catch(error){cpanelDiagnostics={readOnly:true,error:error.message||"cPanel diagnostics unavailable."};}}setStatus({...connections,cpanelDiagnostics});const website=String(connections.website||"unavailable");const cpanel=String(connections.cpanel||"unavailable");setMessage("Connection diagnostics received. WordPress: "+website.replace(/_/g," ")+". cPanel: "+cpanel.replace(/_/g," ")+".");}catch(e){setStatus(null);setMessage(e.message||"Connection check failed.")}finally{setBusy(false)}}
  useEffect(()=>{void connect()},[]);
+ useEffect(()=>{let alive=true;call("/api/communications/cpanel/maintenance/files").then(data=>{if(alive){setMaintenanceAllowed(true);setMaintenanceEntries(data.entries||[]);}}).catch(()=>{if(alive)setMaintenanceAllowed(false)});return()=>{alive=false}},[]);
+ async function maintenanceList(dir=maintenanceDir){setBusy(true);try{const data=await call("/api/communications/cpanel/maintenance/files?dir="+encodeURIComponent(dir));setMaintenanceDir(dir);setMaintenanceEntries(data.entries||[]);setMaintenancePath("");setMaintenanceContent("");setMaintenanceOriginal("");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceRead(path){setBusy(true);try{const data=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(path));if(data.truncated)throw Error("File exceeds the 512 KiB editor limit.");setMaintenancePath(path);setMaintenanceContent(data.content||"");setMaintenanceOriginal(data.content||"");setMaintenanceBackup("");setMaintenanceDiff(false);const history=await call("/api/communications/cpanel/maintenance/history?path="+encodeURIComponent(path));setMaintenanceHistory(history.history||[]);}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceSave(){if(maintenanceReason.trim().length<10||maintenanceReason.trim().length>500){setMessage("Change reason must be 10 to 500 characters.");return;}setMaintenanceDiff(true);setBusy(true);try{const result=await call("/api/communications/cpanel/maintenance/files","PUT",{path:maintenancePath,content:maintenanceContent,reason:maintenanceReason.trim()});setMaintenanceBackup(result.backupId||"");setMaintenanceOriginal(maintenanceContent);const history=await call("/api/communications/cpanel/maintenance/history?path="+encodeURIComponent(maintenancePath));setMaintenanceHistory(history.history||[]);setMessage("Saved. Snapshot created before write; rollback is available.");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceRollback(){if(!maintenanceBackup)return;setBusy(true);try{await call("/api/communications/cpanel/maintenance/rollback","POST",{path:maintenancePath,backupId:maintenanceBackup,reason:maintenanceReason.trim()});await maintenanceRead(maintenancePath);setMessage("Rollback completed; exact snapshot bytes restored.");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenancePromote(){if(maintenanceConfirmation!=="PROMOTE TO LIVE"){setMessage("Type PROMOTE TO LIVE exactly.");return;}if(maintenanceReason.trim().length<10||maintenanceReason.trim().length>500){setMessage("Change reason must be 10 to 500 characters.");return;}setBusy(true);try{const result=await call("/api/communications/cpanel/maintenance/promote","POST",{path:maintenancePath,reason:maintenanceReason.trim(),confirmation:maintenanceConfirmation});setMessage(result.message||"Promoted to live.");setMaintenanceConfirmation("");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceLoadHealth(){setBusy(true);try{const domain=status?.configuredWordPressHost||"irpa.or.tz";const data=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain));setMaintenanceHealth(data);}catch(error){setMaintenanceHealth({error:error.message})}finally{setBusy(false)}}
+
  async function runProductionAcceptance(){
   setBusy(true);setMessage("");setAcceptanceReport(null);
   const rows=[];
@@ -58,7 +67,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
     ["TEST WordPress posts read","/api/communications/website/content?type=posts"],
     ["TEST WordPress categories and tags read","/api/communications/website/taxonomies"],
     ["TEST WordPress SEO capability read","/api/communications/website/seo-capabilities"],
-    ["TEST cPanel root directory read","/api/communications/cpanel/files"]
+    ["TEST cPanel root directory read","/api/communications/cpanel/maintenance/files"]
    ];
    let cpanelEntries=[];
    for(const [label,path] of reads){
@@ -75,9 +84,40 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
    }
    const readableFile=cpanelEntries.find(entry=>entry.type==="file");
    if(readableFile){
-    try{const result=await call("/api/communications/cpanel/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);add("TEST cPanel website file content read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    try{const result=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);add("TEST cPanel website file content read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
     catch(error){add("TEST cPanel website file content read","FAIL",error.httpStatus||0,error.message||"File read failed.");}
    }else add("TEST cPanel website file content read","FAIL",null,"No safe HTML/CSS/TXT/JSON file was returned by the read-only directory listing.");
+   const maintenanceTestPath="portal-test/TEST-IRPA-MAINTENANCE.txt";
+   let maintenanceBackupId="";
+   if(readableFile){
+    try{
+     const read=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);
+     add("Step 1/5 TEST read staging file",read.httpStatus>=200&&read.httpStatus<300?"PASS":"FAIL",read.httpStatus,read.error||read.data?.error||"", "Read staging/"+readableFile.name);
+    }catch(error){add("Step 1/5 TEST read staging file","FAIL",error.httpStatus||0,error.message||"Staging read failed.","Read-only request.");}
+   }else add("Step 1/5 TEST read staging file","FAIL",null,"No safe staging file was listed.","Read-only request.");
+   try{
+    const edited=await call("/api/communications/cpanel/maintenance/files","PUT",{path:maintenanceTestPath,content:"TEST ONLY — Website Maintenance acceptance file; retained after rollback.",reason:"TEST acceptance: verify snapshot, write and rollback workflow."},true);
+    maintenanceBackupId=edited.data?.backupId||"";
+    add("Step 2/5 TEST edit staging/portal-test file",edited.httpStatus===200&&Boolean(maintenanceBackupId)?"PASS":"FAIL",edited.httpStatus,edited.error||edited.data?.error||"", "TEST file written; snapshot ID returned="+String(Boolean(maintenanceBackupId)));
+   }catch(error){add("Step 2/5 TEST edit staging/portal-test file","FAIL",error.httpStatus||0,error.message||"TEST edit failed.");}
+   if(maintenanceBackupId){
+    try{
+     const snapshot=await call("/api/communications/cpanel/maintenance/snapshot?path="+encodeURIComponent(maintenanceTestPath)+"&backupId="+encodeURIComponent(maintenanceBackupId),"GET",undefined,true);
+     add("Step 3/5 TEST snapshot exists",snapshot.httpStatus===200&&snapshot.data?.exists===true?"PASS":"FAIL",snapshot.httpStatus,snapshot.error||snapshot.data?.error||"", "Snapshot exists="+String(snapshot.data?.exists));
+    }catch(error){add("Step 3/5 TEST snapshot exists","FAIL",error.httpStatus||0,error.message||"Snapshot verification failed.");}
+    try{
+     const rolled=await call("/api/communications/cpanel/maintenance/rollback","POST",{path:maintenanceTestPath,backupId:maintenanceBackupId,reason:"TEST acceptance: verify exact rollback."},true);
+     add("Step 4/5 TEST roll back staging file",rolled.httpStatus===200?"PASS":"FAIL",rolled.httpStatus,rolled.error||rolled.data?.error||"", "Rollback restores the pre-edit bytes; no file deletion.");
+    }catch(error){add("Step 4/5 TEST roll back staging file","FAIL",error.httpStatus||0,error.message||"Rollback failed.");}
+   }else{
+    add("Step 3/5 TEST snapshot exists","FAIL",null,"No snapshot ID was returned.");
+    add("Step 4/5 TEST roll back staging file","FAIL",null,"Skipped because no snapshot was created.");
+   }
+   try{
+    const listed=await call("/api/communications/cpanel/maintenance/files?dir=portal-test","GET",undefined,true);
+    const testFiles=(listed.data?.entries||[]).filter(entry=>entry.type==="file"&&/^TEST/i.test(entry.name));
+    add("Step 5/5 TEST list TEST files",listed.httpStatus===200&&testFiles.some(entry=>entry.name==="TEST-IRPA-MAINTENANCE.txt")?"PASS":"FAIL",listed.httpStatus,listed.error||listed.data?.error||"", "TEST files returned="+testFiles.map(entry=>entry.name).join(", "));
+   }catch(error){add("Step 5/5 TEST list TEST files","FAIL",error.httpStatus||0,error.message||"TEST file listing failed.");}
    try{
     const domain=connections?.configuredWordPressHost||"irpa.or.tz";
     const probe=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain),"GET",undefined,true);
@@ -248,8 +288,47 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
  const connectionLabel=value=>({not_checked:"Not checked",connected:"Connected",authentication_failed:"Authentication failed",wrong_account_role:"Wrong account role",not_configured:"Not configured",unavailable:"Unavailable",credentials_missing:"Credentials missing",authentication_rejected:"Authentication rejected",permission_denied:"Permission denied",unavailable_or_denied:"Unavailable or denied"})[String(value||"not_checked")]||String(value||"Not checked").replace(/_/g," ");
  return <section style={{display:"grid",gap:12,minWidth:0}}>
   <nav aria-label="Website Studio sections" style={{display:"flex",gap:8,flexWrap:"wrap",padding:4,borderBottom:"1px solid var(--border-color,#d5dce5)"}}>
-   {[["pages","Pages and Posts"],["media","Upload Media"],["structure","Site Structure"],["acceptance","Production Acceptance"]].map(([id,label])=><button key={id} type="button" aria-pressed={activeTab===id} style={activeTab===id?styles.primary:styles.button} onClick={()=>setActiveTab(id)}>{label}</button>)}
+   {[["pages","Pages and Posts"],["media","Upload Media"],["structure","Site Structure"],["acceptance","Production Acceptance"],...(maintenanceAllowed?[["maintenance","Website Maintenance"]]:[])].map(([id,label])=><button key={id} type="button" aria-pressed={activeTab===id} style={activeTab===id?styles.primary:styles.button} onClick={()=>setActiveTab(id)}>{label}</button>)}
   </nav>
+
+  {activeTab==="maintenance"&&maintenanceAllowed&&<>
+   <section style={styles.panel}>
+    <h3 style={{margin:0}}>Website Maintenance · staging-first</h3>
+    <p style={{margin:0}}>Administrator-only static-file editor. The browser is limited to the configured staging document root and permitted folders. PHP, configuration files, WordPress core folders, uploads and executables are blocked. Maximum file size: 512 KiB.</p>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" style={styles.button} disabled={busy||!maintenanceDir} onClick={()=>void maintenanceList("")}>Staging root</button>
+     <button type="button" style={styles.button} disabled={busy||!maintenanceDir} onClick={()=>void maintenanceList(maintenanceDir.split("/").slice(0,-1).join("/"))}>Up one folder</button>
+     <button type="button" style={styles.button} disabled={busy} onClick={()=>void maintenanceLoadHealth()}>Refresh read-only health</button>
+    </div>
+    <strong>Staging folder: /{maintenanceDir||""}</strong>
+    <div style={{display:"grid",gap:6}}>
+     {maintenanceEntries.map(row=><div key={row.name} style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",borderTop:"1px solid var(--border-color,#d5dce5)",paddingTop:6}}>
+      <span>{row.type==="dir"?"📁":"📄"} {row.name} {row.size?("· "+row.size+" bytes"):""}</span>
+      {row.type==="dir"?<button type="button" style={styles.button} onClick={()=>void maintenanceList(maintenanceDir?maintenanceDir+"/"+row.name:row.name)}>Open</button>:<button type="button" style={styles.button} onClick={()=>void maintenanceRead(maintenanceDir?maintenanceDir+"/"+row.name:row.name)}>Edit</button>}
+     </div>)}
+     {!maintenanceEntries.length&&<p>No permitted files or folders found.</p>}
+    </div>
+   </section>
+   {maintenancePath&&<section style={styles.panel}>
+    <h3 style={{margin:0}}>Editing staging/{maintenancePath}</h3>
+    <label>File content<textarea style={{...styles.field,minHeight:220,fontFamily:"monospace"}} value={maintenanceContent} onChange={e=>{setMaintenanceContent(e.target.value);setMaintenanceDiff(true)}}/></label>
+    <label>Change reason (10–500 characters)<textarea style={styles.field} value={maintenanceReason} maxLength={500} onChange={e=>setMaintenanceReason(e.target.value)} placeholder="Explain why this change is necessary"/></label>
+    <p style={{margin:0}}>Diff preview · {maintenanceOriginal.length} original characters → {maintenanceContent.length} proposed characters</p>
+    {maintenanceDiff&&<pre style={{whiteSpace:"pre-wrap",maxHeight:240,overflow:"auto",padding:10,background:"var(--surface-elevated,#f8fafc)"}}>{maintenanceOriginal===maintenanceContent?"No content changes.": "BEFORE:\n"+maintenanceOriginal+"\n\nAFTER:\n"+maintenanceContent}</pre>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" style={styles.primary} disabled={busy||maintenanceContent===maintenanceOriginal} onClick={()=>void maintenanceSave()}>Save staging file</button>
+     <button type="button" style={styles.button} disabled={busy||!maintenanceBackup} onClick={()=>void maintenanceRollback()}>Rollback last save</button>
+    </div>
+    <label>Promote confirmation — type PROMOTE TO LIVE<input style={styles.field} value={maintenanceConfirmation} onChange={e=>setMaintenanceConfirmation(e.target.value)}/></label>
+    <button type="button" style={styles.button} disabled={busy||maintenanceConfirmation!=="PROMOTE TO LIVE"} onClick={()=>void maintenancePromote()}>Promote to live (snapshot first)</button>
+    <h4>Edit history</h4>{maintenanceHistory.map((row,index)=><div key={row.updatedAt||index} style={{borderTop:"1px solid var(--border-color,#d5dce5)",paddingTop:6}}>{row.updatedAt||"Time not exposed"} · {row.updatedByUid||"User not exposed"} · {row.reason||"Reason not recorded"} · Snapshot {row.rollbackBackupId||"not exposed"}</div>)}
+   </section>}
+   <section style={styles.panel}>
+    <h3 style={{margin:0}}>Read-only website health</h3>
+    <p>WordPress core updates: not exposed. Plugin updates: not exposed. Theme updates: not exposed by the available authenticated REST API. This panel is read-only; no update actions are available.</p>
+    {maintenanceHealth? <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{JSON.stringify({phpVersion:maintenanceHealth.phpVersion||{status:"not exposed"},ssl:maintenanceHealth.ssl||{status:"not exposed"},diskUsage:maintenanceHealth.diskUsage||{status:"not exposed"},errorLog:maintenanceHealth.errorLog||{status:"not exposed"},phpLimits:maintenanceHealth.phpLimits||{status:"not exposed"},error:maintenanceHealth.error||null},null,2)}</pre>:<p>Health details have not been loaded.</p>}
+   </section>
+  </>}
   {activeTab==="media"&&<>
   <section style={styles.panel}><h3 style={{margin:0}}>Media upload and register</h3><p style={{margin:0}}>WordPress upload_files capability: {status?.websiteAccount?.uploadFilesCapability||"not yet checked"} · PHP upload_max_filesize: {status?.cpanelDiagnostics?.phpLimits?.upload_max_filesize||"not readable"} · post_max_size: {status?.cpanelDiagnostics?.phpLimits?.post_max_size||"not readable"}</p><p style={{margin:0}}>Permitted: JPG, PNG, WebP, GIF, sanitised SVG, MP4, MOV, WebM, MP3, PDF, DOCX, XLSX and PPTX. cPanel limit: 50 MB per file; larger videos must use a YouTube/Vimeo HTTPS link. Executables are rejected. Large files are sent in chunks to the cPanel upload route.</p><label>Required destination<select style={styles.field} value={mediaDestination} onChange={e=>setMediaDestination(e.target.value)}><option value="media-library">WordPress Media Library</option><option value="attach">Attach to selected page/post</option><option value="featured">Set as featured image</option><option value="cpanel-folder">cPanel folder</option></select></label>{mediaDestination==="attach"||mediaDestination==="featured"? <><label>Target type<select style={styles.field} value={mediaParentType} onChange={e=>setMediaParentType(e.target.value)}><option value="posts">Post</option><option value="pages">Page</option></select></label><label>Existing WordPress page/post ID<input style={styles.field} inputMode="numeric" value={mediaParentId} onChange={e=>setMediaParentId(e.target.value)} placeholder="Enter existing ID"/></label></>:null}{mediaDestination==="cpanel-folder"?<label>Relative cPanel folder and filename parent<input style={styles.field} value={mediaFolder} onChange={e=>setMediaFolder(e.target.value)} placeholder="uploads/irpa-media"/></label>:null}<label>Select multiple files<input style={styles.field} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,.mov,.webm,.mp3,.pdf,.docx,.xlsx,.pptx" disabled={busy} onChange={e=>{void uploadGeneralFiles(e.target.files);e.target.value=""}}/></label>{uploadProgress.map(row=><div key={row.key} role="status" style={{fontSize:12}}>{row.name}: {row.status}</div>)}{mediaResults.map((row,i)=><div key={row.name+"-"+i} style={{borderTop:"1px solid var(--border-color,#d5dce5)",paddingTop:6,display:"grid",gap:4}}><strong>{row.name} · {row.status}</strong>{row.url?<><a href={row.url} target="_blank" rel="noreferrer">{row.url}</a><button style={styles.button} type="button" onClick={()=>navigator.clipboard.writeText(row.url)}>Copy link</button></>:null}{row.sha256?<small>SHA-256: {row.sha256} · {row.size} bytes</small>:null}{row.mediaId?<strong>WordPress media ID: {row.mediaId}</strong>:null}{row.error?<><span>{row.error}</span><button style={styles.button} type="button" disabled={busy} onClick={()=>void uploadGeneralFiles([row.file])}>Retry upload</button></>:null}</div>)}</section>
   </>}

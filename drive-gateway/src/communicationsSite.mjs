@@ -11,7 +11,8 @@ const REVIEW_ROLES = new Set([
   "Executive Director", "Director Outreach", "Outreach Director",
   "Director Community Development", "Community Development Director", "Approver", "Administrator"
 ]);
-const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json"]);
+const EDITABLE_EXTENSIONS = new Set([".html", ".htm", ".css", ".txt", ".json", ".xml"]);
+const WEBSITE_MAINTENANCE_FOLDERS = new Set(["portal-test", "assets", "css", "images", "documents", "downloads", "fonts"]);
 const MAX_EDIT_BYTES = 512 * 1024;
 const WEBSITE_EDITOR_ROLES = new Set(["Administrator", "Communications Officer", "Executive Director"]);
 const WEBSITE_EDITOR_ROLE_ALIASES = new Map([
@@ -108,6 +109,25 @@ function safeCpanelPath(input, root) {
   const base = String(root || "public_html").replace(/^\/+|\/+$/g, "");
   return { dir: base + (raw.includes("/") ? "/" + raw.split("/").slice(0, -1).join("/") : ""), file: filename, relative: raw };
 }
+function safeWebsiteMaintenancePath(input, root) {
+  const raw = String(input || "").replace(/\\/g, "/").trim();
+  const segments = raw.split("/");
+  if (!raw || raw.startsWith("/") || raw.includes("\0") || segments.some(part => !part || part === "." || part === ".." || part.startsWith("."))) throw new Error("Invalid website file path.");
+  const filename = segments[segments.length - 1], dot = filename.lastIndexOf("."), ext = dot >= 0 ? filename.slice(dot).toLowerCase() : "";
+  if (segments.some(part => /^(wp-admin|wp-includes|uploads)$/i.test(part)) || ["wp-config.php", ".htaccess", ".user.ini"].includes(filename.toLowerCase()) ||
+      /\.(php\d*|phtml|phar|cgi|pl|sh|exe|dll|so|bin|bat|cmd|com|msi|htaccess|ini)$/i.test(filename) || !EDITABLE_EXTENSIONS.has(ext)) throw new Error("Invalid website file path.");
+  if (segments.length > 1 && !WEBSITE_MAINTENANCE_FOLDERS.has(segments[0])) throw new Error("Invalid website file path.");
+  const base = String(root || "public_html").replace(/^\/+|\/+$/g, "");
+  return { dir: base + (raw.includes("/") ? "/" + segments.slice(0, -1).join("/") : ""), file: filename, relative: raw };
+}
+function safeWebsiteMaintenanceDirectory(input, root) {
+  const raw = String(input || "").replace(/\\/g, "/").trim();
+  if (!raw) return String(root || "public_html").replace(/^\/+|\/+$/g, "");
+  const segments = raw.split("/");
+  if (raw.startsWith("/") || raw.includes("\0") || segments.length !== 1 || segments.some(part => !part || part === "." || part === ".." || part.startsWith(".") || !/^[A-Za-z0-9 _.-]{1,120}$/.test(part)) || !WEBSITE_MAINTENANCE_FOLDERS.has(segments[0])) throw new Error("Invalid website directory path.");
+  return String(root || "public_html").replace(/^\/+|\/+$/g, "") + "/" + raw;
+}
+
 function safeCpanelDirectory(input, root) {
   const raw = String(input || "").replace(/\\/g, "/").trim();
   if (!raw) return String(root || "public_html").replace(/^\/+|\/+$/g, "");
@@ -146,6 +166,14 @@ export function createCommunicationsSiteRouter(deps) {
       throw new Error("Your registered IRPA role does not permit this website-management action.");
     }
     return { claims, roles };
+  }
+
+  async function websiteMaintenanceAdminAuthorised(request, env) {
+    const claims = await authenticateFirebaseRequest(request, env);
+    const adminDocument = await getFirestoreDocument(env, "adminProfiles/" + claims.user_id, claims.token);
+    const adminProfile = firestoreDocumentToPlain(adminDocument);
+    if (adminProfile?.active !== true) throw new Error("Website Maintenance is restricted to active administrators.");
+    return { claims, roles: ["Administrator"], admin: true };
   }
 
   async function websiteEditorAuthorised(request, env) {
@@ -1760,7 +1788,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (!/^[a-z0-9.-]{1,253}$/.test(domain) || domain.startsWith(".") || domain.endsWith(".")) {
         return json({ error: "A valid website domain is required for cPanel read-only diagnostics." }, 400, corsHeaders(request));
       }
-      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null } };
+      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null }, phpVersion: { value: null, status: "not exposed" }, diskUsage: { value: null, status: "not exposed" }, errorLog: { lines: [], status: "not exposed" } };
       const extractRows = value => {
         const candidates = [value, value?.data, value?.data?.certificates, value?.certificates, value?.data?.[0]?.data, value?.data?.data];
         return candidates.filter(Array.isArray).flatMap(rows => rows).filter(row => row && typeof row === "object");
@@ -1845,6 +1873,24 @@ export function createCommunicationsSiteRouter(deps) {
         diagnostic: limits.upload && limits.post ? null : "INFO: cPanel did not return both directives. Verify the account's LangPHP UAPI permission and the domain's MultiPHP INI Editor configuration; if the provider restricts this API, confirm the values in cPanel manually.",
         detail: phpLimitErrors.length ? phpLimitErrors.join("; ").slice(0, 200) : null
       };
+      try {
+        const response = await cpanelCall(cp, "LangPHP/php_get_vhost_versions", { vhost: domain });
+        const match = JSON.stringify(response.data || response).match(/(?:phpversion|version)[^0-9]*(\d+\.\d+(?:\.\d+)?)/i);
+        if (match) result.phpVersion = { value: match[1], status: "available", httpStatus: response.__httpStatus };
+      } catch {}
+      try {
+        const response = await cpanelCall(cp, "Quota/get_quota_info");
+        const match = JSON.stringify(response.data || response).match(/(?:diskused|disk_used|used)[^0-9]*(\d+(?:\.\d+)?\s*(?:MB|GB|KB|bytes?)?)/i);
+        if (match) result.diskUsage = { value: match[1], status: "available", httpStatus: response.__httpStatus };
+      } catch {}
+      try {
+        const response = await cpanelCall(cp, "Stats/get_error_log", { domain });
+        const raw = response.data?.log || response.data?.error_log || response.data?.content || "";
+        const safeLog = String(raw).replace(/(authorization|token|password|secret|api[_-]?key)(\s*[:=]\s*)[^\s]+/gi, "$1$2[REDACTED]")
+          .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED EMAIL]");
+        if (safeLog) result.errorLog = { lines: safeLog.split(/\r?\n/).slice(-50), status: "available" };
+      } catch {}
       return json(result, 200, corsHeaders(request));
     }
 
@@ -1902,7 +1948,9 @@ export function createCommunicationsSiteRouter(deps) {
     if (path === "/api/communications/cpanel/files" && request.method === "PUT") {
       const { claims } = await authorised(request, env, true);
       const input = await request.json().catch(() => ({}));
-      const safe = safeCpanelPath(input.path, cpanelConfig(env).documentRoot);
+      let safe;
+      try { safe = safeCpanelPath(input.path, cpanelConfig(env).documentRoot); }
+      catch { return json({ error: "Invalid website file path." }, 400, corsHeaders(request)); }
       const content = String(input.content ?? "");
       if (new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES) return json({ error: "Website file exceeds the 512 KB edit limit." }, 413, corsHeaders(request));
       const cp = cpanelConfig(env);
@@ -1918,6 +1966,133 @@ export function createCommunicationsSiteRouter(deps) {
       await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId"], auditFields, { createOnly: true });
       return json({ success: true, path: safe.relative, backupId, message: "Website file saved through cPanel. A rollback snapshot is retained for seven days; verify the public page before considering the edit complete." }, 200, corsHeaders(request));
     }
+    if (path === "/api/communications/cpanel/maintenance/files" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const cp = cpanelConfig(env);
+      const requestedPath = url.searchParams.get("path");
+      if (requestedPath !== null) {
+        const safe = safeWebsiteMaintenancePath(requestedPath, cp.documentRoot);
+        const file = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+        const content = file.data?.content ?? file.data?.[0]?.content ?? file.data?.data?.content ?? file.data?.data?.[0]?.content ?? file.data?.result?.data?.content;
+        if (typeof content !== "string") throw new Error("The selected website file could not be read.");
+        const truncated = new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES;
+        return json({ path: safe.relative, content: truncated ? "" : content, truncated }, 200, corsHeaders(request));
+      }
+      const relativeDir = String(url.searchParams.get("dir") || "");
+      const dir = safeWebsiteMaintenanceDirectory(relativeDir, cp.documentRoot);
+      const listing = await cpanelCall(cp, "Fileman/list_files", { dir });
+      const rows = listing.data?.[0]?.data || listing.data || [];
+      const entries = Array.isArray(rows) ? rows.map(row => {
+        const name = String(row.file || row.name || "");
+        const type = String(row.type || (row.is_dir ? "dir" : "file")).toLowerCase();
+        const isDirectory = ["dir", "directory", "folder"].includes(type) || row.is_dir === true;
+        const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")).toLowerCase() : "";
+        if (!name || name.startsWith(".") || /^(wp-admin|wp-includes|uploads)$/i.test(name)) return null;
+        if (isDirectory) return relativeDir === "" && WEBSITE_MAINTENANCE_FOLDERS.has(name) && /^[A-Za-z0-9 _.-]{1,120}$/.test(name) ? { name, type: "dir" } : null;
+        return EDITABLE_EXTENSIONS.has(ext) && !["wp-config.php", ".htaccess", ".user.ini"].includes(name.toLowerCase()) &&
+          !/\.(php\d*|phtml|phar|cgi|pl|sh|exe|dll|so|bin|bat|cmd|com|msi)$/i.test(name)
+          ? { name, type: "file", size: Number(row.file_size || row.size || 0) } : null;
+      }).filter(Boolean) : [];
+      return json({ directory: relativeDir, entries }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/maintenance/files" && request.method === "PUT") {
+      const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      let safe;
+      try { safe = safeWebsiteMaintenancePath(input.path, cpanelConfig(env).documentRoot); }
+      catch { return json({ error: "Invalid website file path." }, 400, corsHeaders(request)); }
+      const reason = String(input.reason || "").trim();
+      if (reason.length < 10 || reason.length > 500) return json({ error: "Change reason must be 10 to 500 characters." }, 400, corsHeaders(request));
+      const content = String(input.content ?? "");
+      if (new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES) return json({ error: "Website file exceeds the 512 KB edit limit." }, 413, corsHeaders(request));
+      const cp = cpanelConfig(env);
+      if (!env.DRIVE_KV) return json({ error: "Snapshot storage is unavailable; the file was not changed." }, 503, corsHeaders(request));
+      let priorContent = "";
+      try {
+        const prior = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+        priorContent = prior.data?.content ?? prior.data?.[0]?.content ?? prior.data?.data?.content ?? prior.data?.data?.[0]?.content ?? prior.data?.result?.data?.content ?? "";
+      } catch (error) { if (error?.diagnosticCode !== "cpanel_not_found") throw error; }
+      if (typeof priorContent !== "string") throw new Error("The current file could not be read; the file was not changed.");
+      const backupId = "cpanel-backup:" + crypto.randomUUID();
+      await env.DRIVE_KV.put(backupId, JSON.stringify({ path: safe.relative, content: priorContent }), { expirationTtl: 604800 });
+      await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content, charset: "utf-8" }, "POST");
+      const now = new Date().toISOString();
+      const audit = fields({ action: "CPANEL_STATIC_FILE_EDITED", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, bytes: new TextEncoder().encode(content).byteLength, rollbackBackupId: backupId, backupRetentionDays: 7, reason }, createdAt: now });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId, reason, actorUid: claims.user_id }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId", "reason", "actorUid"], audit, { createOnly: true });
+      return json({ success: true, path: safe.relative, backupId, diff: { before: priorContent, after: content } }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/maintenance/rollback" && request.method === "POST") {
+      const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      const backupId = String(input.backupId || ""), relative = String(input.path || ""), reason = String(input.reason || "").trim();
+      if (reason.length < 10 || reason.length > 500) return json({ error: "Change reason must be 10 to 500 characters." }, 400, corsHeaders(request));
+      if (!/^cpanel-backup:[0-9a-f-]{36}$/i.test(backupId) || !relative) return json({ error: "A valid rollback snapshot and file path are required." }, 400, corsHeaders(request));
+      if (!env.DRIVE_KV) return json({ error: "Snapshot storage is unavailable." }, 503, corsHeaders(request));
+      const backup = await env.DRIVE_KV.get(backupId, "json");
+      if (!backup || backup.path !== relative || typeof backup.content !== "string") return json({ error: "The rollback snapshot is missing, expired or does not match this file." }, 404, corsHeaders(request));
+      const cp = cpanelConfig(env), safe = safeWebsiteMaintenancePath(relative, backup.environment === "production" ? "public_html" : cp.documentRoot);
+      const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+      const currentContent = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content;
+      if (typeof currentContent !== "string") throw new Error("The current file could not be read; rollback was not applied.");
+      const safetyBackupId = "cpanel-backup:" + crypto.randomUUID();
+      await env.DRIVE_KV.put(safetyBackupId, JSON.stringify({ path: safe.relative, content: currentContent, environment: backup.environment }), { expirationTtl: 604800 });
+      await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: backup.content, charset: "utf-8" }, "POST");
+      const now = new Date().toISOString();
+      const audit = fields({ action: "CPANEL_STATIC_FILE_ROLLED_BACK", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, rollbackBackupId: backupId, safetyBackupId, reason }, createdAt: now });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId, safetyBackupId, reason, actorUid: claims.user_id }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId", "safetyBackupId", "reason", "actorUid"], audit, { createOnly: true });
+      return json({ success: true, path: safe.relative, safetyBackupId }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/maintenance/snapshot" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const backupId = String(url.searchParams.get("backupId") || ""), relative = String(url.searchParams.get("path") || "");
+      if (!/^cpanel-backup:[0-9a-f-]{36}$/i.test(backupId) || !relative) return json({ error: "A valid snapshot ID and path are required." }, 400, corsHeaders(request));
+      try { safeWebsiteMaintenancePath(relative, cpanelConfig(env).documentRoot); } catch { return json({ error: "Invalid website file path." }, 400, corsHeaders(request)); }
+      if (!env.DRIVE_KV) return json({ exists: false, status: "unavailable" }, 503, corsHeaders(request));
+      const snapshot = await env.DRIVE_KV.get(backupId, "json");
+      return json({ exists: Boolean(snapshot && snapshot.path === relative && typeof snapshot.content === "string"), path: relative, backupId }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/maintenance/history" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const relative = String(url.searchParams.get("path") || "");
+      try { safeWebsiteMaintenancePath(relative, cpanelConfig(env).documentRoot); } catch { return json({ error: "Invalid website file path." }, 400, corsHeaders(request)); }
+      const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+      if (!projectId) return json({ history: [], status: "not exposed" }, 200, corsHeaders(request));
+      const token = await getFirestoreAdminAccessToken(env);
+      const response = await fetch("https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents/cpanelFileEdits?pageSize=100", { headers: { Authorization: "Bearer " + token, Accept: "application/json" } });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) return json({ error: "Website edit history could not be read." }, 502, corsHeaders(request));
+      const history = (body.documents || []).map(doc => firestoreDocumentToPlain(doc)).filter(row => row?.path === relative).sort((x,y) => String(y.updatedAt||"").localeCompare(String(x.updatedAt||"")));
+      return json({ history }, 200, corsHeaders(request));
+    }
+
+    if (path === "/api/communications/cpanel/maintenance/promote" && request.method === "POST") {
+      const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const input = await request.json().catch(() => ({}));
+      let safe; try { safe = safeWebsiteMaintenancePath(input.path, cpanelConfig(env).documentRoot); } catch { return json({ error: "Invalid website file path." }, 400, corsHeaders(request)); }
+      if (String(input.confirmation || "") !== "PROMOTE TO LIVE") return json({ error: "Type PROMOTE TO LIVE to confirm this action." }, 400, corsHeaders(request));
+      const reason = String(input.reason || "").trim();
+      if (reason.length < 10 || reason.length > 500) return json({ error: "Change reason must be 10 to 500 characters." }, 400, corsHeaders(request));
+      const cp = cpanelConfig(env);
+      if (!env.DRIVE_KV) return json({ error: "Snapshot storage is unavailable; live file was not changed." }, 503, corsHeaders(request));
+      const staging = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+      const content = staging.data?.content ?? staging.data?.[0]?.content ?? staging.data?.data?.content ?? staging.data?.data?.[0]?.content ?? staging.data?.result?.data?.content;
+      if (typeof content !== "string" || new TextEncoder().encode(content).byteLength > MAX_EDIT_BYTES) return json({ error: "Staging file is unavailable or exceeds 512 KiB." }, 400, corsHeaders(request));
+      const live = safeWebsiteMaintenancePath(safe.relative, "public_html");
+      const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: live.dir, file: live.file });
+      const prior = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content ?? "";
+      const snapshotId = "cpanel-backup:" + crypto.randomUUID();
+      await env.DRIVE_KV.put(snapshotId, JSON.stringify({ path: safe.relative, content: prior, environment: "production" }), { expirationTtl: 604800 });
+      await cpanelCall(cp, "Fileman/save_file_content", { dir: live.dir, file: live.file, content, charset: "utf-8" }, "POST");
+      const now = new Date().toISOString();
+      const audit = fields({ action: "CPANEL_STATIC_FILE_PROMOTED", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: safe.relative, actorUid: claims.user_id, actorEmail: claims.email || "", details: { path: safe.relative, reason, snapshotId, source: "staging", destination: "live" }, createdAt: now });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: snapshotId, reason, actorUid: claims.user_id, action: "promote" }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId", "reason", "actorUid", "action"], audit, { createOnly: true });
+      return json({ success: true, path: safe.relative, snapshotId }, 200, corsHeaders(request));
+    }
+
     return null;
   }
 
@@ -1925,7 +2100,7 @@ export function createCommunicationsSiteRouter(deps) {
     try { return await handle(request, env); }
     catch (error) {
       const status = /authentication|token/i.test(String(error.message)) ? 401 :
-        /role does not permit|authorised|authorized/i.test(String(error.message)) ? 403 :
+        /role does not permit|authorised|authorized|restricted to active administrators/i.test(String(error.message)) ? 403 :
         /not found/i.test(String(error.message)) ? 404 : 502;
       return json({ error: error.message || "Website management request failed." }, status, corsHeaders(request));
     }

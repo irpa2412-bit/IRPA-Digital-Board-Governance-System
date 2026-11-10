@@ -114,7 +114,7 @@ test("website publishing enforces Firebase authentication, registered reviewer r
 
 test("cPanel access is secret-backed and static-file editor denies executable or traversal paths",()=>{
  for(const secret of ["CPANEL_BASE_URL","CPANEL_USERNAME","CPANEL_API_TOKEN"]) assert.ok(site.includes(secret),secret);
- assert.ok(site.includes('new Set([".html", ".htm", ".css", ".txt", ".json"])'));
+ assert.ok(site.includes('new Set([".html", ".htm", ".css", ".txt", ".json", ".xml"])'));
  assert.ok(site.includes('p === ".."'));
  assert.ok(site.includes("safeCpanelDirectory"));
  assert.ok(site.includes("Fileman/list_files"));
@@ -127,6 +127,12 @@ test("cPanel access is secret-backed and static-file editor denies executable or
  assert.ok(site.includes("expirationTtl: 604800"));
  assert.ok(site.includes("CPANEL_STATIC_FILE_EDITED"));
  assert.ok(site.includes("MAX_EDIT_BYTES = 512 * 1024"));
+ assert.ok(site.includes("function safeWebsiteMaintenancePath"));
+ assert.ok(site.includes("function safeWebsiteMaintenanceDirectory"));
+ assert.ok(site.includes("websiteMaintenanceAdminAuthorised"));
+ assert.ok(site.includes("PROMOTE TO LIVE"));
+ assert.ok(site.includes('error: "Invalid website file path."'));
+
  assert.ok(site.includes("function sanitizeWordPressContent(value)"));
  assert.ok(site.includes("const allowedTags = new Set"));
  assert.ok(site.includes("const allowedUrl = /^https:\\/\\//.test(decoded)"));
