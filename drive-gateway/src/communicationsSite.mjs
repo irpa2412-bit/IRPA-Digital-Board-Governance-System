@@ -1261,6 +1261,20 @@ export function createCommunicationsSiteRouter(deps) {
       const wp = websiteWordPressConfig(env);
       const requestInput = await request.json().catch(() => ({}));
       const diagnosticMode = requestInput?.diagnosticMode === true;
+      const requestedStep = String(requestInput?.step || "all");
+      const isMediaStep = requestedStep.startsWith("media:");
+      const mediaParts = isMediaStep ? requestedStep.split(":") : [];
+      const mediaKey = mediaParts[1] || "";
+      const selectedDestination = mediaParts[2] || "";
+      const mediaNameByKey = { png: "image", mp4: "video", pdf: "pdf", docx: "docx" };
+      const allowedDestinations = ["media-library", "attach", "featured", "cpanel-folder"];
+      if (!["all", "page-lifecycle", "post-lifecycle"].includes(requestedStep) &&
+          !(isMediaStep && mediaNameByKey[mediaKey] && allowedDestinations.includes(selectedDestination) && mediaParts.length === 3)) {
+        return json({ error: "Invalid production acceptance step." }, 400, corsHeaders(request));
+      }
+      const lifecycleTypes = requestedStep === "all" ? ["pages", "posts"] :
+        requestedStep === "page-lifecycle" ? ["pages"] : requestedStep === "post-lifecycle" ? ["posts"] : [];
+      const runId = /^[0-9a-f-]{36}$/i.test(String(requestInput?.runId || "")) ? String(requestInput.runId) : crypto.randomUUID();
       const report = [];
       const add = (label, status, httpStatus, error = "", detail = null) => report.push({ label: "TEST " + label, status, httpStatus: Number.isInteger(httpStatus) ? httpStatus : null, error: cleanText(error, 300) || null, detail });
       const wpRequest = async (endpoint, method = "GET", payload, headers = {}, step = endpoint, rawJsonBody = null) => {
@@ -1278,7 +1292,7 @@ export function createCommunicationsSiteRouter(deps) {
         const response = await wordpressEditorFetch(wp, url, {
           method, headers: requestHeaders,
           ...(isRawBody ? { body: payload } : rawJsonBody !== null ? { body: rawJsonBody } : payload ? { body: JSON.stringify(payload) } : {}),
-          signal: AbortSignal.timeout(30000)
+          signal: AbortSignal.timeout(60000)
         });
         const detail = response.ok ? null : await wordpressResponseDetail(response.clone(), wp, step);
         if (detail) detail.request = {
@@ -1290,7 +1304,7 @@ export function createCommunicationsSiteRouter(deps) {
         return { response, data, detail };
       };
       const stamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14) + "-" + crypto.randomUUID().slice(0, 8);
-      let testPageId = 0, testPostId = 0, uploadAllowed = false;
+      let testPageId = Number(requestInput?.pageId || 0), testPostId = Number(requestInput?.postId || 0), uploadAllowed = false;
       const cleanupItems = [];
       try {
         const user = await wpRequest("users/me?context=edit");
@@ -1334,7 +1348,7 @@ export function createCommunicationsSiteRouter(deps) {
         const passCount = report.filter(row => row.status === "PASS").length, failCount = report.filter(row => row.status === "FAIL").length;
         return json({ testRun: true, diagnosticMode: true, createdDrafts: { pageId: null, postId: null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
       }
-      for (const type of ["pages", "posts"]) {
+      for (const type of lifecycleTypes) {
         const title = "TEST: IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
         try {
@@ -1365,6 +1379,7 @@ export function createCommunicationsSiteRouter(deps) {
         { name: "pdf", filename: "pdf", mime: "application/pdf", b64: "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAxMCAxMF0gL1Jlc291cmNlcyA8PCA+PiAvQ29udGVudHMgNCAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAwID4+CnN0cmVhbQoKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyMTcgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA1IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoyNjYKJSVFT0YK" },
         { name: "docx", filename: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b64: "UEsDBBQAAAAIAONjYV15bjPX6AAAAK0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH1QyU7DMBD9FWuuKHHggBCK0wPLETiUDxjZk8SqN3nc0v49Tlt6QIXjzFv1+tXeO7GjzDYGBbdtB4KCjsaGScHn+rV5AMEFg0EXAyk4EMNq6NeHRCyqNrCCuZT0KCXrmTxyGxOFiowxeyz1zJNMqDc4kbzrunupYygUSlMWDxj6Zxpx64p42df3qUcmxyCeTsQlSwGm5KzGUnG5C+ZXSnNOaKvyyOHZJr6pBJBXExbk74Cz7r0Ok60h8YG5vKGvLPkVs5Em6q2vyvZ/mys94zhaTRf94pZy1MRcF/euvSAebfjpL49zD99QSwMEFAAAAAgA42NhXZv9N+qtAAAAKQEAAAsAAABfcmVscy8ucmVsc43POw7CMAwG4KtE3mlaBoRQ0y4IqSsqB7ASN61oHkrCo7cnAwNFDIy2f3+W6/ZpZnanECdnBVRFCYysdGqyWsClP232wGJCq3B2lgQsFKFt6jPNmPJKHCcfWTZsFDCm5A+cRzmSwVg4TzZPBhcMplwGzT3KK2ri27Lc8fBpwNpknRIQOlUB6xdP/9huGCZJRydvhmz6ceIrkWUMmpKAhwuKq3e7yCzwpuarF5sXUEsDBBQAAAAIAONjYV1lJT7+rgAAAOsAAAARAAAAd29yZC9kb2N1bWVudC54bWxFjsEKwjAMhl+l9O46PYiMbeJF8CaiD1DbqIM1KUl1+va28+DlC8lPPv52+w6jegHLQNjpZVVrBejID3jv9OW8X2y0kmTR25EQOv0B0du+nRpP7hkAk8oClGbq9COl2Bgj7gHBSkURMGc34mBTXvluJmIfmRyIZH8Yzaqu1ybYAXVRXsl/yowFXJD6w+m4U9Y5iLmEA3Ub3unJ0JoSFvLM+UXApSOb+fBzmX/P/gtQSwECFAMUAAAACADjY2FdeW4z1+gAAACtAQAAEwAAAAAAAAAAAAAAgAEAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAxQAAAAIAONjYV2b/TfqrQAAACkBAAALAAAAAAAAAAAAAACAARkBAABfcmVscy8ucmVsc1BLAQIUAxQAAAAIAONjYV1lJT7+rgAAAOsAAAARAAAAAAAAAAAAAACAAe8BAAB3b3JkL2RvY3VtZW50LnhtbFBLBQYAAAAAAwADALkAAADMAgAAAAA=" }
       ];
+      const selectedMediaTests = requestedStep === "all" ? mediaTests : isMediaStep ? mediaTests.filter(file => file.name === mediaNameByKey[mediaKey]) : [];
       const registerCpanelMediaFallback = async (file, filename, bytes) => {
         const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
         const form = new FormData();
@@ -1385,8 +1400,8 @@ export function createCommunicationsSiteRouter(deps) {
         cleanupItems.push({ kind: "TEST media", title: registerRow.title, id: registerId, url: publicUrl });
         return { registerId, publicUrl };
       };
-      if (uploadAllowed && testPageId) {
-        for (const file of mediaTests) for (const destination of ["media-library", "attach", "featured"]) {
+      if (uploadAllowed && testPageId && selectedDestination !== "cpanel-folder") {
+        for (const file of selectedMediaTests) for (const destination of (isMediaStep ? [selectedDestination] : ["media-library", "attach", "featured"])) {
           const filename = "TEST-IRPA-ACCEPTANCE-" + stamp + "-" + file.name + "-" + destination + "." + file.filename;
           try {
             const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
