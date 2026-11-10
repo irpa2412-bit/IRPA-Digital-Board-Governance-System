@@ -3450,12 +3450,12 @@
    This changes only desktop navigation sizing/positioning; routes, labels, permissions and actions remain unchanged. */
 @media screen and (min-width:761px){
   .sidebar{
-    width:170px;
+    width:180px;
     left:0;
     right:auto;
   }
   .main-area{
-    margin-left:170px;
+    margin-left:180px;
     margin-right:0;
   }
   .sidebar nav{
