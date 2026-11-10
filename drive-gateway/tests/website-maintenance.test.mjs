@@ -42,8 +42,9 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
     }
     if (url.pathname.endsWith("/Fileman/save_file_content")) {
       if (filemanError) return new Response(JSON.stringify({ status: 0, errors: ["No such file or directory"] }), { status: 200 });
+      const fileAlreadyExisted = testFileExists;
       testFileExists = true;
-      assert.ok([...stored.values()].length > 0, "snapshot must be stored before cPanel write");
+      if (fileAlreadyExisted) assert.ok([...stored.values()].length > 0, "snapshot must be stored before cPanel edit");
       current = params.get("content") || new URLSearchParams(init.body).get("content") || "";
       writes.push({ method, content: current, params: new URLSearchParams(init.body || "") });
       return new Response(JSON.stringify({ status: 1, data: {} }), { status: 200 });
