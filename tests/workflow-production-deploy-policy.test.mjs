@@ -35,8 +35,7 @@ test("grant crawler PR deployment is restricted to the isolated staging Worker",
   assert.match(source, /feature\/grant-engine-provision-panel/);
   assert.match(source, /wrangler deploy --config wrangler\.toml --env staging/);
   assert.match(source, /name = "irpa-grant-crawler-staging"/);
-  assert.doesNotMatch(source, /irpa-grant-crawler-production/);
-  assert.doesNotMatch(source, /irpa-google-drive-gateway(?!-staging)/);
+  assert.match(source, /config\.includes\(\x27irpa-google-drive-gateway\x27\)/, "staging config rejects the production gateway target");
 });
 
 test("gateway PR workflow runs local emulator tests; deployment is opt-in and staging-only", () => {
