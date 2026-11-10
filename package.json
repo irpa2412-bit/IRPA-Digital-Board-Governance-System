@@ -23,7 +23,11 @@
     "test:meta-oauth": "node --test tests/meta-oauth-staging.test.mjs",
     "check:staging-gateway-bundle": "node scripts/check-staging-gateway-bundle.mjs",
     "test:pdf-page-rendering": "node --test tests/pdf-page-rendering-diagnostics.test.mjs",
-    "test:social-studio": "node --test tests/social-studio-policy.test.mjs"
+    "test:social-studio": "node --test tests/social-studio-policy.test.mjs",
+    "check:no-billing-deps": "node scripts/check-no-billing-deps.mjs",
+    "test:no-billing-deps": "node --test tests/no-billing-deps.test.mjs",
+    "test:workflow-deployment-policy": "node --test tests/workflow-production-deploy-policy.test.mjs",
+    "test:all": "npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio"
   },
   "dependencies": {
     "firebase": "^11.10.0",

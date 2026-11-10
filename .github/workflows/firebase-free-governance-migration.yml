@@ -8,11 +8,12 @@ on:
       - "drive-gateway/**"
       - "functions/**"
       - "tests/**"
+      - "scripts/check-no-billing-deps.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/firebase-free-governance-migration.yml"
   push:
-    branches: [firebase-free-governance-migration-20261018]
+    branches: [main, firebase-free-governance-migration-20261018, ci/group-b-test-all-billing-audit-20261110]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -58,3 +59,5 @@ jobs:
         run: npm ci --prefix drive-gateway
       - name: Run gateway regression and governance-store tests
         run: npm test --prefix drive-gateway
+      - name: Run complete root test suite and billing audit
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
