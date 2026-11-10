@@ -2161,7 +2161,7 @@ export function createCommunicationsSiteRouter(deps) {
           } catch (error) { add(item, "FAIL", error.httpStatus || 0, error.message || "TEST media cleanup failed."); }
           continue;
         }
-        if (kind === "cpanel-file" && title.startsWith("TEST") && /^portal-test\/[A-Za-z0-9 _.-]+\\.(?:html?|css|txt|json|xml)$/i.test(String(item.path || ""))) {
+        if (kind === "cpanel-file" && title.startsWith("TEST") && /^portal-test\/[A-Za-z0-9 _.-]+\.(?:html?|css|txt|json|xml)$/i.test(String(item.path || ""))) {
           try {
             const cp = cpanelConfig(env);
             if (String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase() !== "staging" || cp.documentRoot !== "public_html/staging") {
