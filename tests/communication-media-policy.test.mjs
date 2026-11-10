@@ -530,7 +530,7 @@ test("Website Maintenance requires an explicit live root and exposes read-only u
  assert.ok(site.includes("/api/communications/website/maintenance/updates"));
  assert.ok(websiteStudio.includes("TEST live document-root configuration gate"));
  assert.ok(websiteStudio.includes("TEST read-only WordPress core/plugin/theme update checks"));
- assert.ok(site.includes("Authenticated GET probes only"));
+ assert.ok(websiteStudio.includes("Authenticated GET probes only"));
  assert.ok(site.includes("not exposed"));
 });
 
