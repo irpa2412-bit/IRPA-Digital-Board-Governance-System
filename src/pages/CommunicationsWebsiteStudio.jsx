@@ -368,3 +368,5 @@ export default function CommunicationsWebsiteStudio({initialTab="pages",isAdmin=
   {message&&<div role="status" style={styles.panel} aria-live="polite">{message}</div>}
  </section>
 }
+
+// Keep administrator Website Maintenance navigation independent of read-only health checks.
