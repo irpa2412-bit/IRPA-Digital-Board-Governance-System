@@ -1,9 +1,5 @@
-import { readFile } from "node:fs/promises";
-
 const API = "https://api.github.com";
 const LABEL = "firestore-rules-approved";
-const COMMENT_MARKER = "<!-- firestore-rules-approval-gate -->";
-const REQUIRED_COMMENT = "firestore.rules changed. Production security rules deploy on merge to main. Owner approval is required: the repository owner adds the 'firestore-rules-approved' label after reviewing the diff. This label is the only approval.";
 
 function latestByTime(items) {
   return [...items].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)).at(-1);
@@ -81,22 +77,15 @@ async function apiPages(url, token) {
   return all;
 }
 
-async function loadApprovers() {
-  const raw = await readFile(".github/firestore-rules-approvers.txt", "utf8");
+async function loadApprovers(base, token) {
+  const file = await apiJson(base + "/contents/.github/firestore-rules-approvers.txt?ref=main", token);
+  if (file.encoding !== "base64" || !file.content) throw new Error("Base-branch approver allow-list was not readable.");
+  const raw = Buffer.from(file.content, "base64").toString("utf8");
   const logins = raw.split(/\r?\n/).map(line => line.replace(/#.*$/, "").trim()).filter(Boolean);
   if (!logins.includes("irpa2412-bit")) throw new Error("Approver allow-list must include repository owner irpa2412-bit.");
   return [...new Set(logins)];
 }
 
-async function upsertFailureComment({ repo, prNumber, token, reason }) {
-  const [owner, name] = repo.split("/");
-  const base = `${API}/repos/${owner}/${name}`;
-  const comments = await apiPages(`${base}/issues/${prNumber}/comments?per_page=100`, token);
-  const existing = comments.find(comment => comment.body?.includes(COMMENT_MARKER));
-  const body = [COMMENT_MARKER, REQUIRED_COMMENT, "", `Rules diff: https://github.com/${repo}/pull/${prNumber}/files`, "", `Gate result: ${reason}`].join("\n");
-  if (existing) await apiJson(`${base}/issues/comments/${existing.id}`, token, "PATCH", { body });
-  else await apiJson(`${base}/issues/${prNumber}/comments`, token, "POST", { body });
-}
 
 async function main() {
   const token = process.env.GH_TOKEN, repo = process.env.REPO, prNumber = process.env.PR_NUMBER;
@@ -110,7 +99,7 @@ async function main() {
       apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
       apiPages(`${base}/pulls/${prNumber}/commits?per_page=100`, token),
       apiPages(`${base}/issues/${prNumber}/timeline?per_page=100`, token),
-      loadApprovers()
+      loadApprovers(base, token)
     ]);
     const changedFiles = changed.map(file => file.filename);
     if (!changedFiles.includes("firestore.rules")) {
@@ -132,18 +121,11 @@ async function main() {
     });
     if (result.pass) { console.log(`PASS: ${result.reason}`); return; }
     console.error(`FAIL: ${result.reason}`);
-    await upsertFailureComment({ repo, prNumber, token, reason: result.reason });
-    console.log("Updated the single Firestore rules approval comment.");
     process.exitCode = 1;
   } catch (error) {
     const reason = `GitHub API/evidence error; fail closed. ${error.message}`;
     console.error(`::error::${reason}`);
-    try {
-      await upsertFailureComment({ repo, prNumber, token, reason });
-      console.error("Updated the single Firestore rules approval comment.");
-    } catch (commentError) {
-      console.error(`::error::Could not post/update the approval comment: ${commentError.message}`);
-    }
+
     process.exitCode = 1;
   }
 }
