@@ -568,7 +568,7 @@ test("archived social account restoration is supervised, status-preserving, reas
  assert.ok(social.includes('role="dialog"')&&social.includes('aria-modal="true"'),"restoration uses an accessible confirmation dialog");
  assert.ok(social.includes('{restoreTarget.accountName}')&&social.includes('{restoreTarget.platform}'),"dialog names the account and platform");
  assert.ok(social.includes('Reason for restoration (required)')&&social.includes('disabled={restoreBusy||!clean(restoreReason)}'),"confirmation requires a reason and has a busy/disabled state");
- assert.ok(social.includes('previousConnectionStatus=item.connectionStatus'),"archiving stores the previous account status");
+ assert.ok(social.includes('update.previousConnectionStatus=item.connectionStatus'),"archiving stores the previous account status");
  assert.ok(social.includes('activeCount=items.filter(x=>x.connectionStatus==="Active").length'),"active count excludes archived records");
  assert.ok(social.includes('className="social-media-accounts"'),"component has a scoped root class");
  assert.ok(social.includes('className="social-media-accounts__record"'),"account cards have a scoped class for wrapping");
