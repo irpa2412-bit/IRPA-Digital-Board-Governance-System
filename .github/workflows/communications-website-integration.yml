@@ -12,6 +12,8 @@ on:
       - "src/pages/SocialMediaAccounts.jsx"
       - "src/styles/social-media-accounts.css"
       - "tests/social-media-accounts-restore.rules.test.cjs"
+      - "tests/social-media-accounts-restore-layout.test.mjs"
+      - "playwright.social-accounts-restore.config.mjs"
       - "firestore.rules"
       - "drive-gateway/src/communicationsSite.mjs"
       - "drive-gateway/src/index.js"
@@ -78,6 +80,10 @@ jobs:
         run: npm run test:communication-media
       - name: Test supervised social account restoration rules in the Firestore emulator
         run: npm run test:social-accounts-restore-rules
+      - name: Install Chromium for social account layout regression
+        run: npx playwright install --with-deps chromium
+      - name: Check archived account layout at 1440px and 900px
+        run: npm run test:social-accounts-restore-layout
       - name: Run Social Studio media and approval policy tests
         run: npm run test:social-studio
       - name: Run Meta OAuth staging security regression tests
