@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createCommunicationsSiteRouter } from "../src/communicationsSite.mjs";
 
-function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "", filemanError = false } = {}) {
+function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "", filemanError = false, portalTestExists = false } = {}) {
   const stored = new Map(), events = [], writes = [], wordpressMethods = [], filemanRequests = [];
-  let current = initial, testFileExists = false;
+  let current = initial, testFileExists = false, portalFolderExists = portalTestExists;
   const router = createCommunicationsSiteRouter({
     authenticateFirebaseRequest: async () => ({ user_id: "maintenance-user", email: "maintenance@example.test", token: "test-token" }),
     getFirestoreDocument: async () => ({ active: administrator }),
@@ -26,10 +26,11 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
       const dir = params.get("dir") || "";
       const rows = dir.endsWith("/portal-test")
         ? (testFileExists ? [{ file: "maintenance-test.txt", type: "file", file_size: current.length }] : [])
-        : (testFileExists ? [{ file: "portal-test", type: "dir", is_dir: true }] : []);
+        : (portalFolderExists ? [{ file: "portal-test", type: "dir", is_dir: true }] : []);
       return new Response(JSON.stringify({ status: 1, data: [{ data: rows }] }), { status: 200 });
     }
-    if (url.pathname.endsWith("/Fileman/mkdir")) return new Response(JSON.stringify({ status: 1, data: {} }), { status: 200 });
+    if (url.pathname.endsWith("/Fileman/mkdir")) { portalFolderExists = true; return new Response(JSON.stringify({ status: 1, data: {} }), { status: 200 }); }
+    if (url.pathname.endsWith("/Fileman/delete_file")) return new Response(JSON.stringify({ status: 1, data: {} }), { status: 200 });
     if (url.pathname.includes("/wp-json/wp/v2/")) {
       wordpressMethods.push(method);
       if (url.pathname.endsWith("/plugins")) return new Response(JSON.stringify([{ version: "1.0", update_available: true }]), { status: 200 });
@@ -74,6 +75,41 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
 }
 
 
+
+
+test("maintenance self-test reuses an existing portal-test folder without mkdir", async () => {
+  const h = makeHarness({ portalTestExists: true });
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/self-test", "POST", {});
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.ok(data.report.some(row => row.name === "Create staging/portal-test" && row.status === "PASS"));
+    assert.equal(h.filemanRequests.some(row => row.operation === "mkdir"), false);
+  } finally { h.restore(); }
+});
+
+test("TEST cleanup refuses a non-TEST item even when it is in an inventory", async () => {
+  const h = makeHarness();
+  const runId = "11111111-1111-4111-8111-111111111111";
+  h.stored.set("website-maintenance-test-inventory:" + runId, {
+    runId, items: [{ kind: "TEST draft page", title: "Board-approved content", id: 743 }]
+  });
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/remove-test-items", "POST", { runId, confirmation: "REMOVE TEST ITEMS" });
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.report[0].status, "REFUSED");
+    assert.equal(h.wordpressMethods.includes("DELETE"), false);
+  } finally { h.restore(); }
+});
+
+test("TEST cleanup requires the exact typed confirmation", async () => {
+  const h = makeHarness();
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/remove-test-items", "POST", { runId: "11111111-1111-4111-8111-111111111111", confirmation: "REMOVE" });
+    assert.equal(response.status, 400);
+  } finally { h.restore(); }
+});
 
 test("maintenance self-test creates portal-test if missing and verifies TEST file lifecycle", async () => {
   const h = makeHarness({ initial: "unused original" });
