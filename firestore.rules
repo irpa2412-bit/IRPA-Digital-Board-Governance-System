@@ -631,7 +631,12 @@ service cloud.firestore {
           &&((resource.data.get("connectionStatus","")=="Pending Verification"&&request.resource.data.get("connectionStatus","") in ["Active","Suspended","Disconnected","Archived"])
             ||(resource.data.get("connectionStatus","")=="Active"&&request.resource.data.get("connectionStatus","") in ["Suspended","Disconnected","Archived"])
             ||(resource.data.get("connectionStatus","")=="Suspended"&&request.resource.data.get("connectionStatus","") in ["Active","Disconnected","Archived"])
-            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived"))
+            ||(resource.data.get("connectionStatus","")=="Disconnected"&&request.resource.data.get("connectionStatus","")=="Archived")
+            ||(resource.data.get("connectionStatus","")=="Archived"&&request.resource.data.get("connectionStatus","")=="Active"))
+          &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
+        ||(communicationMediaReviewer()
+          &&resource.data.get("connectionStatus","")=="Archived"
+          &&request.resource.data.get("connectionStatus","")=="Active"
           &&request.resource.data.diff(resource.data).affectedKeys().hasOnly(["connectionStatus","updatedByUid","updatedAt"]))
       );
     allow delete:if false;
@@ -644,7 +649,7 @@ service cloud.firestore {
       &&request.resource.data.get("platform","") in ["Facebook","Instagram","LinkedIn","X","YouTube","TikTok","WhatsApp","Telegram","Other"]
       &&request.resource.data.get("accountName","") is string
       &&request.resource.data.get("accountName","").size()<=180
-      &&request.resource.data.get("action","") in ["ENROLLED","UPDATED","STATUS_ACTIVE","STATUS_SUSPENDED","STATUS_DISCONNECTED","STATUS_ARCHIVED"]
+      &&request.resource.data.get("action","") in ["ENROLLED","UPDATED","STATUS_ACTIVE","STATUS_SUSPENDED","STATUS_DISCONNECTED","STATUS_ARCHIVED","STATUS_RESTORED"]
       &&request.resource.data.get("actorEmail","")==request.auth.token.get("email","")
       &&existsAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId))
       &&getAfter(/databases/$(database)/documents/socialMediaAccounts/$(request.resource.data.recordId)).data.get("platform","")==request.resource.data.get("platform","")
