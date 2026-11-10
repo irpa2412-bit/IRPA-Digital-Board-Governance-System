@@ -42,6 +42,7 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
     }
     if (url.pathname.endsWith("/Fileman/save_file_content")) {
       if (filemanError) return new Response(JSON.stringify({ status: 0, errors: ["No such file or directory"] }), { status: 200 });
+      // The first write provisions the TEST-only fixture; every later edit must have a prior snapshot.
       if (testFileExists) assert.ok([...stored.values()].length > 0, "snapshot must be stored before editing an existing TEST file");
       current = params.get("content") || new URLSearchParams(init.body).get("content") || "";
       testFileExists = true;
