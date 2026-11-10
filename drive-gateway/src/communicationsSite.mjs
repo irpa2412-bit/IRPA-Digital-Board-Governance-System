@@ -398,8 +398,8 @@ export function createCommunicationsSiteRouter(deps) {
 
   const cpanelHomeCache = new Map();
   async function cpanelAbsoluteDirectory(config, relativeDirectory) {
-    const supplied = String(relativeDirectory || "").replace(/\\\\/g, "/");
-    if (supplied.startsWith("/home/")) return supplied.replace(/\\/+$/g, "");
+    const supplied = String(relativeDirectory || "").replace(/\\/g, "/");
+    if (supplied.startsWith("/home/")) return supplied.replace(/\/+$/g, "");
     const cacheKey = config.root + "|" + config.username;
     let home = cpanelHomeCache.get(cacheKey);
     if (!home) {
@@ -410,7 +410,7 @@ export function createCommunicationsSiteRouter(deps) {
       });
       const payload = await response.json().catch(() => null);
       const rows = [payload?.data, payload?.data?.[0], payload?.data?.data, payload?.data?.data?.[0], payload?.result, payload?.result?.data];
-      home = rows.map(row => row && typeof row === "object" ? row.home : null).find(value => typeof value === "string" && /^\\/home\\/[^/]+$/.test(value));
+      home = rows.map(row => row && typeof row === "object" ? row.home : null).find(value => typeof value === "string" && /^\/home\/[^/]+$/.test(value));
       if (!response.ok || !payload || payload.status !== 1 || !home) {
         const errors = Array.isArray(payload?.errors) ? payload.errors.join(" ") : "";
         const safeErrors = errors.split(config.token).join("[REDACTED]").slice(0, 500);
@@ -418,13 +418,13 @@ export function createCommunicationsSiteRouter(deps) {
           (safeErrors ? ": " + safeErrors : "; UAPI field home was not returned.")),
           { diagnosticCode: "cpanel_home_not_resolved", httpStatus: response.status, uapiStatus: payload?.status ?? "unknown", uapiErrors: safeErrors });
       }
-      cpanelHomeCache.set(cacheKey, home.replace(/\\/+$/g, ""));
+      cpanelHomeCache.set(cacheKey, home.replace(/\/+$/g, ""));
     }
-    const relative = supplied.replace(/^\\/+/, "");
+    const relative = supplied.replace(/^\/+/, "");
     if (!relative || relative.split("/").some(part => !part || part === "." || part === "..")) {
       throw Object.assign(new Error("Invalid relative cPanel directory."), { diagnosticCode: "cpanel_invalid_relative_directory" });
     }
-    return home.replace(/\\/+$/g, "") + "/" + relative;
+    return home.replace(/\/+$/g, "") + "/" + relative;
   }
 
   async function cpanelCall(config, operation, params = {}, method = "GET") {
