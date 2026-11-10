@@ -8,6 +8,7 @@ on:
       - "drive-gateway/**"
       - "functions/**"
       - "tests/**"
+      - "scripts/check-no-billing-deps.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/firebase-free-governance-migration.yml"
@@ -58,3 +59,5 @@ jobs:
         run: npm ci --prefix drive-gateway
       - name: Run gateway regression and governance-store tests
         run: npm test --prefix drive-gateway
+      - name: Run complete root test suite and billing audit
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
