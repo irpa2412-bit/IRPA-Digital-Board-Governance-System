@@ -55,5 +55,6 @@ test("Social Studio wires media upload to the authenticated WordPress Media Libr
  assert.ok(fsSource.includes("/api/communications/website/media"));
  assert.ok(fsSource.includes("destination:\"media-library\""));
  assert.ok(fsSource.includes("setImageUrl(result.media.url)"));
- assert.ok(fsSource.includes("Alternative text is required"));
+ assert.ok(fsSource.includes("validateSocialMediaUpload(mediaFile,altText)"));
+ assert.ok(fsSource.includes("disabled={mediaBusy||!altText.trim()}"));
 });
