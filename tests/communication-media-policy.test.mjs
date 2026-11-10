@@ -563,7 +563,7 @@ test("archived social account restoration is supervised, status-preserving, reas
  assert.ok(social.includes('item.connectionStatus==="Archived"')&&social.includes('>Unarchive</button>'),"archived account cards expose the Unarchive action");
  assert.ok(social.includes('{reviewer&&item.connectionStatus==="Archived"'),"only reviewers see the Unarchive action");
  assert.ok(social.includes("async function restoreArchivedAccount()"),"restoration has a dedicated operation");
- assert.ok(social.includes('RESTORABLE_STATES.includes(restoreTarget?.previousConnectionStatus)?restoreTarget.previousConnectionStatus:"Pending Verification"'),"missing previous status falls back to Pending Verification");
+ assert.ok(social.includes('RESTORABLE_STATES.includes(restoreTarget?.previousConnectionStatus)&&restoreTarget.previousConnectionStatus!=="Active"?restoreTarget.previousConnectionStatus:"Pending Verification"'),"restore never returns an Active account to Active");
  assert.ok(social.includes('connectionStatus:restoreStatus,restoredAt:serverTimestamp(),restoredBy:user.uid,restoreReason:reason'),"restore updates only the status and required restoration metadata");
  assert.ok(social.includes('action:"STATUS_RESTORED"')&&social.includes('reason,createdAt:serverTimestamp()'),"restoration writes an immutable reasoned audit event");
  assert.ok(social.includes('role="dialog"')&&social.includes('aria-modal="true"'),"restoration uses an accessible confirmation dialog");
