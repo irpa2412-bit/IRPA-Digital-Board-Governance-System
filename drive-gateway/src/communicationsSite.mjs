@@ -1804,7 +1804,7 @@ export function createCommunicationsSiteRouter(deps) {
       if (!/^[a-z0-9.-]{1,253}$/.test(domain) || domain.startsWith(".") || domain.endsWith(".")) {
         return json({ error: "A valid website domain is required for cPanel read-only diagnostics." }, 400, corsHeaders(request));
       }
-      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null }, phpVersion: { value: null, status: "not exposed" }, diskUsage: { value: null, status: "not exposed" }, errorLog: { lines: [], status: "not exposed" } };
+      const result = { readOnly: true, domain, emailAccounts: { status: "not_checked" }, ssl: { status: "not_checked" }, phpLimits: { status: "not_checked", upload_max_filesize: null, post_max_size: null }, phpVersion: { value: null, status: "not exposed", reason: "The cPanel PHP-version API has not returned a version for this domain." }, diskUsage: { value: null, status: "not exposed", reason: "The cPanel quota API has not returned disk-usage data." }, errorLog: { lines: [], status: "not exposed", reason: "The cPanel error-log API has not returned readable log lines." } };
       const extractRows = value => {
         const candidates = [value, value?.data, value?.data?.certificates, value?.certificates, value?.data?.[0]?.data, value?.data?.data];
         return candidates.filter(Array.isArray).flatMap(rows => rows).filter(row => row && typeof row === "object");
@@ -1836,10 +1836,11 @@ export function createCommunicationsSiteRouter(deps) {
         result.ssl = {
           status: hosts.length ? "PASS" : "FAIL", httpStatus: response.__httpStatus, hosts,
           error: hosts.length ? null : "No installed SSL certificate matched " + domain + ".",
+          reason: hosts.length ? null : "The SSL inventory was returned, but it contained no certificate matching the requested domain.",
           detail: hosts.length ? null : sanitisedCpanelDetail(response)
         };
       } catch (error) {
-        result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240) };
+        result.ssl = { status: "FAIL", diagnosticCode: String(error.diagnosticCode || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 100), httpStatus: error.httpStatus ?? null, error: cleanText(error.message, 240), reason: "The cPanel SSL inventory request failed; certificate expiry could not be verified." };
       }
       const readIniFile = async filename => {
         const response = await cpanelCall(cp, "Fileman/get_file_content", { dir: cp.documentRoot, file: filename });
@@ -1887,18 +1888,25 @@ export function createCommunicationsSiteRouter(deps) {
         post_max_size: cleanText(limits.post || "", 40) || null,
         source: phpLimitSource,
         diagnostic: limits.upload && limits.post ? null : "INFO: cPanel did not return both directives. Verify the account's LangPHP UAPI permission and the domain's MultiPHP INI Editor configuration; if the provider restricts this API, confirm the values in cPanel manually.",
+        reason: limits.upload && limits.post ? null : "PHP upload/post limits were not exposed by either the account INI files or the MultiPHP UAPI response.",
         detail: phpLimitErrors.length ? phpLimitErrors.join("; ").slice(0, 200) : null
       };
       try {
         const response = await cpanelCall(cp, "LangPHP/php_get_vhost_versions", { vhost: domain });
         const match = JSON.stringify(response.data || response).match(/(?:phpversion|version)[^0-9]*(\d+\.\d+(?:\.\d+)?)/i);
         if (match) result.phpVersion = { value: match[1], status: "available", httpStatus: response.__httpStatus };
-      } catch {}
+        else result.phpVersion = { value: null, status: "not exposed", reason: "The cPanel PHP-version endpoint responded without a version value for this domain." };
+      } catch {
+        result.phpVersion = { value: null, status: "not exposed", reason: "The cPanel PHP-version endpoint is unavailable or its permission is not granted." };
+      }
       try {
         const response = await cpanelCall(cp, "Quota/get_quota_info");
         const match = JSON.stringify(response.data || response).match(/(?:diskused|disk_used|used)[^0-9]*(\d+(?:\.\d+)?\s*(?:MB|GB|KB|bytes?)?)/i);
         if (match) result.diskUsage = { value: match[1], status: "available", httpStatus: response.__httpStatus };
-      } catch {}
+        else result.diskUsage = { value: null, status: "not exposed", reason: "The cPanel quota response did not contain a recognised disk-usage value." };
+      } catch {
+        result.diskUsage = { value: null, status: "not exposed", reason: "The cPanel quota endpoint is unavailable or its permission is not granted." };
+      }
       try {
         const response = await cpanelCall(cp, "Stats/get_error_log", { domain });
         const raw = response.data?.log || response.data?.error_log || response.data?.content || "";
@@ -1906,7 +1914,10 @@ export function createCommunicationsSiteRouter(deps) {
           .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]").replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
           .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED EMAIL]");
         if (safeLog) result.errorLog = { lines: safeLog.split(/\r?\n/).slice(-50), status: "available" };
-      } catch {}
+        else result.errorLog = { lines: [], status: "not exposed", reason: "The cPanel error-log response did not contain readable log content." };
+      } catch {
+        result.errorLog = { lines: [], status: "not exposed", reason: "The cPanel error-log endpoint is unavailable or its permission is not granted." };
+      }
       return json(result, 200, corsHeaders(request));
     }
 
