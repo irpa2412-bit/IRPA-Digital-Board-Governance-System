@@ -524,6 +524,28 @@ test("Website Studio Upload Media retains the full requested media set and desti
 });
 
 
+
+test("Website Maintenance acceptance reports empty staging as INFO and uses split timed requests",()=>{
+ assert.ok(websiteStudio.includes('add("TEST staging empty","INFO"'));
+ assert.ok(websiteStudio.includes('const acceptanceSteps=['));
+ assert.ok(websiteStudio.includes('step:"page-lifecycle"'));
+ assert.ok(websiteStudio.includes('step:"post-lifecycle"'));
+ for(const file of ["png","mp4","pdf","docx"])assert.ok(websiteStudio.includes('"'+file+'"'),"split media step for "+file);
+ for(const destination of ["media-library","attach","featured","cpanel-folder"])assert.ok(websiteStudio.includes('"'+destination+'"'),"split destination "+destination);
+ assert.ok(websiteStudio.includes('const totalSteps=acceptanceSteps.length'));
+ assert.ok(websiteStudio.includes('call("/api/communications/website/production-acceptance","POST",{'));
+ assert.ok(websiteStudio.includes('},true,60000)'));
+ assert.ok(websiteStudio.includes('attempt<2'));
+ assert.ok(websiteStudio.includes('Failed to fetch'));
+ assert.ok(websiteStudio.includes('"RUNNING"'));
+});
+
+test("Website Maintenance cleanup UI requires the exact TEST confirmation",()=>{
+ assert.ok(websiteStudio.includes('REMOVE TEST ITEMS'));
+ assert.ok(websiteStudio.includes('/api/communications/cpanel/maintenance/remove-test-items'));
+ assert.ok(websiteStudio.includes('maintenanceRunId'));
+});
+
 test("Website Maintenance requires an explicit live root and exposes read-only update acceptance", () => {
  assert.ok(site.includes("CPANEL_LIVE_DOCUMENT_ROOT"));
  assert.ok(site.includes("/api/communications/cpanel/maintenance/live-root-status"));
