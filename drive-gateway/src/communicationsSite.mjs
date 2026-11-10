@@ -1797,6 +1797,20 @@ export function createCommunicationsSiteRouter(deps) {
       return json({ success: true, publicUrl: post.link, wpPostId: post.id, message: isPage ? "Approved IRPA website page published and recorded." : "Approved content published to the IRPA website." }, 200, corsHeaders(request));
     }
 
+    if (path === "/api/communications/cpanel/maintenance/live-root-status" && request.method === "GET") {
+      await websiteMaintenanceAdminAuthorised(request, env);
+      const username = String(env.CPANEL_USERNAME || "").trim();
+      const configuredRoot = String(env.CPANEL_LIVE_DOCUMENT_ROOT || "").trim().replace(/\\/g, "/").replace(/\/+$/g, "");
+      if (!configuredRoot) {
+        return json({ readOnly: true, configured: false, status: "not exposed", reason: "Live root not configured" }, 409, corsHeaders(request));
+      }
+      const allowedRoots = ["public_html", "home/" + username + "/public_html", "/home/" + username + "/public_html"];
+      if (!allowedRoots.includes(configuredRoot)) {
+        return json({ readOnly: true, configured: false, status: "invalid", reason: "CPANEL_LIVE_DOCUMENT_ROOT does not match the permitted production document root." }, 409, corsHeaders(request));
+      }
+      return json({ readOnly: true, configured: true, status: "configured", documentRoot: "public_html" }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/website/maintenance/updates" && request.method === "GET") {
       await websiteMaintenanceAdminAuthorised(request, env);
       const wp = websiteWordPressConfig(env);
