@@ -38,7 +38,7 @@ async function countEnrolledUsers(env,deps,claims){
  const enrolled=new Set();
  for(let i=0;i<names.length;i++)for(const doc of rows[i]||[]){
   const data=deps.firestoreDocumentToPlain(doc)||{};
-  const uid=String(String(doc.name||"").split("/").pop()||data.uid||data.userId||"");
+  const uid=String(data.uid||data.userId||data.user_id||String(doc.name||"").split("/").pop()||"");
   const active=names[i]==="adminProfiles"?data.active===true:
    ["Active","Activated"].includes(String(data.status||""))||data.registrationStatus==="Activated"||data.employmentStatus==="Active";
   if(uid&&active)enrolled.add(uid);
