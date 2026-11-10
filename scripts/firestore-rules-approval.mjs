@@ -96,7 +96,7 @@ async function main() {
   const [owner, name] = repo.split("/");
   const base = `${API}/repos/${owner}/${name}`;
   try {
-    const [changed, pr, events, commits, timeline, allowedActors] = await Promise.all([
+    const [changed, pr, events, commits, timeline] = await Promise.all([
       apiPages(`${base}/pulls/${prNumber}/files?per_page=100`, token),
       apiJson(`${base}/issues/${prNumber}`, token),
       apiPages(`${base}/issues/${prNumber}/events?per_page=100`, token),
