@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createCommunicationsSiteRouter } from "../src/communicationsSite.mjs";
 
 function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "" } = {}) {
-  const stored = new Map(), events = [], writes = [];
+  const stored = new Map(), events = [], writes = [], wordpressMethods = [];
   let current = initial;
   const router = createCommunicationsSiteRouter({
     authenticateFirebaseRequest: async () => ({ user_id: "maintenance-user", email: "maintenance@example.test", token: "test-token" }),
@@ -19,6 +19,12 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
     const url = new URL(input instanceof URL ? input.href : String(input));
     const params = new URLSearchParams(url.search);
     const method = init.method || "GET";
+    if (url.pathname.includes("/wp-json/wp/v2/")) {
+      wordpressMethods.push(method);
+      if (url.pathname.endsWith("/plugins")) return new Response(JSON.stringify([{ version: "1.0", update_available: true }]), { status: 200 });
+      if (url.pathname.endsWith("/themes")) return new Response(JSON.stringify([{ version: "2.0", update_available: false }]), { status: 200 });
+      return new Response(JSON.stringify({ code: "rest_no_route" }), { status: 404 });
+    }
     if (url.pathname.endsWith("/Fileman/get_file_content")) return new Response(JSON.stringify({ status: 1, data: { content: current } }), { status: 200 });
     if (url.pathname.endsWith("/Fileman/save_file_content")) {
       assert.ok([...stored.values()].length > 0, "snapshot must be stored before cPanel write");
@@ -32,6 +38,9 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
     IRPA_ENVIRONMENT: environment, IRPA_WORKER_ENVIRONMENT: environment,
     CPANEL_BASE_URL: "https://cpanel.test:2083", CPANEL_USERNAME: "testcp", CPANEL_API_TOKEN: "test-token",
     CPANEL_DOCUMENT_ROOT: "public_html/staging",
+    WORDPRESS_BASE_URL: "https://staging.irpa.or.tz",
+    WORDPRESS_USERNAME: "website-editor",
+    WORDPRESS_APPLICATION_PASSWORD: "test-wordpress-password",
     ...(liveRoot ? { CPANEL_LIVE_DOCUMENT_ROOT: liveRoot } : {}),
     DRIVE_KV: {
       async put(key, value) { stored.set(key, JSON.parse(value)); },
@@ -44,7 +53,7 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
       ...(body ? { body: JSON.stringify(body) } : {})
     }), env);
   }
-  return { request, stored, events, writes, get current() { return current; }, restore() { globalThis.fetch = originalFetch; } };
+  return { request, stored, events, writes, wordpressMethods, get current() { return current; }, restore() { globalThis.fetch = originalFetch; } };
 }
 
 test("website maintenance rejects path traversal and blocked paths with HTTP 400", async () => {
@@ -174,6 +183,38 @@ test("staging-to-live promotion fails closed with HTTP 409 when the live root is
     });
     assert.equal(response.status, 409);
     assert.deepEqual(await response.json(), { error: "Live root not configured" });
+    assert.equal(h.writes.length, 0);
+  } finally { h.restore(); }
+});
+
+test("live-root readiness is read-only and returns HTTP 409 when not configured", async () => {
+  const h = makeHarness();
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/live-root-status");
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), {
+      readOnly: true,
+      configured: false,
+      status: "not exposed",
+      reason: "Live root not configured"
+    });
+    assert.equal(h.writes.length, 0);
+  } finally { h.restore(); }
+});
+
+test("WordPress update checks use GET only and report exposed update metadata", async () => {
+  const h = makeHarness();
+  try {
+    const response = await h.request("/api/communications/website/maintenance/updates");
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.readOnly, true);
+    assert.equal(data.plugins.status, "updates_available");
+    assert.equal(data.plugins.updatesAvailable, 1);
+    assert.equal(data.themes.status, "current");
+    assert.equal(data.core.status, "not exposed");
+    assert.match(data.core.reason, /HTTP 404/);
+    assert.deepEqual(h.wordpressMethods, ["GET", "GET", "GET"]);
     assert.equal(h.writes.length, 0);
   } finally { h.restore(); }
 });
