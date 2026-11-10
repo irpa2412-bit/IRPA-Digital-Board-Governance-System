@@ -432,6 +432,9 @@ export function createCommunicationsSiteRouter(deps) {
     if (operation.startsWith("Fileman/") && Object.prototype.hasOwnProperty.call(requestParams, "dir")) {
       requestParams.dir = await cpanelAbsoluteDirectory(config, requestParams.dir);
     }
+    if (operation === "Fileman/mkdir" && Object.prototype.hasOwnProperty.call(requestParams, "path")) {
+      requestParams.path = await cpanelAbsoluteDirectory(config, requestParams.path);
+    }
     const url = new URL(config.root + "/" + operation);
     const body = new URLSearchParams();
     for (const [key, value] of Object.entries(requestParams)) body.set(key, String(value));
@@ -2089,6 +2092,113 @@ export function createCommunicationsSiteRouter(deps) {
       await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId"], auditFields, { createOnly: true });
       return json({ success: true, path: safe.relative, backupId, message: "Website file saved through cPanel. A rollback snapshot is retained for seven days; verify the public page before considering the edit complete." }, 200, corsHeaders(request));
     }
+    if (path === "/api/communications/cpanel/maintenance/self-test" && request.method === "POST") {
+      const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const cp = cpanelConfig(env);
+      const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
+      if (environment !== "staging" || cp.documentRoot !== "public_html/staging") {
+        return json({ error: "The maintenance self-test is restricted to the staging document root." }, 409, corsHeaders(request));
+      }
+      if (!env.DRIVE_KV) return json({ error: "Snapshot storage is unavailable; no test file was changed." }, 503, corsHeaders(request));
+      const report = [];
+      const add = (name, status, httpStatus, detail = "") => report.push({ name, status, httpStatus, detail });
+      const relativeDirectory = "portal-test";
+      const relativeFile = "portal-test/maintenance-test.txt";
+      const directory = safeWebsiteMaintenanceDirectory(relativeDirectory, cp.documentRoot);
+      const safe = safeWebsiteMaintenancePath(relativeFile, cp.documentRoot);
+      const parseRows = response => {
+        const candidates = [response?.data?.[0]?.data, response?.data, response?.data?.data, response?.data?.data?.[0]?.data];
+        return candidates.find(Array.isArray) || [];
+      };
+      let folderReady = false;
+      try {
+        const rootListing = await cpanelCall(cp, "Fileman/list_files", { dir: cp.documentRoot });
+        const folderExists = parseRows(rootListing).some(row => String(row.file || row.name || "") === relativeDirectory &&
+          (String(row.type || "").toLowerCase().includes("dir") || row.is_dir === true));
+        if (!folderExists) {
+          await cpanelCall(cp, "Fileman/mkdir", { path: directory, permissions: "0755" }, "POST");
+          add("Create staging/portal-test", "PASS", 200, "Folder did not exist and was created through cPanel Fileman::mkdir.");
+        } else add("Create staging/portal-test", "PASS", 200, "Existing staging/portal-test folder reused; no other directory was touched.");
+        folderReady = true;
+      } catch (error) {
+        add("Create staging/portal-test", "FAIL", error.httpStatus || 0, error.message || "cPanel folder provisioning failed.");
+      }
+      if (!folderReady) {
+        add("Read TEST maintenance file", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("Edit TEST maintenance file", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("Snapshot exists", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("Rollback exact bytes", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("List TEST files", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        return json({ readOnly: false, configuredDocumentRoot: cp.configuredDocumentRoot, absoluteTestDirectory: await cpanelAbsoluteDirectory(cp, directory).catch(() => null), report }, 200, corsHeaders(request));
+      }
+      let originalContent = null, snapshotId = "", createdFile = false;
+      try {
+        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
+        const rows = parseRows(listing);
+        const exists = rows.some(row => String(row.file || row.name || "") === "maintenance-test.txt");
+        if (exists) {
+          const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          originalContent = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content;
+          if (typeof originalContent !== "string" || !originalContent.startsWith("TEST ONLY — IRPA Website Maintenance")) {
+            add("Create TEST maintenance-test.txt", "FAIL", current.__httpStatus || 0, "An existing file with that name is not marked TEST; it was not overwritten.");
+            throw new Error("Existing maintenance-test.txt is not verified TEST content.");
+          }
+        } else {
+          originalContent = "TEST ONLY — IRPA Website Maintenance self-test\nOriginal bytes\r\n";
+          await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: originalContent, charset: "utf-8" }, "POST");
+          createdFile = true;
+        }
+        add("Create TEST maintenance-test.txt", "PASS", 200, createdFile ? "TEST file created using Fileman/save_file_content." : "Existing TEST file reused without replacing its original bytes.");
+      } catch (error) {
+        if (!report.some(row => row.name === "Create TEST maintenance-test.txt")) add("Create TEST maintenance-test.txt", "FAIL", error.httpStatus || 0, error.message || "TEST file creation failed.");
+      }
+      try {
+        const read = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+        const content = read.data?.content ?? read.data?.[0]?.content ?? read.data?.data?.content ?? read.data?.data?.[0]?.content ?? read.data?.result?.data?.content;
+        if (typeof content !== "string" || !content.startsWith("TEST ONLY — IRPA Website Maintenance")) throw new Error("Read content was not verified as TEST data.");
+        if (originalContent === null) originalContent = content;
+        add("Read TEST maintenance-test.txt", "PASS", read.__httpStatus, "Read verified TEST content from the absolute cPanel path.");
+      } catch (error) { add("Read TEST maintenance-test.txt", "FAIL", error.httpStatus || 0, error.message || "TEST file read failed."); }
+      if (originalContent !== null) {
+        try {
+          snapshotId = "cpanel-backup:" + crypto.randomUUID();
+          await env.DRIVE_KV.put(snapshotId, JSON.stringify({ path: relativeFile, content: originalContent, environment: "staging", test: true }), { expirationTtl: 604800 });
+          const edited = "TEST ONLY — IRPA Website Maintenance self-test\nEdited bytes\r\n";
+          await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: edited, charset: "utf-8" }, "POST");
+          const verify = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          const value = verify.data?.content ?? verify.data?.[0]?.content ?? verify.data?.data?.content ?? verify.data?.data?.[0]?.content ?? verify.data?.result?.data?.content;
+          const passed = value === edited;
+          add("Edit TEST maintenance-test.txt", passed ? "PASS" : "FAIL", verify.__httpStatus, passed ? "Edit verified; snapshot ID " + snapshotId : "Save request returned but the subsequent read did not match the edited bytes; snapshot ID " + snapshotId);
+        } catch (error) { add("Edit TEST maintenance-test.txt", "FAIL", error.httpStatus || 0, (error.message || "TEST edit failed.") + (snapshotId ? "; snapshot ID " + snapshotId : "")); }
+        const snapshot = await env.DRIVE_KV.get(snapshotId, "json");
+        add("Snapshot exists", snapshot && snapshot.path === relativeFile && snapshot.content === originalContent ? "PASS" : "FAIL", 200, "Snapshot ID " + snapshotId);
+        try {
+          const beforeRollback = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          const current = beforeRollback.data?.content ?? beforeRollback.data?.[0]?.content ?? beforeRollback.data?.data?.content ?? beforeRollback.data?.data?.[0]?.content ?? beforeRollback.data?.result?.data?.content;
+          if (typeof current !== "string") throw new Error("Current TEST bytes could not be read.");
+          await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: originalContent, charset: "utf-8" }, "POST");
+          const restored = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          const restoredContent = restored.data?.content ?? restored.data?.[0]?.content ?? restored.data?.data?.content ?? restored.data?.data?.[0]?.content ?? restored.data?.result?.data?.content;
+          add("Rollback exact bytes", restoredContent === originalContent ? "PASS" : "FAIL", restored.__httpStatus, restoredContent === originalContent ? "Rollback restored the exact original bytes." : "Rollback read-back differed from the original bytes.");
+        } catch (error) { add("Rollback exact bytes", "FAIL", error.httpStatus || 0, error.message || "Rollback failed."); }
+      } else {
+        add("Edit TEST maintenance-test.txt", "FAIL", 0, "No verified TEST file was available.");
+        add("Snapshot exists", "FAIL", 0, "No verified TEST file was available.");
+        add("Rollback exact bytes", "FAIL", 0, "No verified TEST file was available.");
+      }
+      try {
+        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
+        const testFiles = parseRows(listing).map(row => String(row.file || row.name || "")).filter(name => name.startsWith("TEST") || name === "maintenance-test.txt");
+        add("List TEST files", "PASS", listing.__httpStatus, testFiles.join(", ") || "No TEST files found.");
+      } catch (error) { add("List TEST files", "FAIL", error.httpStatus || 0, error.message || "TEST file listing failed."); }
+      const runId = crypto.randomUUID();
+      const inventory = { runId, createdAt: new Date().toISOString(), items: [{ kind: "cpanel-file", path: relativeFile, title: "TEST maintenance-test.txt", createdByRun: true }] };
+      await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify(inventory), { expirationTtl: 2592000 });
+      const audit = fields({ action: "CPANEL_MAINTENANCE_TEST_RUN", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: relativeFile, actorUid: claims.user_id, actorEmail: claims.email || "", details: { runId, path: relativeFile, snapshotId, report: report.map(row => ({ name: row.name, status: row.status, httpStatus: row.httpStatus })) }, createdAt: new Date().toISOString() });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: relativeFile, updatedByUid: claims.user_id, updatedAt: new Date().toISOString(), runId, snapshotId, test: true }), ["path", "updatedByUid", "updatedAt", "runId", "snapshotId", "test"], audit, { createOnly: true });
+      return json({ configuredDocumentRoot: cp.configuredDocumentRoot, relativeAllowlistPath: relativeFile, absoluteFilePath: await cpanelAbsoluteDirectory(cp, safe.dir) + "/" + safe.file, snapshotId, runId, report }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/cpanel/maintenance/files" && request.method === "GET") {
       await websiteMaintenanceAdminAuthorised(request, env);
       const cp = cpanelConfig(env);
