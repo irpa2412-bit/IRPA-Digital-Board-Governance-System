@@ -110,7 +110,7 @@ async function synchronizeClaims(db, auth) {
     try {
       const user = await auth.getUser(uid);
       const previous = user.customClaims || {};
-      const roles = [...roleSet].slice(0, 60);
+      const roles = [...roleSet].sort().slice(0, 60);
       const claims = { ...previous, irpaRoles: roles };
       const shouldKeepAdmin = adminUids.has(uid) || String(user.email || "").toLowerCase() === PRIMARY_ADMIN_EMAIL || previous.admin === true;
       if (shouldKeepAdmin) claims.admin = true;
