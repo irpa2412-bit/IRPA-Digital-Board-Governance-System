@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createCommunicationsSiteRouter } from "../src/communicationsSite.mjs";
 
-function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "" } = {}) {
+function makeHarness({ administrator = true, initial = "<p>original</p>", environment = "staging", liveRoot = "", filemanError = false } = {}) {
   const stored = new Map(), events = [], writes = [], wordpressMethods = [], filemanRequests = [];
-  let current = initial;
+  let current = initial, testFileExists = false;
   const router = createCommunicationsSiteRouter({
     authenticateFirebaseRequest: async () => ({ user_id: "maintenance-user", email: "maintenance@example.test", token: "test-token" }),
     getFirestoreDocument: async () => ({ active: administrator }),
@@ -21,15 +21,28 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
     const method = init.method || "GET";
     if (url.pathname.endsWith("/Variables/get_user_information")) return new Response(JSON.stringify({ status: 1, data: { home: "/home/testcp" } }), { status: 200 });
     if (url.pathname.startsWith("/execute/Fileman/")) filemanRequests.push({ operation: url.pathname.split("/").pop(), dir: params.get("dir") || new URLSearchParams(init.body || "").get("dir"), path: params.get("path") || new URLSearchParams(init.body || "").get("path") });
-    if (url.pathname.endsWith("/Fileman/list_files")) return new Response(JSON.stringify({ status: 1, data: [{ file: "acceptance.txt", type: "file", file_size: 12 }] }), { status: 200 });
+    if (url.pathname.endsWith("/Fileman/list_files")) {
+      if (filemanError) return new Response(JSON.stringify({ status: 0, errors: ["No such file or directory"] }), { status: 200 });
+      const dir = params.get("dir") || "";
+      const rows = dir.endsWith("/portal-test")
+        ? (testFileExists ? [{ file: "maintenance-test.txt", type: "file", file_size: current.length }] : [])
+        : (testFileExists ? [{ file: "portal-test", type: "dir", is_dir: true }] : []);
+      return new Response(JSON.stringify({ status: 1, data: [{ data: rows }] }), { status: 200 });
+    }
+    if (url.pathname.endsWith("/Fileman/mkdir")) return new Response(JSON.stringify({ status: 1, data: {} }), { status: 200 });
     if (url.pathname.includes("/wp-json/wp/v2/")) {
       wordpressMethods.push(method);
       if (url.pathname.endsWith("/plugins")) return new Response(JSON.stringify([{ version: "1.0", update_available: true }]), { status: 200 });
       if (url.pathname.endsWith("/themes")) return new Response(JSON.stringify([{ version: "2.0", update_available: false }]), { status: 200 });
       return new Response(JSON.stringify({ code: "rest_no_route" }), { status: 404 });
     }
-    if (url.pathname.endsWith("/Fileman/get_file_content")) return new Response(JSON.stringify({ status: 1, data: { content: current } }), { status: 200 });
+    if (url.pathname.endsWith("/Fileman/get_file_content")) {
+      if (filemanError) return new Response(JSON.stringify({ status: 0, errors: ["No such file or directory"] }), { status: 200 });
+      return new Response(JSON.stringify({ status: 1, data: { content: current } }), { status: 200 });
+    }
     if (url.pathname.endsWith("/Fileman/save_file_content")) {
+      if (filemanError) return new Response(JSON.stringify({ status: 0, errors: ["No such file or directory"] }), { status: 200 });
+      testFileExists = true;
       assert.ok([...stored.values()].length > 0, "snapshot must be stored before cPanel write");
       current = params.get("content") || new URLSearchParams(init.body).get("content") || "";
       writes.push({ method, content: current, params: new URLSearchParams(init.body || "") });
@@ -59,6 +72,34 @@ function makeHarness({ administrator = true, initial = "<p>original</p>", enviro
   return { request, stored, events, writes, wordpressMethods, filemanRequests, get current() { return current; }, restore() { globalThis.fetch = originalFetch; } };
 }
 
+
+
+test("maintenance self-test creates portal-test if missing and verifies TEST file lifecycle", async () => {
+  const h = makeHarness({ initial: "unused original" });
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/self-test", "POST", {});
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.ok(data.snapshotId);
+    assert.match(data.absoluteFilePath, /^\/home\/testcp\/public_html\/staging\/portal-test\/maintenance-test\.txt$/);
+    assert.ok(h.filemanRequests.some(row => row.operation === "mkdir" && row.path === "/home/testcp/public_html/staging/portal-test"));
+    for (const name of ["Create staging/portal-test", "Create TEST maintenance-test.txt", "Read TEST maintenance-test.txt", "Edit TEST maintenance-test.txt", "Snapshot exists", "Rollback exact bytes", "List TEST files"]) {
+      assert.equal(data.report.find(row => row.name === name)?.status, "PASS", name);
+    }
+  } finally { h.restore(); }
+});
+
+test("cPanel Fileman not_found diagnostics include configured root, absolute path and exact UAPI error", async () => {
+  const h = makeHarness({ filemanError: true });
+  try {
+    const response = await h.request("/api/communications/cpanel/maintenance/files");
+    const data = await response.json();
+    assert.equal(response.status, 404);
+    assert.match(data.error, /CPANEL_DOCUMENT_ROOT=public_html\/staging/);
+    assert.match(data.error, /Fileman path=\/home\/testcp\/public_html\/staging/);
+    assert.match(data.error, /Exact UAPI error: No such file or directory/);
+  } finally { h.restore(); }
+});
 
 test("Fileman list, read and save calls resolve the cPanel home and use absolute paths", async () => {
   const h = makeHarness({ initial: "absolute path test" });
