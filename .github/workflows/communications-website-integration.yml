@@ -84,6 +84,8 @@ jobs:
         run: npm run test:communication-media
       - name: Test supervised social account restoration rules in the Firestore emulator
         run: npm run test:social-accounts-restore-rules
+      - name: Install Playwright test runner without changing repository dependencies
+        run: npm install --no-save @playwright/test
       - name: Install Chromium for social account layout regression
         run: npx playwright install --with-deps chromium
       - name: Check archived account layout at 1440px and 900px
