@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {SOCIAL_PLATFORMS,validateSocialDraft,validateSocialMediaUpload,inspectSocialText,canTransitionSocialStatus,socialCalendarCsv,socialCalendarRange,socialCalendarDocxXml} from "../src/utils/socialStudioPolicy.js";
 
 test("platform text and hashtag limits are enforced",()=>{
@@ -50,7 +51,7 @@ test("Social Studio media upload accepts only JPG PNG WebP MP4 and PDF with requ
  assert.ok(validateSocialMediaUpload({name:"large.jpg",type:"image/jpeg",size:21*1024*1024},"Description").some(x=>x.includes("20 MB")));
 });
 test("Social Studio wires media upload to the authenticated WordPress Media Library route and attaches its URL to the draft",()=>{
- const fsSource = require("node:fs").readFileSync(new URL("../src/pages/CommunicationsSocialStudio.jsx", import.meta.url),"utf8");
+ const fsSource = readFileSync(new URL("../src/pages/CommunicationsSocialStudio.jsx", import.meta.url),"utf8");
  assert.ok(fsSource.includes("/api/communications/website/media"));
  assert.ok(fsSource.includes("destination:\"media-library\""));
  assert.ok(fsSource.includes("setImageUrl(result.media.url)"));
