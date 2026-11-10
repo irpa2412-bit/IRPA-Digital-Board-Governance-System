@@ -409,6 +409,7 @@ test("cPanel diagnostics match SSL certificate subject and read .user.ini before
   globalThis.fetch = async input => {
     const url = new URL(input instanceof URL ? input.href : String(input));
     requests.push(url.pathname + url.search);
+    if (url.pathname.endsWith("/Variables/get_user_information")) return response({ status: 1, data: { home: "/home/irpaortz" } });
     if (url.pathname.endsWith("/Email/list_pops")) return response({ status: 1, data: [] });
     if (url.pathname.endsWith("/SSL/installed_hosts")) return response({ status: 1, data: { certificates: [{ subject: "CN=staging.irpa.or.tz", not_after: "2027-12-31T23:59:59Z", issuer: "Test CA" }] } });
     if (url.pathname.endsWith("/Fileman/get_file_content")) return response({ status: 1, data: { content: "upload_max_filesize=64M\npost_max_size=64M\n" } });
