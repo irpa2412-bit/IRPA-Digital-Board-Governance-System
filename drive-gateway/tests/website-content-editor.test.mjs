@@ -340,6 +340,7 @@ test("cPanel file access refuses any document root other than the exact staging 
   };
   const result = await call(router, env, "/api/communications/cpanel/files?path=probe.txt", { role: "Executive Director" });
   assert.equal(result.status, 503);
+  assert.deepEqual(await result.json(), { error: "CPANEL_DOCUMENT_ROOT does not match the permitted staging document root." });
   assert.equal(cpanelRequests, 0);
 });
 
