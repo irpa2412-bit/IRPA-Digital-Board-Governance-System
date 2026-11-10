@@ -111,7 +111,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages"}){
      if(path.endsWith("/cpanel/files"))cpanelEntries=result.data?.entries||[];
     }catch(error){add(label,"FAIL",error.httpStatus||0,error.message||"Read route failed.");}
    }
-   if(cpanelEntries.length===0)add("TEST staging empty","INFO",200,"No safe staging file was listed; the dedicated maintenance-test.txt file is used instead.","No existing staging file was modified.");
+   if(!cpanelEntries.some(entry=>entry.type==="file"))add("TEST staging empty","INFO",200,"No safe staging file was listed; the dedicated maintenance-test.txt file is used instead.","No existing staging file was modified.");
    add("TEST staging/portal-test self-provisioning","RUNNING",null,"","Creates the dedicated TEST folder only if missing, then creates/reads/edits/snapshots/rolls back maintenance-test.txt.");
    try{
     const selfTest=await call("/api/communications/cpanel/maintenance/self-test","POST",{runId},true,60000);
