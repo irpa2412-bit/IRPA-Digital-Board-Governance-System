@@ -164,7 +164,7 @@ Do not assume scheduled Firestore export is available on Firebase Spark. Record 
 |---|---|
 | Threat model and scenario register | Documented in this file; source-level scenarios only, no runtime validation |
 | Password endpoint source concern | Source finding; runtime exploitability not tested |
-| Client fail-open path | Source finding in `src/firebase/auth.js`; runtime outage behaviour not tested |
+| Client fail-open path | Source finding in client authentication code; exact implementation detail withheld in this public-branch edition; runtime outage behaviour not tested |
 | Worker route inventory | In progress; not complete |
 | Firebase rules emulator matrix | Not run |
 | Git-history secret scan | Not run |
