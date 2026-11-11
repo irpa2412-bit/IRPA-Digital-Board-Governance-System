@@ -4,7 +4,7 @@
 **Repository baseline:** main, commit 9013e162be98bdb8f28d19b7ead7ac9fc5fa75f2  
 **Assessment method:** read-only source inspection through repository files  
 **Production actions:** none  
-**Status:** partial assessment; not a penetration test and not a complete portal inventory.
+**Status:** partial assessment; not a penetration test and not a complete portal inventory. Public-branch edition: implementation-specific exploit details are intentionally minimised pending the Owner's repository-visibility decision. A restricted technical remediation record must preserve exact code-level evidence for authorised implementers.
 
 ## Evidence register
 
@@ -13,10 +13,10 @@
 | Firestore | firestore.rules | Catch-all deny exists; explicit collection rules still require full audit and emulator tests. | PARTIAL |
 | Firebase Storage | storage.rules | All paths deny read/write. | VERIFIED IN SOURCE |
 | Portal registry | firestore.rules, src/App.jsx | portalDefinitions controls portal metadata/navigation; not a full integration registry or runtime capability boundary. | VERIFIED IN SOURCE |
-| Authentication client | src/firebase/auth.js | Firebase Auth is credential authority. Password-attempt check/clear calls Cloudflare endpoints. | VERIFIED IN SOURCE |
-| Password-attempt enforcement | src/firebase/auth.js | Login continues with Firebase Authentication if the password-security endpoint is unavailable. This is a fail-open path for the additional attempt-control layer. | HIGH-PRIORITY REVIEW |
-| Password-attempt Worker | drive-gateway/src/cloudflareAuth.mjs | Password-attempt state/failure/clear routes accept POST and use caller-supplied email; no Firebase identity verification is performed in these three handlers. No per-IP rate limiting is visible in this module. | HIGH-PRIORITY REVIEW |
-| Account lockout integrity | client + Worker password flow | A caller can submit the public password-failure route for an email without proving a corresponding failed Firebase sign-in. If no external edge control blocks it, this may permit targeted account lockout/denial of service. Verify Cloudflare WAF/rate-limit configuration before classifying as exploitable. | POTENTIAL HIGH |
+| Authentication client | client authentication implementation | Firebase Auth is credential authority. Password-attempt check/clear calls Cloudflare endpoints. | VERIFIED IN SOURCE |
+| Password-attempt enforcement | Client and Worker authentication source | Client source contains a fallback that proceeds with Firebase password sign-in when the supplementary security decision service is unavailable. This is a source-level fail-open concern; deployed behaviour is not established. | SOURCE FINDING — DEPLOYMENT NOT VERIFIED |
+| Password-attempt Worker | Cloudflare Worker authentication source | The inspected Worker authentication handlers accept caller-asserted failure/state operations without a demonstrated server-verifiable failed-authentication proof. Per-IP enforcement was not visible in the inspected source; external edge controls were not retrieved. | SOURCE FINDING — EDGE CONTROLS NOT VERIFIED |
+| Account lockout integrity | Client + Worker password flow | An unauthorised failure assertion may enable targeted account-denial-of-service if no external controls intervene. Exploitability is not established; edge controls and deployed route behaviour were not retrieved. | POTENTIAL HIGH |
 | MFA | functions/mfaSecurityAudit.js | Scheduled audit/reminder logic exists. This file alone does not establish mandatory MFA at login or privileged operation time. | NOT PROVEN |
 | Gateway auth primitive | drive-gateway/src/util.mjs | requireUser verifies a Firebase user through injected verifier and rejects missing UID. | VERIFIED IN SOURCE |
 | Document upload | drive-gateway/src/upload.mjs | Upload and retrieval require a user; retrieval checks owner/admin/authorised UID and validates content hash. | VERIFIED IN SOURCE |
@@ -28,22 +28,22 @@
 
 ## Priority findings and required decisions
 
-### F-001 — Password-attempt service availability is fail-open
-**Evidence:** src/firebase/auth.js loginWithEmail catches non-lockout errors from passwordSecurityRequest, marks passwordSecurityAvailable false and continues to signInWithEmailAndPassword.
+### F-001 — Password-attempt service availability is fail-open (source finding; live deployment unverified)
+**Evidence (restricted implementation detail):** source inspection found that the client login path may continue with Firebase password authentication after the supplementary password-security request fails. Exact symbols and route identifiers are intentionally omitted from this public-branch document.
 
 **Risk:** the supplementary attempt/lockout control can be bypassed during endpoint outage or misconfiguration. Firebase Authentication remains the credential verifier, but the additional lockout policy is not guaranteed.
 
 **Required remediation design:** make the authoritative failed-attempt enforcement server-side and atomic with the credential verification flow, or explicitly rely on and verify Firebase/Cloudflare native abuse controls. Do not merely change the client to fail closed without assessing account availability and recovery impact.
 
-### F-002 — Public password-failure endpoint can be invoked without proof of failed authentication
-**Evidence:** drive-gateway/src/cloudflareAuth.mjs handles /api/auth/password-failure using only a syntactically valid email, then increments account-keyed state. The handler does not verify Firebase authentication or a server-verifiable sign-in failure proof. State and clear handlers are also public by design in the inspected module.
+### F-002 — Password-failure reporting lacks demonstrated proof of failed authentication (source finding; live deployment unverified)
+**Evidence (restricted implementation detail):** source inspection found a Worker-side password-failure reporting path that accepts caller-provided account context without a demonstrated server-verifiable failed-authentication proof. Exact endpoint paths and handler identifiers are intentionally omitted from this public-branch document.
 
 **Risk:** absent effective external rate limiting/challenge controls, an attacker may intentionally increment failures and lock/suspend another user's account. This is a potential account-denial-of-service path, not proof that production is currently exploitable; Cloudflare edge rules were not retrieved.
 
 **Required remediation design:** do not accept client assertion of failed login as authoritative. Evaluate a server-mediated sign-in attempt or a proof-based design, plus independent IP/device and account throttles, anti-automation challenge, generic responses and recovery controls. Verify production and staging WAF/rate-limit rules before rollout.
 
-### F-003 — MFA enforcement is not established
-**Evidence:** functions/mfaSecurityAudit.js identifies active registered users and queues reminders when MFA is absent. The inspected source does not prove authentication or sensitive APIs reject privileged accounts without MFA.
+### F-003 — MFA enforcement and scheduled execution are not established
+**Evidence:** a scheduled MFA audit/reminder implementation exists in the repository's `functions/` source tree. Its presence does not prove that it is deployed, scheduled, or enforcing MFA at authentication or sensitive API operations.
 
 **Risk:** reminder coverage may be mistaken for enforcement.
 
@@ -63,6 +63,10 @@
 
 **Required remediation design:** enumerate every route/method and document its authentication, authorisation, input limits, data access, audit, rate limit and test. Review Worker-level headers and Firebase Hosting headers as separate controls.
 
+## Password-security implementation and deployment status
+
+Source inspection identifies both a client-side login integration and a Cloudflare Worker-side password-attempt implementation. A separate `functions/` source implementation also contains staged attempt/lock logic, and the repository contains scheduled MFA audit/reminder code. **The source alone cannot establish which implementation is active in production, whether both are active, whether any Firebase Function is deployed/scheduled, or which version is serving requests.** No Firebase project deployment inventory, Cloudflare live Worker version, route binding, or runtime trace was retrieved in this assessment. Therefore the live enforcement topology is **NOT VERIFIED**. Do not describe the Functions implementation or MFA reminders as operational controls until deployment and invocation are independently verified. The architecture constraint remains Cloudflare-first, Firebase Spark compatible and no new Functions; this assessment does not authorise enabling or deploying Functions.
+
 ## Next read-only assessment tasks
 
 1. Enumerate all gateway route registrations and route-specific authorization checks.
@@ -78,6 +82,18 @@
 
 - No production or staging endpoint was probed.
 - No live account, user, document, collection, credential, secret or integration record was read or changed.
-- No Cloudflare account configuration, Firebase Console configuration, GitHub repository settings, WAF rules, rate-limit rules, production Environment reviewers or deployed Worker version was inspected.
+- No Cloudflare account configuration, Firebase Console configuration, Firebase Functions deployment/schedule inventory, GitHub repository settings, WAF rules, rate-limit rules, production Environment reviewers or deployed Worker version was inspected.
 - No tests, workflows, builds, penetration tests or deployments were run.
 - Findings marked PARTIAL, POTENTIAL or NOT PROVEN must not be reported as verified vulnerabilities or verified protections.
+
+
+## Public-branch disclosure and residual-risk handling
+
+This branch's public-facing assessment intentionally avoids exact endpoint paths, handler names and line-level exploit instructions for the password-attempt weaknesses. This is risk reduction, not remediation and not a substitute for access control: removing text does not erase prior Git history or copies. Repository visibility remains an **OPEN Owner decision**; no visibility change has been made. The authorised technical implementation record should be maintained in a restricted location if the repository remains public. No Cloudflare WAF/rate-limit rule has been changed; production edge mitigation requires separate explicit Owner authorisation.
+
+## Owner decisions still open
+
+- Single-approver risk acceptance: **NOT ACCEPTED / NOT RECORDED**. The Owner has not provided an explicit acceptance decision and review date.
+- Repository visibility (public/private): **OPEN**.
+- Interim production Cloudflare edge rule: **NOT AUTHORISED**.
+- Maximum tolerable security-service outage, escalation route, permitted break-glass actions and delegated alternate: **OPEN**. The Owner's accountability decision is recorded only in the Threat Model.
