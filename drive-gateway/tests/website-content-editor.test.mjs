@@ -533,7 +533,7 @@ test("opt-in caption diagnostic uploads one item, runs A/B/C twice, verifies esc
   assert.ok(rows.every(row => row.detail.contentType === "application/json"));
   assert.ok(rows.every(row => row.detail.classification === "wordpress_response"));
   assert.ok(rows.every(row => row.detail.decodedCaptionMatches === true));
-  assert.ok(rows.every(row => row.detail.returnedCaption === row.detail.returnedCaption && row.detail.returnedCaption.includes("IRPA TEST") && row.detail.returnedCaption.includes("Media upload acceptance")));
+  assert.deepEqual(rows.map(row => row.detail.returnedCaption), expected.slice(0, 6));
   assert.ok(rows.every(row => row.detail.wireEscapeVerified === true));
   assert.ok(rows.every(row => Object.prototype.hasOwnProperty.call(row.detail, "rayId")));
   assert.equal(data.report.find(row => /restore original em-dash caption/.test(row.label)).status, "PASS");
