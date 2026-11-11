@@ -152,3 +152,12 @@ No production deployment, merge, live-data mutation, Firestore/Storage rules mod
 - Staging acceptance and recovery tests pass.
 - Change-control and integration approvals are enforced server-side, not merely in UI.
 - Owner reviews the complete diff and separately authorises merge and production release.
+
+
+## 11. Owner-authorised break-glass accountability
+
+The IRPA Owner, in the capacity of Executive Director, is accountable for approving and activating the break-glass procedure during a security-service outage. This is an Owner-authorised governance decision, not a reviewer decision. A reviewer may assess and challenge the control but does not approve or activate the procedure.
+
+Activation must be exceptional, justified, narrowly scoped, time-bounded and attributable. Record the affected service, reason, approving/activating authority, users and privileges enabled, start and expiry times, actions taken, notifications and closure/revocation. Preserve the audit evidence and complete a post-incident review.
+
+This accountability decision does not create a technical bypass or authorise routine circumvention of authentication, MFA, data-access, change-control or deployment safeguards. Before operational release, IRPA must separately document the maximum tolerable outage, escalation path, exact permitted emergency actions, revocation process and any formally delegated alternate authority. No duration or alternate approver is assumed here.
