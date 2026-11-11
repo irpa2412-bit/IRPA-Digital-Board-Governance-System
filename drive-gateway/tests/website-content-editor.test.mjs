@@ -16,6 +16,7 @@ let mediaUploadStatus;
 let binaryUploadStatus;
 let mediaMetadataStatuses;
 let mediaMetadataRequests;
+let wordpressRequestHeaders;
 let createdPost;
 let postCreateCount;
 let consoleMessages;
@@ -128,6 +129,7 @@ test.beforeEach(() => {
   binaryUploadStatus = 201;
   mediaMetadataStatuses = [];
   mediaMetadataRequests = [];
+  wordpressRequestHeaders = [];
   createdPost = null;
   postCreateCount = 0;
   consoleMessages = [];
@@ -141,7 +143,10 @@ test.beforeEach(() => {
     requestCount++;
     const url = new URL(typeof input === "string" ? input : input.url);
     const method = init.method || "GET";
-    if (url.hostname !== "staging.irpa.or.tz") throw new Error("Test blocked non-staging host.");
+    const requestHeaders = new Headers(init.headers);
+    wordpressRequestHeaders.push({ hostname: url.hostname, path: url.pathname, authorization: requestHeaders.get("Authorization"),
+      userAgent: requestHeaders.get("User-Agent"), stagingAuthorization: requestHeaders.get("X-IRPA-Staging-Authorization") });
+    if (!["staging.irpa.or.tz", "irpa.or.tz"].includes(url.hostname)) throw new Error("Test blocked non-IRPA host.");
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
       const headers = new Headers(init.headers);
       const isMultipart = init.body instanceof FormData;
@@ -154,7 +159,9 @@ test.beforeEach(() => {
     if (url.pathname === "/wp-json/wp/v2/media/88" && method === "POST") {
       const headers = new Headers(init.headers);
       const contentType = headers.get("Content-Type") || "";
-      mediaMetadataRequests.push({ contentType, override: headers.get("X-HTTP-Method-Override"), fields: contentType.includes("application/x-www-form-urlencoded") ? [...new URLSearchParams(init.body).keys()] : Object.keys(JSON.parse(init.body || "{}")) });
+      mediaMetadataRequests.push({ contentType, override: headers.get("X-HTTP-Method-Override"), body: String(init.body || ""),
+        userAgent: headers.get("User-Agent"), authorization: headers.get("Authorization"), stagingAuthorization: headers.get("X-IRPA-Staging-Authorization"),
+        fields: contentType.includes("application/x-www-form-urlencoded") ? [...new URLSearchParams(init.body).keys()] : Object.keys(JSON.parse(init.body || "{}")) });
       const status = mediaMetadataStatuses.length ? mediaMetadataStatuses.shift() : 200;
       if (status === 406) return new Response("<html>Not Acceptable: ModSecurity metadata rule blocked update</html>", { status: 406, headers: { "Content-Type": "text/html", "Server": "LiteSpeed", "cf-ray": "metadata-ray-456" } });
       const metadata = contentType.includes("application/x-www-form-urlencoded") ? Object.fromEntries(new URLSearchParams(init.body)) : JSON.parse(init.body || "{}");
@@ -483,6 +490,64 @@ test("WordPress Administrator credentials are rejected even when authentication 
   const result = await call(router, makeEnv(), "/api/communications/website/content/pages/123");
   assert.equal(result.status, 502);
   assert.equal(requestCount, 1);
+});
+
+test("opt-in caption diagnostic uploads one item, runs A/B/C twice, verifies escaped JSON, restores em-dash caption and preserves all WordPress headers", async () => {
+  const router = makeRouter("Executive Director");
+  const result = await call(router, makeEnv(), "/api/communications/website/production-acceptance", {
+    method: "POST", body: { diagnosticMode: true }, role: "Executive Director"
+  });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  assert.equal(data.diagnosticMode, true);
+  assert.equal(data.diagnosticMedia.metadataCaseCount, 6);
+  assert.equal(data.diagnosticMedia.originalCaptionRestored, true);
+  assert.equal(data.cleanupItems.length, 1, "exactly one media item is retained");
+  assert.equal(data.cleanupItems[0].id, 88);
+  assert.equal(data.cleanupItems[0].url, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
+  const metadata = mediaMetadataRequests;
+  assert.equal(metadata.length, 7, "six test updates plus one restoration");
+  const expected = [
+    "IRPA TEST - Media upload acceptance",
+    "IRPA TEST — Media upload acceptance",
+    "IRPA TEST — Media upload acceptance",
+    "IRPA TEST - Media upload acceptance",
+    "IRPA TEST — Media upload acceptance",
+    "IRPA TEST — Media upload acceptance",
+    "IRPA TEST — Media upload acceptance"
+  ];
+  for (let i = 0; i < expected.length; i++) {
+    const body = JSON.parse(metadata[i].body);
+    assert.equal(body.caption, expected[i]);
+    assert.match(metadata[i].userAgent, /^IRPA-DBGS-Media-406-Diagnostic\/1\.0/);
+    assert.ok(metadata[i].authorization);
+    assert.equal(metadata[i].stagingAuthorization, metadata[i].authorization);
+  }
+  assert.match(metadata[2].body, /\\\\u2014/);
+  assert.equal(metadata[2].body.includes("—"), false);
+  assert.match(metadata[5].body, /\\\\u2014/);
+  assert.equal(metadata[5].body.includes("—"), false);
+  const rows = data.report.filter(row => /caption diagnostic run/.test(row.label));
+  assert.equal(rows.length, 6);
+  assert.ok(rows.every(row => row.status === "PASS" && row.httpStatus === 200));
+  assert.ok(rows.every(row => row.detail.contentType === "application/json"));
+  assert.ok(rows.every(row => row.detail.classification === "wordpress_response"));
+  assert.ok(rows.every(row => row.detail.decodedCaptionMatches === true));
+  assert.ok(rows.every(row => row.detail.wireEscapeVerified === true));
+  assert.ok(rows.every(row => Object.prototype.hasOwnProperty.call(row.detail, "rayId")));
+  assert.equal(data.report.find(row => /restore original em-dash caption/.test(row.label)).status, "PASS");
+});
+
+test("production WordPress requests include Authorization and identifiable User-Agent but never staging authorization header", async () => {
+  const router = makeRouter("Executive Director");
+  const env = makeEnv({ IRPA_ENVIRONMENT: "production", WORDPRESS_BASE_URL: "https://irpa.or.tz" });
+  const result = await call(router, env, "/api/communications/site/status", { role: "Executive Director" });
+  assert.equal(result.status, 200);
+  const wpRequest = wordpressRequestHeaders.find(row => row.hostname === "irpa.or.tz" && row.path === "/wp-json/wp/v2/users/me");
+  assert.ok(wpRequest);
+  assert.ok(wpRequest.authorization);
+  assert.match(wpRequest.userAgent, /^IRPA-DBGS-Communications-Worker\/1\.0/);
+  assert.equal(wpRequest.stagingAuthorization, null);
 });
 
 test("authenticated staging image upload sends file and metadata in one multipart request", async () => {
