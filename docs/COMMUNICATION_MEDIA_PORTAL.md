@@ -64,6 +64,20 @@ The portal calls the existing Cloudflare Worker routes:
 
 The cPanel editor intentionally accepts only HTML, HTM, CSS, TXT and JSON files, with a 512 KiB limit. Before each write it reads the existing file and stores a seven-day rollback snapshot in the existing Cloudflare KV namespace; the editor exposes a rollback action and records audit events. It rejects path traversal, hidden paths, PHP and other executable/script extensions; it does not provide arbitrary shell access, delete-file operations, or unrestricted hosting administration. WordPress page/post content should be edited through the WordPress API. The portal does not embed a cPanel password login session in the browser; it authenticates server-to-server through a restricted cPanel API token.
 
+### Temporary staff fallback for a blocked WordPress Media Library upload
+
+Use this manual route only when the approved media upload flow is blocked and the authorised staff member has access to the live cPanel account:
+
+1. Open **cPanel → File Manager** and navigate to the live WordPress document root's `wp-content/uploads` folder. Confirm that this is the live site, not the staging installation.
+2. Upload the media file using a unique filename. Do not overwrite an existing file and do not delete or replace other files.
+3. Copy the resulting HTTPS URL on the live IRPA website domain.
+4. Open the already-approved page in the normal WordPress/Website Studio editing workflow and add a link or image reference using that HTTPS URL.
+5. Enter meaningful alt text and the intended caption in the page content.
+6. Preview the page on both a phone-sized and desktop-sized view. Save the page as a draft and retain the existing independent approval and publication controls.
+
+**Limitation:** a file placed directly in `wp-content/uploads` by cPanel does **not** create a WordPress Media Library record. It has no WordPress media ID or attachment record, and it is not automatically added to the DBGS `communicationMediaAssets` register. Treat it as a directly hosted file referenced by page content, not as a fully registered Media Library asset. Do not use this workaround to bypass editorial approval or the publication gate.
+
+
 ## Required Cloudflare Worker secrets
 Set these as Worker secrets in the correct environment; never commit them or paste them into the portal:
 - `WORDPRESS_BASE_URL`: the canonical HTTPS WordPress origin for the serving Worker environment, with no path, credentials, query or fragment. Staging accepts only `https://staging.irpa.or.tz`; production accepts only `https://irpa.or.tz` or `https://www.irpa.or.tz`. The production hostname allowlist is enforced by source and must not be widened; a `/staging` path on a production hostname is not accepted as staging.
