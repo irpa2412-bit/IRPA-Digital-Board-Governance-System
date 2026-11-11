@@ -133,7 +133,7 @@ test("production acceptance blocks media tests if upload_files is absent", async
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test("caption diagnostic is opt-in, uploads one media item, and sends three wire variants", async () => {
+test("caption diagnostic is opt-in, uploads one media item, runs A/B/C twice and restores the original em-dash caption", async () => {
   calls.length = 0; nextMediaId = 700;
   const originalFetch = globalThis.fetch;
   const wireBodies = [];
@@ -141,21 +141,26 @@ test("caption diagnostic is opt-in, uploads one media item, and sends three wire
     const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url);
     const method = init.method || "GET";
     const headers = new Headers(init.headers);
-    calls.push({ host: url.hostname, path: url.pathname, method, headers });
-    assert.equal(headers.get("User-Agent"), "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)");
+    calls.push({ host: url.hostname, path: url.pathname, method, headers, body: init.body });
+    if (url.pathname.endsWith("/users/me")) {
+      assert.equal(headers.get("User-Agent"), "IRPA-DBGS-Communications-Worker/1.0 (+https://irpa.or.tz)");
+      return response({ id: 7, roles: ["editor"], capabilities: { upload_files: true } });
+    }
+    assert.equal(url.hostname, "staging.irpa.or.tz");
     assert.equal(headers.get("Authorization"), "Basic " + btoa("editor:testpassword"));
     assert.equal(headers.get("X-IRPA-Staging-Authorization"), "Basic " + btoa("editor:testpassword"));
-    if (url.pathname.endsWith("/users/me")) return response({ id: 7, roles: ["editor"], capabilities: { upload_files: true } });
     if (url.pathname === "/wp-json/wp/v2/media" && method === "POST") {
+      assert.match(headers.get("User-Agent") || "", /^IRPA-DBGS-Media-406-Diagnostic\/1\.0/);
       assert.ok(init.body instanceof Uint8Array);
       return response({ id: ++nextMediaId, source_url: "https://staging.irpa.or.tz/wp-content/uploads/diagnostic.png" }, 201);
     }
     const match = url.pathname.match(/\/wp-json\/wp\/v2\/media\/(\d+)$/);
     if (match && method === "POST") {
+      assert.match(headers.get("User-Agent") || "", /^IRPA-DBGS-Media-406-Diagnostic\/1\.0/);
       const raw = String(init.body);
       wireBodies.push(raw);
       const decoded = JSON.parse(raw);
-      if (decoded.caption === "TEST ONLY — retained for acceptance evidence") {
+      if (decoded.caption === "IRPA TEST - Media upload acceptance" && wireBodies.length === 1) {
         return new Response("<html><body>blocked by edge</body></html>", { status: 406, headers: { "Content-Type": "text/html; charset=UTF-8", "CF-Ray": "abc123-DAR" } });
       }
       return response({ id: Number(match[1]), caption: { raw: decoded.caption } });
@@ -173,18 +178,42 @@ test("caption diagnostic is opt-in, uploads one media item, and sends three wire
     assert.equal(data.diagnosticMode, true);
     assert.equal(data.cleanupItems.length, 1);
     assert.equal(data.cleanupItems[0].id, 701);
+    assert.equal(data.diagnosticMedia.originalCaptionRestored, true);
+    assert.equal(data.diagnosticMedia.metadataCaseCount, 6);
     assert.equal(calls.filter(call => call.path === "/wp-json/wp/v2/media" && call.method === "POST").length, 1);
-    assert.equal(calls.filter(call => /\/media\/701$/.test(call.path) && call.method === "POST").length, 3);
-    assert.equal(wireBodies.length, 3);
-    assert.equal(wireBodies[0].includes("TEST ONLY - retained for acceptance evidence"), true);
-    assert.equal(wireBodies[1].includes("TEST ONLY — retained for acceptance evidence"), true);
-    assert.ok(wireBodies[2].includes("\\u2014"), "Case C sends the literal JSON escape on the wire");
-    assert.ok(wireBodies[2].includes("\\u2014"), "Case C sends the literal JSON escape on the wire");
-    const caseB = data.report.find(row => row.label.includes("B literal em dash"));
-    assert.equal(caseB.httpStatus, 406);
-    assert.equal(caseB.detail.classification, "likely_server_firewall_rejection");
-    assert.equal(caseB.detail.rayId, "abc123-DAR");
-    assert.equal("body" in caseB.detail, false, "HTML response body is not returned");
+    assert.equal(calls.filter(call => /\/media\/701$/.test(call.path) && call.method === "POST").length, 7);
+    assert.equal(wireBodies.length, 7);
+    const expected = [
+      "IRPA TEST - Media upload acceptance",
+      "IRPA TEST — Media upload acceptance",
+      "IRPA TEST — Media upload acceptance",
+      "IRPA TEST - Media upload acceptance",
+      "IRPA TEST — Media upload acceptance",
+      "IRPA TEST — Media upload acceptance",
+      "IRPA TEST — Media upload acceptance"
+    ];
+    assert.deepEqual(wireBodies.map(body => JSON.parse(body).caption), expected);
+    assert.equal(wireBodies[2].includes("\\u2014"), true);
+    assert.equal(wireBodies[2].includes("—"), false);
+    assert.equal(wireBodies[5].includes("\\u2014"), true);
+    assert.equal(wireBodies[5].includes("—"), false);
+    const caseA = data.report.find(row => row.label.includes("run 1 A ASCII"));
+    assert.equal(caseA.status, "FAIL");
+    assert.equal(caseA.httpStatus, 406);
+    assert.equal(caseA.detail.classification, "likely_server_firewall_rejection");
+    assert.equal(caseA.detail.rayId, "abc123-DAR");
+    assert.equal(caseA.detail.contentType, "text/html; charset=UTF-8");
+    assert.equal("body" in caseA.detail, false, "HTML response body is not returned");
+    const passing = data.report.filter(row => row.label.includes("caption diagnostic run") && row.status === "PASS");
+    assert.equal(passing.length, 5);
+    assert.ok(passing.every(row => row.detail.decodedCaptionMatches === true));
+    assert.ok(passing.every(row => row.detail.contentType === "application/json"));
+    assert.ok(passing.every(row => row.detail.classification === "wordpress_response"));
+    assert.equal(data.report.find(row => row.label.includes("restore original em-dash caption")).status, "PASS");
+    const diagnosticCalls = calls.filter(call => /\/media\/701$/.test(call.path) || call.path === "/wp-json/wp/v2/media");
+    assert.ok(diagnosticCalls.every(call => call.headers.get("Authorization") === "Basic " + btoa("editor:testpassword")));
+    assert.ok(diagnosticCalls.every(call => call.headers.get("X-IRPA-Staging-Authorization") === call.headers.get("Authorization")));
+    assert.ok(diagnosticCalls.every(call => /^IRPA-DBGS-Media-406-Diagnostic\/1\.0/.test(call.headers.get("User-Agent") || "")));
     assert.equal(data.nothingDeleted, true);
     assert.equal(data.nothingPublished, true);
     assert.ok(calls.every(call => call.method !== "DELETE"));
