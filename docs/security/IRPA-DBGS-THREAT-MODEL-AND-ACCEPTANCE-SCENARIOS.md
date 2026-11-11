@@ -169,3 +169,36 @@ Do not assume scheduled Firestore export is available on Firebase Spark. Record 
 
 ---
 **Owner decision required before release:** approve the final scenario weights and residual-risk acceptance; separately approve any repository-administration changes, authentication-flow PR, secret rotation or production release.
+
+
+## 15. Password-security service outage policy decision
+
+**Design decision: fail closed for password-based sign-in when the mandatory Cloudflare password-security decision service is unavailable.** The current client behaviour that silently proceeds to Firebase password sign-in when the service fails is not acceptable as the target security policy.
+
+Rationale:
+- Silent fail-open removes the additional account-level protection precisely when its enforcement service is unhealthy.
+- The client cannot provide a trustworthy fallback counter or challenge; a browser-side fallback is attacker-controlled.
+- A server-independent fallback must be proven before it can be relied upon. Firebase's own abuse protections are useful defence-in-depth but are not treated as a substitute for the IRPA-specific policy.
+- Existing authenticated sessions should not be forcibly terminated solely because the password-security service is unavailable.
+- Alternate authentication routes may remain available only after their independence from the failed service, MFA coverage and server-side authorisation are verified. No such availability is assumed by this decision.
+
+Operational safeguards required before implementation:
+1. Return a clear temporary-unavailability message for password sign-in; do not expose internal service details.
+2. Keep account recovery and administrator break-glass paths separately assessed so the outage does not create an informal bypass.
+3. Alert and record the outage through an independent operational channel where available; do not rely solely on the failed Worker.
+4. Restore password sign-in only after health checks pass; do not automatically clear lockout/failure state during recovery.
+5. Test Worker outage, Durable Object/state-store failure, timeout, malformed response, partial outage, successful recovery and concurrent sign-in.
+6. Measure availability impact and document an owner-approved recovery procedure before release.
+
+**Decision status:** Architecture policy selected for the proposed remediation. Not implemented, not deployed and not yet approved as a production operational change. A separate owner release approval remains mandatory.
+
+## 16. Verification record for the review follow-up
+
+- The repository's `.github/CODEOWNERS` file assigns the wildcard and the listed sensitive paths to the same repository owner account. This does not establish independent review separation.
+- The GitHub branch-protection endpoint returned HTTP 403 `Resource not accessible by integration`. Branch protection, required reviews, bypass actors and force-push restrictions are therefore **NOT VERIFIED**.
+- The GitHub connector did not expose the repository Environments listing endpoint. Required reviewers and deployment-branch restrictions for the `production` environment are therefore **NOT VERIFIED**.
+- The repository has Firebase Rules Unit Testing dependencies and two identified rule-test files: `tests/meeting-category-firestore-rules.test.cjs` and `tests/finance-portal-policy.test.cjs`. The package script `test:security-rules` runs those two files. This is targeted coverage, not proof of a complete collection-by-collection rules matrix.
+- No emulator test was run in this review. The current tool session did not provide a repository checkout/runtime in which to install dependencies and execute the test suite.
+- No Git-history secret scan was run. The GitHub connector does not provide a supported repository-history checkout or secret-scanning-alert read in this session. A source-text search is not a substitute for scanning all historical commits.
+- The current `CODEOWNERS` file is present, but because the wildcard owner and sensitive-path owners are the same account, it does not demonstrate independent approval.
+- No GitHub settings, Cloudflare configuration, Firebase project configuration, secrets, production data or Firestore rules were changed.
