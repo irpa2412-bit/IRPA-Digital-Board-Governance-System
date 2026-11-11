@@ -533,9 +533,30 @@ test("opt-in caption diagnostic uploads one item, runs A/B/C twice, verifies esc
   assert.ok(rows.every(row => row.detail.contentType === "application/json"));
   assert.ok(rows.every(row => row.detail.classification === "wordpress_response"));
   assert.ok(rows.every(row => row.detail.decodedCaptionMatches === true));
+  assert.ok(rows.every(row => row.detail.returnedCaption === row.detail.returnedCaption && row.detail.returnedCaption.includes("IRPA TEST") && row.detail.returnedCaption.includes("Media upload acceptance")));
   assert.ok(rows.every(row => row.detail.wireEscapeVerified === true));
   assert.ok(rows.every(row => Object.prototype.hasOwnProperty.call(row.detail, "rayId")));
   assert.equal(data.report.find(row => /restore original em-dash caption/.test(row.label)).status, "PASS");
+});
+
+test("metadata 406 report retains media ID and URL and records safe response metadata before restoration", async () => {
+  mediaMetadataStatuses = [406, 200, 200, 200, 200, 200, 200];
+  const router = makeRouter("Executive Director");
+  const result = await call(router, makeEnv(), "/api/communications/website/production-acceptance", {
+    method: "POST", body: { diagnosticMode: true }, role: "Executive Director"
+  });
+  assert.equal(result.status, 200);
+  const data = await result.json();
+  const failed = data.report.find(row => /caption diagnostic run 1 A ASCII/.test(row.label));
+  assert.equal(failed.status, "FAIL");
+  assert.equal(failed.httpStatus, 406);
+  assert.equal(failed.detail.rayId, "metadata-ray-456");
+  assert.equal(failed.detail.contentType, "text/html");
+  assert.equal(failed.detail.classification, "likely_server_firewall_rejection");
+  assert.equal(failed.detail.mediaId, 88);
+  assert.equal(failed.detail.mediaUrl, "https://staging.irpa.or.tz/wp-content/uploads/field.jpg");
+  assert.equal(JSON.stringify(failed).includes("<html>"), false, "raw HTML must never be returned");
+  assert.equal(data.diagnosticMedia.originalCaptionRestored, true);
 });
 
 test("production WordPress requests include Authorization and identifiable User-Agent but never staging authorization header", async () => {
