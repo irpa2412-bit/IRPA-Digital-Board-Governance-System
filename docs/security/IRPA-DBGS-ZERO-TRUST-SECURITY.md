@@ -138,9 +138,9 @@ Read-only source inspection on main at base commit 9013e162be98bdb8f28d19b7ead7a
 - firestore.rules has a catch-all deny for unmatched Firestore paths and collection-specific rules. Rules must be reviewed collection-by-collection; catch-all denial alone does not prove every explicit rule is safe.
 - storage.rules denies all Firebase Storage reads/writes by default.
 - portalDefinitions is administrator-managed metadata with department validation; it is not a complete integration permission registry.
-- src/firebase/auth.js uses Firebase Authentication and calls Cloudflare gateway password-attempt endpoints. The source comments describe password-attempt protection as additive and preserve Firebase Auth as credential authority; enforcement and failure-mode behaviour need full route-level review.
-- functions/passwordSecurity.js defines staged attempt/lock/suspension logic, but the presence of a function does not prove it is deployed or invoked on every login path.
-- functions/mfaSecurityAudit.js audits/reminds about MFA configuration; reminder/audit logic does not prove MFA is mandatory at authentication or for every privileged action.
+- The client authentication implementation uses Firebase Authentication and calls Cloudflare gateway password-attempt services. The source comments describe the supplementary protection as additive; enforcement and failure-mode behaviour need full route-level review.
+- A separate Firebase Functions source implementation defines staged attempt/lock/suspension logic, but its presence does not prove deployment or invocation on every login path.
+- A scheduled MFA audit/reminder implementation exists in source; this does not prove it is deployed, scheduled or enforcing MFA at authentication or privileged actions.
 - firebase.json defines Hosting headers for index.html and administrator.html; a complete review of headers across hosting paths and Worker responses remains required.
 - Existing deployment workflows can deploy Firebase resources when changes reach main; protected Environment configuration and all deployment triggers must be verified separately.
 
