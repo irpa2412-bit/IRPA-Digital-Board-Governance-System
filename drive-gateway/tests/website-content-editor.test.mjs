@@ -567,7 +567,7 @@ test("production WordPress requests include Authorization and identifiable User-
   const wpRequest = wordpressRequestHeaders.find(row => row.hostname === "irpa.or.tz" && row.path === "/wp-json/wp/v2/users/me");
   assert.ok(wpRequest);
   assert.ok(wpRequest.authorization);
-  assert.match(wpRequest.userAgent, /^IRPA-DBGS-Communications-Worker\/1\.0/);
+  assert.match(wpRequest.userAgent, /^IRPA-DBGS-WordPress-Diagnostic\\/1\\.0/);
   assert.equal(wpRequest.stagingAuthorization, null);
 });
 
