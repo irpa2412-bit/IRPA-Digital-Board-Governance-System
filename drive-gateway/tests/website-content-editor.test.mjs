@@ -523,9 +523,9 @@ test("opt-in caption diagnostic uploads one item, runs A/B/C twice, verifies esc
     assert.ok(metadata[i].authorization);
     assert.equal(metadata[i].stagingAuthorization, metadata[i].authorization);
   }
-  assert.match(metadata[2].body, /\\\\u2014/);
+  assert.equal(metadata[2].body.includes("\\u2014"), true);
   assert.equal(metadata[2].body.includes("—"), false);
-  assert.match(metadata[5].body, /\\\\u2014/);
+  assert.equal(metadata[5].body.includes("\\u2014"), true);
   assert.equal(metadata[5].body.includes("—"), false);
   const rows = data.report.filter(row => /caption diagnostic run/.test(row.label));
   assert.equal(rows.length, 6);
