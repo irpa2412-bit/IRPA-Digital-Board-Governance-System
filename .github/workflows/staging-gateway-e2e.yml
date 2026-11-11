@@ -2248,7 +2248,6 @@ jobs:
   other-portals-report:
     needs: [local-e2e, preflight-staging, deploy-staging-frontend, deploy-staging, signature-acceptance]
     if: always() && needs.local-e2e.result == 'success' && needs.preflight-staging.result == 'success' && needs.deploy-staging-frontend.result == 'success' && needs.deploy-staging.result == 'success'
-    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
