@@ -3,7 +3,7 @@
 **Status:** Design baseline; source review in progress  
 **Branch:** `security/irpa-dbgs-zero-trust-20261111`  
 **Assessment basis:** Repository source inspection only. No production or staging probing has been performed.  
-**Security target:** At least 95% of the weighted, in-scope attack scenarios below must be prevented or contained in repeatable tests. This is a measurable engineering objective, not a guarantee that the system is 95% impossible to hack.
+**Security target:** At least 95% weighted coverage of the approved in-scope scenarios, with every Critical and High scenario passing and no unresolved Critical/High finding before release. This is a measurable engineering objective, not a guarantee that hacking is impossible.
 
 ## 1. System boundary and trusted enforcement
 
@@ -58,6 +58,9 @@ A full compromise of GitHub organisation ownership, Cloudflare account ownership
 | AUTH-03 | Attacker bypasses client role/portal checks and calls Worker endpoints directly | Critical | Worker verifies Firebase token, current server-side role, resource scope and action permission; direct API negative tests |
 | AUTH-04 | MFA reminder exists but privileged action is accepted without MFA | High | Enforce step-up MFA for defined privileged roles/actions; test enrollment, challenge, recovery and revocation |
 | AUTH-05 | Password reset/recovery flow bypasses normal identity assurance | High | Bind recovery to verified factors, short-lived single-use challenges and auditable recovery; replay and takeover tests |
+| AUTH-06 | Stolen or active sessions remain usable after account compromise, role removal or credential reset | High | Server-enforced session/token revocation, bounded token lifetime and revocation propagation; test active-session invalidation across portals and APIs |
+| APP-01 | XSS steals a user's session or performs privileged actions in their browser | High | Contextual output encoding, sanitisation, restrictive CSP, secure cookie/token handling and dependency controls; stored/reflected/DOM XSS tests |
+| SIGN-01 | Token-based electronic-signature link is guessed, replayed, shared or used outside its envelope/signer scope | High | High-entropy single-use tokens bound to signer, envelope and permitted action; short expiry, atomic consumption, replay/guessing tests and auditable revocation |
 | PORTAL-01 | User accesses another portal's records or actions by changing IDs | Critical | Resource-level authorisation and portal scope checks at Worker and Firestore; cross-portal matrix tests |
 | PORTAL-02 | Portal metadata is mistaken for an integration permission grant | High | Server-side default-deny Integration Registry; independent approval and narrow scopes |
 | API-01 | Unauthenticated, wrong-method, malformed or oversized requests reach sensitive routes | High | Route/method/auth matrix, schema validation, size limits and negative tests |
@@ -71,16 +74,22 @@ A full compromise of GitHub organisation ownership, Cloudflare account ownership
 | EDGE-01 | Brute force, enumeration or denial-of-service overwhelms endpoints | High | Edge rate limits by IP and account/resource, abuse telemetry and bounded resource use |
 | CONFIG-01 | Misconfigured Firebase API key, App Check or Worker binding weakens boundary | High | Read-only configuration audit; restrictions and App Check assessment; no config mutation without separate approval |
 | REC-01 | Incident cannot be recovered because backups are absent or untested | Critical | Document actual export/backup path and free-tier constraints; tested restore and recovery objectives |
+| OPS-01 | Security alerts are missed because incident ownership or contact routing is unclear | Medium | Name accountable incident owner, monitored contact route, escalation sequence and periodic contact test |
+| OPS-02 | Security-control outage persists beyond an acceptable period without a defined escalation decision | Medium | Owner-approved maximum tolerable outage, escalation milestones and documented recovery authority; exercise the runbook |
+| AUDIT-02 | Audit checkpoint signing or independent custody fails silently | Medium | Monitor checkpoint generation/export, alert on gaps and periodically verify signatures and chain continuity |
+| DOC-01 | Public security documentation exposes implementation details useful to attackers | Medium | Minimise public technical detail, maintain restricted remediation evidence and review disclosure before publication |
+| SUPPLY-02 | A dependency or build artifact changes unexpectedly without a clear provenance record | Medium | Lockfile review, artifact provenance, pinned CI actions and repeatable build verification |
+| UX-01 | Security controls generate confusing errors that encourage unsafe workarounds | Low | Generic actionable messages, user guidance and support escalation; usability review |
 
 ## 6. Measurable 95% target
 
-The denominator is the approved scenario set in Section 5, weighted by severity: Critical = 5, High = 3, Medium = 2, Low = 1. For each scenario, evidence must demonstrate prevention or bounded containment under the documented preconditions. A scenario counts as passing only when an automated repeatable test or independently reviewable operational control exists.
+The denominator is the approved scenario set in Section 5, weighted by severity: Critical = 5, High = 3, Medium = 2, Low = 1. For each scenario, evidence must demonstrate prevention or bounded containment under the documented preconditions. A scenario counts as passing only when an automated repeatable test or independently reviewable operational control exists. With all Critical and High scenarios mandatory-pass, the 95% threshold is a secondary aggregate measure over the full register; it mainly distinguishes residual Medium/Low gaps. It must never be used to excuse a failed Critical or High scenario.
 
 `Weighted coverage = (weight of passing scenarios / total weight of in-scope scenarios) × 100`
 
 Acceptance requires:
-- Weighted coverage >= 95%.
-- 100% of Critical scenarios pass.
+- Weighted coverage >= 95% across Critical, High, Medium and Low scenarios.
+- 100% of Critical and High scenarios pass.
 - No unresolved Critical or High findings at release.
 - All applicable negative tests pass, including unauthenticated, wrong-role, expired/replayed token, cross-portal and direct API invocation cases.
 - Staging regression and recovery evidence is recorded.
@@ -153,7 +162,7 @@ Do not assume scheduled Firestore export is available on Firebase Spark. Record 
 
 | Area | Current status |
 |---|---|
-| Threat model and scenario register | Documented in this file |
+| Threat model and scenario register | Documented in this file; source-level scenarios only, no runtime validation |
 | Password endpoint source concern | Source finding; runtime exploitability not tested |
 | Client fail-open path | Source finding in `src/firebase/auth.js`; runtime outage behaviour not tested |
 | Worker route inventory | In progress; not complete |
@@ -161,7 +170,9 @@ Do not assume scheduled Firestore export is available on Firebase Spark. Record 
 | Git-history secret scan | Not run |
 | Firebase API key restrictions/App Check | Not retrieved |
 | MFA/recovery coverage | Not complete |
-| GitHub branch protection / CODEOWNERS / protected environments | Not retrieved |
+| GitHub branch protection / required reviews / bypass actors / force-push restrictions | NOT VERIFIED (branch-protection API returned 403 to the connected integration) |
+| CODEOWNERS | PARTIAL — file retrieved; wildcard and sensitive paths resolve to the same repository owner account, so independent review separation is not demonstrated |
+| Protected production environment reviewers / deployment branch restrictions | NOT VERIFIED (environment listing endpoint unavailable to the connected integration) |
 | Cloudflare edge controls | Not retrieved |
 | Backup/restore rehearsal | Not run |
 | Penetration testing | Not run |
@@ -211,7 +222,7 @@ The existing `tests/meeting-category-firestore-rules.test.cjs` contains a test n
 **Classification:** Test-specification inconsistency requiring investigation. It is not reported as a confirmed live data exposure: the emulator suite was not executed and no production access was attempted. Do not weaken or edit Firestore rules to make the test pass. Correct the expected assertion/fixture only after the intended meeting confidentiality policy is confirmed and with the existing Firestore approval gate preserved.
 
 
-## 18. Owner-authorised break-glass accountability decision
+## 18. Owner-authorised break-glass accountability decision — authoritative record
 
 **Decision authorised by the IRPA Owner on 2026-11-11:** The IRPA Owner, acting in the capacity of Executive Director, is the accountable authority who approves and activates the break-glass procedure during an outage of the mandatory security-decision service. This authority is expressly the Owner's decision; it is not delegated to, or dependent on approval by, the reviewer.
 
@@ -220,3 +231,24 @@ The reviewer may assess the design, inspect evidence and report risks, but does 
 Any activation must be narrowly scoped and time-bounded, identify the affected service and users, state the operational reason and permitted actions, record the activation and expiry times, preserve attributable audit evidence, and trigger independent notification where available. The Owner is accountable for ensuring that access is revoked when the outage ends or the approved period expires, and that a post-incident review records actions, impact and any follow-up remediation.
 
 This decision establishes accountability; it does not itself implement or activate a technical bypass. The maximum tolerable security-service outage, escalation contact/sequence, permitted emergency actions and any delegated alternate must be documented and approved before operational release. No outage duration or alternate approver is inferred by this decision.
+
+**Cross-reference:** This is the sole authoritative break-glass decision. Framework Section 11 and Threat Model Section 8 refer here and do not create separate approvals.
+
+## 19. Owner decisions and risk register
+
+| Decision / risk | Status | Required Owner action |
+|---|---|---|
+| Single-approver/no-independent-review risk | **NOT ACCEPTED / NOT RECORDED** | Decide whether to maintain the release block pending independent review or explicitly accept a scoped residual risk with rationale, compensating controls and review date. No acceptance is inferred. |
+| Repository visibility | **OPEN** | Decide public/private. Existing public-branch text has been minimised, but Git history and prior copies may retain earlier detail. |
+| Interim Cloudflare WAF/rate-limit mitigation | **NOT AUTHORISED** | Separate explicit approval required before any production edge configuration change. |
+| Maximum tolerable security-service outage | **OPEN** | Set a duration and escalation milestones. |
+| Incident contact route | **OPEN** | Designate a monitored contact channel and responsible monitor. |
+| Permitted break-glass actions and delegated alternate | **OPEN** | Define exact scope and any alternate in a separate Owner decision. |
+| Owner account hardware-key MFA and offline recovery controls | **NOT VERIFIED** | Supply evidence or approve a plan; do not treat as active controls. |
+
+**Owner-account compromise residual risk:** Owner compromise remains outside the weighted scenario denominator, is not accepted as safe, and must be tracked separately as a catastrophic residual risk.
+
+
+## 20. Public disclosure note
+
+This branch version deliberately omits exact password-security endpoint paths, handler names and line-level exploit instructions. This reduces unnecessary public disclosure but does not remediate the underlying issue, erase prior Git history, or make a public repository private. Maintain detailed implementation evidence in a restricted work area pending the Owner's visibility decision. No Cloudflare edge control or repository visibility setting was changed.
