@@ -27,6 +27,7 @@ export default function CommunicationsWebsiteStudio({initialTab="pages",isAdmin=
   if(captionDiagnostic){
    try{
     const result=await call("/api/communications/website/production-acceptance","POST",{diagnosticMode:true},true);
+    if(result.httpStatus<200||result.httpStatus>=300){const failure=new Error(result.error||"Diagnostic endpoint returned HTTP "+result.httpStatus+".");failure.httpStatus=result.httpStatus;throw failure;}
     const acceptance=result.data||{};
     const rows=Array.isArray(acceptance.report)?acceptance.report:[];
     if(Array.isArray(acceptance.cleanupItems)&&acceptance.cleanupItems.length){
