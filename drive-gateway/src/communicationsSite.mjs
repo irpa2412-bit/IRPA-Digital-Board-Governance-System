@@ -340,7 +340,7 @@ export function createCommunicationsSiteRouter(deps) {
     const isHtml = /text\/html|application\/xhtml\+xml/i.test(contentType) || /^\s*(?:<!doctype\s+html|<html[\s>])/i.test(raw);
     return {
       step, status: response.status, rayId: cleanText(headers.get("cf-ray") || "", 120) || null,
-      classification: isHtml ? "likely_server_firewall_rejection" : "wordpress_or_http_error",
+      classification: isHtml ? "likely_server_firewall_rejection" : response.ok ? "wordpress_response" : "wordpress_or_http_error",
       contentType, ...(isHtml ? {} : { body: sanitizedWordPressBody(raw, wp).slice(0, 300) }), headers: headerDetails
     };
   }
