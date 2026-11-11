@@ -209,3 +209,14 @@ Operational safeguards required before implementation:
 The existing `tests/meeting-category-firestore-rules.test.cjs` contains a test named "meeting invitee can read only the invited meeting and its participant register". In the visible fixture, the second meeting lists a different invitee, but the test asserts that the first invitee can successfully read that second meeting. This assertion conflicts with the test's stated access boundary. The related `meetingParticipant` / `meetingCategoryReadAllowed` rules must be evaluated against the complete fixture and current rules before deciding whether the fixture or the rule is wrong.
 
 **Classification:** Test-specification inconsistency requiring investigation. It is not reported as a confirmed live data exposure: the emulator suite was not executed and no production access was attempted. Do not weaken or edit Firestore rules to make the test pass. Correct the expected assertion/fixture only after the intended meeting confidentiality policy is confirmed and with the existing Firestore approval gate preserved.
+
+
+## 18. Owner-authorised break-glass accountability decision
+
+**Decision authorised by the IRPA Owner on 2026-11-11:** The IRPA Owner, acting in the capacity of Executive Director, is the accountable authority who approves and activates the break-glass procedure during an outage of the mandatory security-decision service. This authority is expressly the Owner's decision; it is not delegated to, or dependent on approval by, the reviewer.
+
+The reviewer may assess the design, inspect evidence and report risks, but does not approve, activate, extend or revoke break-glass access unless the Owner separately delegates that authority in a documented decision.
+
+Any activation must be narrowly scoped and time-bounded, identify the affected service and users, state the operational reason and permitted actions, record the activation and expiry times, preserve attributable audit evidence, and trigger independent notification where available. The Owner is accountable for ensuring that access is revoked when the outage ends or the approved period expires, and that a post-incident review records actions, impact and any follow-up remediation.
+
+This decision establishes accountability; it does not itself implement or activate a technical bypass. The maximum tolerable security-service outage, escalation contact/sequence, permitted emergency actions and any delegated alternate must be documented and approved before operational release. No outage duration or alternate approver is inferred by this decision.
