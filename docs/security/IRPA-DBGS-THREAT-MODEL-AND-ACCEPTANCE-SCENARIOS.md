@@ -202,3 +202,10 @@ Operational safeguards required before implementation:
 - No Git-history secret scan was run. The GitHub connector does not provide a supported repository-history checkout or secret-scanning-alert read in this session. A source-text search is not a substitute for scanning all historical commits.
 - The current `CODEOWNERS` file is present, but because the wildcard owner and sensitive-path owners are the same account, it does not demonstrate independent approval.
 - No GitHub settings, Cloudflare configuration, Firebase project configuration, secrets, production data or Firestore rules were changed.
+
+
+## 17. Rules-test review note (source-only)
+
+The existing `tests/meeting-category-firestore-rules.test.cjs` contains a test named "meeting invitee can read only the invited meeting and its participant register". In the visible fixture, the second meeting lists a different invitee, but the test asserts that the first invitee can successfully read that second meeting. This assertion conflicts with the test's stated access boundary. The related `meetingParticipant` / `meetingCategoryReadAllowed` rules must be evaluated against the complete fixture and current rules before deciding whether the fixture or the rule is wrong.
+
+**Classification:** Test-specification inconsistency requiring investigation. It is not reported as a confirmed live data exposure: the emulator suite was not executed and no production access was attempted. Do not weaken or edit Firestore rules to make the test pass. Correct the expected assertion/fixture only after the intended meeting confidentiality policy is confirmed and with the existing Firestore approval gate preserved.
