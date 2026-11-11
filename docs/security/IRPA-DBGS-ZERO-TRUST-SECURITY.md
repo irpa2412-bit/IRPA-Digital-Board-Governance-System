@@ -56,7 +56,7 @@
 - Validate fields, types, lengths, allowed transitions and ownership at the authoritative server/data layer.
 - Prohibit client-side writes to privileged audit, credential, role, approval and security configuration records.
 - Record security events server-side: actor UID, effective role, action, target, portal, timestamp, outcome, correlation ID and approval/change reference. Avoid logging secrets, tokens, passwords, OTPs or unnecessary personal data.
-- Protect audit records from ordinary update/delete; periodically export/retain protected evidence according to an approved retention policy.
+- Treat audit integrity as tamper-evident, not absolutely immutable: Worker-generated append-only events must be hash-chained with sequence and previous-event hash; periodically sign checkpoints and export them to a separately controlled append-only destination outside the primary administrative trust boundary. Verify chains/checkpoints during audit. Retention and custody remain subject to an approved policy.
 - Encrypt secrets in managed secret stores; rotate and revoke compromised credentials. Never put secrets in source, browser bundles, logs or PR descriptions.
 
 ### 3.5 Application and supply chain
@@ -76,10 +76,12 @@ Every change that can affect an operational portal, shared component, API, data 
 - dependency/impact map, including shared components and downstream portals;
 - threat assessment and rollback plan;
 - test plan and evidence;
-- named independent approver(s);
+- named independent approver(s), where an independent reviewer exists; record the approver identity and evidence;
 - deployment authorisation and post-release verification.
 
 Lifecycle: DRAFT -> IMPACT_REVIEW -> APPROVED_FOR_STAGING -> STAGING -> TESTED -> APPROVED_FOR_RELEASE -> RELEASED -> VERIFIED, with REJECTED, SUSPENDED and ROLLED_BACK exception states.
+
+Interim staffing rule (current IRPA capacity): IRPA currently has no dedicated IT/security staff, so the Owner may sponsor and authorise documentation, inventory and isolated non-production work. This is not acceptance of single-person approval risk. Where a change requires independent approval and no independent approver is available, the change must remain blocked from staging/release or be redesigned to remove that dependency. The Owner cannot self-approve a change that this framework classifies as requiring independent review. The Owner-authorised break-glass accountability in Section 11 is a separate outage decision and is not a standing waiver of change control.
 
 Rules:
 - No direct production edits by builders.
@@ -93,6 +95,10 @@ Rules:
 - If impact or test evidence is incomplete, fail closed.
 
 ## 5. Security incident response
+**Accountable authority:** The IRPA Owner, acting as Executive Director, is accountable for incident command, prioritisation and authorising containment/recovery decisions. The Owner is also the break-glass approving/activating authority under Section 11. This does not imply that an independent responder or technical operator currently exists.
+
+**Contact route:** A dedicated security-incident contact channel and escalation sequence have not yet been designated or verified. Before operational release, IRPA must publish a monitored incident contact route, identify who monitors it and define an escalation path. Do not treat an unverified mailbox or personal account as an operationally monitored security hotline.
+
 1. Detect and classify the event; preserve relevant logs and timestamps.
 2. Contain: revoke sessions/credentials, suspend integration, block abusive traffic or disable the affected capability.
 3. Assess scope and affected portals/data without destructive investigation.
@@ -103,7 +109,7 @@ Rules:
 
 ## 6. Security metrics and 95% target
 
-Do not report “95% secure” from a checklist. Establish a threat-model denominator and test baseline. For each defined attack scenario, record attempted controls, pass/fail, severity and evidence. Target at least 95% prevention/containment of the agreed in-scope scenarios, with **zero unresolved critical/high findings** before production activation. Also track:
+Do not report “95% secure” or “95% impossible to hack.” Use the weighted, version-controlled scenario denominator in the Threat Model. Target at least 95% weighted prevention/containment coverage, with **100% of Critical and High scenarios passing and zero unresolved Critical/High findings** before production activation. Because every Critical/High scenario must pass, the percentage threshold applies principally to Medium/Low scenarios; it is not a substitute for the severity gate. Also track:
 - privileged accounts with MFA / total privileged accounts;
 - sensitive endpoints with server-side authz tests / total sensitive endpoints;
 - portal integrations with approved registry records / total integrations;
@@ -154,10 +160,6 @@ No production deployment, merge, live-data mutation, Firestore/Storage rules mod
 - Owner reviews the complete diff and separately authorises merge and production release.
 
 
-## 11. Owner-authorised break-glass accountability
+## 11. Break-glass governance reference
 
-The IRPA Owner, in the capacity of Executive Director, is accountable for approving and activating the break-glass procedure during a security-service outage. This is an Owner-authorised governance decision, not a reviewer decision. A reviewer may assess and challenge the control but does not approve or activate the procedure.
-
-Activation must be exceptional, justified, narrowly scoped, time-bounded and attributable. Record the affected service, reason, approving/activating authority, users and privileges enabled, start and expiry times, actions taken, notifications and closure/revocation. Preserve the audit evidence and complete a post-incident review.
-
-This accountability decision does not create a technical bypass or authorise routine circumvention of authentication, MFA, data-access, change-control or deployment safeguards. Before operational release, IRPA must separately document the maximum tolerable outage, escalation path, exact permitted emergency actions, revocation process and any formally delegated alternate authority. No duration or alternate approver is assumed here.
+The authoritative Owner decision, scope, activation requirements and unresolved operational parameters are recorded in Section 18 of the Threat Model. That section is the single source of truth; this Framework does not restate or expand the decision. Break-glass is not a technical bypass or standing waiver of authentication, MFA, data-access, change-control or deployment safeguards.
