@@ -2243,7 +2243,6 @@ jobs:
   other-portals-report:
     needs: [local-e2e, preflight-staging, deploy-staging-frontend, deploy-staging, signature-acceptance]
     if: always() && needs.local-e2e.result == 'success' && needs.preflight-staging.result == 'success' && needs.deploy-staging-frontend.result == 'success' && needs.deploy-staging.result == 'success'
-    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -2336,7 +2335,6 @@ jobs:
       - name: Run real-runtime staging cryptographic acceptance
         id: staging-runtime-acceptance
         if: always()
-        continue-on-error: true
         env:
           STAGING_GATEWAY_URL: ${{ needs.deploy-staging.outputs.staging_gateway_url }}
           STAGING_FIREBASE_WEB_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
