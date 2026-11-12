@@ -22,7 +22,14 @@ async function main() {
     createdAt: new Date().toISOString(),
     fixtureOnly: true
   });
-  process.stdout.write("Seeded isolated Firebase Emulator administrator fixture: " + email + "\n");
+  await db.collection("institutionalDepartments").doc("browser-fixture-research").set({
+    recordType: "Institutional Department",
+    name: "Browser Fixture Research Department",
+    code: "BFRD",
+    status: "Active",
+    fixtureOnly: true
+  });
+  process.stdout.write("Seeded isolated Firebase Emulator administrator and active department fixtures: " + email + "\n");
   await db.terminate();
   await admin.app().delete();
 }
