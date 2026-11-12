@@ -288,7 +288,7 @@ jobs:
                 await page.getByText("SIGNATURE WORKSPACE", { exact: false }).waitFor({ state: "visible", timeout: 30000 });
                 console.log("PASS: signed-in Documents → Signing → Open Signing Workspace rendered.");
               } else {
-                console.log("Documents lazy module loaded and Signing tab opened; no pending-signature document was available to open the per-document signing workspace.");
+                throw new Error("Documents lazy module loaded, but no pending-signature document exposed Open Signing Workspace; signing view could not be verified.");
               }
             }
 
