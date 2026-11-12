@@ -10,7 +10,8 @@ name: Deploy IRPA Governance to Firebase
 # 2026-09-26 IT Specialist login gateway release verification: force production deployment of current main.
 
 concurrency:
-  group: irpa-production-frontend-deploys
+  # Dedicated serialization group for irpa-firebase-production.
+  group: irpa-firebase-production
   cancel-in-progress: false
 
 permissions:
@@ -361,7 +362,7 @@ jobs:
             output="$(npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive 2>&1)"
             status=$?
             set -e
-            printf '%s\n' "$output"
+            echo "$output"
             if [ "$status" -eq 0 ]; then
               echo "Firestore rules and indexes deployed successfully."
               exit 0
