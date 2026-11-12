@@ -1,22 +1,9 @@
 name: Production Browser Smoke Tests
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "drive-gateway/**"
-      - "functions/**"
-      - "tests/**"
-      - "public/**"
-      - "index.html"
-      - "package.json"
-      - "package-lock.json"
-      - "vite.config.js"
-      - "firebase.json"
-      - "firestore.rules"
-      - "firestore.indexes.json"
-      - ".github/workflows/production-browser-smoke.yml"
+  workflow_run:
+    workflows: ["Deploy IRPA Governance Frontend to Cloudflare Workers"]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -28,11 +15,14 @@ permissions:
 
 jobs:
   browser-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout deployed frontend commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -40,6 +30,16 @@ jobs:
           cache: npm
       - name: Install application dependencies
         run: npm ci
+      - name: Rebuild exact frontend commit for asset verification
+        env:
+          VITE_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
+          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
+          VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
+        run: VITE_BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" npm run build
       - name: Install Playwright Chromium
         run: |
           npm install --no-save --package-lock=false playwright
@@ -192,4 +192,109 @@ jobs:
 
           if (failed) process.exit(1);
           console.log("Production Chromium smoke tests and six-width viewport audits completed for all configured frontend endpoints.");
+          NODE
+      - name: Verify Cloudflare signing-path assets and lazy Documents workspace
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+          import fs from "node:fs";
+          import path from "node:path";
+          import crypto from "node:crypto";
+
+          const base = "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev";
+          const expectedCommit = process.env.TARGET_SHA;
+          const assetsDir = path.resolve("dist/assets");
+          const jsAssets = fs.readdirSync(assetsDir).filter(name => name.endsWith(".js")).sort();
+          const documentChunk = jsAssets.find(name => name.includes("DocumentLifecycleModule"));
+          if (!expectedCommit || !documentChunk) {
+            throw new Error("Expected deployed commit or built DocumentLifecycleModule chunk is missing.");
+          }
+
+          const localChunk = fs.readFileSync(path.join(assetsDir, documentChunk));
+          const localHash = crypto.createHash("sha256").update(localChunk).digest("hex");
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          const pageErrors = [];
+          page.on("pageerror", error => pageErrors.push(error.message));
+
+          try {
+            const response = await page.goto(base + "/", { waitUntil: "domcontentloaded", timeout: 60000 });
+            if (!response || response.status() !== 200) {
+              throw new Error("Cloudflare frontend did not return HTTP 200.");
+            }
+            await page.waitForFunction(() => {
+              const root = document.querySelector("#root");
+              return Boolean(root && root.children.length > 0);
+            }, { timeout: 30000 });
+
+            const liveStamp = await page.locator('meta[name="irpa-build-version"]').getAttribute("content");
+            if (liveStamp !== expectedCommit) {
+              throw new Error("Live Cloudflare build stamp mismatch: expected " + expectedCommit + ", received " + liveStamp);
+            }
+
+            const assetResults = await page.evaluate(async names => {
+              const results = [];
+              for (const name of names) {
+                const response = await fetch("/assets/" + encodeURIComponent(name) + "?__irpa_signing_check=" + Date.now());
+                const bytes = await response.arrayBuffer();
+                const digest = await crypto.subtle.digest("SHA-256", bytes);
+                const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+                results.push({ name, status: response.status, hash });
+              }
+              return results;
+            }, jsAssets);
+
+            const failedAssets = assetResults.filter(asset => asset.status !== 200);
+            if (failedAssets.length) throw new Error("JavaScript assets did not all return HTTP 200: " + JSON.stringify(failedAssets));
+            const liveChunk = assetResults.find(asset => asset.name === documentChunk);
+            if (!liveChunk || liveChunk.status !== 200 || liveChunk.hash !== localHash) {
+              throw new Error("DocumentLifecycleModule SHA-256 mismatch: local=" + localHash + " live=" + (liveChunk?.hash || "missing"));
+            }
+            console.log(JSON.stringify({
+              check: "all-built-JavaScript-assets",
+              count: assetResults.length,
+              allHttp200: true,
+              documentLifecycleModule: documentChunk,
+              localSha256: localHash,
+              liveSha256: liveChunk.hash,
+              hashMatch: true,
+              liveBuildStamp: liveStamp
+            }));
+
+            const signedOut = await page.evaluate(() => {
+              const visible = element => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+              return [...document.querySelectorAll('input[type="email"], input[type="password"], input[autocomplete="username"]')].some(visible);
+            });
+
+            if (signedOut) {
+              console.log("signed-in signing view not tested");
+            } else {
+              const documentsButton = page.getByRole("button", { name: /^Documents$/i }).first();
+              if (await documentsButton.count()) {
+                await documentsButton.click();
+              } else {
+                const documentsLink = page.getByRole("link", { name: /^Documents$/i }).first();
+                if (!(await documentsLink.count())) throw new Error("Signed-in browser has no Documents navigation control.");
+                await documentsLink.click();
+              }
+              await page.getByText("Documents Workspace", { exact: false }).waitFor({ state: "visible", timeout: 30000 });
+              const signingTab = page.getByRole("button", { name: "Signing", exact: true }).first();
+              if (await signingTab.count()) await signingTab.click();
+              const openSigning = page.getByRole("button", { name: "Open Signing Workspace", exact: true }).first();
+              if (await openSigning.count()) {
+                await openSigning.click();
+                await page.getByText("SIGNATURE WORKSPACE", { exact: false }).waitFor({ state: "visible", timeout: 30000 });
+                console.log("PASS: signed-in Documents → Signing → Open Signing Workspace rendered.");
+              } else {
+                console.log("Documents lazy module loaded and Signing tab opened; no pending-signature document was available to open the per-document signing workspace.");
+              }
+            }
+
+            if (pageErrors.length) throw new Error("Production browser pageErrors: " + pageErrors.join(" | "));
+            console.log(JSON.stringify({ pageErrors, signingPathChecked: !signedOut, liveBuildStamp: liveStamp }));
+          } finally {
+            await browser.close();
+          }
           NODE
