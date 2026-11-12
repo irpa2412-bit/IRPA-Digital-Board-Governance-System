@@ -2547,7 +2547,7 @@
 .main-area>.mobile-global-nav{background:#fff;border-top:1px solid #d7e5df;box-shadow:0 -4px 18px rgba(20,60,44,.09)}.main-area>.mobile-global-nav button{background:#fff;color:#4e6058;border:0;box-shadow:none}.main-area>.mobile-global-nav button.active{background:#0b5fa8;color:#fff;box-shadow:inset 0 3px #fff}
 }
 @media(min-width:761px){
-.dashboard-command,.dashboard-command.page{background:#f4f8f6}.sidebar{background:#063d2a;width:180px;border-right:0}.main-area{margin-left:180px;background:#f4f8f6}.sidebar-brand{background:#063d2a;padding:15px 12px}.quote4-sidebar-logo{width:48px;height:48px;background:#fff;border-radius:50%;padding:3px}.sidebar-brand-copy strong{color:#f6cf58}.sidebar-brand-copy span,.sidebar-brand-copy small{color:#d9ebe3}.topbar{background:linear-gradient(180deg,#063524 0%,#075032 58%,#043121 100%);border-bottom:1px solid #0d6641;box-shadow:0 3px 16px rgba(4,48,33,.18);min-height:57px;padding:8px 18px}
+.dashboard-command,.dashboard-command.page{background:#f4f8f6}.sidebar{position:fixed;background:#063d2a;width:180px;border-right:0}.main-area{margin-left:180px;background:#f4f8f6}.sidebar-brand{background:#063d2a;padding:15px 12px}.quote4-sidebar-logo{width:48px;height:48px;background:#fff;border-radius:50%;padding:3px}.sidebar-brand-copy strong{color:#f6cf58}.sidebar-brand-copy span,.sidebar-brand-copy small{color:#d9ebe3}.topbar{background:linear-gradient(180deg,#063524 0%,#075032 58%,#043121 100%);border-bottom:1px solid #0d6641;box-shadow:0 3px 16px rgba(4,48,33,.18);min-height:57px;padding:8px 18px}
 .desktop-quote4-hero{min-height:126px;height:126px;border-radius:10px;background:#075b42;box-shadow:none}.desktop-quote4-hero-image{background-image:url('/irpa-rangeland-hero.svg');background-size:cover;background-position:center 45%;filter:saturate(1.15) contrast(1.04)}.desktop-quote4-hero-overlay{background:linear-gradient(90deg,rgba(2,52,37,.76),rgba(4,75,51,.30) 62%,rgba(4,61,43,.14))}.desktop-quote4-hero-content{min-height:126px;padding:16px 20px}.desktop-profile-photo{width:64px;height:64px;flex-basis:64px}.desktop-quote4-hero h1{font-size:23px;margin:2px 0}.desktop-quote4-hero p{font-size:12px}.desktop-motto{font-size:12px;margin-top:5px}.desktop-date-card{top:10px;right:12px;min-width:250px;padding:16px 18px;background:rgba(4,66,45,.92);border:1px solid rgba(255,255,255,.34);box-shadow:0 8px 22px rgba(0,0,0,.24);color:#fff}.desktop-date-card strong{font-size:20px;line-height:1.25;color:#fff}.desktop-date-card span{display:block;margin-top:6px;font-size:15px;line-height:1.3;color:#ffe08a;font-weight:850}.desktop-date-card small{display:block;margin-top:8px;font-size:12px;line-height:1.35;color:#e4f1eb;font-weight:650}
 .dashboard-quote4-stats{grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.dashboard-quote4-stats>button{min-height:86px;background:#fff;color:#173c2d;border:1px solid #dce8e2;border-radius:10px;box-shadow:0 3px 10px rgba(28,70,50,.07)}.quote4-stat-icon{width:40px;height:40px;flex-basis:40px;border-radius:9px}.dashboard-quote4-stats strong{font-size:22px;color:#11764c}.dashboard-quote4-stats b{font-size:12px;color:#25473b}.dashboard-quote4-stats small{font-size:12px;color:#667d73;line-height:1.25}
 .dashboard-quote4-main{grid-template-columns:minmax(0,1.75fr) minmax(210px,.65fr);gap:9px}.dashboard-quote4-main .panel{background:#fff;border:1px solid #dce8e2;border-radius:10px;box-shadow:0 3px 10px rgba(28,70,50,.06);padding:12px}.quote4-heading h2{font-size:14px;color:#173c2d}.quote4-activity-table>button{grid-template-columns:78px minmax(0,1.5fr) 110px 95px 14px;min-height:38px;background:#fff;border-bottom:1px solid #edf2ef}.quote4-activity-table>button:hover{background:#f7fbf9}.quote4-activity-table span,.quote4-activity-table small,.quote4-activity-table strong,.quote4-activity-table em{font-size:12px}.quote4-quick-grid{gap:7px}.quote4-quick-grid>button{min-height:76px;background:#fff;color:#173c2d;border:1px solid #dce8e2;border-radius:9px}.quote4-quick-grid>button>span{font-size:18px;color:#128053}.quote4-quick-grid>button>strong{font-size:12px;color:#21473a}.quote4-quick-grid>button>small{font-size:12px;color:#667d73;line-height:1.25}
@@ -3450,12 +3450,12 @@
    This changes only desktop navigation sizing/positioning; routes, labels, permissions and actions remain unchanged. */
 @media screen and (min-width:761px){
   .sidebar{
-    width:170px;
+    width:180px;
     left:0;
     right:auto;
   }
   .main-area{
-    margin-left:170px;
+    margin-left:180px;
     margin-right:0;
   }
   .sidebar nav{
