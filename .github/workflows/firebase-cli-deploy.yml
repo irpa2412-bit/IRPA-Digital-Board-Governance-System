@@ -104,7 +104,22 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
       - name: Deploy Firestore Rules and Indexes (Cloudflare owns frontend hosting)
         if: steps.cloudflare_gate.outcome == 'success'
-        run: npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore --non-interactive
+        run: |
+          set -euo pipefail
+          # Firebase Rules release creation can briefly return HTTP 409 when a
+          # concurrent or just-completed deployment has already created the release.
+          for attempt in 1 2 3; do
+            if npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore --non-interactive; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Firestore deployment failed after $attempt attempts."
+              exit 1
+            fi
+            delay=$((attempt * 10))
+            echo "::warning::Firestore deployment attempt $attempt failed; retrying in $delay seconds."
+            sleep "$delay"
+          done
       - name: Deploy Firestore only while crawler cutover is blocked
         if: steps.cloudflare_gate.outcome != 'success'
         run: |
