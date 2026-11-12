@@ -22,7 +22,8 @@ permissions:
 
 # Serialize Firebase deploys to prevent duplicate Firestore Rules release creation (HTTP 409).
 concurrency:
-  group: irpa-production-frontend-deploys
+  # Dedicated serialization group for irpa-firebase-production.
+  group: irpa-firebase-production
   cancel-in-progress: false
 jobs:
   build-and-deploy:
