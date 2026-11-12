@@ -9,7 +9,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: irpa-production-frontend-deploys
+  # Dedicated serialization group for irpa-cloudflare-grant-crawler-worker.
+  group: irpa-cloudflare-grant-crawler-worker
   cancel-in-progress: false
 jobs:
   deploy:

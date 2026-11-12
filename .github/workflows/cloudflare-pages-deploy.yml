@@ -12,7 +12,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: irpa-production-frontend-deploys
+  # Dedicated serialization group for irpa-cloudflare-frontend-worker.
+  group: irpa-cloudflare-frontend-worker
   cancel-in-progress: false
 jobs:
   build-and-deploy:
