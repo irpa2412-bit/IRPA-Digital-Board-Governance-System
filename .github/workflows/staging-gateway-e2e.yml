@@ -2393,6 +2393,14 @@ jobs:
             if [ -f drive-gateway/runtime-acceptance.log ]; then echo ""; echo "### Runtime cryptographic acceptance redacted log"; tail -n 30 drive-gateway/runtime-acceptance.log | redact; fi
           } >> "$GITHUB_STEP_SUMMARY"
           cat "$table"
+          media_failed=0
+          if [ "${MEDIA_RESULT:-}" != "success" ] || [ "$media_error" -ne 0 ]; then media_failed=1; fi
+          crypto_failed=0
+          if [ "${CRYPTO_RESULT:-}" != "success" ] || [ "$crypto_error" -ne 0 ]; then crypto_failed=1; fi
+          if [ "$media_failed" -ne 0 ] || [ "$crypto_failed" -ne 0 ]; then
+            echo "Acceptance failure recorded in the redacted summary above." >&2
+            exit 1
+          fi
 
   deploy-staging-frontend:
     needs: [local-e2e, preflight-staging]
