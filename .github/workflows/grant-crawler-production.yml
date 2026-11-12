@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: irpa-grant-crawler-production
+  group: irpa-production-frontend-deploys
   cancel-in-progress: false
 jobs:
   test:

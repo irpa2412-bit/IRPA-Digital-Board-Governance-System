@@ -9,12 +9,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: irpa-production-frontend-deploys
   cancel-in-progress: false
-
-permissions:
-  contents: read
-
 jobs:
   deploy:
     name: Deploy Cloudflare Grant Crawler Worker
