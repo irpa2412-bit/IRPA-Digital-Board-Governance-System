@@ -1,8 +1,40 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRPA Member Gateway</title></head>
-<body style="margin:0;background:#071713;color:#edf7f1;font-family:system-ui;display:grid;place-items:center;min-height:100vh">
-<div style="max-width:520px;padding:30px;background:#0b1c16;border:1px solid #294b3c;border-radius:14px">
-<h1 style="margin-top:0">IRPA Member Gateway</h1>
-<p>Secure member access is provided through Firebase Authentication and the governance application.</p>
-<p>Return to the main gateway and sign in using your authorised member account.</p>
-</div></body></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071713">
+<title>IRPA Member Gateway</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#071713;color:#edf7f1;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:grid;place-items:center;min-height:100vh;padding:20px}
+.gateway-card{width:min(100%,560px);padding:30px;background:#0b1c16;border:1px solid #294b3c;border-radius:18px;text-align:center;box-shadow:0 18px 48px #0005}
+h1{margin:0 0 12px;font-size:clamp(1.6rem,5vw,2.2rem)}
+p{line-height:1.6;color:#c6d8ce}
+.qr-panel{display:inline-flex;flex-direction:column;align-items:center;gap:12px;margin:16px 0;padding:18px;background:#fff;color:#071713;border-radius:14px}
+.qr-panel img{display:block;width:220px;height:220px;max-width:100%;image-rendering:pixelated}
+.qr-panel strong{font-size:.95rem}
+.actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:12px}
+a{display:inline-block;padding:11px 16px;border-radius:9px;font-weight:650;text-decoration:none}
+.primary{background:#b9f3cf;color:#082016}
+.secondary{border:1px solid #527361;color:#edf7f1}
+.note{font-size:.82rem;color:#a9c2b4}
+</style>
+</head>
+<body>
+<main class="gateway-card">
+<h1>IRPA Member Gateway</h1>
+<p>Scan the QR code with your phone camera to open the IRPA Digital Board Governance System, or use the secure portal link below.</p>
+<div class="qr-panel">
+<img src="https://api.qrserver.com/v1/create-qr-code/?size=440x440&amp;format=png&amp;margin=12&amp;data=https%3A%2F%2Firpa-digital-board-governance.web.app%2F" alt="QR code linking to the IRPA Digital Board Governance System" width="220" height="220">
+<strong>IRPA-DBGS · Scan to open</strong>
+</div>
+<div class="actions">
+<a class="primary" href="https://irpa-digital-board-governance.web.app/">Open IRPA-DBGS</a>
+<a class="secondary" href="https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System">Source repository</a>
+</div>
+<p class="note">The QR code opens the application only. Authentication and existing access controls remain required.</p>
+</main>
+</body>
+</html>
