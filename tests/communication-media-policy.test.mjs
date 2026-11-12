@@ -566,3 +566,25 @@ test("archived social accounts can be restored only by reviewers with an immutab
  assert.ok(rules.includes('"STATUS_RESTORED"'),"the audit action allowlist includes STATUS_RESTORED");
  assert.ok(rules.includes('allow update,delete:if false;'),"social-account audit records remain immutable");
 });
+
+
+test("staging report preserves media-step continuation but fails after writing the redacted summary", () => {
+ const jobStart = stagingWorkflow.indexOf("  other-portals-report:");
+ const jobEnd = stagingWorkflow.indexOf("\n  deploy-staging-frontend:", jobStart);
+ assert.ok(jobStart >= 0 && jobEnd > jobStart, "the other-portals-report job must exist");
+ const job = stagingWorkflow.slice(jobStart, jobEnd);
+ const mediaStart = job.indexOf("      - name: Verify Communication and Media Archive and controlled-PDF upload");
+ const cryptoStart = job.indexOf("      - name: Run real-runtime staging cryptographic acceptance", mediaStart);
+ assert.ok(mediaStart >= 0 && cryptoStart > mediaStart, "media acceptance must run before crypto acceptance");
+ const mediaStep = job.slice(mediaStart, cryptoStart);
+ assert.match(mediaStep, /continue-on-error: true/, "media failure must not prevent the independent crypto acceptance step");
+ assert.doesNotMatch(job, /^    continue-on-error: true$/m, "the report job itself must not suppress a final failure");
+ const reportStart = job.indexOf("      - name: Other portals acceptance report");
+ assert.ok(reportStart >= 0, "the final report step must exist");
+ const reportStep = job.slice(reportStart);
+ assert.match(reportStep, /MEDIA_RESULT/);
+ assert.match(reportStep, /CRYPTO_RESULT/);
+ assert.match(reportStep, /media_failed=0[\s\S]*exit 1/);
+ assert.match(reportStep, /crypto_failed=0[\s\S]*exit 1/);
+ assert.ok(reportStep.indexOf('} >> "$GITHUB_STEP_SUMMARY"') < reportStep.indexOf("media_failed=0"), "the redacted summary must be written before the job is failed");
+});
