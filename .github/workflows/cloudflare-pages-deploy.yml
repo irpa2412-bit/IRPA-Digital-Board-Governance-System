@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: irpa-cloudflare-pages-production
+  group: irpa-production-frontend-deploys
   cancel-in-progress: false
 jobs:
   build-and-deploy:
@@ -135,10 +135,29 @@ jobs:
               echo "FAIL: production asset request failed: /assets/$name" >&2
               exit 1
             fi
-            if ! cmp -s "$local_asset" "$remote_asset"; then
-              echo "FAIL: production asset content differs from this build: /assets/$name" >&2
-              echo "Local SHA-256:  $(sha256sum "$local_asset" | cut -d ' ' -f 1)" >&2
-              echo "Remote SHA-256: $(sha256sum "$remote_asset" | cut -d ' ' -f 1)" >&2
+            local_hash="$(sha256sum "$local_asset" | cut -d ' ' -f 1)"
+            matched=false
+            for attempt in 1 2 3 4 5 6; do
+              if ! curl --fail --silent --show-error --max-time 30 \
+                "$url/assets/$name?__irpa_verify=$GITHUB_SHA&attempt=$attempt" -o "$remote_asset"; then
+                echo "Asset fetch attempt $attempt of 6 failed: /assets/$name" >&2
+              else
+                remote_hash="$(sha256sum "$remote_asset" | cut -d ' ' -f 1)"
+                if [ "$local_hash" = "$remote_hash" ]; then
+                  matched=true
+                  break
+                fi
+                echo "Asset hash mismatch on attempt $attempt of 6: /assets/$name" >&2
+                echo "Local SHA-256:  $local_hash" >&2
+                echo "Remote SHA-256: $remote_hash" >&2
+              fi
+              if [ "$attempt" -lt 6 ]; then
+                echo "Waiting 30 seconds before retrying exact SHA-256 comparison..."
+                sleep 30
+              fi
+            done
+            if [ "$matched" != true ]; then
+              echo "FAIL: production asset did not match this build after 6 attempts: /assets/$name" >&2
               exit 1
             fi
             asset_count=$((asset_count + 1))
