@@ -20,6 +20,7 @@ import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
 import { isCurrentSigningAuthorityRecord } from "./signingAuthorityPolicy.mjs";
+import { applySigningAuthorityEnforcement } from "./signingAuthorityEnforcement.mjs";
 import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from "./signatureDraftPolicy.mjs";
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
@@ -156,63 +157,88 @@ const passwordRecoveryRouter = createPasswordRecoveryRouter({
 function normalizeGatewayAuthority(value) {
   return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
 }
-async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
-  const input=normalizeGatewayAuthority(manualAuthorityIdentification);
-  if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
-  const adminToken=await getFirestoreAdminAccessToken(env);
-  const records=[];
-  const add=(document,sourceCollection,fallbackId,matchedByEmail=false)=>{
-    if(!document?.fields)return;
-    const record=firestoreDocumentToPlain(document)||{};
-    const id=String(document.name||"").split("/").pop()||fallbackId||user.uid;
-    const existing=records.find(item=>item.sourceCollection===sourceCollection&&item.id===id);
-    if(existing){if(!matchedByEmail)existing.matchedByEmail=false;return;}
-    records.push({id,...record,sourceCollection,matchedByEmail});
-  };
-  const readById=async(collection)=>{
-    try { add(await getFirestoreDocument(env,collection+"/"+user.uid,adminToken),collection,user.uid); }
-    catch(error) { console.error("Signing authority register lookup failed", {collection,code:String(error?.code||error?.status||"UNKNOWN")}); throw error; }
-  };
-  await readById("members");
-  await readById("employees");
-  const getRows=async(collection,field,value)=>{
-    try { return await getFirestoreDocumentsByField(env,collection,field,value,adminToken); }
-    catch(error) { console.error("Signing authority register lookup failed", {collection,code:String(error?.code||error?.status||"UNKNOWN")}); throw error; }
-  };
-  for(const collection of ["members","employees"]){
-    for(const row of await getRows(collection,"uid",user.uid))add(row,collection,user.uid,false);
-  }
-  const originalEmail=String(user.email||"");
-  const normalizedEmail=originalEmail.trim().toLowerCase();
-  const emailValues=[...new Set([normalizedEmail,originalEmail].filter(Boolean))];
-  for(const collection of ["members","employees"]){
-    for(const email of emailValues){
-      for(const row of await getRows(collection,"email",email))add(row,collection,user.uid,true);
+async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification,documentId) {
+  if(!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
+  return applySigningAuthorityEnforcement({
+    env,user,manualAuthorityIdentification,documentId,logger:console,
+    verify:async()=>{
+      const input=normalizeGatewayAuthority(manualAuthorityIdentification);
+      if(!input)throw Object.assign(new Error("Authenticated signing authority identification is required."),{status:403,authorityStatusValue:"MISSING",authorityReason:"manual authority identification is missing"});
+      const adminToken=await getFirestoreAdminAccessToken(env);
+      const records=[];
+      const add=(document,sourceCollection,fallbackId,matchedByEmail=false)=>{
+        if(!document?.fields)return;
+        const record=firestoreDocumentToPlain(document)||{};
+        const id=String(document.name||"").split("/").pop()||fallbackId||user.uid;
+        const existing=records.find(item=>item.sourceCollection===sourceCollection&&item.id===id);
+        if(existing){if(!matchedByEmail)existing.matchedByEmail=false;return;}
+        records.push({id,...record,sourceCollection,matchedByEmail});
+      };
+      const readById=async(collection)=>{
+        try { add(await getFirestoreDocument(env,collection+"/"+user.uid,adminToken),collection,user.uid); }
+        catch(error) { console.error("Signing authority register lookup failed", {collection,code:String(error?.code||error?.status||"UNKNOWN")}); throw error; }
+      };
+      await readById("members");
+      await readById("employees");
+      const getRows=async(collection,field,value)=>{
+        try { return await getFirestoreDocumentsByField(env,collection,field,value,adminToken); }
+        catch(error) { console.error("Signing authority register lookup failed", {collection,code:String(error?.code||error?.status||"UNKNOWN")}); throw error; }
+      };
+      for(const collection of ["members","employees"]){
+        for(const row of await getRows(collection,"uid",user.uid))add(row,collection,user.uid,false);
+      }
+      const originalEmail=String(user.email||"");
+      const normalizedEmail=originalEmail.trim().toLowerCase();
+      const emailValues=[...new Set([normalizedEmail,originalEmail].filter(Boolean))];
+      for(const collection of ["members","employees"]){
+        for(const email of emailValues){
+          for(const row of await getRows(collection,"email",email))add(row,collection,user.uid,true);
+        }
+      }
+      const uniqueRecords=[...new Map(records.map(record=>[record.sourceCollection+":"+record.id,record])).values()];
+      const candidates=record=>[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
+      const active=record=>isCurrentSigningAuthorityRecord(record,user.uid);
+      const match=uniqueRecords.find(record=>active(record)&&candidates(record).includes(input));
+      if(!match){
+        const inactive=uniqueRecords.find(record=>!active(record));
+        const activeRecord=uniqueRecords.find(record=>active(record));
+        let reason,detailRecord;
+        if(!uniqueRecords.length){reason="no register record found for this account";detailRecord=null;}
+        else if(!activeRecord&&inactive){reason="record found but status is inactive";detailRecord=inactive;}
+        else {reason="record found but role does not match";detailRecord=activeRecord||inactive;}
+        const roleFields=detailRecord?["role","boardPosition","designation","jobTitle","position","title","authorityRole","unit","unitName"].filter(field=>Object.prototype.hasOwnProperty.call(detailRecord,field)).join(", "):"none";
+        const statusValue=detailRecord?.status??detailRecord?.employmentStatus??"MISSING";
+        throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: "+reason+" (collection: "+(detailRecord?.sourceCollection||"members/employees")+"; record ID: "+(detailRecord?.id||"none")+"; role fields present: "+(roleFields||"none") + ")."),{status:403,authorityStatusValue:String(statusValue),authorityReason:reason});
+      }
+      return{
+        verified:true,
+        authorityRole:String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
+        authorityDepartment:String(match.department||"").trim(),
+        authorityUnit:String(match.unit||match.unitName||"").trim(),
+        authoritySourceCollection:match.sourceCollection,
+        authoritySourceRecordId:match.id,
+        verificationMethod:"Authenticated Gateway Member/Employee Register Match"
+      };
+    },
+    recordAudit:async({documentId:targetDocumentId,signerUid,statusValue,reason})=>{
+      const token=await getFirestoreAdminAccessToken(env);
+      const auditId="signing-authority-shadow-"+Date.now()+"-"+crypto.randomUUID().slice(0,8);
+      await updateFirestoreDocument(env,"audit/"+auditId,token,{
+        action:{stringValue:"SIGNING_AUTHORITY_SHADOW_REJECTION"},
+        collection:{stringValue:"members/employees"},
+        recordId:{stringValue:signerUid},
+        details:{mapValue:{fields:{
+          document:{stringValue:String(targetDocumentId||"")},
+          signerUid:{stringValue:signerUid},
+          statusValue:{stringValue:String(statusValue||"MISSING")},
+          reason:{stringValue:String(reason||"authority verification failed")}
+        }}},
+        actorUid:{stringValue:signerUid},
+        actorEmail:{stringValue:user.email||""},
+        createdAt:{timestampValue:new Date().toISOString()}
+      },["action","collection","recordId","details","actorUid","actorEmail","createdAt"]);
     }
-  }
-  const uniqueRecords=[...new Map(records.map(record=>[record.sourceCollection+":"+record.id,record])).values()];
-  const candidates=record=>[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
-  const active=record=>isCurrentSigningAuthorityRecord(record,user.uid);
-  const match=uniqueRecords.find(record=>active(record)&&candidates(record).includes(input));
-  if(!match){
-    const inactive=uniqueRecords.find(record=>!active(record));
-    const activeRecord=uniqueRecords.find(record=>active(record));
-    let reason,detailRecord;
-    if(!uniqueRecords.length){reason="no register record found for this account";detailRecord=null;}
-    else if(!activeRecord&&inactive){reason="record found but status is inactive";detailRecord=inactive;}
-    else {reason="record found but role does not match";detailRecord=activeRecord||inactive;}
-    const roleFields=detailRecord?["role","boardPosition","designation","jobTitle","position","title","authorityRole","unit","unitName"].filter(field=>Object.prototype.hasOwnProperty.call(detailRecord,field)).join(", "):"none";
-    throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: "+reason+" (collection: "+(detailRecord?.sourceCollection||"members/employees")+"; record ID: "+(detailRecord?.id||"none")+"; role fields present: "+(roleFields||"none") + ")."),{status:403});
-  }
-  return{
-    verified:true,
-    authorityRole:String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
-    authorityDepartment:String(match.department||"").trim(),
-    authorityUnit:String(match.unit||match.unitName||"").trim(),
-    authoritySourceCollection:match.sourceCollection,
-    authoritySourceRecordId:match.id,
-    verificationMethod:"Authenticated Gateway Member/Employee Register Match"
-  };
+  });
 }
 
 const communicationsSiteRouter = createCommunicationsSiteRouter({
@@ -487,7 +513,7 @@ export default {
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             logger: console,
-            verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
+            verifySigningAuthority: (user, manualAuthority, documentId) => verifyGatewaySigningAuthority(env, user, manualAuthority, documentId),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
           const response = await esignRoute(request,ctx);
