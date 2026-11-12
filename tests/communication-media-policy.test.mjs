@@ -570,13 +570,13 @@ test("archived social accounts can be restored only by reviewers with an immutab
 
 test("Communication Media uploads accept only the provisioned archive folder and keep arbitrary folder parameters rejected", () => {
  const uploadStart = gateway.indexOf("async function upload(request, env)");
- const uploadEnd = gateway.indexOf("\\nasync function ", uploadStart + 1);
+ const uploadEnd = gateway.indexOf("\nasync function ", uploadStart + 1);
  assert.ok(uploadStart >= 0, "the authenticated Drive upload handler must exist");
  assert.ok(uploadEnd > uploadStart, "the upload handler boundary must be identifiable");
  const upload = gateway.slice(uploadStart, uploadEnd);
- assert.match(upload, /else if \\(purpose === "Signed Documents Archive" \\|\\| purpose === "Documents Portal" \\|\\| purpose === "Controlled Documents" \\|\\| purpose === "Communication Media"\\)/);
- assert.match(upload, /else if \\(requestedFolderId \\|\\| data\\.ownerUid\\) \\{\\s*return json\\(\\{ ok: false, error: "Folder parameters are restricted to authorized IRPA archive uploads\\." \\}, 400/);
- assert.match(upload, /folderDescription\\.irpaCommunicationMediaArchive !== true \\|\\| folderDescription\\.purpose !== "IRPA Communication and Media Archive"/);
+ assert.match(upload, /else if \(purpose === "Signed Documents Archive" \|\| purpose === "Documents Portal" \|\| purpose === "Controlled Documents" \|\| purpose === "Communication Media"\)/);
+ assert.match(upload, /else if \(requestedFolderId \|\| data\.ownerUid\) \{\s*return json\(\{ ok: false, error: "Folder parameters are restricted to authorized IRPA archive uploads\." \}, 400/);
+ assert.match(upload, /folderDescription\.irpaCommunicationMediaArchive !== true \|\| folderDescription\.purpose !== "IRPA Communication and Media Archive"/);
  assert.match(upload, /purpose === "Communication Media" && !requestedFolderId/);
- assert.match(upload, /purpose === "Communication Media" && !\\(await authorizeCommunicationMediaDownload\\(env, claims\\)\\)/);
+ assert.match(upload, /purpose === "Communication Media" && !\(await authorizeCommunicationMediaDownload\(env, claims\)\)/);
 });
