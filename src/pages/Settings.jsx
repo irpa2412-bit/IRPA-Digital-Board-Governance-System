@@ -225,6 +225,7 @@ export default function Settings({ admin = false, section = "settings" }) {
 
   return (
     <div className="page">
+      {section === "settings" && <section className="panel" aria-label="Release Readiness shortcut" style={{ marginBottom: 16 }}><div className="panel-header"><div><span className="eyebrow">SYSTEM ADMINISTRATION</span><h2>Release Readiness</h2><p className="panel-description">Open the production release diagnostics. Only an authenticated Administrator can run checks.</p></div></div><a className="primary-button" href="#release-readiness" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none", minHeight: 44, padding: "10px 16px", borderRadius: 8 }}>Open Release Readiness</a></section>}
       {admin && section === "settings" && <DepartmentArchiveRegistry/>}
       {admin && section === "administrators" && (
         <section className="panel">
