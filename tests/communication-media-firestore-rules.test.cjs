@@ -144,7 +144,7 @@ test("the isolated staging rules use token-aware record origin for both media co
   assert.equal(config.firestore.rules, "firestore.staging.rules");
   assert.ok(rules.includes("function communicationMediaRecordOriginMatches(data)"));
   const assets = rules.slice(rules.indexOf("match /communicationMediaAssets/{id}"), rules.indexOf("match /communicationMediaItems/{id}"));
-  const items = rules.slice(rules.indexOf("match /communicationMediaItems/{id}"), rules.indexOf("match /communicationMediaAudit"));
+  const items = rules.slice(rules.indexOf("match /communicationMediaItems/{id}"), rules.indexOf("match /communicationOperations"));
   assert.ok(assets.includes("communicationMediaRecordOriginMatches(request.resource.data)"));
   assert.ok(items.includes("communicationMediaRecordOriginMatches(request.resource.data)"));
   assert.ok(!assets.includes('request.resource.data.get("recordOrigin","")=="PRODUCTION"'));
