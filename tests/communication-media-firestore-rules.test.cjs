@@ -4,7 +4,7 @@ const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@fir
 const fs = require("node:fs");
 
 let env;
-const projectId = process.env.GCLOUD_PROJECT || "irpa-digital-board-governance";
+const projectId = "irpa-dbg-staging-a73ec";
 const mediaAsset = uid => ({
   title: "Staging rules acceptance",
   originalFileName: "acceptance.pdf",
@@ -71,6 +71,19 @@ test("a staging token cannot create a production-origin media asset", async () =
   }));
 });
 
+
+
+test("Communication Media assets remain immutable after creation", async () => {
+  const db = env.authenticatedContext("media-admin", {
+    email: "media-admin@example.test"
+  }).firestore();
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("communicationMediaAssets/immutable-asset").set(mediaAsset("media-admin"));
+  });
+  const ref = db.doc("communicationMediaAssets/immutable-asset");
+  await assertFails(ref.update({ title: "Attempted update" }));
+  await assertFails(ref.delete());
+});
 
 test("HTTP 403 diagnostics report only redacted boolean rule predicates", () => {
   const workflow = fs.readFileSync(".github/workflows/staging-gateway-e2e.yml", "utf8");
