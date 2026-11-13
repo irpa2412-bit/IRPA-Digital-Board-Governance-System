@@ -1,0 +1,77 @@
+name: Staging Firestore Ruleset Read-only Comparison
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-staging-rules:
+    name: Compare deployed staging Firestore rules with Signature branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FIREBASE_PROJECT_ID: irpa-dbg-staging-a73ec
+    steps:
+      - name: Checkout approved Signature source
+        uses: actions/checkout@v4
+        with:
+          ref: fix/signature-trail-20261024
+          path: signature-source
+
+      - name: Authenticate with staging rules viewer credential
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIREBASE_RULES_VIEWER_CREDENTIALS }}
+          token_format: access_token
+
+      - name: Fetch deployed staging ruleset and compare
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          release_json="$(mktemp)"
+          ruleset_json="$(mktemp)"
+          release_url="https://firebaserules.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/releases/cloud.firestore"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Accept: application/json" \
+            "${release_url}" -o "${release_json}"
+          ruleset_name="$(jq -er '.rulesetName' "${release_json}")"
+          ruleset_url="https://firebaserules.googleapis.com/v1/${ruleset_name}"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Accept: application/json" \
+            "${ruleset_url}" -o "${ruleset_json}"
+          python3 - "${ruleset_json}" "signature-source/firestore.rules" <<'PY'
+          import difflib
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          files = payload.get("source", {}).get("files", [])
+          if not files:
+              raise SystemExit("Unable to compare: deployed ruleset has no source files.")
+          deployed = "\n".join(item.get("content", "") for item in files).rstrip("\n").splitlines()
+          source = pathlib.Path(sys.argv[2]).read_text().rstrip("\n").splitlines()
+          if deployed == source:
+              print("STAGING_FIRESTORE_RULESET=MATCH")
+              raise SystemExit(0)
+          print("STAGING_FIRESTORE_RULESET=MISMATCH")
+          print("LINE_LEVEL_DIFF_BEGIN")
+          for line in difflib.unified_diff(
+              source, deployed,
+              fromfile="repository:fix/signature-trail-20261024/firestore.rules",
+              tofile="deployed:staging",
+              lineterm="",
+              n=0,
+          ):
+              print(line)
+          print("LINE_LEVEL_DIFF_END")
+          PY
