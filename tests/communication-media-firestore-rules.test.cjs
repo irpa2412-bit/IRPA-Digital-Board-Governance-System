@@ -142,13 +142,13 @@ test("the isolated staging rules use token-aware record origin for both media co
   const rules = fs.readFileSync("firestore.staging.rules", "utf8");
   const config = JSON.parse(fs.readFileSync("firebase.staging.json", "utf8"));
   assert.equal(config.firestore.rules, "firestore.staging.rules");
-  assert.match(rules, /function communicationMediaRecordOriginMatches\\(data\\)/);
+  assert.ok(rules.includes("function communicationMediaRecordOriginMatches(data)"));
   const assets = rules.slice(rules.indexOf("match /communicationMediaAssets/{id}"), rules.indexOf("match /communicationMediaItems/{id}"));
   const items = rules.slice(rules.indexOf("match /communicationMediaItems/{id}"), rules.indexOf("match /communicationMediaAudit"));
-  assert.match(assets, /communicationMediaRecordOriginMatches\\(request\\.resource\\.data\\)/);
-  assert.match(items, /communicationMediaRecordOriginMatches\\(request\\.resource\\.data\\)/);
-  assert.doesNotMatch(assets, /get\\("recordOrigin",""\\)==="PRODUCTION"/);
-  assert.doesNotMatch(items, /get\\("recordOrigin",""\\)==="PRODUCTION"/);
+  assert.ok(assets.includes("communicationMediaRecordOriginMatches(request.resource.data)"));
+  assert.ok(items.includes("communicationMediaRecordOriginMatches(request.resource.data)"));
+  assert.ok(!assets.includes('request.resource.data.get("recordOrigin","")=="PRODUCTION"'));
+  assert.ok(!items.includes('request.resource.data.get("recordOrigin","")=="PRODUCTION"'));
 });
 
 test("403 diagnostics trust the Admin SDK fixture and capture the structured Firestore error safely", () => {
@@ -156,8 +156,8 @@ test("403 diagnostics trust the Admin SDK fixture and capture the structured Fir
   assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_EXISTS:/);
   assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_ACTIVE:/);
   assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH:/);
-  assert.match(workflow, /const savedProfile=await profileRef\\.get\\(\\)/);
-  assert.match(workflow, /savedProfile\\.get\\("active"\\)!==true/);
+  assert.ok(workflow.includes("const savedProfile=await profileRef.get()"));
+  assert.ok(workflow.includes('savedProfile.get("active")!==true'));
   assert.match(workflow, /const createResponseText=await createResponse\.text\(\)/);
   assert.match(workflow, /STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_CODE/);
   assert.match(workflow, /STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_MESSAGE/);
