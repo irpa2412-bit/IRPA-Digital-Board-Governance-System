@@ -143,6 +143,8 @@ test("403 diagnostics trust the Admin SDK fixture and capture the structured Fir
   assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_EXISTS:/);
   assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_ACTIVE:/);
   assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH:/);
+  assert.match(workflow, /const savedProfile=await profileRef\\.get\\(\\)/);
+  assert.match(workflow, /savedProfile\\.get\\("active"\\)!==true/);
   assert.match(workflow, /const createResponseText=await createResponse\.text\(\)/);
   assert.match(workflow, /STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_CODE/);
   assert.match(workflow, /STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_MESSAGE/);
