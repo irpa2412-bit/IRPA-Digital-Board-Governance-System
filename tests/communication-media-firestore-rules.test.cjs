@@ -122,6 +122,7 @@ test("HTTP 403 diagnostics report only redacted boolean rule predicates", () => 
     "tokenEmailIsPrimaryAdmin",
     "adminProfileExists",
     "adminProfileActive",
+    "adminProfileUidMatches",
     "uploaderUidMatchesAuthenticatedUid",
     "tokenAudienceMatchesRecordOrigin",
     "statusIsAvailable",
