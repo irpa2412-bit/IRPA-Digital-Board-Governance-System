@@ -1189,7 +1189,13 @@ jobs:
           initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
           (async()=>{
             const user=await getAuth().getUserByEmail(process.env.TEST_EMAIL);
-            await getFirestore().collection("adminProfiles").doc(user.uid).set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const profileRef=getFirestore().collection("adminProfiles").doc(user.uid);
+            await profileRef.set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const savedProfile=await profileRef.get();
+            if(!savedProfile.exists||savedProfile.get("active")!==true||savedProfile.get("uid")!==user.uid) throw new Error("Staging media administrator profile did not persist as active for the authenticated UID.");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_EXISTS=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_ACTIVE=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH=true");
             console.log("STAGING_REVIEWER_IDENTITY_READY");
           })().catch(e=>{console.error("Unable to prepare isolated staging reviewer identity:",e.message);process.exit(1)});
           NODE
@@ -2290,6 +2296,29 @@ jobs:
            if(denied.status!==403) throw new Error("Media archive role-denial check failed; expected HTTP 403 and received HTTP "+denied.status+"; response body: "+redactBody(deniedText));
           console.log("STAGING_COMMUNICATION_MEDIA_ROLE_DENIAL=PASS");
           const admin=await signIn(process.env.STAGING_TEST_EMAIL,process.env.STAGING_TEST_PASSWORD);
+          const adminClaims=JSON.parse(Buffer.from(admin.idToken.split(".")[1],"base64url").toString("utf8"));
+          const mediaRoles=["Communication & Media","Communications & Media","Communication and Media","Communications and Media","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"];
+          const roleMatch=doc=>{
+            const f=doc?.fields||{};
+            return mediaRoles.includes(f.role?.stringValue||"")||
+              ["roles","assignedRoles","selectedRoles"].some(k=>(f[k]?.arrayValue?.values||[]).some(v=>mediaRoles.includes(v.stringValue||"")));
+          };
+          async function ownProfile(collection){
+            const url="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(admin.localId);
+            const response=await fetch(url,{headers:{Authorization:"Bearer "+admin.idToken}});
+            return {status:response.status,document:response.ok?await response.json().catch(()=>({})):null};
+          }
+          const [adminProfile,memberProfile,employeeProfile]=await Promise.all(["adminProfiles","members","employees"].map(ownProfile));
+          const eligible={
+            customAdminClaim:adminClaims.admin===true,
+            primaryAdminEmail:String(admin.email||"").toLowerCase()==="irpa2412@gmail.com",
+            activeAdminProfile:adminProfile.status===200&&adminProfile.document?.fields?.active?.booleanValue===true,
+            mediaRoleClaim:Array.isArray(adminClaims.irpaRoles)&&adminClaims.irpaRoles.some(r=>mediaRoles.includes(r)),
+            activeMemberMediaRole:memberProfile.status===200&&(["Active","Activated"].includes(memberProfile.document?.fields?.status?.stringValue||"")||memberProfile.document?.fields?.registrationStatus?.stringValue==="Activated")&&roleMatch(memberProfile.document),
+            activeEmployeeMediaRole:employeeProfile.status===200&&(employeeProfile.document?.fields?.status?.stringValue==="Active"||employeeProfile.document?.fields?.employmentStatus?.stringValue==="Active"||employeeProfile.document?.fields?.registrationStatus?.stringValue==="Activated")&&roleMatch(employeeProfile.document)
+          };
+          console.log("STAGING_MEDIA_ADMIN_ROLE_DIAGNOSTIC="+JSON.stringify({...eligible,adminProfileHttp:adminProfile.status,memberProfileHttp:memberProfile.status,employeeProfileHttp:employeeProfile.status}));
+          if(!Object.values(eligible).some(Boolean)) throw new Error("Staging test identity has no Firestore-rule-recognised administrator or Communication Media role; refusing the media-register write.");
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
           const archive=(()=>{try{return JSON.parse(archiveText)}catch{return {}}})();
@@ -2324,7 +2353,29 @@ jobs:
           };
           const docUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets/"+encodeURIComponent(assetId);
           const createResponse=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets?documentId="+encodeURIComponent(assetId),{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
-          if(!createResponse.ok) throw new Error("Staging Firestore media register write failed with HTTP "+createResponse.status+"; verify the project-scoped rules and administrator role.");
+          if(!createResponse.ok) {
+            if(createResponse.status===403) {
+              const f=fields;
+              const allowedKeys=["title","originalFileName","contentType","fileSize","fileId","webViewLink","storageProvider","purpose","tags","mediaKind","status","recordOrigin","uploadedByUid","uploadedByEmail","createdAt","updatedAt"];
+              const diagnostic={
+                tokenHasAdminClaim:adminClaims.admin===true,
+                tokenEmailIsPrimaryAdmin:String(admin.email||"").toLowerCase()==="irpa2412@gmail.com",
+                adminProfileExists:adminProfile.status===200,
+                adminProfileActive:adminProfile.status===200&&adminProfile.document?.fields?.active?.booleanValue===true,
+                uploaderUidMatchesAuthenticatedUid:f.uploadedByUid?.stringValue===admin.localId,
+                tokenAudienceMatchesRecordOrigin:(adminClaims.aud==="irpa-dbg-staging-a73ec"&&f.recordOrigin?.stringValue==="STAGING")||(adminClaims.aud!=="irpa-dbg-staging-a73ec"&&f.recordOrigin?.stringValue==="PRODUCTION"),
+                statusIsAvailable:f.status?.stringValue==="Available",
+                titlePresent:typeof f.title?.stringValue==="string"&&f.title.stringValue.length>0&&f.title.stringValue.length<=180,
+                originalFileNamePresent:typeof f.originalFileName?.stringValue==="string"&&f.originalFileName.stringValue.length>0,
+                fileIdPresent:typeof f.fileId?.stringValue==="string"&&f.fileId.stringValue.length>0,
+                fileSizeValid:Number.isInteger(Number(f.fileSize?.integerValue))&&Number(f.fileSize.integerValue)>0&&Number(f.fileSize.integerValue)<=26214400,
+                storageProviderIsGoogleDrive:f.storageProvider?.stringValue==="Google Drive",
+                metadataKeysAllowed:Object.keys(f).every(k=>allowedKeys.includes(k))
+              };
+              for(const [key,value] of Object.entries(diagnostic)) console.log("STAGING_MEDIA_REGISTER_403_"+key+"="+String(value));
+            }
+            throw new Error("Staging Firestore media register write failed with HTTP "+createResponse.status+"; redacted rule-condition diagnostics emitted for HTTP 403.");
+          }
           const verifyResponse=await fetch(docUrl,{headers:{Authorization:"Bearer "+admin.idToken}});
           const saved=await verifyResponse.json().catch(()=>({}));
           if(!verifyResponse.ok||saved.fields?.recordOrigin?.stringValue!=="STAGING"||saved.fields?.fileId?.stringValue!==upload.fileId||saved.fields?.storageProvider?.stringValue!=="Google Drive") throw new Error("Staging Firestore media register verification failed with HTTP "+verifyResponse.status+".");
