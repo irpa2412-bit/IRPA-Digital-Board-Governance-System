@@ -2257,7 +2257,6 @@ jobs:
       - name: Verify Communication and Media Archive and controlled-PDF upload
         id: communication-media
         if: always()
-        continue-on-error: true
         env:
           STAGING_GATEWAY_URL: ${{ needs.deploy-staging.outputs.staging_gateway_url }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
