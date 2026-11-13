@@ -2301,6 +2301,7 @@ jobs:
           const uploadResponse=await fetch(base+"/api/upload",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fileName,contentType:"application/pdf",fileSize:pdf.length,base64:pdf.toString("base64"),purpose:"Communication Media",folderId:archive.folderId})});
           const uploadText=await uploadResponse.text();
           const upload=(()=>{try{return JSON.parse(uploadText)}catch{return {}}})();
+          console.log("STAGING_CONTROLLED_PDF_UPLOAD_HTTP_STATUS="+uploadResponse.status);
           if(!uploadResponse.ok||!upload.fileId||upload.storageProvider!=="Google Drive"||upload.fileName!==fileName||Number(upload.fileSize)!==pdf.length) throw new Error("Controlled-PDF upload to the verified media archive failed; HTTP "+uploadResponse.status+"; response body: "+redactBody(uploadText));
           const assetId="staging-acceptance-"+String(process.env.RUN_ID||"test");
           const now=new Date().toISOString();
