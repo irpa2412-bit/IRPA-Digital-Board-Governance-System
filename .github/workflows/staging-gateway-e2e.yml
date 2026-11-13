@@ -2150,7 +2150,13 @@ jobs:
           initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
           (async()=>{
             const user=await getAuth().getUserByEmail(process.env.TEST_EMAIL);
-            await getFirestore().collection("adminProfiles").doc(user.uid).set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const profileRef=getFirestore().collection("adminProfiles").doc(user.uid);
+            await profileRef.set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const savedProfile=await profileRef.get();
+            if(!savedProfile.exists||savedProfile.get("active")!==true||savedProfile.get("uid")!==user.uid) throw new Error("Staging media administrator profile did not persist as active for the authenticated UID.");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_EXISTS=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_ACTIVE=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH=true");
             console.log("STAGING_MEDIA_ADMIN_IDENTITY_READY=true");
           })().catch(e=>{console.error("Unable to prepare staging media test identity: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,180));process.exit(1)});
           NODE
