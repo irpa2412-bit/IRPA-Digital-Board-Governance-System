@@ -135,7 +135,7 @@ test("HTTP 403 diagnostics report only redacted boolean rule predicates", () => 
   ]) {
     assert.match(workflow, new RegExp(field + ":"));
   }
-  assert.match(workflow, /STAGING_MEDIA_REGISTER_403_\+key\+\"=\"\+String\(value\)/);
+  assert.ok(workflow.includes('console.log("STAGING_MEDIA_REGISTER_403_"+key+"="+String(value))'));
 });
 
 
