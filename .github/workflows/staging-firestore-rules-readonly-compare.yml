@@ -1,0 +1,108 @@
+name: Staging Firestore ruleset comparison (read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-firestore-rules-readonly-compare
+  cancel-in-progress: false
+
+jobs:
+  compare-staging-rules:
+    name: Compare deployed staging rules with Signature branch source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout approved comparison source
+        uses: actions/checkout@v4
+        with:
+          ref: fix/signature-trail-20261024
+          persist-credentials: false
+
+      - name: Obtain read-only staging Firebase access token
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_FIRESTORE_RULES_READONLY_SERVICE_ACCOUNT_JSON }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform.read-only
+          create_credentials_file: false
+
+      - name: Fetch active staging Firestore ruleset and compare
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          STAGING_PROJECT_ID: irpa-dbg-staging-a73ec
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import difflib
+          import json
+          import os
+          import pathlib
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          project = "irpa-dbg-staging-a73ec"
+          if os.environ.get("STAGING_PROJECT_ID") != project:
+              print("COMPARISON_ERROR: staging project guard failed")
+              sys.exit(2)
+          token = os.environ.get("ACCESS_TOKEN", "")
+          if not token:
+              print("COMPARISON_ERROR: read-only access token unavailable")
+              sys.exit(2)
+
+          def get_json(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={"Authorization": "Bearer " + token, "Accept": "application/json"},
+                  method="GET",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      return json.loads(response.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  print("COMPARISON_ERROR: Firebase Rules API HTTP " + str(exc.code))
+                  sys.exit(2)
+              except Exception:
+                  print("COMPARISON_ERROR: Firebase Rules API request failed")
+                  sys.exit(2)
+
+          api = "https://firebaserules.googleapis.com/v1/"
+          release = get_json(api + "projects/" + project + "/releases/cloud.firestore")
+          ruleset_name = release.get("rulesetName", "")
+          if not ruleset_name.startswith("projects/" + project + "/rulesets/"):
+              print("COMPARISON_ERROR: active staging Firestore ruleset reference missing or unexpected")
+              sys.exit(2)
+          ruleset = get_json(api + urllib.parse.quote(ruleset_name, safe="/"))
+          source_files = (ruleset.get("source") or {}).get("files") or []
+          matching = [item for item in source_files if item.get("name", "").endswith("firestore.rules")]
+          if len(matching) != 1 or not isinstance(matching[0].get("content"), str):
+              print("COMPARISON_ERROR: expected exactly one deployed firestore.rules source file")
+              sys.exit(2)
+
+          local_path = pathlib.Path("firestore.rules")
+          if not local_path.is_file():
+              print("COMPARISON_ERROR: comparison source firestore.rules missing")
+              sys.exit(2)
+          local = local_path.read_text(encoding="utf-8")
+          deployed = matching[0]["content"]
+          local_lines = local.splitlines(keepends=True)
+          deployed_lines = deployed.splitlines(keepends=True)
+          if local_lines == deployed_lines:
+              print("RULESET_MATCH")
+          else:
+              print("RULESET_MISMATCH")
+              for line in difflib.unified_diff(
+                  local_lines,
+                  deployed_lines,
+                  fromfile="fix/signature-trail-20261024/firestore.rules",
+                  tofile="deployed-staging/firestore.rules",
+                  n=3,
+              ):
+                  sys.stdout.write(line)
+          PY
