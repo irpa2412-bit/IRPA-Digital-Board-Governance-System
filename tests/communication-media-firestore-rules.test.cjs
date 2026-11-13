@@ -39,7 +39,7 @@ const mediaItem = uid => ({
 before(async () => {
   env = await initializeTestEnvironment({
     projectId,
-    firestore: { rules: fs.readFileSync("firestore.rules", "utf8") }
+    firestore: { rules: fs.readFileSync("firestore.staging.rules", "utf8") }
   });
 });
 after(async () => { await env.cleanup(); });
@@ -137,6 +137,19 @@ test("HTTP 403 diagnostics report only redacted boolean rule predicates", () => 
   assert.match(workflow, /STAGING_MEDIA_REGISTER_403_\+key\+\"=\"\+String\(value\)/);
 });
 
+
+test("the isolated staging rules use token-aware record origin for both media collections", () => {
+  const rules = fs.readFileSync("firestore.staging.rules", "utf8");
+  const config = JSON.parse(fs.readFileSync("firebase.staging.json", "utf8"));
+  assert.equal(config.firestore.rules, "firestore.staging.rules");
+  assert.match(rules, /function communicationMediaRecordOriginMatches\\(data\\)/);
+  const assets = rules.slice(rules.indexOf("match /communicationMediaAssets/{id}"), rules.indexOf("match /communicationMediaItems/{id}"));
+  const items = rules.slice(rules.indexOf("match /communicationMediaItems/{id}"), rules.indexOf("match /communicationMediaAudit"));
+  assert.match(assets, /communicationMediaRecordOriginMatches\\(request\\.resource\\.data\\)/);
+  assert.match(items, /communicationMediaRecordOriginMatches\\(request\\.resource\\.data\\)/);
+  assert.doesNotMatch(assets, /get\\("recordOrigin",""\\)==="PRODUCTION"/);
+  assert.doesNotMatch(items, /get\\("recordOrigin",""\\)==="PRODUCTION"/);
+});
 
 test("403 diagnostics trust the Admin SDK fixture and capture the structured Firestore error safely", () => {
   const workflow = fs.readFileSync(".github/workflows/staging-gateway-e2e.yml", "utf8");
