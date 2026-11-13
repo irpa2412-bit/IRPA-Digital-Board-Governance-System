@@ -2320,7 +2320,7 @@ jobs:
             activeAdminProfile:adminProfileExists&&adminProfileActive&&adminProfileUidMatches,
             mediaRoleClaim:Array.isArray(adminClaims.irpaRoles)&&adminClaims.irpaRoles.some(r=>mediaRoles.includes(r))
           };
-          console.log("STAGING_MEDIA_ADMIN_ROLE_DIAGNOSTIC="+JSON.stringify({...eligible,adminProfileExists,adminProfileActive,adminProfileUidMatches}));
+          console.log("STAGING_MEDIA_ADMIN_ROLE_DIAGNOSTIC="+JSON.stringify({...eligible,adminProfileExists:adminProfileExists,adminProfileActive:adminProfileActive,adminProfileUidMatches:adminProfileUidMatches}));
           if(!Object.values(eligible).some(Boolean)) throw new Error("Staging test identity has no Firestore-rule-recognised administrator or Communication Media role; refusing the media-register write.");
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
