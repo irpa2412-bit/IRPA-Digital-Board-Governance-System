@@ -14,7 +14,8 @@ async function main() {
     throw new Error("Refusing to deploy Firestore rules: service account project does not match isolated staging.");
   }
 
-  const rulesPath = path.resolve("firestore.rules");
+  // Read the separately reviewed staging rules source, never the root production/source rules.
+  const rulesPath = path.resolve("firestore.staging.rules");
   const rulesContent = fs.readFileSync(rulesPath, "utf8");
   const auth = new GoogleAuth({
     credentials,
@@ -57,6 +58,7 @@ async function main() {
   const ruleset = await api(
     `${RULES_API}/v1/projects/${PROJECT_ID}/rulesets`,
     "POST",
+    // Firebase Rules API requires the canonical source filename even though the local file is staging-specific.
     { source: { files: [{ name: "firestore.rules", content: rulesContent }] } }
   );
   if (!ruleset?.name) throw new Error("Firebase Rules API did not return a ruleset name.");

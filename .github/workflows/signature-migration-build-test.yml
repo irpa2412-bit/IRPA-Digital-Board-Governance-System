@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
+      - name: Verify staging Firestore rules publisher source and project guards
+        run: node --test tests/staging-firestore-rules-deploy.test.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
