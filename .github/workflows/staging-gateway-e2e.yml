@@ -1189,7 +1189,13 @@ jobs:
           initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
           (async()=>{
             const user=await getAuth().getUserByEmail(process.env.TEST_EMAIL);
-            await getFirestore().collection("adminProfiles").doc(user.uid).set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const profileRef=getFirestore().collection("adminProfiles").doc(user.uid);
+            await profileRef.set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const savedProfile=await profileRef.get();
+            if(!savedProfile.exists||savedProfile.get("active")!==true||savedProfile.get("uid")!==user.uid) throw new Error("Staging media administrator profile did not persist as active for the authenticated UID.");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_EXISTS=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_ACTIVE=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH=true");
             console.log("STAGING_REVIEWER_IDENTITY_READY");
           })().catch(e=>{console.error("Unable to prepare isolated staging reviewer identity:",e.message);process.exit(1)});
           NODE
@@ -2126,6 +2132,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Prepare isolated staging media administrator
+        id: prepare-staging-media-admin
         env:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
@@ -2143,10 +2150,19 @@ jobs:
           initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
           (async()=>{
             const user=await getAuth().getUserByEmail(process.env.TEST_EMAIL);
-            await getFirestore().collection("adminProfiles").doc(user.uid).set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const profileRef=getFirestore().collection("adminProfiles").doc(user.uid);
+            await profileRef.set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const savedProfile=await profileRef.get();
+            if(!savedProfile.exists||savedProfile.get("active")!==true||savedProfile.get("uid")!==user.uid) throw new Error("Staging media administrator profile did not persist as active for the authenticated UID.");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_EXISTS=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_ACTIVE=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH=true");
             console.log("STAGING_MEDIA_ADMIN_IDENTITY_READY=true");
           })().catch(e=>{console.error("Unable to prepare staging media test identity: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,180));process.exit(1)});
           NODE
+          echo "profile_exists=true" >> "$GITHUB_OUTPUT"
+          echo "profile_active=true" >> "$GITHUB_OUTPUT"
+          echo "profile_uid_matches=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify signature mirror, signer trail, and document lifecycle approval
         id: signature-lifecycle
@@ -2265,6 +2281,9 @@ jobs:
           STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
           STAGING_CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
+          STAGING_MEDIA_ADMIN_PROFILE_EXISTS: ${{ steps.prepare-staging-media-admin.outputs.profile_exists }}
+          STAGING_MEDIA_ADMIN_PROFILE_ACTIVE: ${{ steps.prepare-staging-media-admin.outputs.profile_active }}
+          STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH: ${{ steps.prepare-staging-media-admin.outputs.profile_uid_matches }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -2289,6 +2308,19 @@ jobs:
            if(denied.status!==403) throw new Error("Media archive role-denial check failed; expected HTTP 403 and received HTTP "+denied.status+"; response body: "+redactBody(deniedText));
           console.log("STAGING_COMMUNICATION_MEDIA_ROLE_DENIAL=PASS");
           const admin=await signIn(process.env.STAGING_TEST_EMAIL,process.env.STAGING_TEST_PASSWORD);
+          const adminClaims=JSON.parse(Buffer.from(admin.idToken.split(".")[1],"base64url").toString("utf8"));
+          const mediaRoles=["Communication & Media","Communications & Media","Communication and Media","Communications and Media","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"];
+          const adminProfileExists=process.env.STAGING_MEDIA_ADMIN_PROFILE_EXISTS==="true";
+          const adminProfileActive=process.env.STAGING_MEDIA_ADMIN_PROFILE_ACTIVE==="true";
+          const adminProfileUidMatches=process.env.STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH==="true";
+          const eligible={
+            customAdminClaim:adminClaims.admin===true,
+            primaryAdminEmail:String(admin.email||"").toLowerCase()==="irpa2412@gmail.com",
+            activeAdminProfile:adminProfileExists&&adminProfileActive&&adminProfileUidMatches,
+            mediaRoleClaim:Array.isArray(adminClaims.irpaRoles)&&adminClaims.irpaRoles.some(r=>mediaRoles.includes(r))
+          };
+          console.log("STAGING_MEDIA_ADMIN_ROLE_DIAGNOSTIC="+JSON.stringify({...eligible,adminProfileExists:adminProfileExists,adminProfileActive:adminProfileActive,adminProfileUidMatches:adminProfileUidMatches}));
+          if(!Object.values(eligible).some(Boolean)) throw new Error("Staging test identity has no Firestore-rule-recognised administrator or Communication Media role; refusing the media-register write.");
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
           const archive=(()=>{try{return JSON.parse(archiveText)}catch{return {}}})();
@@ -2323,7 +2355,36 @@ jobs:
           };
           const docUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets/"+encodeURIComponent(assetId);
           const createResponse=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets?documentId="+encodeURIComponent(assetId),{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
-          if(!createResponse.ok) throw new Error("Staging Firestore media register write failed with HTTP "+createResponse.status+"; verify the project-scoped rules and administrator role.");
+          const createResponseText=await createResponse.text();
+          if(!createResponse.ok) {
+            if(createResponse.status===403) {
+              const firestoreError=(()=>{try{return JSON.parse(createResponseText)?.error||{}}catch{return {}}})();
+              const errorCode=String(firestoreError.status||"UNKNOWN").replace(/[^A-Z_]/g,"").slice(0,40);
+              const errorMessage=String(firestoreError.message||"No structured Firestore error message returned.").slice(0,220);
+              console.log("STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_CODE="+errorCode);
+              console.log("STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_MESSAGE="+redactBody(errorMessage));
+              const f=fields;
+              const allowedKeys=["title","originalFileName","contentType","fileSize","fileId","webViewLink","storageProvider","purpose","tags","mediaKind","status","recordOrigin","uploadedByUid","uploadedByEmail","createdAt","updatedAt"];
+              const diagnostic={
+                tokenHasAdminClaim:adminClaims.admin===true,
+                tokenEmailIsPrimaryAdmin:String(admin.email||"").toLowerCase()==="irpa2412@gmail.com",
+                adminProfileExists,
+                adminProfileActive,
+                adminProfileUidMatches,
+                uploaderUidMatchesAuthenticatedUid:f.uploadedByUid?.stringValue===admin.localId,
+                tokenAudienceMatchesRecordOrigin:(adminClaims.aud==="irpa-dbg-staging-a73ec"&&f.recordOrigin?.stringValue==="STAGING")||(adminClaims.aud!=="irpa-dbg-staging-a73ec"&&f.recordOrigin?.stringValue==="PRODUCTION"),
+                statusIsAvailable:f.status?.stringValue==="Available",
+                titlePresent:typeof f.title?.stringValue==="string"&&f.title.stringValue.length>0&&f.title.stringValue.length<=180,
+                originalFileNamePresent:typeof f.originalFileName?.stringValue==="string"&&f.originalFileName.stringValue.length>0,
+                fileIdPresent:typeof f.fileId?.stringValue==="string"&&f.fileId.stringValue.length>0,
+                fileSizeValid:Number.isInteger(Number(f.fileSize?.integerValue))&&Number(f.fileSize.integerValue)>0&&Number(f.fileSize.integerValue)<=26214400,
+                storageProviderIsGoogleDrive:f.storageProvider?.stringValue==="Google Drive",
+                metadataKeysAllowed:Object.keys(f).every(k=>allowedKeys.includes(k))
+              };
+              for(const [key,value] of Object.entries(diagnostic)) console.log("STAGING_MEDIA_REGISTER_403_"+key+"="+String(value));
+            }
+            throw new Error("Staging Firestore media register write failed with HTTP "+createResponse.status+"; redacted rule-condition diagnostics emitted for HTTP 403.");
+          }
           const verifyResponse=await fetch(docUrl,{headers:{Authorization:"Bearer "+admin.idToken}});
           const saved=await verifyResponse.json().catch(()=>({}));
           if(!verifyResponse.ok||saved.fields?.recordOrigin?.stringValue!=="STAGING"||saved.fields?.fileId?.stringValue!==upload.fileId||saved.fields?.storageProvider?.stringValue!=="Google Drive") throw new Error("Staging Firestore media register verification failed with HTTP "+verifyResponse.status+".");
