@@ -25,6 +25,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Run staging-specific Communication Media Firestore rules emulator tests
+        run: npx --yes firebase-tools@14 emulators:exec --config firebase.staging.json --only firestore --project irpa-dbg-staging-a73ec "npm run test:communication-media-rules"
+
       - name: Verify migration safety invariants
         shell: bash
         run: |
