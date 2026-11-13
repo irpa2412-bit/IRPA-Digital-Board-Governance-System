@@ -132,14 +132,14 @@ jobs:
           node <<'NODE'
           const fs = require("fs");
           const text = fs.readFileSync("wrangler.toml", "utf8");
-          if (!/\\[env\\.staging\\]/.test(text)) throw new Error("Staging environment is missing.");
+          if (!/\[env\\.staging\\]/.test(text)) throw new Error("Staging environment is missing.");
           if (!/name = "irpa-google-drive-gateway-staging"/.test(text)) throw new Error("Staging Worker name is incorrect.");
-          if (!/\\[env\\.staging\\.vars\\][\\s\\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
-          if (!/\\[env\\.staging\\.vars\\][\\s\\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
-          if (!/\\[\\[env\\.staging\\.kv_namespaces\\]\\][\\s\\S]*binding = "DRIVE_KV"[\\s\\S]*id = "5ea76010553049a2b98c8493c37fbbc4"/.test(text)) throw new Error("Dedicated staging DRIVE_KV binding is missing.");
+          if (!/\[env\\.staging\\.vars\\][\s\\S]*CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(text)) throw new Error("Staging migration flag must be true.");
+          if (!/\[env\\.staging\\.vars\\][\s\\S]*DRIVE_MOCK = "false"/.test(text)) throw new Error("Staging must use real Durable Object state (DRIVE_MOCK=false).");
+          if (!/\[\[env\\.staging\\.kv_namespaces\\]\\][\s\\S]*binding = "DRIVE_KV"[\s\\S]*id = "5ea76010553049a2b98c8493c37fbbc4"/.test(text)) throw new Error("Dedicated staging DRIVE_KV binding is missing.");
           if (process.env.STAGING_FIREBASE_PROJECT_ID !== process.env.STAGING_FIREBASE_PROJECT_ID.trim() || !/^[a-z0-9-]{6,63}$/.test(process.env.STAGING_FIREBASE_PROJECT_ID) || process.env.STAGING_FIREBASE_PROJECT_ID === "irpa-digital-board-governance") throw new Error("Staging Firebase project must be explicitly configured and separate from production.");
-          if (!/\\[\\[env\\.staging\\.durable_objects\\.bindings\\]\\][\\s\\S]*name = "ESIGN_DO"[\\s\\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
-          if (!/\\[\\[env\\.staging\\.migrations\\]\\][\\s\\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
+          if (!/\[\[env\\.staging\\.durable_objects\\.bindings\\]\\][\s\\S]*name = "ESIGN_DO"[\s\\S]*class_name = "EsignRecordDurableObject"/.test(text)) throw new Error("Staging ESIGN_DO binding is missing.");
+          if (!/\[\[env\\.staging\\.migrations\\]\\][\s\\S]*tag = "esign-do-staging-v1"/.test(text)) throw new Error("Staging DO migration is missing.");
           const top = text.split("[env.staging]")[0];
           if (!/CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"/.test(top)) throw new Error("Production/top-level migration flag must be explicitly enabled after cutover.");
           if (!/IRPA_PRODUCTION_CUTOVER = "true"/.test(top)) throw new Error("Explicit production cutover marker is missing.");
