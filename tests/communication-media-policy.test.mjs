@@ -294,3 +294,11 @@ test("media upload and download both enforce registered communications roles at 
  assert.ok(gateway.includes("Your registered IRPA role does not permit communications media uploads."));
  assert.ok(gateway.includes("Your registered IRPA role does not permit access to the communications media archive."));
 });
+
+
+test("staging controlled-PDF acceptance prints the actual upload HTTP status before evaluating the response",()=>{
+ const response=stagingWorkflow.indexOf("const uploadResponse=await fetch(base+\"/api/upload\"");
+ const status=stagingWorkflow.indexOf('console.log("STAGING_CONTROLLED_PDF_UPLOAD_HTTP_STATUS="+uploadResponse.status)');
+ const assertion=stagingWorkflow.indexOf("Controlled-PDF upload to the verified media archive failed; HTTP");
+ assert.ok(response>=0&&status>response&&assertion>status,"actual HTTP status must be emitted before the upload assertion");
+});
