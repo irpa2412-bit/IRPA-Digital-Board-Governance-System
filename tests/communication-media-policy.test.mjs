@@ -302,3 +302,11 @@ test("staging controlled-PDF acceptance prints the actual upload HTTP status bef
  const assertion=stagingWorkflow.indexOf("Controlled-PDF upload to the verified media archive failed; HTTP");
  assert.ok(response>=0&&status>response&&assertion>status,"actual HTTP status must be emitted before the upload assertion");
 });
+
+
+test("Communication Media failure is not masked by continue-on-error in the report job",()=>{
+ const reportJob=stagingWorkflow.split(/\n(?=  [a-z0-9_-]+:\n)/).find(block=>block.startsWith("  other-portals-report:\n"));
+ assert.ok(reportJob,"report job block must exist");
+ assert.doesNotMatch(reportJob,/continue-on-error:\s*true/);
+ assert.match(reportJob,/if:\s*always\(\)/);
+});
