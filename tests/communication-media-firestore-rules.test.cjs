@@ -24,6 +24,18 @@ const mediaAsset = uid => ({
   updatedAt: "2026-11-13T00:00:00.000Z"
 });
 
+const mediaItem = uid => ({
+  title: "Staging media draft",
+  type: "Press Release",
+  body: "A draft created for the isolated staging rules test.",
+  status: "Draft",
+  recordOrigin: "STAGING",
+  createdByUid: uid,
+  createdByEmail: "media-test@example.test",
+  createdAt: "2026-11-13T00:00:00.000Z",
+  updatedAt: "2026-11-13T00:00:00.000Z"
+});
+
 before(async () => {
   env = await initializeTestEnvironment({
     projectId,
@@ -73,6 +85,23 @@ test("a staging token cannot create a production-origin media asset", async () =
 
 
 
+test("active administrator profile can create a valid STAGING media item", async () => {
+  const db = env.authenticatedContext("media-admin", {
+    email: "media-admin@example.test"
+  }).firestore();
+  await assertSucceeds(db.doc("communicationMediaItems/allowed-item").set(mediaItem("media-admin")));
+});
+
+test("a staging token cannot create a production-origin media item", async () => {
+  const db = env.authenticatedContext("media-admin", {
+    email: "media-admin@example.test"
+  }).firestore();
+  await assertFails(db.doc("communicationMediaItems/wrong-origin").set({
+    ...mediaItem("media-admin"),
+    recordOrigin: "PRODUCTION"
+  }));
+});
+
 test("Communication Media assets remain immutable after creation", async () => {
   const db = env.authenticatedContext("media-admin", {
     email: "media-admin@example.test"
@@ -106,4 +135,16 @@ test("HTTP 403 diagnostics report only redacted boolean rule predicates", () => 
     assert.match(workflow, new RegExp(field + ":"));
   }
   assert.match(workflow, /STAGING_MEDIA_REGISTER_403_\+key\+\"=\"\+String\(value\)/);
+});
+
+
+test("403 diagnostics trust the Admin SDK fixture and capture the structured Firestore error safely", () => {
+  const workflow = fs.readFileSync(".github/workflows/staging-gateway-e2e.yml", "utf8");
+  assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_EXISTS:/);
+  assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_ACTIVE:/);
+  assert.match(workflow, /STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH:/);
+  assert.match(workflow, /const createResponseText=await createResponse\.text\(\)/);
+  assert.match(workflow, /STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_CODE/);
+  assert.match(workflow, /STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_MESSAGE/);
+  assert.doesNotMatch(workflow, /async function ownProfile\(/);
 });
