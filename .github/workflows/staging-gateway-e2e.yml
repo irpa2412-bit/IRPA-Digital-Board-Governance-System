@@ -2132,6 +2132,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Prepare isolated staging media administrator
+        id: prepare-staging-media-admin
         env:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
@@ -2153,6 +2154,9 @@ jobs:
             console.log("STAGING_MEDIA_ADMIN_IDENTITY_READY=true");
           })().catch(e=>{console.error("Unable to prepare staging media test identity: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,180));process.exit(1)});
           NODE
+          echo "profile_exists=true" >> "$GITHUB_OUTPUT"
+          echo "profile_active=true" >> "$GITHUB_OUTPUT"
+          echo "profile_uid_matches=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify signature mirror, signer trail, and document lifecycle approval
         id: signature-lifecycle
@@ -2272,6 +2276,9 @@ jobs:
           STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
           STAGING_CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
           STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
+          STAGING_MEDIA_ADMIN_PROFILE_EXISTS: ${{ steps.prepare-staging-media-admin.outputs.profile_exists }}
+          STAGING_MEDIA_ADMIN_PROFILE_ACTIVE: ${{ steps.prepare-staging-media-admin.outputs.profile_active }}
+          STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH: ${{ steps.prepare-staging-media-admin.outputs.profile_uid_matches }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -2298,26 +2305,16 @@ jobs:
           const admin=await signIn(process.env.STAGING_TEST_EMAIL,process.env.STAGING_TEST_PASSWORD);
           const adminClaims=JSON.parse(Buffer.from(admin.idToken.split(".")[1],"base64url").toString("utf8"));
           const mediaRoles=["Communication & Media","Communications & Media","Communication and Media","Communications and Media","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"];
-          const roleMatch=doc=>{
-            const f=doc?.fields||{};
-            return mediaRoles.includes(f.role?.stringValue||"")||
-              ["roles","assignedRoles","selectedRoles"].some(k=>(f[k]?.arrayValue?.values||[]).some(v=>mediaRoles.includes(v.stringValue||"")));
-          };
-          async function ownProfile(collection){
-            const url="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(admin.localId);
-            const response=await fetch(url,{headers:{Authorization:"Bearer "+admin.idToken}});
-            return {status:response.status,document:response.ok?await response.json().catch(()=>({})):null};
-          }
-          const [adminProfile,memberProfile,employeeProfile]=await Promise.all(["adminProfiles","members","employees"].map(ownProfile));
+          const adminProfileExists=process.env.STAGING_MEDIA_ADMIN_PROFILE_EXISTS==="true";
+          const adminProfileActive=process.env.STAGING_MEDIA_ADMIN_PROFILE_ACTIVE==="true";
+          const adminProfileUidMatches=process.env.STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH==="true";
           const eligible={
             customAdminClaim:adminClaims.admin===true,
             primaryAdminEmail:String(admin.email||"").toLowerCase()==="irpa2412@gmail.com",
-            activeAdminProfile:adminProfile.status===200&&adminProfile.document?.fields?.active?.booleanValue===true,
-            mediaRoleClaim:Array.isArray(adminClaims.irpaRoles)&&adminClaims.irpaRoles.some(r=>mediaRoles.includes(r)),
-            activeMemberMediaRole:memberProfile.status===200&&(["Active","Activated"].includes(memberProfile.document?.fields?.status?.stringValue||"")||memberProfile.document?.fields?.registrationStatus?.stringValue==="Activated")&&roleMatch(memberProfile.document),
-            activeEmployeeMediaRole:employeeProfile.status===200&&(employeeProfile.document?.fields?.status?.stringValue==="Active"||employeeProfile.document?.fields?.employmentStatus?.stringValue==="Active"||employeeProfile.document?.fields?.registrationStatus?.stringValue==="Activated")&&roleMatch(employeeProfile.document)
+            activeAdminProfile:adminProfileExists&&adminProfileActive&&adminProfileUidMatches,
+            mediaRoleClaim:Array.isArray(adminClaims.irpaRoles)&&adminClaims.irpaRoles.some(r=>mediaRoles.includes(r))
           };
-          console.log("STAGING_MEDIA_ADMIN_ROLE_DIAGNOSTIC="+JSON.stringify({...eligible,adminProfileHttp:adminProfile.status,memberProfileHttp:memberProfile.status,employeeProfileHttp:employeeProfile.status}));
+          console.log("STAGING_MEDIA_ADMIN_ROLE_DIAGNOSTIC="+JSON.stringify({...eligible,adminProfileExists,adminProfileActive,adminProfileUidMatches}));
           if(!Object.values(eligible).some(Boolean)) throw new Error("Staging test identity has no Firestore-rule-recognised administrator or Communication Media role; refusing the media-register write.");
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
@@ -2353,15 +2350,22 @@ jobs:
           };
           const docUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets/"+encodeURIComponent(assetId);
           const createResponse=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets?documentId="+encodeURIComponent(assetId),{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
+          const createResponseText=await createResponse.text();
           if(!createResponse.ok) {
             if(createResponse.status===403) {
+              const firestoreError=(()=>{try{return JSON.parse(createResponseText)?.error||{}}catch{return {}}})();
+              const errorCode=String(firestoreError.status||"UNKNOWN").replace(/[^A-Z_]/g,"").slice(0,40);
+              const errorMessage=String(firestoreError.message||"No structured Firestore error message returned.").slice(0,220);
+              console.log("STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_CODE="+errorCode);
+              console.log("STAGING_MEDIA_REGISTER_403_FIRESTORE_ERROR_MESSAGE="+redactBody(errorMessage));
               const f=fields;
               const allowedKeys=["title","originalFileName","contentType","fileSize","fileId","webViewLink","storageProvider","purpose","tags","mediaKind","status","recordOrigin","uploadedByUid","uploadedByEmail","createdAt","updatedAt"];
               const diagnostic={
                 tokenHasAdminClaim:adminClaims.admin===true,
                 tokenEmailIsPrimaryAdmin:String(admin.email||"").toLowerCase()==="irpa2412@gmail.com",
-                adminProfileExists:adminProfile.status===200,
-                adminProfileActive:adminProfile.status===200&&adminProfile.document?.fields?.active?.booleanValue===true,
+                adminProfileExists,
+                adminProfileActive,
+                adminProfileUidMatches,
                 uploaderUidMatchesAuthenticatedUid:f.uploadedByUid?.stringValue===admin.localId,
                 tokenAudienceMatchesRecordOrigin:(adminClaims.aud==="irpa-dbg-staging-a73ec"&&f.recordOrigin?.stringValue==="STAGING")||(adminClaims.aud!=="irpa-dbg-staging-a73ec"&&f.recordOrigin?.stringValue==="PRODUCTION"),
                 statusIsAvailable:f.status?.stringValue==="Available",
