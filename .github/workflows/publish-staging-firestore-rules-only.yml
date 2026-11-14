@@ -3,16 +3,12 @@ name: Publish Isolated Staging Firestore Rules Only
 run-name: Publish staging Firestore rules only (${{ github.ref_name }})
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirm_staging_rules_publication:
-        description: "Explicitly confirm publication of firestore.staging.rules to irpa-dbg-staging-a73ec"
-        required: true
-        type: choice
-        options:
-          - "no"
-          - "publish-staging-rules"
-        default: "no"
+  push:
+    branches:
+      - fix/signature-trail-20261024
+    paths:
+      - "firestore.staging.rules"
+      - ".github/workflows/publish-staging-firestore-rules-only.yml"
 
 permissions:
   contents: read
@@ -23,7 +19,7 @@ concurrency:
 
 jobs:
   publish-staging-rules:
-    if: ${{ github.ref == 'refs/heads/fix/signature-trail-20261024' && inputs.confirm_staging_rules_publication == 'publish-staging-rules' }}
+    if: ${{ github.ref == 'refs/heads/fix/signature-trail-20261024' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
