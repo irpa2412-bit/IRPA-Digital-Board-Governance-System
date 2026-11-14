@@ -84,3 +84,17 @@ test("Executive Office is central and is not counted as a fourteenth directorate
 test("portal routing has exactly one authoritative role-to-directorate map", () => {
   assert.equal((app.match(/const ROLE_DEPARTMENT=/g) || []).length, 1);
 });
+
+test("ambiguous role titles are absent from role-gated portal and workflow arrays", () => {
+  const ambiguous = catalogue.compatibilityAliasCandidates
+    .filter(item => item.status === "AMBIGUOUS_OWNER_DECISION_REQUIRED")
+    .map(item => item.alias);
+  for (const name of ["PROCUREMENT_APPROVAL_ROLES", "RESEARCH_AUTHORITY_ROLES", "COMMUNICATIONS_ROLES"]) {
+    const start = app.indexOf(`const ${name}=`);
+    assert.ok(start >= 0, `${name} must remain explicit`);
+    const end = app.indexOf("];", start);
+    assert.ok(end > start, `${name} must be a bounded role list`);
+    const block = app.slice(start, end);
+    for (const alias of ambiguous) assert.ok(!block.includes(`"${alias}"`), `${alias} must not grant ${name}`);
+  }
+});
