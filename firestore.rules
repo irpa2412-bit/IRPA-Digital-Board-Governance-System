@@ -274,7 +274,7 @@ service cloud.firestore {
   }
   match /documents/{id}{allow read:if admin()||controlledDocumentReadAllowed();allow create:if (admin()||controlledDocumentCreateAllowed()||documentLifecycleCreateAllowed(id)||documentLifecycleDerivativeCreateAllowed(id))&&actualCreateAllowed();allow delete:if (admin())&&actualDeleteAllowed();allow update:if (admin()||signatureDocumentInitialEnvelopeLink(id)||signatureDocumentWorkflowUpdate()||documentLifecycleUpdateAllowed())&&actualUpdateAllowed();}
   match /documentTranslationRequests/{id}{
-    function translationReviewer(){return researchAuthority();}
+    function translationReviewer(){return anyInstitutionalRole(["Executive Director","Director Outreach","Director Community Development","Director Research","Research Director","Research Officer","Director Human Resources","HR Director"]);}
     allow create:if signedIn()
       &&request.resource.data.get("requestType","")=="DOCUMENT_TRANSLATION"
       &&request.resource.data.get("requestedByUid","")==request.auth.uid
