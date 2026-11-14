@@ -101,6 +101,7 @@ test("a role title of Administrator without an active adminProfiles record does 
 test("active Research authority cannot read restricted research before clearance", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
+    await db.doc("members/research-authority").set({ uid: "research-authority", status: "Active", role: "Research Officer" });
     await db.doc("researchAuthorities/research-authority").set({
       uid: "research-authority",
       active: true,
@@ -161,6 +162,7 @@ test("Research Officer title alone cannot clear a study even when a custodian ex
 test("research authority cannot clear a study without an active custodian", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
+    await db.doc("members/research-authority").set({ uid: "research-authority", status: "Active", role: "Research Officer" });
     await db.doc("researchAuthorities/research-authority").set({
       uid: "research-authority",
       active: true,
@@ -193,6 +195,7 @@ test("research authority cannot clear a study without an active custodian", asyn
 test("active authority and custodian are required before a research record can be cleared and read", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
+    await db.doc("members/research-authority").set({ uid: "research-authority", status: "Active", role: "Research Officer" });
     await db.doc("researchAuthorities/research-authority").set({
       uid: "research-authority",
       active: true,
