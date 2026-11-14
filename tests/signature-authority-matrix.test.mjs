@@ -61,3 +61,12 @@ test("ambiguous director titles remain distinct and are not silently aliased", (
   assert.equal(findManualAuthorityMatch([{ role: "Field Director" }], "Director Field"), null);
   assert.equal(findManualAuthorityMatch([{ role: "Research Director" }], "Director Research"), null);
 });
+
+test("signer authority selector and verifier accept the same scalar and multi-role register fields", () => {
+  assert.match(source, /record\.designation,record\.jobTitle,record\.position,record\.title,record\.authorityRole/);
+  assert.match(source, /value&&typeof value==="object"/);
+  assert.match(source, /record\.roles/);
+  assert.match(source, /record\.assignedRoles/);
+  assert.match(source, /record\.selectedRoles/);
+  assert.match(source, /record\.roleAssignments/);
+});
