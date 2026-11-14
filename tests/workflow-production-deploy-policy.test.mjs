@@ -63,14 +63,14 @@ test("draft pull requests cannot create production-promotion proof tags", () => 
 test("Cloudflare production smoke verifies the exact deployed build artifact", () => {
   const deploy = readWorkflow(".github/workflows/cloudflare-pages-deploy.yml");
   const smoke = readWorkflow(".github/workflows/production-browser-smoke.yml");
-  assert.match(deploy, /actions\\/upload-artifact@v4/);
-  assert.match(deploy, /name:\\s*irpa-cloudflare-frontend-dist/);
-  assert.match(smoke, /actions:\\s*read/);
-  assert.match(smoke, /actions\\/download-artifact@v4/);
-  assert.match(smoke, /name:\\s*irpa-cloudflare-frontend-dist/);
-  assert.match(smoke, /run_id:\\s*\\$\\{\\{ steps\\.deployment\\.outputs\\.run_id \\}\\}/);
+  assert.ok(deploy.includes("actions/upload-artifact@v4"));
+  assert.ok(deploy.includes("name: irpa-cloudflare-frontend-dist"));
+  assert.ok(smoke.includes("actions: read"));
+  assert.ok(smoke.includes("actions/download-artifact@v4"));
+  assert.ok(smoke.includes("name: irpa-cloudflare-frontend-dist"));
+  assert.ok(smoke.includes("run-id: ${{ steps.deployment.outputs.run_id }}"));
   assert.doesNotMatch(smoke, /npm run build/, "smoke verification must not rebuild with a different build timestamp");
-  assert.match(smoke, /contentType/);
-  assert.match(smoke, /javascript\\|ecmascript/);
-  assert.match(smoke, /crypto\\.subtle\\.digest/);
+  assert.ok(smoke.includes("contentType"));
+  assert.ok(smoke.includes("javascript|ecmascript"));
+  assert.ok(smoke.includes("crypto.subtle.digest"));
 });
