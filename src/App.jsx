@@ -123,11 +123,11 @@ const ROLE_DEPARTMENT={
   "Director Livestock":"Livestock Development","Livestock Director":"Livestock Development","Livestock Officer":"Livestock Development",
   "Director Environment":"Sustainable Rangeland Management and Climate Resilience","Environment Director":"Sustainable Rangeland Management and Climate Resilience","Environment Officer":"Sustainable Rangeland Management and Climate Resilience","Rangeland Officer":"Sustainable Rangeland Management and Climate Resilience",
   "Director Outreach":"Outreach","Outreach Director":"Outreach","Outreach Officer":"Outreach","Director Community Development":"Community Development","Community Development Director":"Community Development","Community Development Officer":"Community Development",
-  "Director Field":"Field Operations","Director Field Operations":"Field Operations","Field Director":"Field Operations","Field Assistant":"Field Operations",
-  "Director Operations":"Operations","Operations Director":"Operations","Operations Manager":"Operations","Driver":"Operations","Administrative Assistant":"Operations",
+  "Director Field Operations":"Field Operations","Field Assistant":"Field Operations",
+  "Director Operations":"Operations","Operations Manager":"Operations","Driver":"Operations","Administrative Assistant":"Operations",
   "IT Specialist":"Information Technology","Information Technology Officer":"Information Technology",
-  "Communications Officer":"Outreach","Communication Officer":"Outreach","Communications Manager":"Outreach","Communication Manager":"Outreach","Media Officer":"Outreach","Media Manager":"Outreach","Public Relations Officer":"Outreach","Communications & Media Officer":"Outreach","Communications and Media Officer":"Outreach","Media and Communications Officer":"Outreach","Media & Communications Officer":"Outreach",
-  "Director Research":"Research, Statistics and Knowledge","Research Director":"Research, Statistics and Knowledge","Director, Research, Statistics and Knowledge":"Research, Statistics and Knowledge","Research Directorate Director":"Research, Statistics and Knowledge","Research Manager":"Research, Statistics and Knowledge","Research Officer":"Research, Statistics and Knowledge","Research, Statistics & Knowledge Officer":"Research, Statistics and Knowledge",
+  "Communications Officer":"Outreach","Communications Manager":"Outreach","Media Officer":"Outreach","Media Manager":"Outreach","Public Relations Officer":"Outreach","Communications & Media Officer":"Outreach",
+  "Director Research":"Research, Statistics and Knowledge","Director, Research, Statistics and Knowledge":"Research, Statistics and Knowledge","Research Directorate Director":"Research, Statistics and Knowledge","Research Manager":"Research, Statistics and Knowledge","Research Officer":"Research, Statistics and Knowledge","Research, Statistics & Knowledge Officer":"Research, Statistics and Knowledge",
   "Programme/Technical Officer":"Cross-Cutting Themes","Monitoring & Evaluation Officer":"Cross-Cutting Themes","Project Officer":"Cross-Cutting Themes"
 };
 
