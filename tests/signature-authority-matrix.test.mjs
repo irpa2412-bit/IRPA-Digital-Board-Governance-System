@@ -25,7 +25,7 @@ test("signature authority selector includes every distinct Board signing office"
 });
 
 test("Board signer eligibility list matches the role catalogue without collapsing Treasurer or Member", () => {
-  const match = source.match(/const BOARD_SIGNING_ROLES=\[([^\]]+)\]/);
+  const match = firebaseSource.match(/const BOARD_SIGNING_ROLES=\[([^\]]+)\]/);
   assert.ok(match, "Board signing eligibility list must remain explicit");
   const configured = [...match[1].matchAll(/"([^"]+)"/g)].map(item => item[1]);
   for (const role of boardRoles) assert.ok(configured.includes(role), `signer eligibility missing: ${role}`);
