@@ -1,6 +1,6 @@
 const SCALAR_FIELDS = [
   "role", "boardPosition", "designation", "jobTitle", "position", "title",
-  "authorityRole", "unit", "unitName"
+  "authorityRole"
 ];
 const ARRAY_FIELDS = ["roles", "assignedRoles", "selectedRoles", "roleAssignments"];
 
