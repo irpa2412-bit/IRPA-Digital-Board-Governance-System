@@ -32,6 +32,7 @@ test("staging publisher captures and stores the backup before publish and rolls 
   assert.match(workflow, /retention-days: 90/);
   assert.match(workflow, /if-no-files-found: error/);
   assert.match(workflow, /always\(\).*steps\.backup\.outcome == 'success'/);
+  assert.match(workflow, /steps\.publish\.outcome != 'success' \|\| steps\.verify\.outcome != 'success'/);
   assert.match(workflow, /inputs\.confirm_staging_rules_publication == 'publish-staging-rules'/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/fix\/signature-trail-20261024'/);
 });
