@@ -62,6 +62,12 @@ test("legacy Board Members plural input resolves to the distinct Board Member ro
   assert.equal(resolveManualAuthorityLabel(record, "Board Members"), "Board Member");
 });
 
+test("department and unit labels cannot be used as signing authority", () => {
+  const unitOnly = { unit: "Finance Unit", unitName: "Procurement Unit" };
+  assert.deepEqual(authorityCandidates(unitOnly), []);
+  assert.equal(findManualAuthorityMatch([unitOnly], "Finance Unit"), null);
+});
+
 test("ambiguous director titles remain distinct and are not silently aliased", () => {
   assert.notEqual(normalizeManualAuthority("Director Field"), normalizeManualAuthority("Field Director"));
   assert.notEqual(normalizeManualAuthority("Director Research"), normalizeManualAuthority("Research Director"));
@@ -76,6 +82,12 @@ test("signer authority selector and verifier accept the same scalar and multi-ro
   assert.match(source, /record\.assignedRoles/);
   assert.match(source, /record\.selectedRoles/);
   assert.match(source, /record\.roleAssignments/);
+});
+
+test("signer register loader requires an explicit active or activated status", () => {
+  const dataSource = fs.readFileSync("src/firebase/data.js", "utf8");
+  assert.match(dataSource, /\["active","activated"\]\.includes\(status\)\|\|employmentStatus==="active"\|\|registrationStatus==="activated"/);
+  assert.doesNotMatch(dataSource, /record\.status\|\|record\.employmentStatus\|\|"Active"/);
 });
 
 test("draft signing matrix documents the technical role source without appointing signatories", () => {
