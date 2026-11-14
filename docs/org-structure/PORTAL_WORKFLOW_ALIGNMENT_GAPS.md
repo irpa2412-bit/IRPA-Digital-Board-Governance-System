@@ -47,7 +47,7 @@ Market Development, Livestock Development, Sustainable Rangeland Management and 
 
 ## 3. Signature matrix status
 
-The technical selector and verifier are aligned to the five distinct Board roles and authenticated Member / Employee register records. The draft signing matrix still does not appoint signatories for governance instruments, bank instruments, procurement contracts or research clearance. Those assignments require the applicable Board resolution, bank mandate, approved delegation, custodian appointment and separation-of-duties evidence.
+The technical selector and verifier are aligned to the five distinct Board roles and authenticated Member / Employee register records. The verifier now requires an explicit Active/Activated register status, reads only the authenticated person’s current Member/Employee records, and excludes department/unit labels from signatory authority matching. Browser and Cloudflare Gateway normalisation are covered for prefixes and repeated whitespace. The draft signing matrix still does not appoint signatories for governance instruments, bank instruments, procurement contracts or research clearance. Those assignments require the applicable Board resolution, bank mandate, approved delegation, custodian appointment and separation-of-duties evidence.
 
 The interim sole-approver remains a scoped, default-off control with zero payment authority; it must not be treated as a blanket legal signing delegation.
 
