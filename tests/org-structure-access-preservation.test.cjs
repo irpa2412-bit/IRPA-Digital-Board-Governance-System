@@ -52,7 +52,7 @@ test("primary owner administrator claim remains sufficient without a job-title d
   await assertSucceeds(db.doc("meetings/owner-claim").delete());
 });
 
-test("active staging-style admin profile remains authoritative across role-title changes", async () => {
+test("active admin profile remains authoritative across role-title changes", async () => {
   const roleTitles = [
     "Administrator",
     "Executive Director",
