@@ -5,6 +5,7 @@ import { authorityCandidates, findManualAuthorityMatch, normalizeManualAuthority
 import { gatewayAuthorityCandidates, resolveGatewayAuthorityLabel } from "../drive-gateway/src/signatureAuthority.mjs";
 
 const source = fs.readFileSync("src/pages/SignaturePlatform.jsx", "utf8");
+const firebaseSource = fs.readFileSync("src/firebase/signaturePlatform.js", "utf8");
 const catalogue = JSON.parse(fs.readFileSync("config/org-structure-authority.json", "utf8"));
 const boardRoles = [
   "Board Chairperson",
