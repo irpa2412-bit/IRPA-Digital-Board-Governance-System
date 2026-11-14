@@ -20,6 +20,22 @@ function fixture() {
   return createBackup({ release, ruleset, savedAt: "2026-11-14T00:00:00.000Z" });
 }
 
+test("staging publisher captures and stores the backup before publish and rolls back on failure", () => {
+  const fs = require("node:fs");
+  const workflow = fs.readFileSync(".github/workflows/publish-staging-firestore-rules-only.yml", "utf8");
+  const backup = workflow.indexOf("Capture active staging rules backup before publication");
+  const artifact = workflow.indexOf("Save pre-publication staging rules backup artifact");
+  const publish = workflow.indexOf("Publish staging rules to the fixed staging Firebase project");
+  const verify = workflow.indexOf("Verify active staging release matches the staging source");
+  const rollback = workflow.indexOf("Roll back staging rules to saved backup if publication or verification fails");
+  assert.ok(backup >= 0 && artifact > backup && publish > artifact && verify > publish && rollback > verify);
+  assert.match(workflow, /retention-days: 90/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /always\(\).*steps\.backup\.outcome == 'success'/);
+  assert.match(workflow, /inputs\.confirm_staging_rules_publication == 'publish-staging-rules'/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/fix\/signature-trail-20261024'/);
+});
+
 test("backup captures the exact active staging ruleset and content hash", () => {
   const backup = fixture();
   assert.equal(backup.projectId, PROJECT_ID);
