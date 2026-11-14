@@ -465,12 +465,15 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    const options=[];
    for(const record of authorityRegisterRecords.filter(x=>x.department===authorityDepartment)){
      const values=[
-       record.role,record.boardPosition,record.unit,record.unitName,
+       record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName,
        ...(Array.isArray(record.roles)?record.roles:[]),
        ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
        ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
        ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
-     ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+     ].flatMap(value=>{
+       const candidates=value&&typeof value==="object"?[value.role,value.title,value.designation,value.position]:[value];
+       return candidates.flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+     });
      for(const role of [...new Set(values)]){
        if(!options.some(x=>x.role.toLowerCase()===role.toLowerCase())){
          options.push({role,unit:record.unit||record.unitName||"",sourceCollection:record.sourceCollection,sourceRecordId:record.sourceRecordId});
