@@ -119,6 +119,43 @@ test("administrator portal navigation includes every registered app module witho
     "the draft job catalogue must not become administrator runtime authority");
 });
 
+
+test("explicitly registered research authority can access restricted research records", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-authority").set({
+      uid: "research-authority",
+      status: "Active",
+      role: "Research Officer"
+    });
+    await db.doc("researchStudies/research-authority-record").set({
+      title: "Restricted research record",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertSucceeds(researcher.doc("researchStudies/research-authority-record").get());
+});
+
+test("Published status does not make research updates readable to ordinary users", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("researchUpdates/published-restricted-update").set({
+      title: "Restricted research update",
+      status: "Published",
+      classification: "RESTRICTED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const ordinaryMember = env.authenticatedContext("ordinary-member").firestore();
+  await assertFails(ordinaryMember.doc("researchUpdates/published-restricted-update").get());
+});
+
 test("restricted research studies remain unreadable until separately cleared for sharing", async () => {
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("researchStudies/restricted-test-record").set({
