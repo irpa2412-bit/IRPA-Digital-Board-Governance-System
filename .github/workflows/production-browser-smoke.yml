@@ -39,8 +39,8 @@ jobs:
           live_url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/"
           curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 30 \
             -H "Cache-Control: no-cache" "${live_url}?__irpa_smoke=${TARGET_SHA}" -o "$live_html"
-          live_commit="$(node -e 'const fs=require("node:fs");const html=fs.readFileSync(process.argv[1],"utf8");const match=html.match(/<meta\\s+name=["\\x27]irpa-build-version["\\x27]\\s+content=["\\x27]([^"\\x27]+)["\\x27]/i);process.stdout.write(match?.[1]||"");' "$live_html")"
-          live_build_time="$(node -e 'const fs=require("node:fs");const html=fs.readFileSync(process.argv[1],"utf8");const match=html.match(/<meta\\s+name=["\\x27]irpa-build-time["\\x27]\\s+content=["\\x27]([^"\\x27]+)["\\x27]/i);process.stdout.write(match?.[1]||"");' "$live_html")"
+          live_commit="$(node -e 'const fs=require("node:fs");const html=fs.readFileSync(process.argv[1],"utf8");const match=html.match(/<meta name="irpa-build-version" content="([^"]+)"/i);process.stdout.write(match?.[1]||"");' "$live_html")"
+          live_build_time="$(node -e 'const fs=require("node:fs");const html=fs.readFileSync(process.argv[1],"utf8");const match=html.match(/<meta name="irpa-build-time" content="([^"]+)"/i);process.stdout.write(match?.[1]||"");' "$live_html")"
           if [ "$live_commit" != "$TARGET_SHA" ]; then
             echo "Live Cloudflare build commit mismatch: expected $TARGET_SHA, received ${live_commit:-missing}." >&2
             exit 1
