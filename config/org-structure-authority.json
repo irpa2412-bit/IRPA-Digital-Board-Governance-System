@@ -3250,7 +3250,7 @@
     "technicalModel": {
       "status": "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT",
       "policyStatus": "POLICY_MODEL_ONLY_PENDING_RUNTIME_CROSSWALK_AND_TESTS",
-      "authoritySource": "Current authenticated Member and Employee register entries for the signer, combined with approved organisational appointment and delegation evidence before an action is authorised.",
+      "authoritySource": "Current authenticated Member and Employee register entries for the signer",
       "acceptedRoleFields": [
         "role",
         "boardPosition",
@@ -3289,7 +3289,8 @@
       "noAppointmentByTitle": true,
       "noImplicitDepartmentAuthority": true,
       "multiRoleCapacitySelection": "Required; evaluate the selected capacity and its delegation independently",
-      "serverSideEnforcementRequired": true
+      "serverSideEnforcementRequired": true,
+      "effectiveAuthoritySource": "Approved organisational appointment + job description + current written delegation + instrument-specific controls must also authorise the selected action."
     }
   },
   "migration": {
