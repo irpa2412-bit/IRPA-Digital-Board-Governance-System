@@ -6,6 +6,7 @@ const arrayAuthorityFields = ["roles", "assignedRoles", "selectedRoles", "roleAs
 
 export function normalizeManualAuthority(value) {
   const normalized = String(value || "")
+    .trim()
     .toLowerCase()
     .replace(/^(the|irpa)\s+/, "")
     .replace(/[._-]+/g, " ")
