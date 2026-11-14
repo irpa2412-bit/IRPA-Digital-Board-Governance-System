@@ -60,6 +60,7 @@ The interim sole-approver remains a scoped, default-off control with zero paymen
 5. Save the currently deployed rules backup and prove the rollback path before each publication.
 6. Pass current-head build, portal navigation, signature gateway, security rules and browser acceptance checks.
 7. Obtain explicit owner approval for the exact staging rules diff before publication. Production rules, production migration and production deployment remain separately gated.
+8. Production rules source is NOT VERIFIED against the live Firebase Console. The owner must provide the exact current Console rules text before any production diff can be prepared or reviewed; repository `firestore.rules` is not proof of the live deployed source.
 
 ## 5. Evidence references
 
