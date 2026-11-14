@@ -67,3 +67,10 @@ test("Market Development remains mapped only to existing operational modules", (
   assert.match(departmentBlock, /"Market Development":\["Reports","Actions"\]/);
   assert.ok(!departmentBlock.includes('"Market Development Portal"'));
 });
+
+test("Executive Office is central and is not counted as a fourteenth directorate", () => {
+  assert.equal(catalogue.directorates.length, 13);
+  assert.equal(catalogue.centralOffice?.name, "Executive Office");
+  assert.equal(catalogue.centralOffice?.status, "CENTRAL_OFFICE_NOT_COUNTED_AS_A_DIRECTORATE");
+  assert.ok(!catalogue.directorates.some(item => item.name === "Executive Office"));
+});
