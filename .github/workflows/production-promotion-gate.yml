@@ -3,7 +3,7 @@ name: Production Promotion Gate
 on:
   pull_request:
     branches: ["main"]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     # Promotion proof covers the application and gateway only. Desktop and
     # generated Android wrapper paths are intentionally excluded.
     paths:
@@ -31,6 +31,7 @@ permissions:
 
 jobs:
   candidate-proof:
+    if: github.event.pull_request.draft == false
     name: candidate-proof
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -102,6 +103,7 @@ jobs:
           echo "PROOF_TAG_COMMIT=$PR_HEAD_SHA"
 
   gate-proof:
+    if: github.event.pull_request.draft == false
     name: gate-proof
     needs: candidate-proof
     runs-on: ubuntu-latest

@@ -52,3 +52,10 @@ test("production promotion pull-request gate explicitly remains non-deploying", 
   assert.match(source, /^\s{2}pull_request:/m);
   assert.match(source, /PRODUCTION_PROMOTION_GATE_IS_NON_DEPLOYING=true/);
 });
+test("draft pull requests cannot create production-promotion proof tags", () => {
+  const source = readWorkflow(".github/workflows/production-promotion-gate.yml");
+  assert.match(source, /types: \[opened, synchronize, reopened, ready_for_review\]/);
+  assert.match(source, /candidate-proof:\s*\n\s+if: github\.event\.pull_request\.draft == false/);
+  assert.match(source, /gate-proof:\s*\n\s+if: github\.event\.pull_request\.draft == false/);
+  assert.match(source, /git push origin "refs\/tags\/\$TAG_NAME"/);
+});

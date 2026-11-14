@@ -452,25 +452,28 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  const authorityOptions=useMemo(()=>{
    const department=String(authorityDepartment||"").trim().toLowerCase();
    if(department==="board of directors"){
-     // Board capacity is a fixed four-choice institutional selector.
-     // Never derive these four labels from register records here: doing so can
-     // duplicate a legacy "Board Chairperson" record and hide the Vice Chairperson.
+     // Board capacity is a fixed five-role institutional selector aligned to
+     // the approved role catalogue. Keep Board Member singular for exact matching.
      return [
        {role:"Board Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-chairperson"},
        {role:"Board Vice Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-vice-chairperson"},
        {role:"Board Secretary",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-secretary"},
-       {role:"Board Members",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-members"}
+       {role:"Board Treasurer",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-treasurer"},
+       {role:"Board Member",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-member"}
      ];
    }
    const options=[];
    for(const record of authorityRegisterRecords.filter(x=>x.department===authorityDepartment)){
      const values=[
-       record.role,record.boardPosition,record.unit,record.unitName,
+       record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName,
        ...(Array.isArray(record.roles)?record.roles:[]),
        ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
        ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
        ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
-     ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+     ].flatMap(value=>{
+       const candidates=value&&typeof value==="object"?[value.role,value.title,value.designation,value.position]:[value];
+       return candidates.flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
+     });
      for(const role of [...new Set(values)]){
        if(!options.some(x=>x.role.toLowerCase()===role.toLowerCase())){
          options.push({role,unit:record.unit||record.unitName||"",sourceCollection:record.sourceCollection,sourceRecordId:record.sourceRecordId});
@@ -485,7 +488,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
      if(/(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
      if(/(^| )vice chairperson$|^board vice chairperson$|^vice chairman$|^vice chairwoman$/.test(normalized)) return "Board Vice Chairperson";
      if(/(^| )board secretary$|^secretary$/.test(normalized)) return "Board Secretary";
-     if(normalized==="board member"||normalized==="board members") return "Board Members";
+     if(normalized==="board member"||normalized==="board members") return "Board Member";
    }
    return role;
  };

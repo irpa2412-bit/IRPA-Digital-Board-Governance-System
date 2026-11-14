@@ -3,6 +3,8 @@ const admin = require("../functions/node_modules/firebase-admin");
 const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "demo-irpa-dgbs";
 const email = "irpa-browser-fixture-admin@example.test";
 const password = "FixtureOnly-Password-2026!";
+const primaryAdminEmail = "irpa-primary-admin-fixture@example.test";
+const primaryAdminPassword = "FixtureOnly-Primary-Admin-2026!";
 
 async function main() {
   if (!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST) {
@@ -22,7 +24,9 @@ async function main() {
     createdAt: new Date().toISOString(),
     fixtureOnly: true
   });
-  process.stdout.write("Seeded isolated Firebase Emulator administrator fixture: " + email + "\n");
+  const primaryAdmin = await auth.createUser({ email: primaryAdminEmail, password: primaryAdminPassword, emailVerified: true, displayName: "IRPA Primary Administrator Claim Fixture" });
+  await auth.setCustomUserClaims(primaryAdmin.uid, { admin: true });
+  process.stdout.write("Seeded isolated Firebase Emulator admin-profile and primary-admin-claim fixtures.\n");
   await db.terminate();
   await admin.app().delete();
 }

@@ -1,0 +1,2917 @@
+{
+  "schemaVersion": 1,
+  "status": "DRAFT — owner review required; not runtime authority",
+  "sourceOfTruth": "This configuration is intended to become the single source for role descriptions, permissions and signing eligibility. Until enforcement is implemented and tested, no workflow permission is granted by this document.",
+  "principles": {
+    "allPositions": "VACANT unless owner records an appointment",
+    "defaultAccess": "DENY",
+    "research": "Restricted by default; no read access based on role name or Published status; release requires Research Director plus recorded clearance and named approver",
+    "protectedControls": [
+      "administrator",
+      "adminProfiles",
+      "finance approval separation",
+      "procurement approval",
+      "signatures",
+      "audit",
+      "auditor",
+      "research restricted-by-default and independence",
+      "actualDataAccess lock",
+      "catch-all deny"
+    ],
+    "paymentAuthority": "Bank mandate governs payments; application role descriptions do not amend bank authority."
+  },
+  "directorates": [
+    {
+      "name": "Sustainable Rangeland Management and Climate Resilience",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Rangeland Management",
+          "units": [
+            "Rangeland Planning",
+            "Restoration and Rehabilitation",
+            "Grazing and Pasture Management"
+          ]
+        },
+        {
+          "name": "Climate Resilience",
+          "units": [
+            "Climate Adaptation",
+            "Natural Resource Monitoring"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Livestock Development",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Livestock Production",
+          "units": [
+            "Animal Breeding and Genetics",
+            "Animal Husbandry"
+          ]
+        },
+        {
+          "name": "Animal Health and Veterinary Services",
+          "units": [
+            "Veterinary Coordination",
+            "Animal Health and Disease Surveillance"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Market Development",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Livestock and Meat Markets",
+          "units": [
+            "Meat Value Chains",
+            "Livestock Trading"
+          ]
+        },
+        {
+          "name": "By-products and Enterprise Development",
+          "units": [
+            "Skins and Hides",
+            "Manure and Organic Fertiliser",
+            "Pastoral Enterprise Development"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cross-Cutting Themes",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Gender, Youth and Inclusion",
+          "units": [
+            "Women and Youth Empowerment"
+          ]
+        },
+        {
+          "name": "Monitoring, Evaluation and Learning",
+          "units": [
+            "Monitoring and Evaluation",
+            "Learning and Knowledge"
+          ]
+        },
+        {
+          "name": "Climate and Safeguards",
+          "units": [
+            "Safeguards and Resilience"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IRPA Capacity Building and Institutional Growth",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Institutional Development",
+          "units": [
+            "Capacity Building",
+            "Partnerships and Resource Mobilisation"
+          ]
+        },
+        {
+          "name": "Digital Governance",
+          "units": [
+            "Digital Governance Systems",
+            "Data Governance"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Finance and Administration",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Finance",
+          "units": [
+            "Accounting",
+            "Budgeting and Financial Reporting",
+            "Payments and Treasury"
+          ]
+        },
+        {
+          "name": "Procurement",
+          "units": [
+            "Procurement Planning",
+            "Sourcing and Evaluation",
+            "Contract Administration"
+          ]
+        },
+        {
+          "name": "Administration",
+          "units": [
+            "Facilities and Logistics",
+            "Records Administration"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Human Resources",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Human Resources",
+          "units": [
+            "Recruitment and Appointments",
+            "Personnel Records",
+            "Learning and Development"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal Oversight",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Internal Audit and Assurance",
+          "units": [
+            "Audit Planning",
+            "Audit and Compliance",
+            "Risk Follow-up"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Governance",
+      "reportsTo": [
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Board Secretariat",
+          "units": [
+            "Board Meetings and Resolutions",
+            "Governance Records"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Field Operations",
+          "units": [
+            "Field Coordination",
+            "Transport and Logistics"
+          ]
+        },
+        {
+          "name": "Information Technology",
+          "units": [
+            "IT Operations",
+            "Information Security"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Outreach",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Communications and Media",
+          "units": [
+            "Editorial and Content",
+            "Website Publishing",
+            "Media Relations"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Community Development",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "departments": [
+        {
+          "name": "Community Mobilisation",
+          "units": [
+            "Pastoral Groups",
+            "Community Partnerships"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Research, Statistics and Knowledge",
+      "reportsTo": [
+        "Executive Director",
+        "Board"
+      ],
+      "independent": true,
+      "departments": [
+        {
+          "name": "Research Governance and Data Stewardship",
+          "units": [
+            "Research Ethics and Clearance",
+            "Restricted Research Records"
+          ]
+        },
+        {
+          "name": "Statistics and Analysis",
+          "units": [
+            "Data Collection",
+            "Statistical Analysis"
+          ]
+        },
+        {
+          "name": "Knowledge Management",
+          "units": [
+            "Research Outputs",
+            "Knowledge Products"
+          ]
+        }
+      ]
+    }
+  ],
+  "centralOffice": {
+    "name": "Executive Office",
+    "status": "CENTRAL_OFFICE_NOT_COUNTED_AS_A_DIRECTORATE",
+    "reportsTo": [
+      "Board"
+    ],
+    "departments": [
+      {
+        "name": "Executive Director's Office",
+        "units": [
+          "Executive Coordination",
+          "Organisational Administration"
+        ]
+      }
+    ],
+    "notes": [
+      "The Executive Office is a central office and is not counted among the 13 directorates.",
+      "Administrator remains a system category; this entry does not appoint an administrator or grant runtime authority."
+    ]
+  },
+  "roles": [
+    {
+      "id": "administrator",
+      "title": "Administrator",
+      "directorate": "Executive Office",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "System category",
+      "purpose": "Owner-controlled administrator governance; no job appointment implied.",
+      "keyDuties": [
+        "Owner-controlled administrator governance; no job appointment implied.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "board-chairperson",
+      "title": "Board Chairperson",
+      "directorate": "Governance",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Board",
+      "purpose": "Lead Board governance and chair Board proceedings.",
+      "keyDuties": [
+        "Lead Board governance and chair Board proceedings.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "board-vice-chairperson",
+      "title": "Board Vice Chairperson",
+      "directorate": "Governance",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Board Chairperson",
+      "purpose": "Support the Chairperson and act only under documented delegation.",
+      "keyDuties": [
+        "Support the Chairperson and act only under documented delegation.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "board-secretary",
+      "title": "Board Secretary",
+      "directorate": "Governance",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Board Chairperson",
+      "purpose": "Maintain Board notices, agendas, minutes, resolutions and governance records.",
+      "keyDuties": [
+        "Maintain Board notices, agendas, minutes, resolutions and governance records.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "board-treasurer",
+      "title": "Board Treasurer",
+      "directorate": "Governance",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Board",
+      "purpose": "Provide Board-level financial oversight and scrutiny; not operational payment processing.",
+      "keyDuties": [
+        "Provide Board-level financial oversight and scrutiny; not operational payment processing.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "board-member",
+      "title": "Board Member",
+      "directorate": "Governance",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Board Chairperson",
+      "purpose": "Participate in collective Board oversight and decisions.",
+      "keyDuties": [
+        "Participate in collective Board oversight and decisions.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "executive-director",
+      "title": "Executive Director",
+      "directorate": "Executive Office",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Board",
+      "purpose": "Lead organisational execution and report to the Board.",
+      "keyDuties": [
+        "Lead organisational execution and report to the Board.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-internal-oversight",
+      "title": "Director Internal Oversight",
+      "directorate": "Internal Oversight",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director and Board (functional independence)",
+      "purpose": "Lead independent assurance, risk oversight and audit follow-up.",
+      "keyDuties": [
+        "Lead independent assurance, risk oversight and audit follow-up.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-livestock",
+      "title": "Director Livestock",
+      "directorate": "Livestock Development",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Lead livestock development strategy, animal health and production.",
+      "keyDuties": [
+        "Lead livestock development strategy, animal health and production.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-environment",
+      "title": "Director Environment",
+      "directorate": "Sustainable Rangeland Management and Climate Resilience",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Lead environmental stewardship, rangeland restoration and climate resilience.",
+      "keyDuties": [
+        "Lead environmental stewardship, rangeland restoration and climate resilience.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-finance-administration",
+      "title": "Director Finance & Administration",
+      "directorate": "Finance and Administration",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Lead financial stewardship, administration and internal financial controls.",
+      "keyDuties": [
+        "Lead financial stewardship, administration and internal financial controls.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-human-resources",
+      "title": "Director Human Resources",
+      "directorate": "Human Resources",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Lead workforce planning, HR controls and personnel administration.",
+      "keyDuties": [
+        "Lead workforce planning, HR controls and personnel administration.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-outreach",
+      "title": "Director Outreach",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Lead external engagement, communications and outreach strategy.",
+      "keyDuties": [
+        "Lead external engagement, communications and outreach strategy.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-community-development",
+      "title": "Director Community Development",
+      "directorate": "Community Development",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Lead community mobilisation, inclusion and local institutional development.",
+      "keyDuties": [
+        "Lead community mobilisation, inclusion and local institutional development.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-field-operations",
+      "title": "Director Field Operations",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Coordinate field delivery, operational plans and field safety.",
+      "keyDuties": [
+        "Coordinate field delivery, operational plans and field safety.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "hr-manager",
+      "title": "HR Manager",
+      "directorate": "Human Resources",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Human Resources",
+      "purpose": "Manage recruitment administration, personnel records and HR processes.",
+      "keyDuties": [
+        "Manage recruitment administration, personnel records and HR processes.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "hr-officer",
+      "title": "HR Officer",
+      "directorate": "Human Resources",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "HR Manager",
+      "purpose": "Maintain personnel records and support HR administration.",
+      "keyDuties": [
+        "Maintain personnel records and support HR administration.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "finance-manager",
+      "title": "Finance Manager",
+      "directorate": "Finance and Administration",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Finance & Administration",
+      "purpose": "Manage accounting operations, budgets and financial reporting.",
+      "keyDuties": [
+        "Manage accounting operations, budgets and financial reporting.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "finance-officer",
+      "title": "Finance Officer",
+      "directorate": "Finance and Administration",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Finance Manager",
+      "purpose": "Prepare finance records, reconciliations and supporting schedules.",
+      "keyDuties": [
+        "Prepare finance records, reconciliations and supporting schedules.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "accountant",
+      "title": "Accountant",
+      "directorate": "Finance and Administration",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Finance Manager",
+      "purpose": "Maintain accounting ledgers, reconciliations and supporting evidence.",
+      "keyDuties": [
+        "Maintain accounting ledgers, reconciliations and supporting evidence.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "internal-oversight-officer",
+      "title": "Internal Oversight Officer",
+      "directorate": "Internal Oversight",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Internal Oversight",
+      "purpose": "Conduct assigned assurance reviews and document findings.",
+      "keyDuties": [
+        "Conduct assigned assurance reviews and document findings.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "rangeland-officer",
+      "title": "Rangeland Officer",
+      "directorate": "Sustainable Rangeland Management and Climate Resilience",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Environment",
+      "purpose": "Support rangeland assessment, restoration monitoring and community practice.",
+      "keyDuties": [
+        "Support rangeland assessment, restoration monitoring and community practice.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "livestock-officer",
+      "title": "Livestock Officer",
+      "directorate": "Livestock Development",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Livestock",
+      "purpose": "Support livestock services, husbandry, veterinary coordination and production.",
+      "keyDuties": [
+        "Support livestock services, husbandry, veterinary coordination and production.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "environment-officer",
+      "title": "Environment Officer",
+      "directorate": "Sustainable Rangeland Management and Climate Resilience",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Environment",
+      "purpose": "Support environmental monitoring, restoration and climate adaptation.",
+      "keyDuties": [
+        "Support environmental monitoring, restoration and climate adaptation.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "outreach-officer",
+      "title": "Outreach Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Support outreach planning, stakeholder communication and reporting.",
+      "keyDuties": [
+        "Support outreach planning, stakeholder communication and reporting.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "community-development-officer",
+      "title": "Community Development Officer",
+      "directorate": "Community Development",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Community Development",
+      "purpose": "Support community groups, participation and local development activities.",
+      "keyDuties": [
+        "Support community groups, participation and local development activities.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "programme-technical-officer",
+      "title": "Programme/Technical Officer",
+      "directorate": "Cross-Cutting Themes",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Relevant Director (to be confirmed)",
+      "purpose": "Deliver assigned programme and technical activities under approved workplans.",
+      "keyDuties": [
+        "Deliver assigned programme and technical activities under approved workplans.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "procurement-officer",
+      "title": "Procurement Officer",
+      "directorate": "Finance and Administration",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Finance & Administration",
+      "purpose": "Prepare procurement requests, sourcing records and procurement files; no self-review or approval.",
+      "keyDuties": [
+        "Prepare procurement requests, sourcing records and procurement files; no self-review or approval.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "operations-manager",
+      "title": "Operations Manager",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Coordinate administration, logistics, facilities and operational support.",
+      "keyDuties": [
+        "Coordinate administration, logistics, facilities and operational support.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "it-specialist",
+      "title": "IT Specialist",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director (functional owner to be confirmed)",
+      "purpose": "Maintain approved IT services, access controls and technical support.",
+      "keyDuties": [
+        "Maintain approved IT services, access controls and technical support.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "information-technology-officer",
+      "title": "Information Technology Officer",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "IT Specialist",
+      "purpose": "Provide technical support and maintain assigned IT operational records.",
+      "keyDuties": [
+        "Provide technical support and maintain assigned IT operational records.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "director-research",
+      "title": "Director Research",
+      "directorate": "Research, Statistics and Knowledge",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director and Board",
+      "purpose": "Lead independent research governance, statistics, knowledge and research data stewardship.",
+      "keyDuties": [
+        "Lead independent research governance, statistics, knowledge and research data stewardship.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "research-director",
+      "title": "Research Director",
+      "directorate": "Research, Statistics and Knowledge",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director and Board",
+      "purpose": "Candidate title for Research directorate leadership; alias status requires confirmation.",
+      "keyDuties": [
+        "Candidate title for Research directorate leadership; alias status requires confirmation.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "research-manager",
+      "title": "Research Manager",
+      "directorate": "Research, Statistics and Knowledge",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Research",
+      "purpose": "Manage approved research programmes and restricted research records within explicit clearance.",
+      "keyDuties": [
+        "Manage approved research programmes and restricted research records within explicit clearance.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "research-officer",
+      "title": "Research Officer",
+      "directorate": "Research, Statistics and Knowledge",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Research Manager",
+      "purpose": "Conduct approved research tasks; restricted-by-default access only when individually authorised.",
+      "keyDuties": [
+        "Conduct approved research tasks; restricted-by-default access only when individually authorised.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "research-statistics-knowledge-officer",
+      "title": "Research, Statistics & Knowledge Officer",
+      "directorate": "Research, Statistics and Knowledge",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Research Manager",
+      "purpose": "Support research, statistics and knowledge tasks under documented access.",
+      "keyDuties": [
+        "Support research, statistics and knowledge tasks under documented access.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "driver",
+      "title": "Driver",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Operations Manager",
+      "purpose": "Provide authorised transport and vehicle-log services.",
+      "keyDuties": [
+        "Provide authorised transport and vehicle-log services.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "field-assistant",
+      "title": "Field Assistant",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Relevant field supervisor",
+      "purpose": "Support field logistics and approved field activities.",
+      "keyDuties": [
+        "Support field logistics and approved field activities.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "administrative-assistant",
+      "title": "Administrative Assistant",
+      "directorate": "Operations",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Operations Manager",
+      "purpose": "Provide administrative, filing and logistical support.",
+      "keyDuties": [
+        "Provide administrative, filing and logistical support.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "communications-officer",
+      "title": "Communications Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare communication materials and publication drafts; no independent release.",
+      "keyDuties": [
+        "Prepare communication materials and publication drafts; no independent release.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "communication-officer",
+      "title": "Communication Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare communication materials and publication drafts; title equivalence requires confirmation.",
+      "keyDuties": [
+        "Prepare communication materials and publication drafts; title equivalence requires confirmation.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "communications-manager",
+      "title": "Communications Manager",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Manage communication planning and editorial workflow; no independent release.",
+      "keyDuties": [
+        "Manage communication planning and editorial workflow; no independent release.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "communication-manager",
+      "title": "Communication Manager",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Manage communication planning and editorial workflow; title equivalence requires confirmation.",
+      "keyDuties": [
+        "Manage communication planning and editorial workflow; title equivalence requires confirmation.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "media-officer",
+      "title": "Media Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare media materials, media logs and publication drafts.",
+      "keyDuties": [
+        "Prepare media materials, media logs and publication drafts.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "media-manager",
+      "title": "Media Manager",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Coordinate media planning and media workflow; no independent release.",
+      "keyDuties": [
+        "Coordinate media planning and media workflow; no independent release.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "public-relations-officer",
+      "title": "Public Relations Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Support public relations, stakeholder messaging and approved publications.",
+      "keyDuties": [
+        "Support public relations, stakeholder messaging and approved publications.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "communications-media-officer",
+      "title": "Communications & Media Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare communication and media materials; no independent release.",
+      "keyDuties": [
+        "Prepare communication and media materials; no independent release.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "communications-and-media-officer",
+      "title": "Communications and Media Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare communication and media materials; candidate alias.",
+      "keyDuties": [
+        "Prepare communication and media materials; candidate alias.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "media-and-communications-officer",
+      "title": "Media and Communications Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare media and communication materials; candidate alias.",
+      "keyDuties": [
+        "Prepare media and communication materials; candidate alias.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "media-communications-officer",
+      "title": "Media & Communications Officer",
+      "directorate": "Outreach",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Director Outreach",
+      "purpose": "Prepare media and communication materials; candidate alias.",
+      "keyDuties": [
+        "Prepare media and communication materials; candidate alias.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "monitoring-evaluation-officer",
+      "title": "Monitoring & Evaluation Officer",
+      "directorate": "Cross-Cutting Themes",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director or assigned programme director",
+      "purpose": "Maintain monitoring frameworks, indicators, data quality and reporting.",
+      "keyDuties": [
+        "Maintain monitoring frameworks, indicators, data quality and reporting.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "project-officer",
+      "title": "Project Officer",
+      "directorate": "Cross-Cutting Themes",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Assigned Programme Director",
+      "purpose": "Coordinate assigned project activities, deliverables and evidence.",
+      "keyDuties": [
+        "Coordinate assigned project activities, deliverables and evidence.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VACANT"
+    },
+    {
+      "id": "management",
+      "title": "Management",
+      "directorate": "System category",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Not applicable",
+      "purpose": "Generic application category only; not an organisational appointment.",
+      "keyDuties": [
+        "Generic application category only; not an organisational appointment.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "NOT_AN_APPOINTMENT"
+    },
+    {
+      "id": "employee",
+      "title": "Employee",
+      "directorate": "System category",
+      "department": "To be confirmed in approved structure",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Not applicable",
+      "purpose": "Generic application category only; not an organisational appointment.",
+      "keyDuties": [
+        "Generic application category only; not an organisational appointment.",
+        "Maintain complete, accurate and attributable records for assigned work.",
+        "Follow approved policies, safeguarding, confidentiality and audit requirements."
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
+      },
+      "prohibitedActions": [
+        "No self-approval or self-review.",
+        "No access outside an expressly enforced and assigned permission.",
+        "No bypass of administrator, audit, auditor, actual-data, signature, finance, procurement or research controls."
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "NOT_AN_APPOINTMENT"
+    },
+    {
+      "id": "interim-sole-approver",
+      "title": "interim sole-approver",
+      "directorate": "Executive Office",
+      "department": "Interim control",
+      "unit": "Signature and Communication & Media only",
+      "reportingLine": "Sole owner; temporary control role, not a permanent post",
+      "purpose": "Narrow temporary exception for website publication author/approver separation and second document signer only.",
+      "keyDuties": [
+        "Owner-only website content approval and publishing while the dedicated flag is enabled.",
+        "Owner-only document signing as the sole interim signer while the dedicated flag is enabled.",
+        "Review two stored AI readiness reports and itemised test statuses before sealing."
+      ],
+      "positionsRequired": "1 — occupied only by the authenticated sole owner during expressly authorised interim mode",
+      "qualifications": "Not an appointment qualification; authenticated owner identity and explicit activation authorisation required.",
+      "workflows": {
+        "mayInitiate": [
+          "Communication & Media website content",
+          "Signature document signing"
+        ],
+        "mayReview": [],
+        "mayApprove": [
+          "Communication & Media website content"
+        ],
+        "maySign": [
+          "Signature documents"
+        ],
+        "mayRelease": [
+          "Communication & Media website publishing"
+        ]
+      },
+      "records": {
+        "mayRead": [
+          "Own interim-mode readiness reports",
+          "Own interim action inventory"
+        ],
+        "mayWrite": [
+          "Interim activation and seal records",
+          "Scoped Signature and Communication & Media workflow records"
+        ]
+      },
+      "limits": {
+        "documentValue": "USD 0 payment authority; no payment initiation, approval or release authority.",
+        "classificationMax": "No access to RESTRICTED research records by virtue of interim mode."
+      },
+      "prohibitedActions": [
+        "No payment authority of any kind under this mode.",
+        "No bypass of authentication, verified signer identity, document hash, signature verification, tamper detection or audit.",
+        "No use outside Signature and Communication & Media.",
+        "No re-enablement after sealing without a new explicit owner authorisation."
+      ],
+      "separationOfDutiesConflicts": [
+        "Only temporary exception: author/approver separation for website publishing and second signer requirement for Signature.",
+        "No exception to finance, procurement, audit, administrator, research or actualDataAccess protections."
+      ],
+      "sealingConditions": [
+        "Two complete stored AI readiness reports with full text and timestamps.",
+        "Every live test is PASS, FAIL or NOT VERIFIED; any FAIL blocks sealing.",
+        "Each NOT VERIFIED item requires specific written owner acceptance.",
+        "Authenticated owner alone invokes seal; server rechecks conditions.",
+        "Seal stores all reports, timestamps and interim action inventory; sets flag OFF; verifies OFF.",
+        "Record exact statement: Sealed by the owner on the advice of two AI reviewers; AI reviewers are advisory, not independent human approvers."
+      ],
+      "accessStatus": "PROPOSED_ONLY_FLAG_DEFAULT_OFF",
+      "appointmentStatus": "INTERIM_OWNER_ROLE"
+    }
+  ],
+  "compatibilityAliasCandidates": [
+    {
+      "alias": "Internal Oversight Director",
+      "candidateCanonical": "Director Internal Oversight",
+      "status": "PROPOSED_COMPATIBILITY_ALIAS"
+    },
+    {
+      "alias": "Livestock Director",
+      "candidateCanonical": "Director Livestock",
+      "status": "PROPOSED_COMPATIBILITY_ALIAS"
+    },
+    {
+      "alias": "Environment Director",
+      "candidateCanonical": "Director Environment",
+      "status": "PROPOSED_COMPATIBILITY_ALIAS"
+    },
+    {
+      "alias": "Outreach Director",
+      "candidateCanonical": "Director Outreach",
+      "status": "PROPOSED_COMPATIBILITY_ALIAS"
+    },
+    {
+      "alias": "Community Development Director",
+      "candidateCanonical": "Director Community Development",
+      "status": "PROPOSED_COMPATIBILITY_ALIAS"
+    },
+    {
+      "alias": "Director Field",
+      "candidateCanonical": "Director Field Operations",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Field Director",
+      "candidateCanonical": "Director Field Operations",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Operations Director",
+      "candidateCanonical": "Director Operations",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Research Director",
+      "candidateCanonical": "Director Research",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Communication Officer",
+      "candidateCanonical": "Communications Officer",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Communication Manager",
+      "candidateCanonical": "Communications Manager",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Communications and Media Officer",
+      "candidateCanonical": "Communications & Media Officer",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Media and Communications Officer",
+      "candidateCanonical": "Communications & Media Officer",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    },
+    {
+      "alias": "Media & Communications Officer",
+      "candidateCanonical": "Communications & Media Officer",
+      "status": "AMBIGUOUS_OWNER_DECISION_REQUIRED"
+    }
+  ],
+  "systemCategories": [
+    "Administrator",
+    "Management",
+    "Employee"
+  ],
+  "signingMatrix": {
+    "status": "DRAFT — requires owner approval and separate legal confirmation of who may bind IRPA",
+    "rows": [
+      {
+        "category": "Governance instruments and Board resolutions",
+        "owningDirectorate": "Governance",
+        "signerRole": "Not assigned pending legal confirmation",
+        "signatures": "Not assigned",
+        "approverBeforeSigning": "Board authority as applicable; confirm instrument",
+        "evidenceOfAuthority": "Certified Board resolution/delegation and verified signatory authority",
+        "interim": "No blanket exception; only scoped Signature portal action if separately activated",
+        "sealed": "No interim exception after seal"
+      },
+      {
+        "category": "Finance, payments and bank instruments",
+        "owningDirectorate": "Finance and Administration",
+        "signerRole": "Bank-mandated signatories only; not assigned by app",
+        "signatures": "As required by bank mandate",
+        "approverBeforeSigning": "Independent finance approval chain",
+        "evidenceOfAuthority": "Current bank mandate and approved finance delegation",
+        "interim": "No authority; USD 0",
+        "sealed": "Bank mandate unchanged"
+      },
+      {
+        "category": "Procurement and contracts",
+        "owningDirectorate": "Finance and Administration",
+        "signerRole": "Not assigned pending legal confirmation",
+        "signatures": "Distinct authorised signatories per instrument",
+        "approverBeforeSigning": "Separate preparer, reviewer and approver",
+        "evidenceOfAuthority": "Approved procurement record, delegation and contract authority",
+        "interim": "No exception",
+        "sealed": "No interim exception"
+      },
+      {
+        "category": "Research data release",
+        "owningDirectorate": "Research, Statistics and Knowledge",
+        "signerRole": "Research Director plus recorded clearance",
+        "signatures": "Research Director approval plus named clearance authority",
+        "approverBeforeSigning": "Research Director; named custodian/clearance recorded",
+        "evidenceOfAuthority": "Classification, named approver, clearance record and audit trail",
+        "interim": "No exception",
+        "sealed": "No exception"
+      },
+      {
+        "category": "Communication & Media website publication",
+        "owningDirectorate": "Outreach",
+        "signerRole": "Communications role per approved delegation",
+        "signatures": "Not applicable",
+        "approverBeforeSigning": "Independent content reviewer/approver",
+        "evidenceOfAuthority": "Approved content record, version and release audit",
+        "interim": "Owner only while dedicated flag ON; label interim sole-approver",
+        "sealed": "Normal separation restored"
+      }
+    ],
+    "technicalModel": {
+      "status": "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT",
+      "authoritySource": "Current authenticated Member and Employee register entries for the signer",
+      "acceptedRoleFields": [
+        "role",
+        "boardPosition",
+        "designation",
+        "jobTitle",
+        "position",
+        "title",
+        "authorityRole",
+        "roles",
+        "assignedRoles",
+        "selectedRoles",
+        "roleAssignments"
+      ],
+      "multipleRegisteredRolesPerPerson": true,
+      "boardRoleOptions": [
+        "Board Chairperson",
+        "Board Vice Chairperson",
+        "Board Secretary",
+        "Board Treasurer",
+        "Board Member"
+      ],
+      "workflowActions": [
+        "Review",
+        "Authorization",
+        "Approval",
+        "Verification",
+        "Recommendation",
+        "Comment",
+        "Signature",
+        "Final Authorization"
+      ],
+      "ambiguousTitles": "Exact-match only; ambiguous director titles are not normalised into one another.",
+      "administratorRecognition": "Administrator mode is derived from authenticated administrator context; the job title Administrator alone cannot select administrator mode or grant administrator authority.",
+      "limitation": "The technical selector and verifier do not appoint signatories or override Board resolutions, bank mandates, approved delegations, separation of duties, or server-side controls."
+    }
+  },
+  "migration": {
+    "status": "PLAN_ONLY_NOT_RUN",
+    "requiredInventory": [
+      "members",
+      "employees",
+      "adminProfiles",
+      "role assignments",
+      "department and unit fields",
+      "workflow records with role snapshots",
+      "signing records"
+    ],
+    "steps": [
+      "Read-only counts and sample inventory in staging",
+      "Export backup with hashes and access controls",
+      "Map old names to canonical IDs; ambiguous titles require owner decision",
+      "Dry-run migration and collision report",
+      "Owner approval before staging execution",
+      "Verify counts, references and audit continuity",
+      "Production migration requires separate RUN MIGRATION approval"
+    ],
+    "rollback": "Restore verified pre-migration backup and prior mapping snapshot; no production target selected."
+  }
+}

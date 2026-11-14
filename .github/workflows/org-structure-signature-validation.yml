@@ -1,0 +1,68 @@
+name: Organisational Structure and Signature Matrix Validation
+
+on:
+  push:
+    branches:
+      - feat/org-structure-directorates
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "config/org-structure-authority.json"
+      - "src/App.jsx"
+      - "src/firebase/signaturePlatform.js"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/utils/signatureAuthority.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/signatureAuthority.mjs"
+      - "tests/org-structure-*.mjs"
+      - "tests/org-structure-*.cjs"
+      - "tests/signature-authority-matrix.test.mjs"
+      - "drive-gateway/tests/signature-authority.test.mjs"
+      - "package.json"
+      - "drive-gateway/package.json"
+      - ".github/workflows/org-structure-signature-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  application-and-signature:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run organisational, portal and signature matrix tests
+        run: npm run test:org-structure-authority
+      - name: Run full application regression suite with Firestore Emulator
+        run: npx firebase emulators:exec --project demo-irpa-org-structure --only firestore "npm run test:all"
+      - name: Build application
+        run: npm run build
+      - name: Install Gateway dependencies
+        run: npm --prefix drive-gateway ci --no-audit --no-fund
+      - name: Run Cloudflare Gateway signature authority tests
+        run: npm --prefix drive-gateway test
+
+  administrator-and-research-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test administrator preservation and restricted research in Firestore Emulator
+        run: npx firebase emulators:exec --project demo-irpa-org-structure --only firestore "node --test tests/org-structure-access-preservation.test.cjs"

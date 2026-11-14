@@ -14,7 +14,7 @@
     "check:production-readability": "node scripts/check-production-readability.mjs",
     "verify:production-readability": "node scripts/verify-production-readability.mjs",
     "test:finance-policy": "node --test tests/finance-portal-policy.test.cjs",
-    "test:security-rules": "node --test --test-concurrency=1 tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs",
+    "test:security-rules": "node --test --test-concurrency=1 tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs tests/org-structure-access-preservation.test.cjs",
     "test:fundraising-registry": "node --test tests/fundraising-source-registry.test.mjs",
     "test:portal-navigation": "node --test tests/portal-workspace-navigation.test.mjs",
     "test:meeting-entry-policy": "node --test functions/meetingEntryPolicy.test.cjs",
@@ -27,7 +27,10 @@
     "check:no-billing-deps": "node scripts/check-no-billing-deps.mjs",
     "test:no-billing-deps": "node --test tests/no-billing-deps.test.mjs",
     "test:workflow-deployment-policy": "node --test tests/workflow-production-deploy-policy.test.mjs",
-    "test:all": "npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio"
+    "test:all": "npm run test:org-structure-authority && npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio",
+    "test:org-structure-authority": "node --test tests/org-structure-authority.test.mjs tests/signature-authority-matrix.test.mjs tests/org-structure-portal-alignment.test.mjs",
+    "test:org-structure-portal-alignment": "node --test tests/org-structure-portal-alignment.test.mjs",
+    "test:signature-authority-matrix": "node --test tests/signature-authority-matrix.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",

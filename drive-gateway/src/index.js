@@ -20,6 +20,7 @@ import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
 import { isCurrentSigningAuthorityRecord } from "./signingAuthorityPolicy.mjs";
+import { normalizeGatewayAuthority, gatewayAuthorityCandidates, resolveGatewayAuthorityLabel } from "./signatureAuthority.mjs";
 import { signatureDraftOwnershipAllowed, validateSignatureDraftRecipients } from "./signatureDraftPolicy.mjs";
 import { runCleanup } from "./upload.mjs";
 import { createDocumentLifecycleRouter } from "./documentLifecycle.mjs";
@@ -153,9 +154,6 @@ const passwordRecoveryRouter = createPasswordRecoveryRouter({
 });
 
 
-function normalizeGatewayAuthority(value) {
-  return String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
-}
 async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentification) {
   const input=normalizeGatewayAuthority(manualAuthorityIdentification);
   if(!input||!user?.uid||!user?.token)throw Object.assign(new Error("Authenticated signing authority is required."),{status:403});
@@ -191,7 +189,7 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     }
   }
   const uniqueRecords=[...new Map(records.map(record=>[record.sourceCollection+":"+record.id,record])).values()];
-  const candidates=record=>[record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName].map(normalizeGatewayAuthority).filter(Boolean);
+  const candidates=record=>gatewayAuthorityCandidates(record);
   const active=record=>isCurrentSigningAuthorityRecord(record,user.uid);
   const match=uniqueRecords.find(record=>active(record)&&candidates(record).includes(input));
   if(!match){
@@ -201,12 +199,12 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     if(!uniqueRecords.length){reason="no register record found for this account";detailRecord=null;}
     else if(!activeRecord&&inactive){reason="record found but status is inactive";detailRecord=inactive;}
     else {reason="record found but role does not match";detailRecord=activeRecord||inactive;}
-    const roleFields=detailRecord?["role","boardPosition","designation","jobTitle","position","title","authorityRole","unit","unitName"].filter(field=>Object.prototype.hasOwnProperty.call(detailRecord,field)).join(", "):"none";
+    const roleFields=detailRecord?["role","boardPosition","designation","jobTitle","position","title","authorityRole","unit","unitName","roles","assignedRoles","selectedRoles","roleAssignments"].filter(field=>Object.prototype.hasOwnProperty.call(detailRecord,field)).join(", "):"none";
     throw Object.assign(new Error("SYSTEM VERIFICATION FAILED: "+reason+" (collection: "+(detailRecord?.sourceCollection||"members/employees")+"; record ID: "+(detailRecord?.id||"none")+"; role fields present: "+(roleFields||"none") + ")."),{status:403});
   }
   return{
     verified:true,
-    authorityRole:String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
+    authorityRole:String(resolveGatewayAuthorityLabel(match,input)||match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim(),
     authorityDepartment:String(match.department||"").trim(),
     authorityUnit:String(match.unit||match.unitName||"").trim(),
     authoritySourceCollection:match.sourceCollection,

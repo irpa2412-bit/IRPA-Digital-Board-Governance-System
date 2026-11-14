@@ -287,7 +287,10 @@ export async function getCurrentSigningAuthorityRegisterEntries(){
  const entries=[];
  const collect=(record,sourceCollection)=>{
    if(!record)return;
-   const active=String(record.status||record.employmentStatus||"Active").trim().toLowerCase()!=="inactive";
+   const status=String(record.status||"").trim().toLowerCase();
+   const employmentStatus=String(record.employmentStatus||"").trim().toLowerCase();
+   const registrationStatus=String(record.registrationStatus||"").trim().toLowerCase();
+   const active=["active","activated"].includes(status)||employmentStatus==="active"||registrationStatus==="activated";
    if(active)entries.push({id:record.id||record.uid||uid,...record,sourceCollection});
  };
  collect(await getRecord(COLLECTIONS.members,uid).catch(()=>null),"members");

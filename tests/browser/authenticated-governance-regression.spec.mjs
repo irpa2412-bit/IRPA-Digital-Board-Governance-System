@@ -474,3 +474,41 @@ for (const viewport of [
     });
   });
 }
+
+const primaryAdminFixtureEmail = "irpa-primary-admin-fixture@example.test";
+const primaryAdminFixturePassword = "FixtureOnly-Primary-Admin-2026!";
+
+test("primary administrator custom claim signs in and reaches every registered portal without an adminProfiles record", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const completedExternalRequests = [];
+  const pageErrors = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await page.on("requestfinished", request => {
+    const url = new URL(request.url());
+    if (!["localhost", "127.0.0.1"].includes(url.hostname)) completedExternalRequests.push(url.href);
+  });
+  await page.route("**/*", route => {
+    const url = new URL(route.request().url());
+    if (["localhost", "127.0.0.1"].includes(url.hostname)) return route.continue();
+    return route.abort();
+  });
+
+  await page.goto("/?adminModule=Dashboard");
+  await page.locator('.auth-card input[type="email"]').fill(primaryAdminFixtureEmail);
+  await page.locator('.auth-card input[type="password"]').fill(primaryAdminFixturePassword);
+  await page.getByRole("button", { name: "Sign In Securely" }).click();
+  await expect(page.locator(".topbar h2")).toContainText("Dashboard", { timeout: 45000 });
+  await expect(page.locator(".auth-card")).toBeHidden();
+
+  for (const module of APP_PORTALS) {
+    await page.goto("/?adminModule=" + encodeURIComponent(module));
+    const title = page.locator(".topbar h2");
+    await expect(title, `primary administrator should reach the ${module} portal`).toBeVisible({ timeout: 30000 });
+    await expect(title).not.toHaveText("");
+    await expect(page.locator("[data-active-portal-content]:visible").first(),
+      `active portal content should render for ${module}`).toBeVisible({ timeout: 30000 });
+  }
+
+  expect(completedExternalRequests, "primary-admin emulator fixture must not complete external/production requests").toEqual([]);
+  expect(pageErrors, "primary-admin portal sweep must not produce uncaught runtime errors").toEqual([]);
+});

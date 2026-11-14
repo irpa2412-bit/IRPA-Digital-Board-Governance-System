@@ -7,6 +7,7 @@ import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthentication
 import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 import { readWorkflowContext } from "./workflowLinks";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+import { findManualAuthorityMatch, resolveManualAuthorityLabel } from "../utils/signatureAuthority.mjs";
 import { resolveSourceDocumentIntegrity } from "./signatureSourceIntegrity.js";
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
 const GATEWAY_URL=getGoogleDriveGatewayUrl();
@@ -40,25 +41,15 @@ function nextActionRecipient(recipients,currentUid){const list=recipients||[];co
 function user(){if(!auth.currentUser)throw new Error("Authentication is required.");return auth.currentUser;}
 function isTrialSignatureMode(){try{const environment=String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase();const authority=String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase();const verified=window.sessionStorage.getItem("irpaActualDataAccessVerified")==="true";return environment!=="ACTUAL"||(authority==="ADMINISTRATOR"&&!verified)}catch{return true}}
 function matchesSignatureEnvironment(record={}){const trial=String(record.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||record.trialData===true||record.isTrial===true;return trial===isTrialSignatureMode()}
-function normalizeManualAuthority(value){
-  return String(value||"").toLowerCase().replace(/^(the|irpa)\\s+/,"").replace(/[._-]+/g," ").replace(/\\s+/g," ").trim();
-}
-function authorityCandidates(record){
-  return [
-    record?.role,record?.boardPosition,record?.designation,record?.jobTitle,record?.position,record?.title,
-    record?.authorityRole,record?.unit,record?.unitName
-  ].map(normalizeManualAuthority).filter(Boolean);
-}
 export async function verifyManualSigningAuthority(manualAuthorityIdentification){
-  const input=normalizeManualAuthority(manualAuthorityIdentification);
+  const input=String(manualAuthorityIdentification||"").trim();
   if(!input) throw new Error("Enter the signing authority you are declaring before signing.");
   const entries=await getCurrentSigningAuthorityRegisterEntries();
-  const matches=entries.filter(entry=>authorityCandidates(entry).includes(input));
-  if(!matches.length){
+  const match=findManualAuthorityMatch(entries,input);
+  if(!match){
     throw new Error("SYSTEM VERIFICATION FAILED: the manually entered signing authority does not match an active IRPA Member or Employee Register entry for this authenticated account.");
   }
-  const match=matches[0];
-  const verifiedRole=String(match.role||match.boardPosition||match.designation||match.jobTitle||match.position||match.title||manualAuthorityIdentification).trim();
+  const verifiedRole=resolveManualAuthorityLabel(match,input);
   return {
     verified:true,
     manualAuthorityIdentification:String(manualAuthorityIdentification).trim(),

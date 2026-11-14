@@ -79,11 +79,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Run all existing npm test scripts
+      - name: Run every component npm test script with emulator isolation
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t scripts < <(node -e 'const p=require("./package.json"); for (const n of Object.keys(p.scripts||{})) if (n.startsWith("test:")) console.log(n)')
+          npm run check:no-billing-deps
+          mapfile -t scripts < <(node -e 'const p=require("./package.json"); for (const n of Object.keys(p.scripts||{})) if (n.startsWith("test:") && n !== "test:all") console.log(n)')
           if [[ ${#scripts[@]} -eq 0 ]]; then
             echo "No existing test scripts were discovered." >&2
             exit 1
