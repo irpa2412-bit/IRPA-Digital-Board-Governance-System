@@ -110,6 +110,7 @@ test("administrator portal navigation includes every registered app module witho
   assert.match(appSource, /storedAuthority!=="Administrator"/);
   assert.match(appSource, /sessionAdministrator\|\|authority==="Administrator"/);
   assert.match(appSource, /if\(sessionAdministrator\)return true/);
+  assert.match(appSource, /selected==="Administrator"\?\["Dashboard","Role Descriptions"\]/);
   assert.match(appSource, /modules=sessionAdministrator\?\[\.\.\.ALL_MODULES,\.\.\.registeredPortalModules\]/);
   assert.ok(appSource.includes("const ALL_MODULES="));
   assert.ok(appSource.includes("RoleJobDescriptionPortal"));
