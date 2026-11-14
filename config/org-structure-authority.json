@@ -340,9 +340,13 @@
       "department": "To be confirmed in approved structure",
       "unit": "To be confirmed in approved structure",
       "reportingLine": "System category",
-      "purpose": "Owner-controlled administrator governance; no job appointment implied.",
+      "purpose": "Execute documented administrative role and duty assignments only after receiving explicit written instructions and authorisation from the Executive Director; maintain auditable assignment records. This system category is not itself an organisational appointment.",
       "keyDuties": [
-        "Owner-controlled administrator governance; no job appointment implied.",
+        "Receive and verify written, scoped role and duty assignment instructions explicitly authorised by the Executive Director.",
+        "Check proposed assignments against the approved organisational structure and available Board/HR records before recording them.",
+        "Record authorised assignments with the instruction reference, scope, assignee, effective date and audit trail.",
+        "Return completed assignment records to the Executive Director for confirmation.",
+        "Do not initiate, approve or alter assignments without the required Executive Director instruction and authorisation.",
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
@@ -360,7 +364,7 @@
         "mayWrite": []
       },
       "limits": {
-        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "documentValue": "Administrative execution only after explicit Executive Director authorisation. No independent appointment, monetary approval, bank mandate, procurement, signing, restricted research or system permission is granted.",
         "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
       },
       "prohibitedActions": [
@@ -598,13 +602,16 @@
       "department": "To be confirmed in approved structure",
       "unit": "To be confirmed in approved structure",
       "reportingLine": "Board",
-      "purpose": "Lead organisational execution and report to the Board.",
+      "purpose": "Lead organisational execution, supervise directorate performance, hold the complete organisational job-description framework for planning, and issue documented instructions authorising administrative role and duty assignments; report to the Board.",
       "keyDuties": [
         "Lead organisational execution and report to the Board.",
+        "Review and retain the complete directorate, department and unit job-description framework.",
+        "Determine proposed role and duty allocations and issue written, scoped instructions and explicit authorisation to the Administrator.",
+        "Review the Administrator's recorded execution of authorised role and duty assignments.",
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -618,7 +625,7 @@
         "mayWrite": []
       },
       "limits": {
-        "documentValue": "No independent monetary approval or payment authority is assigned by this draft.",
+        "documentValue": "No independent monetary approval or payment authority is assigned by this draft. Role and duty assignment instructions do not create financial, bank, procurement, signing or system authority.",
         "classificationMax": "INTERNAL proposed ceiling; RESTRICTED research records remain denied unless separately cleared and authorised."
       },
       "prohibitedActions": [
@@ -632,7 +639,7 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED — organisational employee; owner-confirmed 2026-11-14"
     },
     {
       "id": "director-internal-oversight",
@@ -2913,5 +2920,44 @@
       "Production migration requires separate RUN MIGRATION approval"
     ],
     "rollback": "Restore verified pre-migration backup and prior mapping snapshot; no production target selected."
+  },
+  "assignmentGovernance": {
+    "status": "DELEGATED_PROCESS_DRAFT — Executive Director instruction required before administrator execution",
+    "executiveDirector": {
+      "capacity": "Organisational employee and Executive Director",
+      "possession": "May inspect the complete directorate, department, unit and role-description catalogue for organisational planning and duty allocation.",
+      "authority": "Issues written, scoped instructions and explicit authorisation for proposed role and duty assignments, subject to Board-reserved matters, approved policies and applicable law.",
+      "requiredInstructionFields": [
+        "instruction reference",
+        "date",
+        "directorate, department or unit scope",
+        "role or duty to be assigned",
+        "named assignee or vacancy status",
+        "effective date",
+        "explicit approval by the Executive Director"
+      ],
+      "limits": [
+        "Does not by this handoff appoint Board officers or amend Board-approved governance instruments.",
+        "Does not create bank signing authority, financial approval limits, procurement approval, restricted research access or system permissions.",
+        "Appointments and access remain subject to required HR records, Board decisions, applicable law and separately verified system controls."
+      ]
+    },
+    "administrator": {
+      "mandate": "Administrative execution only: prepare and record role and duty assignments after receiving an explicit written instruction and authorisation from the Executive Director.",
+      "prerequisites": [
+        "Authenticate as the separately controlled Administrator account.",
+        "Verify the Executive Director instruction reference, scope, date and explicit authorisation.",
+        "Check the assignment against the approved organisational structure and existing Board/HR records.",
+        "Record the assignment and its source instruction for audit.",
+        "Return the completed record to the Executive Director for confirmation."
+      ],
+      "prohibited": [
+        "No self-initiated assignment or reallocation.",
+        "No assignment based only on verbal, implied or ambiguous instruction.",
+        "No self-approval or substitution for the Executive Director.",
+        "No Board appointment, bank mandate, financial authority, procurement authority, signature authority, research clearance or system permission may be created by this administrative mandate."
+      ],
+      "accessEffect": "This mandate does not grant application permissions or change Firestore rules. Existing access remains unchanged until separately approved and technically enforced."
+    }
   }
 }
