@@ -2852,7 +2852,45 @@
         "interim": "Owner only while dedicated flag ON; label interim sole-approver",
         "sealed": "Normal separation restored"
       }
-    ]
+    ],
+    "technicalModel": {
+      "status": "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT",
+      "authoritySource": "Current authenticated Member and Employee register entries for the signer",
+      "acceptedRoleFields": [
+        "role",
+        "boardPosition",
+        "designation",
+        "jobTitle",
+        "position",
+        "title",
+        "authorityRole",
+        "roles",
+        "assignedRoles",
+        "selectedRoles",
+        "roleAssignments"
+      ],
+      "multipleRegisteredRolesPerPerson": true,
+      "boardRoleOptions": [
+        "Board Chairperson",
+        "Board Vice Chairperson",
+        "Board Secretary",
+        "Board Treasurer",
+        "Board Member"
+      ],
+      "workflowActions": [
+        "Review",
+        "Authorization",
+        "Approval",
+        "Verification",
+        "Recommendation",
+        "Comment",
+        "Signature",
+        "Final Authorization"
+      ],
+      "ambiguousTitles": "Exact-match only; ambiguous director titles are not normalised into one another.",
+      "administratorRecognition": "Administrator mode is derived from authenticated administrator context; the job title Administrator alone cannot select administrator mode or grant administrator authority.",
+      "limitation": "The technical selector and verifier do not appoint signatories or override Board resolutions, bank mandates, approved delegations, separation of duties, or server-side controls."
+    }
   },
   "migration": {
     "status": "PLAN_ONLY_NOT_RUN",
