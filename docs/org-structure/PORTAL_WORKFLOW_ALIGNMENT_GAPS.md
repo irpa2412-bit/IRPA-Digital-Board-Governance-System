@@ -51,6 +51,18 @@ The technical selector and verifier are aligned to the five distinct Board roles
 
 The interim sole-approver remains a scoped, default-off control with zero payment authority; it must not be treated as a blanket legal signing delegation.
 
+## Runtime role-literal crosswalk still incomplete
+
+A source scan of `anyInstitutionalRole([...])` in the current repository `firestore.rules` found 68 distinct string literals. 45 match a title in the 55-entry draft catalogue; 23 do not. This is an inventory only—no alias or permission was inferred.
+
+Unmatched values requiring explicit classification are:
+
+- Possible legacy role titles: `Community Development Director`, `Departmental Director`, `Departmental Manager`, `Director Field`, `Director Field Department`, `Director Operations`, `Environment Director`, `Field Director`, `Fundraising Officer`, `HR Director`, `Internal Oversight Director`, `Livestock Director`, `Operations Director`, `Outreach Director`, `Procurement Manager`, `Procurement Team Member`, `Secretary to the Board`, `Staff`.
+- Portal/department labels, not signing authority: `Communication & Media`, `Communication and Media`, `Communications & Media`, `Communications and Media`.
+- Permission constant, not a role: `RESTRICTED_DOCUMENT_UPLOAD`.
+
+These values must be mapped to an exact approved role, retained as an explicitly separate legacy role, or removed through a separately reviewed permission change. Do not silently alias titles or treat department/unit labels as signing authority. The scan does not yet include every role literal in frontend modules, Cloudflare Workers or every Firestore collection rule; the full runtime crosswalk remains a merge blocker.
+
 ## 4. Mandatory release gates still open
 
 1. Emulator access-preservation tests PASS for primary administrator claim and active `adminProfiles` across the tested role-title cases; the live staging test identity and real owner login remain NOT VERIFIED.
