@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { authorityCandidates, findManualAuthorityMatch, normalizeManualAuthority, resolveManualAuthorityLabel } from "../src/utils/signatureAuthority.mjs";
+import { gatewayAuthorityCandidates, resolveGatewayAuthorityLabel } from "../drive-gateway/src/signatureAuthority.mjs";
 
 const source = fs.readFileSync("src/pages/SignaturePlatform.jsx", "utf8");
 const catalogue = JSON.parse(fs.readFileSync("config/org-structure-authority.json", "utf8"));
@@ -80,4 +81,15 @@ test("draft signing matrix documents the technical role source without appointin
   assert.match(model.ambiguousTitles, /Exact-match only/);
   assert.match(model.administratorRecognition, /job title Administrator alone cannot/);
   assert.match(model.limitation, /do not appoint signatories/);
+});
+
+test("browser and Cloudflare Gateway resolve the same dual-role register values", () => {
+  const record = {
+    role: "Executive Director",
+    roles: ["Board Secretary", "Executive Director"],
+    roleAssignments: [{ role: "Board Treasurer" }]
+  };
+  assert.deepEqual(authorityCandidates(record), gatewayAuthorityCandidates(record));
+  assert.equal(resolveManualAuthorityLabel(record, "Board Secretary"), resolveGatewayAuthorityLabel(record, "Board Secretary"));
+  assert.equal(resolveManualAuthorityLabel(record, "Board Treasurer"), resolveGatewayAuthorityLabel(record, "Board Treasurer"));
 });
