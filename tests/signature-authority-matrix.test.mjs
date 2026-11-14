@@ -50,6 +50,11 @@ test("signer authority verification recognises multiple roles stored on one memb
   assert.equal(resolveManualAuthorityLabel(dualRoleRecord, "Executive Director"), "Executive Director");
 });
 
+test("client authority normalizer handles prefixes and repeated whitespace", () => {
+  assert.equal(normalizeManualAuthority("  IRPA   Board Secretary  "), "board secretary");
+  assert.equal(normalizeManualAuthority("The   Executive Director"), "executive director");
+});
+
 test("legacy Board Members plural input resolves to the distinct Board Member role", () => {
   const record = { role: "Board Member" };
   assert.equal(normalizeManualAuthority("Board Members"), "board member");
