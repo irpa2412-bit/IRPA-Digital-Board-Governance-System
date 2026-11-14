@@ -505,28 +505,11 @@ jobs:
             https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/
 
   live-hosting-verification:
-    name: Live Hosting Verification and Commit Status
+    name: Firebase Hosting Verification and Commit Status
     runs-on: ubuntu-latest
     needs: build-and-deploy
     if: always()
     steps:
-      - name: Verify live Cloudflare production frontend independently
-        id: cloudflare_live
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
-          html="$RUNNER_TEMP/cloudflare-live-status.html"
-          status="$(curl --location --silent --show-error --output "$html" --write-out '%{http_code}' --retry 5 --retry-delay 3 --max-time 30 "$base/")"
-          echo "Cloudflare HTTP_STATUS=$status"
-          if [ "$status" != "200" ] || ! grep -qi '<html' "$html" || ! grep -Fq "content=\"$GITHUB_SHA\"" "$html"; then
-            echo "live_ok=false" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare frontend did not return HTTP 200 with expected build identity $GITHUB_SHA." >&2
-            exit 1
-          fi
-          echo "live_ok=true" >> "$GITHUB_OUTPUT"
-          echo "Cloudflare frontend returned HTTP 200 and identifies build $GITHUB_SHA."
-
       - name: Verify live Firebase Hosting independently
         id: firebase_live
         shell: bash
@@ -544,22 +527,14 @@ jobs:
           echo "live_ok=true" >> "$GITHUB_OUTPUT"
           echo "Firebase Hosting returned HTTP 200 and identifies build $GITHUB_SHA."
 
-      - name: Publish independent production frontend statuses
+      - name: Publish Firebase Hosting production status
         if: always()
         uses: actions/github-script@v7
         env:
-          CLOUDFLARE_LIVE_OK: ${{ steps.cloudflare_live.outputs.live_ok }}
           FIREBASE_LIVE_OK: ${{ steps.firebase_live.outputs.live_ok }}
         with:
           script: |
             const checks = [
-              {
-                state: process.env.CLOUDFLARE_LIVE_OK === "true" ? "success" : "failure",
-                context: "cloudflare/frontend-live",
-                description: process.env.CLOUDFLARE_LIVE_OK === "true"
-                  ? "Cloudflare Worker frontend returned HTTP 200 and expected build identity."
-                  : "Cloudflare Worker frontend HTTP/build identity verification failed."
-              },
               {
                 state: process.env.FIREBASE_LIVE_OK === "true" ? "success" : "failure",
                 context: "firebase-hosting-live",
