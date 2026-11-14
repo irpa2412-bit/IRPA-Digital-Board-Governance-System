@@ -59,18 +59,73 @@ const PROCUREMENT_APPROVAL_ROLES=["Executive Director","Director Livestock","Liv
 const HR_ROLES=["Executive Director","Director Human Resources","HR Manager"];
 const IT_ROLES=["IT Specialist","Information Technology Officer"];
 const IT_OPERATIONS_MODULES=["IT Operations"];
+// Directorate and department routing is navigation metadata only. It does not
+// grant server-side record permissions. Legacy department keys remain during
+// transition so existing member/employee profiles do not lose their portals.
 const DEPARTMENTAL_MODULES={
   "Executive Office":["Members & Personnel","Participants","Risk Register","Reports"],
+  "Governance":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
+  "Board of Directors":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
+  "Board Secretariat":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
   "Internal Oversight":["Risk Register","Reports","Audit Trail","Decisions","Actions"],
+  "Internal Audit and Assurance":["Risk Register","Reports","Audit Trail"],
+  "Finance and Administration":["Finance Portfolio","Procurement","Employee Payments","Reports","Audit Trail"],
+  "Finance":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
+  "Procurement":["Procurement","Reports","Audit Trail"],
+  "Administration":["Reports","Documents"],
   "Finance & Administration":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
   "Human Resources":["Members & Personnel","Employee Payments","Reports"],
+  "Livestock Development":["Reports","Actions"],
+  "Livestock Production":["Reports","Actions"],
+  "Animal Health and Veterinary Services":["Reports","Actions"],
   "Livestock":["Reports","Actions"],
+  "Sustainable Rangeland Management and Climate Resilience":["Risk Register","Reports","Actions"],
+  "Rangeland Management":["Risk Register","Reports","Actions"],
+  "Climate Resilience":["Risk Register","Reports","Actions"],
   "Environment & Rangeland":["Risk Register","Reports","Actions"],
+  "Market Development":["Reports","Actions"],
+  "Livestock and Meat Markets":["Reports","Actions"],
+  "By-products and Enterprise Development":["Reports","Actions"],
+  "Cross-Cutting Themes":["Reports","Actions","Risk Register"],
+  "Gender, Youth and Inclusion":["Reports","Actions"],
+  "Monitoring, Evaluation and Learning":["Reports","Actions","Risk Register"],
+  "Climate and Safeguards":["Risk Register","Reports","Actions"],
+  "IRPA Capacity Building and Institutional Growth":["Reports","Actions"],
+  "Institutional Development":["Reports","Grant Intelligence & Funding Opportunities"],
+  "Digital Governance":["IT Operations"],
+  "Outreach":["Communication & Media","Reports","Actions"],
+  "Communications and Media":["Communication & Media","Reports","Actions"],
   "Outreach & Community Development":["Reports","Actions"],
+  "Community Development":["Reports","Actions"],
+  "Community Mobilisation":["Reports","Actions"],
   "Field Operations":["Reports","Actions"],
   "Operations":["Reports","Actions"],
   "Information Technology":["IT Operations"],
-  "Research, Statistics and Knowledge Department":["Research, Statistics and Knowledge"],"Research & Knowledge":["Research, Statistics and Knowledge"],"Research":["Research, Statistics and Knowledge"],"Research Department":["Research, Statistics and Knowledge"],"Research and Knowledge":["Research, Statistics and Knowledge"],"Research, Statistics and Knowledge":["Research, Statistics and Knowledge"]
+  "Research, Statistics and Knowledge":["Research, Statistics and Knowledge"],
+  "Research Governance and Data Stewardship":["Research, Statistics and Knowledge"],
+  "Statistics and Analysis":["Research, Statistics and Knowledge"],
+  "Knowledge Management":["Research, Statistics and Knowledge"],
+  "Research, Statistics and Knowledge Department":["Research, Statistics and Knowledge"],
+  "Research & Knowledge":["Research, Statistics and Knowledge"],
+  "Research":["Research, Statistics and Knowledge"],
+  "Research Department":["Research, Statistics and Knowledge"],
+  "Research and Knowledge":["Research, Statistics and Knowledge"]
+};
+const ROLE_DEPARTMENT={
+  "Administrator":"Executive Office","Executive Director":"Executive Office",
+  "Board Chairperson":"Governance","Board Vice Chairperson":"Governance","Board Secretary":"Governance","Board Treasurer":"Governance","Board Member":"Governance",
+  "Director Internal Oversight":"Internal Oversight","Internal Oversight Director":"Internal Oversight","Internal Oversight Officer":"Internal Oversight",
+  "Director Finance & Administration":"Finance and Administration","Finance Manager":"Finance and Administration","Finance Officer":"Finance and Administration","Accountant":"Finance and Administration","Finance Personnel":"Finance and Administration","Procurement Officer":"Finance and Administration","Procurement Manager":"Finance and Administration","Procurement Team Member":"Finance and Administration",
+  "Director Human Resources":"Human Resources","HR Manager":"Human Resources","HR Officer":"Human Resources",
+  "Director Livestock":"Livestock Development","Livestock Director":"Livestock Development","Livestock Officer":"Livestock Development",
+  "Director Environment":"Sustainable Rangeland Management and Climate Resilience","Environment Director":"Sustainable Rangeland Management and Climate Resilience","Environment Officer":"Sustainable Rangeland Management and Climate Resilience","Rangeland Officer":"Sustainable Rangeland Management and Climate Resilience",
+  "Director Outreach":"Outreach","Outreach Director":"Outreach","Outreach Officer":"Outreach","Director Community Development":"Community Development","Community Development Director":"Community Development","Community Development Officer":"Community Development",
+  "Director Field":"Field Operations","Director Field Operations":"Field Operations","Field Director":"Field Operations","Field Assistant":"Field Operations",
+  "Director Operations":"Operations","Operations Director":"Operations","Operations Manager":"Operations","Driver":"Operations","Administrative Assistant":"Operations",
+  "IT Specialist":"Information Technology","Information Technology Officer":"Information Technology",
+  "Communications Officer":"Outreach","Communication Officer":"Outreach","Communications Manager":"Outreach","Communication Manager":"Outreach","Media Officer":"Outreach","Media Manager":"Outreach","Public Relations Officer":"Outreach","Communications & Media Officer":"Outreach","Communications and Media Officer":"Outreach","Media and Communications Officer":"Outreach","Media & Communications Officer":"Outreach",
+  "Director Research":"Research, Statistics and Knowledge","Research Director":"Research, Statistics and Knowledge","Director, Research, Statistics and Knowledge":"Research, Statistics and Knowledge","Research Directorate Director":"Research, Statistics and Knowledge","Research Manager":"Research, Statistics and Knowledge","Research Officer":"Research, Statistics and Knowledge","Research, Statistics & Knowledge Officer":"Research, Statistics and Knowledge",
+  "Programme/Technical Officer":"Cross-Cutting Themes","Monitoring & Evaluation Officer":"Cross-Cutting Themes","Project Officer":"Cross-Cutting Themes"
 };
 const ROLE_DEPARTMENT={
   "Administrator":"Executive Office","Executive Director":"Executive Office",
