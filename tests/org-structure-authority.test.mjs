@@ -1,0 +1,17 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+const root=process.cwd();
+const config=JSON.parse(fs.readFileSync(path.join(root,"config/org-structure-authority.json"),"utf8"));
+const app=fs.readFileSync(path.join(root,"src/App.jsx"),"utf8");
+const match=app.match(/const LOGIN_ROLE_OPTIONS=(\[[\s\S]*?\]);/);
+assert.ok(match,"LOGIN_ROLE_OPTIONS must remain discoverable for catalogue consistency");
+const loginRoles=Function("return "+match[1])();
+const configured=new Set(config.roles.map(r=>r.title));
+test("every application login role has a job-description record",()=>{const missing=loginRoles.filter(r=>!configured.has(r));assert.deepEqual(missing,[]);});
+test("all organisational positions remain vacant in draft",()=>{for(const r of config.roles.filter(r=>!config.systemCategories.includes(r.title)&&r.title!=="interim sole-approver"))assert.equal(r.appointmentStatus,"VACANT",r.title);});
+test("no draft role silently grants a portal or workflow permission",()=>{for(const r of config.roles.filter(r=>r.title!=="interim sole-approver")){for(const k of ["mayInitiate","mayReview","mayApprove","maySign","mayRelease"])assert.deepEqual(r.workflows[k],[],r.title+" "+k);assert.deepEqual(r.records.mayRead,[],r.title+" mayRead");assert.deepEqual(r.records.mayWrite,[],r.title+" mayWrite");}});
+test("protected controls and research restrictions are explicit",()=>{for(const p of ["administrator","adminProfiles","finance approval separation","procurement approval","signatures","audit","auditor","research restricted-by-default and independence","actualDataAccess lock","catch-all deny"])assert.ok(config.principles.protectedControls.includes(p),p);assert.match(config.principles.research,/Restricted by default/);});
+test("ambiguous aliases remain unresolved and cannot grant access",()=>{for(const a of config.compatibilityAliasCandidates.filter(x=>x.status==="AMBIGUOUS_OWNER_DECISION_REQUIRED"))assert.ok(!config.roles.some(r=>r.title===a.alias),a.alias+" must not be silently merged");});
+test("interim mode is scoped, default-off and has zero payment authority",()=>{const r=config.roles.find(x=>x.id==="interim-sole-approver");assert.ok(r);assert.equal(r.accessStatus,"PROPOSED_ONLY_FLAG_DEFAULT_OFF");assert.match(r.limits.documentValue,/USD 0/);assert.deepEqual(r.workflows.mayInitiate,["Communication & Media website content","Signature document signing"]);});
