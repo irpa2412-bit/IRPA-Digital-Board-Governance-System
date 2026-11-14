@@ -89,6 +89,9 @@ test("ambiguous role titles are absent from role-gated portal and workflow array
   const ambiguous = catalogue.compatibilityAliasCandidates
     .filter(item => item.status === "AMBIGUOUS_OWNER_DECISION_REQUIRED")
     .map(item => item.alias);
+  for (const alias of ambiguous) {
+    assert.ok(!roleBlock.includes(`"${alias}":`), `${alias} must not route to a portal`);
+  }
   for (const name of ["PROCUREMENT_APPROVAL_ROLES", "RESEARCH_AUTHORITY_ROLES", "COMMUNICATIONS_ROLES"]) {
     const start = app.indexOf(`const ${name}=`);
     assert.ok(start >= 0, `${name} must remain explicit`);
