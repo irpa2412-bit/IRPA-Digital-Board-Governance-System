@@ -1,3 +1,4 @@
+// Owner-authorised retry after read-back dependency-path repair; no rules semantics changed.
 // Owner-authorised staging-only publication trigger verification; no rule semantics changed.
 // ============================================================================
 // 🔴🔴🔴 RED-LINE POLICY — NON-NEGOTIABLE 🔴🔴🔴

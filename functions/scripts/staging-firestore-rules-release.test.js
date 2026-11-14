@@ -33,6 +33,10 @@ test("staging publisher captures and stores the backup before publish and rolls 
   assert.match(workflow, /if-no-files-found: error/);
   assert.match(workflow, /always\(\).*steps\.backup\.outcome == 'success'/);
   assert.match(workflow, /steps\.publish\.outcome != 'success' \|\| steps\.verify\.outcome != 'success'/);
+  const verifyStart = workflow.indexOf("Verify active staging release matches the staging source");
+  const rollbackStart = workflow.indexOf("Roll back staging rules to saved backup", verifyStart);
+  assert.ok(verifyStart >= 0 && rollbackStart > verifyStart);
+  assert.match(workflow.slice(verifyStart, rollbackStart), /NODE_PATH=.*functions\/node_modules/);
   assert.match(workflow, /branches:\s*\n\s*- fix\/signature-trail-20261024/);
   assert.match(workflow, /paths:\s*\n\s*- "firestore\.staging\.rules"\s*\n\s*- "\.github\/workflows\/publish-staging-firestore-rules-only\.yml"/);
   assert.doesNotMatch(workflow, /workflow_dispatch|confirm_staging_rules_publication/);
