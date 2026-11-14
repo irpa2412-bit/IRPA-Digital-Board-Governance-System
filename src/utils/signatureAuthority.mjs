@@ -7,9 +7,9 @@ const arrayAuthorityFields = ["roles", "assignedRoles", "selectedRoles", "roleAs
 export function normalizeManualAuthority(value) {
   const normalized = String(value || "")
     .toLowerCase()
-    .replace(/^(the|irpa)\\s+/, "")
+    .replace(/^(the|irpa)\s+/, "")
     .replace(/[._-]+/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
   // Preserve the old plural UI spelling as a display/input compatibility form;
   // do not collapse any of the ambiguous director titles.
