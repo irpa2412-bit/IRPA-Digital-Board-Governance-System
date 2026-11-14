@@ -142,3 +142,9 @@ test("archive-backed Signature Portal PDF palette repair is explicitly paired an
   assert.match(workflow, /!signaturePdfArchivePaletteRepair/);
   assert.match(workflow, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/firebase\/data\.js", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
 });
+
+test("main-branch push runs the isolated fixture without requiring a PR source diff", () => {
+  assert.match(workflow, /branches: \[main, feat\/secure-meeting-invitation-flow-20261013/);
+  assert.match(workflow, /const isMainPush = eventName === "push" && process\.env\.GITHUB_REF === "refs\/heads\/main"/);
+  assert.match(workflow, /if \(!isMainPush && eventName !== "workflow_dispatch"/);
+});

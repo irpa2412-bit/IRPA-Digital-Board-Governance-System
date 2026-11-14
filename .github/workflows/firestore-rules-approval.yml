@@ -1,6 +1,12 @@
 name: Firestore Rules Change Approval
 
 on:
+  push:
+    branches: [main, fix/workflow-main-push-validation-20261114]
+    paths:
+      - ".github/workflows/firestore-rules-approval.yml"
+      - "scripts/firestore-rules-approval.mjs"
+      - "tests/firestore-rules-approval.test.mjs"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
   workflow_run:
@@ -13,6 +19,21 @@ permissions:
   issues: read
 
 jobs:
+  firestore-rules-approval-main-validation:
+    if: github.event_name == 'push'
+    name: firestore-rules-approval-main-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout main revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run offline approval decision fixtures
+        run: node --test tests/firestore-rules-approval.test.mjs
+
   firestore-rules-approval:
     if: github.event_name == 'pull_request'
     name: firestore-rules-approval
