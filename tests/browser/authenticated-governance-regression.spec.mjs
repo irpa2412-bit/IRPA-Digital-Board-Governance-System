@@ -498,6 +498,7 @@ test("primary administrator custom claim signs in and reaches every registered p
   await page.locator('.auth-card input[type="password"]').fill(primaryAdminFixturePassword);
   await page.getByRole("button", { name: "Sign In Securely" }).click();
   await expect(page.locator(".topbar h2")).toContainText("Dashboard", { timeout: 45000 });
+  await expect(page.locator(".auth-card")).toBeHidden();
 
   for (const module of APP_PORTALS) {
     await page.goto("/?adminModule=" + encodeURIComponent(module));
