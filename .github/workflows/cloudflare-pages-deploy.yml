@@ -69,6 +69,13 @@ jobs:
             exit 1
           fi
           echo "Production bundle references the canonical Cloudflare Google Drive Gateway."
+      - name: Preserve exact production build for browser smoke verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-cloudflare-frontend-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify Cloudflare credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
