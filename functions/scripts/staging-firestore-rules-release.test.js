@@ -33,7 +33,9 @@ test("staging publisher captures and stores the backup before publish and rolls 
   assert.match(workflow, /if-no-files-found: error/);
   assert.match(workflow, /always\(\).*steps\.backup\.outcome == 'success'/);
   assert.match(workflow, /steps\.publish\.outcome != 'success' \|\| steps\.verify\.outcome != 'success'/);
-  assert.match(workflow, /inputs\.confirm_staging_rules_publication == 'publish-staging-rules'/);
+  assert.match(workflow, /branches:\s*\n\s*- fix\/signature-trail-20261024/);
+  assert.match(workflow, /paths:\s*\n\s*- "firestore\.staging\.rules"\s*\n\s*- "\.github\/workflows\/publish-staging-firestore-rules-only\.yml"/);
+  assert.doesNotMatch(workflow, /workflow_dispatch|confirm_staging_rules_publication/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/fix\/signature-trail-20261024'/);
 });
 

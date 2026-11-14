@@ -3,6 +3,7 @@ name: Staging Administrator Access Preservation Emulator Gate
 on:
   pull_request:
     branches:
+      - main
       - fix/signature-trail-20261024
     paths:
       - "firestore.staging.rules"
