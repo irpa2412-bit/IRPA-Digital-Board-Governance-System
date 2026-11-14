@@ -59,3 +59,18 @@ test("draft pull requests cannot create production-promotion proof tags", () => 
   assert.match(source, /gate-proof:\s*\n\s+if: github\.event\.pull_request\.draft == false/);
   assert.match(source, /git push origin "refs\/tags\/\$TAG_NAME"/);
 });
+
+test("Cloudflare production smoke verifies the exact deployed build artifact", () => {
+  const deploy = readWorkflow(".github/workflows/cloudflare-pages-deploy.yml");
+  const smoke = readWorkflow(".github/workflows/production-browser-smoke.yml");
+  assert.match(deploy, /actions\\/upload-artifact@v4/);
+  assert.match(deploy, /name:\\s*irpa-cloudflare-frontend-dist/);
+  assert.match(smoke, /actions:\\s*read/);
+  assert.match(smoke, /actions\\/download-artifact@v4/);
+  assert.match(smoke, /name:\\s*irpa-cloudflare-frontend-dist/);
+  assert.match(smoke, /run_id:\\s*\\$\\{\\{ steps\\.deployment\\.outputs\\.run_id \\}\\}/);
+  assert.doesNotMatch(smoke, /npm run build/, "smoke verification must not rebuild with a different build timestamp");
+  assert.match(smoke, /contentType/);
+  assert.match(smoke, /javascript\\|ecmascript/);
+  assert.match(smoke, /crypto\\.subtle\\.digest/);
+});
