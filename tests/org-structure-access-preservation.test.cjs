@@ -107,6 +107,8 @@ test("Administrator job title alone does not grant administrator authority", asy
 
 test("administrator portal navigation includes every registered app module without consulting job descriptions", () => {
   assert.match(appSource, /const sessionAdministrator=Boolean\(admin\|\|profile\?\.authorizationType===["']administrator["']\)/);
+  assert.match(appSource, /storedAuthority!=="Administrator"/);
+  assert.match(appSource, /sessionAdministrator\|\|authority==="Administrator"/);
   assert.match(appSource, /if\(sessionAdministrator\)return true/);
   assert.match(appSource, /modules=sessionAdministrator\?\[\.\.\.ALL_MODULES,\.\.\.registeredPortalModules\]/);
   assert.ok(appSource.includes("const ALL_MODULES="));
