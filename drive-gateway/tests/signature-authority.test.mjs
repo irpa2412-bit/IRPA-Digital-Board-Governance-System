@@ -38,6 +38,12 @@ test("gateway supports the legacy Board Members plural spelling without merging 
   assert.notEqual(normalizeGatewayAuthority("Director Research"), normalizeGatewayAuthority("Research Director"));
 });
 
+test("department and unit labels cannot be used as signing authority", () => {
+  const unitOnly = { unit: "Finance Unit", unitName: "Procurement Unit" };
+  assert.deepEqual(gatewayAuthorityCandidates(unitOnly), []);
+  assert.equal(resolveGatewayAuthorityLabel(unitOnly, "Finance Unit"), null);
+});
+
 test("gateway accepts the same scalar authority fields as the client verifier", () => {
   const record = {
     designation: "Board Secretary",
