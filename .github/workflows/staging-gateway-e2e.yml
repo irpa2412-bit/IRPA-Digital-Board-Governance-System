@@ -2306,7 +2306,15 @@ jobs:
           const adminProfileUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/adminProfiles/"+encodeURIComponent(admin.localId);
           const adminProfileResponse=await fetch(adminProfileUrl,{headers:{Authorization:"Bearer "+admin.idToken}});
           const adminProfile=await adminProfileResponse.json().catch(()=>({}));
-          if(!adminProfileResponse.ok||adminProfile.fields?.active?.booleanValue!==true||adminProfile.fields?.role?.stringValue!=="Administrator") throw new Error("STAGING_MEDIA_ADMIN_PROFILE_READBACK=FAIL; self-read did not confirm an active Administrator profile in the same staging project/database (HTTP "+adminProfileResponse.status+").");
+          const adminProfileExists=adminProfileResponse.ok&&Boolean(adminProfile.name);
+          const adminProfileUidMatches=adminProfile.fields?.uid?.stringValue===admin.localId;
+          const adminProfileActive=adminProfile.fields?.active?.booleanValue===true;
+          const adminProfileRoleAdministrator=adminProfile.fields?.role?.stringValue==="Administrator";
+          console.log("STAGING_MEDIA_ADMIN_PROFILE_EXISTS="+adminProfileExists);
+          console.log("STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH="+adminProfileUidMatches);
+          console.log("STAGING_MEDIA_ADMIN_PROFILE_ACTIVE="+adminProfileActive);
+          console.log("STAGING_MEDIA_ADMIN_PROFILE_ROLE_ADMINISTRATOR="+adminProfileRoleAdministrator);
+          if(!adminProfileExists||!adminProfileUidMatches||!adminProfileActive||!adminProfileRoleAdministrator) throw new Error("STAGING_MEDIA_ADMIN_PROFILE_READBACK=FAIL; exact UID, active flag and Administrator role must all match in the staging project (HTTP "+adminProfileResponse.status+").");
           console.log("STAGING_MEDIA_ADMIN_PROFILE_TOKEN_READBACK=PASS");
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
@@ -2316,6 +2324,7 @@ jobs:
           const pdf=Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n","utf8");
           const fileName="IRPA-STAGING-ACCEPTANCE-"+String(process.env.RUN_ID||"test")+".pdf";
           const uploadResponse=await fetch(base+"/api/upload",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fileName,contentType:"application/pdf",fileSize:pdf.length,base64:pdf.toString("base64"),purpose:"Communication Media",folderId:archive.folderId})});
+          console.log("STAGING_CONTROLLED_PDF_UPLOAD_HTTP="+uploadResponse.status);
           const uploadText=await uploadResponse.text();
           const upload=(()=>{try{return JSON.parse(uploadText)}catch{return {}}})();
           if(!uploadResponse.ok||!upload.fileId||upload.storageProvider!=="Google Drive"||upload.fileName!==fileName||Number(upload.fileSize)!==pdf.length) throw new Error("Controlled-PDF upload to the verified media archive failed; HTTP "+uploadResponse.status+"; response body: "+redactBody(uploadText));
@@ -2341,8 +2350,10 @@ jobs:
           };
           const docUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets/"+encodeURIComponent(assetId);
           const createResponse=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/communicationMediaAssets?documentId="+encodeURIComponent(assetId),{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:JSON.stringify({fields})});
+          console.log("STAGING_FIRESTORE_MEDIA_REGISTER_CREATE_HTTP="+createResponse.status);
           if(!createResponse.ok) throw new Error("Staging Firestore media register write failed with HTTP "+createResponse.status+"; verify the project-scoped rules and administrator role.");
           const verifyResponse=await fetch(docUrl,{headers:{Authorization:"Bearer "+admin.idToken}});
+          console.log("STAGING_FIRESTORE_MEDIA_REGISTER_READ_HTTP="+verifyResponse.status);
           const saved=await verifyResponse.json().catch(()=>({}));
           if(!verifyResponse.ok||saved.fields?.recordOrigin?.stringValue!=="STAGING"||saved.fields?.fileId?.stringValue!==upload.fileId||saved.fields?.storageProvider?.stringValue!=="Google Drive") throw new Error("Staging Firestore media register verification failed with HTTP "+verifyResponse.status+".");
           console.log("STAGING_COMMUNICATION_MEDIA_ARCHIVE_PROVISION=PASS");
