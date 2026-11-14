@@ -245,6 +245,64 @@ test("research authority cannot review an unrelated Finance portal request", asy
   }));
 });
 
+test("a Research Officer job title alone cannot clear a record even when a custodian exists", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-officer-title-only").set({
+      uid: "research-officer-title-only",
+      status: "Active",
+      role: "Research Officer"
+    });
+    await db.doc("researchCustodians/custodian-2").set({
+      uid: "custodian-2",
+      active: true,
+      status: "Active",
+      displayName: "Named Research Custodian",
+      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT",
+      appointedByUid: "owner-primary"
+    });
+    await db.doc("researchStudies/title-only-clearance").set({
+      title: "Restricted study",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const titleOnly = env.authenticatedContext("research-officer-title-only").firestore();
+  await assertFails(titleOnly.doc("researchStudies/title-only-clearance").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-officer-title-only",
+    clearanceApprovedByName: "Research Officer",
+    clearanceApprovedAt: new Date(),
+    custodianUid: "custodian-2",
+    custodianName: "Named Research Custodian"
+  }));
+});
+
+test("client administrators cannot self-appoint research authorities or custodians", async () => {
+  const owner = env.authenticatedContext("owner-primary", { admin: true }).firestore();
+  await assertFails(owner.doc("researchAuthorities/owner-primary").set({
+    uid: "owner-primary",
+    active: true,
+    status: "Active",
+    displayName: "Owner",
+    appointmentReference: "SELF-APPOINTMENT",
+    appointedByUid: "owner-primary"
+  }));
+  await assertFails(owner.doc("researchCustodians/owner-primary").set({
+    uid: "owner-primary",
+    active: true,
+    status: "Active",
+    displayName: "Owner",
+    appointmentReference: "SELF-APPOINTMENT",
+    appointedByUid: "owner-primary"
+  }));
+});
+
 test("only a research authority with an active appointed custodian can clear a record for sharing", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
