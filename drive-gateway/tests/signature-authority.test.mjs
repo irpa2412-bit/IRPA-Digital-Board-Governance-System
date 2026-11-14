@@ -26,6 +26,11 @@ test("gateway accepts structured roleAssignments without stringifying objects", 
   assert.ok(candidates.includes("communications officer"));
 });
 
+test("gateway normalizer handles prefixes and repeated whitespace", () => {
+  assert.equal(normalizeGatewayAuthority("  IRPA   Board Secretary  "), "board secretary");
+  assert.equal(normalizeGatewayAuthority("The   Executive Director"), "executive director");
+});
+
 test("gateway supports the legacy Board Members plural spelling without merging ambiguous director titles", () => {
   assert.equal(normalizeGatewayAuthority("Board Members"), "board member");
   assert.equal(resolveGatewayAuthorityLabel({ role: "Board Member" }, "Board Members"), "Board Member");
