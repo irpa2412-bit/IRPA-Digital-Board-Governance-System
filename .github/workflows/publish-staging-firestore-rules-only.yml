@@ -116,7 +116,7 @@ jobs:
           trap 'rm -f "$credential_file"' EXIT
           printf '%s' "$STAGING_FIREBASE_SERVICE_ACCOUNT" > "$credential_file"
           export GOOGLE_APPLICATION_CREDENTIALS="$credential_file"
-          node <<'NODE'
+          NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node <<'NODE'
           const fs = require("node:fs");
           const { GoogleAuth } = require("google-auth-library");
           const project = "irpa-dbg-staging-a73ec";
