@@ -17,6 +17,23 @@ on:
       - "firestore.indexes.json"
       - ".github/workflows/firebase-cli-deploy.yml"
   workflow_dispatch:
+    inputs:
+      authorize_production_firestore_rules_deployment:
+        description: "Owner approval to publish production Firestore Rules and Indexes"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
+      authorize_production_worker_deployment:
+        description: "Owner approval to deploy the production grant-crawler Worker and secrets"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
 permissions:
   contents: read
 
@@ -84,7 +101,7 @@ jobs:
           test -n "$CF_FIRESTORE_SA" || { echo "::error::CLOUDFLARE_FIREBASE_SERVICE_ACCOUNT_JSON is required before production cutover."; exit 1; }
 
       - name: Deploy grant crawler to Cloudflare Workers
-        if: steps.cloudflare_gate.outcome == 'success'
+        if: steps.cloudflare_gate.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.authorize_production_worker_deployment == 'yes'
         working-directory: cloudflare/grant-crawler
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -104,7 +121,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
       - name: Deploy Firestore Rules and Indexes (Cloudflare owns frontend hosting)
-        if: steps.cloudflare_gate.outcome == 'success'
+        if: steps.cloudflare_gate.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.authorize_production_firestore_rules_deployment == 'yes'
         run: |
           set -euo pipefail
           # Firebase Rules release creation can briefly return HTTP 409 when a
@@ -122,7 +139,7 @@ jobs:
             sleep "$delay"
           done
       - name: Deploy Firestore only while crawler cutover is blocked
-        if: steps.cloudflare_gate.outcome != 'success'
+        if: steps.cloudflare_gate.outcome != 'success' && github.event_name == 'workflow_dispatch' && inputs.authorize_production_firestore_rules_deployment == 'yes'
         run: |
           set -euo pipefail
           echo "::warning::Cloudflare grant-crawler cutover preflight or deployment failed. Firebase Hosting will not be updated with an unverified crawler URL; deploying Firestore configuration only."
