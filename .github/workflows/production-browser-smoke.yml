@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   browser-smoke:
@@ -30,9 +31,10 @@ jobs:
           cache: npm
       - name: Install application dependencies
         run: npm ci
-      - name: Capture deployed build timestamp for reproducible asset verification
+      - name: Capture deployed build timestamp for manual smoke verification
+        if: github.event_name == 'workflow_dispatch'
         env:
-          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          TARGET_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           live_html="$RUNNER_TEMP/cloudflare-live-index.html"
@@ -50,11 +52,20 @@ jobs:
             exit 1
           fi
           echo "VITE_BUILD_TIME=$live_build_time" >> "$GITHUB_ENV"
-          echo "Using the deployed UTC build timestamp for byte-for-byte asset reproduction."
 
-      - name: Rebuild exact frontend commit for asset verification
+      - name: Download exact deployed frontend artifact for workflow-run smoke
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: production-frontend-dist-${{ github.event.workflow_run.head_sha }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: deployed-dist
+
+      - name: Rebuild exact frontend commit for manual smoke verification
+        if: github.event_name == 'workflow_dispatch'
         env:
-          VITE_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          VITE_BUILD_COMMIT: ${{ github.sha }}
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
           VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
@@ -218,6 +229,7 @@ jobs:
       - name: Verify Cloudflare signing-path assets and lazy Documents workspace
         env:
           TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          PRODUCTION_DIST_DIR: ${{ github.event_name == 'workflow_run' && 'deployed-dist/assets' || 'dist/assets' }}
         run: |
           node --input-type=module <<'NODE'
           import { chromium } from "playwright";
@@ -227,7 +239,7 @@ jobs:
 
           const base = "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev";
           const expectedCommit = process.env.TARGET_SHA;
-          const assetsDir = path.resolve("dist/assets");
+          const assetsDir = path.resolve(process.env.PRODUCTION_DIST_DIR || "dist/assets");
           const jsAssets = fs.readdirSync(assetsDir).filter(name => name.endsWith(".js")).sort();
           const documentChunk = jsAssets.find(name => name.includes("DocumentLifecycleModule"));
           if (!expectedCommit || !documentChunk) {
