@@ -312,6 +312,26 @@
       ]
     }
   ],
+  "centralOffice": {
+    "name": "Executive Office",
+    "status": "CENTRAL_OFFICE_NOT_COUNTED_AS_A_DIRECTORATE",
+    "reportsTo": [
+      "Board"
+    ],
+    "departments": [
+      {
+        "name": "Executive Director's Office",
+        "units": [
+          "Executive Coordination",
+          "Organisational Administration"
+        ]
+      }
+    ],
+    "notes": [
+      "The Executive Office is a central office and is not counted among the 13 directorates.",
+      "Administrator remains a system category; this entry does not appoint an administrator or grant runtime authority."
+    ]
+  },
   "roles": [
     {
       "id": "administrator",
