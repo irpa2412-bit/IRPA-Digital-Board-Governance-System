@@ -19,13 +19,46 @@ function RoleCard({role}){
     <p className="role-description-note">This is a draft description, not an appointment or a grant of access. Access is denied until the corresponding server-side rule and workflow enforcement are verified.</p>
   </article>;
 }
+function OrganisationalStructure({isAdmin}){
+  return <section className="role-description-card" aria-labelledby="irpa-structure-handoff">
+    <p className="role-description-kicker">EXECUTIVE DIRECTOR'S ORGANISATIONAL COPY</p>
+    <h2 id="irpa-structure-handoff">Directorate, department and unit framework</h2>
+    <p>The complete approved-structure draft is made visible to the Executive Director for organisational planning and preparation of written role and duty assignment instructions. The Administrator uses these instructions for controlled administrative recording.</p>
+    {authority.directorates.map(directorate=><section key={directorate.name} style={{marginTop:18}}>
+      <h3>{directorate.name}</h3>
+      {directorate.departments.map(department=><div key={department.name} style={{margin:"10px 0 10px 16px"}}>
+        <strong>{department.name}</strong>
+        <ul>{department.units.map(unit=><li key={unit}>{unit}</li>)}</ul>
+      </div>)}
+    </section>)}
+    <section style={{marginTop:18}}><h3>{authority.centralOffice.name} · Central Office</h3><p>{authority.centralOffice.departments.map(d=>d.name).join(", ")}</p>{authority.centralOffice.departments.map(d=><ul key={d.name}>{d.units.map(unit=><li key={unit}>{unit}</li>)}</ul>)}</section>
+    <p className="role-description-note">This is the structural placement framework, not a completed position-by-position job evaluation. Departmental and unit-specific duties, qualifications, reporting arrangements and performance indicators require Executive Director review before adoption.</p>
+  </section>;
+}
+function AssignmentMandate({isAdmin}){
+  if(!isAdmin)return null;
+  const mandate=authority.assignmentGovernance?.administrator;
+  const ed=authority.assignmentGovernance?.executiveDirector;
+  return <section className="role-description-card" aria-labelledby="admin-assignment-mandate">
+    <p className="role-description-kicker">ADMINISTRATOR · DELEGATED EXECUTION MANDATE</p>
+    <h2 id="admin-assignment-mandate">Role and duty assignment instructions</h2>
+    <p><strong>Mandate:</strong> {mandate?.mandate}</p>
+    <h3>Mandatory prerequisites before execution</h3><ol>{bullets(mandate?.prerequisites)}</ol>
+    <h3>Prohibited actions</h3><ul>{bullets(mandate?.prohibited)}</ul>
+    <h3>Executive Director instruction requirements</h3><ul>{bullets(ed?.requiredInstructionFields)}</ul>
+    <p className="role-description-note">{mandate?.accessEffect}</p>
+  </section>;
+}
 export default function RoleJobDescriptionPortal({selectedAuthority,roles=[],isAdmin=false}){
+  const isExecutiveDirector=String(selectedAuthority||"").trim()==="Executive Director"||(Array.isArray(roles)&&roles.includes("Executive Director"));
   const visible=useMemo(()=>{
-    if(isAdmin)return authority.roles;
+    if(isAdmin||isExecutiveDirector)return authority.roles;
     const names=new Set([selectedAuthority,...(Array.isArray(roles)?roles:[])].map(x=>String(x||"").trim()).filter(Boolean));
     return authority.roles.filter(role=>names.has(role.title));
-  },[selectedAuthority,roles,isAdmin]);
+  },[selectedAuthority,roles,isAdmin,isExecutiveDirector]);
   return <main className="role-description-portal"><div className="role-description-intro"><p className="role-description-kicker">ORGANISATIONAL AUTHORITY REGISTER</p><h1>Job Descriptions and Access</h1><p>Read-only draft descriptions. A job description does not grant access by itself; the matching Firestore rule and workflow enforcement must also exist.</p><p><strong>Protected rule:</strong> restricted research data remains denied by default. No position is appointed by this register.</p></div>
+    {(isExecutiveDirector||isAdmin)&&<OrganisationalStructure isAdmin={isAdmin}/>}
+    <AssignmentMandate isAdmin={isAdmin}/>
     {visible.length?visible.map(role=><RoleCard key={role.id} role={role}/>):<section className="role-description-card"><h2>No matched job description</h2><p>Your current role does not yet map to a canonical description. Access remains unchanged and no new permissions are granted.</p></section>}
   </main>;
 }
