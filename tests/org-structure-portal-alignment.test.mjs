@@ -28,11 +28,18 @@ test("every department and unit-bearing substructure has a routing entry", () =>
   }
 });
 
-test("each named organisational role routes to its catalogue directorate", () => {
+test("each named organisational role routes within its catalogue directorate", () => {
   for (const role of catalogue.roles) {
     if (role.title === "Management" || role.title === "Employee" || role.title === "interim sole-approver") continue;
-    assert.ok(roleBlock.includes(`"${role.title}":"${role.directorate}"`),
-      `${role.title} must route to ${role.directorate}`);
+    const directorate = catalogue.directorates.find(item => item.name === role.directorate);
+    assert.ok(directorate, `missing directorate for ${role.title}`);
+    const allowed = new Set([directorate.name, ...directorate.departments.map(item => item.name)]);
+    const marker = `"${role.title}":"`;
+    const index = roleBlock.indexOf(marker);
+    assert.ok(index >= 0, `${role.title} must have a portal-routing entry`);
+    const remainder = roleBlock.slice(index + marker.length);
+    const routed = remainder.slice(0, remainder.indexOf('"'));
+    assert.ok(allowed.has(routed), `${role.title} routes to ${routed}, outside ${role.directorate}`);
   }
 });
 
