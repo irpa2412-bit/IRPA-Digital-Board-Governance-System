@@ -70,3 +70,14 @@ test("signer authority selector and verifier accept the same scalar and multi-ro
   assert.match(source, /record\.selectedRoles/);
   assert.match(source, /record\.roleAssignments/);
 });
+
+test("draft signing matrix documents the technical role source without appointing signatories", () => {
+  const model = catalogue.signingMatrix.technicalModel;
+  assert.equal(model.status, "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT");
+  assert.equal(model.authoritySource, "Current authenticated Member and Employee register entries for the signer");
+  assert.equal(model.multipleRegisteredRolesPerPerson, true);
+  assert.deepEqual(model.boardRoleOptions, boardRoles);
+  assert.match(model.ambiguousTitles, /Exact-match only/);
+  assert.match(model.administratorRecognition, /job title Administrator alone cannot/);
+  assert.match(model.limitation, /do not appoint signatories/);
+});
