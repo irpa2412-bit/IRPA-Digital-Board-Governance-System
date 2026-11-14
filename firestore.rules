@@ -55,23 +55,7 @@ service cloud.firestore {
   function researchToolAllowed(tool,studyId,uid){return researchAuthority()&& (exists(path("/databases/"+database+"/documents/researchToolPermissions/"+uid+"_"+tool+"_"+studyId))&&get(path("/databases/"+database+"/documents/researchToolPermissions/"+uid+"_"+tool+"_"+studyId)).data.get("status","")=="Active");}
   function researchRequestOwner(requestId,uid){return exists(/databases/$(database)/documents/researchInformationRequests/$(requestId))&&get(/databases/$(database)/documents/researchInformationRequests/$(requestId)).data.get("requestedByUid","")==uid;}
   function researchGrantRecipient(grantId,uid){return exists(/databases/$(database)/documents/researchInformationGrants/$(grantId))&&get(/databases/$(database)/documents/researchInformationGrants/$(grantId)).data.get("status","")=="Active"&&get(/databases/$(database)/documents/researchInformationGrants/$(grantId)).data.get("grantedToUid","")==uid;}
-  function researchPortalReviewer(portal){
-    return researchAuthority() && (
-      (portal=="Finance Portfolio" && anyInstitutionalRole(["Executive Director","Director Finance & Administration","Finance Manager","Finance Officer","Accountant"])) ||
-      (portal=="Procurement" && anyInstitutionalRole(["Executive Director","Director Finance & Administration","Finance Manager","Procurement Officer","Procurement Manager","Procurement Team Member"])) ||
-      (portal=="Human Resources" && anyInstitutionalRole(["Executive Director","Director Human Resources","HR Manager","HR Officer"])) ||
-      (portal=="Livestock" && anyInstitutionalRole(["Executive Director","Director Livestock","Livestock Director","Livestock Officer"])) ||
-      (portal=="Environment & Rangeland" && anyInstitutionalRole(["Executive Director","Director Environment","Environment Director","Environment Officer","Rangeland Officer"])) ||
-      (portal=="Outreach & Community Development" && anyInstitutionalRole(["Executive Director","Director Outreach","Outreach Director","Outreach Officer","Director Community Development","Community Development Director","Community Development Officer"])) ||
-      (portal=="Field Operations" && anyInstitutionalRole(["Executive Director","Director Field","Director Field Operations","Field Director","Field Assistant"])) ||
-      (portal=="Operations" && anyInstitutionalRole(["Executive Director","Director Operations","Operations Director","Operations Manager"])) ||
-      (portal=="Information Technology" && anyInstitutionalRole(["Executive Director","IT Specialist","Information Technology Officer"])) ||
-      (portal=="Internal Oversight" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Internal Oversight Director","Internal Oversight Officer"])) ||
-      (portal=="Members & Personnel" && anyInstitutionalRole(["Executive Director","Director Human Resources","HR Manager"])) ||
-      (portal=="Meetings" && anyInstitutionalRole(["Executive Director","Board Secretary","Board Chairperson","Board Vice Chairperson"])) ||
-      (portal=="Documents" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration"])) ||
-      (portal=="Reports" && anyInstitutionalRole(["Executive Director","Director Internal Oversight","Director Finance & Administration","Director Human Resources"])));
-  }
+  function researchPortalReviewer(portal){return researchAuthority();}
   function communicationMediaUser(){return admin()||anyInstitutionalRole(["Communication & Media","Communications & Media","Communication and Media","Communications and Media","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
   function communicationMediaReviewer(){return admin()||anyInstitutionalRole(["Executive Director","Director Outreach","Outreach Director","Director Community Development","Community Development Director"]);}
   function authorityRoleRegistered(record,authorityRole){return record.get("role","")==authorityRole||record.get("boardPosition","")==authorityRole||record.get("unit","")==authorityRole||record.get("unitName","")==authorityRole||(record.get("roles",[]) is list&&record.get("roles",[]).hasAny([authorityRole]))||(record.get("assignedRoles",[]) is list&&record.get("assignedRoles",[]).hasAny([authorityRole]))||(record.get("selectedRoles",[]) is list&&record.get("selectedRoles",[]) .hasAny([authorityRole]))||(record.get("roleAssignments",[]) is list&&record.get("roleAssignments",[]).hasAny([authorityRole]));}
