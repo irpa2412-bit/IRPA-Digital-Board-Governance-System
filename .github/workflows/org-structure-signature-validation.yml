@@ -40,6 +40,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run organisational, portal and signature matrix tests
         run: npm run test:org-structure-authority
+      - name: Run full application regression suite with Firestore Emulator
+        run: npx firebase emulators:exec --project demo-irpa-org-structure --only firestore "npm run test:all"
       - name: Build application
         run: npm run build
       - name: Install Gateway dependencies
