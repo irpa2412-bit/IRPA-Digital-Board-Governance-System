@@ -31,7 +31,7 @@ The current rules source still uses legacy department labels in key predicates:
 
 The staging rules define `researchAuthority()` to include `admin()`; `researchStudies` and other research collections allow reads through `researchUser()`. The staging emulator gate in draft PR #695 confirmed that an administrator can read a RESTRICTED, uncleared research study.
 
-**Disposition:** BLOCKED. Every research collection must remain restricted by default. Reading must require explicit clearance, classification and named approver evidence under the owner's research addendum. Do not waive the failing test or treat Administrator status, record type, or Published status as clearance.
+**Disposition:** BLOCKED for release. The current staging rules still include Administrator in `researchAuthority()`, and the deployed staging policy has not been changed. In this PR's draft-only `firestore.rules`, Administrator and department-only membership have been removed as research authority; restricted data access requires an explicit active Research role in the Member/Employee register; `Published` no longer grants read access; and cross-portal review/shared-information reads are held to Research authority. Emulator tests now cover administrator denial, explicit Research Officer access, and denial based only on Published status. A custodian-backed clearance schema (classification, named approver and verified custodian) is not yet implemented, so the draft deliberately enables no external research-data sharing. Do not waive these controls or treat Administrator status, record type, or Published status as clearance.
 
 ### Role arrays in other workflows
 
