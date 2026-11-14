@@ -1,5 +1,4 @@
-const assert = require("node:assert/stri    await db.doc("members/research-authority").set({ uid: "research-authority", status: "Active", role: "Research Officer" });
-ct");
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const { before, after, beforeEach, test } = require("node:test");
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
