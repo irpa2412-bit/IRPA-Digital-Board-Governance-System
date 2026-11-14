@@ -48,6 +48,16 @@ test("production Firebase data mutations and Functions deployments require expli
   assert.match(source, /- name: Deploy Firebase Hosting independently/);
 });
 
+
+test("Firebase deployment workflow does not assert Cloudflare build identity", () => {
+  const source = readWorkflow(".github/workflows/firebase-deploy.yml");
+  assert.match(source, /Verify live Firebase Hosting independently/);
+  assert.match(source, /firebase-hosting-live/);
+  assert.doesNotMatch(source, /cloudflare\/frontend-live/);
+  assert.doesNotMatch(source, /CLOUDFLARE_LIVE_OK/);
+  assert.doesNotMatch(source, /Verify live Cloudflare production frontend independently/);
+});
+
 test("production deployment workflows are not triggered by pull requests", () => {
   for (const path of productionDeployWorkflows) {
     const source = readWorkflow(path);
