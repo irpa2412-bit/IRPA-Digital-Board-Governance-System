@@ -28,5 +28,7 @@ jobs:
           java-version: "21"
       - name: Install repository test dependencies
         run: npm ci --no-audit --no-fund
+      - name: Verify staging rules backup and rollback logic with mocked Rules API
+        run: node --test functions/scripts/staging-firestore-rules-release.test.js
       - name: Verify staging administrator preservation and restricted research
         run: npx firebase emulators:exec --project demo-irpa-staging --only firestore "node --test tests/staging-admin-access-preservation.test.cjs"
