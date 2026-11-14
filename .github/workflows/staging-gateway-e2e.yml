@@ -2148,8 +2148,15 @@ jobs:
           initializeApp({credential:cert(sa),projectId:process.env.PROJECT});
           (async()=>{
             const user=await getAuth().getUserByEmail(process.env.TEST_EMAIL);
-            await getFirestore().collection("adminProfiles").doc(user.uid).set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const profileRef=getFirestore().collection("adminProfiles").doc(user.uid);
+            await profileRef.set({uid:user.uid,email:user.email,role:"Administrator",active:true,updatedAt:new Date().toISOString()},{merge:true});
+            const profileSnap=await profileRef.get();
+            const profile=profileSnap.data()||{};
+            if(!profileSnap.exists||profile.uid!==user.uid||profile.active!==true||profile.role!=="Administrator") throw new Error("Staging admin profile read-after-write verification failed.");
             console.log("STAGING_MEDIA_ADMIN_IDENTITY_READY=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_READBACK=PASS");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_UID_MATCH=true");
+            console.log("STAGING_MEDIA_ADMIN_PROFILE_ACTIVE=true");
           })().catch(e=>{console.error("Unable to prepare staging media test identity: "+String(e.message||e).replace(/[\\r\\n\\t]+/g," ").slice(0,180));process.exit(1)});
           NODE
 
@@ -2296,6 +2303,11 @@ jobs:
            if(denied.status!==403) throw new Error("Media archive role-denial check failed; expected HTTP 403 and received HTTP "+denied.status+"; response body: "+redactBody(deniedText));
           console.log("STAGING_COMMUNICATION_MEDIA_ROLE_DENIAL=PASS");
           const admin=await signIn(process.env.STAGING_TEST_EMAIL,process.env.STAGING_TEST_PASSWORD);
+          const adminProfileUrl="https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/adminProfiles/"+encodeURIComponent(admin.localId);
+          const adminProfileResponse=await fetch(adminProfileUrl,{headers:{Authorization:"Bearer "+admin.idToken}});
+          const adminProfile=await adminProfileResponse.json().catch(()=>({}));
+          if(!adminProfileResponse.ok||adminProfile.fields?.active?.booleanValue!==true||adminProfile.fields?.role?.stringValue!=="Administrator") throw new Error("STAGING_MEDIA_ADMIN_PROFILE_READBACK=FAIL; self-read did not confirm an active Administrator profile in the same staging project/database (HTTP "+adminProfileResponse.status+").");
+          console.log("STAGING_MEDIA_ADMIN_PROFILE_TOKEN_READBACK=PASS");
           const archiveResponse=await fetch(base+"/api/communication-media-archive/provision",{method:"POST",headers:{Authorization:"Bearer "+admin.idToken,"content-type":"application/json"},body:"{}"});
           const archiveText=await archiveResponse.text();
           const archive=(()=>{try{return JSON.parse(archiveText)}catch{return {}}})();
