@@ -3,7 +3,25 @@ name: Organisational Structure and Signature Matrix Validation
 on:
   push:
     branches:
+      - main
       - feat/org-structure-directorates
+      - fix/signature-matrix-main-validation-20261114
+    paths:
+      - "config/org-structure-authority.json"
+      - "src/App.jsx"
+      - "src/firebase/signaturePlatform.js"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/utils/signatureAuthority.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/signatureAuthority.mjs"
+      - "tests/org-structure-*.mjs"
+      - "tests/org-structure-*.cjs"
+      - "tests/signature-authority-matrix.test.mjs"
+      - "drive-gateway/tests/signature-authority.test.mjs"
+      - "package.json"
+      - "drive-gateway/package.json"
+      - ".github/workflows/org-structure-signature-validation.yml"
+  workflow_dispatch:
   pull_request:
     branches:
       - main
