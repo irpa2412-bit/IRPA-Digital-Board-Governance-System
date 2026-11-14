@@ -97,6 +97,42 @@ test("a role title of Administrator without an active adminProfiles record does 
   await assertFails(db.doc("meetings/role-title-only").delete());
 });
 
+test("an explicitly registered Research Officer can read a restricted research study", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-officer").set({
+      uid: "research-officer",
+      status: "Active",
+      role: "Research Officer"
+    });
+    await db.doc("researchStudies/research-officer-study").set({
+      title: "Restricted research study",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-officer").firestore();
+  await assertSucceeds(researcher.doc("researchStudies/research-officer-study").get());
+});
+
+test("Published status does not grant ordinary users access to research updates", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("researchUpdates/published-restricted").set({
+      title: "Restricted research update",
+      status: "Published",
+      classification: "RESTRICTED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const ordinaryMember = env.authenticatedContext("ordinary-member").firestore();
+  await assertFails(ordinaryMember.doc("researchUpdates/published-restricted").get());
+});
+
 test("RESTRICTED research records cannot be read merely because the caller is an administrator", async () => {
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("researchStudies/restricted-staging-test").set({
