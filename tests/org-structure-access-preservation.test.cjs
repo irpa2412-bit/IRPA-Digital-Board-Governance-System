@@ -3,7 +3,8 @@ const fs = require("node:fs");
 const { before, after, beforeEach, test } = require("node:test");
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
 
-const rules = fs.readFileSync("firestore.rules", "utf8");
+const rulesPath = process.env.FIRESTORE_RULES_FILE || "firestore.rules";
+const rules = fs.readFileSync(rulesPath, "utf8");
 const appSource = fs.readFileSync("src/App.jsx", "utf8");
 const catalogue = JSON.parse(fs.readFileSync("config/org-structure-authority.json", "utf8"));
 let env;
