@@ -5,12 +5,18 @@ on:
     workflows: ["Deploy IRPA Governance Frontend to Cloudflare Workers"]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      deployment_run_id:
+        description: "Successful Cloudflare frontend deployment run ID whose exact build artifact should be checked"
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -19,10 +25,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Validate successful Cloudflare deployment run
+        id: deployment
+        env:
+          DEPLOYMENT_RUN_ID: ${{ github.event.workflow_run.id || inputs.deployment_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOYMENT_RUN_ID"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID" > "$RUNNER_TEMP/deployment-run.json"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const run = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/deployment-run.json", "utf8"));
+          if (run.name !== "Deploy IRPA Governance Frontend to Cloudflare Workers" ||
+              run.path !== ".github/workflows/cloudflare-pages-deploy.yml" ||
+              run.status !== "completed" || run.conclusion !== "success" ||
+              run.head_branch !== "main" || !/^[a-f0-9]{40}$/i.test(run.head_sha || "")) {
+            throw new Error("The selected run is not a successful main-branch Cloudflare frontend deployment.");
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${run.id}\\ntarget_sha=${run.head_sha}\\n`);
+          console.log("Validated successful Cloudflare deployment run for commit " + run.head_sha + ".");
+          NODE
       - name: Checkout deployed frontend commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ steps.deployment.outputs.target_sha }}
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -30,16 +57,23 @@ jobs:
           cache: npm
       - name: Install application dependencies
         run: npm ci
-      - name: Rebuild exact frontend commit for asset verification
+      - name: Download exact production build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: irpa-cloudflare-frontend-dist
+          path: dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.deployment.outputs.run_id }}
+      - name: Verify downloaded deployment artifact identity
         env:
-          VITE_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
-          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
-          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
-          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
-          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
-          VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
-        run: VITE_BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" npm run build
+          TARGET_SHA: ${{ steps.deployment.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          test -d dist/assets
+          grep -Fq "content=\\"$TARGET_SHA\\"" dist/index.html
+          echo "PASS: downloaded the exact production build artifact for $TARGET_SHA."
       - name: Install Playwright Chromium
         run: |
           npm install --no-save --package-lock=false playwright
@@ -195,7 +229,7 @@ jobs:
           NODE
       - name: Verify Cloudflare signing-path assets and lazy Documents workspace
         env:
-          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          TARGET_SHA: ${{ steps.deployment.outputs.target_sha }}
         run: |
           node --input-type=module <<'NODE'
           import { chromium } from "playwright";
@@ -206,7 +240,7 @@ jobs:
           const base = "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev";
           const expectedCommit = process.env.TARGET_SHA;
           const assetsDir = path.resolve("dist/assets");
-          const jsAssets = fs.readdirSync(assetsDir).filter(name => name.endsWith(".js")).sort();
+          const jsAssets = fs.readdirSync(assetsDir).filter(name => /\\.m?js$/i.test(name)).sort();
           const documentChunk = jsAssets.find(name => name.includes("DocumentLifecycleModule"));
           if (!expectedCommit || !documentChunk) {
             throw new Error("Expected deployed commit or built DocumentLifecycleModule chunk is missing.");
@@ -237,17 +271,18 @@ jobs:
             const assetResults = await page.evaluate(async names => {
               const results = [];
               for (const name of names) {
-                const response = await fetch("/assets/" + encodeURIComponent(name) + "?__irpa_signing_check=" + Date.now());
+                const response = await fetch("/assets/" + encodeURIComponent(name) + "?__irpa_signing_check=" + Date.now(), { cache: "no-store" });
+                const contentType = response.headers.get("content-type") || "";
                 const bytes = await response.arrayBuffer();
                 const digest = await crypto.subtle.digest("SHA-256", bytes);
                 const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-                results.push({ name, status: response.status, hash });
+                results.push({ name, status: response.status, contentType, hash });
               }
               return results;
             }, jsAssets);
 
-            const failedAssets = assetResults.filter(asset => asset.status !== 200);
-            if (failedAssets.length) throw new Error("JavaScript assets did not all return HTTP 200: " + JSON.stringify(failedAssets));
+            const failedAssets = assetResults.filter(asset => asset.status !== 200 || !/(?:javascript|ecmascript)/i.test(asset.contentType));
+            if (failedAssets.length) throw new Error("JavaScript asset requests returned an error or non-JavaScript fallback content: " + JSON.stringify(failedAssets));
             const liveChunk = assetResults.find(asset => asset.name === documentChunk);
             if (!liveChunk || liveChunk.status !== 200 || liveChunk.hash !== localHash) {
               throw new Error("DocumentLifecycleModule SHA-256 mismatch: local=" + localHash + " live=" + (liveChunk?.hash || "missing"));
