@@ -70,6 +70,9 @@ test("production Firebase CLI rules and Worker deployments require explicit owne
   assert.match(source.slice(workerStart, workerEnd), /inputs\.authorize_production_worker_deployment == 'yes'/);
   assert.match(source.slice(rulesStart, rulesEnd), /inputs\.authorize_production_firestore_rules_deployment == 'yes'/);
   assert.match(source.slice(fallbackRulesStart, fallbackRulesEnd), /inputs\.authorize_production_firestore_rules_deployment == 'yes'/);
+  assert.match(source, /wrangler deploy --config cloudflare\/grant-crawler\/wrangler\.toml/);
+  assert.match(source, /wrangler --config cloudflare\/grant-crawler\/wrangler\.toml secret put FIREBASE_SERVICE_ACCOUNT_JSON/);
+  assert.doesNotMatch(source, /working-directory: cloudflare\/grant-crawler/);
 });
 
 test("grant crawler PR deployment is restricted to the isolated staging Worker", () => {
