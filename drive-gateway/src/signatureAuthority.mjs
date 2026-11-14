@@ -6,6 +6,7 @@ const ARRAY_FIELDS = ["roles", "assignedRoles", "selectedRoles", "roleAssignment
 
 export function normalizeGatewayAuthority(value) {
   const normalized = String(value || "")
+    .trim()
     .toLowerCase()
     .replace(/^(the|irpa)\s+/, "")
     .replace(/[._-]+/g, " ")
