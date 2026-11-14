@@ -73,7 +73,7 @@ These values must be mapped to an exact approved role, retained as an explicitly
 6. Current-head application build, portal navigation, signature gateway, security rules and authenticated browser checks are still running or require final readback.
 7. Obtain explicit owner approval for the exact staging rules diff before publication. No staging rules publication has occurred. Production rules, production migration and production deployment remain separately gated.
 8. Production rules source is NOT VERIFIED against the live Firebase Console. The owner must provide the exact current Console rules text before any production diff can be prepared or reviewed; repository `firestore.rules` is not proof of the live deployed source.
-9. The existing Production Promotion Gate created protected proof tags on draft PR heads. The workflow is now guarded to skip draft PRs and trigger on `ready_for_review`. Three tags were created automatically on earlier draft commits; they remain in the repository pending owner decision and were not deleted. These tags are not deployments.
+9. The existing Production Promotion Gate created functional promotion-proof tags on draft PR heads. The workflow is now guarded to skip draft PRs and trigger on `ready_for_review`. Three tags were created automatically on earlier draft commits; they remain in the repository pending owner decision and were not deleted. These tags are not deployments.
 
 ## 5. Evidence references
 
