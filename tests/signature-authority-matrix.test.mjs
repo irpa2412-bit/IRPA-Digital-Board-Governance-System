@@ -111,3 +111,55 @@ test("browser and Cloudflare Gateway resolve the same dual-role register values"
   assert.equal(resolveManualAuthorityLabel(record, "Board Secretary"), resolveGatewayAuthorityLabel(record, "Board Secretary"));
   assert.equal(resolveManualAuthorityLabel(record, "Board Treasurer"), resolveGatewayAuthorityLabel(record, "Board Treasurer"));
 });
+
+
+test("governance authority is distinct from Executive Director management authority", () => {
+  const framework = catalogue.authorityFramework;
+  assert.equal(framework.governance.authority, "Board of Directors acting collectively under the Constitution, approved policies and recorded resolutions.");
+  assert.equal(framework.management.authority, "Executive Director is the overall management authority and reports to the Board of Directors.");
+  assert.ok(framework.governance.reservedMatters.length >= 4);
+  assert.match(framework.management.limits, /Board-reserved matters/);
+});
+
+test("management directorates report through the Executive Director, with explicit governance exceptions", () => {
+  for (const directorate of catalogue.directorates) {
+    if (directorate.name === "Governance") {
+      assert.deepEqual(directorate.reportsTo, ["Board"]);
+    } else {
+      assert.deepEqual(directorate.reportsTo, ["Executive Director"]);
+    }
+    assert.ok(directorate.authorityRelationship, `missing authority relationship for ${directorate.name}`);
+    for (const department of directorate.departments) {
+      assert.ok(department.delegationModel, `missing delegation model for ${department.name}`);
+      assert.match(department.delegationModel.delegationStatus, /NOT_ASSIGNED/);
+    }
+  }
+  assert.deepEqual(catalogue.centralOffice.reportsTo, ["Executive Director"]);
+  const audit = catalogue.directorates.find(item => item.name === "Internal Oversight");
+  assert.equal(audit.authorityRelationship.functionalOversightBy, "Board");
+});
+
+test("signature matrix separates workflow stages and preserves unassigned legal and financial authorities", () => {
+  const matrix = catalogue.signingMatrix;
+  assert.match(matrix.status, /DRAFT_FOR_BOARD_REVIEW/);
+  assert.ok(matrix.rows.length >= 8);
+  for (const row of matrix.rows) {
+    for (const key of ["prepare", "review", "recommend", "approve", "sign", "release", "evidence", "limit"]) {
+      assert.ok(typeof row[key] === "string" && row[key].length > 0, `${row.category} missing ${key}`);
+    }
+  }
+  const finance = matrix.rows.find(row => row.category.startsWith("Finance,"));
+  assert.match(finance.limit, /no monetary thresholds or bank signatories/i);
+  const board = matrix.rows.find(row => row.category.startsWith("Board resolutions"));
+  assert.match(board.sign, /not assigned by this matrix/i);
+  assert.equal(matrix.technicalModel.defaultDecision, "DENY");
+  assert.equal(matrix.technicalModel.noAppointmentByTitle, true);
+});
+
+test("job descriptions must define reporting, delegation, limits and escalation before runtime authority", () => {
+  const standard = catalogue.authorityFramework.jobDescriptionAuthorityStandard;
+  for (const field of ["Reports to / supervises", "Permitted initiation, review, verification, recommendation, approval, signature and release actions", "Financial and procurement limits with currency and period, if formally approved", "Escalation triggers and approving authority", "Delegation source, effective date, expiry/review date and revocation status"]) {
+    assert.ok(standard.requiredFields.includes(field), `job description standard missing: ${field}`);
+  }
+  assert.match(standard.default, /DENY/);
+});
