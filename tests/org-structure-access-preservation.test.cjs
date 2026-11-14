@@ -1,5 +1,4 @@
-const assert = require("node:assert/stric    await db.doc("members/research-authority").set({ uid: "research-authority", status: "Active", role: "Research Officer" });
-t");
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const { before, after, beforeEach, test } = require("node:test");
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
@@ -246,7 +245,7 @@ test("research authority cannot review an unrelated Finance portal request", asy
   }));
 });
 
-test("a Research Officer job title alone cannot clear a record even when a custodian exists", async () => {
+test("Research Officer title alone cannot clear a record even when a custodian exists", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("members/research-officer-title-only").set({
@@ -254,16 +253,15 @@ test("a Research Officer job title alone cannot clear a record even when a custo
       status: "Active",
       role: "Research Officer"
     });
-    await db.doc("researchCustodians/custodian-2").set({
-      uid: "custodian-2",
+    await db.doc("researchCustodians/custodian-title-only").set({
+      uid: "custodian-title-only",
       active: true,
       status: "Active",
-      displayName: "Named Research Custodian",
-      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT",
-      appointedByUid: "owner-primary"
+      displayName: "Named Custodian",
+      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT"
     });
     await db.doc("researchStudies/title-only-clearance").set({
-      title: "Restricted study",
+      title: "Restricted research study",
       classification: "RESTRICTED",
       sharingStatus: "NOT_CLEARED",
       clearedForSharing: false,
@@ -279,8 +277,8 @@ test("a Research Officer job title alone cannot clear a record even when a custo
     clearanceApprovedByUid: "research-officer-title-only",
     clearanceApprovedByName: "Research Officer",
     clearanceApprovedAt: new Date(),
-    custodianUid: "custodian-2",
-    custodianName: "Named Research Custodian"
+    custodianUid: "custodian-title-only",
+    custodianName: "Named Custodian"
   }));
 });
 
@@ -291,22 +289,21 @@ test("client administrators cannot self-appoint research authorities or custodia
     active: true,
     status: "Active",
     displayName: "Owner",
-    appointmentReference: "SELF-APPOINTMENT",
-    appointedByUid: "owner-primary"
+    appointmentReference: "SELF-APPOINTMENT"
   }));
   await assertFails(owner.doc("researchCustodians/owner-primary").set({
     uid: "owner-primary",
     active: true,
     status: "Active",
     displayName: "Owner",
-    appointmentReference: "SELF-APPOINTMENT",
-    appointedByUid: "owner-primary"
+    appointmentReference: "SELF-APPOINTMENT"
   }));
 });
 
 test("only a research authority with an active appointed custodian can clear a record for sharing", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
+    await db.doc("members/research-authority").set({ uid: "research-authority", status: "Active", role: "Research Officer" });
     await db.doc("researchAuthorities/research-authority").set({
       uid: "research-authority",
       active: true,
