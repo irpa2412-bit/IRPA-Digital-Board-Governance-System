@@ -452,14 +452,14 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  const authorityOptions=useMemo(()=>{
    const department=String(authorityDepartment||"").trim().toLowerCase();
    if(department==="board of directors"){
-     // Board capacity is a fixed four-choice institutional selector.
-     // Never derive these four labels from register records here: doing so can
-     // duplicate a legacy "Board Chairperson" record and hide the Vice Chairperson.
+     // Board capacity is a fixed five-role institutional selector aligned to
+     // the approved role catalogue. Keep Board Member singular for exact matching.
      return [
        {role:"Board Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-chairperson"},
        {role:"Board Vice Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-vice-chairperson"},
        {role:"Board Secretary",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-secretary"},
-       {role:"Board Members",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-members"}
+       {role:"Board Treasurer",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-treasurer"},
+       {role:"Board Member",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-member"}
      ];
    }
    const options=[];
@@ -485,7 +485,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
      if(/(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
      if(/(^| )vice chairperson$|^board vice chairperson$|^vice chairman$|^vice chairwoman$/.test(normalized)) return "Board Vice Chairperson";
      if(/(^| )board secretary$|^secretary$/.test(normalized)) return "Board Secretary";
-     if(normalized==="board member"||normalized==="board members") return "Board Members";
+     if(normalized==="board member"||normalized==="board members") return "Board Member";
    }
    return role;
  };
