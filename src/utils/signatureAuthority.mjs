@@ -1,6 +1,6 @@
 const scalarAuthorityFields = [
   "role", "boardPosition", "designation", "jobTitle", "position", "title",
-  "authorityRole", "unit", "unitName"
+  "authorityRole"
 ];
 const arrayAuthorityFields = ["roles", "assignedRoles", "selectedRoles", "roleAssignments"];
 
