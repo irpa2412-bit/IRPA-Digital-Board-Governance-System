@@ -59,6 +59,7 @@ const PROCUREMENT_APPROVAL_ROLES=["Executive Director","Director Livestock","Liv
 const HR_ROLES=["Executive Director","Director Human Resources","HR Manager"];
 const IT_ROLES=["IT Specialist","Information Technology Officer"];
 const IT_OPERATIONS_MODULES=["IT Operations"];
+// The Executive Office is a central office, separate from the 13 directorates.
 // Directorate and department routing is navigation metadata only. It does not
 // grant server-side record permissions. Legacy department keys remain during
 // transition so existing member/employee profiles do not lose their portals.
