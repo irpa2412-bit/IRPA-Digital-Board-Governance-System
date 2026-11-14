@@ -28,23 +28,29 @@ test("every department and unit-bearing substructure has a routing entry", () =>
   }
 });
 
-test("each named organisational role routes within its catalogue directorate", () => {
+test("each non-ambiguous organisational role routes within its catalogue directorate", () => {
+  const ambiguous = new Set(catalogue.compatibilityAliasCandidates
+    .filter(item => item.status === "AMBIGUOUS_OWNER_DECISION_REQUIRED")
+    .map(item => item.alias));
   for (const role of catalogue.roles) {
     if (role.title === "Management" || role.title === "Employee" || role.title === "interim sole-approver") continue;
+    const marker = `"${role.title}":"`;
+    const index = roleBlock.indexOf(marker);
+    if (ambiguous.has(role.title)) {
+      assert.equal(index, -1, `${role.title} must remain unmapped pending owner decision`);
+      continue;
+    }
     const directorate = catalogue.directorates.find(item => item.name === role.directorate);
     const centralOffice = catalogue.centralOffice?.name === role.directorate ? catalogue.centralOffice : null;
     assert.ok(directorate || centralOffice, `missing directorate or central office for ${role.title}`);
     const unit = directorate || centralOffice;
     const allowed = new Set([unit.name, ...unit.departments.map(item => item.name)]);
-    const marker = `"${role.title}":"`;
-    const index = roleBlock.indexOf(marker);
     assert.ok(index >= 0, `${role.title} must have a portal-routing entry`);
     const remainder = roleBlock.slice(index + marker.length);
     const routed = remainder.slice(0, remainder.indexOf('"'));
     assert.ok(allowed.has(routed), `${role.title} routes to ${routed}, outside ${role.directorate}`);
   }
 });
-
 test("legacy department labels remain supported during transition", () => {
   for (const legacy of [
     "Finance & Administration",
