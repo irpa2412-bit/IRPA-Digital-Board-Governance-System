@@ -47,6 +47,20 @@ test("gateway PR workflow runs local emulator tests; deployment is opt-in and st
   assert.doesNotMatch(source, /environment:\s*production/);
 });
 
+test("production browser smoke verifies the exact deployed artifact instead of rebuilding it", () => {
+  const deploy = readWorkflow(".github/workflows/cloudflare-pages-deploy.yml");
+  const smoke = readWorkflow(".github/workflows/production-browser-smoke.yml");
+  assert.match(deploy, /actions\/upload-artifact@v4/);
+  assert.match(deploy, /name: production-frontend-dist-\$\{\{ github\.sha \}\}/);
+  assert.match(deploy, /path: dist\//);
+  assert.match(smoke, /actions:\s*read/);
+  assert.match(smoke, /actions\/download-artifact@v4/);
+  assert.match(smoke, /run-id: \$\{\{ github\.event\.workflow_run\.id \}\}/);
+  assert.match(smoke, /PRODUCTION_DIST_DIR: \$\{\{ github\.event_name == 'workflow_run' && 'deployed-dist\/assets'/);
+  assert.match(smoke, /liveChunk\.hash !== localHash/);
+  const artifactDownload = smoke.slice(smoke.indexOf("Download exact deployed frontend artifact"), smoke.indexOf("Rebuild exact frontend commit for manual smoke verification"));
+  assert.doesNotMatch(artifactDownload, /npm run build/);
+});
 test("production promotion pull-request gate explicitly remains non-deploying", () => {
   const source = readWorkflow(".github/workflows/production-promotion-gate.yml");
   assert.match(source, /^\s{2}pull_request:/m);
