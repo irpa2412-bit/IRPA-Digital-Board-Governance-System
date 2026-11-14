@@ -169,6 +169,56 @@ test("research authority cannot clear a record until an active custodian is regi
   }));
 });
 
+test("unresolved Research Director title does not confer research authority", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/unresolved-research-director").set({
+      uid: "unresolved-research-director",
+      status: "Active",
+      role: "Research Director"
+    });
+    await db.doc("researchStudies/unresolved-research-director-record").set({
+      title: "Restricted research record",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const unresolved = env.authenticatedContext("unresolved-research-director").firestore();
+  await assertFails(unresolved.doc("researchStudies/unresolved-research-director-record").get());
+});
+
+test("research authority cannot review an unrelated Finance portal request", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-authority").set({
+      uid: "research-authority",
+      status: "Active",
+      role: "Research Officer"
+    });
+    await db.doc("researchInformationRequests/finance-portal-request").set({
+      requestType: "DATA_ACCESS",
+      requestedByUid: "finance-requester",
+      targetPortal: "Finance Portfolio",
+      status: "Submitted",
+      recordOrigin: "TRIAL",
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertFails(researcher.doc("researchInformationRequests/finance-portal-request").update({
+    status: "Approved",
+    decisionReason: "Research authority must not approve finance portal requests.",
+    reviewedAt: new Date(),
+    reviewedByPortal: "Finance Portfolio",
+    updatedAt: new Date()
+  }));
+});
+
 test("Published status does not make research updates readable to ordinary users", async () => {
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("researchUpdates/published-restricted-update").set({
