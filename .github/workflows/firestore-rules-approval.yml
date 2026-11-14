@@ -5,6 +5,7 @@ on:
     branches: [main, fix/firestore-approval-workflow-dispatch-20261114]
     paths:
       - ".github/workflows/firestore-rules-approval.yml"
+      - ".github/workflows/firestore-rules-approval-comment.yml"
       - "scripts/firestore-rules-approval.mjs"
       - "tests/firestore-rules-approval.test.mjs"
   workflow_dispatch:
