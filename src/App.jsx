@@ -113,6 +113,7 @@ const DEPARTMENTAL_MODULES={
   "Research Department":["Research, Statistics and Knowledge"],
   "Research and Knowledge":["Research, Statistics and Knowledge"]
 };
+// Keep one routing map; legacy role labels are preserved as labels, never as administrator claims.
 const ROLE_DEPARTMENT={
   "Administrator":"Executive Office","Executive Director":"Executive Office",
   "Board Chairperson":"Governance","Board Vice Chairperson":"Governance","Board Secretary":"Governance","Board Treasurer":"Governance","Board Member":"Governance",
