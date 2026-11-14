@@ -66,3 +66,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Test administrator preservation and restricted research in Firestore Emulator
         run: npx firebase emulators:exec --project demo-irpa-org-structure --only firestore "node --test tests/org-structure-access-preservation.test.cjs"
+      - name: Test administrator preservation and restricted research against staging rules
+        env:
+          FIRESTORE_RULES_FILE: firestore.staging.rules
+        run: npx firebase emulators:exec --project demo-irpa-org-structure --only firestore "node --test tests/org-structure-access-preservation.test.cjs"
