@@ -128,6 +128,14 @@ test("explicitly registered research authority cannot read restricted records be
       status: "Active",
       role: "Research Officer"
     });
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
+      status: "Active",
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT",
+      appointedByUid: "owner-primary"
+    });
     await db.doc("researchStudies/research-authority-record").set({
       title: "Restricted research record",
       classification: "RESTRICTED",
@@ -149,6 +157,14 @@ test("research authority cannot clear a record until an active custodian is regi
       status: "Active",
       role: "Research Officer"
     });
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
+      status: "Active",
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT",
+      appointedByUid: "owner-primary"
+    });
     await db.doc("researchStudies/research-clearance-test").set({
       title: "Restricted clearance test",
       classification: "RESTRICTED",
@@ -165,7 +181,9 @@ test("research authority cannot clear a record until an active custodian is regi
     clearedForSharing: true,
     clearanceApprovedByUid: "research-authority",
     clearanceApprovedByName: "Research Officer",
-    clearanceApprovedAt: new Date()
+    clearanceApprovedAt: new Date(),
+    custodianUid: "unappointed-custodian",
+    custodianName: "Unappointed Custodian"
   }));
 });
 
@@ -198,6 +216,14 @@ test("research authority cannot review an unrelated Finance portal request", asy
       status: "Active",
       role: "Research Officer"
     });
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
+      status: "Active",
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT",
+      appointedByUid: "owner-primary"
+    });
     await db.doc("researchInformationRequests/finance-portal-request").set({
       requestType: "DATA_ACCESS",
       requestedByUid: "finance-requester",
@@ -217,6 +243,50 @@ test("research authority cannot review an unrelated Finance portal request", asy
     reviewedByPortal: "Finance Portfolio",
     updatedAt: new Date()
   }));
+});
+
+test("only a research authority with an active appointed custodian can clear a record for sharing", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
+      status: "Active",
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT",
+      appointedByUid: "owner-primary"
+    });
+    await db.doc("researchCustodians/custodian-1").set({
+      uid: "custodian-1",
+      active: true,
+      status: "Active",
+      displayName: "Named Research Custodian",
+      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT",
+      appointedByUid: "owner-primary"
+    });
+    await db.doc("researchStudies/clearance-success").set({
+      title: "Restricted study awaiting clearance",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertSucceeds(researcher.doc("researchStudies/clearance-success").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-authority",
+    clearanceApprovedByName: "Research Officer",
+    clearanceApprovedAt: new Date(),
+    custodianUid: "custodian-1",
+    custodianName: "Named Research Custodian"
+  }));
+
+  const ordinaryUser = env.authenticatedContext("ordinary-reader").firestore();
+  await assertSucceeds(ordinaryUser.doc("researchStudies/clearance-success").get());
 });
 
 test("Published status does not make research updates readable to ordinary users", async () => {
