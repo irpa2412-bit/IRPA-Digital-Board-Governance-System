@@ -70,3 +70,7 @@ jobs:
         env:
           FIRESTORE_RULES_FILE: firestore.staging.rules
         run: npx firebase emulators:exec --project demo-irpa-org-structure --only firestore "node --test tests/org-structure-access-preservation.test.cjs"
+      - name: Test staging rules backup and rollback safeguards
+        run: node --test functions/scripts/staging-firestore-rules-release.test.js
+      - name: Test staging administrator access preservation and restricted research
+        run: npx firebase emulators:exec --project demo-irpa-staging --only firestore "node --test tests/staging-admin-access-preservation.test.cjs"
