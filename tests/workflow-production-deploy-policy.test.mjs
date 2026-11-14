@@ -57,5 +57,5 @@ test("draft pull requests cannot create production-promotion proof tags", () => 
   assert.match(source, /types: \[opened, synchronize, reopened, ready_for_review\]/);
   assert.match(source, /candidate-proof:\s*\n\s+if: github\.event\.pull_request\.draft == false/);
   assert.match(source, /gate-proof:\s*\n\s+if: github\.event\.pull_request\.draft == false/);
-  assert.match(source, /git push origin "\$TAG"/);
+  assert.match(source, /git push origin "\$TAG_NAME"/);
 });
