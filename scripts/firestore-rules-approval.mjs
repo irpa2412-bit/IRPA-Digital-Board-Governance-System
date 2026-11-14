@@ -9,7 +9,7 @@ function latestByTime(items) {
 }
 
 export function evaluateApproval({ changedFiles, labels, labelEvents, timeline, rulesCommitIds, allowedActors, apiError }) {
-  if (apiError) return { pass: false, reason: `GitHub API verification failed closed: ${apiError}` };
+  if (apiError) return { pass: false, reason: `GitHub API verification failed; failing closed: ${apiError}` };
   if (!Array.isArray(changedFiles) || !Array.isArray(labels) || !Array.isArray(labelEvents) ||
       !Array.isArray(timeline) || !Array.isArray(rulesCommitIds) || !Array.isArray(allowedActors)) {
     return { pass: false, reason: "Required approval evidence is incomplete; failing closed." };
