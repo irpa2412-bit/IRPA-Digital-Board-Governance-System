@@ -1,0 +1,32 @@
+name: Staging Administrator Access Preservation Emulator Gate
+
+on:
+  pull_request:
+    branches:
+      - fix/signature-trail-20261024
+    paths:
+      - "firestore.staging.rules"
+      - "tests/staging-admin-access-preservation.test.cjs"
+      - ".github/workflows/staging-admin-access-preservation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-rules-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install repository test dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify staging administrator preservation and restricted research
+        run: npx firebase emulators:exec --project demo-irpa-staging --only firestore "node --test tests/staging-admin-access-preservation.test.cjs"
