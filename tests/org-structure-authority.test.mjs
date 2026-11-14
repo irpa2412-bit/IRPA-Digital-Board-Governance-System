@@ -7,7 +7,7 @@ const config=JSON.parse(fs.readFileSync(path.join(root,"config/org-structure-aut
 const app=fs.readFileSync(path.join(root,"src/App.jsx"),"utf8");
 const match=app.match(/const LOGIN_ROLE_OPTIONS=(\[[\s\S]*?\]);/);
 assert.ok(match,"LOGIN_ROLE_OPTIONS must remain discoverable for catalogue consistency");
-const loginRoles=Function("return "+match[1])();
+const loginRoles=JSON.parse(match[1]);
 const configured=new Set(config.roles.map(r=>r.title));
 test("every application login role has a job-description record",()=>{const missing=loginRoles.filter(r=>!configured.has(r));assert.deepEqual(missing,[]);});
 test("all organisational positions remain vacant in draft",()=>{for(const r of config.roles.filter(r=>!config.systemCategories.includes(r.title)&&r.title!=="interim sole-approver"))assert.equal(r.appointmentStatus,"VACANT",r.title);});
