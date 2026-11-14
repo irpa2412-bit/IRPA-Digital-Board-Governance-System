@@ -120,7 +120,7 @@ test("administrator portal navigation includes every registered app module witho
 });
 
 
-test("explicitly registered research authority can access restricted research records", async () => {
+test("explicitly registered research authority cannot read restricted records before clearance", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await db.doc("members/research-authority").set({
@@ -138,7 +138,35 @@ test("explicitly registered research authority can access restricted research re
   });
 
   const researcher = env.authenticatedContext("research-authority").firestore();
-  await assertSucceeds(researcher.doc("researchStudies/research-authority-record").get());
+  await assertFails(researcher.doc("researchStudies/research-authority-record").get());
+});
+
+test("research authority cannot clear a record until an active custodian is registered", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-authority").set({
+      uid: "research-authority",
+      status: "Active",
+      role: "Research Officer"
+    });
+    await db.doc("researchStudies/research-clearance-test").set({
+      title: "Restricted clearance test",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertFails(researcher.doc("researchStudies/research-clearance-test").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-authority",
+    clearanceApprovedByName: "Research Officer",
+    clearanceApprovedAt: new Date()
+  }));
 });
 
 test("Published status does not make research updates readable to ordinary users", async () => {
