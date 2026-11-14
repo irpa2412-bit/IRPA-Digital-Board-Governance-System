@@ -7,9 +7,9 @@ const ARRAY_FIELDS = ["roles", "assignedRoles", "selectedRoles", "roleAssignment
 export function normalizeGatewayAuthority(value) {
   const normalized = String(value || "")
     .toLowerCase()
-    .replace(/^(the|irpa)\\s+/, "")
+    .replace(/^(the|irpa)\s+/, "")
     .replace(/[._-]+/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
   return normalized === "board members" ? "board member" : normalized;
 }
