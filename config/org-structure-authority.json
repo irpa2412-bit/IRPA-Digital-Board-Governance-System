@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "status": "DRAFT — owner review required; not runtime authority",
   "sourceOfTruth": "This configuration is intended to become the single source for role descriptions, permissions and signing eligibility. Until enforcement is implemented and tested, no workflow permission is granted by this document.",
   "principles": {
@@ -24,8 +24,7 @@
     {
       "name": "Sustainable Rangeland Management and Climate Resilience",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -34,22 +33,48 @@
             "Rangeland Planning",
             "Restoration and Rehabilitation",
             "Grazing and Pasture Management"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Rangeland Planning",
+              "Restoration and Rehabilitation",
+              "Grazing and Pasture Management"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Climate Resilience",
           "units": [
             "Climate Adaptation",
             "Natural Resource Monitoring"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Climate Adaptation",
+              "Natural Resource Monitoring"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Livestock Development",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -57,22 +82,47 @@
           "units": [
             "Animal Breeding and Genetics",
             "Animal Husbandry"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Animal Breeding and Genetics",
+              "Animal Husbandry"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Animal Health and Veterinary Services",
           "units": [
             "Veterinary Coordination",
             "Animal Health and Disease Surveillance"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Veterinary Coordination",
+              "Animal Health and Disease Surveillance"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Market Development",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -80,7 +130,18 @@
           "units": [
             "Meat Value Chains",
             "Livestock Trading"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Meat Value Chains",
+              "Livestock Trading"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "By-products and Enterprise Development",
@@ -88,43 +149,92 @@
             "Skins and Hides",
             "Manure and Organic Fertiliser",
             "Pastoral Enterprise Development"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Skins and Hides",
+              "Manure and Organic Fertiliser",
+              "Pastoral Enterprise Development"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Cross-Cutting Themes",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
           "name": "Gender, Youth and Inclusion",
           "units": [
             "Women and Youth Empowerment"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Women and Youth Empowerment"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Monitoring, Evaluation and Learning",
           "units": [
             "Monitoring and Evaluation",
             "Learning and Knowledge"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Monitoring and Evaluation",
+              "Learning and Knowledge"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Climate and Safeguards",
           "units": [
             "Safeguards and Resilience"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Safeguards and Resilience"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "IRPA Capacity Building and Institutional Growth",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -132,22 +242,47 @@
           "units": [
             "Capacity Building",
             "Partnerships and Resource Mobilisation"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Capacity Building",
+              "Partnerships and Resource Mobilisation"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Digital Governance",
           "units": [
             "Digital Governance Systems",
             "Data Governance"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Digital Governance Systems",
+              "Data Governance"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Finance and Administration",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -156,7 +291,19 @@
             "Accounting",
             "Budgeting and Financial Reporting",
             "Payments and Treasury"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Accounting",
+              "Budgeting and Financial Reporting",
+              "Payments and Treasury"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Procurement",
@@ -164,22 +311,48 @@
             "Procurement Planning",
             "Sourcing and Evaluation",
             "Contract Administration"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Procurement Planning",
+              "Sourcing and Evaluation",
+              "Contract Administration"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Administration",
           "units": [
             "Facilities and Logistics",
             "Records Administration"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Facilities and Logistics",
+              "Records Administration"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Human Resources",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -188,15 +361,30 @@
             "Recruitment and Appointments",
             "Personnel Records",
             "Learning and Development"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Recruitment and Appointments",
+              "Personnel Records",
+              "Learning and Development"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Internal Oversight",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -205,9 +393,26 @@
             "Audit Planning",
             "Audit and Compliance",
             "Risk Follow-up"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Audit Planning",
+              "Audit and Compliance",
+              "Risk Follow-up"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "functionalOversightBy": "Board",
+        "scope": "Independent assurance; direct functional access to the Board; no authority to approve or execute the transactions it audits."
+      }
     },
     {
       "name": "Governance",
@@ -220,15 +425,29 @@
           "units": [
             "Board Meetings and Resolutions",
             "Governance Records"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Board Meetings and Resolutions",
+              "Governance Records"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Board",
+        "scope": "Board governance and secretariat functions; no general management authority."
+      }
     },
     {
       "name": "Operations",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -236,22 +455,47 @@
           "units": [
             "Field Coordination",
             "Transport and Logistics"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Field Coordination",
+              "Transport and Logistics"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Information Technology",
           "units": [
             "IT Operations",
             "Information Security"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "IT Operations",
+              "Information Security"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Outreach",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -260,15 +504,30 @@
             "Editorial and Content",
             "Website Publishing",
             "Media Relations"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Editorial and Content",
+              "Website Publishing",
+              "Media Relations"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Community Development",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "departments": [
         {
@@ -276,15 +535,29 @@
           "units": [
             "Pastoral Groups",
             "Community Partnerships"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Pastoral Groups",
+              "Community Partnerships"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "scope": "Management and delivery within approved departmental job descriptions and written delegation."
+      }
     },
     {
       "name": "Research, Statistics and Knowledge",
       "reportsTo": [
-        "Executive Director",
-        "Board"
+        "Executive Director"
       ],
       "independent": true,
       "departments": [
@@ -293,30 +566,67 @@
           "units": [
             "Research Ethics and Clearance",
             "Restricted Research Records"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Research Ethics and Clearance",
+              "Restricted Research Records"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Statistics and Analysis",
           "units": [
             "Data Collection",
             "Statistical Analysis"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Data Collection",
+              "Statistical Analysis"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         },
         {
           "name": "Knowledge Management",
           "units": [
             "Research Outputs",
             "Knowledge Products"
-          ]
+          ],
+          "delegationModel": {
+            "headPosition": "To be confirmed in approved organisational structure",
+            "reportsTo": "Executive Director through the responsible directorate/department head",
+            "subordinateUnits": [
+              "Research Outputs",
+              "Knowledge Products"
+            ],
+            "hierarchy": "Department Head → Unit Head/Supervisor (if established) → Officers/Specialists → Assistants/Support Staff",
+            "delegationStatus": "NOT_ASSIGNED_UNTIL_APPROVED_JOB_DESCRIPTIONS_AND_WRITTEN_DELEGATION",
+            "rule": "Do not infer authority or appointment from department/unit membership."
+          }
         }
-      ]
+      ],
+      "authorityRelationship": {
+        "administrativeReportsTo": "Executive Director",
+        "professionalIndependence": "Research integrity, ethics and clearance decisions remain protected by approved research policy; Board oversight applies where reserved."
+      }
     }
   ],
   "centralOffice": {
     "name": "Executive Office",
     "status": "CENTRAL_OFFICE_NOT_COUNTED_AS_A_DIRECTORATE",
     "reportsTo": [
-      "Board"
+      "Executive Director"
     ],
     "departments": [
       {
@@ -330,7 +640,11 @@
     "notes": [
       "The Executive Office is a central office and is not counted among the 13 directorates.",
       "Administrator remains a system category; this entry does not appoint an administrator or grant runtime authority."
-    ]
+    ],
+    "authorityRelationship": {
+      "reportsTo": "Executive Director",
+      "scope": "Executive coordination and organisational administration; does not create a separate governance or administrator authority."
+    }
   },
   "roles": [
     {
@@ -2800,96 +3114,147 @@
     "Employee"
   ],
   "signingMatrix": {
-    "status": "DRAFT — requires owner approval and separate legal confirmation of who may bind IRPA",
+    "status": "DRAFT_FOR_BOARD_REVIEW — no appointment, delegation, bank mandate or legal signatory is created by this matrix",
+    "governingRule": "A signature is valid within IRPA only when the actor's current appointment, approved job description, applicable delegation/resolution, instrument-specific controls and server-side verification all authorise that exact action.",
+    "authorityChain": [
+      "Board of Directors — governance and reserved decisions",
+      "Executive Director — overall management authority; accountable to the Board",
+      "Directorate / Department Head — delegated departmental management",
+      "Unit Head / Supervisor — expressly sub-delegated operational authority",
+      "Officer / Specialist — assigned preparation, verification or execution duties"
+    ],
+    "columns": [
+      "Instrument / decision",
+      "Prepare / initiate",
+      "Review / verify",
+      "Recommend",
+      "Approve / authorise",
+      "Sign / execute",
+      "Release / publish",
+      "Delegation / evidence required",
+      "Limit / escalation"
+    ],
     "rows": [
       {
-        "category": "Governance instruments and Board resolutions",
-        "owningDirectorate": "Governance",
-        "signerRole": "Not assigned pending legal confirmation",
-        "signatures": "Not assigned",
-        "approverBeforeSigning": "Board authority as applicable; confirm instrument",
-        "evidenceOfAuthority": "Certified Board resolution/delegation and verified signatory authority",
-        "interim": "No blanket exception; only scoped Signature portal action if separately activated",
-        "sealed": "No interim exception after seal"
+        "category": "Board resolutions, governance instruments and constitutional matters",
+        "prepare": "Board Secretariat or authorised officer",
+        "review": "Board committee / governance review as required",
+        "recommend": "Relevant committee or Executive Director where appropriate",
+        "approve": "Board collectively where reserved",
+        "sign": "Only office-holder(s) expressly authorised by Constitution, resolution or legal instrument; not assigned by this matrix",
+        "release": "Board Secretariat after certification and approval",
+        "evidence": "Constitution, approved Board resolution, certified minutes and specific signatory delegation",
+        "limit": "No individual Board office may exercise collective Board authority without express delegation."
       },
       {
-        "category": "Finance, payments and bank instruments",
-        "owningDirectorate": "Finance and Administration",
-        "signerRole": "Bank-mandated signatories only; not assigned by app",
-        "signatures": "As required by bank mandate",
-        "approverBeforeSigning": "Independent finance approval chain",
-        "evidenceOfAuthority": "Current bank mandate and approved finance delegation",
-        "interim": "No authority; USD 0",
-        "sealed": "Bank mandate unchanged"
+        "category": "Organisational strategy, annual plans, budgets and management policies",
+        "prepare": "Relevant department / Executive Office",
+        "review": "Finance and relevant technical departments",
+        "recommend": "Executive Director",
+        "approve": "Board where reserved; otherwise Executive Director within Board-approved delegation",
+        "sign": "Executive Director or specifically delegated officer for management instruments",
+        "release": "Executive Office / responsible department",
+        "evidence": "Board-approved strategy, budget, policy or written ED delegation",
+        "limit": "Any reserved matter or unbudgeted/out-of-limit commitment escalates to Board."
       },
       {
-        "category": "Procurement and contracts",
-        "owningDirectorate": "Finance and Administration",
-        "signerRole": "Not assigned pending legal confirmation",
-        "signatures": "Distinct authorised signatories per instrument",
-        "approverBeforeSigning": "Separate preparer, reviewer and approver",
-        "evidenceOfAuthority": "Approved procurement record, delegation and contract authority",
-        "interim": "No exception",
-        "sealed": "No interim exception"
+        "category": "Routine departmental operations and programme delivery",
+        "prepare": "Assigned officer / unit",
+        "review": "Unit supervisor or department head",
+        "recommend": "Department head",
+        "approve": "Department head only within written ED delegation",
+        "sign": "Department head or named delegate within documented scope",
+        "release": "Responsible department",
+        "evidence": "Approved job description, current appointment, ED delegation, approved workplan/budget and workflow record",
+        "limit": "Escalate cross-departmental, exceptional, unbudgeted or above-limit decisions to ED."
       },
       {
-        "category": "Research data release",
-        "owningDirectorate": "Research, Statistics and Knowledge",
-        "signerRole": "Research Director plus recorded clearance",
-        "signatures": "Research Director approval plus named clearance authority",
-        "approverBeforeSigning": "Research Director; named custodian/clearance recorded",
-        "evidenceOfAuthority": "Classification, named approver, clearance record and audit trail",
-        "interim": "No exception",
-        "sealed": "No exception"
+        "category": "Human resources, recruitment and personnel decisions",
+        "prepare": "HR / responsible department",
+        "review": "HR and relevant supervisor",
+        "recommend": "Department head and HR",
+        "approve": "Executive Director within approved HR policy; Board for ED appointment or reserved senior appointments",
+        "sign": "ED or specifically delegated HR signatory; employment contracts subject to legal authority",
+        "release": "HR after all approvals",
+        "evidence": "Approved HR policy, job description, recruitment record, budget and written delegation",
+        "limit": "No employee may approve own appointment, remuneration or disciplinary outcome; reserved appointments escalate to Board."
       },
       {
-        "category": "Communication & Media website publication",
-        "owningDirectorate": "Outreach",
-        "signerRole": "Communications role per approved delegation",
-        "signatures": "Not applicable",
-        "approverBeforeSigning": "Independent content reviewer/approver",
-        "evidenceOfAuthority": "Approved content record, version and release audit",
-        "interim": "Owner only while dedicated flag ON; label interim sole-approver",
-        "sealed": "Normal separation restored"
+        "category": "Finance, expenditure, payments and bank instruments",
+        "prepare": "Finance officer / budget holder",
+        "review": "Independent finance review and supporting-document verification",
+        "recommend": "Budget holder / Finance lead",
+        "approve": "Authorised approver under approved financial delegation",
+        "sign": "Current bank-mandated signatories only for bank instruments; other instruments require written legal/management authority",
+        "release": "Treasury/payment releaser separate from preparer and approver",
+        "evidence": "Approved budget, finance policy, procurement evidence where applicable, approval trail and current bank mandate",
+        "limit": "This matrix assigns no monetary thresholds or bank signatories. Bank mandate controls bank execution; no self-approval; separate preparation, approval and release."
+      },
+      {
+        "category": "Procurement, quotations, tender evaluation and contracts",
+        "prepare": "Requesting department / procurement",
+        "review": "Procurement and technical/finance review",
+        "recommend": "Evaluation committee / procurement lead",
+        "approve": "Approving authority under approved procurement policy and delegation",
+        "sign": "Named contract signatory under specific written delegation and applicable law",
+        "release": "Procurement / contract custodian after execution",
+        "evidence": "Procurement plan, approved requisition, evaluation record, budget, award approval, contract and delegation",
+        "limit": "No person may improperly combine requisition, evaluation, approval and contract execution; value thresholds remain unassigned pending approved policy."
+      },
+      {
+        "category": "Research ethics, restricted data and research-data release",
+        "prepare": "Research team / data custodian",
+        "review": "Research governance, ethics and data-protection review",
+        "recommend": "Research Director / designated research lead",
+        "approve": "Named authority under approved research ethics and data-governance policy",
+        "sign": "Research Director or expressly delegated authority where required",
+        "release": "Named data custodian after clearance and access conditions",
+        "evidence": "Classification, ethics/clearance record, purpose, data-sharing approval, named approver and audit log",
+        "limit": "Restricted by default; no release based only on role name, publication status or generic Administrator access."
+      },
+      {
+        "category": "Communications, website and social-media publication",
+        "prepare": "Communications/content author",
+        "review": "Independent editorial / technical reviewer",
+        "recommend": "Communications lead",
+        "approve": "Approver under written Communications delegation; ED retains overall management oversight",
+        "sign": "Not normally applicable; approval identity and content version are recorded",
+        "release": "Authorised publisher only after approval",
+        "evidence": "Approved content, reviewer/approver, version, channel, publication permission and release audit",
+        "limit": "Author and approver separation; publishing remains disabled unless expressly enabled; no role title alone grants publication authority."
+      },
+      {
+        "category": "Asset, records and data disposal / transfer",
+        "prepare": "Custodian / responsible department",
+        "review": "Finance, records, IT or compliance review as relevant",
+        "recommend": "Department head",
+        "approve": "Executive Director within delegation; Board where reserved or material",
+        "sign": "Named authorised officer for transfer/disposal instrument",
+        "release": "Custodian after approval and register update",
+        "evidence": "Asset/data register, valuation or classification, policy, approval and recipient record",
+        "limit": "No disposal, transfer or deletion outside approved retention, asset and data-governance controls."
       }
     ],
+    "universalControls": [
+      "Authority follows the approved reporting line and documented delegation, not seniority or a job title alone.",
+      "Board authority is collective unless a valid resolution expressly delegates a defined power.",
+      "Executive Director is the overall management authority and reports to the Board.",
+      "Departmental heads exercise only authority expressly delegated by the Executive Director.",
+      "Sub-delegation is prohibited unless the written delegation permits it.",
+      "Every approval/signature must be attributable to the actor's active appointment and capacity at the time.",
+      "No self-approval; incompatible preparation, review, approval, signing and release duties must be separated.",
+      "Acting appointments require written scope, start/end dates and approving authority.",
+      "A person with multiple roles must select the capacity relevant to the action; roles do not combine automatically.",
+      "The matrix does not replace the Constitution, law, bank mandate, procurement policy or Board resolutions."
+    ],
     "technicalModel": {
-      "status": "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT",
-      "authoritySource": "Current authenticated Member and Employee register entries for the signer",
-      "acceptedRoleFields": [
-        "role",
-        "boardPosition",
-        "designation",
-        "jobTitle",
-        "position",
-        "title",
-        "authorityRole",
-        "roles",
-        "assignedRoles",
-        "selectedRoles",
-        "roleAssignments"
-      ],
-      "multipleRegisteredRolesPerPerson": true,
-      "boardRoleOptions": [
-        "Board Chairperson",
-        "Board Vice Chairperson",
-        "Board Secretary",
-        "Board Treasurer",
-        "Board Member"
-      ],
-      "workflowActions": [
-        "Review",
-        "Authorization",
-        "Approval",
-        "Verification",
-        "Recommendation",
-        "Comment",
-        "Signature",
-        "Final Authorization"
-      ],
-      "ambiguousTitles": "Exact-match only; ambiguous director titles are not normalised into one another.",
-      "administratorRecognition": "Administrator mode is derived from authenticated administrator context; the job title Administrator alone cannot select administrator mode or grant administrator authority.",
-      "limitation": "The technical selector and verifier do not appoint signatories or override Board resolutions, bank mandates, approved delegations, separation of duties, or server-side controls."
+      "status": "POLICY_MODEL_ONLY_PENDING_RUNTIME_CROSSWALK_AND_TESTS",
+      "authoritySource": "Approved organisational structure + active appointment + approved job description + current written delegation + instrument-specific controls",
+      "defaultDecision": "DENY",
+      "noAppointmentByTitle": true,
+      "noImplicitDepartmentAuthority": true,
+      "multiRoleCapacitySelection": "Required; evaluate the selected capacity and its delegation independently",
+      "serverSideEnforcementRequired": true
     }
   },
   "migration": {
@@ -2913,5 +3278,84 @@
       "Production migration requires separate RUN MIGRATION approval"
     ],
     "rollback": "Restore verified pre-migration backup and prior mapping snapshot; no production target selected."
+  },
+  "authorityFramework": {
+    "status": "DRAFT_FOR_BOARD_REVIEW_NOT_RUNTIME_AUTHORITY",
+    "governingPrinciple": "The Board governs; the Executive Director manages; departments execute within documented delegations; job descriptions define authority and limits.",
+    "governance": {
+      "authority": "Board of Directors acting collectively under the Constitution, approved policies and recorded resolutions.",
+      "reservedMatters": [
+        "Strategy and organisational direction",
+        "Approval of annual plans and budgets where reserved to the Board",
+        "Appointment, supervision and accountability of the Executive Director",
+        "Approval of policies and organisational delegations",
+        "Matters expressly reserved by law, Constitution or Board resolution"
+      ],
+      "limits": "Individual Board offices do not independently exercise collective Board powers unless a valid resolution or written delegation expressly authorises the action."
+    },
+    "management": {
+      "authority": "Executive Director is the overall management authority and reports to the Board of Directors.",
+      "responsibilities": [
+        "Lead and coordinate all organisational departments and staff",
+        "Implement Board resolutions, strategy, approved plans and budgets",
+        "Issue, document and monitor departmental delegations",
+        "Approve management decisions within approved policy, budget and delegated limits",
+        "Escalate reserved, exceptional or out-of-limit matters to the Board"
+      ],
+      "limits": "The Executive Director cannot override Board-reserved matters, law, the Constitution, bank mandates, approved procurement controls or documented separation-of-duties requirements."
+    },
+    "reportingRules": {
+      "default": "All management directorates and departments report administratively through the Executive Director; the Executive Director reports to the Board.",
+      "governance": "The Board Secretariat reports to the Board for governance business. The Executive Office supports the Executive Director and reports to the Executive Director.",
+      "independentAssurance": "Internal Audit and Assurance has functional access/reporting to the Board for independence and administrative coordination through the Executive Director; it must not audit its own work.",
+      "researchIndependence": "Research, Statistics and Knowledge retains professional/ethical independence for research integrity and clearance, with administrative accountability to the Executive Director and any Board oversight required by policy."
+    },
+    "departmentalHierarchy": {
+      "order": [
+        "Executive Director",
+        "Directorate / Department Head",
+        "Unit Head / Manager / Supervisor (where established)",
+        "Officer / Specialist",
+        "Assistant / Field or Support Staff"
+      ],
+      "rule": "This is a reporting template, not a claim that every layer is staffed. Each approved department must identify its actual head, subordinate units, incumbents, reporting line and acting arrangements before permissions are activated.",
+      "delegation": "A department head may sub-delegate only where the Executive Director's written delegation expressly permits it; every sub-delegation must be written, scoped, time-bound where appropriate, recorded and revocable.",
+      "vacancy": "A vacant or unconfirmed position carries no authority. A unit name, department label, seniority inference or job title alone never grants approval or signature rights."
+    },
+    "jobDescriptionAuthorityStandard": {
+      "requiredFields": [
+        "Position ID and approved title",
+        "Department and unit",
+        "Reports to / supervises",
+        "Purpose and decision scope",
+        "Permitted initiation, review, verification, recommendation, approval, signature and release actions",
+        "Financial and procurement limits with currency and period, if formally approved",
+        "Prohibited decisions and conflicts",
+        "Escalation triggers and approving authority",
+        "Reporting, recordkeeping and audit evidence",
+        "Delegation source, effective date, expiry/review date and revocation status"
+      ],
+      "rule": "Runtime permissions must be derived from an approved job description plus the current appointment and any required written delegation; all applicable controls must pass.",
+      "default": "DENY unless appointment, job description, delegation, workflow scope and server-side policy all authorise the action."
+    },
+    "authorityEvidence": {
+      "required": [
+        "Approved job description",
+        "Current appointment/acting appointment record",
+        "Applicable Board resolution or Executive Director written delegation",
+        "Approved policy/procedure and budget authority where relevant",
+        "Workflow-specific approval and audit record"
+      ],
+      "auditTrail": [
+        "Actor identity",
+        "Acting capacity / position",
+        "Department and reporting line",
+        "Action requested and performed",
+        "Delegation identifier and version",
+        "Applicable limit and result",
+        "Approver / reviewer identities",
+        "Timestamp and document version/hash"
+      ]
+    }
   }
 }
