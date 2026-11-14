@@ -87,6 +87,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish staging rules to the fixed staging Firebase project
+        id: publish
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
         shell: bash
@@ -108,6 +109,7 @@ jobs:
           node functions/scripts/deploy-staging-firestore-rules.js
 
       - name: Verify active staging release matches the staging source
+        id: verify
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
         shell: bash
@@ -151,7 +153,7 @@ jobs:
           NODE
 
       - name: Roll back staging rules to saved backup if publication or verification fails
-        if: ${{ failure() && steps.backup.outcome == 'success' }}
+        if: ${{ always() && steps.backup.outcome == 'success' && (steps.publish.outcome != 'success' || steps.verify.outcome != 'success') }}
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}
         shell: bash
