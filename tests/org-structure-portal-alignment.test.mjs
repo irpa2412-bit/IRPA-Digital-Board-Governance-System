@@ -74,3 +74,7 @@ test("Executive Office is central and is not counted as a fourteenth directorate
   assert.equal(catalogue.centralOffice?.status, "CENTRAL_OFFICE_NOT_COUNTED_AS_A_DIRECTORATE");
   assert.ok(!catalogue.directorates.some(item => item.name === "Executive Office"));
 });
+
+test("portal routing has exactly one authoritative role-to-directorate map", () => {
+  assert.equal((app.match(/const ROLE_DEPARTMENT=/g) || []).length, 1);
+});
