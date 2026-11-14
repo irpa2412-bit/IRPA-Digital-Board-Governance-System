@@ -611,7 +611,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -639,7 +639,7 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED — organisational employee; owner-confirmed 2026-11-14"
     },
     {
       "id": "director-internal-oversight",
