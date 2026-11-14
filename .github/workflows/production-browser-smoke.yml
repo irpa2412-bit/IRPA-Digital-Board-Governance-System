@@ -43,7 +43,7 @@ jobs:
               run.head_branch !== "main" || !/^[a-f0-9]{40}$/i.test(run.head_sha || "")) {
             throw new Error("The selected run is not a successful main-branch Cloudflare frontend deployment.");
           }
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${run.id}\\ntarget_sha=${run.head_sha}\\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `run_id=${run.id}\ntarget_sha=${run.head_sha}\n`);
           console.log("Validated successful Cloudflare deployment run for commit " + run.head_sha + ".");
           NODE
       - name: Checkout deployed frontend commit
@@ -72,7 +72,7 @@ jobs:
           set -euo pipefail
           test -s dist/index.html
           test -d dist/assets
-          grep -Fq "content=\\"$TARGET_SHA\\"" dist/index.html
+          grep -Fq "content=\"$TARGET_SHA\"" dist/index.html
           echo "PASS: downloaded the exact production build artifact for $TARGET_SHA."
       - name: Install Playwright Chromium
         run: |
@@ -240,7 +240,7 @@ jobs:
           const base = "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev";
           const expectedCommit = process.env.TARGET_SHA;
           const assetsDir = path.resolve("dist/assets");
-          const jsAssets = fs.readdirSync(assetsDir).filter(name => /\\.m?js$/i.test(name)).sort();
+          const jsAssets = fs.readdirSync(assetsDir).filter(name => /\.m?js$/i.test(name)).sort();
           const documentChunk = jsAssets.find(name => name.includes("DocumentLifecycleModule"));
           if (!expectedCommit || !documentChunk) {
             throw new Error("Expected deployed commit or built DocumentLifecycleModule chunk is missing.");
@@ -281,7 +281,7 @@ jobs:
               return results;
             }, jsAssets);
 
-            const failedAssets = assetResults.filter(asset => asset.status !== 200 || !/(?:javascript|ecmascript)/i.test(asset.contentType));
+            const failedAssets = assetResults.filter(asset => asset.status !== 200 || !/javascript|ecmascript/i.test(asset.contentType));
             if (failedAssets.length) throw new Error("JavaScript asset requests returned an error or non-JavaScript fallback content: " + JSON.stringify(failedAssets));
             const liveChunk = assetResults.find(asset => asset.name === documentChunk);
             if (!liveChunk || liveChunk.status !== 200 || liveChunk.hash !== localHash) {
