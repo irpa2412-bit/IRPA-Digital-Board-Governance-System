@@ -97,15 +97,17 @@ test("a role title of Administrator without an active adminProfiles record does 
   await assertFails(db.doc("meetings/role-title-only").delete());
 });
 
-test("an explicitly registered Research Officer can read a restricted research study", async () => {
+test("active Research authority cannot read restricted research before clearance", async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
-    await db.doc("members/research-officer").set({
-      uid: "research-officer",
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
       status: "Active",
-      role: "Research Officer"
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT"
     });
-    await db.doc("researchStudies/research-officer-study").set({
+    await db.doc("researchStudies/research-authority-study").set({
       title: "Restricted research study",
       classification: "RESTRICTED",
       sharingStatus: "NOT_CLEARED",
@@ -114,8 +116,136 @@ test("an explicitly registered Research Officer can read a restricted research s
     });
   });
 
-  const researcher = env.authenticatedContext("research-officer").firestore();
-  await assertSucceeds(researcher.doc("researchStudies/research-officer-study").get());
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertFails(researcher.doc("researchStudies/research-authority-study").get());
+});
+
+test("Research Officer title alone cannot clear a study even when a custodian exists", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-officer-title-only").set({
+      uid: "research-officer-title-only",
+      status: "Active",
+      role: "Research Officer"
+    });
+    await db.doc("researchCustodians/custodian-1").set({
+      uid: "custodian-1",
+      active: true,
+      status: "Active",
+      displayName: "Named Custodian",
+      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT"
+    });
+    await db.doc("researchStudies/title-only-study").set({
+      title: "Restricted research study",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const titleOnly = env.authenticatedContext("research-officer-title-only").firestore();
+  await assertFails(titleOnly.doc("researchStudies/title-only-study").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-officer-title-only",
+    clearanceApprovedByName: "Research Officer",
+    clearanceApprovedAt: new Date(),
+    custodianUid: "custodian-1",
+    custodianName: "Named Custodian"
+  }));
+});
+
+test("research authority cannot clear a study without an active custodian", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
+      status: "Active",
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT"
+    });
+    await db.doc("researchStudies/no-custodian-study").set({
+      title: "Restricted research study",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertFails(researcher.doc("researchStudies/no-custodian-study").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-authority",
+    clearanceApprovedByName: "Research Officer",
+    clearanceApprovedAt: new Date(),
+    custodianUid: "unappointed-custodian",
+    custodianName: "Unappointed Custodian"
+  }));
+});
+
+test("active authority and custodian are required before a research record can be cleared and read", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("researchAuthorities/research-authority").set({
+      uid: "research-authority",
+      active: true,
+      status: "Active",
+      displayName: "Research Officer",
+      appointmentReference: "TEST-RESEARCH-AUTHORITY-APPOINTMENT"
+    });
+    await db.doc("researchCustodians/custodian-2").set({
+      uid: "custodian-2",
+      active: true,
+      status: "Active",
+      displayName: "Named Custodian",
+      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT"
+    });
+    await db.doc("researchStudies/clearable-study").set({
+      title: "Restricted research study",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const researcher = env.authenticatedContext("research-authority").firestore();
+  await assertSucceeds(researcher.doc("researchStudies/clearable-study").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-authority",
+    clearanceApprovedByName: "Research Officer",
+    clearanceApprovedAt: new Date(),
+    custodianUid: "custodian-2",
+    custodianName: "Named Custodian"
+  }));
+  const ordinaryUser = env.authenticatedContext("ordinary-reader").firestore();
+  await assertSucceeds(ordinaryUser.doc("researchStudies/clearable-study").get());
+});
+
+test("client administrator cannot self-appoint research authority or custodian", async () => {
+  const owner = env.authenticatedContext("owner-primary", { admin: true }).firestore();
+  await assertFails(owner.doc("researchAuthorities/owner-primary").set({
+    uid: "owner-primary",
+    active: true,
+    status: "Active",
+    displayName: "Owner",
+    appointmentReference: "SELF-APPOINTMENT"
+  }));
+  await assertFails(owner.doc("researchCustodians/owner-primary").set({
+    uid: "owner-primary",
+    active: true,
+    status: "Active",
+    displayName: "Owner",
+    appointmentReference: "SELF-APPOINTMENT"
+  }));
 });
 
 test("Published status does not grant ordinary users access to research updates", async () => {
