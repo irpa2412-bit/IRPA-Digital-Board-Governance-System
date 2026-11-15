@@ -15,9 +15,9 @@ test("completed gateway signing updates portal envelope, appends trail event, an
   await persistCompletedSignatureEnvelope({
     envelope: {
       id: "ENV-abc", externalReference: "IRPA-ENV-2026-12345678", documentId: "DOC-42",
-      signers: [{uid:"officer-1",name:"Authorization Officer",email:"officer@example.org",status:"Signed",signedAt:"2026-10-24T05:00:00.000Z"}]
+      signers: [{id:"S1",uid:"officer-1",name:"Authorization Officer",email:"officer@example.org",status:"Signed",signedAt:"2026-10-24T05:00:00.000Z"}]
     },
-    completion: {primaryStorageId:"drive-file-7",finalHash:"a".repeat(64),completedAt:"2026-10-24T05:00:00.000Z"},
+    completion: {primaryStorageId:"drive-file-7",files:[{kind:"signer-copy",signerId:"S1",id:"drive-file-signer-7"}],finalHash:"a".repeat(64),completedAt:"2026-10-24T05:00:00.000Z"},
     getDocument, updateDocument, now: () => "2026-10-24T05:00:01.000Z"
   });
   const envelope = docs.get("signatureEnvelopes/IRPA-ENV-2026-12345678");
@@ -60,11 +60,11 @@ test("per-signer and completion audit events use stable IDs and are idempotent",
     envelope: {
       id: "ENV-99", externalReference: envelopeId, documentId: "DOC-99",
       signers: [
-        {uid:"officer-1",name:"Officer One",email:"one@example.org",status:"Signed",signedAt:"2026-10-24T05:00:00.000Z"},
-        {uid:"officer-2",name:"Officer Two",email:"two@example.org",status:"Signed",signedAt:"2026-10-24T05:01:00.000Z"}
+        {id:"S1",uid:"officer-1",name:"Officer One",email:"one@example.org",status:"Signed",signedAt:"2026-10-24T05:00:00.000Z"},
+        {id:"S2",uid:"officer-2",name:"Officer Two",email:"two@example.org",status:"Signed",signedAt:"2026-10-24T05:01:00.000Z"}
       ]
     },
-    completion: {primaryStorageId:"drive-file-99",finalHash:"c".repeat(64),completedAt:"2026-10-24T05:02:00.000Z"},
+    completion: {primaryStorageId:"drive-file-99",files:[{kind:"signer-copy",signerId:"S1",id:"drive-file-99-signer-1"},{kind:"signer-copy",signerId:"S2",id:"drive-file-99-signer-2"}],finalHash:"c".repeat(64),completedAt:"2026-10-24T05:02:00.000Z"},
     getDocument, updateDocument, now: () => "2026-10-24T05:03:00.000Z"
   };
   await persistCompletedSignatureEnvelope(input);

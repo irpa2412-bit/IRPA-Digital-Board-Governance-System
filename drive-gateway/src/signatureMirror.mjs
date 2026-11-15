@@ -32,6 +32,26 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
   for (const signer of signers.filter(s => s.uid && s.status === "Signed")) {
+    const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===((envelope.signers||[]).find(s=>s.uid===signer.uid)?.id||""));
+    if(!signerCopy?.id)throw new Error("Completed signer archive copy is missing for an assigned signer.");
+    const signerArchiveUrl="https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view";
+    const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid);
+    await updateDocument("signatures/"+signatureRecordId,{
+      envelopeId,documentId:clean(existing.documentId||envelope.documentId),
+      recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
+      documentReference:clean(existing.documentReference||existing.envelopeReference||envelope.externalReference),
+      documentTitle:clean(existing.title||envelope.title),
+      signerUid:signer.uid,signerEmail:signer.email||"",signerName:signer.name||"",
+      workflowRole:signer.role||signer.action||"",
+      signatureAuthority:signer.authorityRole||"",
+      signatureAuthorityVerificationStatus:"Verified",
+      signatureStatus:"Signed",status:"Signed",signedAt:signer.signedAt||timestamp,
+      signerArchiveUrl,signerArchiveFileId:signerCopy.id,
+      gatewayEnvelopeId:envelope.id,gatewayDocumentHash:completion.finalHash,
+      cryptographicEvidenceStatus:"Verified",archiveProtocol:"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1",
+      immutable:true
+    });
+
     const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid);
     const signerEventPath = "signatureEvents/" + signerEventId;
     if (!(await getDocument(signerEventPath))) {

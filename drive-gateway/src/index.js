@@ -448,7 +448,7 @@ export default {
         const isEsignPath =
           pathname === "/api/documents/next-reference" ||
           /^\/api\/documents(?:\/.*)?$/.test(pathname) ||
-          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void))?)?$/.test(pathname) ||
+          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void)|\/invitations\/S\d{1,2}\/resend)?)?$/.test(pathname) ||
           /^\/api\/sign\/.*$/.test(pathname) ||
           /^\/api\/document-lifecycle\/.*$/.test(pathname) ||
           /^\/api\/auth\/.*$/.test(pathname);
@@ -2752,7 +2752,7 @@ async function sendSignatureInvitation(request, env) {
   const subject = validateMailHeader("IRPA Digital Board Governance — Signature Invitation", "Subject");
   const appUrl = String(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const link = `${appUrl}/?signEnvelope=${encodeURIComponent(envelopeId)}`;
-  const text = `Dear ${name || "IRPA Signer"},\\n\\nYou have been invited to participate in a document-signing workflow in the IRPA Digital Board Governance System.\\n\\nAssigned action: ${role}\\n\\nOpen the secure signing invitation:\\n${link}\\n\\nRegards,\\nIRPA Administration\\ninfo@irpa.or.tz`;
+  const text = `Dear ${name || "IRPA Signer"},\n\nYou have been invited to participate in a document-signing workflow in the IRPA Digital Board Governance System.\n\nAssigned action: ${role}\n\nOpen the secure signing invitation:\n${link}\n\nRegards,\nIRPA Administration\ninfo@irpa.or.tz`;
   const htmlBody = `<!doctype html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h2>IRPA Digital Board Governance</h2><p>Dear ${escapeMailHtml(name || "IRPA Signer")},</p><p>You have been invited to participate in a document-signing workflow.</p><p><strong>Assigned action:</strong> ${escapeMailHtml(role)}</p><p><a href="${escapeMailHtml(link)}">Open Secure Signing Invitation</a></p><p>Regards,<br>IRPA Administration</p></body></html>`;
   const queuedAt = new Date().toISOString();
   await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, await getFirestoreAdminAccessToken(env), {

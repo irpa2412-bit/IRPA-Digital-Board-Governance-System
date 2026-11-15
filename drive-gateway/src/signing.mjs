@@ -112,7 +112,7 @@ export async function createEnvelope(ctx,user,body){
   catch(error){if(reservationKey)await ctx.meta.delete("externalReferences",reservationKey).catch(()=>{});throw error;}
   for(let i=0;i<signers.length;i++){
     const token=`${id}.${signers[i].id}.${secrets[i]}`;
-    if(ctx.sendInvitation){try{await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}`});signers[i].invitation="Sent";}
+    if(ctx.sendInvitation){try{await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,message:String(err?.message||err).slice(0,200)});}}
     else signers[i].invitation="Sent";
   }
@@ -128,6 +128,33 @@ export async function finalizeEnvelope(ctx,id){const e=await ctx.meta.get("envel
 const owner=(e,u)=>e.createdBy===u.uid||u.isAdmin===true;
 export async function retryCompletion(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");return finalizeEnvelope(ctx,id)}
 export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");return{patch:{status:"Voided",events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
+
+export async function resendInvitation(ctx,user,id,signerId){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  if(["Completed","Voided","Declined"].includes(envelope.status))throw new HttpError(409,"This signing envelope is no longer active.");
+  const target=envelope.signers.find(s=>s.id===signerId);
+  if(!target)throw new HttpError(404,"Signer assignment not found.");
+  if(target.status==="Signed")throw new HttpError(409,"A signed assignment cannot receive another signing invitation.");
+  if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
+  const secret=randomHex(32);
+  await mutate(ctx,id,async current=>{
+    const signer=current.signers.find(s=>s.id===signerId);
+    if(!signer||signer.status==="Signed")throw new HttpError(409,"This signer assignment can no longer be invited.");
+    signer.tokenHash=await sha256Hex(secret);signer.invitation="Pending";
+    return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.requested",signerId,actor:user.uid,at:ctx.now().toISOString()})}};
+  });
+  const token=`${id}.${signerId}.${secret}`;
+  const link=`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
+  try{await ctx.sendInvitation({to:target.email,name:target.name,link});}
+  catch(error){
+    await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Failed";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
+    throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
+  }
+  await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resent",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
+  return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent"};
+}
+
 export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>({id:s.id,name:s.name,email:s.email,order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation})),completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events)}}
 export async function resyncMirror(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status!=="Completed"||!e.externalReference||!e.completion)throw new HttpError(409,"Only completed linked envelopes can be resynchronized.");if(typeof ctx.persistCompletedSignatureEnvelope!=="function")throw new HttpError(503,"Signature mirror persistence is not configured.");await persistMirrorWithStatus(ctx,e,e.completion);const updated=await ctx.meta.get("envelopes",id);return{ok:true,envelopeId:id,status:updated?.status||"Completed",mirrorStatus:updated?.mirrorStatus||"Pending",mirrorError:updated?.mirrorError||null,mirrorAttempts:Number(updated?.mirrorAttempts||0)}}
 export async function persistMirrorWithStatus(ctx,envelope,completion){const id=envelope.id;const now=ctx.now();const nextAt=Number(new Date(envelope.mirrorNextRetryAt||0));if(envelope.mirrorStatus==="Pending"&&Number.isFinite(nextAt)&&nextAt>now.getTime())return false;const attempts=Number(envelope.mirrorAttempts||0)+1;try{await ctx.persistCompletedSignatureEnvelope({envelope,completion});await ctx.meta.update("envelopes",id,{mirrorStatus:"Completed",mirrorError:null,mirrorAttempts:attempts,mirrorNextRetryAt:null,mirrorUpdatedAt:now.toISOString()});return true}catch(error){const message=String(error?.message||error).slice(0,300);const delayMs=Math.min(60*60*1000,30*1000*Math.pow(2,Math.min(attempts-1,7)));try{const latest=await ctx.meta.get("envelopes",id);if(latest)await ctx.meta.update("envelopes",id,{mirrorStatus:"Pending",mirrorError:message,mirrorAttempts:attempts,mirrorNextRetryAt:new Date(now.getTime()+delayMs).toISOString(),mirrorUpdatedAt:now.toISOString()},{ifVersion:latest._v})}catch(statusError){ctx.logger?.error?.("SIGNATURE_MIRROR_STATUS_PERSIST_FAILED",{envelopeId:id,message:String(statusError?.message||statusError).slice(0,200)})}ctx.logger?.error?.("SIGNATURE_PORTAL_COMPLETION_PERSIST_FAILED",{envelopeId:envelope.externalReference,gatewayEnvelopeId:id,message,attempts});return false}}

@@ -415,6 +415,22 @@ async function gatewayAuthenticatedRequest(path, {method="GET",body,contentType=
   });
 }
 
+export async function resendFailedGatewaySignatureInvitations(envelopeId) {
+  if (!envelopeId) throw new Error("A Gateway envelope ID is required.");
+  const statusResponse = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId));
+  const status = await statusResponse.json().catch(() => ({}));
+  if (!statusResponse.ok || status.ok === false) throw new Error(status.error || "Unable to retrieve Gateway invitation delivery status.");
+  const failed = (status.signers || []).filter(s => s.invitation === "Failed" || s.invitation === "Pending");
+  const results = [];
+  for (const signer of failed) {
+    const response = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId) + "/invitations/" + encodeURIComponent(signer.id) + "/resend", {method:"POST",body:JSON.stringify({})});
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok === false) throw new Error(result.error || ("Invitation retry failed for signer " + signer.id + "."));
+    results.push(result);
+  }
+  return {ok:true,envelopeId,attempted:results.length,results};
+}
+
 export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) {
   if (!envelope?.id || !sourceBytes?.length) throw new Error("The Signature Portal envelope and controlled PDF are required for Gateway signing.");
   if (!auth.currentUser || envelope.ownerUid !== auth.currentUser.uid || envelope.senderUid !== auth.currentUser.uid) {
@@ -487,7 +503,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   if (!response.ok || result.ok === false || !result.envelopeId) {
     throw new Error(result.error || "The authenticated Gateway signing envelope was not created.");
   }
-  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",existing:result.existing === true};
+  const invitations=Array.isArray(result.invitations)?result.invitations:[];
+  const invitationFailures=invitations.filter(item=>item.status!=="Sent").length;
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":"Sent",gatewayInvitationFailures:invitationFailures,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
 }
 
 export async function voidGatewaySignatureEnvelope(envelopeId, reason="Signature Portal activation could not be committed") {
