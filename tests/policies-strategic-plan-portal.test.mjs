@@ -31,7 +31,7 @@ test("upload form offers named dropdown selections for policies and strategic pl
  assert.match(portal,/const STRATEGIC_PLAN_OPTIONS=/);
  assert.match(portal,/Other — enter a different title/);
  assert.match(portal,/Enter document name/);
- assert.match(portal,/setKind\(event\.target\.value\);setTitle\("\);setCustomTitle\("\)/);
+ assert.match(portal,/setKind\(event\.target\.value\);setTitle\(""\);setCustomTitle\(""\)/);
 });
 
 test("portal uses the controlled lifecycle archive and limits uploads to internal governance records",()=>{
