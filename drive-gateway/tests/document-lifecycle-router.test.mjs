@@ -30,7 +30,7 @@ function makeDeps(state){
       if(path.includes("?fields=id,name,mimeType,size,description,trashed"))return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4",description:JSON.stringify({irpaGovernance:true,irpaDocumentLifecycle:true,documentId:"LIFE-test"})};
       return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4"};
     },
-    findOrCreateFolder:async(_env,_token,name)=>"folder-"+name.replace(/\s+/g,"-"),
+    findOrCreateFolder:async(_env,_token,name)=>{state.folderCalls??=[];state.folderCalls.push(name);return "folder-"+name.replace(/\s+/g,"-");},
     fetch:async(url)=>{if(String(url).includes("alt=media"))return new Response(state.downloadBytes||new TextEncoder().encode("test"),{status:200,headers:{"content-type":"application/pdf"}});return new Response(JSON.stringify({id:"drive-upload-1",name:"test.pdf",mimeType:"application/pdf",size:"4",webViewLink:"https://drive.example/test"}),{status:200,headers:{"content-type":"application/json"}});},
     recordLifecycleFailure:async(_env,claims,documentId,action,details)=>{state.failureEvents??=[];state.failureEvents.push({documentId,actorUid:claims.user_id,action,details});return {auditId:"failure-audit-1"};},
     commitDocumentAndAudit:async(_env,documentId,_token,documentFields,documentMask,auditFields,{createOnly=false}={})=>{
