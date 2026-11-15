@@ -3295,7 +3295,7 @@ async function getInstitutionalProfileForUser(env, claims) {
 function isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord) {
   if (adminRecord?.fields?.active?.booleanValue === true) return true;
   return [memberRecord, employeeRecord].map(firestoreDocumentToPlain).filter(Boolean).some(profile => {
-    const active = ["Active", "Activated"].includes(String(profile.status || profile.employmentStatus || profile.registrationStatus || ""));
+    const active = [profile.status, profile.employmentStatus, profile.registrationStatus].some(value => ["Active", "Activated"].includes(String(value || "")));
     if (!active) return false;
     const department = String(profile.department || "").trim().toLowerCase();
     const roles = [profile.role, ...(Array.isArray(profile.roles) ? profile.roles : []),
