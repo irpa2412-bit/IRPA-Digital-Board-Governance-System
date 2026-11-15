@@ -54,3 +54,11 @@ test("unsupported file formats remain blocked", () => {
 test("valid public governance document passes validation", () => {
   assert.equal(validate(), "");
 });
+
+test("Research Archive type is accepted for authorised Research personnel", () => {
+  assert.equal(validate({ documentType: "Research Archive", allowResearchArchiveUpload: true }), "");
+});
+
+test("Research Archive type is denied to non-Research personnel", () => {
+  assert.equal(validate({ documentType: "Research Archive", allowResearchArchiveUpload: false }), "Research Archive uploads are limited to authorised Research Department personnel.");
+});
