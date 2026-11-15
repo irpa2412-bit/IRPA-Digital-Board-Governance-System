@@ -63,8 +63,18 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         const dualRole =
           normalized.has("board secretary") &&
           normalized.has("executive director");
-        const department = String(employee?.department || member?.department || "").toLowerCase();
-        const researchAuthority = department.includes("research") || [...normalized].some(role => role.includes("research"));
+        const researchAuthority = [member, employee].some(record => {
+          if (!record) return false;
+          const active = ["Active", "Activated"].includes(String(record.status || record.employmentStatus || record.registrationStatus || ""));
+          if (!active) return false;
+          const department = String(record.department || "").toLowerCase();
+          const roles = [record.role, ...(Array.isArray(record.roles) ? record.roles : []),
+            ...(Array.isArray(record.assignedRoles) ? record.assignedRoles : []),
+            ...(Array.isArray(record.selectedRoles) ? record.selectedRoles : []),
+            ...(Array.isArray(record.roleAssignments) ? record.roleAssignments : [])]
+            .filter(Boolean).flatMap(value => String(value).split(",").map(item => item.trim().toLowerCase()));
+          return department.includes("research") || roles.some(role => role.includes("research"));
+        });
         if (!cancelled) {
           setAllowDualRoleDocumentTypes(dualRole);
           setAllowResearchArchiveUpload(allowResearchArchiveUploadProp || researchAuthority);
