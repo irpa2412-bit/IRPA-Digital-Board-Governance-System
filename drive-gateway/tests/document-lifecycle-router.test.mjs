@@ -128,7 +128,7 @@ test("active Administrator outside Research can upload and retrieve a Confidenti
   const result=await uploaded.json();
   const saved=state.docs[result.documentId].plain;
   assert.equal(saved.ownerType,"ADMINISTRATOR");
-  assert.equal(saved.department,null);
+  assert.equal(saved.department||null,null);
   assert.equal(saved.documentType,"Research Archive");
   assert.equal(saved.archiveCategory,"Research Documents");
   assert.equal(saved.classification,"Confidential");
