@@ -2,7 +2,7 @@ import { canUpload, canRead, canTransition, resolveIdentity, buildDocumentRecord
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const CLASSIFICATIONS = new Set(["Public","Internal","Confidential","Restricted"]);
-const ARCHIVE_CATEGORIES = new Set(["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"]);
+const ARCHIVE_CATEGORIES = new Set(["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents","Policies and Strategic Plans"]);
 const STAGES = {
   WORKING: "01-Working Documents",
   PENDING_SIGNATURE: "02-Pending Signature",
