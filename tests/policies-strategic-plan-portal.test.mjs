@@ -55,6 +55,7 @@ test("Documents upload offers a distinct Research Archive type and Research Docu
  assert.match(documents,/"Research Archive"/);
  assert.match(documents,/"Research Documents"/);
  assert.match(documents,/"Research Archive":\["\.pdf"/);
+ assert.match(documents,/disabled=\{x==="Research Archive"&&!researchArchiveAccess\}/);
 });
 
 test("shared Research Portal upload control exposes Research Archive only to Research-authorised profiles",()=>{
