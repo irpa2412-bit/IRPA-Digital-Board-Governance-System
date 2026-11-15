@@ -37,11 +37,10 @@ test("Gateway signing does not attempt browser-side writes to authoritative sign
 });
 
 test("Gateway invitation retry route is owner-authenticated and included in Worker route allowlist",()=>{
-  assert.match(gatewayRouter,/invitations\\\/\(S\\d\{1,2\}\)\\\/resend/);
-  assert.match(gatewayIndex,/invitations\\\/S\\d\{1,2\}\\\/resend/);
+  assert.ok(gatewayRouter.includes("invitations\\\\/(S\\\\d{1,2})\\\\/resend"));
+  assert.ok(gatewayIndex.includes("invitations\\\\/S\\\\d{1,2}\\\\/resend"));
   assert.match(gatewaySigning,/export async function resendInvitation/);
 });
-
 test("Gateway completion mirror writes signer-specific archive references for My Documents",()=>{
   assert.match(mirror,/signatures\/\+signatureRecordId/);
   assert.match(mirror,/signerArchiveUrl/);
