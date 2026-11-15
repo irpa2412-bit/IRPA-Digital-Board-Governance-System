@@ -30,6 +30,7 @@ export function canUpload(identity,{classification="Internal",documentType="Admi
   if(contentType&&!requiredFormats.includes(normalize(contentType)))return{allowed:false,reason:"The selected file format does not meet the requirements for this document type."};
   if(!CLASSIFICATIONS.includes(c))return{allowed:false,reason:"Invalid classification."};
   if(!t||!a)return{allowed:false,reason:"Document type and archive category are required."};
+  if((t==="Research Archive"||a==="Research Documents")&&c==="Public")return{allowed:false,reason:"Research Archive documents cannot be classified as Public."};
   const roleSet=identity.roles.map(upper);
   if(c==="Restricted"&&identity.actorType!=="ADMINISTRATOR"&&!roleSet.includes("RESTRICTED_DOCUMENT_UPLOAD"))return{allowed:false,reason:"Restricted document upload permission is required."};
   if((t==="Administrator"||a==="Administrator Documents")&&identity.actorType!=="ADMINISTRATOR"&&!roleSet.includes("ADMINISTRATOR_DOCUMENT_UPLOAD"))return{allowed:false,reason:"Administrator document upload permission is required."};
