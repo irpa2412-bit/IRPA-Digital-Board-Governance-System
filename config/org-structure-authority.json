@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "status": "CONSTITUTIONAL AND OWNER-UPDATED GOVERNANCE MODEL — POLICY/DATA MODEL ONLY; RUNTIME WORKFLOW ENFORCEMENT REMAINS SEPARATELY GATED",
+  "status": "OWNER-APPROVED FOR ROLE-DUTY IMPLEMENTATION AND PROFILE OPERATIONALISATION — runtime permissions remain separately governed",
   "sourceOfTruth": "This configuration records IRPA's constitutional governance, confirmed interim personnel baseline and authority design. It does not itself appoint a person, create a delegation, amend a bank mandate or grant runtime permissions. Current appointment, employment, volunteer assignment, bank mandate and server-side authorization records remain authoritative.",
   "principles": {
     "allPositions": "Position occupancy is recorded only where confirmed by the owner; confirmed interim volunteers are labelled as volunteers; all other positions remain VACANT or UNCONFIRMED until an approved appointment is recorded.",
@@ -703,7 +703,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -790,7 +790,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -835,7 +835,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -879,7 +879,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "SEVERAL — OCCUPIED; individual register records and tenure dates authoritative",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -928,7 +928,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -3675,5 +3675,16 @@
       ],
       "rule": "Volunteer status is not employee status. Titles and volunteer participation do not confer management, procurement, financial approval, bank-signatory, administrator, security, research-clearance or production-deployment authority."
     }
+  },
+  "implementationApproval": {
+    "approvedBy": "Sole repository owner / IRPA authority",
+    "approvedAt": "2026-11-15",
+    "scope": "Role descriptions and key duties approved for implementation and operationalisation across intended employee and Board-member positions; subject to Executive Director-led review and adjustment as circumstances require.",
+    "amendmentAuthority": "Executive Director may initiate and approve versioned role-description amendments through the controlled governance process.",
+    "limits": [
+      "This approval does not appoint a person or change any position's occupancy status.",
+      "This approval does not grant system permissions, Firebase claims, administrator access, financial/procurement approval, signature authority or bank-signatory status.",
+      "Current appointment, engagement, volunteer assignment and individual register records remain authoritative."
+    ]
   }
 }
