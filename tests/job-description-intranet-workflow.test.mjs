@@ -21,8 +21,8 @@ test("Administrator can only distribute the Executive Director-approved record w
  assert.match(page,/distributeRole/);
  assert.doesNotMatch(page,/assignRole|setAssignments|Verified active Member \/ Employee/);
  assert.match(rules,/ED_APPROVED_PENDING_ADMIN_DISTRIBUTION.*RELEASED_TO_DELEGATE/s);
- assert.match(rules,/designatedRecipientUid","")==resource\.data\.get\("designatedRecipientUid"/);
- assert.match(rules,/roleSnapshot",null\)==resource\.data\.get\("roleSnapshot"/);
+ assert.ok(rules.includes('request.resource.data.get("designatedRecipientUid","")==resource.data.get("designatedRecipientUid","")'));
+ assert.ok(rules.includes('request.resource.data.get("roleSnapshot",null)==resource.data.get("roleSnapshot",null)'));
  assert.match(rules,/hasOnly\(\["status","distributedByUid"/);
 });
 test("Delegate acknowledgement is scoped to the ED-designated authenticated identity",()=>{
