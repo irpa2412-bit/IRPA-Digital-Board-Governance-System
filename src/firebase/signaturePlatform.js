@@ -479,13 +479,12 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
     else if(field.type==="Name")gatewayFields[field.fieldId]=profile?.displayName||u.displayName||u.email||"";
     else if(field.type==="Date")gatewayFields[field.fieldId]=new Date().toISOString().slice(0,10);
   }
-  const submission=await submitGatewaySignature({token,signature,fieldValues:gatewayFields,fieldApplications,signatureConfirmed:true,consent:true,manualAuthorityIdentification:authorityVerification.manualAuthorityIdentification||manualAuthorityIdentification||""});
+  await submitGatewaySignature({token,signature,fieldValues:gatewayFields,fieldApplications,signatureConfirmed:true,consent:true,manualAuthorityIdentification:authorityVerification.manualAuthorityIdentification||manualAuthorityIdentification||""});
   const after=await fetchGatewaySigningStatus(token);
   if(after.envelopeId!==status.envelopeId||after.signer?.uid!==u.uid||after.signer?.status!=="Signed")throw new Error("Gateway did not persist the authenticated signer action. No Firebase completion was recorded.");
   const gatewaySigners=Array.isArray(after.signers)?after.signers:[];
   const nextGatewaySigner=gatewaySigners.find(s=>s.status!=="Signed");
   const completed=after.status==="Completed";
-  let signedUrl=envelope.signedDocumentUrl||envelope.documentUrl;
   let finalHash=null;
   let evidence=null;
   if(completed){
@@ -494,7 +493,6 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
     if(pdfCheck.envelopeId!==after.envelopeId||pdfCheck.documentHash!==after.completion?.finalHash||!pdfCheck.verified)throw new Error("The completed PDF hash does not match the Gateway envelope completion record.");
     evidence=await fetchGatewaySigningResource("/api/sign/evidence",token);
     if(evidence.envelopeId!==after.envelopeId||evidence.documentHash!==pdfCheck.documentHash||evidence.auditChainValid!==true||!Array.isArray(evidence.evidence)||!evidence.evidence.length||evidence.evidence.some(e=>e.signerUid!==u.uid))throw new Error("Persisted cryptographic evidence does not verify for this envelope, final PDF, authenticated signer, and audit chain.");
-    finalHash=pdfCheck.documentHash;
     finalHash=pdfCheck.documentHash;
   }
   const updatedRecipients=(envelope.recipients||[]).map(r=>{
