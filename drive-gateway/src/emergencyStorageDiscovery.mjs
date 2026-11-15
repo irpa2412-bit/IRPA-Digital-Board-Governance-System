@@ -1,5 +1,5 @@
 const ROUTE_PATH = "/api/signature-pathway/emergency-storage";
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 25;
 const MATCH_TERMS = [
   "firestore-emergency://",
   "IRPA-EMG-DOC",
@@ -43,9 +43,9 @@ function inspectFields(fields = {}) {
     const type = firestoreValueType(value);
     const fieldName = String(name || "");
     const lowerName = fieldName.toLowerCase();
-    if (/(^|[._-])bytes?($|[._-])/.test(lowerName) || lowerName === "bytes") hasBytesField = true;
+    if (lowerName.includes("bytes")) hasBytesField = true;
     if (lowerName.includes("base64")) hasBase64Field = true;
-    if (lowerName === "chunks" || lowerName.endsWith(".chunks") || lowerName.endsWith("_chunks")) {
+    if (lowerName.includes("chunk")) {
       hasChunksField = true;
       const array = value?.arrayValue?.values;
       if (Array.isArray(array)) chunkCount += array.length;
@@ -167,6 +167,7 @@ export function createEmergencyStorageDiscoveryRoute(deps) {
       if (!runId) return json({ ok: false, error: "A discovery run ID is required for audit." }, 400, cors);
       const hitCount = Math.max(0, Math.min(1000000, Number(body.hitCount) || 0));
       const collectionCount = Math.max(0, Math.min(1000000, Number(body.collectionCount) || 0));
+      const completed = body.completed === true;
       const scannedCollectionIds = Array.isArray(body.scannedCollectionIds) ? body.scannedCollectionIds.filter(safeCollectionId).slice(0, 1000) : [];
       const auditId = "emergency-storage-discovery-" + runId;
       const fields = {
@@ -176,6 +177,7 @@ export function createEmergencyStorageDiscoveryRoute(deps) {
         actorEmail: { stringValue: String(claims.email || "") },
         hitCount: { integerValue: String(hitCount) },
         collectionCount: { integerValue: String(collectionCount) },
+        completed: { booleanValue: completed },
         scannedCollectionIds: { arrayValue: { values: scannedCollectionIds.map(id => ({ stringValue: id })) } },
         createdAt: { timestampValue: new Date().toISOString() }
       };
