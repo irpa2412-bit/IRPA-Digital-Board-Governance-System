@@ -27,6 +27,9 @@ const STRATEGIC_PLAN_OPTIONS=["IRPA Strategic Plan","Annual Operational Plan","D
 const clean=value=>String(value||"").trim();
 const readableDate=value=>{if(!value)return "—";const date=new Date(value);return Number.isNaN(date.getTime())?"—":date.toLocaleDateString();};
 const normalize=value=>clean(value).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+const isPolicyPlanRecord=item=>["Policy and Strategic Plan","Policy","Strategic Plan"].includes(item.documentType);
+const isPolicyRecord=item=>item.documentType==="Policy"||(item.documentType==="Policy and Strategic Plan"&&MANDATORY_POLICIES.some(name=>normalize(name)===normalize(item.title)));
+const isPlanRecord=item=>item.documentType==="Strategic Plan"||(item.documentType==="Policy and Strategic Plan"&&STRATEGIC_PLAN_OPTIONS.some(name=>normalize(name)===normalize(item.title)));
 
 function downloadFile(result,record){
  const blob=new Blob([result.bytes],{type:result.contentType||"application/octet-stream"});
@@ -59,7 +62,7 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
   try{
    const result=await listLifecycleDocuments();
    const records=Array.isArray(result?.documents)?result.documents:[];
-   setDocuments(records.filter(item=>item.archiveCategory==="Governance Documents"&&["Policy","Strategic Plan"].includes(item.documentType)));
+   setDocuments(records.filter(item=>isPolicyPlanRecord(item)&&["Policies and Strategic Plans","Governance Documents"].includes(item.archiveCategory)));
    setMessage("The authorised governance document register has been refreshed.");
   }catch(e){setError(e?.message||"Unable to retrieve the Policies and Strategic Plan register.");}
   finally{setBusy(false);}
@@ -69,16 +72,16 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
  const visible=useMemo(()=>{
   const q=normalize(search);
   return documents.filter(item=>{
-   if(section==="POLICIES"&&item.documentType!=="Policy")return false;
-   if(section==="PLANS"&&item.documentType!=="Strategic Plan")return false;
-   if(section==="OTHER"&&item.documentType!=="Policy"&&item.documentType!=="Strategic Plan")return false;
+   if(section==="POLICIES"&&!isPolicyRecord(item))return false;
+   if(section==="PLANS"&&!isPlanRecord(item))return false;
+   if(section==="OTHER"&&!isPolicyPlanRecord(item))return false;
    return !q||[item.title,item.fileName,item.version,item.reference].some(value=>normalize(value).includes(q));
   }).sort((a,b)=>String(b.updatedAt||b.uploadedAt||"").localeCompare(String(a.updatedAt||a.uploadedAt||"")));
  },[documents,section,search]);
 
  const policyStatus=useMemo(()=>MANDATORY_POLICIES.map(name=>{
   const target=normalize(name);
-  const record=documents.find(item=>item.documentType==="Policy"&&normalize(item.title)===target);
+  const record=documents.find(item=>isPolicyRecord(item)&&normalize(item.title)===target);
   return {name,record:record||null};
  }),[documents]);
 
@@ -90,7 +93,7 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
   if(!selectedTitle){setError(title===OTHER_TITLE?"Enter the document title.":"Select a document name from the list.");return;}
   setBusy(true);
   try{
-   await uploadLifecycleDocument({file,title:selectedTitle,documentType:kind,archiveCategory:"Governance Documents",classification:"Internal",version:clean(version)||"1.0"});
+   await uploadLifecycleDocument({file,title:selectedTitle,documentType:"Policy and Strategic Plan",archiveCategory:"Policies and Strategic Plans",classification:"Confidential",version:clean(version)||"1.0"});
    setFile(null);setTitle("");setCustomTitle("");setVersion("1.0");setUploadOpen(false);
    await refresh();
    setMessage("Document uploaded to the IRPA Governance Documents archive as a working record. Upload does not itself constitute approval or publication.");
@@ -116,7 +119,7 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
     <div style={{minWidth:0,flex:"1 1 320px"}}>
      <span className="eyebrow">IRPA INSTITUTIONAL GOVERNANCE LIBRARY</span>
      <h2 style={{margin:"5px 0"}}>Policies and Strategic Plan Portal</h2>
-     <p className="panel-description" style={{margin:0}}>The central institutional register for IRPA policies, strategic plans and approved governance documents. Access is available through each active organisational profile and remains subject to the controlled-document service.</p>
+     <p className="panel-description" style={{margin:0}}>The central institutional register for IRPA policies, strategic plans and approved governance documents. Uploads default to Confidential. Access is available through each active organisational profile and remains subject to the controlled-document service.</p>
     </div>
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
      <button type="button" onClick={()=>setUploadOpen(value=>!value)}>{uploadOpen?"Close Upload":"Upload Document"}</button>
@@ -131,7 +134,7 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
   </div>
   {uploadOpen&&<form className="panel" onSubmit={submitUpload} style={{marginBottom:14}}>
    <h3 style={{marginTop:0}}>Upload a Policy or Strategic Plan</h3>
-   <p className="panel-description">Uploads are saved as working records in the controlled Governance Documents archive. Formal approval, signature and final adoption must follow IRPA's applicable governance authority and workflows.</p>
+   <p className="panel-description">Uploads are saved as working records in the controlled Policies and Strategic Plans archive. Formal approval, signature and final adoption must follow IRPA's applicable governance authority and workflows.</p>
    <div className="form-grid">
     <div className="form-field"><label htmlFor="irpa-policy-kind">Document category</label><select id="irpa-policy-kind" value={kind} onChange={event=>{setKind(event.target.value);setTitle("");setCustomTitle("");}}><option value="Policy">Policy</option><option value="Strategic Plan">Strategic Plan</option></select></div>
     <div className="form-field"><label htmlFor="irpa-policy-version">Version</label><input id="irpa-policy-version" value={version} onChange={event=>setVersion(event.target.value)} placeholder="1.0" maxLength={30}/></div>

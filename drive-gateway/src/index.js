@@ -1360,7 +1360,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
     const classification = String(data.classification || "Public").trim();
     const documentType = String(data.documentType || "").trim();
-    const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
+    const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents","Policies and Strategic Plans"];
     const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
     const problems = [];
     if (isResearchArchiveRequest(documentType, archiveCategory) &&
@@ -1468,7 +1468,7 @@ async function uploadControlledDocument(request, env) {
     return json({ok:false,error:"Research Archive documents cannot be classified as Public."},403,corsHeaders(request));
   }
 
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents","Policies and Strategic Plans"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
@@ -2220,7 +2220,7 @@ async function ensureDocumentArchiveFolder(request, env) {
 
   const classification = String(data.classification || "Public").trim();
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Research Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Research Documents","Policies and Strategic Plans"];
   if (isResearchArchiveRequest(data.documentType, archiveCategory)) {
     const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
     const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,await getFirestoreAdminAccessToken(env));
@@ -2340,7 +2340,7 @@ async function ensureSignedDocumentArchive(request, env) {
   const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
   const documentType = String(fields.documentType?.stringValue || data.documentType || "Administrative Document").trim();
   const governanceArchive = /governance/i.test(documentType);
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Research Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Research Documents","Policies and Strategic Plans"];
   if (isResearchArchiveRequest(documentType, archiveCategory)) {
     const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
     const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,await getFirestoreAdminAccessToken(env));

@@ -9,8 +9,8 @@ const controlledUpload=await readFile(new URL("../src/components/ControlledDocum
 const researchPortal=await readFile(new URL("../src/pages/ResearchStatisticsKnowledgePortal.jsx",import.meta.url),"utf8");
 const accessPoint=await readFile(new URL("../src/components/PortalDocumentAccessPoint.jsx",import.meta.url),"utf8");
 
-test("Policies and Strategic Plan Portal is registered as a Documents sub-portal",()=>{
- assert.match(app,/\["Documents",\[[^\]]*"Policies and Strategic Plans"\]\]/);
+test("Policies and Strategic Plan Portal is registered in the static Portals menu",()=>{
+ assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
  assert.match(app,/const BASE_MEMBER_MODULES=\[[^\]]*"Policies and Strategic Plans"[^\]]*\]/);
  assert.match(app,/active==="Policies and Strategic Plans"&&<React\.Suspense/);
  assert.match(app,/Policies and Strategic Plans":"Policies and Strategic Plan Portal"/);
@@ -42,7 +42,7 @@ test("portal uses the controlled lifecycle archive and limits uploads to interna
  assert.match(portal,/listLifecycleDocuments\(\)/);
  assert.match(portal,/uploadLifecycleDocument\(/);
  assert.match(portal,/downloadLifecycleDocument\(/);
- assert.match(portal,/archiveCategory:"Governance Documents",classification:"Internal"/);
+ assert.match(portal,/documentType:"Policy and Strategic Plan",archiveCategory:"Policies and Strategic Plans",classification:"Confidential"/);
  assert.match(portal,/10\*1024\*1024/);
  assert.match(portal,/Upload does not itself constitute approval or publication/);
  assert.doesNotMatch(portal,/setDoc\(|addDoc\(|collection\(db/);
@@ -50,7 +50,7 @@ test("portal uses the controlled lifecycle archive and limits uploads to interna
 
 test("Research authority can reach Documents and the Policies and Strategic Plans sub-portal",()=>{
  assert.match(app,/RESEARCH_AUTHORITY_ROLES\.includes\(selected\)\?\["Dashboard","Documents","Policies and Strategic Plans","Research, Statistics and Knowledge"/);
- assert.match(app,/\["Documents",\[[^\]]*"Policies and Strategic Plans"\]\]/);
+ assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
 });
 
 test("Documents upload offers a distinct Research Archive type and Research Documents category",()=>{
@@ -68,9 +68,31 @@ test("shared Research Portal upload control exposes Research Archive only to Res
  assert.match(controlledUpload,/documentType === "Research Archive" && value === "Public"/);
  assert.match(documents,/setClassification\("Confidential"\)/);
  assert.match(documents,/x==="Public"&&documentType==="Research Archive"/);
- assert.match(documents,/else if\(archiveCategory==="Research Documents"\)\{setArchiveCategory\("Administrative Documents"\);\}/);
+ assert.match(documents,/else if\(\["Research Documents","Policies and Strategic Plans"\]\.includes\(archiveCategory\)\)\{setArchiveCategory\("Administrative Documents"\);\}/);
  assert.match(documents,/setArchiveCategory\("Administrative Documents"\);return r/);
  assert.match(app,/ResearchStatisticsKnowledgePortal profile=\{profile\} employee=\{employee\} admin=\{sessionAdministrator\}/);
  assert.match(researchPortal,/allowResearchArchiveUpload=\{admin\}/);
  assert.match(accessPoint,/allowResearchArchiveUpload=\{allowResearchArchiveUpload\}/);
+});
+
+
+test("Policies and Strategic Plans is a static top-level Portals entry for Administrator, Research and ordinary member authorities",()=>{
+ assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
+ assert.ok(app.includes('const BASE_MEMBER_MODULES=["Dashboard","Role Descriptions","Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Documents","Policies and Strategic Plans"'));
+ assert.ok(app.includes('modules=sessionAdministrator?[...ALL_MODULES,...registeredPortalModules]'));
+ assert.ok(app.includes('RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans"'));
+ assert.ok(app.includes('Object.entries(NAV).map'));
+});
+
+test("Documents offers a dedicated Policy and Strategic Plan archive and defaults it to Confidential",()=>{
+ assert.ok(documents.includes('"Policy and Strategic Plan"'));
+ assert.ok(documents.includes('"Policies and Strategic Plans"'));
+ assert.ok(documents.includes('setArchiveCategory("Policies and Strategic Plans");setClassification("Confidential")'));
+});
+
+test("Gateway lifecycle and upload routes accept the dedicated policy archive category",async()=>{
+ const lifecycle=await readFile(new URL("../drive-gateway/src/documentLifecycle.mjs",import.meta.url),"utf8");
+ const gateway=await readFile(new URL("../drive-gateway/src/index.js",import.meta.url),"utf8");
+ assert.ok(lifecycle.includes('"Policies and Strategic Plans"'));
+ assert.ok((gateway.match(/"Policies and Strategic Plans"/g)||[]).length>=3);
 });
