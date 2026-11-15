@@ -15,6 +15,11 @@ test("Gateway invitation URL carries the portal envelope ID as well as its one-t
   assert.match(gatewaySigning,/gatewayToken=\$\{encodeURIComponent\(token\)\}&signEnvelope=\$\{encodeURIComponent\(externalReference\|\|""\)\}/);
 });
 
+test("Gateway email delivery failures are exposed to the owner after workflow activation",()=>{
+  assert.match(clientCore,/gatewayInvitationFailures/);
+  assert.match(clientUi,/Retry pending or failed invitations/);
+});
+
 test("Gateway token remains available after the app removes it from the address bar",()=>{
   assert.match(clientCore,/sessionStorage\.getItem\("irpaGatewaySigningToken"\)/);
 });
