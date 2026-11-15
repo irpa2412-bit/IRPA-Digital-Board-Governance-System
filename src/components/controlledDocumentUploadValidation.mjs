@@ -3,7 +3,8 @@ const ALLOWED_DOCUMENT_TYPES = new Set([
   "Administrative",
   "Finance",
   "Procurement",
-  "Administrator"
+  "Administrator",
+  "Research Archive"
 ]);
 
 const UNSUPPORTED_FORMAT_MESSAGE =
@@ -21,16 +22,20 @@ export function validateControlledDocumentUpload({
   file,
   documentType,
   allowRestrictedUpload = false,
+  allowResearchArchiveUpload = false,
   contentType = "",
   maxBytes = 10 * 1024 * 1024
 } = {}) {
   if (!authenticated) return "You must be signed in.";
   if (!documentType) return "Choose a document type before uploading.";
   if (!ALLOWED_DOCUMENT_TYPES.has(String(documentType))) {
-    return "Choose one of the five supported document types.";
+    return "Choose one of the six supported document types.";
   }
   if (documentType === "Administrator" && !allowRestrictedUpload) {
     return "Administrator/restricted documents require special permission.";
+  }
+  if (documentType === "Research Archive" && !allowResearchArchiveUpload) {
+    return "Research Archive uploads are limited to authorised Research Department personnel.";
   }
   if (!file) return "Select a document file to upload.";
   if (!Number.isFinite(Number(file.size)) || Number(file.size) <= 0) {
