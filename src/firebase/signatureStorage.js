@@ -503,7 +503,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   if (!response.ok || result.ok === false || !result.envelopeId) {
     throw new Error(result.error || "The authenticated Gateway signing envelope was not created.");
   }
-  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",existing:result.existing === true};
+  const invitations=Array.isArray(result.invitations)?result.invitations:[];
+  const invitationFailures=invitations.filter(item=>item.status!=="Sent").length;
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":"Sent",gatewayInvitationFailures:invitationFailures,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
 }
 
 export async function voidGatewaySignatureEnvelope(envelopeId, reason="Signature Portal activation could not be committed") {
