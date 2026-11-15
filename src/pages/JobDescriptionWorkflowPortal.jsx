@@ -29,7 +29,7 @@ export default function JobDescriptionWorkflowPortal({selectedAuthority,isAdmin=
    const ref=collection(db,"jobDescriptionWorkflows");
    const snap=canManage?await getDocs(ref):await getDocs(query(ref,where("designatedRecipientUid","==",uid)));
    setWorkflows(snap.docs.map(d=>({id:d.id,...d.data()})));
-   if(isAdmin||isExecutiveDirector){
+   if(isExecutiveDirector){
     const [members,employees]=await Promise.all([getDocs(collection(db,"members")),getDocs(collection(db,"employees"))]);
     const rows=[...members.docs.map(d=>({uid:d.id,source:"Member",...d.data()})),...employees.docs.map(d=>({uid:d.id,source:"Employee",...d.data()}))];
     const unique=new Map();
