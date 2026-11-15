@@ -9,6 +9,11 @@ on:
     paths:
       - "config/org-structure-authority.json"
       - "src/App.jsx"
+      - "src/pages/JobDescriptionWorkflowPortal.jsx"
+      - "src/pages/JobDescriptionWorkflowPortal.css"
+      - "firestore.rules"
+      - "tests/job-description-intranet-workflow.test.mjs"
+      - "docs/org-structure/INTRANET-JOB-DESCRIPTION-WORKFLOW.md"
       - "src/firebase/signaturePlatform.js"
       - "src/pages/SignaturePlatform.jsx"
       - "src/utils/signatureAuthority.mjs"
