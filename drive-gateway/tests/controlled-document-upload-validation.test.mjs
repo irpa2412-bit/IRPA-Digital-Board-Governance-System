@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { validateControlledDocumentUpload } from "../../src/components/controlledDocumentUploadValidation.mjs";
@@ -28,7 +29,7 @@ test("unauthenticated upload is rejected before upload work begins", () => {
 });
 
 test("unsupported document types are rejected", () => {
-  assert.equal(validate({ documentType: "Unknown" }), "Choose one of the five supported document types.");
+  assert.equal(validate({ documentType: "Unknown" }), "Choose one of the six supported document types.");
 });
 
 test("Administrator documents remain blocked without special permission", () => {
@@ -61,4 +62,11 @@ test("Research Archive type is accepted for authorised Research personnel", () =
 
 test("Research Archive type is denied to non-Research personnel", () => {
   assert.equal(validate({ documentType: "Research Archive", allowResearchArchiveUpload: false }), "Research Archive uploads are limited to authorised Research Department personnel.");
+});
+
+const gatewaySource = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
+test("Research Archive upload is enforced by the gateway for active Research authority", () => {
+  assert.match(gatewaySource, /function isActiveResearchArchiveAuthority\(/);
+  assert.match(gatewaySource, /isResearchArchiveRequest\(documentType, archiveCategory\)[\s\S]{0,220}isActiveResearchArchiveAuthority\(memberRecord, employeeRecord, adminRecord\)/);
+  assert.match(gatewaySource, /Research Archive upload authority is required/);
 });
