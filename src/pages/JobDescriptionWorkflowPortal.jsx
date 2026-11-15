@@ -61,7 +61,7 @@ export default function JobDescriptionWorkflowPortal({selectedAuthority,isAdmin=
     appointmentReference:asText(form.appointmentReference),delegationReference:asText(form.delegationReference),
     effectiveFrom:asText(form.effectiveFrom),reviewBy:asText(form.reviewBy),
     releasedAt:serverTimestamp(),createdAt:serverTimestamp(),updatedAt:serverTimestamp(),
-    assignedUid:target.uid,permissionsActivated:false,recordOrigin:"PRODUCTION"
+    permissionsActivated:false,recordOrigin:"PRODUCTION"
    });
    setMessage("Approved "+role.title+" for "+displayName(target)+". The Administrator may now distribute the approved document only; no authority or access is activated.");
    await load();
