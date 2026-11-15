@@ -4,6 +4,7 @@ import {readFile} from "node:fs/promises";
 
 const app=await readFile(new URL("../src/App.jsx",import.meta.url),"utf8");
 const portal=await readFile(new URL("../src/pages/PoliciesStrategicPlanPortal.jsx",import.meta.url),"utf8");
+const documents=await readFile(new URL("../src/pages/DocumentLifecycleModule.jsx",import.meta.url),"utf8");
 
 test("Policies and Strategic Plan Portal is registered as a Documents sub-portal",()=>{
  assert.match(app,/\["Documents",\[[^\]]*"Policies and Strategic Plans"\]\]/);
@@ -42,4 +43,15 @@ test("portal uses the controlled lifecycle archive and limits uploads to interna
  assert.match(portal,/10\*1024\*1024/);
  assert.match(portal,/Upload does not itself constitute approval or publication/);
  assert.doesNotMatch(portal,/setDoc\(|addDoc\(|collection\(db/);
+});
+
+test("Research authority can reach Documents and the Policies and Strategic Plans sub-portal",()=>{
+ assert.match(app,/RESEARCH_AUTHORITY_ROLES\.includes\(selected\)\?\["Dashboard","Documents","Policies and Strategic Plans","Research, Statistics and Knowledge"/);
+ assert.match(app,/\["Documents",\[[^\]]*"Policies and Strategic Plans"\]\]/);
+});
+
+test("Documents upload offers a distinct Research Archive type and Research Documents category",()=>{
+ assert.match(documents,/"Research Archive"/);
+ assert.match(documents,/"Research Documents"/);
+ assert.match(documents,/"Research Archive":\["\.pdf"/);
 });
