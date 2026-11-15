@@ -1401,6 +1401,10 @@ async function registerControlledDocumentRecord(request, env) {
   if (String(supplied.uploadedByUid||"")!==String(claims.user_id||"") || !Array.isArray(supplied.authorizedUids) || !supplied.authorizedUids.includes(claims.user_id)) {
     return json({ok:false,error:"STEP Firestore documents record: uploader identity and self-authorization must match the authenticated user."},403,corsHeaders(request));
   }
+  if (isResearchArchiveRequest(supplied.documentType, supplied.archiveCategory) &&
+      !isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord)) {
+    return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+  }
   if (supplied.status!=="Draft" || supplied.authorizationStatus!=="Draft") return json({ok:false,error:"STEP Firestore documents record: initial controlled documents must remain Draft."},400,corsHeaders(request));
   const driveFileId = String(supplied.fileId||supplied.driveFileId||supplied.archiveFileId||"").trim();
   const archiveFolderId = String(supplied.archiveFolderId||"").trim();
