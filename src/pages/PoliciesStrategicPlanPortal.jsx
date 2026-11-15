@@ -21,6 +21,8 @@ const MANDATORY_POLICIES=[
 ];
 const MAX_FILE_BYTES=10*1024*1024;
 const ACCEPT=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv,.tsv,.md,.png,.jpg,.jpeg,.webp";
+const OTHER_TITLE="__OTHER__";
+const STRATEGIC_PLAN_OPTIONS=["IRPA Strategic Plan","Annual Operational Plan","Departmental Strategic Plan","Programme Strategic Plan"];
 const clean=value=>String(value||"").trim();
 const readableDate=value=>{if(!value)return "—";const date=new Date(value);return Number.isNaN(date.getTime())?"—":date.toLocaleDateString();};
 const normalize=value=>clean(value).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
@@ -41,7 +43,7 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
  const [section,setSection]=useState("POLICIES");
  const [uploadOpen,setUploadOpen]=useState(false);
  const [kind,setKind]=useState("Policy");
- const [title,setTitle]=useState("");
+ const [title,setTitle]=useState("");\n const [customTitle,setCustomTitle]=useState("");
  const [version,setVersion]=useState("1.0");
  const [file,setFile]=useState(null);
  const [search,setSearch]=useState("");
@@ -82,11 +84,12 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
   event.preventDefault();setError("");setMessage("");
   if(!file){setError("Select a document to upload.");return;}
   if(file.size>MAX_FILE_BYTES){setError("The selected file exceeds the 10 MB portal limit.");return;}
-  if(!clean(title)){setError("Enter the policy or strategic plan title.");return;}
+  const selectedTitle=title===OTHER_TITLE?clean(customTitle):clean(title);
+  if(!selectedTitle){setError(title===OTHER_TITLE?"Enter the document title.":"Select a document name from the list.");return;}
   setBusy(true);
   try{
-   await uploadLifecycleDocument({file,title:clean(title),documentType:kind,archiveCategory:"Governance Documents",classification:"Internal",version:clean(version)||"1.0"});
-   setFile(null);setTitle("");setVersion("1.0");setUploadOpen(false);
+   await uploadLifecycleDocument({file,title:selectedTitle,documentType:kind,archiveCategory:"Governance Documents",classification:"Internal",version:clean(version)||"1.0"});
+   setFile(null);setTitle("");setCustomTitle("");setVersion("1.0");setUploadOpen(false);
    await refresh();
    setMessage("Document uploaded to the IRPA Governance Documents archive as a working record. Upload does not itself constitute approval or publication.");
   }catch(e){setError(e?.message||"The document upload failed.");}
@@ -128,9 +131,18 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
    <h3 style={{marginTop:0}}>Upload a Policy or Strategic Plan</h3>
    <p className="panel-description">Uploads are saved as working records in the controlled Governance Documents archive. Formal approval, signature and final adoption must follow IRPA's applicable governance authority and workflows.</p>
    <div className="form-grid">
-    <div className="form-field"><label htmlFor="irpa-policy-kind">Document category</label><select id="irpa-policy-kind" value={kind} onChange={event=>setKind(event.target.value)}><option value="Policy">Policy</option><option value="Strategic Plan">Strategic Plan</option></select></div>
+    <div className="form-field"><label htmlFor="irpa-policy-kind">Document category</label><select id="irpa-policy-kind" value={kind} onChange={event=>{setKind(event.target.value);setTitle("");setCustomTitle("");}}><option value="Policy">Policy</option><option value="Strategic Plan">Strategic Plan</option></select></div>
     <div className="form-field"><label htmlFor="irpa-policy-version">Version</label><input id="irpa-policy-version" value={version} onChange={event=>setVersion(event.target.value)} placeholder="1.0" maxLength={30}/></div>
-    <div className="form-field" style={{gridColumn:"1 / -1"}}><label htmlFor="irpa-policy-title">Document title</label><input id="irpa-policy-title" value={title} onChange={event=>setTitle(event.target.value)} placeholder={kind==="Policy"?"e.g. Procurement Policy":"e.g. IRPA Strategic Plan 2027–2031"} required maxLength={180}/></div>
+    <div className="form-field" style={{gridColumn:"1 / -1"}}>
+     <label htmlFor="irpa-policy-title">Select document name</label>
+     <select id="irpa-policy-title" value={title} onChange={event=>setTitle(event.target.value)} required>
+      <option value="">Choose a {kind==="Policy"?"policy":"strategic plan"} name</option>
+      {(kind==="Policy"?MANDATORY_POLICIES:STRATEGIC_PLAN_OPTIONS).map(name=><option key={name} value={name}>{name}</option>)}
+      <option value={OTHER_TITLE}>Other — enter a different title</option>
+     </select>
+     {title===OTHER_TITLE&&<div style={{marginTop:9}}><label htmlFor="irpa-policy-custom-title">Enter document name</label><input id="irpa-policy-custom-title" value={customTitle} onChange={event=>setCustomTitle(event.target.value)} placeholder="Enter the full document title" required maxLength={180}/></div>}
+     <small>Select the relevant name from the list. Choose Other only when the document is not listed.</small>
+    </div>
     <div className="form-field" style={{gridColumn:"1 / -1"}}><label htmlFor="irpa-policy-file">Document file (maximum 10 MB)</label><input id="irpa-policy-file" type="file" accept={ACCEPT} onChange={event=>setFile(event.target.files?.[0]||null)} required/><small>PDF, Microsoft Office, OpenDocument, RTF, text, CSV and common image formats.</small></div>
    </div>
    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}><button type="submit" disabled={busy||!file}>{busy?"Uploading…":"Upload Working Document"}</button><button type="button" className="secondary-button" onClick={()=>setUploadOpen(false)} disabled={busy}>Cancel</button></div>
