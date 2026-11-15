@@ -90,7 +90,7 @@ export function buildInvitationMessage({name,link,meetingAccess=null,username=""
   }
   return {
     subject,
-    text:`Dear ${safeName},\\n\\nYou have been invited to access the IRPA Digital Board Governance System workspace.\\n\\nOpen the invitation link to create your password and activate your account:\\n${safeLink}\\n\\nAfter activation, you can sign in directly to your IRPA workspace.${meetingText}\\n\\nIf you did not expect this email, please contact IRPA Administration.`,
+    text:`Dear ${safeName},\n\nYou have been invited to access the IRPA Digital Board Governance System workspace.\n\nOpen the invitation link to create your password and activate your account:\n${safeLink}\n\nAfter activation, you can sign in directly to your IRPA workspace.${meetingText}\n\nIf you did not expect this email, please contact IRPA Administration.`,
     html:`<p>Dear ${escapeHtml(safeName)},</p><p>You have been invited to access the IRPA Digital Board Governance System workspace.</p><p>Open the invitation link below to create your password and activate your account:</p><p><a href="${escapeHtml(safeLink)}">Activate My Account</a></p><p>After activation, you can sign in directly to your IRPA workspace.</p>${meetingHtml}<p>If you did not expect this email, please contact IRPA Administration.</p>`
   };
 }
