@@ -11,7 +11,7 @@ on:
       - "src/App.jsx"
       - "src/pages/JobDescriptionWorkflowPortal.jsx"
       - "src/pages/JobDescriptionWorkflowPortal.css"
-      - "firestore.rules"
+      - "firestore.rules"\n      - "firestore.staging.rules"
       - "tests/job-description-intranet-workflow.test.mjs"
       - "docs/org-structure/INTRANET-JOB-DESCRIPTION-WORKFLOW.md"
       - "src/firebase/signaturePlatform.js"
