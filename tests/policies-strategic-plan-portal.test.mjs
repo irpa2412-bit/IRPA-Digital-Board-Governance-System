@@ -6,6 +6,8 @@ const app=await readFile(new URL("../src/App.jsx",import.meta.url),"utf8");
 const portal=await readFile(new URL("../src/pages/PoliciesStrategicPlanPortal.jsx",import.meta.url),"utf8");
 const documents=await readFile(new URL("../src/pages/DocumentLifecycleModule.jsx",import.meta.url),"utf8");
 const controlledUpload=await readFile(new URL("../src/components/ControlledDocumentUpload.jsx",import.meta.url),"utf8");
+const researchPortal=await readFile(new URL("../src/pages/ResearchStatisticsKnowledgePortal.jsx",import.meta.url),"utf8");
+const accessPoint=await readFile(new URL("../src/components/PortalDocumentAccessPoint.jsx",import.meta.url),"utf8");
 
 test("Policies and Strategic Plan Portal is registered as a Documents sub-portal",()=>{
  assert.match(app,/\["Documents",\[[^\]]*"Policies and Strategic Plans"\]\]/);
@@ -66,4 +68,7 @@ test("shared Research Portal upload control exposes Research Archive only to Res
  assert.match(controlledUpload,/documentType === "Research Archive" && value === "Public"/);
  assert.match(documents,/setClassification\("Confidential"\)/);
  assert.match(documents,/x==="Public"&&documentType==="Research Archive"/);
+ assert.match(app,/ResearchStatisticsKnowledgePortal profile=\{profile\} employee=\{employee\} admin=\{sessionAdministrator\}/);
+ assert.match(researchPortal,/allowResearchArchiveUpload=\{admin\}/);
+ assert.match(accessPoint,/allowResearchArchiveUpload=\{allowResearchArchiveUpload\}/);
 });
