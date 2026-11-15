@@ -195,7 +195,7 @@ function memberModules(p,e,selectedAuthority){
   const selected=String(selectedAuthority||"").trim();
   if(!selected)return["Dashboard"];
   const roles=[selected];
-  const m=selected==="Administrator"?["Dashboard","Role Descriptions"]:(RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Research, Statistics and Knowledge","Grant Intelligence & Funding Opportunities"]:[...BASE_MEMBER_MODULES]);
+  const m=selected==="Administrator"?["Dashboard","Role Descriptions"]:(RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans","Research, Statistics and Knowledge","Grant Intelligence & Funding Opportunities"]:[...BASE_MEMBER_MODULES]);
   const authorityProfile={...(p||{}),roles,role:selected};
   const authorityEmployee=e?{...e,roles:[selected],role:selected}:null;
   const department=String(authorityProfile?.department||authorityEmployee?.department||ROLE_DEPARTMENT[selected]||"").trim();
