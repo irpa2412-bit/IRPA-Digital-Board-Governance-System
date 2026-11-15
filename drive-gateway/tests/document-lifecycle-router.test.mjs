@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createDocumentLifecycleRouter, buildMultipartBody } from "../src/documentLifecycle.mjs";
 
 function plain(fields){return Object.fromEntries(Object.entries(fields||{}).map(([k,v])=>[k,v?.stringValue??v?.booleanValue??v?.integerValue??(v?.arrayValue?.values||undefined)]));}
@@ -7,9 +8,10 @@ function makeDeps(state){
   return {
     FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
     allowedContentTypes:new Set(["application/pdf","text/plain"]),
-    authenticateFirebaseRequest:async()=>state.researchUser?({user_id:"research-1",email:"research@irpa.or.tz",token:"token"}):({user_id:"emp-1",email:"employee@irpa.or.tz",token:"token"}),
+    authenticateFirebaseRequest:async()=>state.adminUser?({user_id:"admin-1",email:"administrator@irpa.or.tz",token:"token"}):state.researchUser?({user_id:"research-1",email:"research@irpa.or.tz",token:"token"}):({user_id:"emp-1",email:"employee@irpa.or.tz",token:"token"}),
     getFirestoreAdminAccessToken:async()=> "worker-admin-token",
     getFirestoreDocument:async(_env,path)=>{
+      if(path==="adminProfiles/admin-1")return state.adminUser?{fields:{active:{booleanValue:true}}}:null;
       if(path==="adminProfiles/emp-1")return null;
       if(path==="members/emp-1")return null;
       if(path==="employees/emp-1")return {fields:{status:{stringValue:"Active"},department:{stringValue:"Finance"},roles:{arrayValue:{values:[{stringValue:"Finance Officer"}]}}}};
@@ -25,10 +27,10 @@ function makeDeps(state){
     driveFetch:async(_env,_token,path,options={})=>{
       if(options.method==="DELETE"){state.deletedFiles.push(path);if(state.failDelete)throw new Error("simulated Drive rollback failure");return {};}
       if(path.includes("/copy"))return {id:"copied-"+Math.random().toString(16).slice(2)};
-      if(path.includes("?fields=id,name,mimeType,size,description,trashed"))return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4",description:JSON.stringify({irpaGovernance:true,irpaDocumentLifecycle:true,documentId:"LIFE-test"})};
+      if(path.includes("?fields=id,name,mimeType,size,description,trashed")){const registered=Object.values(state.docs).find(row=>row.plain?.fileId&&path.includes(encodeURIComponent(row.plain.fileId)));return {id:registered?.plain.fileId||"drive-1",name:registered?.plain.fileName||"test.pdf",mimeType:"application/pdf",size:"4",description:JSON.stringify({irpaGovernance:true,irpaDocumentLifecycle:true,documentId:registered?.plain.documentId||"LIFE-test"})};}
       return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4"};
     },
-    findOrCreateFolder:async(_env,_token,name)=>"folder-"+name.replace(/\s+/g,"-"),
+    findOrCreateFolder:async(_env,_token,name)=>{state.folderCalls??=[];state.folderCalls.push(name);return "folder-"+name.replace(/\s+/g,"-");},
     fetch:async(url)=>{if(String(url).includes("alt=media"))return new Response(state.downloadBytes||new TextEncoder().encode("test"),{status:200,headers:{"content-type":"application/pdf"}});return new Response(JSON.stringify({id:"drive-upload-1",name:"test.pdf",mimeType:"application/pdf",size:"4",webViewLink:"https://drive.example/test"}),{status:200,headers:{"content-type":"application/json"}});},
     recordLifecycleFailure:async(_env,claims,documentId,action,details)=>{state.failureEvents??=[];state.failureEvents.push({documentId,actorUid:claims.user_id,action,details});return {auditId:"failure-audit-1"};},
     commitDocumentAndAudit:async(_env,documentId,_token,documentFields,documentMask,auditFields,{createOnly=false}={})=>{
@@ -116,6 +118,32 @@ test("Research Officer can upload a Research Archive record into Research Docume
   const saved=Object.values(state.docs)[0];
   assert.equal(saved.plain.documentType,"Research Archive");
   assert.equal(saved.plain.archiveCategory,"Research Documents");
+});
+
+test("active Administrator outside Research can upload and retrieve a Confidential Research Archive record",async()=>{
+  const state={docs:{},writes:[],deletedFiles:[],adminUser:true,downloadBytes:new TextEncoder().encode("test")};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const uploaded=await router(req("/api/document-lifecycle/upload",{fileName:"research.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Administrator Research Archive Record",documentType:"Research Archive",archiveCategory:"Research Documents",classification:"Confidential"}),env);
+  assert.equal(uploaded.status,201);
+  const result=await uploaded.json();
+  const saved=state.docs[result.documentId].plain;
+  assert.equal(saved.ownerType,"ADMINISTRATOR");
+  assert.equal(saved.department||null,null);
+  assert.equal(saved.documentType,"Research Archive");
+  assert.equal(saved.archiveCategory,"Research Documents");
+  assert.equal(saved.classification,"Confidential");
+  assert.ok(state.folderCalls.includes("Research Documents"));
+  assert.ok(state.folderCalls.includes("Confidential"));
+  const retrieved=await router(req("/api/document-lifecycle/download",{documentId:result.documentId,fileId:result.fileId}),env);
+  assert.equal(retrieved.status,200);
+  const downloaded=await retrieved.json();
+  assert.equal(atob(downloaded.base64),"test");
+  assert.equal(downloaded.sha256,saved.sha256);
+});
+
+test("Research Archive UI selection defaults its category and classification to Research Documents and Confidential",async()=>{
+  const source=await readFile(new URL("../../src/pages/DocumentLifecycleModule.jsx",import.meta.url),"utf8");
+  assert.match(source,/if\(value==="Research Archive"\)\{setArchiveCategory\("Research Documents"\);setClassification\("Confidential"\);\}/);
 });
 
 test("successful upload atomically writes document registry and audit event",async()=>{
