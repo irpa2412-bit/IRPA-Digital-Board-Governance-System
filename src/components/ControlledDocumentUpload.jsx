@@ -8,8 +8,8 @@ import { validateControlledDocumentUpload } from "./controlledDocumentUploadVali
 import { describeUploadFailure } from "./uploadRuntimeDiagnostics.mjs";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator"];
-const ARCHIVE_CATEGORIES = { Governance: "Governance Documents", Administrative: "Administrative Documents", Finance: "Finance Documents", Procurement: "Procurement Documents", Administrator: "Administrator Documents" };
+const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator", "Research Archive"];
+const ARCHIVE_CATEGORIES = { Governance: "Governance Documents", Administrative: "Administrative Documents", Finance: "Finance Documents", Procurement: "Procurement Documents", Administrator: "Administrator Documents", "Research Archive": "Research Documents" };
 const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv,.tsv,.md,.html,.epub,.json,.xml,.jpg,.jpeg,.png,.webp,.svg";
 const MIME_BY_EXTENSION = { pdf:"application/pdf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls:"application/vnd.ms-excel", xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt:"application/vnd.ms-powerpoint", pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation", odt:"application/vnd.oasis.opendocument.text", ods:"application/vnd.oasis.opendocument.spreadsheet", odp:"application/vnd.oasis.opendocument.presentation", rtf:"application/rtf", txt:"text/plain", csv:"text/csv", tsv:"text/tab-separated-values", md:"text/markdown", html:"text/html", epub:"application/epub+zip", json:"application/json", xml:"application/xml", jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", svg:"image/svg+xml" };
 
@@ -28,6 +28,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
   const [generatedReference, setGeneratedReference] = useState("");
   const [documentType, setDocumentType] = useState("");
   const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
+  const [allowResearchArchiveUpload, setAllowResearchArchiveUpload] = useState(false);
   const [version, setVersion] = useState("1.0");
   const [archiveCategory, setArchiveCategory] = useState("");
   const [classification, setClassification] = useState("Public");
@@ -62,7 +63,12 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         const dualRole =
           normalized.has("board secretary") &&
           normalized.has("executive director");
-        if (!cancelled) setAllowDualRoleDocumentTypes(dualRole);
+        const department = String(employee?.department || member?.department || "").toLowerCase();
+        const researchAuthority = department.includes("research") || [...normalized].some(role => role.includes("research"));
+        if (!cancelled) {
+          setAllowDualRoleDocumentTypes(dualRole);
+          setAllowResearchArchiveUpload(researchAuthority);
+        }
       } catch (_) {
         if (!cancelled) setAllowDualRoleDocumentTypes(false);
       }
@@ -129,6 +135,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
       file,
       documentType,
       allowRestrictedUpload,
+      allowResearchArchiveUpload,
       contentType,
       maxBytes: MAX_UPLOAD_BYTES
     });
@@ -325,6 +332,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
           <li><strong>Governance Documents</strong> — Board, committee, resolutions, decisions and other governance records.</li>
           <li><strong>Administrative Documents</strong> — policies, governance, HR and general administrative records.</li>
           <li><strong>Administrator Documents</strong> — restricted administrator records (special permission required).</li>
+          <li><strong>Research Documents</strong> — Research Archive records for authorised Research personnel.</li>
         </ul>
         <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
       </div>}
@@ -350,9 +358,9 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
             <label>Document Type</label>
             <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(ARCHIVE_CATEGORIES[value] || value); }} aria-label="Document Type">
               <option value="">Select document type</option>
-              {DOCUMENT_TYPES.map(type => <option key={type} value={type}>{type}{type === "Governance" ? " — Sensitive" : type === "Administrator" ? " — Restricted" : ""}</option>)}
+              {DOCUMENT_TYPES.map(type => <option key={type} value={type} disabled={type === "Research Archive" && !allowResearchArchiveUpload}>{type}{type === "Governance" ? " — Sensitive" : type === "Administrator" ? " — Restricted" : type === "Research Archive" ? " — Research personnel only" : ""}</option>)}
             </select>
-            <small className="muted" style={{display:"block",marginTop:6}}>Five canonical document types only. Governance is sensitive; Administrator is restricted.</small>
+            <small className="muted" style={{display:"block",marginTop:6}}>Six canonical document types. Governance is sensitive; Administrator is restricted; Research Archive is limited to authorised Research personnel.</small>
           </div>
 <div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
           </div>
