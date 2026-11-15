@@ -4,7 +4,7 @@ import { persistCompletedSignatureEnvelope } from "../src/signatureMirror.mjs";
 
 test("completion mirror creates a signer-specific signature register record from each archived signer copy", async () => {
   const documents = new Map([["signatureEnvelopes/IRPA-ENV-TEST", {
-    id:"IRPA-ENV-TEST",documentId:"DOC-TEST",documentReference:"IRPA-DOC-TEST",
+    id:"IRPA-ENV-TEST",documentId:"DOC-TEST",documentReference:"IRPA-DOC-TEST",recordOrigin:"TRIAL",trialData:true,
     title:"Test governance resolution",signers:[]
   }]]);
   const writes = [];
@@ -34,6 +34,8 @@ test("completion mirror creates a signer-specific signature register record from
   });
   const chair = writes.find(x=>x.path==="signatures/gateway-IRPA-ENV-TEST-chair-uid")?.fields;
   const secretary = writes.find(x=>x.path==="signatures/gateway-IRPA-ENV-TEST-secretary-uid")?.fields;
+  assert.equal(chair.recordOrigin,"TRIAL");
+  assert.equal(chair.trialData,true);
   assert.equal(chair.signerArchiveFileId,"chair-copy");
   assert.equal(chair.signatureAuthority,"Board Chairperson");
   assert.equal(chair.signerArchiveUrl,"https://drive.google.com/file/d/chair-copy/view");
