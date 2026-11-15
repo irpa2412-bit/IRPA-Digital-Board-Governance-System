@@ -36,6 +36,8 @@ export default function DocumentLifecycleModule({profile,employee,admin=false}){
  const currentUid=profile?.uid||employee?.uid;
  const researchArchiveAccess=admin||[profile,employee].some(record=>{
   if(!record)return false;
+  const active=["Active","Activated"].includes(String(record.status||record.employmentStatus||record.registrationStatus||""));
+  if(!active)return false;
   const roles=[record.role,...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])].filter(Boolean);
   return String(record.department||"").toLowerCase().includes("research")||roles.some(role=>String(role).toLowerCase().includes("research"));
  });
