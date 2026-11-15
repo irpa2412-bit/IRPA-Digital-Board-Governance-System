@@ -8,6 +8,7 @@ const gatewayRouter=read("drive-gateway/src/router.mjs");
 const gatewayIndex=read("drive-gateway/src/index.js");
 const clientCore=read("src/firebase/signaturePlatform.js");
 const clientUi=read("src/pages/SignaturePlatform.jsx");
+const appSource=read("src/App.jsx");
 const firestoreRules=read("firestore.rules");
 const mirror=read("drive-gateway/src/signatureMirror.mjs");
 
@@ -18,6 +19,12 @@ test("Gateway invitation URL carries the portal envelope ID as well as its one-t
 test("Gateway email delivery failures are exposed to the owner after workflow activation",()=>{
   assert.match(clientCore,/gatewayInvitationFailures/);
   assert.match(clientUi,/Retry pending or failed invitations/);
+});
+
+test("invitation landing route passes the envelope ID and retains the Gateway token",()=>{
+  assert.match(appSource,/get\("signEnvelope"\)/);
+  assert.match(appSource,/sessionStorage\.setItem\("irpaGatewaySigningToken",token\)/);
+  assert.match(appSource,/SignaturePlatformWithUpload signerOnly=\{true\} signingEnvelopeId=\{signingEnvelopeId\}/);
 });
 
 test("Gateway token remains available after the app removes it from the address bar",()=>{
