@@ -7,7 +7,7 @@ import DocumentReader from "../components/DocumentReader";
 import DocumentTranslationWorkspace from "../components/DocumentTranslationWorkspace";
 import { listLifecycleDocuments,uploadLifecycleDocument,downloadLifecycleDocument,transitionLifecycleDocument,completeLifecycleSignature,shareLifecycleDocument } from "../firebase/documentLifecycle";
 
-const TYPES=["Governance","Finance","Procurement","Administrative","HR","Research","Project","Other"];
+const TYPES=["Governance","Finance","Procurement","Administrative","HR","Research","Research Archive","Project","Other"];
 const FORMAT_REQUIREMENTS={
  Governance:[".pdf",".doc",".docx",".ppt",".pptx",".txt",".png",".jpg",".jpeg"],
  Finance:[".pdf",".doc",".docx",".xls",".xlsx",".csv",".txt",".png",".jpg",".jpeg"],
@@ -15,12 +15,13 @@ const FORMAT_REQUIREMENTS={
  Administrative:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".txt",".csv",".png",".jpg",".jpeg",".webp"],
  HR:[".pdf",".doc",".docx",".xls",".xlsx",".csv",".txt",".png",".jpg",".jpeg"],
  Research:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".csv",".txt",".png",".jpg",".jpeg",".webp"],
+ "Research Archive":[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".csv",".txt",".png",".jpg",".jpeg",".webp"],
  Project:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".csv",".txt",".png",".jpg",".jpeg",".webp"],
  Other:[".pdf",".doc",".docx",".xls",".xlsx",".ppt",".pptx",".odt",".ods",".odp",".rtf",".txt",".csv",".tsv",".md",".html",".xhtml",".epub",".json",".xml",".png",".jpg",".jpeg",".webp",".svg"]
 };
 const formatAccept=type=>(FORMAT_REQUIREMENTS[type]||FORMAT_REQUIREMENTS.Other).join(",");
 const formatLabel=type=>(FORMAT_REQUIREMENTS[type]||FORMAT_REQUIREMENTS.Other).join(", ");
-const CATEGORIES=["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"];
+const CATEGORIES=["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
 const CLASSIFICATIONS=["Public","Internal","Confidential","Restricted"];
 const STAGES=["WORKING","PENDING_SIGNATURE","SIGNED","POST_SIGNATURE","FINAL_ARCHIVE"];
 
