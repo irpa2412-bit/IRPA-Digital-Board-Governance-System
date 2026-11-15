@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { getIdToken } from "firebase/auth";
+import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
@@ -86,6 +88,10 @@ export default function SignaturePathwaySelfTest() {
   const [message, setMessage] = useState("Ready. Run the test to inspect registered controlled documents.");
   const [results, setResults] = useState([]);
   const [progress, setProgress] = useState({ completed: 0, total: 0, active: 0 });
+  const [discoveryBusy, setDiscoveryBusy] = useState(false);
+  const [discoveryProgress, setDiscoveryProgress] = useState("");
+  const [discovery, setDiscovery] = useState(null);
+  const [discoveryError, setDiscoveryError] = useState("");
 
   async function requireAdministrator() {
     const user = auth.currentUser;
@@ -93,6 +99,81 @@ export default function SignaturePathwaySelfTest() {
     if (String(user.email || "").trim().toLowerCase() === "irpa2412@gmail.com") return;
     const admin = await getDoc(doc(db, "adminProfiles", user.uid));
     if (!admin.exists() || admin.data()?.active !== true) throw new Error("STEP administrator check failed: active administrator access is required.");
+  }
+
+  async function emergencyStorageRequest(payload) {
+    const gateway = getGoogleDriveGatewayUrl();
+    if (!gateway) throw new Error("Google Drive gateway is not configured.");
+    if (!auth.currentUser) throw new Error("Authentication is required.");
+    const token = await getIdToken(auth.currentUser);
+    const response = await fetch(gateway + "/api/signature-pathway/emergency-storage", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok !== true) throw new Error(data.error || "Emergency-storage discovery request failed (HTTP " + response.status + ").");
+    return data;
+  }
+
+  async function findEmergencyStorage() {
+    setDiscoveryBusy(true);
+    setDiscovery(null);
+    setDiscoveryError("");
+    setDiscoveryProgress("Listing root Firestore collections…");
+    const runId = window.crypto?.randomUUID ? window.crypto.randomUUID() : "emergency-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    const scannedCollectionIds = [];
+    const hits = [];
+    try {
+      await requireAdministrator();
+      const collectionIds = [];
+      let rootCursor = null;
+      do {
+        const page = await emergencyStorageRequest({ action: "collections", pageToken: rootCursor });
+        collectionIds.push(...(page.collectionIds || []));
+        rootCursor = page.nextPageToken || null;
+      } while (rootCursor);
+      const uniqueCollectionIds = [...new Set(collectionIds)];
+      for (let index = 0; index < uniqueCollectionIds.length; index += 1) {
+        const collectionId = uniqueCollectionIds[index];
+        setDiscoveryProgress("Collection " + (index + 1) + " of " + uniqueCollectionIds.length + ": " + collectionId);
+        let cursor = null;
+        do {
+          const page = await emergencyStorageRequest({ action: "scan", collectionId, pageToken: cursor });
+          hits.push(...(page.hits || []));
+          cursor = page.nextPageToken || null;
+        } while (cursor);
+        scannedCollectionIds.push(collectionId);
+      }
+      const audit = await emergencyStorageRequest({
+        action: "audit", runId, hitCount: hits.length,
+        collectionCount: scannedCollectionIds.length, scannedCollectionIds
+      });
+      setDiscovery({ hits, scannedCollectionIds, collectionCount: scannedCollectionIds.length, auditTime: audit.auditTime });
+      setDiscoveryProgress("Discovery complete. " + scannedCollectionIds.length + " collections scanned; " + hits.length + " hit(s).");
+    } catch (error) {
+      setDiscoveryError(error?.message || "Emergency-storage discovery failed.");
+      setDiscoveryProgress("Discovery stopped. No success is assumed.");
+    } finally {
+      setDiscoveryBusy(false);
+    }
+  }
+
+  function copyEmergencyStorageReport() {
+    if (!discovery) return;
+    const lines = discovery.hits.length
+      ? discovery.hits.map(hit => [
+          "Collection path: " + hit.collectionPath,
+          "Document ID: " + hit.documentId,
+          "Fields: " + hit.fields.map(field => field.name + " (" + field.type + ", " + field.sizeBytes + " bytes)").join("; "),
+          "Bytes field: " + (hit.hasBytesField ? "yes" : "no"),
+          "Base64 field: " + (hit.hasBase64Field ? "yes" : "no"),
+          "Chunks field: " + (hit.hasChunksField ? "yes" : "no"),
+          "Chunk count: " + hit.chunkCount
+        ].join("\n")).join("\n\n")
+      : "no emergency storage found in " + discovery.collectionCount + " collections scanned\nCollections scanned: " + discovery.scannedCollectionIds.join(", ");
+    const report = "Emergency storage discovery report\n" + lines + "\n\nAudit time: " + (discovery.auditTime || "not returned");
+    navigator.clipboard.writeText(report).then(() => setDiscoveryProgress("Emergency-storage report copied to clipboard.")).catch(error => setDiscoveryError("Copy failed: " + (error?.message || "Clipboard access unavailable.")));
   }
 
   async function reconcile() {
@@ -159,6 +240,29 @@ export default function SignaturePathwaySelfTest() {
 
   return <section className="panel">
     <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Read-only inspection of every registered controlled document: Drive metadata, controlled-route download, SHA-256, byte size, PDF page count, per-page extractable text and non-blank rendering. Flags a final page with zero text or a render failure. No document, Drive file or Firestore record is repaired or changed.</p></div></div>
+    <div className="panel" style={{padding:12,marginBottom:14}}>
+      <div><strong>Find emergency storage</strong><p className="panel-description">Administrator-only, read-only scan of root Firestore collections for emergency-storage references and the four affected identifiers. File contents are never returned. Each collection page is requested separately.</p></div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <button type="button" onClick={findEmergencyStorage} disabled={discoveryBusy}>{discoveryBusy ? "Scanning…" : "Find emergency storage"}</button>
+        <button type="button" className="secondary-button" onClick={copyEmergencyStorageReport} disabled={!discovery}>Copy Report</button>
+      </div>
+      {discoveryProgress && <p role="status" aria-live="polite" style={{margin:"10px 0 0",fontSize:13}}>{discoveryProgress}</p>}
+      {discoveryError && <div className="auth-message" role="alert" style={{marginTop:8}}>{discoveryError}</div>}
+      {discovery && (discovery.hits.length ? <div style={{overflowX:"auto",marginTop:12}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead><tr><th style={{textAlign:"left",padding:7}}>Collection path</th><th style={{textAlign:"left",padding:7}}>Document ID</th><th style={{textAlign:"left",padding:7}}>Field metadata</th><th style={{textAlign:"left",padding:7}}>Bytes / Base64 / Chunks</th></tr></thead>
+          <tbody>{discovery.hits.map((hit,index)=><tr key={hit.collectionPath + "/" + hit.documentId + index}>
+            <td style={{padding:7,verticalAlign:"top",overflowWrap:"anywhere"}}>{hit.collectionPath}</td>
+            <td style={{padding:7,verticalAlign:"top",overflowWrap:"anywhere"}}>{hit.documentId}</td>
+            <td style={{padding:7,verticalAlign:"top"}}>{hit.fields.map((field,i)=><div key={field.name + i}>{field.name} · {field.type} · {field.sizeBytes} bytes</div>)}</td>
+            <td style={{padding:7,verticalAlign:"top"}}>Bytes: {hit.hasBytesField ? "yes" : "no"}<br/>Base64: {hit.hasBase64Field ? "yes" : "no"}<br/>Chunks: {hit.hasChunksField ? "yes" : "no"} · count {hit.chunkCount}</td>
+          </tr>)}</tbody>
+        </table>
+      </div> : <div style={{marginTop:10}}>
+        <strong>no emergency storage found in {discovery.collectionCount} collections scanned</strong>
+        <div style={{fontSize:13,marginTop:5}}>Collections scanned: {discovery.scannedCollectionIds.length ? discovery.scannedCollectionIds.join(", ") : "(none)"}</div>
+      </div>)}
+    </div>
     <div aria-label="Self-test totals" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8,marginBottom:14}}>
       <div className="panel" style={{padding:10}}><strong>{summarizeSelfTestResults(results).documentsReadable}</strong><div className="muted" style={{fontSize:12}}>Documents readable</div></div>
       <div className="panel" style={{padding:10}}><strong>{summarizeSelfTestResults(results).documentsUnreadable}</strong><div className="muted" style={{fontSize:12}}>Documents unreadable</div></div>
