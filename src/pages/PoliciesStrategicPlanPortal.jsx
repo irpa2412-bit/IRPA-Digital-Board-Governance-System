@@ -43,7 +43,8 @@ export default function PoliciesStrategicPlanPortal({profile,employee,admin=fals
  const [section,setSection]=useState("POLICIES");
  const [uploadOpen,setUploadOpen]=useState(false);
  const [kind,setKind]=useState("Policy");
- const [title,setTitle]=useState("");\n const [customTitle,setCustomTitle]=useState("");
+ const [title,setTitle]=useState("");
+ const [customTitle,setCustomTitle]=useState("");
  const [version,setVersion]=useState("1.0");
  const [file,setFile]=useState(null);
  const [search,setSearch]=useState("");
