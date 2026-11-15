@@ -217,7 +217,7 @@ test("Signature Pathway diagnostics batch one document per Worker request with b
   function extractFunction(name) {
     const start = ui.indexOf("export function " + name);
     assert.ok(start >= 0, name + " must be exported for the diagnostic contract");
-    const open = ui.indexOf("{", start);
+    const open = ui.indexOf(") {", start) + 2;
     let depth = 0;
     for (let index = open; index < ui.length; index += 1) {
       if (ui[index] === "{") depth += 1;
