@@ -101,7 +101,7 @@ service cloud.firestore {
   function procurementLocationImmutable(){return request.resource.data.department==resource.data.department&&request.resource.data.unit==resource.data.unit;}
   function management(){return admin()||anyMemberRole(["Executive Director","Management","Finance Manager","Director Internal Oversight"]);}
   // Job-description workflow authority is independent of the generic Administrator role.
-  function jobDescriptionExecutiveDirector(){return (activeMember()&&recordHasRole(get(/databases/$(database)/documents/members/$(request.auth.uid)).data,["Executive Director"]))||(activeEmployee()&&recordHasRole(get(/databases/$(database)/documents/employees/$(request.auth.uid)).data,["Executive Director"]));}
+  function jobDescriptionExecutiveDirector(){return anyInstitutionalRole(["Executive Director"]);}
   function jobDescriptionIdentityActive(uid){return uid is string&&uid.size()>0&&((exists(/databases/$(database)/documents/members/$(uid))&&(get(/databases/$(database)/documents/members/$(uid)).data.get("status","") in ["Active","Activated"]||get(/databases/$(database)/documents/members/$(uid)).data.get("registrationStatus","")=="Activated"))||(exists(/databases/$(database)/documents/employees/$(uid))&&(get(/databases/$(database)/documents/employees/$(uid)).data.get("status","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("employmentStatus","")=="Active"||get(/databases/$(database)/documents/employees/$(uid)).data.get("registrationStatus","")=="Activated")));}
   function jobDescriptionReservedRole(roleId){return roleId in ["administrator","board-chairperson","board-vice-chairperson","board-secretary","board-treasurer","board-member","executive-director"];}
 
