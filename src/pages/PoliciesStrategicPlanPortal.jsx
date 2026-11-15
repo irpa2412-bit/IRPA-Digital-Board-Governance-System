@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from "react";
+// Access is provided through Documents; Research-role module visibility is configured in App.jsx.
 import {listLifecycleDocuments,uploadLifecycleDocument,downloadLifecycleDocument} from "../firebase/documentLifecycle";
 
 const MANDATORY_POLICIES=[
