@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
 import { createEnvelope, getEnvelopeStatus, resendInvitation } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
+import { buildInvitationMessage } from "../src/invitationEmail.mjs";
 
 async function fixture({failResend=false}={}) {
   const sent=[];
@@ -29,6 +30,12 @@ async function fixture({failResend=false}={}) {
   });
   return{ctx,sent,created,externalReference};
 }
+
+test("Gateway invitation plain-text body uses real line breaks, not escaped newline text",()=>{
+  const message=buildInvitationMessage({name:"Assigned Signer",link:"https://irpa.example.test/sign?gatewayToken=token&signEnvelope=IRPA-ENV-1"});
+  assert.ok(message.text.includes("\\n\\n"));
+  assert.doesNotMatch(message.text,/\\\\n/);
+});
 
 test("initial Gateway invitation contains the portal envelope ID and a one-time signer token",async()=>{
   const f=await fixture();
