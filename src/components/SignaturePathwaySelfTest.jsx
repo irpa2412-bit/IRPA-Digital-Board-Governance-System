@@ -124,8 +124,12 @@ export default function SignaturePathwaySelfTest() {
     const runId = window.crypto?.randomUUID ? window.crypto.randomUUID() : "emergency-" + Date.now() + "-" + Math.random().toString(36).slice(2);
     const scannedCollectionIds = [];
     const hits = [];
+    let authorized = false;
+    let completed = false;
+    let auditTime = null;
     try {
       await requireAdministrator();
+      authorized = true;
       const collectionIds = [];
       let rootCursor = null;
       do {
@@ -145,16 +149,25 @@ export default function SignaturePathwaySelfTest() {
         } while (cursor);
         scannedCollectionIds.push(collectionId);
       }
-      const audit = await emergencyStorageRequest({
-        action: "audit", runId, hitCount: hits.length,
-        collectionCount: scannedCollectionIds.length, scannedCollectionIds
-      });
-      setDiscovery({ hits, scannedCollectionIds, collectionCount: scannedCollectionIds.length, auditTime: audit.auditTime });
-      setDiscoveryProgress("Discovery complete. " + scannedCollectionIds.length + " collections scanned; " + hits.length + " hit(s).");
+      completed = true;
     } catch (error) {
       setDiscoveryError(error?.message || "Emergency-storage discovery failed.");
-      setDiscoveryProgress("Discovery stopped. No success is assumed.");
     } finally {
+      if (authorized) {
+        try {
+          const audit = await emergencyStorageRequest({
+            action: "audit", runId, hitCount: hits.length,
+            collectionCount: scannedCollectionIds.length, scannedCollectionIds, completed
+          });
+          auditTime = audit.auditTime || null;
+        } catch (error) {
+          setDiscoveryError(previous => [previous, "Audit event could not be confirmed: " + (error?.message || "unknown error")].filter(Boolean).join(" "));
+        }
+      }
+      setDiscovery({ hits, scannedCollectionIds, collectionCount: scannedCollectionIds.length, auditTime, completed });
+      setDiscoveryProgress(completed
+        ? "Discovery complete. " + scannedCollectionIds.length + " collections scanned; " + hits.length + " hit(s)."
+        : "Scan incomplete. " + scannedCollectionIds.length + " collection(s) completed; no negative conclusion can be drawn.");
       setDiscoveryBusy(false);
     }
   }
@@ -259,7 +272,7 @@ export default function SignaturePathwaySelfTest() {
           </tr>)}</tbody>
         </table>
       </div> : <div style={{marginTop:10}}>
-        <strong>no emergency storage found in {discovery.collectionCount} collections scanned</strong>
+        <strong>{discovery.completed ? "no emergency storage found in " + discovery.collectionCount + " collections scanned" : "Scan incomplete; no conclusion about emergency storage can be drawn"}</strong>
         <div style={{fontSize:13,marginTop:5}}>Collections scanned: {discovery.scannedCollectionIds.length ? discovery.scannedCollectionIds.join(", ") : "(none)"}</div>
       </div>)}
     </div>
