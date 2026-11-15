@@ -1359,7 +1359,7 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     const fileSize = Number(data.fileSize || 0);
     const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
     const classification = String(data.classification || "Public").trim();
-    const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"];
+    const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
     const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
     const problems = [];
     if (!ALLOWED_CONTENT_TYPES.has(contentType)) problems.push("Unsupported content type.");
@@ -1444,7 +1444,7 @@ async function uploadControlledDocument(request, env) {
   const classification = String(data.classification || "Public").trim();
   const governanceArchive = data.governanceArchive !== false && /governance/i.test(documentType);
 
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
