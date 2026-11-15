@@ -49,6 +49,15 @@ test("Gateway owner may link a newly-created Gateway envelope exactly once using
   }));
 });
 
+test("clients cannot create envelopes pre-marked as Gateway-backed", async () => {
+  await assertFails(signerDb().doc("signatureEnvelopes/forged-gateway-envelope").set({
+    senderUid:"assigned-signer",ownerUid:"assigned-signer",envelopeReference:"ENV-FORGED",
+    documentId:"DOC-FORGED",participantUids:["assigned-signer"],actionUids:["assigned-signer"],
+    signingMode:"Sequential",currentSignerUid:"assigned-signer",status:"Draft",
+    gatewayEnvelopeId:"ENV-ATTACKER"
+  }));
+});
+
 test("participants cannot mutate the authoritative state of Gateway-backed envelopes", async () => {
   await assertFails(signerDb().doc("signatureEnvelopes/gateway-envelope").update({
     status:"Completed",lastSignedByUid:"assigned-signer",lastSignedAt:new Date(),
