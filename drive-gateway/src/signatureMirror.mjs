@@ -38,6 +38,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid);
     await updateDocument("signatures/"+signatureRecordId,{
       envelopeId,documentId:clean(existing.documentId||envelope.documentId),
+      recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
       documentReference:clean(existing.documentReference||existing.envelopeReference||envelope.externalReference),
       documentTitle:clean(existing.title||envelope.title),
       signerUid:signer.uid,signerEmail:signer.email||"",signerName:signer.name||"",
