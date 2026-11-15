@@ -3,7 +3,7 @@ import assert from"node:assert/strict";
 import fs from"node:fs";
 const page=fs.readFileSync("src/pages/JobDescriptionWorkflowPortal.jsx","utf8");
 const app=fs.readFileSync("src/App.jsx","utf8");
-const rules=fs.readFileSync("firestore.rules","utf8");
+const rules=fs.readFileSync("firestore.rules","utf8");\nconst stagingRules=fs.readFileSync("firestore.staging.rules","utf8");
 test("Executive Director has a dedicated intranet job-description administration route",()=>{
  assert.match(app,/Job Description Administration/);
  assert.match(app,/selectedAuthority==="Executive Director"/);
