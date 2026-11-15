@@ -7,7 +7,7 @@ function bullets(values,empty="None assigned in this draft"){
 }
 function RoleCard({role}){
   return <article className="role-description-card">
-    <header><div><p className="role-description-kicker">DRAFT JOB DESCRIPTION · READ ONLY</p><h2>{role.title}</h2><p>{role.directorate} · {role.department} · {role.unit}</p></div><span className="role-description-status">{role.appointmentStatus||"INTERIM"}</span></header>
+    <header><div><p className="role-description-kicker">OWNER-APPROVED ROLE DESCRIPTION · READ ONLY</p><h2>{role.title}</h2><p>{role.directorate} · {role.department} · {role.unit}</p></div><span className="role-description-status">{role.appointmentStatus||"INTERIM"}</span></header>
     <p><strong>Reports to:</strong> {role.reportingLine}</p><p><strong>Purpose:</strong> {role.purpose}</p>
     <h3>Key duties</h3><ul>{bullets(role.keyDuties)}</ul>
     <p><strong>Positions required:</strong> {role.positionsRequired}</p><p><strong>Qualifications:</strong> {role.qualifications}</p>
@@ -16,7 +16,7 @@ function RoleCard({role}){
     <p><strong>Limits:</strong> {role.limits?.documentValue} {role.limits?.classificationMax}</p>
     <h3>Prohibited actions</h3><ul>{bullets(role.prohibitedActions)}</ul><h3>Separation of duties</h3><ul>{bullets(role.separationOfDutiesConflicts)}</ul>
     {role.sealingConditions&&<><h3>Conditions for sealing</h3><ul>{bullets(role.sealingConditions)}</ul></>}
-    <p className="role-description-note">This is a draft description, not an appointment or a grant of access. Access is denied until the corresponding server-side rule and workflow enforcement are verified.</p>
+    <p className="role-description-note">This approved role description is not an appointment or a grant of access. Any amendment must be initiated and approved by the Executive Director, recorded as a new version, and reviewed against the Constitution and organisational controls. System permissions, signature authority and bank mandates remain separately governed.</p>
   </article>;
 }
 export default function RoleJobDescriptionPortal({selectedAuthority,roles=[],isAdmin=false}){
@@ -25,7 +25,7 @@ export default function RoleJobDescriptionPortal({selectedAuthority,roles=[],isA
     const names=new Set([selectedAuthority,...(Array.isArray(roles)?roles:[])].map(x=>String(x||"").trim()).filter(Boolean));
     return authority.roles.filter(role=>names.has(role.title));
   },[selectedAuthority,roles,isAdmin]);
-  return <main className="role-description-portal"><div className="role-description-intro"><p className="role-description-kicker">ORGANISATIONAL AUTHORITY REGISTER</p><h1>Job Descriptions and Access</h1><p>Read-only draft descriptions. A job description does not grant access by itself; the matching Firestore rule and workflow enforcement must also exist.</p><p><strong>Protected rule:</strong> restricted research data remains denied by default. No position is appointed by this register.</p></div>
+  return <main className="role-description-portal"><div className="role-description-intro"><p className="role-description-kicker">ORGANISATIONAL AUTHORITY REGISTER</p><h1>Job Descriptions and Access</h1><p>Owner-approved role descriptions and key duties for operational use. Role descriptions remain version-controlled; position-specific permissions are separately governed and are not granted by this register.</p><p><strong>Protected rule:</strong> restricted research data remains denied by default. No position is appointed by this register.</p></div>
     {visible.length?visible.map(role=><RoleCard key={role.id} role={role}/>):<section className="role-description-card"><h2>No matched job description</h2><p>Your current role does not yet map to a canonical description. Access remains unchanged and no new permissions are granted.</p></section>}
   </main>;
 }
