@@ -323,7 +323,9 @@ export async function startSignatureWorkflow(envelope){
       gatewayOriginalHash:gateway.gatewayOriginalHash,
       gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",
       gatewayBridgeStatus:"Connected",
-      gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1"
+      gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",
+      gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent",
+      gatewayInvitationFailures:Number(gateway.gatewayInvitationFailures||0)
     }:{})
   };
   try{
