@@ -22,13 +22,13 @@ function resolveContentType(file) {
   return MIME_BY_EXTENSION[ext] || "application/octet-stream";
 }
 
-export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, submitLabel = "Upload Document", compact = false, deferSave = false, showSaveButton = false, workflowContextOverride = {} }) {
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, allowResearchArchiveUpload: allowResearchArchiveUploadProp = false, submitLabel = "Upload Document", compact = false, deferSave = false, showSaveButton = false, workflowContextOverride = {} }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [generatedReference, setGeneratedReference] = useState("");
   const [documentType, setDocumentType] = useState("");
   const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
-  const [allowResearchArchiveUpload, setAllowResearchArchiveUpload] = useState(false);
+  const [allowResearchArchiveUpload, setAllowResearchArchiveUpload] = useState(allowResearchArchiveUploadProp);
   const [version, setVersion] = useState("1.0");
   const [archiveCategory, setArchiveCategory] = useState("");
   const [classification, setClassification] = useState("Public");
@@ -67,7 +67,7 @@ export default function ControlledDocumentUpload({ purpose = "Controlled Documen
         const researchAuthority = department.includes("research") || [...normalized].some(role => role.includes("research"));
         if (!cancelled) {
           setAllowDualRoleDocumentTypes(dualRole);
-          setAllowResearchArchiveUpload(researchAuthority);
+          setAllowResearchArchiveUpload(allowResearchArchiveUploadProp || researchAuthority);
         }
       } catch (_) {
         if (!cancelled) setAllowDualRoleDocumentTypes(false);
