@@ -27,7 +27,7 @@ function makeDeps(state){
     driveFetch:async(_env,_token,path,options={})=>{
       if(options.method==="DELETE"){state.deletedFiles.push(path);if(state.failDelete)throw new Error("simulated Drive rollback failure");return {};}
       if(path.includes("/copy"))return {id:"copied-"+Math.random().toString(16).slice(2)};
-      if(path.includes("?fields=id,name,mimeType,size,description,trashed"))return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4",description:JSON.stringify({irpaGovernance:true,irpaDocumentLifecycle:true,documentId:"LIFE-test"})};
+      if(path.includes("?fields=id,name,mimeType,size,description,trashed")){const registered=Object.values(state.docs).find(row=>row.plain?.fileId&&path.includes(encodeURIComponent(row.plain.fileId)));return {id:registered?.plain.fileId||"drive-1",name:registered?.plain.fileName||"test.pdf",mimeType:"application/pdf",size:"4",description:JSON.stringify({irpaGovernance:true,irpaDocumentLifecycle:true,documentId:registered?.plain.documentId||"LIFE-test"})};}
       return {id:"drive-1",name:"test.pdf",mimeType:"application/pdf",size:"4"};
     },
     findOrCreateFolder:async(_env,_token,name)=>{state.folderCalls??=[];state.folderCalls.push(name);return "folder-"+name.replace(/\s+/g,"-");},
