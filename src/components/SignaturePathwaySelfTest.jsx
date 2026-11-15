@@ -184,7 +184,7 @@ export default function SignaturePathwaySelfTest() {
           "Chunks field: " + (hit.hasChunksField ? "yes" : "no"),
           "Chunk count: " + hit.chunkCount
         ].join("\n")).join("\n\n")
-      : "no emergency storage found in " + discovery.collectionCount + " collections scanned\nCollections scanned: " + discovery.scannedCollectionIds.join(", ");
+      : (discovery.completed ? "no emergency storage found in " + discovery.collectionCount + " collections scanned" : "Scan incomplete; no conclusion about emergency storage can be drawn") + "\nCollections scanned: " + discovery.scannedCollectionIds.join(", ");
     const report = "Emergency storage discovery report\n" + lines + "\n\nAudit time: " + (discovery.auditTime || "not returned");
     navigator.clipboard.writeText(report).then(() => setDiscoveryProgress("Emergency-storage report copied to clipboard.")).catch(error => setDiscoveryError("Copy failed: " + (error?.message || "Clipboard access unavailable.")));
   }
