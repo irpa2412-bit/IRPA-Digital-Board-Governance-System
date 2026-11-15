@@ -5,6 +5,7 @@ import {readFile} from "node:fs/promises";
 const app=await readFile(new URL("../src/App.jsx",import.meta.url),"utf8");
 const portal=await readFile(new URL("../src/pages/PoliciesStrategicPlanPortal.jsx",import.meta.url),"utf8");
 const documents=await readFile(new URL("../src/pages/DocumentLifecycleModule.jsx",import.meta.url),"utf8");
+const controlledUpload=await readFile(new URL("../src/components/ControlledDocumentUpload.jsx",import.meta.url),"utf8");
 
 test("Policies and Strategic Plan Portal is registered as a Documents sub-portal",()=>{
  assert.match(app,/\["Documents",\[[^\]]*"Policies and Strategic Plans"\]\]/);
@@ -54,4 +55,10 @@ test("Documents upload offers a distinct Research Archive type and Research Docu
  assert.match(documents,/"Research Archive"/);
  assert.match(documents,/"Research Documents"/);
  assert.match(documents,/"Research Archive":\["\.pdf"/);
+});
+
+test("shared Research Portal upload control exposes Research Archive only to Research-authorised profiles",()=>{
+ assert.match(controlledUpload,/"Research Archive": "Research Documents"/);
+ assert.match(controlledUpload,/disabled=\{type === "Research Archive" && !allowResearchArchiveUpload\}/);
+ assert.match(controlledUpload,/setAllowResearchArchiveUpload\(researchAuthority\)/);
 });
