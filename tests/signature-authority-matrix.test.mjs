@@ -149,7 +149,8 @@ test("signature matrix separates workflow stages and preserves unassigned legal 
     }
   }
   const finance = matrix.rows.find(row => row.category.startsWith("Finance,"));
-  assert.match(finance.limit, /current bank mandate governs/i);\n  assert.match(finance.limit, /does not alter the mandate/i);
+  assert.match(finance.limit, /current bank mandate governs/i);
+  assert.match(finance.limit, /does not alter the mandate/i);
   const board = matrix.rows.find(row => row.category.startsWith("Board resolutions"));
   assert.match(board.sign, /not assigned by this matrix/i);
   assert.equal(matrix.technicalModel.defaultDecision, "DENY");
