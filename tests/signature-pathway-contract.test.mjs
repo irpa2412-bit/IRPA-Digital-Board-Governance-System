@@ -212,4 +212,34 @@ test("Signature Pathway diagnostics batch one document per Worker request with b
   assert.doesNotMatch(route, /const metadata=await diagnosticFetch/);
   assert.match(diagnostics, /diagnostic\.driveDescription = metadata\.description/);
   assert.match(readiness, /documents: \[\{ documentId: "wiAfPSIxHLTd6MdeM04q"/);
+});test("mixed self-test rows produce correct readable, unreadable and non-file totals", async () => {
+  const ui = await read("../src/components/SignaturePathwaySelfTest.jsx");
+  function extractFunction(name) {
+    const start = ui.indexOf("export function " + name);
+    assert.ok(start >= 0, name + " must be exported for the diagnostic contract");
+    const open = ui.indexOf(") {", start) + 2;
+    let depth = 0;
+    for (let index = open; index < ui.length; index += 1) {
+      if (ui[index] === "{") depth += 1;
+      if (ui[index] === "}") {
+        depth -= 1;
+        if (depth === 0) return ui.slice(start, index + 1).replace(/^export /, "");
+      }
+    }
+    throw new Error("Unterminated function: " + name);
+  }
+  const classify = new Function(extractFunction("classifySelfTestRecord") + "; return classifySelfTestRecord;")();
+  const summarize = new Function(extractFunction("summarizeSelfTestResults") + "; return summarizeSelfTestResults;")();
+  assert.equal(classify({ documentId: "communicationWebsiteEdits-abc" }), "NON_FILE_RECORD");
+  assert.equal(classify({ documentId: "controlled-document-1" }), "CONTROLLED_DOCUMENT");
+  const rows = [
+    { classification: classify({ documentId: "communicationWebsiteEdits-abc" }), checks: [] },
+    { classification: classify({ documentId: "controlled-document-readable" }), checks: [{ status: "PASS" }, { status: "PASS" }] },
+    { classification: classify({ documentId: "controlled-document-no-drive-id" }), checks: [{ status: "FAIL" }, { status: "FAIL" }] }
+  ];
+  assert.deepEqual(summarize(rows), {
+    documentsReadable: 1,
+    documentsUnreadable: 1,
+    nonFileRecords: 1
+  });
 });
