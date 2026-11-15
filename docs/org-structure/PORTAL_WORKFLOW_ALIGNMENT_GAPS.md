@@ -80,3 +80,18 @@ These values must be mapped to an exact approved role, retained as an explicitly
 - Source audit: `firestore.rules` role and department predicates; `src/App.jsx` navigation routing; `src/pages/SignaturePlatform.jsx`; `src/firebase/signaturePlatform.js`; `drive-gateway/src/index.js`.
 - Staging rules evidence: PR #695 merged to `fix/signature-trail-20261024`; PR #696 draft post-merge emulator run PASS — 11/11 staging access/research tests and 5/5 mocked backup/rollback tests. No live rules publication. Staging frontend Hosting and staging Worker deployment PASS; Worker health PASS. Staging-only Worker secrets were injected by the automated staging deploy; no values are recorded here. The staging acceptance job was skipped.
 - Organisational and signature validation workflow: `.github/workflows/org-structure-signature-validation.yml` (current run pending at the time of this draft).
+
+
+## 6. Owner-confirmed constitutional/personnel corrections
+
+The authority register now records the Executive Director as OCCUPIED and the permanent employee Board Secretary office as occupied by the same incumbent in a separate capacity. The Board Chairperson and Treasurer are occupied; several Board Member positions are occupied. Board Members serve four-year terms, renewable once, with a maximum tenure of eight years. The Board Secretary office is not subject to that Board-member tenure cycle.
+
+The owner-confirmed volunteer baseline includes the Director of International Oversight, Programme Officer, Outreach Officer, Community Development Officer, Director of Finance and Administration, and an IT Specialist in preliminary college training. Volunteer status is not employment and creates no implied approval, banking, procurement, administrator, security, research or production authority. The next senior Director represents the Executive Director during absence within the constitutional and recorded acting scope; the specific individual must be established from an approved seniority order.
+
+IRPA confirms existing authorised bank accounts and signatories. The current bank mandate and supporting Board resolutions remain authoritative; the organisational matrix must not invent or alter account details, signatories, signing combinations or limits.
+
+## 7. Job-description release design
+
+Required sequence: Executive Director reviews the complete catalogue; Executive Director releases the approved version to the Administrator; Administrator assigns each description to a verified current delegate; Administrator releases the assigned description to that delegate; acknowledgement and appointment/delegation evidence are recorded. The Administrator cannot rewrite descriptions, create appointments, expand delegations or grant Board-reserved powers. A released description or acknowledgement does not activate permissions by itself.
+
+**Runtime gap remains:** this repository change updates the constitutional/policy data model and documentation. It does not implement the authenticated Executive Director review queue, Administrator assignment/release UI, delegate acknowledgement workflow, immutable server-side transition enforcement or role-specific live access. Those require a separately tested runtime implementation. No Firestore rules or live personnel records are changed by this change.

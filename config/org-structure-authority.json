@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "status": "DRAFT — owner review required; not runtime authority",
-  "sourceOfTruth": "This configuration is intended to become the single source for role descriptions, permissions and signing eligibility. Until enforcement is implemented and tested, no workflow permission is granted by this document.",
+  "status": "CONSTITUTIONAL AND OWNER-UPDATED GOVERNANCE MODEL — POLICY/DATA MODEL ONLY; RUNTIME WORKFLOW ENFORCEMENT REMAINS SEPARATELY GATED",
+  "sourceOfTruth": "This configuration records IRPA's constitutional governance, confirmed interim personnel baseline and authority design. It does not itself appoint a person, create a delegation, amend a bank mandate or grant runtime permissions. Current appointment, employment, volunteer assignment, bank mandate and server-side authorization records remain authoritative.",
   "principles": {
-    "allPositions": "VACANT unless owner records an appointment",
+    "allPositions": "Position occupancy is recorded only where confirmed by the owner; confirmed interim volunteers are labelled as volunteers; all other positions remain VACANT or UNCONFIRMED until an approved appointment is recorded.",
     "defaultAccess": "DENY",
     "research": "Restricted by default; no read access based on role name or Published status; release requires Research Director plus recorded clearance and named approver",
     "protectedControls": [
@@ -731,7 +731,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED",
+      "engagementStatus": "BOARD_OFFICE_HOLDER"
     },
     {
       "id": "board-vice-chairperson",
@@ -782,7 +783,7 @@
       "directorate": "Governance",
       "department": "To be confirmed in approved structure",
       "unit": "To be confirmed in approved structure",
-      "reportingLine": "Board Chairperson",
+      "reportingLine": "Board for governance business; same incumbent as Executive Director for organisational management",
       "purpose": "Maintain Board notices, agendas, minutes, resolutions and governance records.",
       "keyDuties": [
         "Maintain Board notices, agendas, minutes, resolutions and governance records.",
@@ -817,7 +818,9 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED — PERMANENT EMPLOYEE OFFICE",
+      "engagementStatus": "PERMANENT_IRPA_EMPLOYEE_OFFICE",
+      "dualCapacityGroup": "EXECUTIVE_DIRECTOR_BOARD_SECRETARY"
     },
     {
       "id": "board-treasurer",
@@ -860,7 +863,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED",
+      "engagementStatus": "BOARD_OFFICE_HOLDER"
     },
     {
       "id": "board-member",
@@ -903,7 +907,13 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED — SEVERAL MEMBERS",
+      "engagementStatus": "BOARD_MEMBER; INDIVIDUAL RECORDS AND TENURE DATES AUTHORITATIVE",
+      "tenure": {
+        "termYears": 4,
+        "renewalsAllowed": 1,
+        "maximumTenureYears": 8
+      }
     },
     {
       "id": "executive-director",
@@ -946,7 +956,9 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "OCCUPIED",
+      "engagementStatus": "IRPA_EMPLOYEE",
+      "dualCapacityGroup": "EXECUTIVE_DIRECTOR_BOARD_SECRETARY"
     },
     {
       "id": "director-internal-oversight",
@@ -1118,7 +1130,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "VOLUNTEER_ACTIVE",
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
     },
     {
       "id": "director-human-resources",
@@ -1720,7 +1733,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "VOLUNTEER_ACTIVE",
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
     },
     {
       "id": "community-development-officer",
@@ -1763,7 +1777,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "VOLUNTEER_ACTIVE",
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
     },
     {
       "id": "programme-technical-officer",
@@ -1806,7 +1821,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "VACANT",
+      "engagementStatus": "UNCONFIRMED_POSITION"
     },
     {
       "id": "procurement-officer",
@@ -1935,7 +1951,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "appointmentStatus": "VOLUNTEER_ACTIVE",
+      "engagementStatus": "VOLUNTEER — PRELIMINARY COLLEGE TRAINING; SUPERVISED SUPPORT ONLY"
     },
     {
       "id": "information-technology-officer",
@@ -3034,6 +3051,94 @@
       ],
       "accessStatus": "PROPOSED_ONLY_FLAG_DEFAULT_OFF",
       "appointmentStatus": "INTERIM_OWNER_ROLE"
+    },
+    {
+      "id": "director-international-oversight",
+      "title": "Director of International Oversight",
+      "directorate": "Executive Office",
+      "department": "International Oversight and Partnerships",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director",
+      "purpose": "Support international partner engagement and relationship development within specifically assigned responsibilities.",
+      "keyDuties": [
+        "Support engagement with potential international partners when available",
+        "Assist with partner communication and relationship continuity",
+        "Provide advice and follow-up within an assigned scope",
+        "Refer commitments, agreements and institutional positions to the Executive Director or Board as required"
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent financial or contractual authority",
+        "classificationMax": "Public unless separately authorised"
+      },
+      "prohibitedActions": [
+        "No independent commitment on behalf of IRPA",
+        "No approval, bank signing, procurement, administrator or production authority by title alone"
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VOLUNTEER_ACTIVE",
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
+    },
+    {
+      "id": "programme-officer",
+      "title": "Programme Officer",
+      "directorate": "Cross-Cutting Themes",
+      "department": "Programme Development and Coordination",
+      "unit": "To be confirmed in approved structure",
+      "reportingLine": "Executive Director or assigned Programme Director",
+      "purpose": "Support programme design, coordination and partner-facing programme preparation within assigned responsibilities.",
+      "keyDuties": [
+        "Support programme concept and proposal development",
+        "Coordinate assigned programme information and follow-up",
+        "Support implementation planning and reporting",
+        "Escalate commitments and approvals to the authorised management authority"
+      ],
+      "positionsRequired": "1 — VACANT",
+      "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
+      "workflows": {
+        "mayInitiate": [],
+        "mayReview": [],
+        "mayApprove": [],
+        "maySign": [],
+        "mayRelease": []
+      },
+      "records": {
+        "mayRead": [],
+        "mayWrite": []
+      },
+      "limits": {
+        "documentValue": "No independent financial or contractual authority",
+        "classificationMax": "Public unless separately authorised"
+      },
+      "prohibitedActions": [
+        "No independent financial approval, contract signature, bank signing, administrator or production authority"
+      ],
+      "separationOfDutiesConflicts": [
+        "Cannot combine incompatible preparer, reviewer, approver or releaser steps for the same transaction.",
+        "Cannot approve own expenses or own work.",
+        "Finance approver cannot sign the same item they approved."
+      ],
+      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "appointmentStatus": "VOLUNTEER_ACTIVE",
+      "knownVolunteerDesignation": "Programme Officer",
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
     }
   ],
   "compatibilityAliasCandidates": [
@@ -3143,7 +3248,7 @@
         "approve": "Board collectively where reserved",
         "sign": "Only office-holder(s) expressly authorised by Constitution, resolution or legal instrument; not assigned by this matrix",
         "release": "Board Secretariat after certification and approval",
-        "evidence": "Constitution, approved Board resolution, certified minutes and specific signatory delegation",
+        "evidence": "Constitution, approved Board resolution, certified minutes and specific signatory delegation; Board-member tenure records are maintained separately from the permanent employee Board Secretary office.",
         "limit": "No individual Board office may exercise collective Board authority without express delegation."
       },
       {
@@ -3188,7 +3293,7 @@
         "sign": "Current bank-mandated signatories only for bank instruments; other instruments require written legal/management authority",
         "release": "Treasury/payment releaser separate from preparer and approver",
         "evidence": "Approved budget, finance policy, procurement evidence where applicable, approval trail and current bank mandate",
-        "limit": "This matrix assigns no monetary thresholds or bank signatories. Bank mandate controls bank execution; no self-approval; separate preparation, approval and release."
+        "limit": "Existing authorised bank accounts and signatories are recognised; current bank mandate governs signatory identities, joint-signing rules and limits. This matrix does not alter the mandate. No self-approval; separate preparation, review, approval and payment release."
       },
       {
         "category": "Procurement, quotations, tender evaluation and contracts",
@@ -3245,7 +3350,13 @@
       "No self-approval; incompatible preparation, review, approval, signing and release duties must be separated.",
       "Acting appointments require written scope, start/end dates and approving authority.",
       "A person with multiple roles must select the capacity relevant to the action; roles do not combine automatically.",
-      "The matrix does not replace the Constitution, law, bank mandate, procurement policy or Board resolutions."
+      "The matrix does not replace the Constitution, law, bank mandate, procurement policy or Board resolutions.",
+      "The Executive Director also holds the permanent employee office of Board Secretary; each action must use the selected capacity and applicable authority independently.",
+      "Board Members serve four-year terms, renewable once, with a maximum tenure of eight years; this tenure limit does not apply to the permanent employee Board Secretary office.",
+      "The next senior Director represents the Executive Director during absence only within the Constitution and a recorded acting scope; no permanent succession is inferred.",
+      "IRPA has existing authorised bank accounts and signatories; current bank mandates, not job titles or this matrix, determine bank execution.",
+      "The Executive Director reviews and releases job descriptions to the Administrator; the Administrator assigns and releases each approved description to the respective delegate without expanding its authority.",
+      "Volunteer engagement is distinct from employment and conveys no implied financial, procurement, banking, administrator, security, research or production authority."
     ],
     "technicalModel": {
       "status": "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT",
@@ -3291,6 +3402,12 @@
       "multiRoleCapacitySelection": "Required; evaluate the selected capacity and its delegation independently",
       "serverSideEnforcementRequired": true,
       "effectiveAuthoritySource": "Approved organisational appointment + job description + current written delegation + instrument-specific controls must also authorise the selected action."
+    },
+    "existingBankMandates": {
+      "status": "EXISTING_AUTHORISED_BANK_ACCOUNTS_AND_SIGNATORIES_CONFIRMED_BY_OWNER",
+      "authority": "Current bank mandate and supporting Board resolutions",
+      "applicationRule": "Reflect the existing mandate exactly after verification; do not invent, replace or infer signatories, account identifiers, joint-signing combinations or transaction limits.",
+      "limitation": "This organisational matrix does not amend or supersede the bank mandate."
     }
   },
   "migration": {
@@ -3313,7 +3430,8 @@
       "Verify counts, references and audit continuity",
       "Production migration requires separate RUN MIGRATION approval"
     ],
-    "rollback": "Restore verified pre-migration backup and prior mapping snapshot; no production target selected."
+    "rollback": "Restore verified pre-migration backup and prior mapping snapshot; no production target selected.",
+    "constitutionalPersonnelBaseline": "2026-11-15 owner-confirmed; no personal names, bank account identifiers or bank mandate values inferred."
   },
   "authorityFramework": {
     "status": "DRAFT_FOR_BOARD_REVIEW_NOT_RUNTIME_AUTHORITY",
@@ -3392,6 +3510,170 @@
         "Approver / reviewer identities",
         "Timestamp and document version/hash"
       ]
+    },
+    "constitutionalOfficeModel": {
+      "executiveDirectorBoardSecretary": {
+        "status": "OCCUPIED_CONFIRMED_BY_OWNER",
+        "arrangement": "The Executive Director is also the permanent Board Secretary under IRPA's Constitution. These are two distinct capacities held by the same incumbent, not two separate persons or two Board-member offices.",
+        "employment": "The Board Secretary is an IRPA employee. The Board Secretary office is not subject to the four-year Board-member tenure cycle; continuity is subject to the Constitution and applicable employment/appointment processes.",
+        "boardSecretaryCapacity": "For Board governance business, maintains institutional continuity, understands and records Board decisions, supports Board orientation and ensures decisions are clearly communicated for implementation.",
+        "executiveDirectorCapacity": "Overall management authority; coordinates organisational implementation of Board decisions and reports to the Board.",
+        "capacitySelection": "The incumbent must select the relevant Board Secretary or Executive Director capacity for each action. Authority from the two capacities must not be combined automatically.",
+        "absenceRepresentation": "During the Executive Director's absence, the next senior Director represents the Executive Director in accordance with the Constitution and only within the scope of that representation. The next senior Director's identity and any operational limits must be established from the approved seniority order and recorded acting arrangement; no permanent succession or automatic transfer of Board Secretary office is implied."
+      },
+      "boardTenure": {
+        "status": "OWNER_CONFIRMED_CONSTITUTIONAL_RULE",
+        "termYears": 4,
+        "renewalCount": 1,
+        "maximumContinuousTenureYears": 8,
+        "rule": "Board Members serve four-year terms, renewable once. The maximum tenure is eight years. The term limit applies to Board-member offices and does not apply to the employee Board Secretary office.",
+        "evidence": "Constitution and current appointment/election records; individual start/end dates must be recorded from approved records, not inferred."
+      },
+      "banking": {
+        "status": "EXISTING_AUTHORISED_BANK_ACCOUNTS_AND_SIGNATORIES_CONFIRMED_BY_OWNER",
+        "authoritySource": "Current bank mandates and supporting Board resolutions",
+        "rule": "IRPA already has authorised bank accounts and authorised signatories. The application must recognise the current bank mandate; it must not create, replace, infer or alter bank signatories, account details, signing combinations or transaction limits.",
+        "dataBoundary": "Account identifiers, signatory identities, signing combinations and limits are not reproduced or guessed in this organisational model. They must be verified against the current bank mandate before any banking workflow is activated."
+      }
+    },
+    "governanceManagementCycles": {
+      "status": "POLICY_MODEL_FOR_ALIGNMENT; detailed calendars remain subject to Constitution and Board-approved policies",
+      "governanceCycle": {
+        "owner": "Board of Directors acting collectively",
+        "stages": [
+          "Constitutional and strategic direction",
+          "Review of organisational performance, risks and compliance",
+          "Consideration of management submissions and recommendations",
+          "Reserved decisions, approvals and resolutions",
+          "Recording, certification and communication of Board decisions",
+          "Oversight of implementation and follow-up at subsequent Board meetings"
+        ],
+        "continuity": "The permanent employee Board Secretary preserves institutional memory, decision context, certified records and orientation across successive Board compositions.",
+        "tenure": "Board-member terms are four years, renewable once, with a maximum tenure of eight years."
+      },
+      "managementCycle": {
+        "owner": "Executive Director",
+        "stages": [
+          "Translate Board resolutions and approved strategy into implementation priorities",
+          "Prepare operational plans, budgets and departmental assignments",
+          "Issue job descriptions and written delegations within Board-approved authority",
+          "Monitor programme, finance, personnel, risk and compliance performance",
+          "Review results, resolve operational issues and escalate reserved or out-of-limit matters",
+          "Report implementation progress and exceptions to the Board"
+        ],
+        "accountability": "The Executive Director remains accountable to the Board. Departments and volunteers execute only within documented responsibilities and written delegations."
+      },
+      "decisionLifecycle": [
+        "Initiate",
+        "Review / verify",
+        "Recommend",
+        "Approve / authorise",
+        "Sign / execute",
+        "Release / publish",
+        "Record and monitor"
+      ],
+      "separation": "The lifecycle stages are distinct controls. No self-approval; incompatible duties remain separated; Board-reserved matters remain with the Board; the current bank mandate controls bank execution."
+    },
+    "jobDescriptionReleaseWorkflow": {
+      "status": "APPROVED_DESIGN_MODEL_NOT_YET_RUNTIME_ENFORCED",
+      "stages": [
+        {
+          "stage": "EXECUTIVE_DIRECTOR_REVIEW",
+          "actor": "Executive Director in the management capacity",
+          "action": "Receives the complete organisational job-description catalogue, reviews role purpose, reporting line, decision scope, prohibitions, escalation and delegation requirements; records approval or return for revision.",
+          "boundary": "The Executive Director cannot alter or approve matters reserved to the Board."
+        },
+        {
+          "stage": "RELEASE_TO_ADMINISTRATOR",
+          "actor": "Executive Director",
+          "action": "Releases the reviewed job-description version to the Administrator for controlled administration.",
+          "boundary": "The Administrator receives only the version released by the Executive Director; no independent authority to rewrite, approve or expand delegations."
+        },
+        {
+          "stage": "ADMINISTRATIVE_ASSIGNMENT",
+          "actor": "Administrator",
+          "action": "Matches each released job description to a verified, current Member/Employee/Volunteer identity and records the assignment evidence for the Executive Director's approved role.",
+          "boundary": "Administrator may not invent appointments, change the role scope, appoint bank signatories or assign reserved Board powers."
+        },
+        {
+          "stage": "RELEASE_TO_DELEGATE",
+          "actor": "Administrator",
+          "action": "Releases the assigned job description and approved delegation record to the respective delegate for acknowledgement.",
+          "boundary": "Only the relevant delegate receives the assigned description; no authority is active until all required appointment, delegation, policy and server-side checks pass."
+        },
+        {
+          "stage": "ACKNOWLEDGEMENT_AND_ACTIVATION",
+          "actor": "Delegate and authorised approving authority",
+          "action": "Records receipt/acknowledgement and verifies effective date, expiry/review date, limits, escalation and revocation state.",
+          "boundary": "Acknowledgement is not itself an appointment or delegation; missing, expired, inconsistent or revoked evidence means DENY."
+        }
+      ],
+      "auditEvidence": [
+        "Job-description ID and version",
+        "Executive Director review and release actor/capacity/timestamp",
+        "Administrator assignment actor/timestamp",
+        "Verified delegate UID and current engagement status",
+        "Appointment or volunteer assignment reference",
+        "Written delegation/resolution reference",
+        "Effective date, expiry/review date and revocation status",
+        "Delegate acknowledgement",
+        "Immutable event history"
+      ],
+      "authorization": "No workflow permission is activated by job-description release alone. Current appointment/engagement, approved job description, written delegation, relevant policy and server-side authorization must all independently permit the action."
+    },
+    "interimPersonnelBaseline": {
+      "status": "OWNER_CONFIRMED_INTERIM_PERSONNEL; IDENTITIES AND INDIVIDUAL APPOINTMENT RECORDS REMAIN TO BE VERIFIED",
+      "board": [
+        {
+          "role": "Board Chairperson",
+          "status": "OCCUPIED"
+        },
+        {
+          "role": "Board Treasurer",
+          "status": "OCCUPIED"
+        },
+        {
+          "role": "Board Member",
+          "status": "SEVERAL_OCCUPIED; individual member records and tenure dates remain authoritative"
+        }
+      ],
+      "employee": [
+        {
+          "role": "Executive Director",
+          "status": "OCCUPIED"
+        },
+        {
+          "role": "Board Secretary",
+          "status": "OCCUPIED_PERMANENT_EMPLOYEE_OFFICE; same incumbent as Executive Director"
+        }
+      ],
+      "volunteers": [
+        {
+          "role": "Director of International Oversight",
+          "status": "VOLUNTEER_ACTIVE_LIMITED_AVAILABILITY"
+        },
+        {
+          "role": "Programme Officer",
+          "status": "VOLUNTEER_ACTIVE_LIMITED_AVAILABILITY"
+        },
+        {
+          "role": "Outreach Officer",
+          "status": "VOLUNTEER_ACTIVE_LIMITED_AVAILABILITY"
+        },
+        {
+          "role": "Community Development Officer",
+          "status": "VOLUNTEER_ACTIVE_LIMITED_AVAILABILITY"
+        },
+        {
+          "role": "Director of Finance and Administration",
+          "status": "VOLUNTEER_ACTIVE_LIMITED_AVAILABILITY"
+        },
+        {
+          "role": "IT Specialist",
+          "status": "VOLUNTEER_IN_PRELIMINARY_COLLEGE_TRAINING; SUPERVISED_SUPPORT_ONLY"
+        }
+      ],
+      "rule": "Volunteer status is not employee status. Titles and volunteer participation do not confer management, procurement, financial approval, bank-signatory, administrator, security, research-clearance or production-deployment authority."
     }
   }
 }

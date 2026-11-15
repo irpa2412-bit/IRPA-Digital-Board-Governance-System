@@ -149,7 +149,8 @@ test("signature matrix separates workflow stages and preserves unassigned legal 
     }
   }
   const finance = matrix.rows.find(row => row.category.startsWith("Finance,"));
-  assert.match(finance.limit, /no monetary thresholds or bank signatories/i);
+  assert.match(finance.limit, /current bank mandate governs/i);
+  assert.match(finance.limit, /does not alter the mandate/i);
   const board = matrix.rows.find(row => row.category.startsWith("Board resolutions"));
   assert.match(board.sign, /not assigned by this matrix/i);
   assert.equal(matrix.technicalModel.defaultDecision, "DENY");
@@ -162,4 +163,39 @@ test("job descriptions must define reporting, delegation, limits and escalation 
     assert.ok(standard.requiredFields.includes(field), `job description standard missing: ${field}`);
   }
   assert.match(standard.default, /DENY/);
+});
+
+
+test("constitutional continuity and Board-member tenure are explicit and distinct",()=>{
+ const model=catalogue.authorityFramework.constitutionalOfficeModel;
+ assert.equal(model.executiveDirectorBoardSecretary.status,"OCCUPIED_CONFIRMED_BY_OWNER");
+ assert.match(model.executiveDirectorBoardSecretary.employment,/IRPA employee/);
+ assert.match(model.executiveDirectorBoardSecretary.absenceRepresentation,/next senior Director/);
+ assert.equal(model.boardTenure.termYears,4);assert.equal(model.boardTenure.renewalCount,1);assert.equal(model.boardTenure.maximumContinuousTenureYears,8);
+ assert.match(model.boardTenure.rule,/does not apply to the employee Board Secretary office/);
+});
+test("governance and management cycles preserve collective Board authority and ED management accountability",()=>{
+ const cycles=catalogue.authorityFramework.governanceManagementCycles;
+ assert.ok(cycles.governanceCycle.stages.length>=5);assert.ok(cycles.managementCycle.stages.length>=5);
+ assert.match(cycles.governanceCycle.continuity,/permanent employee Board Secretary/);
+ assert.match(cycles.managementCycle.accountability,/Executive Director remains accountable to the Board/);
+});
+test("job-description release chain is ED review and release, Administrator assignment and delegate release",()=>{
+ const flow=catalogue.authorityFramework.jobDescriptionReleaseWorkflow;
+ assert.equal(flow.status,"APPROVED_DESIGN_MODEL_NOT_YET_RUNTIME_ENFORCED");
+ assert.deepEqual(flow.stages.map(s=>s.stage),["EXECUTIVE_DIRECTOR_REVIEW","RELEASE_TO_ADMINISTRATOR","ADMINISTRATIVE_ASSIGNMENT","RELEASE_TO_DELEGATE","ACKNOWLEDGEMENT_AND_ACTIVATION"]);
+ assert.match(flow.stages[2].boundary,/may not invent appointments/);
+ assert.match(flow.authorization,/server-side authorization/);
+});
+test("existing bank mandates are recognised without inventing signatories or limits",()=>{
+ const bank=catalogue.authorityFramework.constitutionalOfficeModel.banking;
+ assert.match(bank.status,/EXISTING_AUTHORISED_BANK_ACCOUNTS/);
+ assert.match(bank.rule,/must not create, replace, infer or alter bank signatories/);
+ assert.ok(catalogue.signingMatrix.existingBankMandates);
+});
+test("volunteer roles remain non-authorising and IT support is supervised",()=>{
+ const p=catalogue.authorityFramework.interimPersonnelBaseline;
+ assert.equal(p.volunteers.length,6);
+ assert.match(p.volunteers.find(x=>x.role==="IT Specialist").status,/SUPERVISED_SUPPORT_ONLY/);
+ for(const id of ["director-international-oversight","programme-officer","outreach-officer","community-development-officer","director-finance-administration","it-specialist"]){const role=catalogue.roles.find(x=>x.id===id);assert.ok(role);for(const key of ["mayInitiate","mayReview","mayApprove","maySign","mayRelease"])assert.deepEqual(role.workflows[key],[],id+" "+key);}
 });
