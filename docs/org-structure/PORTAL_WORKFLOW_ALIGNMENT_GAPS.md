@@ -95,3 +95,33 @@ IRPA confirms existing authorised bank accounts and signatories. The current ban
 Required sequence: Executive Director reviews the complete catalogue; Executive Director releases the approved version to the Administrator; Administrator assigns each description to a verified current delegate; Administrator releases the assigned description to that delegate; acknowledgement and appointment/delegation evidence are recorded. The Administrator cannot rewrite descriptions, create appointments, expand delegations or grant Board-reserved powers. A released description or acknowledgement does not activate permissions by itself.
 
 **Runtime gap remains:** this repository change updates the constitutional/policy data model and documentation. It does not implement the authenticated Executive Director review queue, Administrator assignment/release UI, delegate acknowledgement workflow, immutable server-side transition enforcement or role-specific live access. Those require a separately tested runtime implementation. No Firestore rules or live personnel records are changed by this change.
+
+
+## 8. Intranet job-description workflow implementation (2026-11-15)
+
+A dedicated `Job Description Administration` portal has been added for the Executive Director and Administrator. The authenticated `Role Descriptions` portal now also exposes the assigned delegate's acknowledgement workflow.
+
+Implemented workflow states:
+- `RELEASED_TO_ADMINISTRATOR` — Executive Director releases a versioned JD snapshot.
+- `ASSIGNED_PENDING_DELEGATE_ACKNOWLEDGEMENT` — Administrator assigns an active Member/Employee identity and records appointment/engagement, delegation/resolution and date references.
+- `ACKNOWLEDGED_PENDING_ED_VERIFICATION` — the assigned delegate acknowledges within DBGS.
+- `VERIFIED_PENDING_SERVER_AUTHORIZATION` — Executive Director records the governing evidence reference reviewed.
+
+Firestore rules enforce actor-specific, ordered transitions; deny reserved Board/Executive Director/Administrator role assignment; prevent record deletion; and require the permission-activation flag to remain false. Existing server-side Firestore audit triggers record changes. No Cloud Function, external workflow SaaS or email delivery is added.
+
+**Important remaining boundary:** this workflow deliberately does not activate application permissions, update Firebase claims, alter member/employee role assignments, create administrator profiles, or confer signature/bank authority. A separately designed and tested server-side authorization release is still required before operational access can be granted from a verified appointment/delegation. The workflow is not yet deployed or live-verified.
+
+
+## 9. Governance correction — Executive Director assignment authority (2026-11-15)
+
+The Administrator is **not** vested with authority to assign positions, determine responsibilities, appoint or select delegates, or amend job descriptions. The earlier draft implementation that exposed recipient selection and assignment fields to the Administrator has been superseded.
+
+The operative process is now:
+1. Executive Director selects the intended person, determines and approves the position and JD responsibilities/limits, and records appointment/engagement and written delegation/resolution references with effective/review dates.
+2. Administrator receives that exact approved instruction and distributes the versioned JD to the named person through DBGS. Administrator has no recipient-selection or content-edit permission.
+3. Named delegate acknowledges receipt in the intranet portal.
+4. Executive Director verifies the acknowledgement and evidence record.
+
+Firestore production and staging rules have been aligned to enforce this boundary: only the Executive Director can create the assignment instruction; the Administrator can only change the workflow state from `ED_APPROVED_PENDING_ADMIN_DISTRIBUTION` to `RELEASED_TO_DELEGATE` without changing the named recipient, JD snapshot or governing references; only the designated recipient can acknowledge; only the Executive Director can verify. Workflow permission activation remains false at every stage.
+
+The revised implementation is in the development branch and requires the full CI/security-rule/build review before merge. It has not been deployed or live-verified.
