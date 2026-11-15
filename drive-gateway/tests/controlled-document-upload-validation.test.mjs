@@ -70,3 +70,7 @@ test("Research Archive upload is enforced by the gateway for active Research aut
   assert.match(gatewaySource, /isResearchArchiveRequest\(documentType, archiveCategory\)[\s\S]{0,220}isActiveResearchArchiveAuthority\(memberRecord, employeeRecord, adminRecord\)/);
   assert.match(gatewaySource, /Research Archive upload authority is required/);
 });
+
+test("Research Archive classification cannot be Public at the gateway", () => {
+  assert.match(gatewaySource, /Research Archive documents cannot be classified as Public/);
+});
