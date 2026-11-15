@@ -10,6 +10,12 @@ test("Executive Director has a dedicated intranet job-description administration
  assert.match(app,/selectedAuthority==="Executive Director"/);
  assert.match(page,/ED_APPROVED_PENDING_ADMIN_DISTRIBUTION/);
 });
+test("Executive Director workflow read accepts the same active institutional role claims as the application",()=>{
+ for(const source of [rules,stagingRules]){
+  assert.match(source,/function jobDescriptionExecutiveDirector\(\)\{return anyInstitutionalRole\(\["Executive Director"\]\);\}/);
+  assert.match(source,/function anyInstitutionalRole\(roles\)/);
+ }
+});
 test("Executive Director alone determines the designated position-holder and approves assignment evidence",()=>{
  assert.match(page,/Executive Director-designated position-holder/);
  assert.match(page,/designatedRecipientUid:target\.uid/);
