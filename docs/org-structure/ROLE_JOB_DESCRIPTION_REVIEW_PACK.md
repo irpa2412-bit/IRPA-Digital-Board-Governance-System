@@ -1,6 +1,6 @@
 # IRPA Role Job Descriptions — Review Pack
 
-**DRAFT — FOR OWNER REVIEW ONLY.** All organisational positions are VACANT. This pack does not appoint anyone and does not grant runtime access. HR and legal review is advised before use for any actual appointment. Protected controls remain superior to every job description.
+**OWNER-UPDATED CONSTITUTIONAL / PERSONNEL BASELINE — DRAFT DESCRIPTIONS, NOT APPOINTMENT OR ACCESS GRANTS.** Confirmed occupied offices and volunteer roles are identified in the authority register. All other positions remain unconfirmed/vacant. HR and legal review is advised before formal use. Protected controls remain superior to every job description.
 
 ## Summary
 
@@ -1090,3 +1090,18 @@
 ## Interim sole-approver
 
 **DRAFT — owner-only, default OFF.** Scope limited to website publishing author/approver separation and second signer in Signature. USD 0 payment authority. Activation requires explicit authenticated owner authorisation. Sealing requires two stored complete AI readiness reports; any FAIL blocks; each NOT VERIFIED item needs specific written owner acceptance; authenticated owner invokes seal; server stores full report text/timestamps and interim action inventory, sets and verifies flag OFF, and records the required advisory statement. AI reviewers are advisory, not independent human approvers. Re-enablement requires new explicit authorisation.
+
+
+## Constitutional and interim personnel corrections (15 November 2026)
+
+- Executive Director: OCCUPIED. The Executive Director is also the permanent employee Board Secretary; both are capacities of the same incumbent. Board Secretary continuity is not subject to Board-member term limits.
+- Board Chairperson and Board Treasurer: OCCUPIED.
+- Board Members: several occupied positions; each member's approved term dates must be individually recorded. Board terms are four years, renewable once, maximum eight years.
+- Volunteer roles confirmed by the owner: Director of International Oversight; Programme Officer; Outreach Officer; Community Development Officer; Director of Finance and Administration; and IT Specialist (preliminary college training, supervised support only).
+- Volunteer engagement is not employment and does not confer implied approval, signing, banking, procurement, administrator, security or production authority.
+- During Executive Director absence, the next senior Director represents the Executive Director within the constitutional and recorded acting scope. The individual is not assumed until the approved seniority order is verified.
+- IRPA has existing authorised bank accounts and signatories. Current bank mandates and Board resolutions govern; this pack does not alter or recreate them.
+
+## Required job-description routing
+
+**Executive Director review → Executive Director release to Administrator → Administrator assigns to verified delegate → Administrator releases the assigned description to that delegate → acknowledgement and evidence verification.** The Administrator may administer the approved assignment but may not change the job description, create an appointment or expand authority. No runtime permission arises from a release or acknowledgement alone.
