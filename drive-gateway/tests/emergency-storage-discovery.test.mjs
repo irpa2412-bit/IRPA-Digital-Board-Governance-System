@@ -92,3 +92,23 @@ test("root collection listing uses one Firestore request and returns only collec
   assert.equal(calls.length, 1);
   assert.match(calls[0].url, /:listCollectionIds/);
 });
+
+
+test("a completed discovery run writes one metadata-only audit event", async () => {
+  const { route, calls } = fixture({ firestorePages: [{ body: { commitTime: "2026-11-15T18:00:00Z" } }] });
+  const response = await route(new Request("https://worker.test/api/signature-pathway/emergency-storage", {
+    method: "POST", headers: { Authorization: "Bearer user-token" },
+    body: JSON.stringify({ action: "audit", runId: "run-123", hitCount: 2, collectionCount: 1, scannedCollectionIds: ["documents"], completed: true })
+  }), {});
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(data.audited, true);
+  assert.equal(data.hitCount, 2);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /:commit/);
+  const write = JSON.parse(calls[0].init.body).writes[0];
+  assert.equal(write.update.fields.action.stringValue, "EMERGENCY_STORAGE_DISCOVERY");
+  assert.equal(write.update.fields.hitCount.integerValue, "2");
+  assert.equal(write.update.fields.completed.booleanValue, true);
+  assert.equal(JSON.stringify(write).includes("file-bytes"), false);
+});
