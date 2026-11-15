@@ -1367,6 +1367,9 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
         !isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord)) {
       problems.push("Research Archive upload authority is required.");
     }
+    if (isResearchArchiveRequest(documentType, archiveCategory) && classification === "Public") {
+      problems.push("Research Archive documents cannot be classified as Public.");
+    }
     if (!ALLOWED_CONTENT_TYPES.has(contentType)) problems.push("Unsupported content type.");
     if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) problems.push("File size must be between 1 byte and 10 MB.");
     if (!allowedCategories.includes(archiveCategory)) problems.push("Invalid document archive category.");
@@ -1404,6 +1407,10 @@ async function registerControlledDocumentRecord(request, env) {
   if (isResearchArchiveRequest(supplied.documentType, supplied.archiveCategory) &&
       !isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord)) {
     return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+  }
+  if (isResearchArchiveRequest(supplied.documentType, supplied.archiveCategory) &&
+      String(supplied.classification || "") === "Public") {
+    return json({ok:false,error:"Research Archive documents cannot be classified as Public."},403,corsHeaders(request));
   }
   if (supplied.status!=="Draft" || supplied.authorizationStatus!=="Draft") return json({ok:false,error:"STEP Firestore documents record: initial controlled documents must remain Draft."},400,corsHeaders(request));
   const driveFileId = String(supplied.fileId||supplied.driveFileId||supplied.archiveFileId||"").trim();
@@ -1456,6 +1463,9 @@ async function uploadControlledDocument(request, env) {
   if (isResearchArchiveRequest(documentType, archiveCategory) &&
       !isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord)) {
     return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+  }
+  if (isResearchArchiveRequest(documentType, archiveCategory) && classification === "Public") {
+    return json({ok:false,error:"Research Archive documents cannot be classified as Public."},403,corsHeaders(request));
   }
 
   const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
@@ -2215,6 +2225,7 @@ async function ensureDocumentArchiveFolder(request, env) {
     const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
     const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,await getFirestoreAdminAccessToken(env));
     if (!isActiveResearchArchiveAuthority(memberRecord,employeeRecord,adminRecord)) return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+    if (classification === "Public") return json({ok:false,error:"Research Archive documents cannot be classified as Public."},403,corsHeaders(request));
   }
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
@@ -2334,6 +2345,7 @@ async function ensureSignedDocumentArchive(request, env) {
     const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
     const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,await getFirestoreAdminAccessToken(env));
     if (!isActiveResearchArchiveAuthority(memberRecord,employeeRecord,adminRecord)) return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+    if (classification === "Public") return json({ok:false,error:"Research Archive documents cannot be classified as Public."},403,corsHeaders(request));
   }
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
