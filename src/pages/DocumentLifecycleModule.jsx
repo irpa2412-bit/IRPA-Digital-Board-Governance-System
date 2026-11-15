@@ -36,7 +36,7 @@ export default function DocumentLifecycleModule({profile,employee,admin=false}){
  const currentUid=profile?.uid||employee?.uid;
  const researchArchiveAccess=admin||[profile,employee].some(record=>{
   if(!record)return false;
-  const roles=[record.role,...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[])].filter(Boolean);
+  const roles=[record.role,...(Array.isArray(record.roles)?record.roles:[]),...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])].filter(Boolean);
   return String(record.department||"").toLowerCase().includes("research")||roles.some(role=>String(role).toLowerCase().includes("research"));
  });
  const load=async()=>{setBusy(true);setError("");try{const r=await listLifecycleDocuments();setDocuments(r.documents||[]);if(selected){const fresh=(r.documents||[]).find(x=>x.documentId===selected.documentId);if(fresh)setSelected(fresh)}}catch(e){setError(e.message||"Unable to load the document workspace.")}finally{setBusy(false)}};
