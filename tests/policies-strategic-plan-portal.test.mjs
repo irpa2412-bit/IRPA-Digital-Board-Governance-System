@@ -62,4 +62,8 @@ test("shared Research Portal upload control exposes Research Archive only to Res
  assert.match(controlledUpload,/"Research Archive": "Research Documents"/);
  assert.match(controlledUpload,/disabled=\{type === "Research Archive" && !allowResearchArchiveUpload\}/);
  assert.match(controlledUpload,/setAllowResearchArchiveUpload\(researchAuthority\)/);
+ assert.match(controlledUpload,/setClassification\("Confidential"\)/);
+ assert.match(controlledUpload,/documentType === "Research Archive" && value === "Public"/);
+ assert.match(documents,/setClassification\("Confidential"\)/);
+ assert.match(documents,/x==="Public"&&documentType==="Research Archive"/);
 });
