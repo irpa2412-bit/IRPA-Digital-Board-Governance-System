@@ -68,7 +68,7 @@ test("shared Research Portal upload control exposes Research Archive only to Res
  assert.match(controlledUpload,/documentType === "Research Archive" && value === "Public"/);
  assert.match(documents,/setClassification\("Confidential"\)/);
  assert.match(documents,/x==="Public"&&documentType==="Research Archive"/);
- assert.match(documents,/else if\(archiveCategory==="Research Documents"\)setArchiveCategory\("Administrative Documents"\)/);
+ assert.match(documents,/else if\(archiveCategory==="Research Documents"\)\{setArchiveCategory\("Administrative Documents"\);\}/);
  assert.match(documents,/setArchiveCategory\("Administrative Documents"\);return r/);
  assert.match(app,/ResearchStatisticsKnowledgePortal profile=\{profile\} employee=\{employee\} admin=\{sessionAdministrator\}/);
  assert.match(researchPortal,/allowResearchArchiveUpload=\{admin\}/);
