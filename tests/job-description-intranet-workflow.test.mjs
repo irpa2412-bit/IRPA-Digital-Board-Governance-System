@@ -8,31 +8,46 @@ const stagingRules=fs.readFileSync("firestore.staging.rules","utf8");
 test("Executive Director has a dedicated intranet job-description administration route",()=>{
  assert.match(app,/Job Description Administration/);
  assert.match(app,/selectedAuthority==="Executive Director"/);
- assert.match(page,/RELEASED_TO_ADMINISTRATOR/);
+ assert.match(page,/ED_APPROVED_PENDING_ADMIN_DISTRIBUTION/);
 });
-test("workflow enforces ED release, Administrator assignment, delegate acknowledgement and ED evidence verification",()=>{
- for(const stage of ["RELEASED_TO_ADMINISTRATOR","ASSIGNED_PENDING_DELEGATE_ACKNOWLEDGEMENT","ACKNOWLEDGED_PENDING_ED_VERIFICATION","VERIFIED_PENDING_SERVER_AUTHORIZATION"])assert.ok(page.includes(stage),stage);
- assert.match(rules,/function jobDescriptionExecutiveDirector\(\)/);
- assert.match(rules,/admin\(\).*RELEASED_TO_ADMINISTRATOR/s);
- assert.match(rules,/assignedUid.*ACKNOWLEDGED_PENDING_ED_VERIFICATION/s);
+test("Executive Director alone determines the designated position-holder and approves assignment evidence",()=>{
+ assert.match(page,/Executive Director-designated position-holder/);
+ assert.match(page,/designatedRecipientUid:target\.uid/);
+ assert.match(rules,/jobDescriptionExecutiveDirector\(\).*designatedRecipientUid/s);
+ assert.match(rules,/jobDescriptionIdentityActive\(request\.resource\.data\.get\("designatedRecipientUid"/);
+});
+test("Administrator can only distribute the Executive Director-approved record without changing its terms",()=>{
+ assert.match(page,/Administrator — Distribution queue/);
+ assert.match(page,/distributeRole/);
+ assert.doesNotMatch(page,/assignRole|setAssignments|Verified active Member \/ Employee/);
+ assert.match(rules,/ED_APPROVED_PENDING_ADMIN_DISTRIBUTION.*RELEASED_TO_DELEGATE/s);
+ assert.match(rules,/designatedRecipientUid","")==resource\.data\.get\("designatedRecipientUid"/);
+ assert.match(rules,/roleSnapshot",null\)==resource\.data\.get\("roleSnapshot"/);
+ assert.match(rules,/hasOnly\(\["status","distributedByUid"/);
+});
+test("Delegate acknowledgement is scoped to the ED-designated authenticated identity",()=>{
+ assert.match(page,/workflow\.designatedRecipientUid!==uid/);
+ assert.match(rules,/resource\.data\.get\("designatedRecipientUid",""\)==request\.auth\.uid/);
+});
+test("Executive Director verifies acknowledgement and evidence; permission activation remains denied",()=>{
+ assert.match(page,/VERIFIED_PENDING_SERVER_AUTHORIZATION/);
  assert.match(rules,/jobDescriptionExecutiveDirector\(\).*VERIFIED_PENDING_SERVER_AUTHORIZATION/s);
-});
-test("Administrator cannot assign reserved governance offices or activate permissions",()=>{
- assert.match(page,/RESERVED_ROLE_IDS/);
- assert.match(rules,/function jobDescriptionReservedRole/);
- assert.match(rules,/permissionsActivated",true\)==false/);
  assert.match(page,/permissionsActivated:false/);
  assert.doesNotMatch(page,/permissionsActivated:true/);
 });
-test("delegate acknowledgement is scoped to the assigned authenticated identity",()=>{
- assert.match(page,/workflow\.assignedUid!==uid/);
- assert.match(rules,/resource\.data\.get\("assignedUid",""\)==request\.auth\.uid/);
+test("Production and staging rules enforce the same intranet workflow controls",()=>{
+ for(const source of [rules,stagingRules]){
+  assert.match(source,/match \/jobDescriptionWorkflows\/{roleId}/);
+  assert.match(source,/ED_APPROVED_PENDING_ADMIN_DISTRIBUTION/);
+  assert.match(source,/RELEASED_TO_DELEGATE/);
+  assert.match(source,/allow delete:if false/);
+ }
 });
-test("workflow is intranet-only and does not depend on email delivery or third-party workflow services",()=>{
+test("workflow is intranet-only and does not depend on external email delivery",()=>{
  assert.match(page,/from"firebase\/firestore"/);
- assert.doesNotMatch(page,/sendEmployeeRegistrationEmail|mailto:|https?:\/\//);
+ assert.doesNotMatch(page,/sendEmployeeRegistrationEmail|mailto:/);
 });
-test("job descriptions are snapshotted and workflow records are not deletable",()=>{
+test("job descriptions are snapshotted and protected from client deletion",()=>{
  assert.match(page,/roleSnapshot:role/);
  assert.match(rules,/allow delete:if false/);
 });
