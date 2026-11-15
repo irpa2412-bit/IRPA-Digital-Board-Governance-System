@@ -6,10 +6,10 @@ Operate internal IRPA governance and management processes inside DBGS. The intra
 
 ## Job-description lifecycle
 
-1. **Catalogue control:** The approved role catalogue is read from `config/org-structure-authority.json`. The Executive Director reviews the complete catalogue and releases a versioned snapshot to the Administrator queue.
-2. **Administrator assignment:** The Administrator selects an existing active Member or Employee identity and records the appointment/engagement instrument, written delegation or resolution reference, effective date and review/expiry date. The Administrator cannot edit the approved JD snapshot, appoint a person, create missing evidence, or assign reserved Board/Executive Director/Administrator offices.
-3. **Delegate release:** The assigned delegate sees the description in the authenticated Role Descriptions portal. The delegate acknowledges receipt inside DBGS. No email link is required.
-4. **Executive Director verification:** The Executive Director reviews the recorded references and delegate acknowledgement, then records the governing evidence reference reviewed.
+1. **Executive Director decision and assignment:** The Executive Director reviews the complete approved role catalogue, determines the specific position-holder, confirms the role and department, approves the duties, decision scope, limits, escalation and reporting lines, and records the appointment/engagement and written delegation/resolution references with effective and review dates. The Executive Director alone creates the assignment instruction.
+2. **Administrator distribution:** The Administrator receives the exact approved instruction and distributes the version-controlled job description to the named person through the relevant department/unit in DBGS. The Administrator cannot choose or substitute the recipient, create or approve an appointment, amend duties or limits, or independently assign a role.
+3. **Delegate acknowledgement:** The named recipient sees only their own released job description in the authenticated Role Descriptions portal and acknowledges receipt inside DBGS.
+4. **Executive Director verification:** The Executive Director reviews the acknowledgement and records the governing appointment/delegation evidence reference. Any discrepancy returns to the Executive Director; the Administrator cannot resolve it by changing the assignment.
 5. **Runtime authorization:** The workflow stops at `VERIFIED_PENDING_SERVER_AUTHORIZATION`. It does not issue Firebase claims, alter member/employee roles, create administrator profiles, grant portal access, enable signature authority, or change bank mandates. Runtime permissions require a separately implemented and tested server-side authorization release based on the governing appointment/delegation instrument and policy checks.
 
 ## Authority and separation of duties
@@ -59,7 +59,7 @@ Operate internal IRPA governance and management processes inside DBGS. The intra
 ## Acceptance criteria
 
 - Executive Director can review the catalogue and release an approved JD snapshot.
-- Administrator can assign only an existing active Member/Employee identity and must supply appointment/engagement, delegation/resolution and date references.
+- Executive Director selects the named person and supplies appointment/engagement, delegation/resolution and date references; Administrator can only distribute the approved JD to that named person.
 - Reserved Board/Executive Director/Administrator positions cannot be assigned through the Administrator interface.
 - Assigned delegate can view and acknowledge only their own assigned JD.
 - Executive Director can record evidence verification after acknowledgement.
