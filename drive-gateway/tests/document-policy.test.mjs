@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {resolveIdentity,canUpload,canRead,canTransition,buildDocumentRecord} from "../src/documentPolicy.mjs";
 const employee=resolveIdentity({uid:"emp-1",email:"e@irpa.or.tz",employee:{status:"Active",department:"Finance",roles:["Finance Officer"]}});
+const research=resolveIdentity({uid:"research-1",email:"r@irpa.or.tz",employee:{status:"Active",department:"Research, Statistics and Knowledge",roles:["Research Officer"]}});
 const hr=resolveIdentity({uid:"hr-1",email:"h@irpa.or.tz",employee:{status:"Active",department:"HR",roles:["HR Officer"]}});
 const admin=resolveIdentity({uid:"adm-1",email:"a@irpa.or.tz",admin:{active:true}});
 test("active employee may upload internal finance document within department",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Finance",archiveCategory:"Finance Documents"}).allowed,true));
@@ -18,4 +19,7 @@ test("finance document accepts spreadsheet format required for financial schedul
 test("finance document accepts PDF format",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Finance",archiveCategory:"Finance Documents",contentType:"application/pdf"}).allowed,true));
 test("finance document rejects presentation format",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Finance",archiveCategory:"Finance Documents",contentType:"application/vnd.openxmlformats-officedocument.presentationml.presentation"}).allowed,false));
 test("research document accepts presentation format",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Research",archiveCategory:"Administrative Documents",contentType:"application/vnd.openxmlformats-officedocument.presentationml.presentation"}).allowed,true));
+test("Research Archive type accepts research file formats for Research personnel",()=>{const research=resolveIdentity({uid:"research-1",email:"r@irpa.or.tz",employee:{status:"Active",department:"Research, Statistics and Knowledge",roles:["Research Officer"]}});assert.equal(canUpload(research,{classification:"Internal",documentType:"Research Archive",archiveCategory:"Research Documents",contentType:"application/pdf"}).allowed,true)});
+test("Research Archive upload is denied to non-Research personnel",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Research Archive",archiveCategory:"Research Documents",contentType:"application/pdf"}).allowed,false));
+test("Research Archive cannot be uploaded with Public classification",()=>assert.equal(canUpload(research,{classification:"Public",documentType:"Research Archive",archiveCategory:"Research Documents",contentType:"application/pdf"}).reason,"Research Archive documents cannot be classified as Public."));
 test("other document type supports broader formats",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Other",archiveCategory:"Administrative Documents",contentType:"application/json"}).allowed,true));

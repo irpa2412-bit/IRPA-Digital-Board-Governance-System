@@ -81,6 +81,10 @@ test("Executive Office is central and is not counted as a fourteenth directorate
   assert.ok(!catalogue.directorates.some(item => item.name === "Executive Office"));
 });
 
+test("Research authority receives Documents and Policies and Strategic Plans access", () => {
+  assert.match(app,/RESEARCH_AUTHORITY_ROLES\.includes\(selected\)\?\["Dashboard","Documents","Policies and Strategic Plans","Research, Statistics and Knowledge"/);
+});
+
 test("portal routing has exactly one authoritative role-to-directorate map", () => {
   assert.equal((app.match(/const ROLE_DEPARTMENT=/g) || []).length, 1);
 });

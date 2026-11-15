@@ -5,7 +5,8 @@ const DocumentReader = React.lazy(() => import("./DocumentReader"));
 
 export default function PortalDocumentAccessPoint({
   portal = "Current Portal",
-  allowRestrictedUpload = false
+  allowRestrictedUpload = false,
+  allowResearchArchiveUpload = false
 }) {
   const [open, setOpen] = useState(false);
   const [uploaded, setUploaded] = useState(null);
@@ -71,6 +72,7 @@ export default function PortalDocumentAccessPoint({
           <ControlledDocumentUpload
             purpose={`${label} — Document Upload`}
             allowRestrictedUpload={allowRestrictedUpload}
+            allowResearchArchiveUpload={allowResearchArchiveUpload}
             onUploaded={doc => setUploaded(doc)}
           />
         </div>

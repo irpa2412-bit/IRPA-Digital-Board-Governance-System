@@ -7,12 +7,13 @@ function makeDeps(state){
   return {
     FIREBASE_PROJECT_ID:"irpa-digital-board-governance",
     allowedContentTypes:new Set(["application/pdf","text/plain"]),
-    authenticateFirebaseRequest:async()=>({user_id:"emp-1",email:"employee@irpa.or.tz",token:"token"}),
+    authenticateFirebaseRequest:async()=>state.researchUser?({user_id:"research-1",email:"research@irpa.or.tz",token:"token"}):({user_id:"emp-1",email:"employee@irpa.or.tz",token:"token"}),
     getFirestoreAdminAccessToken:async()=> "worker-admin-token",
     getFirestoreDocument:async(_env,path)=>{
       if(path==="adminProfiles/emp-1")return null;
       if(path==="members/emp-1")return null;
       if(path==="employees/emp-1")return {fields:{status:{stringValue:"Active"},department:{stringValue:"Finance"},roles:{arrayValue:{values:[{stringValue:"Finance Officer"}]}}}};
+      if(path==="employees/research-1")return {fields:{status:{stringValue:"Active"},department:{stringValue:"Research, Statistics and Knowledge"},roles:{arrayValue:{values:[{stringValue:"Research Officer"}]}}}};
       if(path.startsWith("documents/"))return state.docs[path.split("/").pop()]||null;
       if(path.startsWith("signatureEnvelopes/"))return state.envelopes?.[path.split("/").pop()]?{plain:state.envelopes[path.split("/").pop()]}:null;
       return null;
@@ -105,6 +106,16 @@ test("upload rolls back Drive file when atomic document/audit commit fails",asyn
   assert.equal(state.failureEvents[0].details.failureReason,"simulated atomic document/audit commit failure");
   assert.equal(state.failureEvents[0].details.driveFileId,"drive-upload-1");
   assert.equal(state.failureEvents[0].details.rollbackStatus,"SUCCEEDED");
+});
+
+test("Research Officer can upload a Research Archive record into Research Documents",async()=>{
+  const state={docs:{},writes:[],deletedFiles:[],researchUser:true};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/upload",{fileName:"research.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Research Archive Record",documentType:"Research Archive",archiveCategory:"Research Documents",classification:"Internal"}),env);
+  assert.equal(response.status,201);
+  const saved=Object.values(state.docs)[0];
+  assert.equal(saved.plain.documentType,"Research Archive");
+  assert.equal(saved.plain.archiveCategory,"Research Documents");
 });
 
 test("successful upload atomically writes document registry and audit event",async()=>{
