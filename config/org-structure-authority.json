@@ -1821,9 +1821,8 @@
         "Finance approver cannot sign the same item they approved."
       ],
       "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VOLUNTEER_ACTIVE",
-      "knownVolunteerDesignation": "Programme Officer",
-      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
+      "appointmentStatus": "VACANT",
+      "engagementStatus": "UNCONFIRMED_POSITION"
     },
     {
       "id": "procurement-officer",
@@ -3405,7 +3404,7 @@
       "effectiveAuthoritySource": "Approved organisational appointment + job description + current written delegation + instrument-specific controls must also authorise the selected action."
     },
     "existingBankMandates": {
-      "status": "EXISTING_AUTHORised_BANK_ACCOUNTS_AND_SIGNATORIES_CONFIRMED_BY_OWNER",
+      "status": "EXISTING_AUTHORISED_BANK_ACCOUNTS_AND_SIGNATORIES_CONFIRMED_BY_OWNER",
       "authority": "Current bank mandate and supporting Board resolutions",
       "applicationRule": "Reflect the existing mandate exactly after verification; do not invent, replace or infer signatories, account identifiers, joint-signing combinations or transaction limits.",
       "limitation": "This organisational matrix does not amend or supersede the bank mandate."
