@@ -6,6 +6,8 @@ on:
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/App.jsx"
+      - "src/pages/PoliciesStrategicPlanPortal.jsx"
+      - "tests/policies-strategic-plan-portal.test.mjs"
       - "tests/portal-workspace-navigation.test.mjs"
       - "tests/communication-media-policy.test.mjs"
       - "src/pages/CommunicationMediaPortal.jsx"
@@ -45,4 +47,4 @@ jobs:
       - name: Install locked application dependencies
         run: npm ci
       - name: Run isolated navigation regression tests
-        run: npm run test:portal-navigation && npm run test:communication-media
+        run: npm run test:portal-navigation && npm run test:policies-strategic-plan-portal && npm run test:communication-media
