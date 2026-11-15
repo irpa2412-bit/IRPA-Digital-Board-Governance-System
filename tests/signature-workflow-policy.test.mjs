@@ -166,3 +166,17 @@ test("owner remains selectable for field assignment and each signature field rem
   assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
   assert.ok(portal.includes('ownerSigningEnabled?[{...documentOwner,optionalSigning:false,actionRequired:true}]:[]'));
 });
+
+test("signature assignment and signing handlers synchronously reject repeated submissions", () => {
+  assert.match(portal, /const addSignerInFlightRef=useRef\(false\),signInFlightRef=useRef\(false\)/);
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)\n/);
+  assert.ok(addSigner, "the signer assignment handler must exist");
+  assert.match(addSigner[1], /if\(addSignerInFlightRef\.current\|\|busy\)return/);
+  assert.match(addSigner[1], /addSignerInFlightRef\.current=true/);
+  assert.match(addSigner[1], /finally\{addSignerInFlightRef\.current=false;setBusy\(false\)\}/);
+  const sign = portal.match(/async function sign\(\)\{([\s\S]*?)\n/);
+  assert.ok(sign, "the signing handler must exist");
+  assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
+  assert.match(sign[1], /signInFlightRef\.current=true/);
+  assert.match(sign[1], /finally\{signInFlightRef\.current=false;setBusy\(false\)\}/);
+});
