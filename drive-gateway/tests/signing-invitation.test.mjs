@@ -33,8 +33,8 @@ async function fixture({failResend=false}={}) {
 
 test("Gateway invitation plain-text body uses real line breaks, not escaped newline text",()=>{
   const message=buildInvitationMessage({name:"Assigned Signer",link:"https://irpa.example.test/sign?gatewayToken=token&signEnvelope=IRPA-ENV-1"});
-  assert.ok(message.text.includes("\\n\\n"));
-  assert.doesNotMatch(message.text,/\\\\n/);
+  assert.ok(message.text.includes("\n\n"));
+  assert.doesNotMatch(message.text,/\\n/);
 });
 
 test("initial Gateway invitation contains the portal envelope ID and a one-time signer token",async()=>{
