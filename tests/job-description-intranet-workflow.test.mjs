@@ -16,6 +16,12 @@ test("Executive Director alone determines the designated position-holder and app
  assert.match(rules,/jobDescriptionExecutiveDirector\(\).*designatedRecipientUid/s);
  assert.match(rules,/jobDescriptionIdentityActive\(request\.resource\.data\.get\("designatedRecipientUid"/);
 });
+test("Executive Director selects from active system member and employee registers; Administrator does not load those registers",()=>{
+ assert.match(page,/if\(isExecutiveDirector\)\{\s*const \[members,employees\]=await Promise\.all\(\[getDocs\(collection\(db,"members"\)\),getDocs\(collection\(db,"employees"\)\)\]\)/);
+ assert.match(page,/activeRecord\(row\)/);
+ assert.match(page,/source:"Member"/);
+ assert.match(page,/source:"Employee"/);
+});
 test("Administrator can only distribute the Executive Director-approved record without changing its terms",()=>{
  assert.match(page,/Administrator — Distribution queue/);
  assert.match(page,/distributeRole/);
