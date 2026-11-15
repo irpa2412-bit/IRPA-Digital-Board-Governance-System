@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {resolveIdentity,canUpload,canRead,canTransition,buildDocumentRecord} from "../src/documentPolicy.mjs";
 const employee=resolveIdentity({uid:"emp-1",email:"e@irpa.or.tz",employee:{status:"Active",department:"Finance",roles:["Finance Officer"]}});
+const research=resolveIdentity({uid:"research-1",email:"r@irpa.or.tz",employee:{status:"Active",department:"Research, Statistics and Knowledge",roles:["Research Officer"]}});
 const hr=resolveIdentity({uid:"hr-1",email:"h@irpa.or.tz",employee:{status:"Active",department:"HR",roles:["HR Officer"]}});
 const admin=resolveIdentity({uid:"adm-1",email:"a@irpa.or.tz",admin:{active:true}});
 test("active employee may upload internal finance document within department",()=>assert.equal(canUpload(employee,{classification:"Internal",documentType:"Finance",archiveCategory:"Finance Documents"}).allowed,true));
