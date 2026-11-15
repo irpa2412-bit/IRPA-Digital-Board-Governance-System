@@ -110,3 +110,18 @@ Implemented workflow states:
 Firestore rules enforce actor-specific, ordered transitions; deny reserved Board/Executive Director/Administrator role assignment; prevent record deletion; and require the permission-activation flag to remain false. Existing server-side Firestore audit triggers record changes. No Cloud Function, external workflow SaaS or email delivery is added.
 
 **Important remaining boundary:** this workflow deliberately does not activate application permissions, update Firebase claims, alter member/employee role assignments, create administrator profiles, or confer signature/bank authority. A separately designed and tested server-side authorization release is still required before operational access can be granted from a verified appointment/delegation. The workflow is not yet deployed or live-verified.
+
+
+## 9. Governance correction — Executive Director assignment authority (2026-11-15)
+
+The Administrator is **not** vested with authority to assign positions, determine responsibilities, appoint or select delegates, or amend job descriptions. The earlier draft implementation that exposed recipient selection and assignment fields to the Administrator has been superseded.
+
+The operative process is now:
+1. Executive Director selects the intended person, determines and approves the position and JD responsibilities/limits, and records appointment/engagement and written delegation/resolution references with effective/review dates.
+2. Administrator receives that exact approved instruction and distributes the versioned JD to the named person through DBGS. Administrator has no recipient-selection or content-edit permission.
+3. Named delegate acknowledges receipt in the intranet portal.
+4. Executive Director verifies the acknowledgement and evidence record.
+
+Firestore production and staging rules have been aligned to enforce this boundary: only the Executive Director can create the assignment instruction; the Administrator can only change the workflow state from `ED_APPROVED_PENDING_ADMIN_DISTRIBUTION` to `RELEASED_TO_DELEGATE` without changing the named recipient, JD snapshot or governing references; only the designated recipient can acknowledge; only the Executive Director can verify. Workflow permission activation remains false at every stage.
+
+The revised implementation is in the development branch and requires the full CI/security-rule/build review before merge. It has not been deployed or live-verified.
