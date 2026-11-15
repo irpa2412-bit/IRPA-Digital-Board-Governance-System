@@ -1359,9 +1359,14 @@ async function controlledDocumentUploadPolicyCheck(request, env) {
     const fileSize = Number(data.fileSize || 0);
     const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
     const classification = String(data.classification || "Public").trim();
+    const documentType = String(data.documentType || "").trim();
     const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
     const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
     const problems = [];
+    if (isResearchArchiveRequest(documentType, archiveCategory) &&
+        !isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord)) {
+      problems.push("Research Archive upload authority is required.");
+    }
     if (!ALLOWED_CONTENT_TYPES.has(contentType)) problems.push("Unsupported content type.");
     if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_BYTES) problems.push("File size must be between 1 byte and 10 MB.");
     if (!allowedCategories.includes(archiveCategory)) problems.push("Invalid document archive category.");
@@ -1443,6 +1448,11 @@ async function uploadControlledDocument(request, env) {
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
   const classification = String(data.classification || "Public").trim();
   const governanceArchive = data.governanceArchive !== false && /governance/i.test(documentType);
+
+  if (isResearchArchiveRequest(documentType, archiveCategory) &&
+      !isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord)) {
+    return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+  }
 
   const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Administrator Documents","Research Documents"];
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
@@ -2196,7 +2206,12 @@ async function ensureDocumentArchiveFolder(request, env) {
 
   const classification = String(data.classification || "Public").trim();
   const archiveCategory = String(data.archiveCategory || "Administrative Documents").trim();
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Research Documents"];
+  if (isResearchArchiveRequest(data.documentType, archiveCategory)) {
+    const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
+    const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,await getFirestoreAdminAccessToken(env));
+    if (!isActiveResearchArchiveAuthority(memberRecord,employeeRecord,adminRecord)) return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+  }
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
@@ -2310,7 +2325,12 @@ async function ensureSignedDocumentArchive(request, env) {
   const reference = cleanName(data.reference || fields.reference?.stringValue || documentId);
   const documentType = String(fields.documentType?.stringValue || data.documentType || "Administrative Document").trim();
   const governanceArchive = /governance/i.test(documentType);
-  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents"];
+  const allowedCategories = ["Finance Documents","Procurement Documents","Governance Documents","Administrative Documents","Research Documents"];
+  if (isResearchArchiveRequest(documentType, archiveCategory)) {
+    const {memberRecord,employeeRecord} = await getInstitutionalProfileForUser(env,claims);
+    const adminRecord = await getFirestoreDocument(env,"adminProfiles/"+claims.user_id,await getFirestoreAdminAccessToken(env));
+    if (!isActiveResearchArchiveAuthority(memberRecord,employeeRecord,adminRecord)) return json({ok:false,error:"Research Archive upload authority is required."},403,corsHeaders(request));
+  }
   const allowedClassifications = ["Public","Internal","Confidential","Restricted"];
   if (!allowedCategories.includes(archiveCategory)) return json({ok:false,error:"Invalid document archive category."},400,corsHeaders(request));
   if (!allowedClassifications.includes(classification)) return json({ok:false,error:"Invalid document access classification."},400,corsHeaders(request));
@@ -3266,6 +3286,26 @@ async function getInstitutionalProfileForUser(env, claims) {
     memberRecord: memberMatches[0] || null,
     employeeRecord: employeeMatches[0] || null
   };
+}
+
+function isActiveResearchArchiveAuthority(memberRecord, employeeRecord, adminRecord) {
+  if (adminRecord?.fields?.active?.booleanValue === true) return true;
+  return [memberRecord, employeeRecord].map(firestoreDocumentToPlain).filter(Boolean).some(profile => {
+    const active = ["Active", "Activated"].includes(String(profile.status || profile.employmentStatus || profile.registrationStatus || ""));
+    if (!active) return false;
+    const department = String(profile.department || "").trim().toLowerCase();
+    const roles = [profile.role, ...(Array.isArray(profile.roles) ? profile.roles : []),
+      ...(Array.isArray(profile.assignedRoles) ? profile.assignedRoles : []),
+      ...(Array.isArray(profile.selectedRoles) ? profile.selectedRoles : []),
+      ...(Array.isArray(profile.roleAssignments) ? profile.roleAssignments : [])]
+      .filter(Boolean).flatMap(value => String(value).split(",").map(item => item.trim().toLowerCase()).filter(Boolean));
+    return department.includes("research") || roles.some(role => role.includes("research"));
+  });
+}
+
+function isResearchArchiveRequest(documentType, archiveCategory) {
+  return String(documentType || "").trim() === "Research Archive" ||
+    String(archiveCategory || "").trim() === "Research Documents";
 }
 
 function base64UrlEncodeBytes(bytes) {
