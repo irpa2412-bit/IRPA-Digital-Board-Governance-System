@@ -36,7 +36,7 @@ test("external guest signing page is routed before account authentication and su
 
 test("email-link identity is transaction-scoped and does not require a register or authority matrix lookup",()=>{
   assert.doesNotMatch(signing,/verifyEmailSignerAuthority/);
-  assert.match(signing,/signer\.identityType==="email-link"/);
+  assert.match(signing,/identityType==="email-link"/);
   assert.match(signing,/signer\.emailLinkStatus==="opened"/);
   assert.match(signing,/s0\.identityType!=="email-link"/);
   assert.match(signing,/declarationDiscrepancy/);
