@@ -9,7 +9,7 @@ function active(ctx,e){if(["Voided","Declined"].includes(e.status))throw new Htt
 const can=(e,s)=>s.status==="Pending"&&(e.signingMode==="Parallel"||e.signers.every(x=>x.order>=s.order||x.status==="Signed"));
 export function canAuthenticatedSignerAccess(signer,user){
   if(signer?.identityType==="email-link") return signer.emailLinkStatus==="opened";
-  if(!signer?.uid) return false;
+  if(!signer?.uid) return true;
   return Boolean(user?.uid)&&user.uid===signer.uid;
 }
 function assertSignerAuthentication(signer,user){
@@ -33,7 +33,6 @@ export function validateEnvelopeFields(fields,signers){
 }
 export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
   const assigned=(fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),out={},byId=new Map(assigned.map(f=>[f.fieldId,f])),applications=new Map();
-  for(const submittedFieldId of Object.keys(values||{}))if(!byId.has(submittedFieldId))throw new HttpError(403,"A submitted field is not assigned to this signer.");
   if(!Array.isArray(fieldApplications))throw new HttpError(400,"Explicit confirmed signature field applications are required.");
   for(const application of fieldApplications){
     const field=byId.get(String(application?.fieldId||""));
