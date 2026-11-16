@@ -555,7 +555,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   if(addSignerInFlightRef.current||busy)return;
   const email=String(signerEmail||"").trim().toLowerCase();
   const registered=selectedSigner?members.find(x=>x.uid===selectedSigner):null;
-  if(!registered&&!email){setMessage("Select a registered officer or enter the registered email address for an email-link signer.");return;}
+  if(!registered&&!email){setMessage("Select an existing officer or enter the person's email address for an invitation.");return;}
   if(recipients.some(x=>String(x.email||"").trim().toLowerCase()===(registered?String(registered.email||"").trim().toLowerCase():email))){setMessage("This email address is already in the signer hierarchy.");return;}
   if(!title.trim()){setMessage("Enter the envelope title before adding a signer. The owner section cannot be saved without a title.");return;}
   if(!documentId||!documentUrl){setMessage("Select a controlled PDF before adding a signer. The owner section will be saved automatically when you add the officer.");return;}
@@ -604,7 +604,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     const emailLinkRecipients=gatewayRecipients;
     if(emailLinkRecipients.length&&!env.gatewayEnvelopeId){
       setDraftEnvelopeId(env.id);
-      setMessage("Creating the isolated Gateway email-link preview and sending invitations…");
+      setMessage("Creating the Gateway email-signing envelope and sending invitations…");
       const sourceFileId=String(documentUrl||"").startsWith("drive://")?String(documentUrl).slice("drive://".length):(selectedDoc?.driveFileId||selectedDoc?.fileId||selectedDoc?.archiveFileId||selectedDoc?.sourceFileId||"");
       if(!sourceFileId)throw new Error("The controlled PDF has no verified Google Drive file ID for the email-link preview.");
       const sourceBytes=await downloadControlledDocumentBytes(sourceFileId,documentId);
