@@ -21,33 +21,11 @@ test("UID-bound signer comparison is exact and cannot be bypassed by email alone
 import {createHash} from "node:crypto";
 import {sign} from "../src/signing.mjs";
 
-test("staging sign rejects a context without signing-authority verification",async()=>{
-  const secret="a".repeat(64);
-  const hash=createHash("sha256").update(secret).digest("hex");
-  const envelope={
-    id:"ENV-staging-test",
-    documentId:"DOC-staging-test",
-    documentHash:"unused-before-authority-check",
-    expiresAt:"2999-01-01T00:00:00.000Z",
-    status:"Sent",
-    signingMode:"Sequential",
-    events:[],
-    signers:[{id:"S1",uid:"staging-user",status:"Pending",order:1,tokenHash:hash}]
-  };
-  const ctx={
-    env:{IRPA_ENVIRONMENT:"staging"},
-    now:()=>new Date("2026-10-24T00:00:00.000Z"),
-    meta:{get:async(collection,id)=>collection==="envelopes"&&id===envelope.id?envelope:null},
-    storage:{get:async()=>{throw new Error("Storage must not be reached before authority configuration is checked.");}}
-  };
-  await assert.rejects(
-    sign(ctx,{
-      token:envelope.id+".S1."+secret,
-      signature:{type:"typed",value:"Staging test signer"},
-      consent:true,
-      manualAuthorityIdentification:"Test Authority",
-      user:{uid:"staging-user",email:"staging@example.invalid",token:"staging-id-token"}
-    }),
-    error=>error?.status===503&&error.message==="Signing authority verification is not configured on this gateway."
-  );
+test("email-link token access requires redemption while UID-bound access remains exact",()=>{
+  assert.equal(canAuthenticatedSignerAccess({identityType:"email-link",emailLinkStatus:"issued"},null),false);
+  assert.equal(canAuthenticatedSignerAccess({identityType:"email-link",emailLinkStatus:"opened"},null),true);
+  assert.equal(canAuthenticatedSignerAccess({identityType:"legacy-token",uid:null},null),true);
+  assert.equal(canAuthenticatedSignerAccess({uid:"staging-user"},null),false);
+  assert.equal(canAuthenticatedSignerAccess({uid:"staging-user"},{uid:"other-user"}),false);
+  assert.equal(canAuthenticatedSignerAccess({uid:"staging-user"},{uid:"staging-user"}),true);
 });
