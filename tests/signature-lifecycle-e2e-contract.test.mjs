@@ -34,6 +34,9 @@ test("2. envelope creation binds source integrity, two unique signers and page-s
   assert.match(create, /resolveSourceDocumentIntegrity/);
   assert.match(create, /sha256:sourceSha256/);
   assert.match(create, /byteLength:sourceByteLength/);
+  assert.match(signing, /PDFDocument\.load\(sourceBytes\)/);
+  assert.match(signing, /field\.page>pageCount/);
+  assert.match(signing, /seenUids\.has\(uid\)/);
   assert.match(create, /participantUids/);
   assert.match(create, /page:Number\(field\?\.page\|\|1\)/);
   assert.match(portal, /recipients\.some\(x=>x\.uid===m\.uid\)/);
