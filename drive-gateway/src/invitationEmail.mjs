@@ -107,12 +107,12 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
   const safeName=validateName(name);
   if(!safeName)throw new Error("Invalid name");
   const safeLink=new URL(link).toString();
-  const clean=(value,max=180)=>String(value||"").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,max);
+  const clean=(value,max=180)=>String(value||"").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,max);
   const safeTitle=clean(title)||"A controlled IRPA document";
   const safeOwner=clean(ownerName)||"IRPA Document Owner";
   const safeExpiry=clean(expiresAt,80)||"the expiry date shown on the invitation page";
   const subject="IRPA secure document-signing invitation";
-  const text="Dear "+safeName+",\\n\\n"+safeOwner+" has invited you to review a controlled document in the IRPA Digital Board Governance System.\\n\\nDocument: "+safeTitle+"\\nLink expiry: "+safeExpiry+"\\n\\nOpen your single-use secure link (read-only preview at this stage):\\n"+safeLink+"\\n\\nThis link is private to you. Do not forward it. If you did not expect this invitation, contact IRPA Administration.";
+  const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\nLink expiry: "+safeExpiry+"\n\nOpen your single-use secure link (read-only preview at this stage):\n"+safeLink+"\n\nThis link is private to you. Do not forward it. If you did not expect this invitation, contact IRPA Administration.";
   const html="<p>Dear "+escapeHtml(safeName)+",</p><p>"+escapeHtml(safeOwner)+" has invited you to review a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeHtml(safeExpiry)+"</p><p><a href=\""+escapeHtml(safeLink)+"\">Open secure document link</a></p><p>This is a private, single-use link. Do not forward it. The current link provides a read-only preview; signing will be enabled only after the separate email verification step.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
   return {subject,text,html};
 }
