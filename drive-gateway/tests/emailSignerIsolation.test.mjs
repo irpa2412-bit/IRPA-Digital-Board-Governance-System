@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canAuthenticatedSignerAccess, validateEnvelopeFields, validateFieldValues } from "../src/signing.mjs";
+import { canAuthenticatedSignerAccess, validateEnvelopeFields, validateFieldValues, openSigning } from "../src/signing.mjs";
+import { sha256Hex } from "../src/util.mjs";
 
 const externalSigner = {
   id: "S1",
@@ -57,9 +58,26 @@ test("email-link signer cannot submit another signer's assigned field values", (
   assert.throws(() => validateFieldValues(fields, externalSigner, { "reviewer-comment": "Private" }, { type: "typed", value: "Vendor" }, []), /Complete the required/);
 });
 
-test("email-link open payload does not return another signer's applied field values", async () => {
-  // The public signing projection deliberately exposes no other signer's saved field payload.
-  const source = await import("../src/signing.mjs");
-  assert.equal(typeof source.openSigning, "function");
-  assert.equal(typeof source.sign, "function");
+test("email-link open returns only this signer's fields and never another signer's saved signature", async () => {
+  const secret = "a".repeat(64);
+  const signer = { ...externalSigner, tokenHash: await sha256Hex(secret), emailLinkExpiresAt: "2099-01-01T00:00:00.000Z", emailLinkStatus: "opened" };
+  const reviewer = { ...otherSigner, tokenHash: await sha256Hex("b".repeat(64)), status: "Signed", fieldValues: { "reviewer-signature": "PRIVATE-SAVED-SIGNATURE" }, uid: "reviewer-uid" };
+  const envelope = {
+    id: "ENV-test", documentId: "DOC-test", title: "Test", status: "InProgress",
+    expiresAt: "2099-01-01T00:00:00.000Z", events: [],
+    signers: [signer, reviewer],
+    fields: [
+      { fieldId: "vendor-name", signerId: "S1", type: "Name", page: 1 },
+      { fieldId: "reviewer-signature", signerId: "S2", type: "Signature", page: 1 },
+    ],
+  };
+  const ctx = {
+    now: () => new Date("2026-11-16T14:00:00.000Z"),
+    meta: { get: async (collection, id) => collection === "envelopes" && id === envelope.id ? structuredClone(envelope) : null },
+  };
+  const result = await openSigning(ctx, `ENV-test.S1.${secret}`, null);
+  assert.deepEqual(result.fields.map(field => field.fieldId), ["vendor-name"]);
+  assert.deepEqual(result.appliedFields, []);
+  assert.equal(JSON.stringify(result).includes("PRIVATE-SAVED-SIGNATURE"), false);
+  assert.equal(JSON.stringify(result).includes("reviewer-uid"), false);
 });
