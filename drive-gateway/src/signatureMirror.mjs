@@ -52,7 +52,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       signatureStatus:"Signed",status:"Signed",signedAt:signer.signedAt||timestamp,
       signerArchiveUrl,signerArchiveFileId:signerCopy.id,
       gatewayEnvelopeId:envelope.id,gatewayDocumentHash:completion.finalHash,
-      cryptographicEvidenceStatus:assignedSigner?.identityType==="email-link"&&!signer.uid?"GatewayAuditOnly":"Verified",archiveProtocol:assignedSigner?.identityType==="email-link"&&!signer.uid?"IRPA-GATEWAY-AUDIT-CHAIN-1":"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1",
+      cryptographicEvidenceStatus:assignedSigner?.identityType==="email-link"&&!signer.uid?(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner.id)?"Verified":"GatewayAuditOnly":"Verified",archiveProtocol:assignedSigner?.identityType==="email-link"&&!signer.uid?"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1":"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1",
       immutable:true
     });
 
