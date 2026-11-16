@@ -181,3 +181,18 @@ test("signature assignment and signing handlers synchronously reject repeated su
   assert.match(sign[1], /signInFlightRef\.current=true/);
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
 });
+
+test("verified register authority, not a racy Signer Identity read, gates signing", () => {
+  const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
+  const gatewayPortal = fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx", import.meta.url), "utf8");
+  const identity = fs.readFileSync(new URL("../src/firebase/signerIdentity.js", import.meta.url), "utf8");
+
+  assert.match(platform, /verifyManualSigningAuthority\(manualAuthorityIdentification\);await ensureMySignerIdentity\(profile/);
+  assert.match(platform, /updateMySignerAuthority\(\{authorityRole:authorityVerification\.authorityRole,authorityStatus:"Current"/);
+  assert.doesNotMatch(platform, /const signerIdentity=await getMySignerIdentity\(\);if\(!signerIdentity\?\.authorityRole/);
+  assert.match(gatewayPortal, /const savedProfile=await getMySignatureProfile\(\)\.catch\(\(\)=>null\);\s*const identity=await getMySignerIdentity\(\)\.catch\(\(\)=>null\);/);
+  assert.match(gatewayPortal, /const persistedAuthority=await updateMySignerAuthority\(\{authorityRole:verifiedAuthority\.authorityRole,authorityStatus:"Current"/);
+  assert.doesNotMatch(gatewayPortal, /identity\?\.authorityRole\|\|identity\.authorityRole==="Not yet assigned"/);
+  assert.match(identity, /fetch\(gateway\+"\/api\/signature\/authority"/);
+});
+
