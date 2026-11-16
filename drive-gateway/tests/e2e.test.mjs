@@ -7,7 +7,7 @@ const post=(p,b,u)=>new Request("https://gw.test"+p,{method:"POST",headers:{"con
 async function up(s,id="DOC-001",o={}){const b=await pdf(2),r=await route(uploadReq(b,{documentId:id,...o}),s.ctx);assert.equal(r.status,201);return{b,h:await sha256Hex(b)}}
 const ss=[{name:"Amina",email:"a@example.org",order:1},{name:"Juma",email:"j@example.org",order:2}];
 async function env(s,signers=ss){await up(s);const r=await route(post("/api/envelopes",{documentId:"DOC-001",signers,archives:["legal-contracts","board-governance"]},"u1"),s.ctx);assert.equal(r.status,201);return(await r.json()).envelopeId}
-const sig=(t,v="Amina K")=>post("/api/sign/submit",{token:t,consent:true,signature:{type:"typed",value:v}});const openLink=async(s,t)=>route(get("/api/sign/open",{token:t}),s.ctx);
+const sig=(t,v="Amina K")=>post("/api/sign/submit",{token:t,consent:true,signature:{type:"typed",value:v}});const openLink=async(s,t)=>route(get("/api/sign/email/open",{token:t}),s.ctx);
 test("1 valid PDF stored in every archive",async()=>{const s=setup(),x=await up(s);assert.equal(s.storage.objs.size,2);assert.equal((await s.meta.get("documents","DOC-001")).hash,x.h)});
 test("2 invalid PDF rejected",async()=>{const s=setup();assert.equal((await route(uploadReq(new TextEncoder().encode("hello")),s.ctx)).status,400)});
 test("3 truncated PDF rejected",async()=>{const s=setup(),b=await pdf();assert.equal((await route(uploadReq(b.slice(0,-100)),s.ctx)).status,400)});
