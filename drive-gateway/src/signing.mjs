@@ -172,7 +172,8 @@ export async function openEmailSigning(ctx,token,ip=""){
       signer.emailLinkOpenedAt=now.toISOString();
       return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash})}};
     });
-    return await openSigning(ctx,token,null);
+    const preview=await openSigning(ctx,token,null);
+    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt};
   }catch{
     throw new HttpError(401,genericEmailSigningFailure());
   }
