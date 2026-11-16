@@ -515,6 +515,14 @@ export async function getGatewaySignatureEnvelopeStatus(envelopeId) {
   return data;
 }
 
+export async function resendGatewayEmailInvitation(envelopeId,signerId) {
+  if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/resend",{method:"POST",body:JSON.stringify({})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false)throw new Error(data.error||"Unable to resend the email signing invitation.");
+  return data;
+}
+
 export async function revokeGatewayEmailInvitation(envelopeId,signerId) {
   if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
   const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/revoke",{method:"POST",body:JSON.stringify({})});
