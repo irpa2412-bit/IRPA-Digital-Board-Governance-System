@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 const extensions = [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json"];
@@ -17,11 +17,10 @@ async function resolveLocalImport(fromFile, specifier) {
   const candidates = [base, ...extensions.map(ext => base + ext), ...extensions.map(ext => path.join(base, "index" + ext))];
   for (const candidate of candidates) {
     try {
-      const stat = await import("node:fs/promises").then(fs => fs.stat(candidate));
-      if (stat.isFile()) return candidate;
+      if ((await stat(candidate)).isFile()) return candidate;
     } catch {}
   }
-  return null;
+  throw new Error("Unable to resolve relative import " + specifier + " from " + path.relative(root, fromFile));
 }
 
 async function collect(file) {
@@ -29,9 +28,9 @@ async function collect(file) {
   const source = await readFile(file, "utf8");
   const imports = new Set();
   const patterns = [
-    /\\b(?:import|export)\\s+(?:[^"'()]*?\\s+from\\s+)?["']([^"']+)["']/g,
-    /\\bimport\\s*\\(\\s*["']([^"']+)["']\\s*\\)/g,
-    /\\brequire\\s*\\(\\s*["']([^"']+)["']\\s*\\)/g
+    /\b(?:import|export)\s+(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/g,
+    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g
   ];
   for (const pattern of patterns) for (const match of source.matchAll(pattern)) imports.add(match[1]);
   const dependencies = [];
