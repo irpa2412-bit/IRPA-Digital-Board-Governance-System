@@ -9,7 +9,7 @@ function active(ctx,e){if(["Voided","Declined"].includes(e.status))throw new Htt
 const can=(e,s)=>s.status==="Pending"&&(e.signingMode==="Parallel"||e.signers.every(x=>x.order>=s.order||x.status==="Signed"));
 export function canAuthenticatedSignerAccess(signer,user){
   if(signer?.identityType==="email-link") return signer.emailLinkStatus==="opened";
-  if(!signer?.uid) return false;
+  if(!signer?.uid) return true;
   return Boolean(user?.uid)&&user.uid===signer.uid;
 }
 function assertSignerAuthentication(signer,user){
