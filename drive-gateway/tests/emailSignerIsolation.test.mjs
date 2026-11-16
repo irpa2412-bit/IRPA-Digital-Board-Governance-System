@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canAuthenticatedSignerAccess, validateEnvelopeFields, validateFieldValues, openSigning } from "../src/signing.mjs";
+import { canAuthenticatedSignerAccess, validateEnvelopeFields, validateFieldValues, openSigning, getSigningEvidence, chainEvents } from "../src/signing.mjs";
+import { generateSignerKeyPair, exportPublicKeyJwk, createCryptographicEvidence } from "../src/cryptographicGate.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 const externalSigner = {
@@ -58,6 +59,34 @@ test("email-link signer cannot submit another signer's assigned field values", (
   const attempted = validateFieldValues(fields, externalSigner, { "vendor-name": "Vendor", "reviewer-comment": "Private" }, { type: "typed", value: "Vendor" }, []);
   assert.deepEqual(attempted, { "vendor-name": "Vendor" });
   assert.equal(JSON.stringify(attempted).includes("Private"), false);
+});
+
+
+test("email invitation can retrieve only its own cryptographic evidence, never another signer's evidence",async()=>{
+  const secret="c".repeat(64),otherSecret="d".repeat(64);
+  const signer={...externalSigner,tokenHash:await sha256Hex(secret),emailHash:"1".repeat(64),emailLinkExpiresAt:"2099-01-01T00:00:00.000Z"};
+  const reviewer={...otherSigner,tokenHash:await sha256Hex(otherSecret),emailHash:"2".repeat(64),emailLinkExpiresAt:"2099-01-01T00:00:00.000Z"};
+  const envelopeId="ENV-evidence-isolation",documentHash="f".repeat(64);
+  const events=await chainEvents([],{type:"envelope.created",at:"2026-11-16T14:00:00.000Z"});
+  async function evidenceFor(identity){
+    const pair=await generateSignerKeyPair();
+    return createCryptographicEvidence({
+      keyId:"KEY-"+identity.id,
+      signer:{uid:null,identityType:"email-link",emailHash:identity.emailHash,signerId:identity.id,envelopeId,signatureHash:await sha256Hex("signature-"+identity.id),signatureType:"typed",privateKey:pair.privateKey,publicKey:pair.publicKey},
+      documentHash,chainHead:events.at(-1).hash,signedAt:"2026-11-16T14:01:00.000Z",
+      publicKeyJwk:await exportPublicKeyJwk(pair.publicKey),
+    });
+  }
+  const ownEvidence=await evidenceFor(signer),otherEvidence=await evidenceFor(reviewer);
+  const envelope={id:envelopeId,documentId:"DOC-evidence",title:"Evidence isolation",status:"Completed",expiresAt:"2099-01-01T00:00:00.000Z",events,signers:[signer,reviewer],completion:{finalHash:documentHash}};
+  const ctx={now:()=>new Date("2026-11-16T14:00:00.000Z"),meta:{
+    get:async(collection,id)=>collection==="envelopes"&&id===envelopeId?structuredClone(envelope):null,
+    list:async collection=>collection==="cryptographicEvidence"?[ownEvidence,otherEvidence]:[],
+  }};
+  const result=await getSigningEvidence(ctx,`ENV-evidence-isolation.S1.${secret}`,null);
+  assert.equal(result.evidence.length,1);
+  assert.equal(result.evidence[0].signerId,"S1");
+  assert.equal(result.evidence.some(item=>item.signerId==="S2"),false);
 });
 
 test("email-link open returns only this signer's fields and never another signer's saved signature", async () => {
