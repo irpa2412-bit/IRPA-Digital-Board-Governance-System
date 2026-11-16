@@ -1,5 +1,5 @@
 import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {Conflict,VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {MAX_SIGNERS,buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
-import {createEmailSigningToken,markEmailSigningTokenOpened,genericEmailSigningFailure} from "./emailSigningLinks.mjs";
+import {createEmailSigningToken,markEmailSigningTokenOpened,hashNormalizedEmail,genericEmailSigningFailure} from "./emailSigningLinks.mjs";
 export async function chainEvents(events,e){const body={...e,prevHash:events.length?events.at(-1).hash:"GENESIS"};return[...events,{...body,hash:await sha256Hex(canonicalJson(body))}]}
 export async function verifyChain(events){if(!Array.isArray(events))return false;let p="GENESIS";for(const e of events){const {hash,...b}=e;if(b.prevHash!==p||await sha256Hex(canonicalJson(b))!==hash)return false;p=hash}return true}
 async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get("envelopes",id);if(!c)throw new HttpError(404,"Envelope not found.");if(!await verifyChain(c.events))throw new HttpError(409,"Signing audit chain failed verification.");const {patch,result}=await fn(c);if(!patch)return result;try{await ctx.meta.update("envelopes",id,patch,{ifVersion:c._v});return result}catch(e){if(!(e instanceof VersionConflict))throw e}}throw new HttpError(409,"Please retry.")}
@@ -162,6 +162,8 @@ export async function openEmailSigning(ctx,token,ip=""){
     await consumeEmailLinkRateLimit(ctx,"ip:"+ipHash,20,now);
     const loaded=await load(ctx,token);
     if(loaded.signer.identityType!=="email-link"||loaded.signer.emailLinkStatus!=="issued"||now.getTime()>=Date.parse(loaded.signer.emailLinkExpiresAt))throw new HttpError(401,genericEmailSigningFailure());
+    const expectedEmailHash=await hashNormalizedEmail(loaded.signer.email);
+    if(!loaded.signer.emailHash||!safeEqual(expectedEmailHash,loaded.signer.emailHash))throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env);
     await mutate(ctx,loaded.env.id,async current=>{
       const signer=current.signers.find(item=>item.id===loaded.signer.id);
