@@ -363,6 +363,12 @@ export function createDocumentLifecycleRouter(deps) {
         const canonical=verification.envelope;
         if(clean(canonical.externalReference)!==envelopeId||clean(canonical.documentId)!==documentId)return deps.json({ok:false,error:"The canonical Gateway envelope does not belong to this document and Signature Portal envelope."},403,deps.corsHeaders(request));
         if(clean(canonical.status)!=="Completed"||clean(canonical.completion?.finalHash)!==verification.finalHash)return deps.json({ok:false,error:"The canonical Gateway envelope is not verifiably completed."},409,deps.corsHeaders(request));
+        const completionFiles=Array.isArray(canonical.completion?.files)?canonical.completion.files:[];
+        const archiveFile=completionFiles.find(file=>file?.kind==="archive"&&file?.id);
+        const ownerCopy=completionFiles.find(file=>file?.kind==="owner-copy"&&file?.id);
+        const signedSigners=(canonical.signers||[]).filter(signer=>signer?.status==="Signed"&&signer?.uid);
+        const missingSignerCopy=signedSigners.some(signer=>{const signerRecord=(canonical.signers||[]).find(item=>item.uid===signer.uid);return !completionFiles.some(file=>file?.kind==="signer-copy"&&file?.id&&file.signerId===signerRecord?.id)});
+        if(!archiveFile||!ownerCopy||missingSignerCopy)return deps.json({ok:false,error:"Canonical completion is missing the final archive file, owner copy or a required signer copy."},409,deps.corsHeaders(request));
         signedFileId=clean(canonical.completion?.primaryStorageId);
         lastSignedByUid=clean(verification.lastSignedByUid);
         if(!lastSignedByUid||!canonical.signers.some(s=>s.uid===lastSignedByUid&&s.status==="Signed"))return deps.json({ok:false,error:"The canonical completion record does not identify a required signer."},409,deps.corsHeaders(request));
@@ -378,12 +384,16 @@ export function createDocumentLifecycleRouter(deps) {
       }
       const patch={status:"SIGNED",signatureStatus:"COMPLETED",signatureEnvelopeId:envelopeId,signatureAssurance,signedAt,signedByUid:lastSignedByUid,signedDocumentUrl:firebaseEnvelope.signedDocumentUrl||null,signedSourceFileId:signedFileId||null,updatedAt:nowIso()};
       if(signatureAssurance==="CRYPTOGRAPHICALLY_VERIFIED"){
+        const completionFiles=verification.envelope.completion.files||[];const archiveFile=completionFiles.find(file=>file?.kind==="archive"&&file?.id);const ownerCopy=completionFiles.find(file=>file?.kind==="owner-copy"&&file?.id);const notices=Object.values(verification.envelope.completion.notifications||{});
+        patch.finalArchiveStatus="ARCHIVED";patch.finalArchiveFileId=archiveFile.id;patch.finalArchivePath=archiveFile.path||"";patch.finalArchiveTarget=archiveFile.archiveKey||"";patch.finalArchiveCategory=document.archiveCategory||"";patch.finalArchivedAt=signedAt;patch.ownerCompletedFileId=ownerCopy.id;patch.completionNoticeCount=notices.length;patch.completionNoticeSentCount=notices.filter(item=>item?.status==="Sent").length;patch.completionNoticeFailedCount=notices.filter(item=>item?.status==="Failed").length;
+      }
+      if(signatureAssurance==="CRYPTOGRAPHICALLY_VERIFIED"){
         patch.finalSignedPdfSha256=verification.finalHash;
         patch.cryptographicEvidenceIds=verification.envelope.completion.cryptographicEvidenceIds;
       }
       await commitDocumentAndAudit(deps,env,claims,documentId,patch,"SIGNATURE_COMPLETED",{envelopeId,signatureAssurance});
       await deps.updateFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,adminToken,firestoreFields({signatureAssurance}),["signatureAssurance"]);
-      return deps.json({ok:true,documentId,status:"SIGNED",envelopeId,signedSourceFileId:signedFileId||null,signatureAssurance},200,deps.corsHeaders(request));
+      return deps.json({ok:true,documentId,status:"SIGNED",envelopeId,signedSourceFileId:signedFileId||null,signatureAssurance,finalArchiveStatus:signatureAssurance==="CRYPTOGRAPHICALLY_VERIFIED"?"ARCHIVED":null,completionNoticeSentCount:signatureAssurance==="CRYPTOGRAPHICALLY_VERIFIED"?Number(verification.envelope.completion.notifications?Object.values(verification.envelope.completion.notifications).filter(item=>item?.status==="Sent").length:0):null},200,deps.corsHeaders(request));
     }
 
     if(pathname==="/api/document-lifecycle/share"&&method==="POST"){
