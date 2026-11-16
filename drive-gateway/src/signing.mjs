@@ -177,7 +177,7 @@ export async function openEmailSigning(ctx,token,ip=""){
       return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash})}};
     });
     const preview=await openSigning(ctx,token,null);
-    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt};
+    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt,envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars};
   }catch{
     throw new HttpError(401,genericEmailSigningFailure());
   }
