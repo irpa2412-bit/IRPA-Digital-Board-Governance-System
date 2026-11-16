@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const read = path => fs.readFileSync(new URL(path, import.meta.url), "utf8");
 const lifecycle = read("../drive-gateway/src/documentLifecycle.mjs");
+const documentPolicy = read("../drive-gateway/src/documentPolicy.mjs");
 const signing = read("../drive-gateway/src/signing.mjs");
 const gateway = read("../drive-gateway/src/index.js");
 const client = read("../src/firebase/signaturePlatform.js");
@@ -23,6 +24,8 @@ test("1. controlled PDF upload records SHA-256, byte length and parsed PDF page 
   assert.match(upload, /sha256\(bytes\)/);
   assert.match(upload, /fileSize:bytes\.length/);
   assert.match(upload, /pdfPageCount|pageCount/);
+  assert.match(documentPolicy, /pdfPageCount:Number\(pdfPageCount\)/);
+  assert.match(upload, /pdfPageCount,archivePath/);
   assert.match(upload, /status:"WORKING"/);
 });
 
