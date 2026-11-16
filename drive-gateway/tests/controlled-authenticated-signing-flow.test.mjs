@@ -340,7 +340,7 @@ test("signing audit records the assigned signer without inventing registered aut
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].authorityVerification,null);
   assert.equal(current.events.at(-1).signerId,"S1");
-  assert.equal(current.events.at(-1).authoritySourceCollection,undefined);
+  assert.equal(current.events.at(-1).authoritySourceCollection,null);
 });
 
 
