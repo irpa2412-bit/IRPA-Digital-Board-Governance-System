@@ -43,6 +43,7 @@ test("3. transport creates signer invitations and enforces assigned-only retriev
   assert.match(gateway, /sendSignatureInvitation/);
   assert.match(signing, /invitations\.updated/);
   assert.match(portal, /Assigned to me|Assigned to Me|assigned to me/i);
+  assert.match(portal, /envelopes\.filter\(e=>\(e\.recipients\|\|\[\]\)\.some\(r=>r\?\.uid===auth\.currentUser\?\.uid\)\)/);
   assert.match(signing, /participant|signer/i);
 });
 
@@ -53,7 +54,8 @@ test("4. signing enforces signer assignment, authority, consent, order and dupli
   assert.match(client, /currentSignerUid&&envelope\.currentSignerUid!==u\.uid/);
   assert.match(client, /consent:true/);
   assert.match(portal, /signInFlightRef/);
-  assert.match(signing, /idempotency|compareAndSet|compare-and-set|alreadySigned/i);
+  assert.match(signing, /idempotent:true/);
+  assert.match(signing, /ifVersion:c\._v/);
 });
 
 test("5. final completion is server-verified and binds the final PDF hash and audit evidence", () => {
@@ -78,7 +80,9 @@ test("7. decline, revoke, reminder, immutable completion and retry-after-network
   assert.match(client, /Declined/);
   assert.match(signing, /decline|Declined/i);
   assert.match(signing, /revoke|Voided|Cancelled/i);
-  assert.match(signing, /remind|reminder/i);
+  assert.match(signing, /resendInvitation/);
+  assert.match(signing, /retryCompletion/);
+  assert.match(signing, /A completed envelope cannot be voided/);
   assert.match(signing, /Completed/);
   assert.match(client, /retry|network|idempot/i);
 });
