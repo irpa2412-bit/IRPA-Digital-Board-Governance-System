@@ -72,7 +72,8 @@ export async function createEnvelope(ctx,user,body){
   if(!["Sequential","Parallel"].includes(signingMode))throw new HttpError(400,"Unsupported signing mode.");
   if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
-  if(cryptoRequired&&input.some(s=>!s?.uid)&&typeof ctx.verifyEmailSignerAuthority!=="function")throw new HttpError(400,"Email-link signer authority verification is not configured.");
+  if(cryptoRequired&&input.some(s=>!s?.uid&&s?.identityType!=="email-link"))throw new HttpError(400,"Every production signer must be UID-bound or explicitly use the verified email-link path.");
+  if(cryptoRequired&&input.some(s=>s?.identityType==="email-link")&&typeof ctx.verifyEmailSignerAuthority!=="function")throw new HttpError(400,"Email-link signer authority verification is not configured.");
   const sourceBytes=await ctx.storage.get(doc.primaryStorageId);
   if(!sourceBytes)throw new HttpError(409,"The stored document failed its integrity check.");
   await verifySourceDocumentIntegrity(sourceBytes,{},doc);
@@ -85,11 +86,12 @@ export async function createEnvelope(ctx,user,body){
     seenEmails.add(email);
     if(uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
     if(uid)seenUids.add(uid);
-    const signerId=`S${i+1}`,secret=randomHex(32),authority=uid?null:await ctx.verifyEmailSignerAuthority(email,s?.authorityRole||"");
-    if(!uid&&authority?.verified!==true)throw new HttpError(403,"The email address does not match a current registered signing authority.");
-    const issued=uid?null:await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))});
+    const signerId=`S${i+1}`,secret=randomHex(32),emailLink=s?.identityType==="email-link",authority=emailLink?await ctx.verifyEmailSignerAuthority?.(email,s?.authorityRole||""):null;
+    if(emailLink&&authority?.verified!==true)throw new HttpError(403,"The email address does not match a current registered signing authority.");
+    if(!uid&&!emailLink&&ctx.env?.DRIVE_MOCK!=="true")throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
+    const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
     const finalSecret=issued?.token||secret;secrets.push(finalSecret);
-    signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,name:validateName(s?.name||authority?.name||email),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:uid?"account":"email-link",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{},authorityVerification:{authorityRole:authority.authorityRole,sourceCollection:authority.sourceCollection,sourceRecordId:authority.sourceRecordId,verifiedAt:ctx.now().toISOString()}}:{})});
+    signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,name:validateName(s?.name||authority?.name||email),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:emailLink?"email-link":uid?"account":"legacy-token",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{},authorityVerification:{authorityRole:authority.authorityRole,sourceCollection:authority.sourceCollection,sourceRecordId:authority.sourceRecordId,verifiedAt:ctx.now().toISOString()}}:{})});
   }
   const fields=validateEnvelopeFields(body?.fields,signers);
   const sourceHash=doc.sha256||doc.hash||await sha256Hex(sourceBytes),sourceSize=doc.fileSize??doc.byteLength??doc.size??sourceBytes.byteLength;
