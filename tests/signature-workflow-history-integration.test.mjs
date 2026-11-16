@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { runInNewContext } from "node:vm";
 import { omitUndefinedFirestoreFields } from "../src/firebase/firestorePayload.js";
 
 const signingService = readFileSync(
@@ -18,11 +19,8 @@ test("legacy signEnvelope binds and executes the workflow-history sanitizer", ()
   const signEnvelopeStart = signingService.indexOf("export async function signEnvelope(");
   assert.notEqual(signEnvelopeStart, -1, "the legacy signEnvelope implementation must exist");
   const signingPath = signingService.slice(signEnvelopeStart);
-  assert.match(
-    signingPath,
-    /workflowHistory\s*:\s*arrayUnion\(omitUndefinedFirestoreFields\(actionRecord\)\)/,
-    "signEnvelope must sanitize its actual actionRecord before arrayUnion"
-  );
+  const workflowHistoryCall = signingPath.match(/workflowHistory\s*:\s*(arrayUnion\(omitUndefinedFirestoreFields\(actionRecord\)\))/);
+  assert.ok(workflowHistoryCall, "signEnvelope must sanitize its actual actionRecord before arrayUnion");
 
   const actionRecord = {
     uid: "integration-test-signer",
@@ -31,7 +29,11 @@ test("legacy signEnvelope binds and executes the workflow-history sanitizer", ()
     nested: { optionalRecordId: undefined, retained: "audit-value" }
   };
   const arrayUnion = value => ({ operation: "arrayUnion", value });
-  const workflowHistoryValue = arrayUnion(omitUndefinedFirestoreFields(actionRecord));
+  const workflowHistoryValue = runInNewContext(workflowHistoryCall[1], {
+    actionRecord,
+    arrayUnion,
+    omitUndefinedFirestoreFields
+  });
 
   assert.deepEqual(workflowHistoryValue, {
     operation: "arrayUnion",
