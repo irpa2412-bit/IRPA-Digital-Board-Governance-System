@@ -3040,21 +3040,21 @@ async function deleteDriveFile(request, env) {
 async function signatureDriveHealthRoute(request, env) {
   const headers = corsHeaders(request);
   if (request.method === "OPTIONS") return new Response(null, { headers });
-  if (request.method !== "GET") return json({ ok: false, statusClass: "error", classification: "method_not_allowed" }, 405, headers);
+  if (request.method !== "GET") return json({ statusClass: "error", classification: "method_not_allowed" }, 405, headers);
   let claims;
   try {
     claims = await authenticateFirebaseRequest(request, env);
   } catch {
-    return json({ ok: false, statusClass: "error", classification: "authentication_required" }, 401, headers);
+    return json({ statusClass: "error", classification: "authentication_required" }, 401, headers);
   }
   let adminProfile = null;
   try { adminProfile = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token); } catch {}
   if (claims.firebaseClaims?.admin !== true && adminProfile?.fields?.active?.booleanValue !== true) {
-    return json({ ok: false, statusClass: "error", classification: "administrator_required" }, 403, headers);
+    return json({ statusClass: "error", classification: "administrator_required" }, 403, headers);
   }
   try {
     await getDriveAccessToken(env);
-    return json({ ok: true, statusClass: "ok", classification: "ok" }, 200, headers);
+    return json({ statusClass: "ok", classification: "ok" }, 200, headers);
   } catch (error) {
     const message = String(error?.message || "").toLowerCase();
     let classification = "refresh_failed";
@@ -3063,7 +3063,7 @@ async function signatureDriveHealthRoute(request, env) {
     else if (message.includes("invalid_client")) classification = "invalid_client";
     else if (message.includes("not yet been authorized") || message.includes("refresh token")) classification = "missing_refresh_token";
     else if (message.includes("fetch") || message.includes("network") || message.includes("timeout")) classification = "network";
-    return json({ ok: false, statusClass: "error", classification }, 503, headers);
+    return json({ statusClass: "error", classification }, 503, headers);
   }
 }
 
