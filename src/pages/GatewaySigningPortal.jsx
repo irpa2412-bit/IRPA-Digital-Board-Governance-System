@@ -32,7 +32,7 @@ export default function GatewaySigningPortal({token}){
       fetchGatewaySigningResource("/api/sign/open",token),
       getMySignatureProfile().catch(()=>null)
     ]);
-    if(!result.signer?.authenticated)throw new Error("Sign in with the invited IRPA account before continuing.");
+    if(!result.signer?.authenticated)throw new Error("The invited signer identity could not be authenticated. Reopen your invitation or sign in with the invited account.");
     const signingRequired=Boolean(result.canSign&&result.status!=="Completed");
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
     let initialEvidence=null;
