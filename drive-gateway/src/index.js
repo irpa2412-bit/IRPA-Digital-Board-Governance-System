@@ -495,6 +495,17 @@ export default {
               return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendCompletionNotice: async ({to,name,title,link,completedAt}) => {
+              const recipient=normalizeRecipientEmail(to);
+              const subject=validateMailHeader("IRPA Digital Board Governance — Document Signing Completed","Subject");
+              const safeName=escapeMailHtml(name||"IRPA colleague");
+              const safeTitle=escapeMailHtml(title||"IRPA document");
+              const safeLink=escapeMailHtml(link||"https://irpa-digital-board-governance.web.app");
+              const completed=String(completedAt||"").trim();
+              const text="Dear "+(name||"IRPA colleague")+",\\n\\nThe signing workflow for "+(title||"the IRPA document")+" is now complete. Your completed copy is available in the Signature Portal.\\n\\nCompleted at: "+completed+"\\nOpen the Signature Portal: "+(link||"https://irpa-digital-board-governance.web.app")+"\\n\\nRegards,\\nIRPA Administration";
+              const html="<!doctype html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6;color:#1f2937\"><h2>IRPA Digital Board Governance</h2><p>Dear "+safeName+",</p><p>The signing workflow for <strong>"+safeTitle+"</strong> is now complete. Your completed copy is available in the Signature Portal.</p><p><strong>Completed at:</strong> "+escapeMailHtml(completed)+"</p><p><a href=\""+safeLink+"\">Open the Signature Portal</a></p><p>Regards,<br/>IRPA Administration</p></body></html>";
+              return smtpSend(env,{to:recipient,subject,text,html});
+            },
             logger: console,
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
