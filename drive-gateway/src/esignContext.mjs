@@ -192,8 +192,9 @@ export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInv
     sendInvitation,
     logger:logger||console,
     now:now||(()=>new Date()),
-    config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14},
+    config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14,emailLinkTtlDays:Math.max(1,Math.min(30,Number(env.IRPA_EMAIL_SIGNING_LINK_TTL_DAYS)||7))},
     crypto:env.DRIVE_MOCK==="true"?null:{keyProvider:createCloudflareSignerKeyProvider(env)},
-    allowReturnTokens:env.DRIVE_MOCK==="true"||(env.IRPA_ENVIRONMENT==="staging"&&env.IRPA_STAGING_CRYPTO_TEST_MODE==="true")
+    allowReturnTokens:env.DRIVE_MOCK==="true"||(env.IRPA_ENVIRONMENT==="staging"&&env.IRPA_STAGING_CRYPTO_TEST_MODE==="true"),
+    allowLegacyTestSigners:env.DRIVE_MOCK==="true"
   };
 }
