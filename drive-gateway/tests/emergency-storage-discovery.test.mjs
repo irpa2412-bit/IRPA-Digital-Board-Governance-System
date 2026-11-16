@@ -187,3 +187,22 @@ test("blob inspection reports missing chunk subcollections without reconstructin
   assert.deepEqual(result.subcollections, []);
   assert.equal(calls.length, 2);
 });
+
+test("one emergency blob maps to two documents while other affected documents have no blob", async () => {
+  const pages = [
+    { body: { fields: { totalChunks: { integerValue: "1" } } } },
+    { body: { collectionIds: ["chunks"] } },
+    { body: { documents: [{ name: "projects/p/databases/(default)/documents/emergencyBlobs/blob-shared/chunks/0", fields: { index: { integerValue: "0" }, data: { stringValue: "X" } } }] } },
+    { body: { fields: { fileId: { stringValue: "firestore-emergency://blob-shared" }, fileSize: { integerValue: "1" } } } },
+    { body: { fields: { fileId: { stringValue: "firestore-emergency://blob-shared" }, fileSize: { integerValue: "1" } } } },
+    { status: 404 }, { status: 404 }
+  ];
+  const { route } = fixture({ firestorePages: pages });
+  const response = await route(new Request("https://worker.test/api/signature-pathway/emergency-storage", {
+    method: "POST", headers: { Authorization: "Bearer user-token" },
+    body: JSON.stringify({ action: "inspectBlob", collectionPath: "emergencyBlobs", documentId: "blob-shared" })
+  }), {});
+  const linked = (await response.json()).subcollections[0].linkedDocuments;
+  assert.equal(linked.filter(item => item.hasBlob).length, 2);
+  assert.equal(linked.filter(item => item.hasBlob === false).length, 2);
+});
