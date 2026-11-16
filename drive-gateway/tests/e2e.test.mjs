@@ -8,7 +8,7 @@ async function up(s,id="DOC-001",o={}){const b=await pdf(2),r=await route(upload
 const ss=[{name:"Amina",email:"a@example.org",order:1},{name:"Juma",email:"j@example.org",order:2}];
 async function env(s,signers=ss){await up(s);const r=await route(post("/api/envelopes",{documentId:"DOC-001",signers,archives:["legal-contracts","board-governance"]},"u1"),s.ctx);assert.equal(r.status,201);return(await r.json()).envelopeId}
 const sig=(t,v="Amina K")=>post("/api/sign/submit",{token:t,consent:true,signature:{type:"typed",value:v}});
-test("1 valid PDF stored in every archive",async()=>{const s=setup(),x=await up(s);assert.equal(s.storage.objs.size,2);assert.equal((await s.meta.get("documents","DOC-001")).hash,x.h)});
+test("1 valid PDF stored in every archive with SHA-256, byte length and page count",async()=>{const s=setup(),x=await up(s),document=await s.meta.get("documents","DOC-001");assert.equal(s.storage.objs.size,2);assert.equal(document.hash,x.h);assert.equal(document.size,x.b.length);assert.equal(document.pageCount,2)});
 test("2 invalid PDF rejected",async()=>{const s=setup();assert.equal((await route(uploadReq(new TextEncoder().encode("hello")),s.ctx)).status,400)});
 test("3 truncated PDF rejected",async()=>{const s=setup(),b=await pdf();assert.equal((await route(uploadReq(b.slice(0,-100)),s.ctx)).status,400)});
 test("4 empty PDF rejected",async()=>{const s=setup();assert.equal((await route(uploadReq(new Uint8Array()),s.ctx)).status,400)});
@@ -67,4 +67,32 @@ test("30 a signing field beyond the actual last PDF page is rejected",async()=>{
   const response=await route(post("/api/envelopes",{documentId:"DOC-PAGE-BOUND",signers:[{name:"Signer Two",email:"two@example.org",uid:"u2",order:1},{name:"Signer Three",email:"three@example.org",uid:"u3",order:2}],fields:[{fieldId:"invalid-last-page",type:"Signature",page:4,x:8,y:18,width:50,height:10,signerUid:"u2",required:true}],archives:["legal-contracts"]},"u1"),s.ctx);
   assert.equal(response.status,400);
   assert.match((await response.json()).error,/exceeds the controlled PDF page count/);
+});
+
+test("31 decline records a single terminal signer decision",async()=>{
+  const s=setup(),id=await env(s,[{name:"Amina",email:"a@example.org",uid:"u2",order:1},{name:"Juma",email:"j@example.org",uid:"u3",order:2}]);
+  const response=await route(post("/api/sign/decline",{token:s.tokenFor("a@example.org"),reason:"Unable to approve" },"u2"),s.ctx);
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).status,"Declined");
+  const record=await s.meta.get("envelopes",id);
+  assert.equal(record.status,"Declined");
+  assert.equal(record.signers[0].status,"Declined");
+  assert.equal(record.events.filter(event=>event.type==="signer.declined").length,1);
+});
+
+test("32 a non-signing pending signer can receive a reminder with a rotated token",async()=>{
+  const s=setup(),id=await env(s,[{name:"Amina",email:"a@example.org",uid:"u2",order:1}]);
+  const original=s.tokenFor("a@example.org"),inviteCount=s.invites.length;
+  const reminder=await route(post("/api/envelopes/"+id+"/invitations/S1/resend",{},"u1"),s.ctx);
+  assert.equal(reminder.status,200);
+  assert.equal((await reminder.json()).deliveryStatus,"Sent");
+  assert.equal(s.invites.length,inviteCount+1);
+  const refreshed=s.tokenFor("a@example.org");
+  assert.notEqual(refreshed,original);
+  assert.equal((await route(post("/api/sign/submit",{token:original,consent:true,signature:{type:"typed",value:"Amina"} },"u2"),s.ctx)).status,403);
+  const record=await s.meta.get("envelopes",id);
+  assert.equal(record.status,"Sent");
+  assert.equal(record.signers[0].status,"Pending");
+  const signed=await route(post("/api/sign/submit",{token:refreshed,consent:true,signature:{type:"typed",value:"Amina"} },"u2"),s.ctx);
+  assert.equal(signed.status,200);
 });
