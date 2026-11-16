@@ -138,7 +138,7 @@ export default function EmailSigningReadOnlyPage({token}) {
         {!signatureFields.length&&<label style={{display:"block",margin:"14px 0"}}>Typed signature<input style={inputStyle} value={typedSignature} onChange={e=>setTypedSignature(e.target.value)} placeholder="Type your full name as your signature"/></label>}
         <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"18px 0"}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/><span>I have reviewed this document and consent to apply my electronic signature to my assigned action.</span></label>
         {!record.canSign&&<p role="status">Your assignment is waiting for the preceding action in the signing sequence.</p>}
-        <button type="button" disabled={submitting||!record.canSign} onClick={submit} style={{...buttonStyle,opacity:submitting||!record.canSign?.55:1}}>{submitting?"Submitting…":"Confirm and submit my assigned action"}</button>
+        <button type="button" disabled={submitting||!record.canSign} onClick={submit} style={{...buttonStyle,opacity:(submitting||!record.canSign)?0.55:1}}>{submitting?"Submitting…":"Confirm and submit my assigned action"}</button>
       </>}
     </section>
   </main>;
