@@ -21,7 +21,7 @@ async function fixture({authority=true,failMail=false}={}) {
   const source=await ctx.storage.put({path:"source/email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
   const documentId="DOC-EMAIL-"+Math.random().toString(16).slice(2,10);
   await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"email-link.pdf",title:"Email Link Governance Instrument",classification:"Restricted"});
-  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{documentId,externalReference:"IRPA-EXT-"+Math.random().toString(16).slice(2,10),archives:["board-governance"],signingMode:"Sequential",signers:[{email:"Board.Secretary@example.org",name:"Client supplied name",order:1,role:"Client supplied role"}]});
+  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{documentId,externalReference:"IRPA-EXT-"+Math.random().toString(16).slice(2,10),archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",email:"Board.Secretary@example.org",name:"Client supplied name",authorityRole:"Board Secretary",order:1,role:"Client supplied role"}]});
   const envelope=await ctx.meta.get("envelopes",created.envelopeId);
   const token=new URL(sent[0].link).searchParams.get("emailSignToken");
   return {ctx,sent,created,envelope,token,now:value=>{now=value}};
