@@ -233,6 +233,43 @@ test("active authority and custodian are required before a research record can b
   await assertSucceeds(ordinaryUser.doc("researchStudies/clearable-study").get());
 });
 
+test("Research Director title alone does not grant Research Authority", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/research-director-title-only").set({
+      uid: "research-director-title-only",
+      status: "Active",
+      role: "Research Director"
+    });
+    await db.doc("researchCustodians/custodian-director-test").set({
+      uid: "custodian-director-test",
+      active: true,
+      status: "Active",
+      displayName: "Named Custodian",
+      appointmentReference: "TEST-CUSTODIAN-APPOINTMENT"
+    });
+    await db.doc("researchStudies/research-director-title-only").set({
+      title: "Restricted research study",
+      classification: "RESTRICTED",
+      sharingStatus: "NOT_CLEARED",
+      clearedForSharing: false,
+      recordOrigin: "TRIAL"
+    });
+  });
+
+  const titleOnly = env.authenticatedContext("research-director-title-only").firestore();
+  await assertFails(titleOnly.doc("researchStudies/research-director-title-only").update({
+    classification: "CONFIDENTIAL",
+    sharingStatus: "CLEARED_FOR_SHARING",
+    clearedForSharing: true,
+    clearanceApprovedByUid: "research-director-title-only",
+    clearanceApprovedByName: "Research Director",
+    clearanceApprovedAt: new Date(),
+    custodianUid: "custodian-director-test",
+    custodianName: "Named Custodian"
+  }));
+});
+
 test("client administrator cannot self-appoint research authority or custodian", async () => {
   const owner = env.authenticatedContext("owner-primary", { admin: true }).firestore();
   await assertFails(owner.doc("researchAuthorities/owner-primary").set({
