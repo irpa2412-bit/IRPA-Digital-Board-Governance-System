@@ -12,16 +12,10 @@ export async function hashNormalizedEmail(email){
   return sha256Hex(normalized);
 }
 
-function base64Url(bytes){
-  let binary="";
-  for(const byte of bytes)binary+=String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
-}
-
 export async function createEmailSigningToken({envelopeId,signerId,email,now=new Date(),ttlDays=7,randomBytes}){
   const bytes=randomBytes?new Uint8Array(randomBytes):crypto.getRandomValues(new Uint8Array(32));
   if(bytes.byteLength<32)throw new Error("Email signing tokens require at least 32 random bytes.");
-  const token=base64Url(bytes);
+  const token=[...bytes].map(value=>value.toString(16).padStart(2,"0")).join("");
   const tokenHash=await sha256Hex(token);
   const createdAt=new Date(now).toISOString();
   const days=Math.max(1,Math.min(30,Number(ttlDays)||7));
