@@ -6,6 +6,7 @@ const read = path => fs.readFileSync(new URL(path, import.meta.url), "utf8");
 const lifecycle = read("../drive-gateway/src/documentLifecycle.mjs");
 const documentPolicy = read("../drive-gateway/src/documentPolicy.mjs");
 const signing = read("../drive-gateway/src/signing.mjs");
+const router = read("../drive-gateway/src/router.mjs");
 const gateway = read("../drive-gateway/src/index.js");
 const client = read("../src/firebase/signaturePlatform.js");
 const portal = read("../src/pages/SignaturePlatform.jsx");
@@ -111,6 +112,7 @@ test("7. decline, revoke, reminder, immutable completion and retry-after-network
   assert.match(signing, /decline|Declined/i);
   assert.match(signing, /revoke|Voided|Cancelled/i);
   assert.match(signing, /resendInvitation/);
+  assert.match(router, /invitations\\\\\/\(S\\\\d\{1,2\}\)\\\\\/resend/);
   assert.match(signing, /retryCompletion/);
   assert.match(signing, /A completed envelope cannot be voided/);
   assert.match(signing, /Completed/);
