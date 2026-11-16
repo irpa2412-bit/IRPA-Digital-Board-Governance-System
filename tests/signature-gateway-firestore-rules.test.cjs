@@ -34,6 +34,10 @@ beforeEach(async () => {
       documentId:"DOC-EXTERNAL",participantUids:["external-signer"],actionUids:["external-signer"],
       signingMode:"Sequential",currentSignerUid:"external-signer",status:"In Progress"
     });
+    await db.doc("documents/DOC-EXTERNAL").set({
+      signatureEnvelopeId:"external-envelope",signatureOwnerUid:"document-owner",
+      signatureStatus:"Pending",workflowOwnerSectionSaved:true,recordOrigin:"PRODUCTION"
+    });
   });
 });
 const signerDb = () => testEnv.authenticatedContext("assigned-signer", {email:"signer@example.test"}).firestore();
@@ -127,4 +131,19 @@ test("an authenticated non-participant cannot create a signature audit event", a
   await assertFails(db.doc("signatureEvents/unassigned-event").set({
     envelopeId:"external-envelope",actorUid:"unassigned-account",event:"Signature Submitted"
   }));
+});
+
+test("authenticated external signer can update only the signing workflow fields on the linked document", async () => {
+  const db = testEnv.authenticatedContext("external-signer", {email:"external@example.test"}).firestore();
+  const batch = db.batch();
+  batch.update(db.doc("signatureEnvelopes/external-envelope"), {
+    status:"In Progress",lastSignedByUid:"external-signer"
+  });
+  batch.update(db.doc("documents/DOC-EXTERNAL"), {
+    workflowActionStatus:"Signed",lastWorkflowAction:"Signature",
+    lastWorkflowActionUid:"external-signer",lastWorkflowActionAt:new Date(),
+    signatureEnvelopeId:"external-envelope",signatureOwnerUid:"document-owner",
+    signatureStatus:"Pending"
+  });
+  await assertSucceeds(batch.commit());
 });
