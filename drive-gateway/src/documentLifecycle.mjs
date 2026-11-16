@@ -1,4 +1,5 @@
 import { canUpload, canRead, canTransition, resolveIdentity, buildDocumentRecord, DOCUMENT_FORMAT_REQUIREMENTS } from "./documentPolicy.mjs";
+import { PDFDocument } from "pdf-lib";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const CLASSIFICATIONS = new Set(["Public","Internal","Confidential","Restricted"]);
@@ -220,12 +221,17 @@ export function createDocumentLifecycleRouter(deps) {
       const documentId="LIFE-"+crypto.randomUUID().replace(/-/g,"").slice(0,24);
       const reference="IRPA-DOC-"+new Date().getUTCFullYear()+"-"+documentId.slice(-8).toUpperCase();
       const hash=await sha256(bytes);
+      let pdfPageCount=null;
+      if(contentType==="application/pdf"){
+        try{const parsedPdf=await PDFDocument.load(bytes);pdfPageCount=parsedPdf.getPageCount();if(!Number.isInteger(pdfPageCount)||pdfPageCount<1)throw new Error("PDF has no pages.");}
+        catch{return deps.json({ok:false,error:"The uploaded PDF could not be parsed."},400,deps.corsHeaders(request));}
+      }
       const accessToken=await deps.getDriveAccessToken(env);
       const archive=await ensureLifecycleArchive(deps,env,accessToken,{category,classification,stage:"WORKING",documentId,title:clean(data.title||fileName),reference});
       let uploaded=null;
       try {
         uploaded=await uploadToDrive(deps,env,accessToken,{folderId:archive.folderId,fileName,contentType,bytes,description:{irpaGovernance:true,irpaDocumentLifecycle:true,documentId,reference,stage:"WORKING",ownerUid:parentDocument?.ownerUid||claims.user_id,classification,archiveCategory:category,accessPolicy:parentDocument?.accessPolicy||(classification==="Public"?"PUBLIC":classification==="Internal"?"IRPA_INTERNAL":"CONTROLLED"),authorizedUids:parentDocument?.authorizedUids||[claims.user_id],authorizedRoles:parentDocument?.authorizedRoles||[],authorizedDepartments:parentDocument?.authorizedDepartments||[],parentDocumentId:parentDocument?.documentId||null,translationDerivative:Boolean(parentDocument),sha256:hash}});
-        const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory:category,documentType:parentDocument?.documentType||data.documentType,authorizedRoles:parentDocument?.authorizedRoles||data.authorizedRoles,authorizedDepartments:parentDocument?.authorizedDepartments||data.authorizedDepartments,parentDocumentId:parentDocument?.documentId||data.parentDocumentId},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,archivePath:archive.archivePath});
+        const record=buildDocumentRecord(identity,{...data,reference,classification,archiveCategory:category,documentType:parentDocument?.documentType||data.documentType,authorizedRoles:parentDocument?.authorizedRoles||data.authorizedRoles,authorizedDepartments:parentDocument?.authorizedDepartments||data.authorizedDepartments,parentDocumentId:parentDocument?.documentId||data.parentDocumentId},{documentId,fileId:uploaded.id,fileName,fileSize:bytes.length,sha256:hash,pdfPageCount,archivePath:archive.archivePath});
         if(parentDocument){
           record.ownerUid=parentDocument.ownerUid;
           record.ownerType=parentDocument.ownerType||record.ownerType;
@@ -263,7 +269,7 @@ export function createDocumentLifecycleRouter(deps) {
         if(failureAuditStatus==="FAILED") throw new Error("Document upload failed and storage rollback "+rollbackStatus.toLowerCase()+"; failure audit could not be persisted: "+(error?.message||String(error)));
         throw error;
       }
-      return deps.json({ok:true,documentId,reference,archivePath:archive.archivePath,fileId:uploaded.id,fileName,sha256:hash,status:"WORKING"},201,deps.corsHeaders(request));
+      return deps.json({ok:true,documentId,reference,archivePath:archive.archivePath,fileId:uploaded.id,fileName,sha256:hash,byteLength:bytes.length,pdfPageCount,status:"WORKING"},201,deps.corsHeaders(request));
     }
 
     if(pathname==="/api/document-lifecycle/download"&&method==="POST"){
