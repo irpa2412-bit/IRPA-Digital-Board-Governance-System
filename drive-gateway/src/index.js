@@ -519,8 +519,12 @@ export default {
             persistCompletedSignatureEnvelope,
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
-              const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-              return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
+              const adminToken = await getFirestoreAdminAccessToken(env);
+              const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
+              const member = await getFirestoreDocument(env, `members/${claims.user_id}`, adminToken);
+              const employee = await getFirestoreDocument(env, `employees/${claims.user_id}`, adminToken);
+              const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
+              return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             verifyEmailSignerAuthority: (email,authorityRole) => verifyGatewayEmailSignerAuthority(env,email,authorityRole),
