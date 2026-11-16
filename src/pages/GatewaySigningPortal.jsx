@@ -6,7 +6,7 @@ import{renderPdfPageToCanvas,describePdfPageError}from"../utils/pdfPageRendering
 pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 import{getMySignatureProfile,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
 import{auth}from"../firebase/config";
-import{fetchGatewaySigningResource,submitGatewaySignature,verifyGatewaySignedPdf}from"../firebase/signatureStorage";
+import{fetchGatewaySigningResource,submitGatewaySignature,verifyGatewaySignedPdf,downloadSignatureBytes}from"../firebase/signatureStorage";
 
 async function pngDataUrl(source){
   const value=String(source||"");
@@ -22,8 +22,29 @@ async function pngDataUrl(source){
 }
 
 export default function GatewaySigningPortal({token,emailLink=false}){
-  const[opened,setOpened]=useState(null),[profile,setProfile]=useState(null);
+  const[opened,setOpened]=useState(null),[profile,setProfile]=useState(null),[savedSignatureSrc,setSavedSignatureSrc]=useState(""),[savedInitialsSrc,setSavedInitialsSrc]=useState("");
   const[declaration,setDeclaration]=useState({name:"",occupation:"",capacity:""});
+  useEffect(()=>{
+    let cancelled=false;
+    const resolveAsset=async(url)=>{
+      const value=String(url||"");
+      if(!value)return "";
+      if(value.startsWith("drive://")){
+        const bytes=await downloadSignatureBytes(value.slice("drive://".length));
+        let binary="";
+        for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));
+        return "data:image/png;base64,"+btoa(binary);
+      }
+      return value.startsWith("data:image/")?value:"";
+    };
+    (async()=>{
+      try{
+        const [signature,initials]=await Promise.all([resolveAsset(profile?.signatureUrl),resolveAsset(profile?.initialsUrl)]);
+        if(!cancelled){setSavedSignatureSrc(signature);setSavedInitialsSrc(initials);}
+      }catch(error){if(!cancelled){setSavedSignatureSrc("");setSavedInitialsSrc("");}}
+    })();
+    return()=>{cancelled=true};
+  },[profile?.signatureUrl,profile?.initialsUrl]);
   const[values,setValues]=useState({}),[applications,setApplications]=useState({}),[signaturePad,setSignaturePad]=useState(null),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[message,setMessage]=useState(""),[pdfUrl,setPdfUrl]=useState(""),[status,setStatus]=useState(null),[evidence,setEvidence]=useState(null);
   const canvasRef=useRef(null),[pdfDocument,setPdfDocument]=useState(null),[pageNum,setPageNum]=useState(1),[pageSize,setPageSize]=useState({width:760,height:980}),[pageError,setPageError]=useState(null),[pdfLoadError,setPdfLoadError]=useState(null),[renderRetry,setRenderRetry]=useState(0),[pdfLoadRetry,setPdfLoadRetry]=useState(0);
   useEffect(()=>{let cancelled=false;let task=null;(async()=>{if(!pdfUrl){setPdfDocument(null);return}setPdfLoadError(null);try{const response=await fetch(pdfUrl);if(!response.ok)throw new Error("Signing PDF request returned HTTP "+response.status);const bytes=new Uint8Array(await response.arrayBuffer());if(!bytes.byteLength)throw new Error("Gateway returned an empty signing PDF.");task=pdfjsLib.getDocument({data:bytes});const doc=await task.promise;if(!cancelled){setPdfDocument(doc);setPageNum(1)}}catch(error){console.error("Gateway signing PDF load failed",error);if(!cancelled)setPdfLoadError(describePdfPageError(error));}})();return()=>{cancelled=true;task?.destroy?.()}},[pdfUrl,pdfLoadRetry]);
@@ -132,6 +153,6 @@ export default function GatewaySigningPortal({token,emailLink=false}){
       {!opened.canSign&&status?.status!=="Completed"&&<p className="muted">This signing task is pending another authorized signer.</p>}
     </section>
     {status?.status==="Completed"&&<section className="panel" style={{marginTop:16}}><h2>Cryptographic evidence</h2><p>Completed PDF SHA-256: <code>{status.completion?.finalHash||"Unavailable"}</code></p><p>Audit chain: {status.auditChainValid===true?"Verified":"Not verified"}</p>{evidence?.evidence?.map(item=><article className="stat-card" key={item.evidenceId} style={{marginTop:8}}><strong>{item.evidenceId}</strong><p>Envelope: {item.envelopeId}</p><p>Signer UID: {item.signerUid}</p><p>Algorithm: {item.algorithm}</p><p>Document hash: <code>{item.documentHash}</code></p><p>Evidence status: {item.status}</p></article>)}</section>}
-    {signaturePad&&<SignatureFieldConfirmationPad field={signaturePad} savedSignatureUrl={profile?.signatureUrl||""} savedInitialsUrl={profile?.initialsUrl||""} onCancel={()=>setSignaturePad(null)} onConfirm={async value=>{const field=signaturePad;const application={fieldId:field.fieldId,confirmed:true,page:Number(field.page||1),x:Number(field.x??0),y:Number(field.y??0),width:Number(field.width??24),height:Number(field.height??9),value};setApplications(previous=>({...previous,[field.fieldId]:application}));setValues(previous=>({...previous,[field.fieldId]:value}));setSignaturePad(null);setMessage(field.type+" confirmed for page "+application.page+". It will be applied only when you submit this signing action.");}}/>}
+    {signaturePad&&<SignatureFieldConfirmationPad field={signaturePad} savedSignatureUrl={savedSignatureSrc} savedInitialsUrl={savedInitialsSrc} onCancel={()=>setSignaturePad(null)} onConfirm={async value=>{const field=signaturePad;const application={fieldId:field.fieldId,confirmed:true,page:Number(field.page||1),x:Number(field.x??0),y:Number(field.y??0),width:Number(field.width??24),height:Number(field.height??9),value};setApplications(previous=>({...previous,[field.fieldId]:application}));setValues(previous=>({...previous,[field.fieldId]:value}));setSignaturePad(null);setMessage(field.type+" confirmed for page "+application.page+". It will be applied only when you submit this signing action.");}}/>}
   </main>;
 }
