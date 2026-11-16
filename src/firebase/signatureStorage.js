@@ -403,9 +403,14 @@ async function sha256HexBytes(bytes) {
 }
 
 async function gatewayAuthenticatedRequest(path, {method="GET",body,contentType="application/json",signingToken=null}={}) {
-  if (!auth.currentUser) throw new Error("Authentication is required.");
-  const token = await getIdToken(auth.currentUser);
-  const headers = {Authorization:"Bearer " + token};
+  const guestSigningPath=/^\/api\/sign\/(?:email\/(?:open|pdf)|open|status|evidence|verify|pdf|submit|decline)$/.test(String(path||""));
+  const headers = {};
+  if (auth.currentUser) {
+    const token = await getIdToken(auth.currentUser);
+    headers.Authorization = "Bearer " + token;
+  } else if (!signingToken || !guestSigningPath) {
+    throw new Error("Authentication or a valid signing invitation is required.");
+  }
   if (contentType) headers["Content-Type"] = contentType;
   if (signingToken) headers["x-signing-token"] = signingToken;
   return fetch(requireGateway() + path, {
