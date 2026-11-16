@@ -212,7 +212,8 @@ async function inspectBlobRecord(deps, base, token, collectionPath, documentId) 
     subcollections
   };
 }
-\nfunction safeCollectionId(value) {
+
+function safeCollectionId(value) {
   const id = String(value || "");
   return /^[A-Za-z][A-Za-z0-9_-]{0,99}$/.test(id) ? id : "";
 }
