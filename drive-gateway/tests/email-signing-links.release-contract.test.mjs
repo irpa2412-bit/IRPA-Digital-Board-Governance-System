@@ -39,7 +39,7 @@ test("authority comes from active register email and exact accepted role fields,
 test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
   assert.match(signing,/sha256Hex\("email-signing-rate:"\+key\)/);
   assert.match(signing,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
-  assert.match(signing,/emailLinkStatus="opened"/);
+  assert.match(signing,/signer\.emailLinkStatus=opened\.status/);
   assert.match(signing,/emailLinkStatus="revoked"/);
   assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^\n]*token\b/i);
 });
@@ -53,8 +53,8 @@ test("email invitation reuses the existing SMTP retry flow with both text and HT
 });
 
 test("owner resend rotates the link and revoke is routed without changing login signer routes",()=>{
-  assert.match(router,/invitations\/\(S\d{1,2}\)\/resend/);
-  assert.match(router,/invitations\/\(S\d{1,2}\)\/revoke/);
+  assert.ok(router.includes(String.raw`invitations\/(S\d{1,2})\/resend`));
+  assert.ok(router.includes(String.raw`invitations\/(S\d{1,2})\/revoke`));
   assert.match(signing,/emailLinkTokenHistory/);
   assert.match(signing,/email_link\.resent/);
   assert.match(signing,/email_link\.revoked/);
