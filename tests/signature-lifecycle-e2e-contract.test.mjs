@@ -11,6 +11,8 @@ const client = read("../src/firebase/signaturePlatform.js");
 const portal = read("../src/pages/SignaturePlatform.jsx");
 const selfTest = read("../src/components/SignaturePathwaySelfTest.jsx");
 const signaturePad = read("../src/components/SignatureFieldConfirmationPad.jsx");
+const stagingAcceptance = read("../drive-gateway/tests/staging-signature-lifecycle-acceptance.mjs");
+const gatewayE2E = read("../drive-gateway/tests/e2e.test.mjs");
 const documentPortal = read("../src/pages/DocumentLifecycleModule.jsx");
 
 function section(source, start, end) {
@@ -28,6 +30,8 @@ test("1. controlled PDF upload records SHA-256, byte length and parsed PDF page 
   assert.match(documentPolicy, /pdfPageCount:Number\(pdfPageCount\)/);
   assert.match(upload, /pdfPageCount,archivePath/);
   assert.match(upload, /status:"WORKING"/);
+  assert.match(stagingAcceptance, /uploaded\.size,bytes\.length/);
+  assert.match(stagingAcceptance, /uploaded\.pageCount,2/);
 });
 
 test("2. envelope creation binds source integrity, two unique signers and page-specific fields", () => {
@@ -77,6 +81,8 @@ test("5. final completion is server-verified and binds the final PDF hash and au
   assert.match(complete, /status:"SIGNED"/);
   assert.match(complete, /finalSignedPdfSha256/);
   assert.match(complete, /verification\.finalHash/);
+  assert.match(complete, /finalArchiveStatus="ARCHIVED"|finalArchiveStatus/);
+  assert.match(complete, /completionNoticeSentCount/);
   assert.match(signing, /Completed/);
   assert.match(signing, /completion/);
 });
@@ -91,6 +97,7 @@ test("6. signed output returns to final archive and notices/retrieval remain sig
   assert.match(signing, /createdByEmail/);
   assert.match(signing, /for\(const signer of initial\.signers\|\|\[\]\)/);
   assert.match(signing, /completion\.notice\.sent/);
+  assert.match(signing, /notificationStatus:completionNoticeStatus/);
   assert.match(gateway, /sendCompletionNotice: async/);
 });
 
