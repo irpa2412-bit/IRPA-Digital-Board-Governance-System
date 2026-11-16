@@ -83,6 +83,57 @@ function diagnosticRow(item, result) {
   };
 }
 
+function SignatureLifecycleSelfTestPanel() {
+  const [busy,setBusy]=useState(false);
+  const [rows,setRows]=useState([]);
+  const [message,setMessage]=useState("Not run. This portal check reads the authenticated signing register only; it does not create, sign, revoke or delete records.");
+  async function run() {
+    setBusy(true);setRows([]);setMessage("Checking the authenticated signing register…");
+    try {
+      const user=auth.currentUser;
+      if(!user?.uid)throw new Error("Authentication required.");
+      const isRootAdmin=String(user.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
+      const adminSnap=isRootAdmin?null:await getDoc(doc(db,"adminProfiles",user.uid));
+      if(!isRootAdmin&&(!adminSnap?.exists()||adminSnap.data()?.active!==true))throw new Error("Active administrator access is required.");
+      const gateway=getGoogleDriveGatewayUrl();
+      if(!gateway)throw new Error("Gateway URL is not configured.");
+      const token=await getIdToken(user);
+      const response=await fetch(gateway+"/api/signature-workflow/list",{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok||payload.ok!==true)throw new Error("Signing register request failed (HTTP "+response.status+").");
+      const envelopes=Array.isArray(payload.envelopes)?payload.envelopes:[];
+      const assigned=envelopes.filter(e=>(e.recipients||[]).some(r=>r?.uid===user.uid));
+      const multi=envelopes.filter(e=>(e.recipients||[]).filter(r=>r?.uid&&r.uid!==e.ownerUid).length>=2);
+      const completed=envelopes.filter(e=>e.status==="Completed");
+      const signed=assigned.filter(e=>(e.recipients||[]).some(r=>r?.uid===user.uid&&r.status==="Signed"));
+      const declined=envelopes.filter(e=>["Declined","Cancelled","Voided"].includes(e.status));
+      const make=(stage,status,detail)=>({stage,status,httpStatus:String(response.status),detail});
+      setRows([
+        make("1. Controlled PDF upload","NOT RUN","Read-only inventory cannot upload a staging PDF or verify a new upload hash, byte length and page count."),
+        make("2. Envelope and field placement",multi.length?"PASS":"NOT RUN",multi.length+" envelope(s) show at least two non-owner signers; page-specific field placement still requires the staging acceptance run."),
+        make("3. Signer transport and assignment",assigned.length?"PASS":"NOT RUN",assigned.length+" envelope(s) are visible to this account through the authenticated assigned/participant list; invitation delivery itself is not re-sent."),
+        make("4. Signing ceremony and authority",signed.length?"PASS":"NOT RUN",signed.length+" visible envelope(s) contain a signed assignment for this account; pad interaction and server authority checks require a live staging ceremony."),
+        make("5. Completion and final PDF",completed.length?"PASS":"NOT RUN",completed.length+" completed envelope(s) are visible; final PDF hash/page placement require the staging acceptance run."),
+        make("6. Return to archive",completed.some(e=>e.signedDocumentUrl||e.ownerCompletedDocumentUrl)?"PASS":"NOT RUN","Archive retrieval is not downloaded by this read-only check; original uploads are not changed."),
+        make("7. Decline, revoke, reminder and retry",declined.length?"PASS":"NOT RUN",declined.length+" declined/cancelled/voided envelope(s) observed; reminder, retry and completed-envelope immutability require controlled staging actions.")
+      ]);
+      setMessage("Read-only register check completed. HTTP "+response.status+" is the register query status only; it is not an end-to-end pass for actions marked NOT RUN.");
+    } catch(error) {
+      setRows(["1. Controlled PDF upload","2. Envelope and field placement","3. Signer transport and assignment","4. Signing ceremony and authority","5. Completion and final PDF","6. Return to archive","7. Decline, revoke, reminder and retry"].map(stage=>({stage,status:"FAIL",httpStatus:"—",detail:error?.message||"The read-only check failed."})));
+      setMessage("Signature Lifecycle self-test failed. No write was attempted.");
+    } finally {setBusy(false);}
+  }
+  return <section className="panel" style={{marginBottom:14}}>
+    <div className="panel-heading"><div><span className="eyebrow">READ-ONLY PORTAL SELF-TEST</span><h3>Signature Lifecycle</h3><p className="panel-description">Inspects the authenticated signing register. The staging acceptance workflow separately exercises upload, signing and archive actions.</p></div></div>
+    <button type="button" onClick={run} disabled={busy}>{busy?"Checking…":"Run Signature Lifecycle Self-Test"}</button>
+    <div role="status" aria-live="polite" style={{marginTop:10,fontSize:13}}>{message}</div>
+    {rows.length>0&&<div style={{overflowX:"auto",marginTop:12}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+      <thead><tr><th style={{textAlign:"left",padding:7}}>Stage</th><th style={{textAlign:"left",padding:7}}>Result</th><th style={{textAlign:"left",padding:7}}>HTTP status</th><th style={{textAlign:"left",padding:7}}>Detail</th></tr></thead>
+      <tbody>{rows.map((row,index)=><tr key={row.stage+index}><td style={{padding:7,verticalAlign:"top"}}>{row.stage}</td><td style={{padding:7,verticalAlign:"top"}}><strong>{row.status}</strong></td><td style={{padding:7,verticalAlign:"top"}}>{row.httpStatus}</td><td style={{padding:7,verticalAlign:"top"}}>{row.detail}</td></tr>)}</tbody>
+    </table></div>}
+  </section>;
+}
+
 export default function SignaturePathwaySelfTest() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Ready. Run the test to inspect registered controlled documents.");
@@ -260,6 +311,7 @@ export default function SignaturePathwaySelfTest() {
   }
 
   return <section className="panel">
+    <SignatureLifecycleSelfTestPanel/>
     <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Read-only inspection of every registered controlled document: Drive metadata, controlled-route download, SHA-256, byte size, PDF page count, per-page extractable text and non-blank rendering. Flags a final page with zero text or a render failure. No document, Drive file or Firestore record is repaired or changed.</p></div></div>
     <div className="panel" style={{padding:12,marginBottom:14}}>
       <div><strong>Find emergency storage</strong><p className="panel-description">Administrator-only inspection of one emergency blob per Worker request. Chunk payloads are reconstructed in Worker memory only; responses contain metadata and measurements, never file bytes.</p></div>

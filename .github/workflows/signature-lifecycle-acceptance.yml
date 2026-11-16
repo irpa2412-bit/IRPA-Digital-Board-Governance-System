@@ -1,0 +1,75 @@
+name: Signature Lifecycle Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/signature-lifecycle-e2e-contract.test.mjs"
+      - "src/components/SignaturePathwaySelfTest.jsx"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/firebase/signaturePlatform.js"
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "src/firebase/documentLifecycle.js"
+      - "drive-gateway/src/signing.mjs"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/router.mjs"
+      - "drive-gateway/src/documentPolicy.mjs"
+      - "drive-gateway/tests/**"
+      - "src/firebase/signaturePlatform.js"
+      - "vite.config.js"
+      - ".github/workflows/cloudflare-pages-deploy.yml"
+      - ".github/workflows/signature-lifecycle-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signature-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Gateway dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: drive-gateway
+      - name: Run consolidated lifecycle acceptance contract
+        run: node --test tests/signature-lifecycle-e2e-contract.test.mjs
+      - name: Run Gateway regression suite
+        run: npm test
+        working-directory: drive-gateway
+      - name: Build frontend
+        run: npm run build
+
+  staging-runtime-acceptance:
+    if: github.event_name == 'pull_request'
+    needs: signature-lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install staging acceptance dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Run isolated staging signature lifecycle acceptance
+        working-directory: drive-gateway
+        env:
+          STAGING_GATEWAY_URL: https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          STAGING_CRYPTO_TEST_EMAIL: ${{ secrets.STAGING_CRYPTO_TEST_EMAIL }}
+          STAGING_CRYPTO_TEST_PASSWORD: ${{ secrets.STAGING_CRYPTO_TEST_PASSWORD }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: node tests/staging-signature-lifecycle-acceptance.mjs

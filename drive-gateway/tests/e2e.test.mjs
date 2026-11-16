@@ -1,6 +1,6 @@
 import test from "node:test";import assert from "node:assert/strict";import{PDFDocument}from"pdf-lib";import{memoryMeta,memoryStorage}from"../src/adapters.mjs";import{makeContext,route}from"../src/router.mjs";import{runCleanup}from"../src/upload.mjs";import{verifyChain}from"../src/signing.mjs";import{MAX_PDF_BYTES}from"../src/pdf.mjs";import{sha256Hex}from"../src/util.mjs";import{persistCompletedSignatureEnvelope}from"../src/signatureMirror.mjs";import{createDocumentLifecycleRouter}from"../src/documentLifecycle.mjs";
-const quiet={error(){},log(){}};const PNG="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";const U={u1:{uid:"u1"},u2:{uid:"u2"},u3:{uid:"u3"},u4:{uid:"u4"},admin:{uid:"admin",isAdmin:true}};
-function setup(){const storage=memoryStorage(),meta=memoryMeta(),invites=[],clock={t:new Date("2026-10-04T10:00:00Z")};const ctx=makeContext({storage,meta,logger:quiet,now:()=>new Date(clock.t),verifyUser:async r=>U[(r.headers.get("authorization")||"").replace("Bearer ","")]||null,sendInvitation:async i=>invites.push(i),config:{appUrl:"https://app.example.test",ttlDays:14}});return{ctx,storage,meta,invites,clock,tokenFor:e=>new URL(invites.find(i=>i.to===e).link).searchParams.get("gatewayToken")}}
+const quiet={error(){},log(){}};const PNG="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";const U={u1:{uid:"u1",email:"owner@example.org"},u2:{uid:"u2",email:"two@example.org"},u3:{uid:"u3",email:"three@example.org"},u4:{uid:"u4",email:"four@example.org"},admin:{uid:"admin",isAdmin:true}};
+function setup(){const storage=memoryStorage(),meta=memoryMeta(),invites=[],notices=[],clock={t:new Date("2026-10-04T10:00:00Z")};const ctx=makeContext({storage,meta,logger:quiet,now:()=>new Date(clock.t),verifyUser:async r=>U[(r.headers.get("authorization")||"").replace("Bearer ","")]||null,sendInvitation:async i=>invites.push(i),config:{appUrl:"https://app.example.test",ttlDays:14}});ctx.sendCompletionNotice=async notice=>notices.push(notice);return{ctx,storage,meta,invites,notices,clock,tokenFor:e=>new URL(invites.find(i=>i.to===e).link).searchParams.get("gatewayToken")}}
 async function pdf(p=1){const d=await PDFDocument.create();for(let i=0;i<p;i++)d.addPage().drawText("Page "+(i+1),{x:50,y:700});return d.save()}
 function uploadReq(b,o={}){const f=new FormData();f.set("file",new Blob([b],{type:"application/pdf"}),o.name||"doc.pdf");if(o.documentId)f.set("documentId",o.documentId);f.set("title","Test Doc");f.set("classification",o.classification||"Restricted");f.set("archives",JSON.stringify(o.archives||["administrative-documents","board-governance"]));return new Request("https://gw.test/api/documents",{method:"POST",headers:{authorization:`Bearer ${o.user||"u1"}`},body:f})}
 const post=(p,b,u)=>new Request("https://gw.test"+p,{method:"POST",headers:{"content-type":"application/json",...(u?{authorization:`Bearer ${u}`}:{})},body:JSON.stringify(b)});const get=(p,o={})=>new Request("https://gw.test"+p,{headers:{...(o.user?{authorization:`Bearer ${o.user}`}:{}),...(o.token?{"x-signing-token":o.token}:{})}});
@@ -8,7 +8,7 @@ async function up(s,id="DOC-001",o={}){const b=await pdf(2),r=await route(upload
 const ss=[{name:"Amina",email:"a@example.org",order:1},{name:"Juma",email:"j@example.org",order:2}];
 async function env(s,signers=ss){await up(s);const r=await route(post("/api/envelopes",{documentId:"DOC-001",signers,archives:["legal-contracts","board-governance"]},"u1"),s.ctx);assert.equal(r.status,201);return(await r.json()).envelopeId}
 const sig=(t,v="Amina K")=>post("/api/sign/submit",{token:t,consent:true,signature:{type:"typed",value:v}});
-test("1 valid PDF stored in every archive",async()=>{const s=setup(),x=await up(s);assert.equal(s.storage.objs.size,2);assert.equal((await s.meta.get("documents","DOC-001")).hash,x.h)});
+test("1 valid PDF stored in every archive with SHA-256, byte length and page count",async()=>{const s=setup(),x=await up(s),document=await s.meta.get("documents","DOC-001");assert.equal(s.storage.objs.size,2);assert.equal(document.hash,x.h);assert.equal(document.size,x.b.length);assert.equal(document.pageCount,2)});
 test("2 invalid PDF rejected",async()=>{const s=setup();assert.equal((await route(uploadReq(new TextEncoder().encode("hello")),s.ctx)).status,400)});
 test("3 truncated PDF rejected",async()=>{const s=setup(),b=await pdf();assert.equal((await route(uploadReq(b.slice(0,-100)),s.ctx)).status,400)});
 test("4 empty PDF rejected",async()=>{const s=setup();assert.equal((await route(uploadReq(new Uint8Array()),s.ctx)).status,400)});
@@ -22,7 +22,7 @@ test("11 cleanup removes failed rollback",async()=>{const s=setup();s.storage.fa
 test("12 envelope owner authorization",async()=>{const s=setup();await up(s);assert.equal((await route(post("/api/envelopes",{documentId:"DOC-001",signers:ss,archives:["legal-contracts"]},"u2"),s.ctx)).status,403)});
 test("13 invitation transport required",async()=>{const s=setup(),c=makeContext({storage:s.storage,meta:s.meta,verifyUser:s.ctx.verifyUser,logger:quiet});await up(s);assert.equal((await route(post("/api/envelopes",{documentId:"DOC-001",signers:ss,archives:["legal-contracts"]},"u1"),c)).status,500)});
 test("14 signing order enforced",async()=>{const s=setup();await env(s);assert.equal((await route(sig(s.tokenFor("j@example.org"),"Juma M"),s.ctx)).status,409)});
-test("15 sequential signing completes and creates copies",async()=>{const s=setup();const id=await env(s);const a=s.tokenFor("a@example.org"),j=s.tokenFor("j@example.org");assert.equal((await route(sig(a),s.ctx)).status,200);const r=await route(post("/api/sign/submit",{token:j,consent:true,signature:{type:"drawn",value:PNG}},s.ctx),s.ctx);assert.equal(r.status,200);assert.equal((await r.json()).completed,true);const st=await(await route(get("/api/envelopes/"+id,{user:"u1"}),s.ctx)).json();assert.equal(st.status,"Completed");assert.equal(st.auditChainValid,true);assert.equal(st.completion.files.length,5)});
+test("15 sequential signing completes and creates copies",async()=>{const s=setup();const id=await env(s);const a=s.tokenFor("a@example.org"),j=s.tokenFor("j@example.org");assert.equal((await route(sig(a),s.ctx)).status,200);const r=await route(post("/api/sign/submit",{token:j,consent:true,signature:{type:"drawn",value:PNG}},s.ctx),s.ctx);assert.equal(r.status,200);assert.equal((await r.json()).completed,true);const st=await(await route(get("/api/envelopes/"+id,{user:"u1"}),s.ctx)).json();assert.equal(st.status,"Completed");assert.equal(st.auditChainValid,true);assert.equal(st.completion.files.length,5);const completed=await s.meta.get("envelopes",id);assert.equal(completed.signers[0].electronicConsentAccepted,true);assert.ok(completed.signers[0].electronicConsentAt);assert.ok(completed.events.some(event=>event.consentAccepted===true));assert.equal(s.notices.length,3);assert.deepEqual([...new Set(s.notices.map(notice=>notice.to.toLowerCase()))].sort(),["a@example.org","j@example.org","owner@example.org"]);const eventCount=completed.events.length;const retry=await route(sig(a),s.ctx);assert.equal(retry.status,200);assert.equal((await retry.json()).idempotent,true);const afterRetry=await s.meta.get("envelopes",id);assert.equal(afterRetry.events.length,eventCount);assert.equal(s.notices.length,3)});
 test("16 malformed and tampered token rejected",async()=>{const s=setup();await env(s);const t=s.tokenFor("a@example.org"),p=t.split(".");assert.equal((await route(sig("bad"),s.ctx)).status,401);assert.equal((await route(sig(p[0]+"."+p[1]+"."+"0".repeat(64)),s.ctx)).status,403)});
 test("17 invalid signature and wrong linked account rejected",async()=>{const s=setup();await env(s,[{name:"A",email:"a@example.org",order:1},{name:"L",email:"l@example.org",order:2,uid:"u2"}]);assert.equal((await route(sig(s.tokenFor("a@example.org"),"<bad>"),s.ctx)).status,400);await route(sig(s.tokenFor("a@example.org")),s.ctx);const r=await route(post("/api/sign/submit",{token:s.tokenFor("l@example.org"),consent:true,signature:{type:"typed",value:"Linked"}}, "u1"),s.ctx);assert.equal(r.status,403)});
 test("18 audit chain detects tampering and completed PDF integrity",async()=>{const s=setup(),id=await env(s,[{name:"Amina",email:"a@example.org",order:1}]);await route(sig(s.tokenFor("a@example.org")),s.ctx);const e=await s.meta.get("envelopes",id);assert.equal(await verifyChain(e.events),true);e.events[1].ip="6.6.6.6";assert.equal(await verifyChain(e.events),false)});
@@ -43,3 +43,79 @@ test("26 concurrent externalReference requests reserve exactly one canonical env
 test("27 an incomplete Gateway envelope may be voided by its owner",async()=>{const s=setup();const id=await env(s);const response=await route(post("/api/envelopes/"+id+"/void",{reason:"owner cancellation"},"u1"),s.ctx);assert.equal(response.status,200);assert.equal((await response.json()).status,"Voided");});
 
 test("28 stale externalReference reservation can be reclaimed after its lease expires",async()=>{const s=setup();await up(s);const externalReference="IRPA-EXT-STALE-001",key=await sha256Hex("u1\\n"+externalReference);await s.meta.create("externalReferences",key,{ownerUid:"u1",externalReference,envelopeId:"ENV-CRASHED",createdAt:"2026-10-04T09:00:00.000Z"});const response=await route(post("/api/envelopes",{documentId:"DOC-001",externalReference,signers:[{name:"Amina",email:"a@example.org",uid:"u1",order:1}],archives:["legal-contracts"]},"u1"),s.ctx);assert.equal(response.status,201);const created=await response.json();assert.equal((await s.meta.get("externalReferences",key)).envelopeId,created.envelopeId);assert.equal((await s.meta.list("envelopes")).length,1);});
+
+test("29 signature fields on the first and actual last PDF page are accepted for two signers",async()=>{
+  const s=setup(),bytes=await pdf(3);
+  assert.equal((await route(uploadReq(bytes,{documentId:"DOC-LAST-PAGE"}),s.ctx)).status,201);
+  const fields=[
+    {fieldId:"first-signature",type:"Signature",page:1,x:8,y:18,width:50,height:10,signerUid:"u2",required:true},
+    {fieldId:"first-date",type:"Date",page:1,x:8,y:30,width:30,height:6,signerUid:"u2",required:true},
+    {fieldId:"last-signature",type:"Signature",page:3,x:8,y:18,width:50,height:10,signerUid:"u3",required:true},
+    {fieldId:"last-date",type:"Date",page:3,x:8,y:30,width:30,height:6,signerUid:"u3",required:true}
+  ];
+  const response=await route(post("/api/envelopes",{documentId:"DOC-LAST-PAGE",signers:[{name:"Signer Two",email:"two@example.org",uid:"u2",order:1},{name:"Signer Three",email:"three@example.org",uid:"u3",order:2}],fields,archives:["legal-contracts"]},"u1"),s.ctx);
+  assert.equal(response.status,201);
+  const data=await response.json(),saved=await s.meta.get("envelopes",data.envelopeId);
+  assert.equal(saved.fields.length,4);
+  assert.equal(saved.fields.find(field=>field.fieldId==="last-signature").page,3);
+  assert.equal(saved.fields.find(field=>field.fieldId==="last-date").page,3);
+});
+
+test("30 a signing field beyond the actual last PDF page is rejected",async()=>{
+  const s=setup(),bytes=await pdf(3);
+  assert.equal((await route(uploadReq(bytes,{documentId:"DOC-PAGE-BOUND"}),s.ctx)).status,201);
+  const response=await route(post("/api/envelopes",{documentId:"DOC-PAGE-BOUND",signers:[{name:"Signer Two",email:"two@example.org",uid:"u2",order:1},{name:"Signer Three",email:"three@example.org",uid:"u3",order:2}],fields:[{fieldId:"invalid-last-page",type:"Signature",page:4,x:8,y:18,width:50,height:10,signerUid:"u2",required:true}],archives:["legal-contracts"]},"u1"),s.ctx);
+  assert.equal(response.status,400);
+  assert.match((await response.json()).error,/exceeds the controlled PDF page count/);
+});
+
+test("31 decline records a single terminal signer decision",async()=>{
+  const s=setup(),id=await env(s,[{name:"Amina",email:"a@example.org",uid:"u2",order:1},{name:"Juma",email:"j@example.org",uid:"u3",order:2}]);
+  const response=await route(post("/api/sign/decline",{token:s.tokenFor("a@example.org"),reason:"Unable to approve" },"u2"),s.ctx);
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).status,"Declined");
+  const record=await s.meta.get("envelopes",id);
+  assert.equal(record.status,"Declined");
+  assert.equal(record.signers[0].status,"Declined");
+  assert.equal(record.events.filter(event=>event.type==="signer.declined").length,1);
+});
+
+test("32 a non-signing pending signer can receive a reminder with a rotated token",async()=>{
+  const s=setup(),id=await env(s,[{name:"Amina",email:"a@example.org",uid:"u2",order:1}]);
+  const original=s.tokenFor("a@example.org"),inviteCount=s.invites.length;
+  const reminder=await route(post("/api/envelopes/"+id+"/invitations/S1/resend",{},"u1"),s.ctx);
+  assert.equal(reminder.status,200);
+  assert.equal((await reminder.json()).deliveryStatus,"Sent");
+  assert.equal(s.invites.length,inviteCount+1);
+  const refreshed=s.tokenFor("a@example.org");
+  assert.notEqual(refreshed,original);
+  assert.equal((await route(post("/api/sign/submit",{token:original,consent:true,signature:{type:"typed",value:"Amina"} },"u2"),s.ctx)).status,403);
+  const record=await s.meta.get("envelopes",id);
+  assert.equal(record.status,"Sent");
+  assert.equal(record.signers[0].status,"Pending");
+  const signed=await route(post("/api/sign/submit",{token:refreshed,consent:true,signature:{type:"typed",value:"Amina"} },"u2"),s.ctx);
+  assert.equal(signed.status,200);
+});
+
+test("33 failed completion notice retries only the undelivered recipient",async()=>{
+  const s=setup(),original=s.ctx.sendCompletionNotice;let failOnce=true;
+  s.ctx.sendCompletionNotice=async notice=>{if(notice.to==="two@example.org"&&failOnce){failOnce=false;throw new Error("temporary SMTP failure")}return original(notice)};
+  const id=await env(s,[{name:"Signer Two",email:"two@example.org",uid:"u2",order:1},{name:"Signer Three",email:"three@example.org",uid:"u3",order:2}]);
+  const first=await route(post("/api/sign/submit",{token:s.tokenFor("two@example.org"),consent:true,signature:{type:"typed",value:"Signer Two"} },"u2"),s.ctx);
+  assert.equal(first.status,200);
+  const last=await route(post("/api/sign/submit",{token:s.tokenFor("three@example.org"),consent:true,signature:{type:"typed",value:"Signer Three"} },"u3"),s.ctx);
+  assert.equal(last.status,200);assert.equal((await last.json()).completed,true);
+  let completed=await s.meta.get("envelopes",id);
+  assert.equal(completed.completion.notifications["two@example.org"].status,"Failed");
+  assert.equal(completed.completion.notifications["owner@example.org"].status,"Sent");
+  assert.equal(completed.completion.notifications["three@example.org"].status,"Sent");
+  const retry=await route(post("/api/envelopes/"+id+"/retry-completion",{},"u1"),s.ctx);
+  assert.equal(retry.status,200);
+  completed=await s.meta.get("envelopes",id);
+  assert.equal(completed.completion.notifications["two@example.org"].status,"Sent");
+  assert.equal(completed.completion.notifications["owner@example.org"].status,"Sent");
+  assert.equal(completed.completion.notifications["three@example.org"].status,"Sent");
+  assert.equal(s.notices.filter(notice=>notice.to==="owner@example.org").length,1);
+  assert.equal(s.notices.filter(notice=>notice.to==="three@example.org").length,1);
+  assert.equal(s.notices.filter(notice=>notice.to==="two@example.org").length,1);
+});

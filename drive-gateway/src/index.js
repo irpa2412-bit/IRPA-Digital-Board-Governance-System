@@ -495,6 +495,17 @@ export default {
               return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendCompletionNotice: async ({to,name,title,link,completedAt}) => {
+              const recipient=normalizeRecipientEmail(to);
+              const subject=validateMailHeader("IRPA Digital Board Governance — Document Signing Completed","Subject");
+              const safeName=escapeMailHtml(name||"IRPA colleague");
+              const safeTitle=escapeMailHtml(title||"IRPA document");
+              const safeLink=escapeMailHtml(link||"https://irpa-digital-board-governance.web.app");
+              const completed=String(completedAt||"").trim();
+              const text="Dear "+(name||"IRPA colleague")+",\\n\\nThe signing workflow for "+(title||"the IRPA document")+" is now complete. Your completed copy is available in the Signature Portal.\\n\\nCompleted at: "+completed+"\\nOpen the Signature Portal: "+(link||"https://irpa-digital-board-governance.web.app")+"\\n\\nRegards,\\nIRPA Administration";
+              const html="<!doctype html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6;color:#1f2937\"><h2>IRPA Digital Board Governance</h2><p>Dear "+safeName+",</p><p>The signing workflow for <strong>"+safeTitle+"</strong> is now complete. Your completed copy is available in the Signature Portal.</p><p><strong>Completed at:</strong> "+escapeMailHtml(completed)+"</p><p><a href=\""+safeLink+"\">Open the Signature Portal</a></p><p>Regards,<br/>IRPA Administration</p></body></html>";
+              return smtpSend(env,{to:recipient,subject,text,html});
+            },
             logger: console,
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
@@ -1196,6 +1207,9 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     step = "Validate draft and source controlled document";
     const body = await request.json();
     const draft = body && body.draft || {};
+    const expectedDraftVersion=Number(draft.expectedDraftVersion??0);
+    delete draft.expectedDraftVersion;
+    if(!Number.isInteger(expectedDraftVersion)||expectedDraftVersion<0)return json({ok:false,step,error:"A valid expected draft version is required."},400,corsHeaders(request));
     const envelopeId = String(draft.envelopeReference || body.envelopeId || "").trim();
     const documentId = String(draft.documentId || "").trim();
     if (!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId) || !/^[A-Za-z0-9_-]{1,150}$/.test(documentId) || !String(draft.title || "").trim() || !String(draft.documentUrl || "").trim()) return json({ok:false,step,error:"A valid envelope ID, title, canonical document ID and controlled document URL are required."},400,corsHeaders(request));
@@ -1205,7 +1219,9 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     if (!signatureDraftOwnershipAllowed(sourceData,uid,activeAdmin)) return json({ok:false,step,error:"Only the source-document owner or an authorized administrator may create a signing draft."},403,corsHeaders(request));
     const existing = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, adminToken);
     const existingData = firestoreDocumentToPlain(existing) || {};
+    const currentDraftVersion=Number(existingData.draftVersion||0);
     if (existing && String(existingData.ownerUid || existingData.senderUid || "") !== uid) return json({ok:false,step,error:"Only the original signing-draft owner may update this envelope."},403,corsHeaders(request));
+    if(expectedDraftVersion!==currentDraftVersion)return json({ok:false,step,error:"The signing draft changed since it was loaded. Reload the draft before adding or changing signers.",expectedDraftVersion,currentDraftVersion},409,corsHeaders(request));
     const recipients = Array.isArray(draft.recipients) ? draft.recipients : [];
     const signingMode = String(draft.signingMode || "Sequential");
     const validationError = validateSignatureDraftRecipients(recipients,signingMode);
@@ -1221,11 +1237,15 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     const ownerSignatureFields = fields.filter(field => field && field.signerUid === uid && field.type === "Signature" && field.required !== false);
     if (ownerSigningEnabled && ownerSignatureFields.length === 0) return json({ok:false,step,error:"Owner signature is required, but no required Signature field is explicitly assigned to the authenticated owner."},400,corsHeaders(request));
     if (!ownerSigningEnabled && fields.some(field => field && field.signerUid === uid && field.type === "Signature")) return json({ok:false,step,error:"An owner Signature field is assigned while the owner signature requirement is disabled."},400,corsHeaders(request));
+    if(existing&&String(existingData.status||"Draft")!=="Draft")return json({ok:false,step,error:"A signing envelope cannot be changed after its workflow has started."},409,corsHeaders(request));
+    const sameDraft=Boolean(existing)&&String(existingData.title||"")===String(draft.title||"").trim()&&String(existingData.documentId||"")===documentId&&String(existingData.documentUrl||"")===String(draft.documentUrl||"")&&String(existingData.signingMode||"Sequential")===signingMode&&JSON.stringify(existingData.recipients||[])===JSON.stringify(recipients)&&JSON.stringify(existingData.fields||[])===JSON.stringify(fields)&&Boolean(existingData.ownerSigningEnabled)===Boolean(body.ownerSigningEnabled===true);
+    if(sameDraft)return json({ok:true,idempotent:true,envelopeReference:envelopeId,status:"Draft",draftVersion:currentDraftVersion,writesPerformed:false},200,corsHeaders(request));
+    if(existing&&!existing.updateTime)return json({ok:false,step,error:"The existing draft has no update version; refusing a non-atomic signer assignment update."},409,corsHeaders(request));
     const participantUids = Array.from(new Set(recipients.map(item => String(item && item.uid || "")).filter(Boolean)));
     if (!participantUids.includes(uid)) return json({ok:false,step,error:"The authenticated owner must be a participant in the signing envelope."},400,corsHeaders(request));
     if (fields.some(field => field && field.signerUid && !participantUids.includes(String(field.signerUid)))) return json({ok:false,step,error:"Every assigned field must belong to a participant in this envelope."},400,corsHeaders(request));
     const now = new Date().toISOString();
-    const envelope = {...draft,envelopeReference:envelopeId,title:String(draft.title).trim(),documentId,senderUid:uid,senderEmail:email,ownerUid:uid,ownerEmail:email,recordOrigin:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION",trialData:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL",status:"Draft",signingMode,recipients,fields,participantUids,actionUids:Array.from(new Set(fields.map(field=>String(field && field.signerUid || "")).filter(Boolean))),updatedAt:now,...(existing?{}:{createdAt:now})};
+    const envelope = {...draft,envelopeReference:envelopeId,draftVersion:currentDraftVersion+1,title:String(draft.title).trim(),documentId,senderUid:uid,senderEmail:email,ownerUid:uid,ownerEmail:email,recordOrigin:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION",trialData:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL",status:"Draft",signingMode,recipients,fields,participantUids,actionUids:Array.from(new Set(fields.map(field=>String(field && field.signerUid || "")).filter(Boolean))),updatedAt:now,...(existing?{}:{createdAt:now})};
     delete envelope.id;
     step = "Commit envelope, source-document link and audit event atomically";
     const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
@@ -1233,7 +1253,7 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     const event = {envelopeId,event:"Owner Section Saved",details:{ownerUid:uid,ownerSignatureRequired:ownerSigningEnabled,assignedOwnerSignatureFieldIds:ownerSignatureFields.map(field=>String(field.fieldId||"")),fieldCount:fields.filter(field=>field && field.signerUid===uid).length,recipientCount:recipients.length,writePath:"authenticated-worker"},actorUid:uid,actorEmail:email,createdAt:now};
     const docFields = {signatureEnvelopeId:signatureDraftFirestoreValue(envelopeId),signatureReference:signatureDraftFirestoreValue(envelopeId),signatureStatus:signatureDraftFirestoreValue("Draft"),signatureOwnerUid:signatureDraftFirestoreValue(uid),workflowOwnerSectionSaved:signatureDraftFirestoreValue(true),authorizationRequestId:signatureDraftFirestoreValue(draft.authorizationRequestId || null),authorizationReference:signatureDraftFirestoreValue(draft.authorizationReference || null),updatedAt:signatureDraftFirestoreValue(now)};
     const writes = [
-      {update:{name:base+"/signatureEnvelopes/"+envelopeId,fields:signatureDraftFirestoreValue(envelope).mapValue.fields},updateMask:{fieldPaths:Object.keys(envelope)},currentDocument:{exists:Boolean(existing)}},
+      {update:{name:base+"/signatureEnvelopes/"+envelopeId,fields:signatureDraftFirestoreValue(envelope).mapValue.fields},updateMask:{fieldPaths:Object.keys(envelope)},currentDocument:existing?{updateTime:existing.updateTime}:{exists:false}},
       {update:{name:base+"/documents/"+documentId,fields:docFields},updateMask:{fieldPaths:Object.keys(docFields)},currentDocument:{exists:true}},
       {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
     ];
@@ -2492,7 +2512,7 @@ async function lookupInductionRegistration(request, env) {
   const enteredName = String(data.fullName || "").trim();
   if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
 
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\s+/g," ");
   const target = normalize(enteredName);
   const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
   const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
