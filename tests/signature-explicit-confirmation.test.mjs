@@ -88,3 +88,8 @@ test("all signer types are authenticated by transaction identity, not IRPA regis
   assert.match(platform, /occupation:signerAuthorityRole\.trim\(\),capacity:""/);
   assert.match(gatewayPortal, /declarations,consent/);
 });
+
+test("final PDF certificate prints owner-recorded and signer-declared occupation and capacity separately", () => {
+  assert.match(certificate, /Owner declared: .*Occupation: .*Capacity:/);
+  assert.match(certificate, /Signer declared: .*Occupation: .*Capacity:/);
+});
