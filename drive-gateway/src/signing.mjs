@@ -10,7 +10,7 @@ const can=(e,s)=>s.status==="Pending"&&(e.signingMode==="Parallel"||e.signers.ev
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
   if(signer?.identityType==="email-link") return signer.emailLinkStatus==="opened";
-  if(!signer?.uid) return true;
+  if(!signer?.uid) return false;
   return Boolean(user?.uid)&&user.uid===signer.uid;
 }
 function assertSignerAuthentication(signer,user){
