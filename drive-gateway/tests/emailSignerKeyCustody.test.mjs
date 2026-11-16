@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {EsignRecordDurableObject,buildEsignContext} from "../src/esignContext.mjs";
-import {buildCanonicalSigningPayload,createCryptographicEvidence,verifyCryptographicEvidence} from "../src/cryptographicGate.mjs";
+import {buildCanonicalSigningPayload,createCryptographicEvidence,verifyCryptographicEvidence,sealAndPersist} from "../src/cryptographicGate.mjs";
 import {sha256Hex} from "../src/util.mjs";
 
 function durableObjectNamespace(){
@@ -60,6 +60,33 @@ test("email-link cryptographic evidence binds envelope, signer ID, invited email
   assert.equal(await verifyCryptographicEvidence(evidence,{documentHash,signerIdentityType:"email-link",signerIdentityHash:signer.emailHash,publicKey:key.publicKey}),true);
   assert.equal(await verifyCryptographicEvidence(evidence,{documentHash,signerIdentityType:"email-link",signerIdentityHash:"c".repeat(64),publicKey:key.publicKey}),false);
   assert.equal(await verifyCryptographicEvidence(evidence,{documentHash:await sha256Hex("tampered-pdf"),signerIdentityType:"email-link",signerIdentityHash:signer.emailHash,publicKey:key.publicKey}),false);
+});
+
+
+test("production sealing persists email-link evidence bound to the exact final PDF",async()=>{
+  const ctx=buildEsignContext({env:{DRIVE_MOCK:"false",ESIGN_DO:durableObjectNamespace()},verifyUser:async()=>null,sendInvitation:async()=>{},logger:{error(){}}});
+  const rows=new Map();
+  const meta={
+    get:async(collection,id)=>rows.get(collection+"/"+id)||null,
+    create:async(collection,id,value)=>{const key=collection+"/"+id;if(rows.has(key))throw new Error("duplicate evidence");rows.set(key,structuredClone(value));},
+    list:async(collection)=>[...rows.entries()].filter(([key])=>key.startsWith(collection+"/")).map(([key,value])=>({id:key.slice(collection.length+1),...value})),
+    delete:async(collection,id)=>rows.delete(collection+"/"+id),
+  };
+  const signer={id:"S1",identityType:"email-link",emailHash:"e".repeat(64),signatureValue:"typed external signature",signatureType:"typed",signedAt:"2026-11-16T15:05:00.000Z"};
+  const finalBytes=new TextEncoder().encode("finalized signed PDF bytes");
+  const result=await sealAndPersist({
+    meta,storage:{put:async()=>({id:"unused"})},keyProvider:ctx.crypto.keyProvider,
+    envelope:{id:"ENV-production-email",chainHead:await sha256Hex("event chain"),signers:[signer]},
+    document:{id:"DOC-production-email",bytes:finalBytes},
+  });
+  assert.equal(result.sealed,true);
+  assert.equal(result.evidenceIds.length,1);
+  assert.equal(result.evidence[0].signerUid,null);
+  assert.equal(result.evidence[0].signerIdentityHash,signer.emailHash);
+  assert.equal(await verifyCryptographicEvidence(result.evidence[0],{
+    documentHash:result.documentHash,signerIdentityType:"email-link",signerIdentityHash:signer.emailHash,
+    publicKey:await (async()=>{const key=await ctx.crypto.keyProvider.getSignerKeyForSigner({...signer,envelopeId:"ENV-production-email"});return key.publicKey;})(),
+  }),true);
 });
 
 test("email signer key refuses a payload for a different assignment",async()=>{
