@@ -5,6 +5,8 @@ import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
+import {PDFDocument} from "pdf-lib";
+import {openSigning,sign} from "../src/signing.mjs";
 
 const NOW=new Date("2026-11-16T08:00:00.000Z");
 async function fixture({authority=true,failMail=false}={}) {
@@ -107,6 +109,31 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
   const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(current.signers[0].emailLinkStatus,"issued");
   assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"revoked");
+});
+
+
+test("external email-link signer can declare and sign without a Firebase UID or authority-register match",async()=>{
+  const f=await fixture({authority:false});
+  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.22");
+  assert.equal(opened.ok,true);
+  assert.equal(opened.signer.identityType,"email-link");
+  assert.equal(opened.signer.authenticated,true);
+  const signed=await sign(f.ctx,{
+    token:f.token,
+    signature:{type:"typed",value:"Vendor Signer"},
+    declarations:{name:"Vendor Signer",occupation:"External Consultant",capacity:"Contractor"},
+    consent:true,
+    user:null
+  });
+  assert.equal(signed.completed,true);
+  assert.equal(signed.status,"Completed");
+  const completed=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(completed.signers[0].uid,null);
+  assert.equal(completed.signers[0].signerDeclarations.occupation,"External Consultant");
+  assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
+  assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
+  const pdf=await getSigningPdf(f.ctx,f.token,null);
+  assert.equal(pdf.fileName.includes("-signed-"),true);
 });
 
 test("email-link invitations do not require register, authority-matrix or Firebase UID matches",async()=>{
