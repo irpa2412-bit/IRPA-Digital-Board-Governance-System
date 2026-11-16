@@ -132,11 +132,11 @@ export async function createEnvelope(ctx,user,body){
   const fields=validateEnvelopeFields(body?.fields,signers);
   if(fields.some(field=>field.page>pageCount))throw new HttpError(400,"A signing field page exceeds the controlled PDF page count.");
   const sourceHash=doc.sha256||doc.hash||await sha256Hex(sourceBytes),sourceSize=doc.fileSize??doc.byteLength??doc.size??sourceBytes.byteLength;
-  const e={id,externalReference:externalReference||null,documentId:doc.id,documentHash:sourceHash,sha256:sourceHash,byteLength:sourceSize,documentSize:sourceSize,title:doc.title,fileName:doc.fileName,classification:doc.classification,createdBy:user.uid,status:"Sent",signingMode,signers,fields,archiveTargets:archives,createdAt:ctx.now().toISOString(),expiresAt:new Date(ctx.now().getTime()+ctx.config.ttlDays*86400000).toISOString(),events:[],completion:null};
+  const e={id,externalReference:externalReference||null,documentId:doc.id,documentHash:sourceHash,sha256:sourceHash,byteLength:sourceSize,documentSize:sourceSize,title:doc.title,fileName:doc.fileName,classification:doc.classification,createdBy:user.uid,createdByEmail:user.email||doc.ownerEmail||"",status:"Sent",signingMode,signers,fields,archiveTargets:archives,createdAt:ctx.now().toISOString(),expiresAt:new Date(ctx.now().getTime()+ctx.config.ttlDays*86400000).toISOString(),events:[],completion:null};
   e.events=await chainEvents([],{type:"envelope.created",at:e.createdAt,actor:user.uid,documentHash:sourceHash,signerCount:signers.length});
   let reservationKey=null;
   if(externalReference){
-    reservationKey=await sha256Hex(user.uid+"\\n"+externalReference);
+    reservationKey=await sha256Hex(user.uid+"\n"+externalReference);
     try{await ctx.meta.create("externalReferences",reservationKey,{ownerUid:user.uid,externalReference,envelopeId:id,createdAt:e.createdAt});}
     catch(error){
       if(!(error instanceof Conflict))throw error;
