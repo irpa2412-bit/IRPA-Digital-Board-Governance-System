@@ -17,7 +17,7 @@ function assertSignerAuthentication(signer,user){
 }
 export async function verifySourceDocumentIntegrity(bytes,envelope={},sourceDocument={}){const rawHash=envelope.sha256||envelope.documentHash||envelope.originalHash||sourceDocument.sha256||sourceDocument.hash||null;const rawSize=envelope.byteLength??envelope.documentSize??envelope.fileSize??sourceDocument.fileSize??sourceDocument.byteLength??sourceDocument.size??null;const expectedHash=rawHash==null||String(rawHash).trim()===""?null:String(rawHash).trim().toLowerCase();const expectedSize=rawSize==null||rawSize===""||!Number.isFinite(Number(rawSize))?null:Number(rawSize);if((expectedHash&&expectedHash!==await sha256Hex(bytes))||(expectedSize!=null&&expectedSize!==bytes.byteLength))throw new HttpError(409,"The document failed its integrity check.");return{expectedHash,expectedSize}}
 async function original(ctx,e){const d=await ctx.meta.get("documents",e.documentId),b=d&&await ctx.storage.get(d.primaryStorageId);if(!b)throw new HttpError(409,"The source document is unavailable.");await verifySourceDocumentIntegrity(b,e,d);return{doc:d,bytes:b}}
-function validateEnvelopeFields(fields,signers){
+export function validateEnvelopeFields(fields,signers){
   if(fields==null)return[];
   if(!Array.isArray(fields)||fields.length>100)throw new HttpError(400,"Invalid signing fields.");
   const ids=new Set(),byId=new Map((signers||[]).map(x=>[x.id,x])),uids=new Set((signers||[]).map(x=>x.uid).filter(Boolean));
@@ -31,7 +31,7 @@ function validateEnvelopeFields(fields,signers){
     return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160)};
   });
 }
-function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
+export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
   const assigned=(fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),out={},byId=new Map(assigned.map(f=>[f.fieldId,f])),applications=new Map();
   if(!Array.isArray(fieldApplications))throw new HttpError(400,"Explicit confirmed signature field applications are required.");
   for(const application of fieldApplications){
