@@ -214,34 +214,6 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
   };
 }
 
-async function verifyGatewayEmailSignerAuthority(env,email,requestedAuthorityRole="") {
-  const normalized=String(email||"").trim().toLowerCase();
-  if(!normalized)return {verified:false};
-  const adminToken=await getFirestoreAdminAccessToken(env);
-  const matches=[];
-  for(const collectionName of ["members","employees"]){
-    const rows=await getFirestoreDocumentsByField(env,collectionName,"email",normalized,adminToken);
-    for(const row of rows){
-      const id=String(row.name||"").split("/").pop();
-      const profile={id,...(firestoreDocumentToPlain(row)||{}),sourceCollection:collectionName};
-      const status=String(profile.status||profile.employmentStatus||profile.registrationStatus||"").trim().toLowerCase();
-      if(!["active","activated"].includes(status)||profile.accountActivated===false)continue;
-      matches.push(profile);
-    }
-  }
-  if(matches.length!==1)return {verified:false};
-  const profile=matches[0];
-  const roles=gatewayAuthorityCandidates(profile);
-  const requested=normalizeGatewayAuthority(requestedAuthorityRole);
-  const matchedRole=requested?roles.find(role=>normalizeGatewayAuthority(role)===requested):(roles.length===1?roles[0]:null);
-  if(!matchedRole)return {verified:false};
-  const authorityRole=resolveGatewayAuthorityLabel(profile,matchedRole);
-  if(!authorityRole)return {verified:false};
-  const expiry=profile.authorityExpiresAt||profile.authorityExpiry||profile.authorityValidUntil||profile.validUntil||profile.expiresAt;
-  if(expiry&&Date.parse(String(expiry))<=Date.now())return {verified:false};
-  return {verified:true,authorityRole,sourceCollection:profile.sourceCollection,sourceRecordId:profile.id,department:String(profile.department||""),unit:String(profile.unit||profile.unitName||""),name:String(profile.displayName||profile.fullName||profile.name||normalized),verificationMethod:"Server-side exact Member/Employee register email and matrix-role match"};
-}
-
 const communicationsSiteRouter = createCommunicationsSiteRouter({
   authenticateFirebaseRequest,
   getFirestoreDocument,
@@ -527,9 +499,7 @@ export default {
               return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
-            verifyEmailSignerAuthority: (email,authorityRole) => verifyGatewayEmailSignerAuthority(env,email,authorityRole),
             logger: console,
-            verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
           const response = await esignRoute(request,ctx);
