@@ -14,11 +14,14 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   const signers = (envelope.signers || []).map(s => {
     const prior = priorSigners.find(p => (s.uid && p.uid === s.uid) || (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()));
     return {
-      uid: s.uid || null, name: s.name || "", email: s.email || "",
+      uid: s.uid || null, signerId:s.id||null, identityType:s.identityType||"account", name: s.name || "", email: s.email || "",
       status: s.status || "", signedAt: s.signedAt || null,
       role: s.role || prior?.role || prior?.action || "",
       action: s.action || prior?.action || prior?.role || "",
-      authorityRole: s.authorityVerification?.authorityRole || ""
+      authorityRole: s.authorityVerification?.authorityRole || "",
+      ownerDeclaredParticulars:s.declaredParticulars||{},
+      signerDeclarations:s.signerDeclarations||{},
+      declarationDiscrepancy:s.declarationDiscrepancy||null
     };
   });
   const lastSignedByUid = [...signers].reverse().find(s => s.uid && s.status === "Signed")?.uid || null;
@@ -31,34 +34,41 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     lastSignedByUid, gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
-  for (const signer of signers.filter(s => s.uid && s.status === "Signed")) {
-    const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===((envelope.signers||[]).find(s=>s.uid===signer.uid)?.id||""));
+  for (const signer of signers.filter(s => s.status === "Signed")) {
+    const assignedSigner=(envelope.signers||[]).find(x=>(x.uid&&x.uid===signer.uid)||(x.email&&x.email===signer.email));
+    const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""));
     if(!signerCopy?.id)throw new Error("Completed signer archive copy is missing for an assigned signer.");
     const signerArchiveUrl="https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view";
-    const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid);
+    const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid||assignedSigner?.id||signer.email);
     await updateDocument("signatures/"+signatureRecordId,{
       envelopeId,documentId:clean(existing.documentId||envelope.documentId),
       recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
       documentReference:clean(existing.documentReference||existing.envelopeReference||envelope.externalReference),
       documentTitle:clean(existing.title||envelope.title),
-      signerUid:signer.uid,signerEmail:signer.email||"",signerName:signer.name||"",
-      workflowRole:signer.role||signer.action||"",
-      signatureAuthority:signer.authorityRole||"",
-      signatureAuthorityVerificationStatus:"Verified",
+      signerUid:signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
+      workflowRole:signer.role||signer.action||signer.signerDeclarations?.occupation||signer.declaredParticulars?.occupation||"",
+      signatureAuthority:signer.authorityRole||signer.signerDeclarations?.occupation||signer.declaredParticulars?.occupation||"",
+      signatureAuthorityVerificationStatus:signer.authorityRole?"Verified":"NotApplicable",
+      ownerDeclaredParticulars:assignedSigner?.declaredParticulars||{},
+      signerDeclarations:assignedSigner?.signerDeclarations||{},
+      declarationDiscrepancy:assignedSigner?.declarationDiscrepancy||null,
       signatureStatus:"Signed",status:"Signed",signedAt:signer.signedAt||timestamp,
       signerArchiveUrl,signerArchiveFileId:signerCopy.id,
       gatewayEnvelopeId:envelope.id,gatewayDocumentHash:completion.finalHash,
-      cryptographicEvidenceStatus:"Verified",archiveProtocol:"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1",
+      cryptographicEvidenceStatus:(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner?.id)?"Verified":"GatewayAuditOnly",archiveProtocol:(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner?.id)?"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1":"IRPA-GATEWAY-AUDIT-CHAIN-1",
       immutable:true
     });
 
-    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid);
+    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid || assignedSigner?.id || signer.email);
     const signerEventPath = "signatureEvents/" + signerEventId;
     if (!(await getDocument(signerEventPath))) {
       await updateDocument(signerEventPath, {
         envelopeId,
         event: "Gateway Signer Signed",
-        actorUid: signer.uid,
+        actorUid: signer.uid || "",
+        actorEmail: signer.email || "",
+        signerId: assignedSigner?.id || null,
+        declarationDiscrepancy: assignedSigner?.declarationDiscrepancy || null,
         signedAt: signer.signedAt || timestamp
       });
     }
@@ -76,7 +86,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
         finalHash: completion.finalHash, completedAt: completion.completedAt, source: "drive-gateway"
       },
       actorUid: lastSignedByUid || "",
-      actorEmail: signers.find(s => s.uid === lastSignedByUid)?.email || "",
+      actorEmail: signers.find(s => s.uid === lastSignedByUid)?.email || [...signers].reverse().find(s => s.status === "Signed")?.email || "",
       createdAt: timestamp
     });
   }

@@ -5,35 +5,41 @@ import fs from "node:fs";
 const read=path=>fs.readFileSync(new URL(path,import.meta.url),"utf8");
 const signing=read("../src/signing.mjs");
 const router=read("../src/router.mjs");
-const index=read("../src/index.js");
 const app=read("../../src/App.jsx");
 const page=read("../../src/pages/EmailSigningReadOnlyPage.jsx");
 const storage=read("../../src/firebase/signatureStorage.js");
 const mail=read("../src/invitationEmail.mjs");
 
-test("public email-link routes return only a minimal preview and its associated PDF",()=>{
+test("email-link routes return only the invited signer's assigned fields and controlled PDF",()=>{
   assert.match(router,/\/api\/sign\/email\/open/);
   assert.match(router,/\/api\/sign\/email\/pdf/);
-  assert.match(signing,/return \{ok:true,title:preview\.title,ownerName:preview\.ownerName,linkExpiresAt:preview\.linkExpiresAt\}/);
+  assert.match(signing,/fields:preview\.fields/);
+  assert.match(signing,/appliedFields:\[\]/);
+  assert.match(signing,/ownerDeclaredParticulars:preview\.ownerDeclaredParticulars/);
   assert.match(router,/genericEmailSigningFailure\(\)/);
   assert.match(page,/\/api\/sign\/email\/open/);
   assert.match(page,/\/api\/sign\/email\/pdf/);
   assert.doesNotMatch(page,/\/api\/documents\/|\/api\/envelopes\//);
 });
 
-test("guest page is routed before account authentication and is read-only",()=>{
+test("external guest signing page is routed before account authentication and submits through the token-only Gateway path",()=>{
   assert.match(app,/emailSignToken/);
   assert.ok(app.indexOf("emailSigningToken=params.get")<app.indexOf("if(!user)return <AuthScreen/>"));
-  assert.match(page,/Read-only controlled document/);
-  assert.doesNotMatch(page,/signature-pad|consent|submitSignature|\/api\/sign\/submit/);
+  assert.match(page,/Controlled document preview/);
+  assert.match(page,/Your declaration for this document/);
+  assert.match(page,/Confirm and submit my assigned action/);
+  assert.match(page,/\/api\/sign\/submit/);
+  assert.match(page,/credentials:"omit"/);
+  assert.doesNotMatch(page,/verifyManualSigningAuthority|manualAuthorityIdentification/);
+  assert.match(storage,/signerId:resolveSignerId\(field\)/);
 });
 
-test("authority comes from active register email and exact accepted role fields, not client claims",()=>{
-  assert.match(index,/for\(const collectionName of \["members","employees"\]\)/);
-  assert.match(index,/getFirestoreDocumentsByField\(env,collectionName,"email",normalized,adminToken\)/);
-  assert.match(index,/gatewayAuthorityCandidates\(profile\)/);
-  assert.match(index,/normalizeGatewayAuthority\(requestedAuthorityRole\)/);
-  assert.match(signing,/ctx\.verifyEmailSignerAuthority\?\.\(email,s\?\.authorityRole\|\|""\)/);
+test("email-link identity is transaction-scoped and does not require a register or authority matrix lookup",()=>{
+  assert.doesNotMatch(signing,/verifyEmailSignerAuthority/);
+  assert.match(signing,/identityType==="email-link"/);
+  assert.match(signing,/signer\.emailLinkStatus==="opened"/);
+  assert.match(signing,/s0\.identityType!=="email-link"/);
+  assert.match(signing,/declarationDiscrepancy/);
 });
 
 test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
@@ -46,13 +52,11 @@ test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
 
 test("email invitation reuses the existing SMTP retry flow with both text and HTML bodies",()=>{
   assert.match(mail,/sendWithRetry\(\(\)=>smtpSend\(\{to,\.\.\.message\}\)/);
-  assert.match(index,/sendEmailSigningInvitation/);
-  assert.match(index,/SMTP_PASSWORD/);
   assert.match(mail,/const text=/);
   assert.match(mail,/const html=/);
 });
 
-test("owner resend rotates the link and revoke is routed without changing login signer routes",()=>{
+test("owner resend rotates the link and revoke remains an owner-controlled operation",()=>{
   assert.ok(router.includes(String.raw`invitations\/(S\d{1,2})\/resend`));
   assert.ok(router.includes(String.raw`invitations\/(S\d{1,2})\/revoke`));
   assert.match(signing,/emailLinkTokenHistory/);

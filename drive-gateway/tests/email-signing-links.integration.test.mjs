@@ -5,6 +5,8 @@ import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
+import {PDFDocument} from "pdf-lib";
+import {openSigning,sign} from "../src/signing.mjs";
 
 const NOW=new Date("2026-11-16T08:00:00.000Z");
 async function fixture({authority=true,failMail=false}={}) {
@@ -18,7 +20,7 @@ async function fixture({authority=true,failMail=false}={}) {
     sendInvitation:async message=>{sent.push(message);if(failMail)throw new Error("SMTP rejected");},
     logger:{error(){}}
   });
-  const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA read-only email signing preview");
+  const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
   const source=await ctx.storage.put({path:"source/email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
   const documentId="DOC-EMAIL-"+Math.random().toString(16).slice(2,10);
   await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"email-link.pdf",title:"Email Link Governance Instrument",classification:"Restricted"});
@@ -62,8 +64,9 @@ test("email-link signer is stored with token hash, email hash, expiry and issued
   assert.equal(signer.tokenHash,await sha256Hex(f.token.split(".")[2]));
   assert.equal(signer.emailHash,await sha256Hex("board.secretary@example.org"));
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
-  assert.equal(signer.authorityVerification.authorityRole,"Board Secretary");
-  assert.equal(signer.name,"Registered Board Secretary");
+  assert.equal(signer.authorityVerification,undefined);
+  assert.equal(signer.name,"Client supplied name");
+  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",occupation:"",capacity:""});
   assert.equal(f.sent.length,1);
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
@@ -80,7 +83,10 @@ test("email link opens once, changes status to opened and exposes only its contr
   assert.equal(stored.signers[0].emailLinkOpenCount,1);
   const pdf=await getSigningPdf(f.ctx,f.token,null);
   assert.equal(pdf.fileName,"email-link.pdf");
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
+  const resumed=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  assert.equal(resumed.ok,true);
+  const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the redeemed invitation must not redeem it a second time");
 });
 
 test("expired, tampered, unknown and revoked links return the same neutral response",async()=>{
@@ -108,8 +114,37 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
   assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"revoked");
 });
 
-test("email link cannot be created without a server-side active register and authority match",async()=>{
-  await assert.rejects(()=>fixture({authority:false}),/does not match a current registered signing authority/);
+
+test("external email-link signer can declare and sign without a Firebase UID or authority-register match",async()=>{
+  const f=await fixture({authority:false});
+  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.22");
+  assert.equal(opened.ok,true);
+  assert.equal(opened.signer.identityType,"email-link");
+  assert.equal(opened.signer.authenticated,true);
+  const signed=await sign(f.ctx,{
+    token:f.token,
+    signature:{type:"typed",value:"Vendor Signer"},
+    declarations:{name:"Vendor Signer",occupation:"External Consultant",capacity:"Contractor"},
+    consent:true,
+    user:null
+  });
+  assert.equal(signed.completed,true);
+  assert.equal(signed.status,"Completed");
+  const completed=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(completed.signers[0].uid,null);
+  assert.equal(completed.signers[0].signerDeclarations.occupation,"External Consultant");
+  assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
+  assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
+  const pdf=await getSigningPdf(f.ctx,f.token,null);
+  assert.equal(pdf.fileName.includes("-signed-"),true);
+});
+
+test("email-link invitations do not require register, authority-matrix or Firebase UID matches",async()=>{
+  const f=await fixture({authority:false});
+  assert.equal(f.envelope.signers[0].identityType,"email-link");
+  assert.equal(f.envelope.signers[0].uid,null);
+  assert.equal(f.envelope.signers[0].emailLinkStatus,"issued");
+  assert.equal(f.envelope.signers[0].authorityVerification,undefined);
 });
 
 test("duplicate email signer is refused and login-bound signing remains UID authenticated",async()=>{

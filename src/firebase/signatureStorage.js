@@ -439,9 +439,20 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
   const actionRecipients = recipients.filter(r => r?.identityType === "email-link" && String(r?.email||"").trim() && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
   if (!actionRecipients.length) throw new Error("At least one authorized action signer is required.");
-  const signerUids = new Set();
-  if ((envelope.fields || []).some(field => field?.signerUid && !signerUids.has(field.signerUid))) {
-    throw new Error("A signing field is assigned to a view-only or optional signer. Correct the field assignments before Gateway activation.");
+  const ordered = [...actionRecipients].sort((a,b) => Number(a.routingOrder || 1) - Number(b.routingOrder || 1));
+  const signerAssignmentByKey = new Map();
+  ordered.forEach((recipient,index)=>{
+    const signerId="S"+String(index+1);
+    for(const key of [recipient.id,recipient.signerId,recipient.uid,recipient.email]){
+      if(key)signerAssignmentByKey.set(String(key).trim().toLowerCase(),signerId);
+    }
+  });
+  const resolveSignerId=field=>{
+    const key=String(field?.signerId||field?.signerUid||"").trim().toLowerCase();
+    return signerAssignmentByKey.get(key)||(/^S\\d{1,2}$/.test(key)?key:null);
+  };
+  if ((envelope.fields || []).some(field => !resolveSignerId(field) || !ordered.some((recipient,index)=>"S"+String(index+1)===resolveSignerId(field)))) {
+    throw new Error("A signing field is assigned to a view-only, optional, or unknown signer. Correct the field assignments before Gateway activation.");
   }
   const bytes = sourceBytes instanceof Uint8Array ? sourceBytes : new Uint8Array(sourceBytes);
   if (bytes.length < 8 || new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") {
@@ -477,10 +488,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     const data = await existingResponse.json().catch(() => ({}));
     throw new Error(data.error || ("The Gateway could not verify the existing source document (HTTP " + existingResponse.status + ")."));
   }
-  const ordered = [...actionRecipients].sort((a,b) => Number(a.routingOrder || 1) - Number(b.routingOrder || 1));
-  const fields = (envelope.fields || []).filter(field => signerUids.has(field?.signerUid)).map(field => ({
+  const fields = (envelope.fields || []).map(field => ({
     fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
-    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerUid:field.signerUid,required:field.required === true,
+    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),required:field.required === true,
     placeholder:field.placeholder || ""
   }));
   const payload = {
@@ -493,8 +503,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     signers:ordered.map((recipient,index) => ({
       identityType:"email-link",
       email:String(recipient.email || "").trim().toLowerCase(),
-      authorityRole:String(recipient.authorityRole||"").trim(),
       name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
+      occupation:String(recipient.occupation||recipient.capacity||recipient.role||"").trim(),
+      capacity:String(recipient.capacity||"").trim(),
       order:envelope.signingMode === "Parallel" ? 1 : index + 1
     })),
     fields
