@@ -70,30 +70,3 @@ export function revokeEmailSigningToken(record,{now=new Date(),actorUid=""}={}){
   return {...record,status:"revoked",revokedAt:new Date(now).toISOString(),revokedByUid:String(actorUid||"")};
 }
 
-
-function matrixAllows(role,matrix){
-  const wanted=normalizeGatewayAuthority(role);
-  const rows=Array.isArray(matrix)?matrix:Array.isArray(matrix?.rows)?matrix.rows:[];
-  return rows.some(row=>{
-    const rowRole=normalizeGatewayAuthority(row?.role||row?.authorityRole||row?.title||"");
-    const action=String(row?.sign||row?.signature||row?.action||"").toLowerCase();
-    const allowed=row?.canSign===true||row?.signature===true||/sign|execute|authori[sz]ed signatory/.test(action);
-    return rowRole===wanted&&allowed&&row?.active!==false;
-  });
-}
-
-export function resolveEmailSignerAuthority({email,memberRecords=[],employeeRecords=[],matrix=[],now=new Date()}={}){
-  const normalized=normalizeEmail(email);
-  const records=[
-    ...(Array.isArray(memberRecords)?memberRecords:[]).map(record=>({...record,sourceCollection:"members"})),
-    ...(Array.isArray(employeeRecords)?employeeRecords:[]).map(record=>({...record,sourceCollection:"employees"}))
-  ].filter(record=>normalizeEmail(record.email)===normalized&&isActive(record));
-  if(records.length!==1)return {verified:false,reason:"No unique active Member or Employee register match."};
-  const record=records[0];
-  const roles=gatewayAuthorityCandidates(record);
-  const matchedRole=roles.find(role=>matrixAllows(role,matrix));
-  if(!matchedRole)return {verified:false,reason:"The active register entry has no matching signature-authority matrix role."};
-  const expiry=record.authorityExpiresAt||record.authorityExpiry||record.validUntil||null;
-  if(expiry&&Date.parse(String(expiry))<=new Date(now).getTime())return {verified:false,reason:"The registered authority has expired."};
-  return {verified:true,authorityRole:resolveGatewayAuthorityLabel(record,matchedRole)||matchedRole,sourceCollection:record.sourceCollection,sourceRecordId:String(record.id||""),department:String(record.department||""),unit:String(record.unit||record.unitName||""),matchedEmailHashOnly:true};
-}
