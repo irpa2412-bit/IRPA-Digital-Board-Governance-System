@@ -1,7 +1,7 @@
 # Signature flow — direct Firestore static gap audit
 
 Baseline: `main` at `3df2170929d2dc18793b823ba4629790c57837fc`, inspected 2026-11-17.
-Scope: `src/firebase/signaturePlatform.js`, `src/firebase/signerIdentity.js` (shared helper), `src/pages/DocumentLifecycleModule.jsx`, `src/pages/GatewaySigningPortal.jsx`, `src/pages/SignaturePlatform.jsx`, `src/components/SignaturePathwaySelfTest.jsx`, and signature storage/lifecycle helpers.
+Scope: `src/firebase/signaturePlatform.js`, `src/firebase/signerIdentity.js` and `src/firebase/data.js` (shared helpers), `src/pages/DocumentLifecycleModule.jsx`, `src/pages/GatewaySigningPortal.jsx`, `src/pages/SignaturePlatform.jsx`, `src/components/SignaturePathwaySelfTest.jsx`, and signature storage/lifecycle helpers.
 Counts include Firestore SDK operation builders (`collection`, `query`) and the `arrayUnion` transform. Builders/transforms are not network requests and do not independently trigger rules evaluation.
 
 | File:line | Operation | Collection/path | Caller | Governing rule (one line) | Verdict for caller / email-link signer | Gateway replacement |
@@ -47,6 +47,13 @@ Counts include Firestore SDK operation builders (`collection`, `query`) and the 
 | signerIdentity.js:46 | setDoc | signerIdentities/{uid} | Logged-in signer/profile helper | signerIdentities create: self(uid), matching UID/profile ID and default authority state | Conditional ALLOW; email-link DENY | Identity create/upsert route missing |
 | signerIdentity.js:59 | updateDoc | signerIdentities/{uid} | Logged-in signer/profile helper | signerIdentities update: admin or self with identity fixed and authority unchanged | Conditional ALLOW; email-link DENY | Identity upsert route missing |
 | signerIdentity.js:100 | updateDoc | signerIdentities/{uid} | Logged-in signer | signerIdentities update: admin or self with identity fixed and authority unchanged | Conditional ALLOW; email-link DENY | Identity authentication-evidence route missing |
+| data.js:67 | getDoc (via getRecord) | members/{uid} or employees/{uid} | Logged-in signer loading declared institutional particulars | members/employees read: signedIn() | Authenticated user ALLOW; email-link DENY | Missing token-authorised register-enrichment route |
+| data.js:300 | collection | members | Logged-in signer | Builder only; members read rule applies to query | N/A builder; email-link cannot query | Missing token-authorised register-enrichment route |
+| data.js:300 | query | members | Logged-in signer | Builder only; members read rule applies to query | N/A builder; email-link cannot query | Missing token-authorised register-enrichment route |
+| data.js:300 | getDocs | members | Logged-in signer | members read: signedIn() | Authenticated user ALLOW; email-link DENY | Missing token-authorised register-enrichment route |
+| data.js:301 | collection | employees | Logged-in signer | Builder only; employees read rule applies to query | N/A builder; email-link cannot query | Missing token-authorised register-enrichment route |
+| data.js:301 | query | employees | Logged-in signer | Builder only; employees read rule applies to query | N/A builder; email-link cannot query | Missing token-authorised register-enrichment route |
+| data.js:301 | getDocs | employees | Logged-in signer | employees read: signedIn() | Authenticated user ALLOW; email-link DENY | Missing token-authorised register-enrichment route |
 | DocumentLifecycleModule.jsx:47 | collection | documentTranslationRequests | Logged-in document owner | Builder only; documentTranslationRequests read rule applies to query | N/A builder; email-link DENY | Existing document lifecycle Gateway routes; translation-request list route not verified |
 | DocumentLifecycleModule.jsx:47 | query | documentTranslationRequests | Logged-in document owner | Builder only; documentTranslationRequests read rule applies to query | N/A builder; email-link DENY | Translation-request list route missing/not verified |
 | DocumentLifecycleModule.jsx:47 | getDocs | documentTranslationRequests | Logged-in document owner | documentTranslationRequests read: admin, matching documentOwnerUid, or translationReviewer | Owner ALLOW; email-link DENY | Translation-request list route missing/not verified |
@@ -57,6 +64,6 @@ Counts include Firestore SDK operation builders (`collection`, `query`) and the 
 ## Exact denial conclusion
 
 - The email-link signer implementation in `GatewaySigningPortal.jsx` and `EmailSigningReadOnlyPage.jsx` uses Gateway HTTP routes, not direct Firestore SDK calls. No direct Firestore SDK call was found in `GatewaySigningPortal.jsx` or `SignaturePlatform.jsx` page components.
-- The 47 source call expressions above include 35 request/transaction operations and 12 local builders/transforms. The email-link signer is not authorised by any of the UID-bound Firestore rules: if it attempted any of the 36 direct Firestore request/transaction operations, the applicable `signedIn()`/self/participant predicates deny it. It should use the token-authorised Gateway routes instead.
+- The 54 source call expressions above include 38 request/transaction operations and 16 local builders/transforms. The email-link signer is not authorised by any of the UID-bound Firestore rules: if it attempted any of the 38 direct Firestore request/transaction operations, the applicable `signedIn()`/self/participant predicates deny it. It should use the token-authorised Gateway routes instead.
 - Existing token routes observed in Worker dispatch: `GET /api/sign/email/open`, `POST /api/sign/submit`, `GET /api/sign/status`, `GET /api/sign/pdf`, `GET /api/sign/evidence`. Existing authenticated workflow routes: `GET /api/signature-workflow/list`, `GET /api/signature-workflow/view`, `POST /api/signature-workflow/draft`. Other route replacements in the table are explicitly marked missing or not verified.
 - No Firestore rules, indexes, secrets, or records were changed by this static audit.
