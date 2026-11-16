@@ -10,6 +10,7 @@ const service = read("../src/firebase/signaturePlatform.js");
 const storage = read("../src/firebase/signatureStorage.js");
 const worker = read("../drive-gateway/src/signing.mjs");
 const pdf = read("../drive-gateway/src/pdf.mjs");
+const certificate = pdf;
 const draftWorker = read("../drive-gateway/src/index.js");
 
 test("page load, Add signer, Save and Create Draft never insert a signature image", () => {
@@ -54,7 +55,7 @@ test("the Worker refuses unconfirmed and non-assigned signature field applicatio
 });
 
 test("the signing view keeps server-side visibility filtering for later signers", () => {
-  assert.match(worker, /fields:\(env\.fields\|\|\[\]\)\.filter\(f=>f\.signerUid===signer\.uid\)/);
+  assert.match(worker, /fields:\(env\.fields\|\|\[\]\)\.filter\(f=>f\.signerId===signer\.id\|\|\(!f\.signerId&&signer\.uid&&f\.signerUid===signer\.uid\)\)/);
   assert.match(gatewayPortal, /const fields=opened\.fields\|\|\[\]/);
 });
 
@@ -73,4 +74,24 @@ test("signature confirmation palette is a fixed bottom sheet and closes only aft
   assert.match(platform, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:6/);
+});
+
+test("all signer types are authenticated by transaction identity, not IRPA register authority", () => {
+  assert.doesNotMatch(worker, /verifySigningAuthority\(user,manualAuthorityIdentification\)/);
+  assert.doesNotMatch(worker, /Current IRPA Member\/Employee signing authority could not be verified/);
+  assert.match(worker, /else assertSignerAuthentication\(s0,user\)/);
+  assert.match(worker, /if\(!declared\.name\|\|!declared\.occupation\)throw new HttpError\(400/);
+  assert.match(worker, /signerDeclarations:declared/);
+  assert.match(gatewayPortal, /Your occupation \*/);
+  assert.match(gatewayPortal, /Additional capacity \(optional\)/);
+  assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|Member\/Employee Register|Registered signing authority/);
+  assert.doesNotMatch(service, /current signing authority has not been registered|A Current authority is required to sign|Your Signature Application is not active/);
+  assert.doesNotMatch(platform, /verifyManualSigningAuthority|authorityVerification\?\.verified|Verify Authority/);
+  assert.match(platform, /occupation:signerAuthorityRole\.trim\(\),capacity:signerCapacity\.trim\(\)/);
+  assert.match(gatewayPortal, /declarations,consent/);
+});
+
+test("final PDF certificate prints owner-recorded and signer-declared occupation and capacity separately", () => {
+  assert.match(certificate, /Owner declared: .*Occupation: .*Capacity:/);
+  assert.match(certificate, /Signer declared: .*Occupation: .*Capacity:/);
 });

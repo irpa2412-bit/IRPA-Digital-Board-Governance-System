@@ -100,6 +100,17 @@ async function runViewport(name,viewport){
  console.log("DRAW_INK_PIXELS "+name+": "+JSON.stringify(drawingEvidence));
  console.log("DRAW_INK_PIXELS "+name+": "+inkPixels);
  assert.ok(inkPixels>10,"pointer stroke must leave visible ink before Confirm");
+ // A viewport-width change resizes the responsive canvas. The in-progress
+ // handwritten mark must survive both the resize and restoration before Confirm.
+ await page.setViewportSize({width:viewport.width-40,height:viewport.height});
+ await page.waitForTimeout(150);
+ const countDarkInk=el=>{const p=el.getContext("2d").getImageData(0,0,el.width,el.height).data;let count=0;for(let i=0;i<p.length;i+=4)if(p[i+3]>0&&p[i]<100&&p[i+1]<100&&p[i+2]<100)count++;return count;};
+ const resizedInk=await canvas.evaluate(countDarkInk);
+ assert.ok(resizedInk>10,"handwritten ink must survive responsive canvas resize before Confirm");
+ await page.setViewportSize(viewport);
+ await page.waitForTimeout(150);
+ const restoredInk=await canvas.evaluate(countDarkInk);
+ assert.ok(restoredInk>10,"handwritten ink must survive restoring the original viewport before Confirm");
  await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-before-confirm.png",fullPage:true});
  await page.getByRole("button",{name:"Confirm Initials"}).click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-initial-page-1");

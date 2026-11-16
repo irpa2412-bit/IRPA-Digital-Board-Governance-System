@@ -1,7 +1,7 @@
 import React,{useLayoutEffect,useRef,useState}from"react";
 
 export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="",savedInitialsUrl="",onConfirm,onCancel}){
-  const canvasRef=useRef(null),drawing=useRef(false),last=useRef(null),canvasSize=useRef({width:0,height:0});
+  const canvasRef=useRef(null),drawing=useRef(false),last=useRef(null),canvasSize=useRef({width:0,height:0}),dirtyRef=useRef(false);
   const[mode,setMode]=useState("Draw"),[typed,setTyped]=useState(""),[dirty,setDirty]=useState(false),[error,setError]=useState("");
   const label=field?.type==="Initials"?"initials":"signature";
   useLayoutEffect(()=>{
@@ -12,17 +12,23 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       if(!rect.width||!rect.height)return;
       if(canvasSize.current.width===rect.width&&canvasSize.current.height===rect.height)return;
       const ratio=Math.max(1,window.devicePixelRatio||1);
+      // Preserve confirmed-in-progress ink if layout/scrollbar changes resize the
+      // canvas. Resetting its backing dimensions without restoring pixels silently
+      // discarded initials on desktop and mobile before the signer tapped Confirm.
+      const previous=document.createElement("canvas");
+      const hadInk=dirtyRef.current&&canvas.width>0&&canvas.height>0;
+      if(hadInk){previous.width=canvas.width;previous.height=canvas.height;previous.getContext("2d").drawImage(canvas,0,0);}
       canvas.width=Math.round(rect.width*ratio);
       canvas.height=Math.round(rect.height*ratio);
       canvasSize.current={width:rect.width,height:rect.height};
       const ctx=canvas.getContext("2d");
       ctx.setTransform(ratio,0,0,ratio,0,0);
       ctx.clearRect(0,0,rect.width,rect.height);
+      if(hadInk)ctx.drawImage(previous,0,0,previous.width,previous.height,0,0,rect.width,rect.height);
       ctx.lineCap="round";
       ctx.lineJoin="round";
       ctx.lineWidth=5;
       ctx.strokeStyle="#111827";
-      setDirty(false);
       setError("");
     };
     resize();
@@ -46,6 +52,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     ctx.arc(p.x,p.y,2.5,0,Math.PI*2);
     ctx.fillStyle="#111827";
     ctx.fill();
+    dirtyRef.current=true;
     setDirty(true);
   };
   const move=e=>{
@@ -67,6 +74,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     }
     if(mode==="Use my saved signature")setMode("Draw");
     setTyped("");
+    dirtyRef.current=false;
     setDirty(false);
     setError("");
   };
