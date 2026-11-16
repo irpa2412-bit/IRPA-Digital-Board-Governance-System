@@ -95,3 +95,12 @@ test("final PDF certificate prints owner-recorded and signer-declared occupation
   assert.match(certificate, /Owner declared: .*Occupation: .*Capacity:/);
   assert.match(certificate, /Signer declared: .*Occupation: .*Capacity:/);
 });
+
+test("legacy signing persists signer-declared authority safely when institutional authority metadata is null", () => {
+  assert.match(service, /const signerAuthority=null/);
+  assert.match(service, /signatureAuthorityDepartment:authorityVerification\.authorityDepartment\|\|signerAuthority\?\.authorityDepartment\|\|""/);
+  assert.match(service, /signatureAuthorityUnit:authorityVerification\.authorityUnit\|\|signerAuthority\?\.authorityUnit\|\|""/);
+  assert.match(service, /signatureAuthorityStatus:signerAuthority\?\.authorityStatus\|\|""/);
+  assert.doesNotMatch(service, /signerAuthority\.(?:authorityRole|authorityDepartment|authorityUnit|authorityStatus|authoritySourceCollection|authoritySourceRecordId)/);
+  assert.match(service, /signatureAuthorityVerificationStatus:"Signer-declared; not independently verified"/);
+});
