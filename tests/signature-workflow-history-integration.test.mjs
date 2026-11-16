@@ -60,7 +60,7 @@ test("every signing-application reference to the sanitizer is declared in module
     for (const name of readdirSync(directory)) {
       const path = join(directory, name);
       if (statSync(path).isDirectory()) visit(path);
-      else if (/\\.(?:mjs|js|jsx|ts|tsx)$/.test(name)) sourceFiles.push(path);
+      else if (/\.(?:mjs|js|jsx|ts|tsx)$/.test(name)) sourceFiles.push(path);
     }
   };
   roots.forEach(visit);
@@ -70,10 +70,10 @@ test("every signing-application reference to the sanitizer is declared in module
     const source = readFileSync(path, "utf8");
     if (!source.includes("omitUndefinedFirestoreFields")) continue;
     const declared =
-      /\\bimport\\s*\\{[^}]*\\bomitUndefinedFirestoreFields\\b[^}]*\\}\\s*from\\s*["'][^"']+["']/.test(source) ||
-      /\\bexport\\s+function\\s+omitUndefinedFirestoreFields\\b/.test(source) ||
-      /\\bfunction\\s+omitUndefinedFirestoreFields\\b/.test(source) ||
-      /\\bconst\\s+omitUndefinedFirestoreFields\\s*=/.test(source);
+      /\bimport\s*\{[^}]*\bomitUndefinedFirestoreFields\b[^}]*\}\s*from\s*["'][^"']+["']/.test(source) ||
+      /\bexport\s+function\s+omitUndefinedFirestoreFields\b/.test(source) ||
+      /\bfunction\s+omitUndefinedFirestoreFields\b/.test(source) ||
+      /\bconst\s+omitUndefinedFirestoreFields\s*=/.test(source);
     assert.ok(declared, `${relative(process.cwd(), path)} references the sanitizer without a module-scope declaration/import`);
     references.push(relative(process.cwd(), path));
   }
