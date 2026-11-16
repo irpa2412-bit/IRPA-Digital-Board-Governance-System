@@ -1,4 +1,4 @@
-import { arrayUnion, collection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, query, runTransaction as firestoreRunTransaction, serverTimestamp, setDoc as firestoreSetDoc, updateDoc as firestoreUpdateDoc, where, writeBatch as firestoreWriteBatch } from "firebase/firestore";
+import { arrayUnion as firestoreArrayUnion, collection as firestoreCollection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, query as firestoreQuery, runTransaction as firestoreRunTransaction, serverTimestamp, setDoc as firestoreSetDoc, updateDoc as firestoreUpdateDoc, where, writeBatch as firestoreWriteBatch } from "firebase/firestore";
 import { runSignatureFirestore, wrapSignatureBatch } from "./signatureFirestoreDiagnostics.js";
 import { requireSupportedSignatureRoutingMode } from "./signatureWorkflowPolicy.js";
 import { omitUndefinedFirestoreFields } from "./firestorePayload.js";
@@ -11,6 +11,9 @@ import { readWorkflowContext } from "./workflowLinks";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { findManualAuthorityMatch, resolveManualAuthorityLabel } from "../utils/signatureAuthority.mjs";
 import { resolveSourceDocumentIntegrity } from "./signatureSourceIntegrity.js";
+const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreCollection(...args));
+const query=(ref,...constraints)=>runSignatureFirestore({operation:"query",target:ref,screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreQuery(ref,...constraints));
+const arrayUnion=(...values)=>runSignatureFirestore({operation:"arrayUnion",collectionPath:"signatureEnvelopes.workflowHistory",screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreArrayUnion(...values));
 const SIGNATURE_SCREEN="Signature workflow";
 const SIGNATURE_USER_TYPE="logged-in owner or signer";
 const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreGetDoc(ref));
