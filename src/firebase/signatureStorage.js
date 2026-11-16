@@ -437,9 +437,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error("Only the authenticated document owner can connect this signing workflow to the Gateway.");
   }
   const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
-  const actionRecipients = recipients.filter(r => r?.uid && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
+  const actionRecipients = recipients.filter(r => r?.identityType === "email-link" && String(r?.email||"").trim() && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
   if (!actionRecipients.length) throw new Error("At least one authorized action signer is required.");
-  const signerUids = new Set(actionRecipients.map(r => r.uid));
+  const signerUids = new Set();
   if ((envelope.fields || []).some(field => field?.signerUid && !signerUids.has(field.signerUid))) {
     throw new Error("A signing field is assigned to a view-only or optional signer. Correct the field assignments before Gateway activation.");
   }
@@ -491,7 +491,6 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => ({
-      uid:recipient.uid,
       email:String(recipient.email || "").trim().toLowerCase(),
       name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
       order:envelope.signingMode === "Parallel" ? 1 : index + 1
@@ -506,6 +505,22 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   const invitations=Array.isArray(result.invitations)?result.invitations:[];
   const invitationFailures=invitations.filter(item=>item.status!=="Sent").length;
   return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":"Sent",gatewayInvitationFailures:invitationFailures,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
+}
+
+export async function getGatewaySignatureEnvelopeStatus(envelopeId) {
+  if(!envelopeId)throw new Error("A Gateway envelope ID is required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/status");
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false)throw new Error(data.error||"Unable to retrieve email-link signer status.");
+  return data;
+}
+
+export async function revokeGatewayEmailInvitation(envelopeId,signerId) {
+  if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/revoke",{method:"POST",body:JSON.stringify({})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false)throw new Error(data.error||"Unable to revoke the email signing link.");
+  return data;
 }
 
 export async function voidGatewaySignatureEnvelope(envelopeId, reason="Signature Portal activation could not be committed") {
