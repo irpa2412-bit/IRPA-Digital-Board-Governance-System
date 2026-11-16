@@ -78,6 +78,7 @@ test("email-link open returns only this signer's fields and never another signer
     meta: { get: async (collection, id) => collection === "envelopes" && id === envelope.id ? structuredClone(envelope) : null },
   };
   const result = await openSigning(ctx, `ENV-test.S1.${secret}`, null);
+  await assert.rejects(()=>openSigning(ctx,`ENV-test.S2.${secret}`,null),/not valid|invalid signing link/i,"an invitation token for S1 must not be usable as S2");
   assert.deepEqual(result.fields.map(field => field.fieldId), ["vendor-name"]);
   assert.deepEqual(result.appliedFields, []);
   assert.equal(JSON.stringify(result).includes("PRIVATE-SAVED-SIGNATURE"), false);
