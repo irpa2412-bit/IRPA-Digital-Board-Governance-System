@@ -10,6 +10,7 @@ const gateway = read("../drive-gateway/src/index.js");
 const client = read("../src/firebase/signaturePlatform.js");
 const portal = read("../src/pages/SignaturePlatform.jsx");
 const selfTest = read("../src/components/SignaturePathwaySelfTest.jsx");
+const signaturePad = read("../src/components/SignatureFieldConfirmationPad.jsx");
 const documentPortal = read("../src/pages/DocumentLifecycleModule.jsx");
 
 function section(source, start, end) {
@@ -59,6 +60,11 @@ test("4. signing enforces signer assignment, authority, consent, order and dupli
   assert.match(client, /authorityStatus!==\"Current\"/);
   assert.match(client, /currentSignerUid&&envelope\.currentSignerUid!==u\.uid/);
   assert.match(client, /consent:true/);
+  assert.match(signing, /electronicConsentAccepted=true/);
+  assert.match(signing, /consentAccepted:true/);
+  assert.match(signaturePad, /mode==="Draw"/);
+  assert.match(signaturePad, /mode==="Type"/);
+  assert.match(signaturePad, /Use my saved signature/);
   assert.match(portal, /signInFlightRef/);
   assert.match(signing, /idempotent:true/);
   assert.match(signing, /ifVersion:c\._v/);
