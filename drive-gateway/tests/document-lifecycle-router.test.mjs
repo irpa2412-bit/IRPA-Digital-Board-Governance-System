@@ -305,7 +305,7 @@ test("canonical completion requires archive and owner/signer copies and records 
   assert.equal(saved.finalArchiveTarget,"board-governance");
   assert.equal(saved.finalArchiveCategory,"Governance Documents");
   assert.equal(saved.ownerCompletedFileId,"owner-copy-1");
-  assert.equal(saved.completionNoticeSentCount,2);
+  assert.equal(saved.completionNoticeSentCount,"2");
   assert.equal(saved.signedSourceFileId,"signed-pdf-1");
   assert.equal(saved.fileId,"original-file");
 });
