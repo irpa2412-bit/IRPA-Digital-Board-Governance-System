@@ -13,6 +13,12 @@ on:
       - "drive-gateway/src/signing.mjs"
       - "drive-gateway/src/documentLifecycle.mjs"
       - "drive-gateway/src/index.js"
+      - "drive-gateway/src/router.mjs"
+      - "drive-gateway/src/documentPolicy.mjs"
+      - "drive-gateway/tests/**"
+      - "src/firebase/signaturePlatform.js"
+      - "vite.config.js"
+      - ".github/workflows/cloudflare-pages-deploy.yml"
       - ".github/workflows/signature-lifecycle-acceptance.yml"
   workflow_dispatch:
 
