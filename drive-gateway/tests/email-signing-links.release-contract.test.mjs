@@ -38,7 +38,7 @@ test("email-link identity is transaction-scoped and does not require a register 
   assert.doesNotMatch(signing,/verifyEmailSignerAuthority/);
   assert.match(signing,/identityType==="email-link"/);
   assert.match(signing,/signer\.emailLinkStatus==="opened"/);
-  assert.match(signing,/s0\.identityType!=="email-link"/);
+  assert.match(signing,/else assertSignerAuthentication\(s0,user\)/);
   assert.match(signing,/declarationDiscrepancy/);
 });
 
