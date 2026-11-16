@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            if (id.includes("/src/pages/DocumentLifecycleModule.jsx")) return "document-lifecycle-module";
             if (id.includes("/src/pages/SignaturePlatform.jsx") || id.includes("/src/pages/GatewaySigningPortal.jsx") || id.includes("/src/components/SignatureFieldConfirmationPad.jsx") || id.includes("/src/firebase/signaturePlatform.js") || id.includes("/src/firebase/signatureStorage.js")) return "signing-workspace";
           }
         }
