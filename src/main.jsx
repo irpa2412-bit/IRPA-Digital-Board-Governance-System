@@ -1,6 +1,7 @@
 import React,{Component,useState}from"react";
 import ReactDOM from"react-dom/client";
 import App from"./App";
+import SigningDiagnostic from"./components/SigningDiagnostic";
 import InvitationActivation from"./pages/InvitationActivation";import MeetingEntryGateway from"./pages/MeetingEntryGateway";
 import { logout } from "./firebase/auth";
 import "./styles/app.css";
@@ -64,7 +65,7 @@ class AppBootBoundary extends Component{
         </section>
       </main>;
     }
-    return this.props.children;
+    return <>{this.props.children}<SigningDiagnostic/></>;
   }
 }
 
