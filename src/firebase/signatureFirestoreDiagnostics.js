@@ -15,9 +15,8 @@ function safeCode(error){
   const code=String(error?.code||error?.status||"unknown");
   return /^[a-zA-Z0-9._/-]{1,100}$/.test(code)?code:"unknown";
 }
-export async function runSignatureFirestore({operation,target,collectionPath,screen,userType},execute){
-  try{return await execute();}
-  catch(error){
+export function runSignatureFirestore({operation,target,collectionPath,screen,userType},execute){
+  const fail=error=>{
     const report={
       operation:String(operation||"unknown").slice(0,40),
       collectionPath:maskPath(collectionPath||targetPath(target)),
@@ -28,7 +27,11 @@ export async function runSignatureFirestore({operation,target,collectionPath,scr
     };
     if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("irpa:signing-diagnostic",{detail:report}));
     throw error;
-  }
+  };
+  try{
+    const result=execute();
+    return result&&typeof result.then==="function"?result.catch(fail):result;
+  }catch(error){return fail(error);}
 }
 export function wrapSignatureBatch(batch,{screen,userType,collectionPath}={}){
   return new Proxy(batch,{get(target,property,receiver){
