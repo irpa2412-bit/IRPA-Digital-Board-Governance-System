@@ -359,7 +359,7 @@ function Dashboard({user,admin,employee,profile,onNavigate,selectedAuthority,aut
      ?String(employee?.employeeNumber||"").trim()
      :"";
  const photo=profile?.photoUrl||profile?.photoURL||profile?.avatarUrl||profile?.profilePhotoUrl||employee?.photoUrl||employee?.photoURL||employee?.avatarUrl||user?.photoURL||"";
- const initials=displayName.split(/\\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()||"IR";
+ const initials=displayName.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()||"IR";
  useEffect(()=>{const clockId=setInterval(()=>setLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);
  const liveDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",day:"2-digit",month:"long",year:"numeric"}).format(liveNow);
  const liveDay=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",weekday:"long"}).format(liveNow);
