@@ -29,6 +29,15 @@ beforeEach(async () => {
       documentId:"DOC-LEGACY",participantUids:["assigned-signer"],actionUids:["assigned-signer"],
       signingMode:"Sequential",currentSignerUid:"assigned-signer",status:"In Progress"
     });
+    await db.doc("signatureEnvelopes/external-envelope").set({
+      senderUid:"document-owner",ownerUid:"document-owner",envelopeReference:"ENV-EXTERNAL",
+      documentId:"DOC-EXTERNAL",participantUids:["external-signer"],actionUids:["external-signer"],
+      signingMode:"Sequential",currentSignerUid:"external-signer",status:"In Progress"
+    });
+    await db.doc("documents/DOC-EXTERNAL").set({
+      signatureEnvelopeId:"external-envelope",signatureOwnerUid:"document-owner",
+      signatureStatus:"Pending",workflowOwnerSectionSaved:true,recordOrigin:"PRODUCTION"
+    });
   });
 });
 const signerDb = () => testEnv.authenticatedContext("assigned-signer", {email:"signer@example.test"}).firestore();
@@ -88,4 +97,53 @@ test("legacy non-Gateway envelope audit event creation remains available to an a
   await assertSucceeds(signerDb().doc("signatureEvents/legacy-event").set({
     envelopeId:"legacy-envelope",actorUid:"assigned-signer",event:"Legacy Signature Submitted"
   }));
+});
+
+test("authenticated external signer can create a signature record with self-declared occupation without any IRPA or signer-identity register record", async () => {
+  const db = testEnv.authenticatedContext("external-signer", {email:"external@example.test"}).firestore();
+  await assertSucceeds(db.doc("signatures/external-signer-record").set({
+    envelopeId:"external-envelope",documentId:"DOC-EXTERNAL",signerUid:"external-signer",
+    signatureAuthority:"Independent Consultant",signatureAuthorityDeclared:"Independent Consultant",
+    signatureAuthorityVerificationStatus:"Signer-declared; not independently verified",
+    signatureStatus:"Signed",status:"Signed",signedDocumentHash:"a".repeat(64)
+  }));
+});
+
+test("an authenticated account outside the assigned envelope cannot create a signature record", async () => {
+  const db = testEnv.authenticatedContext("unassigned-account", {email:"unassigned@example.test"}).firestore();
+  await assertFails(db.doc("signatures/unassigned-record").set({
+    envelopeId:"external-envelope",documentId:"DOC-EXTERNAL",signerUid:"unassigned-account",
+    signatureAuthority:"Independent Consultant",signatureAuthorityDeclared:"Independent Consultant",
+    signatureAuthorityVerificationStatus:"Signer-declared; not independently verified",
+    signatureStatus:"Signed",status:"Signed"
+  }));
+});
+
+test("an authenticated external envelope participant can create only their own audit event without an IRPA member record", async () => {
+  const db = testEnv.authenticatedContext("external-signer", {email:"external@example.test"}).firestore();
+  await assertSucceeds(db.doc("signatureEvents/external-signer-event").set({
+    envelopeId:"external-envelope",actorUid:"external-signer",event:"Signature Submitted"
+  }));
+});
+
+test("an authenticated non-participant cannot create a signature audit event", async () => {
+  const db = testEnv.authenticatedContext("unassigned-account", {email:"unassigned@example.test"}).firestore();
+  await assertFails(db.doc("signatureEvents/unassigned-event").set({
+    envelopeId:"external-envelope",actorUid:"unassigned-account",event:"Signature Submitted"
+  }));
+});
+
+test("authenticated external signer can update only the signing workflow fields on the linked document", async () => {
+  const db = testEnv.authenticatedContext("external-signer", {email:"external@example.test"}).firestore();
+  const batch = db.batch();
+  batch.update(db.doc("signatureEnvelopes/external-envelope"), {
+    status:"In Progress",lastSignedByUid:"external-signer"
+  });
+  batch.update(db.doc("documents/DOC-EXTERNAL"), {
+    workflowActionStatus:"Signed",lastWorkflowAction:"Signature",
+    lastWorkflowActionUid:"external-signer",lastWorkflowActionAt:new Date(),
+    signatureEnvelopeId:"external-envelope",signatureOwnerUid:"document-owner",
+    signatureStatus:"Pending"
+  });
+  await assertSucceeds(batch.commit());
 });
