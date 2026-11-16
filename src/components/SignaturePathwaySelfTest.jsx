@@ -95,6 +95,7 @@ export default function SignaturePathwaySelfTest() {
   const [discoveryProgress, setDiscoveryProgress] = useState("");
   const [discovery, setDiscovery] = useState(null);
   const [discoveryError, setDiscoveryError] = useState("");
+  const [driveHealth, setDriveHealth] = useState({ statusClass: "not_run", classification: "not_run" });
 
   async function requireAdministrator() {
     const user = auth.currentUser;
@@ -200,6 +201,28 @@ export default function SignaturePathwaySelfTest() {
     navigator.clipboard.writeText(report).then(() => setDiscoveryProgress("Emergency-storage report copied to clipboard.")).catch(error => setDiscoveryError("Copy failed: " + (error?.message || "Clipboard access unavailable.")));
   }
 
+  async function checkDriveHealth() {
+    setDriveHealth({ statusClass: "checking", classification: "checking" });
+    try {
+      await requireAdministrator();
+      const gateway = getGoogleDriveGatewayUrl();
+      if (!gateway || !auth.currentUser) throw new Error("Gateway unavailable");
+      const token = await getIdToken(auth.currentUser);
+      const response = await fetch(gateway + "/api/signature-pathway/drive-health", {
+        method: "GET",
+        headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+        cache: "no-store"
+      });
+      const data = await response.json().catch(() => ({}));
+      setDriveHealth({
+        statusClass: String(data.statusClass || (response.ok ? "ok" : "error")),
+        classification: String(data.classification || "unknown")
+      });
+    } catch {
+      setDriveHealth({ statusClass: "error", classification: "network_or_authentication" });
+    }
+  }
+
   async function reconcile() {
     setBusy(true);
     setResults([]);
@@ -207,6 +230,7 @@ export default function SignaturePathwaySelfTest() {
     setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 times (4 total attempts). No changes will be made.");
     try {
       await requireAdministrator();
+      await checkDriveHealth();
       const snapshot = await getDocs(collection(db, "documents"));
       const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
@@ -264,6 +288,10 @@ export default function SignaturePathwaySelfTest() {
 
   return <section className="panel">
     <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Read-only inspection of every registered controlled document: Drive metadata, controlled-route download, SHA-256, byte size, PDF page count, per-page extractable text and non-blank rendering. Flags a final page with zero text or a render failure. No document, Drive file or Firestore record is repaired or changed.</p></div></div>
+    <div className="panel" style={{padding:12,marginBottom:14}}>
+      <div><strong>Google Drive token refresh health</strong><p className="panel-description">Read-only administrator check through the existing Gateway. Only status class and error classification are displayed; no token or credential details are returned.</p><div role="status">Status: {driveHealth.statusClass} · Classification: {driveHealth.classification}</div></div>
+      <button type="button" onClick={checkDriveHealth} disabled={busy}>Check Drive refresh</button>
+    </div>
     <div className="panel" style={{padding:12,marginBottom:14}}>
       <div><strong>Find emergency storage</strong><p className="panel-description">Administrator-only inspection of one emergency blob per Worker request. Chunk payloads are reconstructed in Worker memory only; responses contain metadata and measurements, never file bytes.</p></div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
