@@ -183,6 +183,31 @@ jobs:
             exit 1
           }
           echo "PASS: Cloudflare frontend endpoint, deployed build identity, static assets and Worker health."
+      - name: Verify live signing-workspace chunk
+        run: |
+          set -euo pipefail
+          url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          local_chunk="$(find dist/assets -maxdepth 1 -type f -name 'signing-workspace-*.js' -print -quit)"
+          if [ -z "$local_chunk" ]; then
+            echo "FAIL: build did not emit the signing-workspace chunk." >&2
+            exit 1
+          fi
+          chunk_name="${local_chunk##*/}"
+          live_chunk="$RUNNER_TEMP/live-$chunk_name"
+          if ! curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 30 \
+            -H "Cache-Control: no-cache" "$url/assets/$chunk_name?__irpa_signing_verify=$GITHUB_SHA" -o "$live_chunk"; then
+            echo "FAIL: live signing-workspace chunk is missing: /assets/$chunk_name" >&2
+            exit 1
+          fi
+          if ! cmp -s "$local_chunk" "$live_chunk"; then
+            echo "FAIL: live signing-workspace chunk differs from this production build." >&2
+            exit 1
+          fi
+          if ! grep -Fq "Signature Lifecycle" "$live_chunk"; then
+            echo "FAIL: live signing-workspace chunk is missing the Signature Lifecycle self-test." >&2
+            exit 1
+          fi
+          echo "PASS: live signing-workspace chunk exists, matches this build and contains the Signature Lifecycle self-test."
       - name: Publish migration boundary
         run: |
           echo "Cloudflare Pages hosts the frontend. Firebase Authentication and Firestore remain the authoritative identity/data services during this safe migration."
