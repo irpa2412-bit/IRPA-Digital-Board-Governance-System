@@ -53,8 +53,8 @@ test("email invitation reuses the existing SMTP retry flow with both text and HT
 });
 
 test("owner resend rotates the link and revoke is routed without changing login signer routes",()=>{
-  assert.match(router,/invitations\\/\(S\\d\{1,2\}\)\\/resend/);
-  assert.match(router,/invitations\\/\(S\\d\{1,2\}\)\\/revoke/);
+  assert.match(router,/invitations\/\(S\d{1,2}\)\/resend/);
+  assert.match(router,/invitations\/\(S\d{1,2}\)\/revoke/);
   assert.match(signing,/emailLinkTokenHistory/);
   assert.match(signing,/email_link\.resent/);
   assert.match(signing,/email_link\.revoked/);
