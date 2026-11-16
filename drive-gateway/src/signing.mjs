@@ -1,5 +1,5 @@
 import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {Conflict,VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {MAX_SIGNERS,buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
-import {createEmailSigningToken,hashNormalizedEmail,genericEmailSigningFailure} from "./emailSigningLinks.mjs";
+import {createEmailSigningToken,hashNormalizedEmail,markEmailSigningTokenOpened,genericEmailSigningFailure} from "./emailSigningLinks.mjs";
 export async function chainEvents(events,e){const body={...e,prevHash:events.length?events.at(-1).hash:"GENESIS"};return[...events,{...body,hash:await sha256Hex(canonicalJson(body))}]}
 export async function verifyChain(events){if(!Array.isArray(events))return false;let p="GENESIS";for(const e of events){const {hash,...b}=e;if(b.prevHash!==p||await sha256Hex(canonicalJson(b))!==hash)return false;p=hash}return true}
 async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get("envelopes",id);if(!c)throw new HttpError(404,"Envelope not found.");if(!await verifyChain(c.events))throw new HttpError(409,"Signing audit chain failed verification.");const {patch,result}=await fn(c);if(!patch)return result;try{await ctx.meta.update("envelopes",id,patch,{ifVersion:c._v});return result}catch(e){if(!(e instanceof VersionConflict))throw e}}throw new HttpError(409,"Please retry.")}
@@ -165,11 +165,13 @@ export async function openEmailSigning(ctx,token,ip=""){
     await mutate(ctx,loaded.env.id,async current=>{
       const signer=current.signers.find(item=>item.id===loaded.signer.id);
       if(!signer||signer.identityType!=="email-link"||signer.emailLinkStatus!=="issued")throw new HttpError(401,genericEmailSigningFailure());
-      signer.emailLinkStatus="opened";
-      signer.emailLinkOpenCount=Number(signer.emailLinkOpenCount||0)+1;
-      signer.emailLinkAttemptCount=Number(signer.emailLinkAttemptCount||0)+1;
-      signer.emailLinkLastIpHash=ipHash;
-      signer.emailLinkOpenedAt=now.toISOString();
+      const opened=await markEmailSigningTokenOpened({tokenHash:signer.tokenHash,expiresAt:signer.emailLinkExpiresAt,status:signer.emailLinkStatus,attemptCount:signer.emailLinkAttemptCount,openCount:signer.emailLinkOpenCount,ipAttempts:signer.emailLinkIpAttempts},{token:parts[2],now,ipHash,maxAttempts:8});
+      signer.emailLinkStatus=opened.status;
+      signer.emailLinkOpenCount=opened.openCount;
+      signer.emailLinkAttemptCount=opened.attemptCount;
+      signer.emailLinkIpAttempts=opened.ipAttempts;
+      signer.emailLinkLastIpHash=opened.lastIpHash;
+      signer.emailLinkOpenedAt=opened.openedAt;
       return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash})}};
     });
     const preview=await openSigning(ctx,token,null);
