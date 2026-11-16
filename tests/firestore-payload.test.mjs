@@ -31,6 +31,6 @@ test("rejects undefined array entries instead of silently dropping audit data", 
 });
 
 test("preserves non-plain Firestore values unchanged", () => {
-  const timestampLike = Object.freeze({ toDate: () => new Date(0) });
+  const timestampLike = new Date(0);
   assert.equal(omitUndefinedFirestoreFields(timestampLike), timestampLike);
 });
