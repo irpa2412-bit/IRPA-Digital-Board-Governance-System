@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {canAuthenticatedSignerAccess} from "../src/signing.mjs";
 
-test("unbound legacy signers are not accepted as authenticated production identities",()=>{
-  assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"legacy-token"},null),true);
-  assert.equal(canAuthenticatedSignerAccess({uid:undefined,identityType:"legacy-token"},undefined),true);
+test("unbound legacy signers are rejected; email-link identity requires redeemed invitation",()=>{
+  assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"legacy-token"},null),false);
+  assert.equal(canAuthenticatedSignerAccess({uid:undefined,identityType:"legacy-token"},undefined),false);
   assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"email-link",emailLinkStatus:"issued"},null),false);
   assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"email-link",emailLinkStatus:"opened"},null),true);
 });
