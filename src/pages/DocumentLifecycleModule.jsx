@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState}from"react";
-import{collection,getDocs as firestoreGetDocs,query,where}from"firebase/firestore";
+import{collection as firestoreCollection,getDocs as firestoreGetDocs,query as firestoreQuery,where}from"firebase/firestore";
 import{runSignatureFirestore}from"../firebase/signatureFirestoreDiagnostics.js";
 import{db}from"../firebase/config";
 import{createRecord,COLLECTIONS}from"../firebase/data";
@@ -8,6 +8,8 @@ import DocumentReader from "../components/DocumentReader";
 import DocumentTranslationWorkspace from "../components/DocumentTranslationWorkspace";
 import { listLifecycleDocuments,uploadLifecycleDocument,downloadLifecycleDocument,transitionLifecycleDocument,completeLifecycleSignature,shareLifecycleDocument } from "../firebase/documentLifecycle";
 
+const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:"Document Lifecycle / Translation Requests",userType:"logged-in document owner"},()=>firestoreCollection(...args));
+const query=(ref,...constraints)=>runSignatureFirestore({operation:"query",target:ref,screen:"Document Lifecycle / Translation Requests",userType:"logged-in document owner"},()=>firestoreQuery(ref,...constraints));
 const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Document Lifecycle / Translation Requests",userType:"logged-in document owner"},()=>firestoreGetDocs(ref));
 
 const TYPES=["Governance","Finance","Procurement","Administrative","HR","Research","Research Archive","Policy and Strategic Plan","Project","Other"];
