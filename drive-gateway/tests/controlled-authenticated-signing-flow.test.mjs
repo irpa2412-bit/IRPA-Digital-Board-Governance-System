@@ -421,7 +421,7 @@ test("Gateway open keeps later signers' assignments hidden while retaining the a
 });
 
 
-test("later signer sees earlier confirmed signature but never an unsigned later assignment", async () => {
+test("later signer cannot retrieve another signer's saved signature through the invitation payload", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
   fixture.envelope.signers[0].order=2;
   fixture.envelope.signers[1].order=1;
@@ -434,7 +434,7 @@ test("later signer sees earlier confirmed signature but never an unsigned later 
   ];
   const opened=await openSigning(fixture.ctx,fixture.token,{uid:"member-uid",email:"member@example.org"});
   assert.deepEqual(opened.fields.map(field=>field.fieldId),["current-signature"]);
-  assert.deepEqual(opened.appliedFields.map(field=>field.fieldId),["prior-signature"]);
-  assert.equal(opened.appliedFields[0].value,SIGNATURE_PNG);
+  assert.deepEqual(opened.appliedFields,[]);
+  assert.equal(JSON.stringify(opened).includes(SIGNATURE_PNG),false);
   assert.equal(opened.fields.some(field=>field.fieldId==="future-signature"),false);
 });
