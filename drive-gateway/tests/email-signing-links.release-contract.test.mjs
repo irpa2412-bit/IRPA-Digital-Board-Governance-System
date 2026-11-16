@@ -28,12 +28,11 @@ test("guest page is routed before account authentication and is read-only",()=>{
   assert.doesNotMatch(page,/signature-pad|consent|submitSignature|\/api\/sign\/submit/);
 });
 
-test("authority comes from active register email and exact accepted role fields, not client claims",()=>{
-  assert.match(index,/for\(const collectionName of \["members","employees"\]\)/);
-  assert.match(index,/getFirestoreDocumentsByField\(env,collectionName,"email",normalized,adminToken\)/);
-  assert.match(index,/gatewayAuthorityCandidates\(profile\)/);
-  assert.match(index,/normalizeGatewayAuthority\(requestedAuthorityRole\)/);
-  assert.match(signing,/ctx\.verifyEmailSignerAuthority\?\.\(email,s\?\.authorityRole\|\|""\)/);
+test("email-link assignment is independent of member and employee authority registers",()=>{
+  assert.doesNotMatch(signing,/ctx\.verifyEmailSignerAuthority/);
+  assert.doesNotMatch(signing,/ctx\.verifySigningAuthority/);
+  assert.match(signing,/emailHash:issued\?\.record\.emailHash\|\|null/);
+  assert.match(signing,/emailLinkStatus==="opened"/);
 });
 
 test("token, IP and envelope mutations use hashes and compare-and-set",()=>{

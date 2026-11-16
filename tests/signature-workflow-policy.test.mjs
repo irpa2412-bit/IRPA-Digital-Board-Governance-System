@@ -68,7 +68,7 @@ test("Signature Portal palette queries include document owner and signature owne
 // Source-contract checks follow the current handler shape, including signerUid ownership and whitespace-safe finally blocks.
 test("adding the first signing officer creates a signature field assigned to that officer", () => {
   assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"\}\)/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Assigned signature field — click to open your signing pane"\}\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
@@ -180,4 +180,57 @@ test("signature assignment and signing handlers synchronously reject repeated su
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
   assert.match(sign[1], /signInFlightRef\.current=true/);
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
+});
+
+test("email invitation tokens scope fields to one signer and never expose another saved signature profile", () => {
+  const gatewayPortal = fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx", import.meta.url), "utf8");
+  const gateway = fs.readFileSync(new URL("../drive-gateway/src/signing.mjs", import.meta.url), "utf8");
+  const rules = fs.readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+
+  assert.match(gateway, /signerById=new Map/);
+  assert.match(gateway, /signerId:assigned\.id/);
+  assert.match(gateway, /f\.signerId===signer\.id/);
+  assert.match(gateway, /identityType==="email-link"\) return signer\.emailLinkStatus==="opened"/);
+  assert.doesNotMatch(gateway, /ctx\.verifyEmailSignerAuthority|ctx\.verifySigningAuthority/);
+  assert.match(app, /<GatewaySigningPortal token=\{emailSigningToken\} emailLink\/>/);
+  assert.match(gatewayPortal, /fetchGatewaySigningResource\("\/api\/sign\/email\/open",token\)/);
+  assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
+  assert.match(gatewayPortal, /const assignedAccount=Boolean\(result\.signer\?\.uid&&auth\.currentUser\?\.uid===result\.signer\.uid\)/);
+  assert.match(gatewayPortal, /const verifiedProfileOwner=Boolean\(auth\.currentUser\?\.uid&&auth\.currentUser\?\.emailVerified/);
+  assert.match(gatewayPortal, /\(assignedAccount\|\|verifiedProfileOwner\)\?await getMySignatureProfile\(\)\.catch\(\(\)=>null\):null/);
+  assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|updateMySignerAuthority|manualAuthority/);
+  assert.match(rules, /match \/signatureProfiles\/\{uid\}\{allow read:if signatureProfileUser\(\)&&self\(uid\)/);
+  assert.doesNotMatch(rules, /match \/signatureProfiles\/\{uid\}\{allow read:if admin\(\)/);
+  assert.match(rules, /allow delete:if false/);
+});
+
+test("Gateway-linked envelopes cannot fall back to client-side UID signing",()=>{
+  const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  const firebase=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+  assert.match(portal,/selected\.gatewayEnvelopeId&&!window\.sessionStorage\.getItem\("irpaGatewaySigningToken"\)/);
+  assert.match(firebase,/envelope\?\.gatewayEnvelopeId&&\(typeof window==="undefined"\|\|!window\.sessionStorage\?\.getItem\("irpaGatewaySigningToken"\)\)/);
+});
+
+test("email invitations carry owner-assigned PDF fields and permitted action into the Gateway",()=>{
+  const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+  const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  const signing=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+  assert.match(storage,/const signerIdByAssignment\s*=\s*new Map/);
+  assert.match(storage,/signerId:\s*signerIdByAssignment\.get/);
+  assert.match(storage,/permittedAction:String\(recipient\.permittedAction/);
+  assert.match(portal,/fields:env\.fields\|\|\[\]/);
+  assert.match(portal,/gatewayRecipients=\[\.\.\.\(ownerSigningEnabled\?/);
+  assert.match(signing,/permittedAction,ownerAssignedParticulars/);
+  assert.match(signing,/f\.signerId===signer\.id/);
+  assert.match(signing,/ownerAssignedParticulars/);
+  assert.match(signing,/signerDeclaredParticulars/);
+  assert.match(signing,/particularsComparison/);
+});
+
+test("account-bound signer access remains restricted to the matching Firebase UID", () => {
+  const gateway = fs.readFileSync(new URL("../drive-gateway/src/signing.mjs", import.meta.url), "utf8");
+  assert.match(gateway, /return Boolean\(user\?\.uid\)&&user\.uid===signer\.uid/);
+  assert.match(gateway, /if\(!signer\?\.uid\) return true/);
+  assert.match(gateway, /if\(signer\?\.identityType==="email-link"\) return signer\.emailLinkStatus==="opened"/);
 });

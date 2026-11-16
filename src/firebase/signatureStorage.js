@@ -403,9 +403,14 @@ async function sha256HexBytes(bytes) {
 }
 
 async function gatewayAuthenticatedRequest(path, {method="GET",body,contentType="application/json",signingToken=null}={}) {
-  if (!auth.currentUser) throw new Error("Authentication is required.");
-  const token = await getIdToken(auth.currentUser);
-  const headers = {Authorization:"Bearer " + token};
+  const guestSigningPath=/^\/api\/sign\/(?:email\/(?:open|pdf)|open|status|evidence|verify|pdf|submit|decline)$/.test(String(path||""));
+  const headers = {};
+  if (auth.currentUser) {
+    const token = await getIdToken(auth.currentUser);
+    headers.Authorization = "Bearer " + token;
+  } else if (!signingToken || !guestSigningPath) {
+    throw new Error("Authentication or a valid signing invitation is required.");
+  }
   if (contentType) headers["Content-Type"] = contentType;
   if (signingToken) headers["x-signing-token"] = signingToken;
   return fetch(requireGateway() + path, {
@@ -437,12 +442,10 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error("Only the authenticated document owner can connect this signing workflow to the Gateway.");
   }
   const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
-  const actionRecipients = recipients.filter(r => r?.identityType === "email-link" && String(r?.email||"").trim() && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
-  if (!actionRecipients.length) throw new Error("At least one authorized action signer is required.");
-  const signerUids = new Set();
-  if ((envelope.fields || []).some(field => field?.signerUid && !signerUids.has(field.signerUid))) {
-    throw new Error("A signing field is assigned to a view-only or optional signer. Correct the field assignments before Gateway activation.");
-  }
+  const actionRecipients = recipients.filter(r => String(r?.email||"").trim() && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
+  if (!actionRecipients.length) throw new Error("At least one email-addressed action signer is required.");
+  if (actionRecipients.some(r=>!r?.uid)) throw new Error("Each assigned signer must have a stable workflow assignment ID before invitation.");
+
   const bytes = sourceBytes instanceof Uint8Array ? sourceBytes : new Uint8Array(sourceBytes);
   if (bytes.length < 8 || new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") {
     throw new Error("The Gateway signing source must be the controlled PDF.");
@@ -478,11 +481,15 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error(data.error || ("The Gateway could not verify the existing source document (HTTP " + existingResponse.status + ")."));
   }
   const ordered = [...actionRecipients].sort((a,b) => Number(a.routingOrder || 1) - Number(b.routingOrder || 1));
-  const fields = (envelope.fields || []).filter(field => signerUids.has(field?.signerUid)).map(field => ({
+  const signerIdByAssignment = new Map(ordered.map((recipient,index)=>[String(recipient.uid),`S${index+1}`]));
+  const unassignedFields=(envelope.fields||[]).filter(field=>field?.signerUid&&!signerIdByAssignment.has(String(field.signerUid)));
+  if(unassignedFields.length)throw new Error("A signing field is assigned to a person who is not included in this email invitation sequence.");
+  const fields = (envelope.fields || []).filter(field => field?.signerUid&&signerIdByAssignment.has(String(field.signerUid))).map(field => ({
     fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
-    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerUid:field.signerUid,required:field.required === true,
+    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:signerIdByAssignment.get(String(field.signerUid)),required:field.required === true,
     placeholder:field.placeholder || ""
   }));
+  if(!fields.some(field=>field.type==="Signature"&&field.required))throw new Error("Assign at least one required signature field to an invited signer before sending invitations.");
   const payload = {
     externalReference:envelope.id,
     documentId,
@@ -492,8 +499,10 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => ({
       identityType:"email-link",
+      permittedAction:String(recipient.permittedAction||recipient.action||recipient.role||"Signature").trim(),
       email:String(recipient.email || "").trim().toLowerCase(),
-      authorityRole:String(recipient.authorityRole||"").trim(),
+      occupation:String(recipient.occupation||recipient.capacity||recipient.authorityRole||"").trim(),
+      capacity:String(recipient.capacity||recipient.occupation||recipient.authorityRole||"").trim(),
       name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
       order:envelope.signingMode === "Parallel" ? 1 : index + 1
     })),
@@ -561,11 +570,11 @@ export async function fetchGatewaySigningResource(path, token, {pdf=false}={}) {
   return pdf ? new Uint8Array(await response.arrayBuffer()) : response.json();
 }
 
-export async function submitGatewaySignature({token,signature,fieldValues={},fieldApplications=[],signatureConfirmed=false,manualAuthorityIdentification="",consent=true}={}) {
+export async function submitGatewaySignature({token,signature,fieldValues={},fieldApplications=[],signatureConfirmed=false,signerDeclaration,consent=true}={}) {
   if (!token) throw new Error("A Gateway signing token is required.");
   const response = await gatewayAuthenticatedRequest("/api/sign/submit", {
     method:"POST",
-    body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,manualAuthorityIdentification,consent})
+    body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,signerDeclaration,consent})
   });
   const data = await response.json().catch(() => ({}));
   assertGatewaySigningResponse(response,data);
