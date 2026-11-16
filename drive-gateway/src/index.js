@@ -315,6 +315,7 @@ export default {
 
       if (pathname === "/api/system/release-readiness") return await createReleaseReadinessRoute({ authenticateFirebaseRequest, getFirestoreDocument, systemDiagnosticsRoute, actualDataAccessRoute, reconcileSignatureDocumentIds, corsHeaders })(request, env);
       if (pathname === "/api/signature-pathway/emergency-storage") return await emergencyStorageDiscoveryRoute(request, env);
+      if (pathname === "/api/signature-pathway/drive-health") return await signatureDriveHealthRoute(request, env);
 
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
@@ -3035,6 +3036,36 @@ async function deleteDriveFile(request, env) {
 }
 
 
+
+async function signatureDriveHealthRoute(request, env) {
+  const headers = corsHeaders(request);
+  if (request.method === "OPTIONS") return new Response(null, { headers });
+  if (request.method !== "GET") return json({ ok: false, statusClass: "error", classification: "method_not_allowed" }, 405, headers);
+  let claims;
+  try {
+    claims = await authenticateFirebaseRequest(request, env);
+  } catch {
+    return json({ ok: false, statusClass: "error", classification: "authentication_required" }, 401, headers);
+  }
+  let adminProfile = null;
+  try { adminProfile = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token); } catch {}
+  if (claims.firebaseClaims?.admin !== true && adminProfile?.fields?.active?.booleanValue !== true) {
+    return json({ ok: false, statusClass: "error", classification: "administrator_required" }, 403, headers);
+  }
+  try {
+    await getDriveAccessToken(env);
+    return json({ ok: true, statusClass: "ok", classification: "ok" }, 200, headers);
+  } catch (error) {
+    const message = String(error?.message || "").toLowerCase();
+    let classification = "refresh_failed";
+    if (!env.DRIVE_KV || !env.GOOGLE_DRIVE_CLIENT_ID || !env.GOOGLE_DRIVE_CLIENT_SECRET || !env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY) classification = "missing_binding";
+    else if (message.includes("invalid_grant")) classification = "invalid_grant";
+    else if (message.includes("invalid_client")) classification = "invalid_client";
+    else if (message.includes("not yet been authorized") || message.includes("refresh token")) classification = "missing_refresh_token";
+    else if (message.includes("fetch") || message.includes("network") || message.includes("timeout")) classification = "network";
+    return json({ ok: false, statusClass: "error", classification }, 503, headers);
+  }
+}
 
 async function getDriveAccessToken(env) {
   const stored = await env.DRIVE_KV.get("google-drive-refresh-token", "json");
