@@ -102,7 +102,7 @@ export default function GatewaySigningPortal({token,emailLink=false}){
   if(!opened)return <main className="content-area" style={{padding:24,maxWidth:900,margin:"0 auto"}}><h1>Gateway Signing Unavailable</h1><p role="alert">{message||"The signing invitation could not be opened."}</p><p>Return to the IRPA Digital Governance workspace and confirm you are signed in with the invited account.</p></main>;
   const fields=opened.fields||[];
   return <main className="content-area" style={{padding:20,maxWidth:1240,margin:"0 auto",width:"100%"}}>
-    <section className="welcome-panel"><div><span className="eyebrow">IRPA CRYPTOGRAPHIC SIGNING</span><h1>{opened.title||"Signing Invitation"}</h1><p>Authenticated Drive Gateway · Envelope {opened.envelopeId}</p></div><div className="identity-card"><span>Gateway status</span><strong>{status?.status||opened.status}</strong><small>{opened.signer?.name||profile?.displayName||"Authenticated signer"}</small></div></section>
+    <section className="welcome-panel"><div><span className="eyebrow">IRPA CRYPTOGRAPHIC SIGNING</span><h1>{opened.title||"Signing Invitation"}</h1><p>Authenticated Drive Gateway · Envelope {opened.envelopeId}</p></div><div className="identity-card"><span>Gateway status</span><strong>{status?.status||opened.status}</strong><small>{opened.signer?.name||profile?.displayName||"Assigned signer"}</small><small>Assigned action: {opened.signer?.permittedAction||"Signature"}</small></div></section>
     {message&&<div className="auth-message" role="status" style={{margin:"14px 0"}}>{message}</div>}
     <section className="panel" style={{marginTop:16}}>
       <h2>Controlled PDF</h2>
