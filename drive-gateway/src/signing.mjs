@@ -33,6 +33,7 @@ export function validateEnvelopeFields(fields,signers){
 }
 export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
   const assigned=(fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),out={},byId=new Map(assigned.map(f=>[f.fieldId,f])),applications=new Map();
+  for(const submittedFieldId of Object.keys(values||{}))if(!byId.has(submittedFieldId))throw new HttpError(403,"A submitted field is not assigned to this signer.");
   if(!Array.isArray(fieldApplications))throw new HttpError(400,"Explicit confirmed signature field applications are required.");
   for(const application of fieldApplications){
     const field=byId.get(String(application?.fieldId||""));
@@ -200,8 +201,6 @@ export async function resendInvitation(ctx,user,id,signerId){
   if(target.status==="Signed")throw new HttpError(409,"A signed assignment cannot receive another signing invitation.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
-  const authority=emailLink?await ctx.verifyEmailSignerAuthority?.(target.email):null;
-  if(emailLink&&authority?.verified!==true)throw new HttpError(403,"The registered email signing authority is no longer current.");
   const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+(ctx.config.emailLinkTtlDays||7)*86400000).toISOString();
   await mutate(ctx,id,async current=>{
     const signer=current.signers.find(s=>s.id===signerId);
@@ -209,7 +208,7 @@ export async function resendInvitation(ctx,user,id,signerId){
     if(signer.identityType==="email-link"){
       signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:now.toISOString()}].slice(-10);
       signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkLastIpHash=null;signer.emailLinkOpenedAt=null;
-      signer.authorityVerification={authorityRole:authority.authorityRole,sourceCollection:authority.sourceCollection,sourceRecordId:authority.sourceRecordId,verifiedAt:now.toISOString()};
+      
     }
     signer.tokenHash=await sha256Hex(secret);signer.invitation="Pending";
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:emailLink?"email_link.resent":"invitation.resend.requested",signerId,actor:user.uid,at:now.toISOString()})}};
