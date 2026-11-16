@@ -185,4 +185,11 @@ test("email-link signer can submit assigned fields with declaration mismatch rec
   assert.equal(signer.particularsComparison.overallStatus,"MISMATCH");
   assert.equal(stored.events.at(-1).particularsComparison.overallStatus,"MISMATCH");
   assert.equal(signer.status,"Signed");
+  const secondToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
+  await openEmailSigning(f.ctx,secondToken,"198.51.100.31");
+  const nextSigner=await openSigning(f.ctx,secondToken,null);
+  assert.deepEqual(nextSigner.fields.map(field=>field.fieldId),["second-signature"]);
+  assert.equal(nextSigner.appliedFields[0].applied,true);
+  assert.equal(nextSigner.appliedFields[0].value,null);
+  assert.equal(JSON.stringify(nextSigner).includes(png),false);
 });
