@@ -11,7 +11,7 @@ const page=read("../../src/pages/EmailSigningReadOnlyPage.jsx");
 const storage=read("../../src/firebase/signatureStorage.js");
 const mail=read("../src/invitationEmail.mjs");
 
-test("public email-link routes return only a minimal preview and its associated PDF",()=>{
+test("public email-link routes return the invited signer's fields and associated PDF only",()=>{
   assert.match(router,/\/api\/sign\/email\/open/);
   assert.match(router,/\/api\/sign\/email\/pdf/);
   assert.match(signing,/return \{ok:true,title:preview\.title,ownerName:preview\.ownerName,linkExpiresAt:preview\.linkExpiresAt\}/);
@@ -21,14 +21,14 @@ test("public email-link routes return only a minimal preview and its associated 
   assert.doesNotMatch(page,/\/api\/documents\/|\/api\/envelopes\//);
 });
 
-test("guest page is routed before account authentication and is read-only",()=>{
+test("guest signing page is routed before account authentication and submits only the invited assignment",()=>{
   assert.match(app,/emailSignToken/);
   assert.ok(app.indexOf("emailSigningToken=params.get")<app.indexOf("if(!user)return <AuthScreen/>"));
   assert.match(page,/Read-only controlled document/);
   assert.doesNotMatch(page,/signature-pad|consent|submitSignature|\/api\/sign\/submit/);
 });
 
-test("authority comes from active register email and exact accepted role fields, not client claims",()=>{
+test("email-link signing does not consult IRPA register or authority matrix",()=>{
   assert.match(index,/for\(const collectionName of \["members","employees"\]\)/);
   assert.match(index,/getFirestoreDocumentsByField\(env,collectionName,"email",normalized,adminToken\)/);
   assert.match(index,/gatewayAuthorityCandidates\(profile\)/);
