@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createDocumentLifecycleRouter, buildMultipartBody } from "../src/documentLifecycle.mjs";
+import { PDFDocument } from "pdf-lib";
+
+async function validPdfBase64(){const pdf=await PDFDocument.create();pdf.addPage([612,792]);return Buffer.from(await pdf.save()).toString("base64");}
 
 function plain(fields){return Object.fromEntries(Object.entries(fields||{}).map(([k,v])=>[k,v?.stringValue??v?.booleanValue??v?.integerValue??(v?.arrayValue?.values||undefined)]));}
 function makeDeps(state){
@@ -93,10 +96,11 @@ test("multipart body uses real CRLF separators and preserves binary payload",()=
 });
 
 test("upload rolls back Drive file when atomic document/audit commit fails",async()=>{
+  const pdfBase64=await validPdfBase64();
   const state={docs:{},writes:[],deletedFiles:[],failAudit:true};
   const router=createDocumentLifecycleRouter(makeDeps(state));
   await assert.rejects(
-    router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env),
+    router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:pdfBase64,title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env),
     /simulated atomic document\/audit commit failure/
   );
   assert.deepEqual(state.writes,[]);
@@ -111,19 +115,22 @@ test("upload rolls back Drive file when atomic document/audit commit fails",asyn
 });
 
 test("Research Officer can upload a Research Archive record into Research Documents",async()=>{
+  const pdfBase64=await validPdfBase64();
   const state={docs:{},writes:[],deletedFiles:[],researchUser:true};
   const router=createDocumentLifecycleRouter(makeDeps(state));
-  const response=await router(req("/api/document-lifecycle/upload",{fileName:"research.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Research Archive Record",documentType:"Research Archive",archiveCategory:"Research Documents",classification:"Internal"}),env);
+  const response=await router(req("/api/document-lifecycle/upload",{fileName:"research.pdf",contentType:"application/pdf",base64:pdfBase64,title:"Research Archive Record",documentType:"Research Archive",archiveCategory:"Research Documents",classification:"Internal"}),env);
   assert.equal(response.status,201);
   const saved=Object.values(state.docs)[0];
   assert.equal(saved.plain.documentType,"Research Archive");
   assert.equal(saved.plain.archiveCategory,"Research Documents");
+  assert.equal(saved.fields.pdfPageCount.integerValue,"1");
 });
 
 test("active Administrator outside Research can upload and retrieve a Confidential Research Archive record",async()=>{
-  const state={docs:{},writes:[],deletedFiles:[],adminUser:true,downloadBytes:new TextEncoder().encode("test")};
+  const pdfBase64=await validPdfBase64();
+  const state={docs:{},writes:[],deletedFiles:[],adminUser:true,downloadBytes:Buffer.from(pdfBase64,"base64")};
   const router=createDocumentLifecycleRouter(makeDeps(state));
-  const uploaded=await router(req("/api/document-lifecycle/upload",{fileName:"research.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Administrator Research Archive Record",documentType:"Research Archive",archiveCategory:"Research Documents",classification:"Confidential"}),env);
+  const uploaded=await router(req("/api/document-lifecycle/upload",{fileName:"research.pdf",contentType:"application/pdf",base64:pdfBase64,title:"Administrator Research Archive Record",documentType:"Research Archive",archiveCategory:"Research Documents",classification:"Confidential"}),env);
   assert.equal(uploaded.status,201);
   const result=await uploaded.json();
   const saved=state.docs[result.documentId].plain;
@@ -137,7 +144,7 @@ test("active Administrator outside Research can upload and retrieve a Confidenti
   const retrieved=await router(req("/api/document-lifecycle/download",{documentId:result.documentId,fileId:result.fileId}),env);
   assert.equal(retrieved.status,200);
   const downloaded=await retrieved.json();
-  assert.equal(atob(downloaded.base64),"test");
+  assert.equal(Buffer.from(downloaded.base64,"base64").equals(Buffer.from(pdfBase64,"base64")),true);
   assert.equal(downloaded.sha256,saved.sha256);
 });
 
@@ -147,15 +154,17 @@ test("Research Archive UI selection defaults its category and classification to 
 });
 
 test("successful upload atomically writes document registry and audit event",async()=>{
+  const pdfBase64=await validPdfBase64();
   const state={docs:{},writes:[],deletedFiles:[]};
   const router=createDocumentLifecycleRouter(makeDeps(state));
-  const response=await router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env);
+  const response=await router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:pdfBase64,title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env);
   assert.equal(response.status,201);
   assert.equal(state.writes.length,2);
   assert.match(state.writes[0].path,/^documents\/LIFE-/);
   assert.match(state.writes[1].path,/^audit\/LIFE-/);
   const saved=Object.values(state.docs)[0];
   assert.equal(saved.fields.sha256.stringValue.length,64);
+  assert.equal(saved.fields.pdfPageCount.integerValue,"1");
 });
 
 const TEST_SHA256="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
@@ -179,10 +188,11 @@ test("download rejects retrieved bytes whose SHA-256 differs from the register",
 });
 
 test("failed Drive rollback is explicitly recorded and reported after atomic commit failure",async()=>{
+  const pdfBase64=await validPdfBase64();
   const state={docs:{},writes:[],deletedFiles:[],failAudit:true,failDelete:true,failureEvents:[]};
   const router=createDocumentLifecycleRouter(makeDeps(state));
   await assert.rejects(
-    router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:btoa("test"),title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env),
+    router(req("/api/document-lifecycle/upload",{fileName:"test.pdf",contentType:"application/pdf",base64:pdfBase64,title:"Test document",documentType:"Other",archiveCategory:"Administrative Documents",classification:"Internal"}),env),
     /rollback was incomplete; failure audit RECORDED/
   );
   assert.equal(state.failureEvents.length,1);
