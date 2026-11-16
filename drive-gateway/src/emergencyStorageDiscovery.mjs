@@ -146,6 +146,7 @@ async function inspectBlobRecord(deps, base, token, collectionPath, documentId) 
     method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ pageSize: 100 })
   });
   const subcollections = [];
+  let reconstructed = [];
   for (const collectionId of (collections.collectionIds || []).filter(safeCollectionId)) {
     const childUrl = parentUrl + "/" + encodeURIComponent(collectionId) + "?pageSize=1000";
     const childResult = await firestoreRequest(deps, childUrl, { method: "GET", headers });
@@ -164,6 +165,7 @@ async function inspectBlobRecord(deps, base, token, collectionPath, documentId) 
     const totalChunks = scalar(parentFields, ["totalChunks"]);
     const expectedSize = scalar(parentFields, ["fileSize", "size", "byteLength", "expectedSize"]);
     const chunks = indexed.map(item => item.payload);
+    reconstructed = chunks;
     const joinedLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
     const joined = new Uint8Array(joinedLength);
     let offset = 0;

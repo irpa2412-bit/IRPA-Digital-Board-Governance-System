@@ -174,7 +174,7 @@ test("blob inspection detects chunk index gaps and parent size mismatches", asyn
 
 test("blob inspection reports missing chunk subcollections without reconstructing content", async () => {
   const pages = [
-    { body: { fields: { totalChunks: { integerValue: "1" } } },
+    { body: { fields: { totalChunks: { integerValue: "1" } } } },
     { body: { collectionIds: [] } }
   ];
   const { route, calls } = fixture({ firestorePages: pages });
