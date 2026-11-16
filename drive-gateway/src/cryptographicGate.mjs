@@ -259,6 +259,8 @@ export function buildCryptographicAuditEvent(evidence) {
     at: evidence.signedAt,
     evidenceId: evidence.evidenceId,
     signerUid: evidence.signerUid,
+    signerIdentityType:evidence.signerIdentityType||"firebase-uid",
+    signerIdentityHash:evidence.signerIdentityHash||null,
     signerId: evidence.signerId,
     envelopeId: evidence.envelopeId,
     documentHash: evidence.documentHash,
