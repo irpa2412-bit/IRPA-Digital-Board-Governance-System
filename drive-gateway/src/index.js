@@ -214,7 +214,7 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
   };
 }
 
-async function verifyGatewayEmailSignerAuthority(env,email) {
+async function verifyGatewayEmailSignerAuthority(env,email,requestedAuthorityRole="") {
   const normalized=String(email||"").trim().toLowerCase();
   if(!normalized)return {verified:false};
   const adminToken=await getFirestoreAdminAccessToken(env);
@@ -231,16 +231,15 @@ async function verifyGatewayEmailSignerAuthority(env,email) {
   }
   if(matches.length!==1)return {verified:false};
   const profile=matches[0];
-  const identityId=String(profile.uid||profile.id||"");
-  if(!identityId||!(/^[A-Za-z0-9_-]{1,150}$/).test(identityId))return {verified:false};
-  const identityDoc=await getFirestoreDocument(env,"signerIdentities/"+identityId,adminToken);
-  if(!identityDoc?.fields)return {verified:false};
-  const identity=firestoreDocumentToPlain(identityDoc)||{};
-  const authorityRole=resolveGatewayAuthorityLabel(profile,identity.authorityRole||"");
-  if(!authorityRole||String(identity.authorityStatus||"").trim()!=="Current")return {verified:false};
-  const expiry=identity.authorityExpiresAt||identity.authorityExpiry||identity.validUntil||null;
+  const roles=gatewayAuthorityCandidates(profile);
+  const requested=normalizeGatewayAuthority(requestedAuthorityRole);
+  const matchedRole=requested?roles.find(role=>normalizeGatewayAuthority(role)===requested):(roles.length===1?roles[0]:null);
+  if(!matchedRole)return {verified:false};
+  const authorityRole=resolveGatewayAuthorityLabel(profile,matchedRole);
+  if(!authorityRole)return {verified:false};
+  const expiry=profile.authorityExpiresAt||profile.authorityExpiry||profile.authorityValidUntil||profile.validUntil||profile.expiresAt;
   if(expiry&&Date.parse(String(expiry))<=Date.now())return {verified:false};
-  return {verified:true,authorityRole,sourceCollection:profile.sourceCollection,sourceRecordId:profile.id,department:String(profile.department||""),unit:String(profile.unit||profile.unitName||""),name:String(profile.displayName||profile.fullName||profile.name||identity.signerName||normalized),verificationMethod:"Server-side active Member/Employee register and current Signer Identity role match"};
+  return {verified:true,authorityRole,sourceCollection:profile.sourceCollection,sourceRecordId:profile.id,department:String(profile.department||""),unit:String(profile.unit||profile.unitName||""),name:String(profile.displayName||profile.fullName||profile.name||normalized),verificationMethod:"Server-side exact Member/Employee register email and matrix-role match"};
 }
 
 const communicationsSiteRouter = createCommunicationsSiteRouter({
@@ -524,7 +523,7 @@ export default {
               return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
-            verifyEmailSignerAuthority: email => verifyGatewayEmailSignerAuthority(env,email),
+            verifyEmailSignerAuthority: (email,authorityRole) => verifyGatewayEmailSignerAuthority(env,email,authorityRole),
             logger: console,
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
