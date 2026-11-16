@@ -82,7 +82,7 @@ const post = (path, body, user = "u1") =>
       "content-type": "application/json",
       authorization: `Bearer ${user}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(path === "/api/sign/submit" && !body.declarations ? { ...body, declarations: { name: "G5 Test Signer", occupation: "Test Occupation", capacity: "" } } : body),
   });
 
 const get = (path, options = {}) =>
