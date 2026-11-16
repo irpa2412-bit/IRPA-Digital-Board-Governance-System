@@ -39,7 +39,7 @@ test("uploaded controlled PDF enters the pre-signing palette with scoped documen
   assert.match(page, /setDocumentId\(initialDocument\.id\);setDocumentUrl\(url\)/);
   assert.match(page, /setSigningCircle\("Document Selected"\);setTab\("Prepare Envelope"\)/);
   assert.match(page, /import\{[^}]*downloadControlledDocumentBytes,downloadSignatureBytes(?:,resendFailedGatewaySignatureInvitations)?[^}]*\}from"\.\.\/firebase\/signatureStorage"/);
-  assert.match(page, /signingStage&&envelopeId\?await downloadSignatureBytes\([^;]+:await downloadControlledDocumentBytes\(url\.slice\("drive:\/\/"\.length\),documentId\)/);
+  assert.match(page, /const fileId=String\(url\)\.slice\("drive:\/\/".length\);[\s\S]*?signingStage&&envelopeId\?await downloadSignatureBytes\(fileId,documentId,envelopeId\):await downloadControlledDocumentBytes\(fileId,documentId\)/);
   assert.match(storage, /export async function downloadControlledDocumentBytes\(fileId, documentId\)/);
   assert.match(storage, /if \(!fileId \|\| !documentId\) throw new Error/);
 });
