@@ -122,7 +122,7 @@ test("required checkbox fields accept only an explicit checked value and signatu
     {fieldId:"sig-b",signerId:"S1",type:"Signature",required:true,page:1},
     {fieldId:"initials",signerId:"S1",type:"Initials",required:true,page:1},
   ],[externalSigner]);
-  const app=(fieldId,value)=>({fieldId,page:1,x:0,y:80,width:24,height:9,confirmed:true,value});
+  const app=(fieldId,value)=>({fieldId,page:1,x:10,y:80,width:24,height:9,confirmed:true,value});
   const markA="data:image/png;base64,"+"A".repeat(100);
   const markB="data:image/png;base64,"+"B".repeat(100);
   const markI="data:image/png;base64,"+"C".repeat(100);
