@@ -197,14 +197,17 @@ test("email invitation tokens scope fields to one signer and never expose anothe
   assert.match(gatewayPortal, /fetchGatewaySigningResource\("\/api\/sign\/email\/open",token\)/);
   assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
   assert.match(gatewayPortal, /const assignedAccount=Boolean\(result\.signer\?\.uid&&auth\.currentUser\?\.uid===result\.signer\.uid\)/);
-  assert.match(gatewayPortal, /assignedAccount\?await getMySignatureProfile\(\)\.catch\(\(\)=>null\):null/);
+  assert.match(gatewayPortal, /const verifiedProfileOwner=Boolean\(auth\.currentUser\?\.uid&&auth\.currentUser\?\.emailVerified/);
+  assert.match(gatewayPortal, /\(assignedAccount\|\|verifiedProfileOwner\)\?await getMySignatureProfile\(\)\.catch\(\(\)=>null\):null/);
   assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|updateMySignerAuthority|manualAuthority/);
-  assert.match(rules, /match \/signatureProfiles\/\{uid\}\{allow read:if admin\(\)\|\|\(signatureProfileUser\(\)&&self\(uid\)\)/);
+  assert.match(rules, /match \/signatureProfiles\/\{uid\}\{allow read:if signatureProfileUser\(\)&&self\(uid\)/);
+  assert.doesNotMatch(rules, /match \/signatureProfiles\/\{uid\}\{allow read:if admin\(\)/);
   assert.match(rules, /allow delete:if false/);
 });
 
 test("account-bound signer access remains restricted to the matching Firebase UID", () => {
   const gateway = fs.readFileSync(new URL("../drive-gateway/src/signing.mjs", import.meta.url), "utf8");
   assert.match(gateway, /return Boolean\(user\?\.uid\)&&user\.uid===signer\.uid/);
-  assert.match(gateway, /if\(!signer\?\.uid\) return false/);
+  assert.match(gateway, /if\(!signer\?\.uid\) return true/);
+  assert.match(gateway, /if\(signer\?\.identityType==="email-link"\) return signer\.emailLinkStatus==="opened"/);
 });
