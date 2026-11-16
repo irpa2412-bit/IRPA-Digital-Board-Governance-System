@@ -86,7 +86,8 @@ test("7. decline, revoke, reminder, immutable completion and retry-after-network
   assert.match(signing, /retryCompletion/);
   assert.match(signing, /A completed envelope cannot be voided/);
   assert.match(signing, /Completed/);
-  assert.match(client, /retry|network|idempot/i);
+  assert.match(portal, /resendFailedGatewaySignatureInvitations/);
+  assert.match(signing, /idempotent:true/);
 });
 
 test("portal Signature Lifecycle self-test reports stages, HTTP status and detail without document bytes", () => {
