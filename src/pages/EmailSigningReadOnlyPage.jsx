@@ -54,7 +54,7 @@ export default function EmailSigningReadOnlyPage({token}) {
   const selectedField=(record?.fields||[]).find(field=>field.fieldId===selectedFieldId)||null;
   const signatureFields=(record?.fields||[]).filter(field=>["Signature","Initials"].includes(field.type));
   const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
-  const selectedApplication=fieldApplications.find(item=>item.fieldId===selectedFieldId);
+  const isFieldComplete=field=>fieldApplications.some(item=>item.fieldId===field.fieldId)||(!["Signature","Initials"].includes(field.type)&&fieldValues[field.fieldId]!==undefined&&String(fieldValues[field.fieldId]).trim()!=="");
 
   function point(event){
     const canvas=canvasRef.current;
@@ -72,7 +72,7 @@ export default function EmailSigningReadOnlyPage({token}) {
     ctx.lineWidth=2.4;ctx.lineCap="round";ctx.strokeStyle="#111827";ctx.lineTo(p.x,p.y);ctx.stroke();
   }
   function stopDrawing(){drawingRef.current=false;}
-  function clearPad(){const c=canvasRef.current;if(c)c.getContext("2d").clearRect(0,0,c.width,c.height);setSignatureValue("");}
+  function clearPad(){const c=canvasRef.current;if(c)c.getContext("2d").clearRect(0,0,c.width,c.height);setSignatureValue("");if(selectedField)setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedField.fieldId));}
   function confirmField(){
     if(!selectedField)return;
     if(["Signature","Initials"].includes(selectedField.type)){
@@ -86,7 +86,7 @@ export default function EmailSigningReadOnlyPage({token}) {
       setFieldValues(current=>({...current,[selectedField.fieldId]:value}));
     }
     setError("");
-    const next=(record?.fields||[]).find(field=>field.fieldId!==selectedField.fieldId&&!fieldApplications.some(item=>item.fieldId===field.fieldId));
+    const next=(record?.fields||[]).find(field=>field.fieldId!==selectedField.fieldId&&!isFieldComplete(field));
     if(next)setSelectedFieldId(next.fieldId);
   }
   async function submit(){
@@ -129,7 +129,7 @@ export default function EmailSigningReadOnlyPage({token}) {
         </section>
         {!!record.fields.length&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
           <h2 style={{fontSize:18}}>Your assigned document fields</h2>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{record.fields.map(field=><button key={field.fieldId} type="button" onClick={()=>{setSelectedFieldId(field.fieldId);setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563"}}>{field.type}: {field.placeholder||field.fieldId}{fieldApplications.some(item=>item.fieldId===field.fieldId)?" ✓":""}</button>)}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{record.fields.map(field=><button key={field.fieldId} type="button" onClick={()=>{setSelectedFieldId(field.fieldId);setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563"}}>{field.type}: {field.placeholder||field.fieldId}{isFieldComplete(field)?" ✓":""}</button>)}</div>
           {selectedField&&<div style={{marginTop:14,padding:12,border:"1px solid #9ca3af",borderRadius:8}}>
             <h3 style={{fontSize:16,marginTop:0}}>Complete: {selectedField.placeholder||selectedField.type}</h3>
             {["Signature","Initials"].includes(selectedField.type)?<><p style={{fontSize:13}}>Draw your {selectedField.type.toLowerCase()} below, then confirm this assigned field.</p><canvas ref={canvasRef} width={520} height={180} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerCancel={stopDrawing} style={{width:"100%",height:150,border:"1px solid #6b7280",borderRadius:6,touchAction:"none",background:"#fff"}}/><div style={{display:"flex",gap:8,marginTop:8}}><button type="button" onClick={clearPad} style={{...buttonStyle,background:"#6b7280"}}>Clear</button><button type="button" onClick={confirmField} style={buttonStyle}>Confirm assigned field</button></div></>:<><label style={{display:"block",margin:"8px 0"}}>{selectedField.type}{selectedField.required?" (required)":""}{selectedField.type==="Checkbox"?<input type="checkbox" checked={fieldValues[selectedField.fieldId]==="true"} onChange={e=>setFieldValues(current=>({...current,[selectedField.fieldId]:e.target.checked?"true":"false"}))}/>:<input style={inputStyle} type={selectedField.type==="Date"?"date":"text"} value={fieldValues[selectedField.fieldId]||""} onChange={e=>setFieldValues(current=>({...current,[selectedField.fieldId]:e.target.value}))} placeholder={selectedField.placeholder||"Enter your response"}/>}</label><button type="button" onClick={confirmField} style={buttonStyle}>Confirm assigned field</button></>}
