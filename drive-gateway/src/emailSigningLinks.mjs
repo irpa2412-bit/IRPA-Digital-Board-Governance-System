@@ -1,5 +1,5 @@
 import { sha256Hex, safeEqual } from "./util.mjs";
-import { gatewayAuthorityCandidates, normalizeGatewayAuthority } from "./signatureAuthority.mjs";
+import { gatewayAuthorityCandidates, normalizeGatewayAuthority, resolveGatewayAuthorityLabel } from "./signatureAuthority.mjs";
 
 const NEUTRAL = "This signing link is unavailable. Contact the document owner for a new invitation.";
 const normalizeEmail = value => String(value || "").trim().toLowerCase();
@@ -106,5 +106,5 @@ export function resolveEmailSignerAuthority({email,memberRecords=[],employeeReco
   if(!matchedRole)return {verified:false,reason:"The active register entry has no matching signature-authority matrix role."};
   const expiry=record.authorityExpiresAt||record.authorityExpiry||record.validUntil||null;
   if(expiry&&Date.parse(String(expiry))<=new Date(now).getTime())return {verified:false,reason:"The registered authority has expired."};
-  return {verified:true,authorityRole:matchedRole,sourceCollection:record.sourceCollection,sourceRecordId:String(record.id||""),department:String(record.department||""),unit:String(record.unit||record.unitName||""),matchedEmailHashOnly:true};
+  return {verified:true,authorityRole:resolveGatewayAuthorityLabel(record,matchedRole)||matchedRole,sourceCollection:record.sourceCollection,sourceRecordId:String(record.id||""),department:String(record.department||""),unit:String(record.unit||record.unitName||""),matchedEmailHashOnly:true};
 }
