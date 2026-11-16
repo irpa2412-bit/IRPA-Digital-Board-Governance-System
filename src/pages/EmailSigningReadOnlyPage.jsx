@@ -123,6 +123,7 @@ export default function EmailSigningReadOnlyPage({token}) {
         <section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
           <h2 style={{fontSize:18}}>Your declaration for this document</h2>
           <p style={{fontSize:13,color:"#4b5563"}}>These are your transaction-specific declarations. They are recorded with the signing evidence; they are not checked against an IRPA authority register.</p>
+          <p style={{fontSize:13,background:"#f3f4f6",padding:10,borderRadius:7}}><strong>Owner-recorded particulars for this assignment:</strong> {record.ownerDeclaredParticulars?.name||"Not supplied"} · {record.ownerDeclaredParticulars?.occupation||record.ownerDeclaredParticulars?.capacity||"Occupation/capacity not supplied"}</p>
           <label style={{display:"block",margin:"10px 0"}}>Full name<input style={inputStyle} value={declarations.name} onChange={e=>setDeclaration("name",e.target.value)} autoComplete="name"/></label>
           <label style={{display:"block",margin:"10px 0"}}>Occupation / capacity<input style={inputStyle} value={declarations.occupation} onChange={e=>setDeclaration("occupation",e.target.value)} placeholder="Enter your occupation or capacity"/></label>
           <label style={{display:"block",margin:"10px 0"}}>Additional capacity (optional)<input style={inputStyle} value={declarations.capacity} onChange={e=>setDeclaration("capacity",e.target.value)} placeholder="Additional official particulars"/></label>
