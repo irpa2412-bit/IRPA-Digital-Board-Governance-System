@@ -1,10 +1,11 @@
 import { collection, doc, getDoc as firestoreGetDoc, getDocs, query, serverTimestamp, setDoc as firestoreSetDoc, updateDoc as firestoreUpdateDoc, where } from "firebase/firestore";
 import { runSignatureFirestore } from "./signatureFirestoreDiagnostics.js";
+import { auth, db } from "./config";
+import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+
 const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:"Signer Identity",userType:"logged-in signer"},()=>firestoreGetDoc(ref));
 const setDoc=(ref,data,options)=>runSignatureFirestore({operation:"setDoc",target:ref,screen:"Signer Identity",userType:"logged-in signer"},()=>firestoreSetDoc(ref,data,options));
 const updateDoc=(ref,data)=>runSignatureFirestore({operation:"updateDoc",target:ref,screen:"Signer Identity",userType:"logged-in signer"},()=>firestoreUpdateDoc(ref,data));
-import { auth, db } from "./config";
-import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 
 export const SIGNER_IDENTITY_COLLECTION = "signerIdentities";
 export const IRPA_ORGANISATION = "Improvement of Rangeland in Pastoral Areas";
