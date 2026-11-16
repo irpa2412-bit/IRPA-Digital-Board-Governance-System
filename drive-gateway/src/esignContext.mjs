@@ -125,7 +125,7 @@ export class EsignRecordDurableObject {
         if(payload.envelopeId!==record.envelopeId||payload.signerId!==record.signerId||payload.signerIdentityType!=="email-link"||payload.signerIdentityHash!==record.emailHash||payload.keyId!==keyId)return Response.json({ok:false,error:"Signer-key identity mismatch."},{status:403});
         const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},record.privateKey,new TextEncoder().encode(canonicalPayload));
         const bytes=new Uint8Array(signature);let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
-        return Response.json({ok:true,signature:btoa(binary).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,"")});
+        return Response.json({ok:true,signature:btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")});
       }
 
       if (body.op === "get") return Response.json({ok:true, value:await this.state.storage.get("record") || null});
