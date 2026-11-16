@@ -82,7 +82,8 @@ test("all signer types are authenticated by transaction identity, not IRPA regis
   assert.match(worker, /else assertSignerAuthentication\(s0,user\)/);
   assert.match(worker, /if\(!declared\.name\|\|!declared\.occupation\)throw new HttpError\(400/);
   assert.match(worker, /signerDeclarations:declared/);
-  assert.match(gatewayPortal, /Your occupation \/ capacity/);
+  assert.match(gatewayPortal, /Your occupation \*/);
+  assert.match(gatewayPortal, /Additional capacity \(optional\)/);
   assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|Member\/Employee Register|Registered signing authority/);
   assert.doesNotMatch(service, /current signing authority has not been registered|A Current authority is required to sign|Your Signature Application is not active/);
   assert.doesNotMatch(platform, /verifyManualSigningAuthority|authorityVerification\?\.verified|Verify Authority/);
