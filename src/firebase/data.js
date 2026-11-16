@@ -293,12 +293,12 @@ export async function getCurrentSigningAuthorityRegisterEntries(){
    const active=["active","activated"].includes(status)||employmentStatus==="active"||registrationStatus==="activated";
    if(active)entries.push({id:record.id||record.uid||uid,...record,sourceCollection});
  };
- collect(await getRecord(COLLECTIONS.members,uid).catch(()=>null),"members");
- collect(await getRecord(COLLECTIONS.employees,uid).catch(()=>null),"employees");
+ collect(await runSignatureFirestore({operation:"getDoc",collectionPath:"members/[masked]",screen:"Signer Authority Register Lookup",userType:"logged-in signer"},()=>getRecord(COLLECTIONS.members,uid)).catch(()=>null),"members");
+ collect(await runSignatureFirestore({operation:"getDoc",collectionPath:"employees/[masked]",screen:"Signer Authority Register Lookup",userType:"logged-in signer"},()=>getRecord(COLLECTIONS.employees,uid)).catch(()=>null),"employees");
  if(email){
    const [memberSnap,employeeSnap]=await Promise.all([
-     getDocs(query(collection(db,COLLECTIONS.members),where("email","==",email))).catch(()=>null),
-     getDocs(query(collection(db,COLLECTIONS.employees),where("email","==",email))).catch(()=>null)
+     runSignatureFirestore({operation:"getDocs",collectionPath:"members",screen:"Signer Authority Register Lookup",userType:"logged-in signer"},()=>getDocs(query(collection(db,COLLECTIONS.members),where("email","==",email)))).catch(()=>null),
+     runSignatureFirestore({operation:"getDocs",collectionPath:"employees",screen:"Signer Authority Register Lookup",userType:"logged-in signer"},()=>getDocs(query(collection(db,COLLECTIONS.employees),where("email","==",email)))).catch(()=>null)
    ]);
    memberSnap?.docs.forEach(x=>collect({id:x.id,...x.data()},"members"));
    employeeSnap?.docs.forEach(x=>collect({id:x.id,...x.data()},"employees"));
