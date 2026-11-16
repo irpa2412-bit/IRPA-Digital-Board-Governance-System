@@ -2496,7 +2496,7 @@ async function lookupInductionRegistration(request, env) {
   const enteredName = String(data.fullName || "").trim();
   if (enteredName.length < 2) return json({ok:true,matched:false,reason:"Enter at least 2 characters."},200,corsHeaders(request));
 
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/\\s+/g," ");
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/\s+/g," ");
   const target = normalize(enteredName);
   const member = await getFirestoreDocument(env, `members/${cleanId(claims.user_id)}`, claims.token);
   const employee = await getFirestoreDocument(env, `employees/${cleanId(claims.user_id)}`, claims.token);
