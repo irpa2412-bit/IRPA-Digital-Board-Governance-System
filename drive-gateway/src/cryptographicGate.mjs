@@ -367,7 +367,7 @@ export async function sealAndPersist({
   const artifacts = [];
   try {
     for (const signer of envelope.signers || []) {
-      const keyRecord = signer.uid ? await keyProvider.getSignerKey(signer.uid) : await keyProvider.getSignerKeyForSigner?.(signer);
+      const keyRecord = signer.uid ? await keyProvider.getSignerKey(signer.uid) : await keyProvider.getSignerKeyForSigner?.({...signer,envelopeId:envelope.id});
       if(!keyRecord)throw new Error("Gateway signer key custody is not configured for this signer identity.");
       const evidence = await createCryptographicEvidence({
         keyId: keyRecord.keyId,
