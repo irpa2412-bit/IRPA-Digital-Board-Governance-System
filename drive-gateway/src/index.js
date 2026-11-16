@@ -3083,7 +3083,10 @@ async function getDriveAccessToken(env) {
     })
   });
   const tokens = await response.json();
-  if (!response.ok || !tokens.access_token) throw new Error(tokens.error_description || "Google Drive access token refresh failed.");
+  if (!response.ok || !tokens.access_token) {
+    const providerCode = String(tokens.error || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+    throw new Error(providerCode || tokens.error_description || "Google Drive access token refresh failed.");
+  }
   return tokens.access_token;
 }
 
