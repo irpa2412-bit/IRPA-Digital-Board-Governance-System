@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { getIdToken } from "firebase/auth";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
-import { collection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs } from "firebase/firestore";
+import { collection as firestoreCollection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs } from "firebase/firestore";
 import { runSignatureFirestore } from "../firebase/signatureFirestoreDiagnostics.js";
 import { auth, db } from "../firebase/config";
 import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
@@ -12,6 +12,7 @@ import { downloadControlledDocumentBytes } from "../firebase/signatureStorage";
 import { renderPdfPageToCanvas, describePdfPageError } from "../utils/pdfPageRendering.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
+const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreCollection(...args));
 const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDoc(ref));
 const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDocs(ref));
 
