@@ -68,7 +68,7 @@ test("Signature Portal palette queries include document owner and signature owne
 // Source-contract checks follow the current handler shape, including signerUid ownership and whitespace-safe finally blocks.
 test("adding the first signing officer creates a signature field assigned to that officer", () => {
   assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"\}\)/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Assigned signature field — click to open your signing pane"\}\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
@@ -221,7 +221,7 @@ test("email invitations carry owner-assigned PDF fields and permitted action int
   assert.match(storage,/permittedAction:String\(recipient\.permittedAction/);
   assert.match(portal,/fields:env\.fields\|\|\[\]/);
   assert.match(portal,/gatewayRecipients=\[\.\.\.\(ownerSigningEnabled\?/);
-  assert.match(signing,/permittedAction:cleanText\(s\?\.permittedAction/);
+  assert.match(signing,/permittedAction,ownerAssignedParticulars/);
   assert.match(signing,/f\.signerId===signer\.id/);
   assert.match(signing,/ownerAssignedParticulars/);
   assert.match(signing,/signerDeclaredParticulars/);
