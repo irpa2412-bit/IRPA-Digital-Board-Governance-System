@@ -205,6 +205,22 @@ test("email invitation tokens scope fields to one signer and never expose anothe
   assert.match(rules, /allow delete:if false/);
 });
 
+test("email invitations carry owner-assigned PDF fields and permitted action into the Gateway",()=>{
+  const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+  const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  const signing=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+  assert.match(storage,/const signerIdByAssignment=new Map/);
+  assert.match(storage,/signerId:signerIdByAssignment\.get/);
+  assert.match(storage,/permittedAction:String\(recipient\.permittedAction/);
+  assert.match(portal,/fields:env\.fields\|\|\[\]/);
+  assert.match(portal,/gatewayRecipients=\[\.\.\.\(ownerSigningEnabled\?/);
+  assert.match(signing,/permittedAction:cleanText\(s\?\.permittedAction/);
+  assert.match(signing,/f\.signerId===signer\.id/);
+  assert.match(signing,/ownerAssignedParticulars/);
+  assert.match(signing,/signerDeclaredParticulars/);
+  assert.match(signing,/particularsComparison/);
+});
+
 test("account-bound signer access remains restricted to the matching Firebase UID", () => {
   const gateway = fs.readFileSync(new URL("../drive-gateway/src/signing.mjs", import.meta.url), "utf8");
   assert.match(gateway, /return Boolean\(user\?\.uid\)&&user\.uid===signer\.uid/);
