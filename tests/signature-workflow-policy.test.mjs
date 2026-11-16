@@ -187,7 +187,10 @@ test("verified register authority, not a racy Signer Identity read, gates signin
   const gatewayPortal = fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx", import.meta.url), "utf8");
   const identity = fs.readFileSync(new URL("../src/firebase/signerIdentity.js", import.meta.url), "utf8");
 
-  assert.match(platform, /verifyManualSigningAuthority\(manualAuthorityIdentification\);await ensureMySignerIdentity\(profile/);
+  const authorityCheck = platform.indexOf("const authorityVerification=await verifyManualSigningAuthority(manualAuthorityIdentification)");
+  const identityEnsure = platform.indexOf("await ensureMySignerIdentity(profile,{organisationName:IRPA_ORGANISATION})", authorityCheck);
+  const authorityPersist = platform.indexOf("await updateMySignerAuthority({authorityRole:authorityVerification.authorityRole,authorityStatus:\"Current\"", identityEnsure);
+  assert.ok(authorityCheck >= 0 && identityEnsure > authorityCheck && authorityPersist > identityEnsure, "verify the register authority before persisting the Signer Identity mirror");
   assert.match(platform, /updateMySignerAuthority\(\{authorityRole:authorityVerification\.authorityRole,authorityStatus:"Current"/);
   assert.doesNotMatch(platform, /const signerIdentity=await getMySignerIdentity\(\);if\(!signerIdentity\?\.authorityRole/);
   assert.match(gatewayPortal, /const savedProfile=await getMySignatureProfile\(\)\.catch\(\(\)=>null\);\s*const identity=await getMySignerIdentity\(\)\.catch\(\(\)=>null\);/);
