@@ -194,5 +194,7 @@ test("verified register authority, not a racy Signer Identity read, gates signin
   assert.match(gatewayPortal, /const persistedAuthority=await updateMySignerAuthority\(\{authorityRole:verifiedAuthority\.authorityRole,authorityStatus:"Current"/);
   assert.doesNotMatch(gatewayPortal, /identity\?\.authorityRole\|\|identity\.authorityRole==="Not yet assigned"/);
   assert.match(identity, /fetch\(gateway\+"\/api\/signature\/authority"/);
+  assert.match(platform, /return await syncGatewaySigningMirror\(status\.externalReference,after\)/);
+  assert.match(platform, /Gateway signing audit chain verification failed; the Signature Portal workflow was not advanced/);
 });
 
