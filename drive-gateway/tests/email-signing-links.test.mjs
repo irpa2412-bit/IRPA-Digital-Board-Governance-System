@@ -7,7 +7,6 @@ import {
   consumeEmailSigningToken,
   revokeEmailSigningToken,
   hashNormalizedEmail,
-  resolveEmailSignerAuthority,
   genericEmailSigningFailure
 } from "../src/emailSigningLinks.mjs";
 import { sha256Hex } from "../src/util.mjs";
@@ -73,24 +72,12 @@ test("token use is single-use and cannot be consumed twice", async () => {
   assert.throws(()=>consumeEmailSigningToken(used,{now:NOW}),/unavailable/i);
 });
 
-test("authority is derived from an active register email match and matrix role, never client-supplied role", async () => {
-  const result=resolveEmailSignerAuthority({
-    email:"Board.Secretary@Example.org",
-    memberRecords:[{id:"m1",email:"board.secretary@example.org",status:"Active",role:"Board Secretary"}],
-    employeeRecords:[],
-    matrix:[{role:"Board Secretary",canSign:true,active:true}],
-    now:NOW
-  });
-  assert.equal(result.verified,true);
-  assert.equal(result.authorityRole,"Board Secretary");
-  const denied=resolveEmailSignerAuthority({
-    email:"board.secretary@example.org",
-    memberRecords:[{id:"m1",email:"board.secretary@example.org",status:"Inactive",role:"Board Secretary"}],
-    employeeRecords:[],
-    matrix:[{role:"Board Secretary",canSign:true,active:true}],
-    now:NOW
-  });
-  assert.equal(denied.verified,false);
+test("email invitation security is based on token integrity and email binding, not an authority register",async()=>{
+  const issued=await createEmailSigningToken({envelopeId:"ENV-1",signerId:"S1",email:"external@example.org",now:NOW,randomBytes:new Uint8Array(32).fill(7)});
+  assert.equal(issued.record.emailHash,await hashNormalizedEmail("EXTERNAL@example.org"));
+  assert.equal(issued.record.status,"issued");
+  assert.equal(issued.record.tokenHash,await sha256Hex(issued.token));
+  assert.equal(issued.record.token.length,64);
 });
 
 test("email hashing normalizes whitespace and case", async () => {
