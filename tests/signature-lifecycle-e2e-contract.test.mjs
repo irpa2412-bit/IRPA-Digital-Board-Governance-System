@@ -82,6 +82,10 @@ test("6. signed output returns to final archive and notices/retrieval remain sig
   assert.match(client, /getMySignedDocuments/);
   assert.match(portal, /signerArchiveUrl/);
   assert.match(signing, /notification|email|invitation/i);
+  assert.match(signing, /createdByEmail/);
+  assert.match(signing, /for\(const signer of initial\.signers\|\|\[\]\)/);
+  assert.match(signing, /completion\.notice\.sent/);
+  assert.match(gateway, /sendCompletionNotice: async/);
 });
 
 test("7. decline, revoke, reminder, immutable completion and retry-after-network-error are covered", () => {
