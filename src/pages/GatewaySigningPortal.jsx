@@ -4,8 +4,7 @@ import pdfWorker from"pdfjs-dist/build/pdf.worker.min.mjs?url";
 import SignatureFieldConfirmationPad from"../components/SignatureFieldConfirmationPad";
 import{renderPdfPageToCanvas,describePdfPageError}from"../utils/pdfPageRendering.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
-import{getMySignatureProfile,verifyManualSigningAuthority,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
-import{getMySignerIdentity}from"../firebase/signerIdentity";
+import{getMySignatureProfile,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
 import{fetchGatewaySigningResource,submitGatewaySignature,verifyGatewaySignedPdf}from"../firebase/signatureStorage";
 
 async function pngDataUrl(source){
@@ -22,23 +21,19 @@ async function pngDataUrl(source){
 }
 
 export default function GatewaySigningPortal({token}){
-  const[opened,setOpened]=useState(null),[profile,setProfile]=useState(null),[authorityIdentity,setAuthorityIdentity]=useState(null),[manualAuthority,setManualAuthority]=useState("");
+  const[opened,setOpened]=useState(null),[profile,setProfile]=useState(null),[declarations,setDeclarations]=useState({name:"",occupation:"",capacity:""});
   const[values,setValues]=useState({}),[applications,setApplications]=useState({}),[signaturePad,setSignaturePad]=useState(null),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[message,setMessage]=useState(""),[pdfUrl,setPdfUrl]=useState(""),[status,setStatus]=useState(null),[evidence,setEvidence]=useState(null);
   const canvasRef=useRef(null),[pdfDocument,setPdfDocument]=useState(null),[pageNum,setPageNum]=useState(1),[pageSize,setPageSize]=useState({width:760,height:980}),[pageError,setPageError]=useState(null),[pdfLoadError,setPdfLoadError]=useState(null),[renderRetry,setRenderRetry]=useState(0),[pdfLoadRetry,setPdfLoadRetry]=useState(0);
   useEffect(()=>{let cancelled=false;let task=null;(async()=>{if(!pdfUrl){setPdfDocument(null);return}setPdfLoadError(null);try{const response=await fetch(pdfUrl);if(!response.ok)throw new Error("Signing PDF request returned HTTP "+response.status);const bytes=new Uint8Array(await response.arrayBuffer());if(!bytes.byteLength)throw new Error("Gateway returned an empty signing PDF.");task=pdfjsLib.getDocument({data:bytes});const doc=await task.promise;if(!cancelled){setPdfDocument(doc);setPageNum(1)}}catch(error){console.error("Gateway signing PDF load failed",error);if(!cancelled)setPdfLoadError(describePdfPageError(error));}})();return()=>{cancelled=true;task?.destroy?.()}},[pdfUrl,pdfLoadRetry]);
   useEffect(()=>{let cancelled=false;const controller=new AbortController();(async()=>{if(!pdfDocument||!canvasRef.current)return;setPageError(null);try{const metrics=await renderPdfPageToCanvas(pdfDocument,pageNum,canvasRef.current,{maxWidth:760,maxPixels:4000000,signal:controller.signal});if(!cancelled)setPageSize({width:metrics.width,height:metrics.height});}catch(error){if(!cancelled){console.error("Gateway signing PDF page render failed",{page:pageNum,error});setPageError(describePdfPageError(error));}}})();return()=>{cancelled=true;controller.abort()}},[pdfDocument,pageNum,renderRetry]);
   useEffect(()=>{let cancelled=false;let objectUrl="";(async()=>{setLoading(true);setMessage("");try{
     if(!token)throw new Error("The Gateway signing token is missing.");
-    const [result,savedProfile,identity]=await Promise.all([
+    const [result,savedProfile]=await Promise.all([
       fetchGatewaySigningResource("/api/sign/open",token),
-      getMySignatureProfile().catch(()=>null),
-      getMySignerIdentity().catch(()=>null)
+      getMySignatureProfile().catch(()=>null)
     ]);
     if(!result.signer?.authenticated)throw new Error("Sign in with the invited IRPA account before continuing.");
     const signingRequired=Boolean(result.canSign&&result.status!=="Completed");
-    if(signingRequired&&(!savedProfile||savedProfile.status!=="Active"))throw new Error("An active Signature Profile is required before signing this Gateway envelope.");
-    if(signingRequired&&(!identity?.authorityRole||identity.authorityRole==="Not yet assigned"))throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");
-    if(signingRequired&&identity.authorityStatus!=="Current")throw new Error("Your signing authority is "+String(identity?.authorityStatus||"not verified")+". A Current authority is required to sign.");
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
     let initialEvidence=null;
     if(gatewayStatus.status==="Completed"){
@@ -54,7 +49,7 @@ export default function GatewaySigningPortal({token}){
     const pdfBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
     if(gatewayStatus.status==="Completed"){const verification=await verifyGatewaySignedPdf({token,bytes:pdfBytes});if(verification.documentHash!==gatewayStatus.completion?.finalHash)throw new Error("Completed PDF hash does not match the Gateway completion record.");}
     objectUrl=URL.createObjectURL(new Blob([pdfBytes],{type:"application/pdf"}));
-    if(!cancelled){setOpened(result);setProfile(savedProfile);setAuthorityIdentity(identity);setValues(nextValues);setApplications({});setPageNum(1);setPdfUrl(objectUrl);setStatus(gatewayStatus);setEvidence(initialEvidence);if(gatewayStatus.externalReference&&gatewayStatus.auditChainValid===true){try{await syncGatewaySigningMirror(gatewayStatus.externalReference,gatewayStatus)}catch(syncError){console.warn("Gateway status loaded; Signature Portal mirror reconciliation is pending.",syncError)}}}
+    if(!cancelled){setOpened(result);setProfile(savedProfile);setDeclarations({name:"",occupation:"",capacity:""});setValues(nextValues);setApplications({});setPageNum(1);setPdfUrl(objectUrl);setStatus(gatewayStatus);setEvidence(initialEvidence);if(gatewayStatus.externalReference&&gatewayStatus.auditChainValid===true){try{await syncGatewaySigningMirror(gatewayStatus.externalReference,gatewayStatus)}catch(syncError){console.warn("Gateway status loaded; Signature Portal mirror reconciliation is pending.",syncError)}}}
   }catch(error){if(!cancelled)setMessage(error?.message||"Unable to load the Gateway signing transaction.");}finally{if(!cancelled)setLoading(false)}})();return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl)}},[token]);
   async function refreshStatus(){
     const next=await fetchGatewaySigningResource("/api/sign/status",token);
@@ -77,7 +72,7 @@ export default function GatewaySigningPortal({token}){
     if(busy)return;setBusy(true);setMessage("");
     try{
       if(!opened?.canSign)throw new Error("This envelope is not currently assigned to you for signing.");
-      if(!profile||profile.status!=="Active")throw new Error("An active Signature Profile is required.");
+      if(!declarations.name.trim()||!declarations.occupation.trim())throw new Error("Enter your name and occupation/capacity before signing.");
       const signingFields=(opened.fields||[]).filter(field=>field.type==="Signature"||field.type==="Initials");
       for(const field of opened.fields||[]){
         const value=values[field.fieldId];
@@ -88,9 +83,7 @@ export default function GatewaySigningPortal({token}){
       if(signingFields.some(field=>field.required)&&!confirmed.length)throw new Error("No signature field has been explicitly confirmed.");
       const signatureValue=confirmed.find(application=>signingFields.find(field=>field.fieldId===application.fieldId)?.type==="Signature")?.value||confirmed[0]?.value;
       if(!signatureValue)throw new Error("Tap your assigned signature field and confirm a signature before submitting.");
-      const verifiedAuthority=await verifyManualSigningAuthority(manualAuthority);
-      if(!verifiedAuthority?.verified)throw new Error("The signing authority could not be verified.");
-      const result=await submitGatewaySignature({token,signature:{type:"drawn",value:signatureValue},fieldValues:values,fieldApplications:confirmed,signatureConfirmed:true,manualAuthorityIdentification:manualAuthority,consent});
+      const result=await submitGatewaySignature({token,signature:{type:"drawn",value:signatureValue},fieldValues:values,fieldApplications:confirmed,signatureConfirmed:true,declarations,consent});
       const next=await refreshStatus();
       const pdfBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
       const url=URL.createObjectURL(new Blob([pdfBytes],{type:"application/pdf"}));
@@ -99,7 +92,7 @@ export default function GatewaySigningPortal({token}){
     }catch(error){setMessage(error?.message||"The Gateway did not complete the signing action.");}
     finally{setBusy(false)}
   }
-  if(loading)return <main className="content-area" style={{padding:24}}><h1>IRPA Gateway Signing</h1><p>Verifying signer identity, envelope authorization and controlled PDF…</p></main>;
+  if(loading)return <main className="content-area" style={{padding:24}}><h1>IRPA Gateway Signing</h1><p>Verifying the signer’s authenticated identity, envelope-specific permission and controlled PDF…</p></main>;
   if(!opened)return <main className="content-area" style={{padding:24,maxWidth:900,margin:"0 auto"}}><h1>Gateway Signing Unavailable</h1><p role="alert">{message||"The signing invitation could not be opened."}</p><p>Return to the IRPA Digital Governance workspace and confirm you are signed in with the invited account.</p></main>;
   const fields=opened.fields||[];
   return <main className="content-area" style={{padding:20,maxWidth:1240,margin:"0 auto",width:"100%"}}>
@@ -112,16 +105,16 @@ export default function GatewaySigningPortal({token}){
     </section>
     <section className="panel" style={{marginTop:16}}>
       <h2>Your assigned fields</h2>
-      {fields.length===0?<p className="muted">No additional fields are assigned. Your saved Signature Profile will be recorded in the signed PDF and evidence.</p>:fields.map(field=><label key={field.fieldId} style={{display:"block",marginTop:12}}>
+      {fields.length===0?<p className="muted">No additional fields are assigned. Your authenticated signer identity and transaction-specific declaration will be recorded in the signing evidence.</p>:fields.map(field=><label key={field.fieldId} style={{display:"block",marginTop:12}}>
         <strong>{field.type}{field.required?" *":""}</strong>
         {field.type==="Signature"||field.type==="Initials"?<button type="button" className="secondary-button" style={{display:"block",marginTop:6}} onClick={()=>setSignaturePad(field)}>{applications[field.fieldId]?"Confirmed — tap to change": "Tap to open "+field.type+" pad"} · Page {field.page||1}</button>:
          field.type==="Checkbox"?<span style={{display:"flex",gap:8,alignItems:"center",marginTop:6}}><input type="checkbox" checked={values[field.fieldId]==="true"} onChange={e=>setValues(previous=>({...previous,[field.fieldId]:e.target.checked?"true":"false"}))}/><span>{field.placeholder||"Confirm this item"}</span></span>:
          <input style={{display:"block",width:"100%",marginTop:6}} value={values[field.fieldId]||""} type={field.type==="Number"?"number":"text"} placeholder={field.placeholder||("Enter "+String(field.type||"value").toLowerCase())} onChange={e=>setValues(previous=>({...previous,[field.fieldId]:e.target.value}))}/>
         }
       </label>)}
-      <label style={{display:"block",marginTop:18}}><strong>Registered signing authority *</strong><input style={{display:"block",width:"100%",marginTop:6}} value={manualAuthority} onChange={e=>setManualAuthority(e.target.value)} placeholder="Enter the role/designation in your active IRPA Member or Employee Register"/><small className="muted">Current identity authority: {authorityIdentity?.authorityRole||"Not verified"}. The Gateway independently checks this declaration against the active Member/Employee Register.</small></label>
+      <label style={{display:"block",marginTop:18}}><strong>Your name *</strong><input style={{display:"block",width:"100%",marginTop:6}} value={declarations.name} onChange={e=>setDeclarations(previous=>({...previous,name:e.target.value}))} placeholder="Enter your full name"/></label><label style={{display:"block",marginTop:12}}><strong>Your occupation / capacity *</strong><input style={{display:"block",width:"100%",marginTop:6}} value={declarations.occupation} onChange={e=>setDeclarations(previous=>({...previous,occupation:e.target.value,capacity:e.target.value}))} placeholder="Enter your occupation or capacity for this document"/><small className="muted">This is your declaration for this transaction. It is recorded for traceability and is not checked against an IRPA Member or Employee Register.</small></label>
       <div style={{display:"flex",gap:10,alignItems:"flex-start",marginTop:18}}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} id="gateway-signing-consent"/><label htmlFor="gateway-signing-consent">I consent to sign this controlled document electronically. Each signature field must be confirmed separately before it is applied.</label></div>
-      <button type="button" disabled={busy||!consent||!manualAuthority.trim()||!opened.canSign||status?.status==="Completed"} onClick={signNow} style={{marginTop:16}}>{busy?"Submitting authenticated signature…":status?.status==="Completed"?"Signing Completed":"Sign and Submit"}</button>
+      <button type="button" disabled={busy||!consent||!declarations.name.trim()||!declarations.occupation.trim()||!opened.canSign||status?.status==="Completed"} onClick={signNow} style={{marginTop:16}}>{busy?"Submitting authenticated signature…":status?.status==="Completed"?"Signing Completed":"Sign and Submit"}</button>
       {!opened.canSign&&status?.status!=="Completed"&&<p className="muted">This signing task is pending another authorized signer.</p>}
     </section>
     {status?.status==="Completed"&&<section className="panel" style={{marginTop:16}}><h2>Cryptographic evidence</h2><p>Completed PDF SHA-256: <code>{status.completion?.finalHash||"Unavailable"}</code></p><p>Audit chain: {status.auditChainValid===true?"Verified":"Not verified"}</p>{evidence?.evidence?.map(item=><article className="stat-card" key={item.evidenceId} style={{marginTop:8}}><strong>{item.evidenceId}</strong><p>Envelope: {item.envelopeId}</p><p>Signer UID: {item.signerUid}</p><p>Algorithm: {item.algorithm}</p><p>Document hash: <code>{item.documentHash}</code></p><p>Evidence status: {item.status}</p></article>)}</section>}
