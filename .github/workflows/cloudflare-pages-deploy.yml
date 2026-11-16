@@ -208,6 +208,28 @@ jobs:
             exit 1
           fi
           echo "PASS: live signing-workspace chunk exists, matches this build and contains the Signature Lifecycle self-test."
+      - name: Verify live DocumentLifecycleModule SHA-256
+        run: |
+          set -euo pipefail
+          url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          local_chunk="$(find dist/assets -maxdepth 1 -type f -name 'document-lifecycle-module-*.js' -print -quit)"
+          if [ -z "$local_chunk" ]; then
+            echo "FAIL: build did not emit the DocumentLifecycleModule chunk." >&2
+            exit 1
+          fi
+          chunk_name="${local_chunk##*/}"
+          live_chunk="$RUNNER_TEMP/live-$chunk_name"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 30 \
+            -H "Cache-Control: no-cache" "$url/assets/$chunk_name?__irpa_document_lifecycle_verify=$GITHUB_SHA" -o "$live_chunk"
+          local_sha="$(sha256sum "$local_chunk" | cut -d ' ' -f 1)"
+          live_sha="$(sha256sum "$live_chunk" | cut -d ' ' -f 1)"
+          if [ "$local_sha" != "$live_sha" ]; then
+            echo "FAIL: live DocumentLifecycleModule SHA-256 does not match this production build." >&2
+            echo "Expected: $local_sha" >&2
+            echo "Live:     $live_sha" >&2
+            exit 1
+          fi
+          echo "PASS: DocumentLifecycleModule live SHA-256 matches: $live_sha"
       - name: Publish migration boundary
         run: |
           echo "Cloudflare Pages hosts the frontend. Firebase Authentication and Firestore remain the authoritative identity/data services during this safe migration."
