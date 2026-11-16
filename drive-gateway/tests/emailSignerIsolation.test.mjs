@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canAuthenticatedSignerAccess, validateEnvelopeFields, validateFieldValues, openSigning, getSigningEvidence, chainEvents } from "../src/signing.mjs";
-import { generateSignerKeyPair, exportPublicKeyJwk, createCryptographicEvidence } from "../src/cryptographicGate.mjs";
+import { exportPublicKeyJwk, createCryptographicEvidence } from "../src/cryptographicGate.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 const externalSigner = {
@@ -69,7 +69,7 @@ test("email invitation can retrieve only its own cryptographic evidence, never a
   const envelopeId="ENV-evidence-isolation",documentHash="f".repeat(64);
   const events=await chainEvents([],{type:"envelope.created",at:"2026-11-16T14:00:00.000Z"});
   async function evidenceFor(identity){
-    const pair=await generateSignerKeyPair();
+    const pair=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
     return createCryptographicEvidence({
       keyId:"KEY-"+identity.id,
       signer:{uid:null,identityType:"email-link",emailHash:identity.emailHash,signerId:identity.id,envelopeId,signatureHash:await sha256Hex("signature-"+identity.id),signatureType:"typed",privateKey:pair.privateKey,publicKey:pair.publicKey},
