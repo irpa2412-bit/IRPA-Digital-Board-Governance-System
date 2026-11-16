@@ -42,6 +42,6 @@ test("Drive health route is administrator-only, GET-only, refreshes without file
   assert.match(route, /await getDriveAccessToken\(env\)/);
   assert.match(route, /statusClass: "ok", classification: "ok"/);
   assert.match(route, /statusClass: "error", classification/);
-  assert.doesNotMatch(route, /driveFetch|\.put\(|\.delete\(|accessToken|refreshToken|client_secret|error\.message/);
+  assert.doesNotMatch(route, /driveFetch|\.put\(|\.delete\(|accessToken|refreshToken|client_secret|error\.message|\bok:/);
   assert.match(selfTest, /\/api\/signature-pathway\/drive-health/);
 });
