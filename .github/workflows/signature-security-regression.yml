@@ -6,6 +6,8 @@ on:
       - "drive-gateway/**"
       - "src/firebase/signaturePlatform.js"
       - "src/firebase/signatureStorage.js"
+      - "src/firebase/firestorePayload.js"
+      - "tests/signature-workflow-history-integration.test.mjs"
       - ".github/workflows/signature-security-regression.yml"
   push:
     branches:
@@ -59,6 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           npx firebase emulators:exec --only firestore --project demo-irpa-signature "npm run test:security-rules && npm run test:meeting-category"
+          node --test tests/signature-workflow-history-integration.test.mjs
           npm run test:pdf-page-rendering
           npm run test:fundraising-registry
           npm run test:portal-navigation
