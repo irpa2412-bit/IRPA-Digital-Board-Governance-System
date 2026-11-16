@@ -1207,6 +1207,9 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     step = "Validate draft and source controlled document";
     const body = await request.json();
     const draft = body && body.draft || {};
+    const expectedDraftVersion=Number(draft.expectedDraftVersion??0);
+    delete draft.expectedDraftVersion;
+    if(!Number.isInteger(expectedDraftVersion)||expectedDraftVersion<0)return json({ok:false,step,error:"A valid expected draft version is required."},400,corsHeaders(request));
     const envelopeId = String(draft.envelopeReference || body.envelopeId || "").trim();
     const documentId = String(draft.documentId || "").trim();
     if (!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId) || !/^[A-Za-z0-9_-]{1,150}$/.test(documentId) || !String(draft.title || "").trim() || !String(draft.documentUrl || "").trim()) return json({ok:false,step,error:"A valid envelope ID, title, canonical document ID and controlled document URL are required."},400,corsHeaders(request));
@@ -1216,7 +1219,9 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     if (!signatureDraftOwnershipAllowed(sourceData,uid,activeAdmin)) return json({ok:false,step,error:"Only the source-document owner or an authorized administrator may create a signing draft."},403,corsHeaders(request));
     const existing = await getFirestoreDocument(env, "signatureEnvelopes/" + envelopeId, adminToken);
     const existingData = firestoreDocumentToPlain(existing) || {};
+    const currentDraftVersion=Number(existingData.draftVersion||0);
     if (existing && String(existingData.ownerUid || existingData.senderUid || "") !== uid) return json({ok:false,step,error:"Only the original signing-draft owner may update this envelope."},403,corsHeaders(request));
+    if(expectedDraftVersion!==currentDraftVersion)return json({ok:false,step,error:"The signing draft changed since it was loaded. Reload the draft before adding or changing signers.",expectedDraftVersion,currentDraftVersion},409,corsHeaders(request));
     const recipients = Array.isArray(draft.recipients) ? draft.recipients : [];
     const signingMode = String(draft.signingMode || "Sequential");
     const validationError = validateSignatureDraftRecipients(recipients,signingMode);
@@ -1234,13 +1239,13 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     if (!ownerSigningEnabled && fields.some(field => field && field.signerUid === uid && field.type === "Signature")) return json({ok:false,step,error:"An owner Signature field is assigned while the owner signature requirement is disabled."},400,corsHeaders(request));
     if(existing&&String(existingData.status||"Draft")!=="Draft")return json({ok:false,step,error:"A signing envelope cannot be changed after its workflow has started."},409,corsHeaders(request));
     const sameDraft=Boolean(existing)&&String(existingData.title||"")===String(draft.title||"").trim()&&String(existingData.documentId||"")===documentId&&String(existingData.documentUrl||"")===String(draft.documentUrl||"")&&String(existingData.signingMode||"Sequential")===signingMode&&JSON.stringify(existingData.recipients||[])===JSON.stringify(recipients)&&JSON.stringify(existingData.fields||[])===JSON.stringify(fields)&&Boolean(existingData.ownerSigningEnabled)===Boolean(body.ownerSigningEnabled===true);
-    if(sameDraft)return json({ok:true,idempotent:true,envelopeReference:envelopeId,status:"Draft",writesPerformed:false},200,corsHeaders(request));
+    if(sameDraft)return json({ok:true,idempotent:true,envelopeReference:envelopeId,status:"Draft",draftVersion:currentDraftVersion,writesPerformed:false},200,corsHeaders(request));
     if(existing&&!existing.updateTime)return json({ok:false,step,error:"The existing draft has no update version; refusing a non-atomic signer assignment update."},409,corsHeaders(request));
     const participantUids = Array.from(new Set(recipients.map(item => String(item && item.uid || "")).filter(Boolean)));
     if (!participantUids.includes(uid)) return json({ok:false,step,error:"The authenticated owner must be a participant in the signing envelope."},400,corsHeaders(request));
     if (fields.some(field => field && field.signerUid && !participantUids.includes(String(field.signerUid)))) return json({ok:false,step,error:"Every assigned field must belong to a participant in this envelope."},400,corsHeaders(request));
     const now = new Date().toISOString();
-    const envelope = {...draft,envelopeReference:envelopeId,title:String(draft.title).trim(),documentId,senderUid:uid,senderEmail:email,ownerUid:uid,ownerEmail:email,recordOrigin:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION",trialData:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL",status:"Draft",signingMode,recipients,fields,participantUids,actionUids:Array.from(new Set(fields.map(field=>String(field && field.signerUid || "")).filter(Boolean))),updatedAt:now,...(existing?{}:{createdAt:now})};
+    const envelope = {...draft,envelopeReference:envelopeId,draftVersion:currentDraftVersion+1,title:String(draft.title).trim(),documentId,senderUid:uid,senderEmail:email,ownerUid:uid,ownerEmail:email,recordOrigin:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL"?"TRIAL":"PRODUCTION",trialData:String(sourceData.recordOrigin || "PRODUCTION").toUpperCase()==="TRIAL",status:"Draft",signingMode,recipients,fields,participantUids,actionUids:Array.from(new Set(fields.map(field=>String(field && field.signerUid || "")).filter(Boolean))),updatedAt:now,...(existing?{}:{createdAt:now})};
     delete envelope.id;
     step = "Commit envelope, source-document link and audit event atomically";
     const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
