@@ -565,19 +565,19 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     if(recipients.some(x=>x.uid===registered.uid)){setMessage("This officer is already in the signer hierarchy.");return;}
     next={uid:registered.uid,name:registered.name||registered.email,email:registered.email||email,role,institutionalRole:registered.boardPosition||registered.role||"",routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
   }else{
-    if(!signerAuthorityRole.trim()){setMessage("Enter the signer current institutional authority capacity exactly as recorded in the IRPA Member or Employee Register.");return;}
+    if(!signerAuthorityRole.trim()){setMessage("Enter the occupation or capacity assigned to this person for this document.");return;}
     const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(email));
     const emailHash=Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,"0")).join("");
-    next={uid:"email-link-"+emailHash.slice(0,24),identityType:"email-link",name:email,email,role,institutionalRole:"",authorityRole:signerAuthorityRole.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending",emailLinkStatus:"Not issued"};
+    next={uid:"email-link-"+emailHash.slice(0,24),identityType:"email-link",name:email,email,role,institutionalRole:"",occupation:signerAuthorityRole.trim(),capacity:signerAuthorityRole.trim(),ownerAssignedParticulars:{name:email,occupation:signerAuthorityRole.trim(),capacity:signerAuthorityRole.trim()},routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending",emailLinkStatus:"Not issued"};
   }
   const nextRecipients=[...recipients,next];
   const nextFields=fields.map(f=>(["Signature","Initials"].includes(f.type)&&!f.signerUid)?{...f,signerUid:next.uid}:f);
   if(!nextFields.some(f=>["Signature","Initials"].includes(f.type)&&f.signerUid===next.uid))nextFields.push({...makeField("Signature",nextFields.length,next.uid,preparationPage),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"});
-  addSignerInFlightRef.current=true;setBusy(true);setMessage(registered?"Saving the registered officer assignment…":"Checking the typed email against IRPA's server-side Member/Employee authority register and saving the email-link assignment…");
+  addSignerInFlightRef.current=true;setBusy(true);setMessage(registered?"Saving the officer's email-addressed signing assignment…":"Saving the email-addressed signing assignment and document-specific occupation/capacity…");
   try{
     const saved=await saveSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,signingMode,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,recipients:nextRecipients,fields:nextFields,ownerSigningEnabled});
     setDraftEnvelopeId(saved.id);setRecipients(nextRecipients);setFields(nextFields);setSelectedSigner("");setSignerEmail("");setSignerRole("Review");setSignerAuthorityRole("");
-    setMessage(registered?"Owner section saved. "+(registered.name||registered.email)+" is assigned as "+role+".":"Email-link signer saved for "+email+". The Gateway will verify the active Member/Employee register and current Signer Identity authority before issuing the link; no client-supplied role is used as signing authority.");
+    setMessage(registered?"Owner section saved. "+(registered.name||registered.email)+" is assigned by email as "+role+".":"Email-link signer saved for "+email+". The occupation/capacity is recorded as the document owner's assignment, not as a verified identity or authority.");
   }catch(x){setMessage("Signer was not added: "+(x.message||"Unable to save the workflow."));}
   finally{addSignerInFlightRef.current=false;setBusy(false);}
 }
@@ -599,21 +599,21 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     let env=draftEnvelopeId
       ?await finalizeSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled})
       :await createSignatureEnvelope({title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled});
-    const emailLinkRecipients=orderedRecipients.filter(recipient=>recipient.identityType==="email-link");
+    const emailLinkRecipients=orderedRecipients.filter(recipient=>String(recipient.email||"").trim());
     if(emailLinkRecipients.length&&!env.gatewayEnvelopeId){
       setDraftEnvelopeId(env.id);
       setMessage("Creating the isolated Gateway email-link preview and sending invitations…");
       const sourceFileId=String(documentUrl||"").startsWith("drive://")?String(documentUrl).slice("drive://".length):(selectedDoc?.driveFileId||selectedDoc?.fileId||selectedDoc?.archiveFileId||selectedDoc?.sourceFileId||"");
       if(!sourceFileId)throw new Error("The controlled PDF has no verified Google Drive file ID for the email-link preview.");
       const sourceBytes=await downloadControlledDocumentBytes(sourceFileId,documentId);
-      const gatewayResult=await createGatewaySignatureEnvelope({envelope:{...env,ownerUid:auth.currentUser?.uid,senderUid:auth.currentUser?.uid,recipients:emailLinkRecipients,fields:[]},sourceBytes});
+      const gatewayResult=await createGatewaySignatureEnvelope({envelope:{...env,ownerUid:auth.currentUser?.uid,senderUid:auth.currentUser?.uid,recipients:emailLinkRecipients,fields:env.fields||[]},sourceBytes});
       try{await attachGatewayEmailLinkEnvelope(env.id,gatewayResult);}
       catch(error){await voidGatewaySignatureEnvelope(gatewayResult.gatewayEnvelopeId,"Email-link envelope could not be linked to its owner record");throw error;}
       env={...env,...gatewayResult,gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent"};
     }
     setEnvelopes(prev=>[env,...prev.filter(item=>item.id!==env.id)]);
     setDraftEnvelopeId(null);setTitle("");setDocumentId("");setDocumentUrl("");setRecipients([]);setFields([]);setSelectedField(null);setOwnerSigningEnabled(false);setTab("Envelopes");
-    setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend; the login-based signing path is unchanged.":emailLinkRecipients.length?"Envelope created. Email-link invitations were issued; recipients can open a read-only document preview without a DBGS account.":"Envelope created as Draft.");
+    setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend; the login-based signing path is unchanged.":emailLinkRecipients.length?"Envelope created. Email invitations were issued; each recipient can open their assigned signing fields after verifying the invitation email.":"Envelope created as Draft.");
   }catch(x){
     console.error("IRPA Signature Portal: Create Draft Envelope failed",{errorType:x?.name||"Error"});
     setMessage((draftEnvelopeId?"Draft saved; email-link setup did not finish: ":"Create Draft Envelope was not completed: ")+(x.message||"Unable to create envelope."));
