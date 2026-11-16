@@ -59,7 +59,7 @@ test("4. signing enforces signer assignment, authority, consent, order and dupli
 });
 
 test("5. final completion is server-verified and binds the final PDF hash and audit evidence", () => {
-  const complete = section(lifecycle, 'pathname==="/api/document-lifecycle/signature-complete"', "\n    }");
+  const complete = section(lifecycle, 'pathname==="/api/document-lifecycle/signature-complete"', String.fromCharCode(10) + "    }");
   assert.match(complete, /status:"SIGNED"/);
   assert.match(complete, /finalSignedPdfSha256/);
   assert.match(complete, /verification\.finalHash/);
