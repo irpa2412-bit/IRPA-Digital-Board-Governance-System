@@ -100,7 +100,7 @@ export class EsignRecordDurableObject {
         const envelopeId=String(body.envelopeId||"");
         const signerId=String(body.signerId||"");
         const emailHash=String(body.emailHash||"").toLowerCase();
-        if(!/^EMAIL-[0-9a-f]{64}$/.test(keyId)||!/^S\\d{1,2}$/.test(signerId)||!envelopeId||!/^[0-9a-f]{64}$/.test(emailHash))return Response.json({ok:false,error:"Invalid signer-key identity."},{status:400});
+        if(body.key!=="email-signer-key:"+keyId||!/^EMAIL-[0-9a-f]{64}$/.test(keyId)||!/^S\d{1,2}$/.test(signerId)||!envelopeId||!/^[0-9a-f]{64}$/.test(emailHash))return Response.json({ok:false,error:"Invalid signer-key identity."},{status:400});
         const recordKey="emailSignerKey:"+keyId;
         let record=await this.state.storage.get(recordKey);
         if(record&&(record.envelopeId!==envelopeId||record.signerId!==signerId||record.emailHash!==emailHash))return Response.json({ok:false,error:"Signer-key identity conflict."},{status:409});
@@ -119,7 +119,7 @@ export class EsignRecordDurableObject {
         const keyId=String(body.keyId||"");
         const record=await this.state.storage.get("emailSignerKey:"+keyId);
         const canonicalPayload=String(body.canonicalPayload||"");
-        if(!record||!canonicalPayload||canonicalPayload.length>100000)return Response.json({ok:false,error:"Signer key is unavailable."},{status:404});
+        if(body.key!=="email-signer-key:"+keyId||!record||!canonicalPayload||canonicalPayload.length>100000)return Response.json({ok:false,error:"Signer key is unavailable."},{status:404});
         let payload;
         try{payload=JSON.parse(canonicalPayload)}catch{return Response.json({ok:false,error:"Invalid canonical signer payload."},{status:400})}
         if(payload.envelopeId!==record.envelopeId||payload.signerId!==record.signerId||payload.signerIdentityType!=="email-link"||payload.signerIdentityHash!==record.emailHash||payload.keyId!==keyId)return Response.json({ok:false,error:"Signer-key identity mismatch."},{status:403});
