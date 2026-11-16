@@ -21,7 +21,7 @@ function durableObjectNamespace(){
           blockConcurrencyWhile:fn=>fn(),
         };
         const object=new EsignRecordDurableObject(state,{});
-        instances.set(id,{fetch:request=>object.fetch(request)});
+        instances.set(id,{fetch:(input,init)=>object.fetch(input instanceof Request?input:new Request(input,init))});
       }
       return instances.get(id);
     },
