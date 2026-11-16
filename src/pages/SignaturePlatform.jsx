@@ -573,7 +573,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   }
   const nextRecipients=[...recipients,next];
   const nextFields=fields.map(f=>(["Signature","Initials"].includes(f.type)&&!f.signerUid)?{...f,signerUid:next.uid}:f);
-  if(!nextFields.some(f=>["Signature","Initials"].includes(f.type)&&f.signerUid===next.uid))nextFields.push({...makeField("Signature",nextFields.length,next.uid,preparationPage),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"});
+  if(!nextFields.some(f=>["Signature","Initials"].includes(f.type)&&f.signerUid===next.uid))nextFields.push({...makeField("Signature",nextFields.length,next.uid,preparationPage),placeholder:"Assigned signature field — click to open your signing pane"});
   addSignerInFlightRef.current=true;setBusy(true);setMessage(registered?"Saving the officer's email-addressed signing assignment…":"Saving the email-addressed signing assignment and document-specific occupation/capacity…");
   try{
     const saved=await saveSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,signingMode,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,recipients:nextRecipients,fields:nextFields,ownerSigningEnabled});
