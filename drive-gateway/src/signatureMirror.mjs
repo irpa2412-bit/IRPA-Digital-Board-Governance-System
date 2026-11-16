@@ -31,7 +31,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     lastSignedByUid, gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
-  for (const signer of signers.filter(s => s.uid && s.status === "Signed")) {
+  for (const signer of signers.filter(s => s.status === "Signed")) {
     const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===((envelope.signers||[]).find(s=>s.uid===signer.uid)?.id||""));
     if(!signerCopy?.id)throw new Error("Completed signer archive copy is missing for an assigned signer.");
     const signerArchiveUrl="https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view";
@@ -41,10 +41,10 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
       documentReference:clean(existing.documentReference||existing.envelopeReference||envelope.externalReference),
       documentTitle:clean(existing.title||envelope.title),
-      signerUid:signer.uid,signerEmail:signer.email||"",signerName:signer.name||"",
+      signerUid:signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
       workflowRole:signer.role||signer.action||"",
       signatureAuthority:signer.authorityRole||"",
-      signatureAuthorityVerificationStatus:"Verified",
+      signatureAuthorityVerificationStatus:signer.authorityRole?"Verified":"NotApplicable",
       signatureStatus:"Signed",status:"Signed",signedAt:signer.signedAt||timestamp,
       signerArchiveUrl,signerArchiveFileId:signerCopy.id,
       gatewayEnvelopeId:envelope.id,gatewayDocumentHash:completion.finalHash,
@@ -52,13 +52,13 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       immutable:true
     });
 
-    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid);
+    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(assignedSigner?.id || signer.uid || signer.email);
     const signerEventPath = "signatureEvents/" + signerEventId;
     if (!(await getDocument(signerEventPath))) {
       await updateDocument(signerEventPath, {
         envelopeId,
         event: "Gateway Signer Signed",
-        actorUid: signer.uid,
+        actorUid: signer.uid || "",
         signedAt: signer.signedAt || timestamp
       });
     }
