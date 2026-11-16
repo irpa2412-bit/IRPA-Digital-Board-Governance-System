@@ -111,6 +111,16 @@ test("7. decline, revoke, reminder, immutable completion and retry-after-network
   assert.match(signing, /Completed/);
   assert.match(portal, /resendFailedGatewaySignatureInvitations/);
   assert.match(signing, /idempotent:true/);
+  assert.match(gatewayE2E, /assert.equal\(retry\.status,200\)/);
+  assert.match(gatewayE2E, /electronicConsentAccepted/);
+  assert.match(gatewayE2E, /signature fields on the first and actual last PDF page/);
+  assert.match(gatewayE2E, /beyond the actual last PDF page/);
+  assert.match(gatewayE2E, /a non-signing pending signer can receive a reminder/);
+  assert.match(gatewayE2E, /decline records a single terminal signer decision/);
+  assert.match(stagingAcceptance, /ACCEPTANCE_ROW/);
+  assert.match(stagingAcceptance, /Pending signer reminder/);
+  assert.match(stagingAcceptance, /Assigned signer may decline/);
+  assert.match(stagingAcceptance, /Owner can revoke an incomplete envelope/);
 });
 
 test("portal Signature Lifecycle self-test reports stages, HTTP status and detail without document bytes", () => {
