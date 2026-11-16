@@ -13,6 +13,8 @@ const selfTest = read("../src/components/SignaturePathwaySelfTest.jsx");
 const signaturePad = read("../src/components/SignatureFieldConfirmationPad.jsx");
 const stagingAcceptance = read("../drive-gateway/tests/staging-signature-lifecycle-acceptance.mjs");
 const gatewayE2E = read("../drive-gateway/tests/e2e.test.mjs");
+const viteConfig = read("../vite.config.js");
+const frontendDeploy = read("../.github/workflows/cloudflare-pages-deploy.yml");
 const documentPortal = read("../src/pages/DocumentLifecycleModule.jsx");
 
 function section(source, start, end) {
@@ -129,4 +131,9 @@ test("portal Signature Lifecycle self-test reports stages, HTTP status and detai
   assert.match(selfTest, /Detail/);
   assert.match(selfTest, /PASS|FAIL/);
   assert.doesNotMatch(selfTest, /console\.log\([^)]*base64/i);
+  assert.match(viteConfig, /manualChunks\(id\)/);
+  assert.match(viteConfig, /return "signing-workspace"/);
+  assert.match(frontendDeploy, /Verify live signing-workspace chunk/);
+  assert.match(frontendDeploy, /curl --fail/);
+  assert.match(frontendDeploy, /cmp -s "\$local_chunk" "\$live_chunk"/);
 });
