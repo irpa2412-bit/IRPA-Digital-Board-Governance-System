@@ -39,10 +39,37 @@ test("completion mirror creates a signer-specific signature register record from
   assert.equal(chair.signerArchiveFileId,"chair-copy");
   assert.equal(chair.signatureAuthority,"Board Chairperson");
   assert.equal(chair.signerArchiveUrl,"https://drive.google.com/file/d/chair-copy/view");
-  assert.equal(chair.cryptographicEvidenceStatus,"Verified");
+  assert.equal(chair.cryptographicEvidenceStatus,"GatewayAuditOnly","mirror must not claim cryptographic verification without a signer evidence record");
   assert.equal(secretary.signerArchiveFileId,"secretary-copy");
   assert.equal(secretary.signatureAuthority,"Board Secretary");
   assert.equal(secretary.status,"Signed");
+});
+
+
+test("email signer mirror includes signer ID, declarations and verified per-signer evidence",async()=>{
+  const writes=[];
+  const envelope={id:"ENV-EMAIL",externalReference:"IRPA-ENV-EMAIL",documentId:"DOC-EMAIL",signers:[{
+    id:"S1",identityType:"email-link",uid:null,email:"external@example.test",name:"External Signer",status:"Signed",signedAt:"2026-11-16T15:10:00.000Z",
+    declaredParticulars:{name:"Owner Name",occupation:"Supplier"},
+    signerDeclarations:{name:"External Name",occupation:"Consultant"},
+    declarationDiscrepancy:{detected:true,fields:["name","occupation"],ownerDeclared:{name:"Owner Name",occupation:"Supplier"},signerDeclared:{name:"External Name",occupation:"Consultant"}}
+  }]};
+  await persistCompletedSignatureEnvelope({
+    envelope,
+    completion:{finalHash:"d".repeat(64),completedAt:"2026-11-16T15:11:00.000Z",primaryStorageId:"archive-email",files:[{kind:"signer-copy",signerId:"S1",id:"external-copy"}],signerEvidence:[{signerId:"S1",evidenceId:"CRYPTO-EMAIL-1",identityType:"email-link"}]},
+    getDocument:async()=>({documentId:"DOC-EMAIL"}),
+    updateDocument:async(path,fields)=>writes.push({path,fields}),
+    now:()=>"2026-11-16T15:11:01.000Z"
+  });
+  const record=writes.find(item=>item.path==="signatures/gateway-IRPA-ENV-EMAIL-S1")?.fields;
+  assert.ok(record);
+  assert.equal(record.signerUid,null);
+  assert.equal(record.signerId,"S1");
+  assert.equal(record.signerIdentityType,"email-link");
+  assert.equal(record.cryptographicEvidenceStatus,"Verified");
+  assert.deepEqual(record.ownerDeclaredParticulars,{name:"Owner Name",occupation:"Supplier"});
+  assert.deepEqual(record.signerDeclarations,{name:"External Name",occupation:"Consultant"});
+  assert.equal(record.declarationDiscrepancy.detected,true);
 });
 
 test("completion mirror fails closed when an assigned signer archive copy is missing", async () => {
