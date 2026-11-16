@@ -42,7 +42,7 @@ function setup() {
     meta,
     invites,
     tokenFor: (email) =>
-      new URL(invites.find((i) => i.to === email).link).searchParams.get("gatewayToken"),
+      (()=>{const u=new URL(invites.find((i) => i.to === email).link);return u.searchParams.get("emailSignToken")||u.searchParams.get("gatewayToken")})(),
   };
 }
 
