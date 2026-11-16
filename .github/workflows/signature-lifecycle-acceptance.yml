@@ -1,0 +1,43 @@
+name: Signature Lifecycle Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/signature-lifecycle-e2e-contract.test.mjs"
+      - "src/components/SignaturePathwaySelfTest.jsx"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/firebase/signaturePlatform.js"
+      - "src/pages/DocumentLifecycleModule.jsx"
+      - "src/firebase/documentLifecycle.js"
+      - "drive-gateway/src/signing.mjs"
+      - "drive-gateway/src/documentLifecycle.mjs"
+      - "drive-gateway/src/index.js"
+      - ".github/workflows/signature-lifecycle-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signature-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install Gateway dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: drive-gateway
+      - name: Run consolidated lifecycle acceptance contract
+        run: node --test tests/signature-lifecycle-e2e-contract.test.mjs
+      - name: Run Gateway regression suite
+        run: npm test
+        working-directory: drive-gateway
+      - name: Build frontend
+        run: npm run build
