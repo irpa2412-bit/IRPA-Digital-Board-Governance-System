@@ -17,7 +17,6 @@ export default function EmailSigningReadOnlyPage({token}) {
   const [selectedFieldId,setSelectedFieldId]=useState("");
   const [fieldApplications,setFieldApplications]=useState([]);
   const [signatureMarks,setSignatureMarks]=useState({});
-  const signatureValue=signatureFields.map(field=>fieldApplications.find(item=>item.fieldId===field.fieldId)?.value).find(Boolean)||"";
   const [typedSignature,setTypedSignature]=useState("");
   const [consent,setConsent]=useState(false);
   const canvasRef=useRef(null);
@@ -54,10 +53,13 @@ export default function EmailSigningReadOnlyPage({token}) {
 
   const selectedField=(record?.fields||[]).find(field=>field.fieldId===selectedFieldId)||null;
   const signatureFields=(record?.fields||[]).filter(field=>["Signature","Initials"].includes(field.type));
+  const signatureValue=signatureFields.map(field=>fieldApplications.find(item=>item.fieldId===field.fieldId)?.value).find(Boolean)||"";
   useEffect(()=>{
     const canvas=canvasRef.current,value=selectedField?signatureMarks[selectedField.fieldId]:null;
-    if(!canvas||!value)return;
-    const context=canvas.getContext("2d"),image=new Image();
+    if(!canvas)return;
+    const context=canvas.getContext("2d");context.clearRect(0,0,canvas.width,canvas.height);
+    if(!value)return;
+    const image=new Image();
     image.onload=()=>{context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);};
     image.src=value;
   },[selectedFieldId,signatureMarks,selectedField]);
