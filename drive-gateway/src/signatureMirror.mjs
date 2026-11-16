@@ -36,7 +36,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""));
     if(!signerCopy?.id)throw new Error("Completed signer archive copy is missing for an assigned signer.");
     const signerArchiveUrl="https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view";
-    const signatureRecordId="gateway-"+envelopeId+"-"+clean(assignedSigner?.id||signer.uid||signer.email);
+    const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid||assignedSigner?.id||signer.email);
     await updateDocument("signatures/"+signatureRecordId,{
       envelopeId,documentId:clean(existing.documentId||envelope.documentId),
       recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
@@ -53,7 +53,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       immutable:true
     });
 
-    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(assignedSigner?.id || signer.uid || signer.email);
+    const signerEventId = "gateway-signed-" + envelopeId + "-" + clean(signer.uid || assignedSigner?.id || signer.email);
     const signerEventPath = "signatureEvents/" + signerEventId;
     if (!(await getDocument(signerEventPath))) {
       await updateDocument(signerEventPath, {
