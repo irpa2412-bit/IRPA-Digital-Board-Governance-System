@@ -107,6 +107,10 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
   assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"revoked");
 });
 
+test("a view-only recipient cannot receive or use an email signing token",async()=>{
+  await assert.rejects(()=>fixture({signers:[{identityType:"email-link",email:"viewer@example.org",name:"Viewer Person",role:"View Only"}]}),/view-only recipient cannot receive a signing invitation/i);
+});
+
 test("email-link assignment does not require a register or authority-matrix match",async()=>{
   const f=await fixture({authority:false});
   assert.equal(f.envelope.signers[0].identityType,"email-link");
