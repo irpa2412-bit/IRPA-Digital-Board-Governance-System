@@ -64,7 +64,7 @@ test("email-link signer is stored with token hash, email hash, expiry and issued
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
   assert.equal(signer.authorityVerification,undefined);
   assert.equal(signer.name,"Client supplied name");
-  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",occupation:"Board Secretary",capacity:""});
+  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",occupation:"",capacity:""});
   assert.equal(f.sent.length,1);
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
