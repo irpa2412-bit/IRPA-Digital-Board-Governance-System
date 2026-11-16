@@ -566,11 +566,11 @@ export async function fetchGatewaySigningResource(path, token, {pdf=false}={}) {
   return pdf ? new Uint8Array(await response.arrayBuffer()) : response.json();
 }
 
-export async function submitGatewaySignature({token,signature,fieldValues={},fieldApplications=[],signatureConfirmed=false,manualAuthorityIdentification="",consent=true}={}) {
+export async function submitGatewaySignature({token,signature,fieldValues={},fieldApplications=[],signatureConfirmed=false,consent=true}={}) {
   if (!token) throw new Error("A Gateway signing token is required.");
   const response = await gatewayAuthenticatedRequest("/api/sign/submit", {
     method:"POST",
-    body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,manualAuthorityIdentification,consent})
+    body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed,consent})
   });
   const data = await response.json().catch(() => ({}));
   assertGatewaySigningResponse(response,data);
