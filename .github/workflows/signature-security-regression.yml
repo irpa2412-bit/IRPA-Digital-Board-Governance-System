@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - "fix/signature-hardening-phase1-20261102"
+      - "fix/signature-authority-progression-20261116"
     paths:
       - "drive-gateway/**"
       - "src/firebase/signaturePlatform.js"
