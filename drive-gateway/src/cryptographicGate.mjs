@@ -88,14 +88,20 @@ export function buildCanonicalSigningPayload({
   authorityRole,
   authoritySourceCollection,
   authoritySourceRecordId,
+  signerIdentityType,
+  signerIdentityHash,
 } = {}) {
+  const identityType=String(signerIdentityType||(signerUid?"firebase-uid":"")).trim();
+  const identityHash=String(signerIdentityHash||"").trim().toLowerCase();
+  if(!signerUid&&!(identityType==="email-link"&&/^[0-9a-f]{64}$/.test(identityHash)))throw new Error("A verified signer UID or invitation email hash is required for cryptographic evidence.");
   const payload = {
     schema: CRYPTO_EVIDENCE_SCHEMA,
     gateVersion: CRYPTOGRAPHIC_GATE_VERSION,
     algorithm: "ECDSA-P256-SHA256",
     envelopeId: String(envelopeId || ""),
     signerId: String(signerId || ""),
-    signerUid: requireIdentity(signerUid),
+    signerIdentityType:identityType,
+    ...(signerUid?{signerUid:requireIdentity(signerUid)}:{signerIdentityHash:identityHash}),
     documentHash: requireHexHash(documentHash, "documentHash"),
     signatureHash: requireHexHash(signatureHash, "signatureHash"),
     signatureType: String(signatureType || ""),
@@ -142,11 +148,14 @@ export async function createCryptographicEvidence({
   signedAt,
   publicKeyJwk: suppliedPublicKeyJwk,
 } = {}) {
-  const signerUid = requireIdentity(signer?.uid);
+  const signerUid = signer?.uid ? requireIdentity(signer.uid) : null;
+  const signerIdentityType=String(signer?.identityType||(signerUid?"firebase-uid":"")).trim();
+  const signerIdentityHash=String(signer?.emailHash||"").trim().toLowerCase()||null;
+  if(!signerUid&&!(signerIdentityType==="email-link"&&/^[0-9a-f]{64}$/.test(signerIdentityHash||"")))throw new Error("A UID or verified email-link identity is required for cryptographic signing.");
   const publicKey = signer?.publicKey;
   const privateKey = signer?.privateKey;
   const signatureHash = requireHexHash(signer?.signatureHash, "signatureHash");
-  if (!publicKey || !privateKey) throw new Error("Signer cryptographic key material is unavailable.");
+  if (!publicKey || (!privateKey&&typeof signer?.signCanonicalPayload!=="function")) throw new Error("Signer cryptographic key material is unavailable.");
 
   let publicKeyJwk;
   let verificationKey = publicKey;
@@ -167,6 +176,8 @@ export async function createCryptographicEvidence({
     envelopeId: signer.envelopeId,
     signerId: signer.signerId || signer.id,
     signerUid,
+    signerIdentityType,
+    signerIdentityHash,
     documentHash,
     signatureHash,
     signatureType: signer.signatureType,
@@ -178,7 +189,7 @@ export async function createCryptographicEvidence({
     authoritySourceRecordId:signer.authorityVerification?.authoritySourceRecordId,
   });
   const payloadHash = await sha256Hex(canonicalPayload);
-  const signature = await signCanonicalPayload(privateKey, canonicalPayload);
+  const signature = typeof signer.signCanonicalPayload==="function" ? await signer.signCanonicalPayload(canonicalPayload) : await signCanonicalPayload(privateKey, canonicalPayload);
   if (suppliedPublicKeyJwk && !await verifyCanonicalPayload(verificationKey, canonicalPayload, signature)) {
     throw new Error("Supplied public signing key does not match the signer private key.");
   }
@@ -190,6 +201,8 @@ export async function createCryptographicEvidence({
     algorithm: "ECDSA-P256-SHA256",
     keyId,
     signerUid,
+    signerIdentityType,
+    signerIdentityHash,
     signerId: signer.signerId || signer.id,
     envelopeId: signer.envelopeId,
     documentHash,
@@ -211,12 +224,15 @@ export async function createCryptographicEvidence({
 export async function verifyCryptographicEvidence(evidence, {
   documentHash,
   signerUid,
+  signerIdentityType,
+  signerIdentityHash,
   publicKey,
 } = {}) {
   if (!evidence || evidence.schema !== CRYPTO_EVIDENCE_SCHEMA) return false;
   if (evidence.status !== "SEALED") return false;
   if (documentHash !== evidence.documentHash) return false;
-  if (signerUid !== evidence.signerUid) return false;
+  if(signerUid){if(signerUid!==evidence.signerUid)return false;}
+  else if(signerIdentityType!=="email-link"||signerIdentityType!==evidence.signerIdentityType||signerIdentityHash!==evidence.signerIdentityHash)return false;
   if (await sha256Hex(evidence.canonicalPayload) !== evidence.payloadHash) return false;
 
   let parsed;
@@ -226,7 +242,7 @@ export async function verifyCryptographicEvidence(evidence, {
     return false;
   }
   if (parsed.documentHash !== evidence.documentHash ||
-      parsed.signerUid !== evidence.signerUid ||
+      (evidence.signerUid ? parsed.signerUid !== evidence.signerUid : (parsed.signerIdentityType !== evidence.signerIdentityType || parsed.signerIdentityHash !== evidence.signerIdentityHash)) ||
       parsed.keyId !== evidence.keyId ||
       parsed.envelopeId !== evidence.envelopeId ||
       parsed.signerId !== evidence.signerId) return false;
@@ -349,11 +365,14 @@ export async function sealAndPersist({
   const artifacts = [];
   try {
     for (const signer of envelope.signers || []) {
-      const keyRecord = await keyProvider.getSignerKey(signer.uid);
+      const keyRecord = signer.uid ? await keyProvider.getSignerKey(signer.uid) : await keyProvider.getSignerKeyForSigner?.(signer);
+      if(!keyRecord)throw new Error("Gateway signer key custody is not configured for this signer identity.");
       const evidence = await createCryptographicEvidence({
         keyId: keyRecord.keyId,
         signer: {
-          uid: signer.uid,
+          uid: signer.uid||null,
+          identityType:signer.identityType||"account",
+          emailHash:signer.emailHash||null,
           signerId: signer.id,
           envelopeId: envelope.id,
           signatureHash: await sha256Hex(String(signer.signatureValue || "")),
@@ -361,6 +380,7 @@ export async function sealAndPersist({
           authorityVerification:signer.authorityVerification||null,
           privateKey: keyRecord.privateKey,
           publicKey: keyRecord.publicKey,
+          signCanonicalPayload:keyRecord.signCanonicalPayload,
         },
         publicKeyJwk: keyRecord.publicKeyJwk,
         documentHash,
@@ -372,7 +392,9 @@ export async function sealAndPersist({
       if (existing) {
         const valid = await verifyCryptographicEvidence(existing, {
           documentHash,
-          signerUid: signer.uid,
+          signerUid: signer.uid||null,
+          signerIdentityType:signer.identityType||"account",
+          signerIdentityHash:signer.emailHash||null,
           publicKey: keyRecord.publicKey,
         });
         if (!valid) throw new Error("Existing cryptographic evidence failed verification.");
