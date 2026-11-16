@@ -11,6 +11,9 @@ import {
   genericEmailSigningFailure
 } from "../src/emailSigningLinks.mjs";
 import { sha256Hex } from "../src/util.mjs";
+import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
+import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
+import fs from "node:fs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
@@ -94,19 +97,16 @@ test("email hashing normalizes whitespace and case", async () => {
 });
 
 test("duplicate signer and compare-and-set policy remain enforced", () => {
-  const policy = await import("../src/signatureDraftPolicy.mjs");
-  assert.match(policy.validateSignatureDraftRecipients([{uid:"u1",email:"a@example.org"},{email:" A@example.org "}],"Sequential"),/Duplicate signer email/);
-  assert.match(policy.validateSignatureDraftRecipients([{uid:"u1",email:"a@example.org"},{uid:"u1",email:"b@example.org"}],"Sequential"),/Duplicate signer UID/);
+  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"a@example.org"},{email:" A@example.org "}],"Sequential"),/Duplicate signer email/);
+  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"a@example.org"},{uid:"u1",email:"b@example.org"}],"Sequential"),/Duplicate signer UID/);
 });
 
-test("registered login-based signing access remains UID-bound", async () => {
-  const {canAuthenticatedSignerAccess}=await import("../src/signing.mjs");
+test("registered login-based signing access remains UID-bound", () => {
   assert.equal(canAuthenticatedSignerAccess({uid:"member-1"},{uid:"member-1"}),true);
   assert.equal(canAuthenticatedSignerAccess({uid:"member-1"},{uid:"other"}),false);
 });
 
 test("mail delivery is delegated once to the existing Worker invitation sender", () => {
-  const fs = await import("node:fs");
   const source = fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   assert.match(source,/sendWithRetry\s*\(/);
   assert.match(source,/smtpSend\(env,\{to:email,subject,text,html:htmlBody\}\)/);
