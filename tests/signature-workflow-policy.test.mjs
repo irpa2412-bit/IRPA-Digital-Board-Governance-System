@@ -38,7 +38,7 @@ test("uploaded controlled PDF enters the pre-signing palette with scoped documen
   const storage = fs.readFileSync(new URL("../src/firebase/signatureStorage.js", import.meta.url), "utf8");
   assert.match(page, /setDocumentId\(initialDocument\.id\);setDocumentUrl\(url\)/);
   assert.match(page, /setSigningCircle\("Document Selected"\);setTab\("Prepare Envelope"\)/);
-  assert.match(page, /import\{downloadControlledDocumentBytes,downloadSignatureBytes(?:,resendFailedGatewaySignatureInvitations)?\}from"\.\.\/firebase\/signatureStorage"/);
+  assert.match(page, /import\{[^}]*downloadControlledDocumentBytes,downloadSignatureBytes(?:,resendFailedGatewaySignatureInvitations)?[^}]*\}from"\.\.\/firebase\/signatureStorage"/);
   assert.match(page, /signingStage&&envelopeId\?await downloadSignatureBytes\([^;]+:await downloadControlledDocumentBytes\(url\.slice\("drive:\/\/"\.length\),documentId\)/);
   assert.match(storage, /export async function downloadControlledDocumentBytes\(fileId, documentId\)/);
   assert.match(storage, /if \(!fileId \|\| !documentId\) throw new Error/);
@@ -67,7 +67,7 @@ test("Signature Portal palette queries include document owner and signature owne
 
 test("adding the first signing officer creates a signature field assigned to that officer", () => {
   assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,m\.uid,preparationPage\),placeholder:"Tap to sign after preparation"\}\)/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,m\.uid,preparationPage\),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"\}\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
@@ -169,12 +169,12 @@ test("owner remains selectable for field assignment and each signature field rem
 
 test("signature assignment and signing handlers synchronously reject repeated submissions", () => {
   assert.match(portal, /const addSignerInFlightRef=useRef\(false\),signInFlightRef=useRef\(false\)/);
-  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)\n\s*\}/);
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n\s*function removeSigner\()/);
   assert.ok(addSigner, "the signer assignment handler must exist");
   assert.match(addSigner[1], /if\(addSignerInFlightRef\.current\|\|busy\)return/);
   assert.match(addSigner[1], /addSignerInFlightRef\.current=true/);
   assert.match(addSigner[1], /finally\{addSignerInFlightRef\.current=false;setBusy\(false\)\}/);
-  const sign = portal.match(/async function sign\(\)\{([\s\S]*?)\n/);
+  const sign = portal.match(/async function sign\(\)\{([\s\S]*?)(?=\n\s*(?:async )?function |\n\s*return \()/);
   assert.ok(sign, "the signing handler must exist");
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
   assert.match(sign[1], /signInFlightRef\.current=true/);
