@@ -5,7 +5,7 @@ import SignatureFieldConfirmationPad from"../components/SignatureFieldConfirmati
 import{renderPdfPageToCanvas,describePdfPageError}from"../utils/pdfPageRendering.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 import{getMySignatureProfile,verifyManualSigningAuthority,syncGatewaySigningMirror}from"../firebase/signaturePlatform";
-import{getMySignerIdentity}from"../firebase/signerIdentity";
+import{getMySignerIdentity,updateMySignerAuthority}from"../firebase/signerIdentity";
 import{fetchGatewaySigningResource,submitGatewaySignature,verifyGatewaySignedPdf}from"../firebase/signatureStorage";
 
 async function pngDataUrl(source){
@@ -29,16 +29,12 @@ export default function GatewaySigningPortal({token}){
   useEffect(()=>{let cancelled=false;const controller=new AbortController();(async()=>{if(!pdfDocument||!canvasRef.current)return;setPageError(null);try{const metrics=await renderPdfPageToCanvas(pdfDocument,pageNum,canvasRef.current,{maxWidth:760,maxPixels:4000000,signal:controller.signal});if(!cancelled)setPageSize({width:metrics.width,height:metrics.height});}catch(error){if(!cancelled){console.error("Gateway signing PDF page render failed",{page:pageNum,error});setPageError(describePdfPageError(error));}}})();return()=>{cancelled=true;controller.abort()}},[pdfDocument,pageNum,renderRetry]);
   useEffect(()=>{let cancelled=false;let objectUrl="";(async()=>{setLoading(true);setMessage("");try{
     if(!token)throw new Error("The Gateway signing token is missing.");
-    const [result,savedProfile,identity]=await Promise.all([
-      fetchGatewaySigningResource("/api/sign/open",token),
-      getMySignatureProfile().catch(()=>null),
-      getMySignerIdentity().catch(()=>null)
-    ]);
+    const result=await fetchGatewaySigningResource("/api/sign/open",token);
+    const savedProfile=await getMySignatureProfile().catch(()=>null);
+    const identity=await getMySignerIdentity().catch(()=>null);
     if(!result.signer?.authenticated)throw new Error("Sign in with the invited IRPA account before continuing.");
     const signingRequired=Boolean(result.canSign&&result.status!=="Completed");
     if(signingRequired&&(!savedProfile||savedProfile.status!=="Active"))throw new Error("An active Signature Profile is required before signing this Gateway envelope.");
-    if(signingRequired&&(!identity?.authorityRole||identity.authorityRole==="Not yet assigned"))throw new Error("Your current signing authority has not been registered. Update your Signer Identity capacity before signing.");
-    if(signingRequired&&identity.authorityStatus!=="Current")throw new Error("Your signing authority is "+String(identity?.authorityStatus||"not verified")+". A Current authority is required to sign.");
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
     let initialEvidence=null;
     if(gatewayStatus.status==="Completed"){
@@ -90,6 +86,8 @@ export default function GatewaySigningPortal({token}){
       if(!signatureValue)throw new Error("Tap your assigned signature field and confirm a signature before submitting.");
       const verifiedAuthority=await verifyManualSigningAuthority(manualAuthority);
       if(!verifiedAuthority?.verified)throw new Error("The signing authority could not be verified.");
+      const persistedAuthority=await updateMySignerAuthority({authorityRole:verifiedAuthority.authorityRole,authorityStatus:"Current",authorityDepartment:verifiedAuthority.authorityDepartment,authorityUnit:verifiedAuthority.authorityUnit});
+      setAuthorityIdentity(persistedAuthority);
       const result=await submitGatewaySignature({token,signature:{type:"drawn",value:signatureValue},fieldValues:values,fieldApplications:confirmed,signatureConfirmed:true,manualAuthorityIdentification:manualAuthority,consent});
       const next=await refreshStatus();
       const pdfBytes=await fetchGatewaySigningResource("/api/sign/pdf",token,{pdf:true});
