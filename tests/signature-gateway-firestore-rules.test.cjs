@@ -98,8 +98,14 @@ test("a signer can read only their own saved Signature Profile", async () => {
   await assertFails(db.doc("signatureProfiles/other-signer").get());
   await assertFails(testEnv.unauthenticatedContext().firestore().doc("signatureProfiles/assigned-signer").get());
 });
-test("a signer cannot overwrite another person's saved Signature Profile", async () => {
+test("neither another signer nor an administrator can read or overwrite a saved Signature Profile", async () => {
+  await assertFails(signerDb().doc("signatureProfiles/other-signer").get());
   await assertFails(signerDb().doc("signatureProfiles/other-signer").set({
     uid:"other-signer",email:"other@example.test",signaturePath:"attacker-controlled.png"
+  }));
+  const adminDb=testEnv.authenticatedContext("admin-user",{admin:true,email:"admin@example.test"}).firestore();
+  await assertFails(adminDb.doc("signatureProfiles/assigned-signer").get());
+  await assertFails(adminDb.doc("signatureProfiles/assigned-signer").set({
+    uid:"assigned-signer",email:"signer@example.test",signaturePath:"admin-overwrite.png"
   }));
 });
