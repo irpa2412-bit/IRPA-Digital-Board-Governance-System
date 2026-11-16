@@ -120,7 +120,16 @@ export async function createEnvelope(ctx,user,body){
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
     else signers[i].invitation="Sent";
   }
-  await mutate(ctx,id,async cur=>({patch:{signers:cur.signers.map((signer,index)=>({...signer,invitation:signers[index]?.invitation||signer.invitation})),events:await chainEvents(cur.events,{type:"invitations.updated",at:ctx.now().toISOString()})}}));
+  await mutate(ctx,id,async cur=>{
+    const at=ctx.now().toISOString();
+    const updatedSigners=cur.signers.map((signer,index)=>({...signer,invitation:signers[index]?.invitation||signer.invitation}));
+    let events=cur.events;
+    for(let index=0;index<updatedSigners.length;index++){
+      const signer=updatedSigners[index];
+      events=await chainEvents(events,{type:signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,expiresAt:signer.emailLinkExpiresAt||null,at});
+    }
+    return{patch:{signers:updatedSigners,events}};
+  });
   const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&signers.every(s=>s.uid===user.uid)):ctx.allowReturnTokens;
   return{ok:true,envelopeId:id,status:"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(returnTokens?{tokens:secrets.map((s,i)=>`${id}.S${i+1}.${s}`)}:{})};
 }
