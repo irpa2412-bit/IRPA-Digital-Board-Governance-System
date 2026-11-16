@@ -1,5 +1,7 @@
 import React,{useEffect,useMemo,useState}from"react";
-import{collection,getDocs,query,where}from"firebase/firestore";
+import{collection,getDocs as firestoreGetDocs,query,where}from"firebase/firestore";
+import{runSignatureFirestore}from"../firebase/signatureFirestoreDiagnostics.js";
+const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Document Lifecycle / Translation Requests",userType:"logged-in document owner"},()=>firestoreGetDocs(ref));
 import{db}from"../firebase/config";
 import{createRecord,COLLECTIONS}from"../firebase/data";
 import SignaturePlatform from "./SignaturePlatform";
