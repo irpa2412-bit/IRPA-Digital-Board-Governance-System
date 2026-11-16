@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from "react";
-import {getGoogleDriveGatewayUrl} from "../firebase/signaturePlatform";
+import {getGoogleDriveGatewayUrl} from "../firebase/gatewayUrl";
 
 const NEUTRAL="This signing link is unavailable. Contact the document owner for a new invitation.";
 
