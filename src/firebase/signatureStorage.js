@@ -499,6 +499,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => ({
       identityType:"email-link",
+      permittedAction:String(recipient.permittedAction||recipient.action||recipient.role||"Signature").trim(),
       email:String(recipient.email || "").trim().toLowerCase(),
       occupation:String(recipient.occupation||recipient.capacity||recipient.authorityRole||"").trim(),
       capacity:String(recipient.capacity||recipient.occupation||recipient.authorityRole||"").trim(),
