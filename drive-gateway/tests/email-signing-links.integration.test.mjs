@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
-import {createEnvelope,openEmailSigning,openSigning,getSigningPdf,resendInvitation,revokeInvitation,canAuthenticatedSignerAccess} from "../src/signing.mjs";
+import {createEnvelope,openEmailSigning,openSigning,getSigningPdf,resendInvitation,revokeInvitation,canAuthenticatedSignerAccess,sign} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
 
@@ -147,4 +147,38 @@ test("invitation token exposes only its exact signer fields and never a saved si
   assert.deepEqual(second.fields.map(field=>field.fieldId),["second-signature"]);
   assert.equal(canAuthenticatedSignerAccess({identityType:"email-link",emailLinkStatus:"opened"},null),true);
   assert.equal(canAuthenticatedSignerAccess({identityType:"email-link",emailLinkStatus:"issued"},null),false);
+});
+
+
+test("email-link signer can submit assigned fields with declaration mismatch recorded but not rejected",async()=>{
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+  const f=await fixture({
+    signers:[
+      {identityType:"email-link",email:"first@example.org",name:"Owner Assigned Name",occupation:"Board Secretary",capacity:"Document Signatory",order:1},
+      {identityType:"email-link",email:"second@example.org",name:"Second Signer",occupation:"Officer",capacity:"Reviewer",order:2}
+    ],
+    fields:[
+      {fieldId:"first-signature",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true},
+      {fieldId:"second-signature",type:"Signature",signerId:"S2",page:1,x:40,y:10,width:20,height:8,required:true}
+    ]
+  });
+  await openEmailSigning(f.ctx,f.token,"198.51.100.30");
+  const result=await sign(f.ctx,{
+    token:f.token,
+    signature:{type:"drawn",value:png},
+    fieldValues:{},
+    fieldApplications:[{fieldId:"first-signature",confirmed:true,page:1,x:10,y:10,width:20,height:8,value:png}],
+    signatureConfirmed:true,
+    signerDeclaration:{name:"Signer Declared Name",occupation:"Independent Consultant",capacity:"External Reviewer"},
+    consent:true,
+    user:null
+  });
+  assert.equal(result.status,"InProgress");
+  const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const signer=stored.signers[0];
+  assert.deepEqual(signer.ownerAssignedParticulars,{name:"Owner Assigned Name",occupation:"Board Secretary",capacity:"Document Signatory"});
+  assert.deepEqual(signer.signerDeclaredParticulars,{name:"Signer Declared Name",occupation:"Independent Consultant",capacity:"External Reviewer"});
+  assert.equal(signer.particularsComparison.overallStatus,"MISMATCH");
+  assert.equal(stored.events.at(-1).particularsComparison.overallStatus,"MISMATCH");
+  assert.equal(signer.status,"Signed");
 });
