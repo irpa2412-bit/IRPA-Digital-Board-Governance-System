@@ -109,6 +109,7 @@ async function createEnvelope(s, signer = {
   name: "Gate Five Signer",
   email: "g5.signer@example.org",
   order: 1,
+  identityType: "email-link",
 }) {
   await upload(s);
   const response = await route(
