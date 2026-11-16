@@ -10,6 +10,7 @@ const service = read("../src/firebase/signaturePlatform.js");
 const storage = read("../src/firebase/signatureStorage.js");
 const worker = read("../drive-gateway/src/signing.mjs");
 const pdf = read("../drive-gateway/src/pdf.mjs");
+const certificate = pdf;
 const draftWorker = read("../drive-gateway/src/index.js");
 
 test("page load, Add signer, Save and Create Draft never insert a signature image", () => {
