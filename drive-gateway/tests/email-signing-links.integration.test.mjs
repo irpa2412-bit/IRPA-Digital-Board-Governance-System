@@ -62,8 +62,9 @@ test("email-link signer is stored with token hash, email hash, expiry and issued
   assert.equal(signer.tokenHash,await sha256Hex(f.token.split(".")[2]));
   assert.equal(signer.emailHash,await sha256Hex("board.secretary@example.org"));
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
-  assert.equal(signer.authorityVerification.authorityRole,"Board Secretary");
-  assert.equal(signer.name,"Registered Board Secretary");
+  assert.equal(signer.authorityVerification,undefined);
+  assert.equal(signer.name,"Client supplied name");
+  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",occupation:"Board Secretary",capacity:""});
   assert.equal(f.sent.length,1);
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
@@ -108,8 +109,12 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
   assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"revoked");
 });
 
-test("email link cannot be created without a server-side active register and authority match",async()=>{
-  await assert.rejects(()=>fixture({authority:false}),/does not match a current registered signing authority/);
+test("email-link invitations do not require register, authority-matrix or Firebase UID matches",async()=>{
+  const f=await fixture({authority:false});
+  assert.equal(f.envelope.signers[0].identityType,"email-link");
+  assert.equal(f.envelope.signers[0].uid,null);
+  assert.equal(f.envelope.signers[0].emailLinkStatus,"issued");
+  assert.equal(f.envelope.signers[0].authorityVerification,undefined);
 });
 
 test("duplicate email signer is refused and login-bound signing remains UID authenticated",async()=>{
