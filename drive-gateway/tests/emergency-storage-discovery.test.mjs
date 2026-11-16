@@ -112,3 +112,97 @@ test("a completed discovery run writes one metadata-only audit event", async () 
   assert.equal(write.update.fields.completed.booleanValue, true);
   assert.equal(JSON.stringify(write).includes("file-bytes"), false);
 });
+
+
+test("blob inspection reports contiguous chunks, in-memory PDF measurements, and never returns bytes", async () => {
+  const pdfText = "%PDF-1.4\\n1 0 obj <</Type /Page>> endobj\\n%%EOF";
+  const encoded = btoa(pdfText);
+  const pages = [
+    { body: { fields: { totalChunks: { integerValue: "1" }, fileSize: { integerValue: String(pdfText.length) } } } },
+    { body: { collectionIds: ["chunks"] } },
+    { body: { documents: [{ name: "projects/p/databases/(default)/documents/emergencyBlobs/blob-a/chunks/0", fields: { index: { integerValue: "0" }, data: { bytesValue: encoded }, note: { stringValue: "metadata-only" } } }] } },
+    { status: 404 }, { status: 404 }, { status: 404 }, { status: 404 }
+  ];
+  const { route, calls } = fixture({ firestorePages: pages });
+  const response = await route(new Request("https://worker.test/api/signature-pathway/emergency-storage", {
+    method: "POST", headers: { Authorization: "Bearer user-token", "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "inspectBlob", collectionPath: "emergencyBlobs", documentId: "blob-a" })
+  }), {});
+  assert.equal(response.status, 200);
+  const resultText = await response.text();
+  const result = JSON.parse(resultText);
+  const detail = result.subcollections[0];
+  assert.equal(detail.chunkDocumentCount, 1);
+  assert.equal(detail.indexesContiguous, true);
+  assert.equal(detail.totalChunksMatchesActual, true);
+  assert.equal(detail.byteLength, pdfText.length);
+  assert.equal(detail.startsWithPdfHeader, true);
+  assert.equal(detail.mimeTypeImplied, "application/pdf");
+  assert.equal(detail.pdfPageCount, 1);
+  assert.equal(detail.parentSizeMatches, true);
+  const expectedDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pdfText));
+  const expectedHash = Array.from(new Uint8Array(expectedDigest), byte => byte.toString(16).padStart(2, "0")).join("");
+  assert.equal(detail.sha256, expectedHash);
+  assert.equal(resultText.includes(encoded), false);
+  assert.equal(resultText.includes(pdfText), false);
+  assert.equal(calls.length, 7, "one parent record is inspected in one bounded request");
+});
+
+test("blob inspection detects chunk index gaps and parent size mismatches", async () => {
+  const data = "AB";
+  const pages = [
+    { body: { fields: { totalChunks: { integerValue: "3" }, fileSize: { integerValue: "99" } } } },
+    { body: { collectionIds: ["chunks"] } },
+    { body: { documents: [
+      { name: "projects/p/databases/(default)/documents/emergencyBlobs/blob-gap/chunks/0", fields: { index: { integerValue: "0" }, data: { stringValue: "A" } } },
+      { name: "projects/p/databases/(default)/documents/emergencyBlobs/blob-gap/chunks/2", fields: { index: { integerValue: "2" }, data: { stringValue: "B" } } }
+    ] } },
+    { status: 404 }, { status: 404 }, { status: 404 }, { status: 404 }
+  ];
+  const { route } = fixture({ firestorePages: pages });
+  const response = await route(new Request("https://worker.test/api/signature-pathway/emergency-storage", {
+    method: "POST", headers: { Authorization: "Bearer user-token" },
+    body: JSON.stringify({ action: "inspectBlob", collectionPath: "emergencyBlobs", documentId: "blob-gap" })
+  }), {});
+  const detail = (await response.json()).subcollections[0];
+  assert.equal(detail.indexesContiguous, false);
+  assert.equal(detail.chunkDocumentCount, 2);
+  assert.equal(detail.totalChunksMatchesActual, false);
+  assert.equal(detail.parentSizeMatches, false);
+  assert.equal(detail.byteLength, data.length);
+});
+
+test("blob inspection reports missing chunk subcollections without reconstructing content", async () => {
+  const pages = [
+    { body: { fields: { totalChunks: { integerValue: "1" } } } },
+    { body: { collectionIds: [] } }
+  ];
+  const { route, calls } = fixture({ firestorePages: pages });
+  const response = await route(new Request("https://worker.test/api/signature-pathway/emergency-storage", {
+    method: "POST", headers: { Authorization: "Bearer user-token" },
+    body: JSON.stringify({ action: "inspectBlob", collectionPath: "emergencyBlobs", documentId: "blob-missing" })
+  }), {});
+  const result = await response.json();
+  assert.deepEqual(result.subcollectionIds, []);
+  assert.deepEqual(result.subcollections, []);
+  assert.equal(calls.length, 2);
+});
+
+test("one emergency blob maps to two documents while other affected documents have no blob", async () => {
+  const pages = [
+    { body: { fields: { totalChunks: { integerValue: "1" } } } },
+    { body: { collectionIds: ["chunks"] } },
+    { body: { documents: [{ name: "projects/p/databases/(default)/documents/emergencyBlobs/blob-shared/chunks/0", fields: { index: { integerValue: "0" }, data: { stringValue: "X" } } }] } },
+    { body: { fields: { fileId: { stringValue: "firestore-emergency://blob-shared" }, fileSize: { integerValue: "1" } } } },
+    { body: { fields: { fileId: { stringValue: "firestore-emergency://blob-shared" }, fileSize: { integerValue: "1" } } } },
+    { status: 404 }, { status: 404 }
+  ];
+  const { route } = fixture({ firestorePages: pages });
+  const response = await route(new Request("https://worker.test/api/signature-pathway/emergency-storage", {
+    method: "POST", headers: { Authorization: "Bearer user-token" },
+    body: JSON.stringify({ action: "inspectBlob", collectionPath: "emergencyBlobs", documentId: "blob-shared" })
+  }), {});
+  const linked = (await response.json()).subcollections[0].linkedDocuments;
+  assert.equal(linked.filter(item => item.hasBlob).length, 2);
+  assert.equal(linked.filter(item => item.hasBlob === false).length, 2);
+});
