@@ -13,7 +13,8 @@ const read = path => readFile(new URL(path, import.meta.url), "utf8");
 test("Gateway envelope creation rejects duplicate UIDs and duplicate emails and validates signing mode", async () => {
   const source = await read("../src/signing.mjs");
   assert.match(source, /if\(!\["Sequential","Parallel"\]\.includes\(signingMode\)\)/);
-  assert.match(source, /email=validateEmail\(s\?\.email\)\.trim\(\)\.toLowerCase\(\)/);  assert.match(source, /if\(seenEmails\.has\(email\)\)throw new HttpError\(400,"Duplicate signer email\."/);
+  assert.match(source, /email=validateEmail\(s\?\.email\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(source, /if\(seenEmails\.has\(email\)\)throw new HttpError\(400,"Duplicate signer email\."/);
   assert.match(source, /if\(uid&&seenUids\.has\(uid\)\)throw new HttpError\(400,"Duplicate signer UID\."/);
   assert.match(source, /meta\.create\("externalReferences",reservationKey/);
 });
