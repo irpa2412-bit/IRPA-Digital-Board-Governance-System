@@ -1,4 +1,13 @@
-import { arrayUnion, collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { arrayUnion, collection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, query, runTransaction as firestoreRunTransaction, serverTimestamp, setDoc as firestoreSetDoc, updateDoc as firestoreUpdateDoc, where, writeBatch as firestoreWriteBatch } from "firebase/firestore";
+import { runSignatureFirestore, wrapSignatureBatch } from "./signatureFirestoreDiagnostics.js";
+const SIGNATURE_SCREEN="Signature workflow";
+const SIGNATURE_USER_TYPE="logged-in owner or signer";
+const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreGetDoc(ref));
+const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreGetDocs(ref));
+const setDoc=(ref,data,options)=>runSignatureFirestore({operation:"setDoc",target:ref,screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreSetDoc(ref,data,options));
+const updateDoc=(ref,data)=>runSignatureFirestore({operation:"updateDoc",target:ref,screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreUpdateDoc(ref,data));
+const runTransaction=(...args)=>runSignatureFirestore({operation:"runTransaction",collectionPath:"signatureProfiles/[masked]+signatureEvents/[masked]",screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE},()=>firestoreRunTransaction(...args));
+const writeBatch=(...args)=>wrapSignatureBatch(firestoreWriteBatch(...args),{screen:SIGNATURE_SCREEN,userType:SIGNATURE_USER_TYPE,collectionPath:"signatureEnvelopes/[masked]+documents/[masked]"});
 import { requireSupportedSignatureRoutingMode } from "./signatureWorkflowPolicy.js";
 import { omitUndefinedFirestoreFields } from "./firestorePayload.js";
 import { createGatewaySignatureEnvelope, voidGatewaySignatureEnvelope, downloadSignatureBytes, downloadControlledDocumentBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes, fetchGatewaySigningStatus, fetchGatewaySigningResource, submitGatewaySignature, verifyGatewaySignedPdf } from "./signatureStorage";
