@@ -77,7 +77,7 @@ test("email invitation security is based on token integrity and email binding, n
   assert.equal(issued.record.emailHash,await hashNormalizedEmail("EXTERNAL@example.org"));
   assert.equal(issued.record.status,"issued");
   assert.equal(issued.record.tokenHash,await sha256Hex(issued.token));
-  assert.equal(issued.record.token.length,64);
+  assert.equal(issued.token.length,64);
 });
 
 test("email hashing normalizes whitespace and case", async () => {
