@@ -348,6 +348,7 @@ export async function rollbackCryptographicEvidence(meta, envelopeId) {
   }
 }
 
+// UID signers retain secret-backed keys; external email-link assignments use the Gateway-only Durable Object key path.
 export async function sealAndPersist({
   meta,
   storage,
