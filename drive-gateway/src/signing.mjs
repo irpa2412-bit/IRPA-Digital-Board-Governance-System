@@ -53,10 +53,10 @@ export function validateFieldValues(fields,signer,values,signature,fieldApplicat
     if(f.type==="Signature"||f.type==="Initials"){
       value=applications.get(f.fieldId);
       if(!value){if(f.required)throw new HttpError(400,"Tap the assigned "+f.type.toLowerCase()+" field and confirm it before signing.");continue}
-      if(f.type==="Signature"&&signature?.value!==value)throw new HttpError(400,"The signer evidence must match the explicitly confirmed signature field.");
+      // Each assigned Signature/Initials field carries its own confirmed specimen; signer-level evidence remains a separate transaction event.
     }else if(f.type==="Checkbox"){
       value=value===true||value==="true"?"true":value===false||value==="false"?"false":"";
-      if(f.required&&!value)throw new HttpError(400,"Complete the required checkbox field.");
+      if(f.required&&value!=="true")throw new HttpError(400,"Complete the required checkbox field.");
     }else{
       value=String(value??"").trim();
       if(f.required&&!value)throw new HttpError(400,"Complete the required "+f.type.toLowerCase()+" field.");
