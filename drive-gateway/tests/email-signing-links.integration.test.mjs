@@ -20,7 +20,7 @@ async function fixture({authority=true,failMail=false}={}) {
     sendInvitation:async message=>{sent.push(message);if(failMail)throw new Error("SMTP rejected");},
     logger:{error(){}}
   });
-  const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA read-only email signing preview");
+  const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
   const source=await ctx.storage.put({path:"source/email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
   const documentId="DOC-EMAIL-"+Math.random().toString(16).slice(2,10);
   await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"email-link.pdf",title:"Email Link Governance Instrument",classification:"Restricted"});
