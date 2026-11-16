@@ -1,5 +1,4 @@
 import { sha256Hex, safeEqual } from "./util.mjs";
-import { gatewayAuthorityCandidates, normalizeGatewayAuthority, resolveGatewayAuthorityLabel } from "./signatureAuthority.mjs";
 
 const NEUTRAL = "This signing link is unavailable. Contact the document owner for a new invitation.";
 const normalizeEmail = value => String(value || "").trim().toLowerCase();
@@ -71,10 +70,6 @@ export function revokeEmailSigningToken(record,{now=new Date(),actorUid=""}={}){
   return {...record,status:"revoked",revokedAt:new Date(now).toISOString(),revokedByUid:String(actorUid||"")};
 }
 
-function isActive(record){
-  const status=String(record?.status||record?.employmentStatus||record?.registrationStatus||"").trim().toLowerCase();
-  return ["active","activated"].includes(status)&&record?.accountActivated!==false;
-}
 
 function matrixAllows(role,matrix){
   const wanted=normalizeGatewayAuthority(role);
