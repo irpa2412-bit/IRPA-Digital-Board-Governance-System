@@ -14,6 +14,7 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
+import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../src/invitationEmail.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
@@ -104,6 +105,16 @@ test("duplicate signer and compare-and-set policy remain enforced", () => {
 test("registered login-based signing access remains UID-bound", () => {
   assert.equal(canAuthenticatedSignerAccess({uid:"member-1"},{uid:"member-1"}),true);
   assert.equal(canAuthenticatedSignerAccess({uid:"member-1"},{uid:"other"}),false);
+});
+
+test("email invitation has real plain-text newlines and one HTML/plain-text SMTP send",async()=>{
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
+  assert.match(message.text,/\nDocument: Board Policy/);
+  assert.doesNotMatch(message.text,/\\n/);
+  assert.match(message.html,/href=/);
+  let calls=0;
+  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);return {ok:true};},logger:{warn(){},error(){}}});
+  assert.equal(calls,1);
 });
 
 test("mail delivery is delegated once to the existing Worker invitation sender", () => {
