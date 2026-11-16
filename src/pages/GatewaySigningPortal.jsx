@@ -21,7 +21,7 @@ async function pngDataUrl(source){
   return result;
 }
 
-export default function GatewaySigningPortal({token}){
+export default function GatewaySigningPortal({token,emailLink=false}){
   const[opened,setOpened]=useState(null),[profile,setProfile]=useState(null);
   const[values,setValues]=useState({}),[applications,setApplications]=useState({}),[signaturePad,setSignaturePad]=useState(null),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[message,setMessage]=useState(""),[pdfUrl,setPdfUrl]=useState(""),[status,setStatus]=useState(null),[evidence,setEvidence]=useState(null);
   const canvasRef=useRef(null),[pdfDocument,setPdfDocument]=useState(null),[pageNum,setPageNum]=useState(1),[pageSize,setPageSize]=useState({width:760,height:980}),[pageError,setPageError]=useState(null),[pdfLoadError,setPdfLoadError]=useState(null),[renderRetry,setRenderRetry]=useState(0),[pdfLoadRetry,setPdfLoadRetry]=useState(0);
@@ -29,6 +29,7 @@ export default function GatewaySigningPortal({token}){
   useEffect(()=>{let cancelled=false;const controller=new AbortController();(async()=>{if(!pdfDocument||!canvasRef.current)return;setPageError(null);try{const metrics=await renderPdfPageToCanvas(pdfDocument,pageNum,canvasRef.current,{maxWidth:760,maxPixels:4000000,signal:controller.signal});if(!cancelled)setPageSize({width:metrics.width,height:metrics.height});}catch(error){if(!cancelled){console.error("Gateway signing PDF page render failed",{page:pageNum,error});setPageError(describePdfPageError(error));}}})();return()=>{cancelled=true;controller.abort()}},[pdfDocument,pageNum,renderRetry]);
   useEffect(()=>{let cancelled=false;let objectUrl="";(async()=>{setLoading(true);setMessage("");try{
     if(!token)throw new Error("The Gateway signing token is missing.");
+    if(emailLink){try{window.history.replaceState({},document.title,window.location.pathname+window.location.hash);}catch{}await fetchGatewaySigningResource("/api/sign/email/open",token);}
     const result=await fetchGatewaySigningResource("/api/sign/open",token);
     const assignedAccount=Boolean(result.signer?.uid&&auth.currentUser?.uid===result.signer.uid);
     if(result.signer?.identityType==="email-link"&&!result.signer?.emailVerified)throw new Error("Verify the invitation email link before continuing.");
