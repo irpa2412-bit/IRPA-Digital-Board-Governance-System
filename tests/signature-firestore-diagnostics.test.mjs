@@ -13,7 +13,7 @@ const selfTest = read("../src/components/SignaturePathwaySelfTest.jsx");
 const worker = read("../drive-gateway/src/index.js");
 
 test("one shared Firestore wrapper emits only masked, non-payload diagnostic metadata", () => {
-  assert.match(diagnostic, /export async function runSignatureFirestore/);
+  assert.match(diagnostic, /export function runSignatureFirestore/);
   assert.match(diagnostic, /maskPath\(collectionPath\|\|targetPath\(target\)\)/);
   assert.match(diagnostic, /errorCode:safeCode\(error\)/);
   assert.doesNotMatch(diagnostic, /error\.message|error\.stack|request\.auth|Authorization|email:/);
