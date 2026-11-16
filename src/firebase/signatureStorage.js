@@ -503,7 +503,6 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     signers:ordered.map((recipient,index) => ({
       identityType:"email-link",
       email:String(recipient.email || "").trim().toLowerCase(),
-      authorityRole:String(recipient.authorityRole||"").trim(),
       name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
       occupation:String(recipient.occupation||recipient.capacity||recipient.role||"").trim(),
       capacity:String(recipient.capacity||"").trim(),
