@@ -36,7 +36,8 @@ export default function GatewaySigningPortal({token,emailLink=false}){
     const verifiedProfileOwner=Boolean(auth.currentUser?.uid&&auth.currentUser?.emailVerified&&String(auth.currentUser?.email||"").trim().toLowerCase()===String(result.signer?.email||"").trim().toLowerCase()&&(!result.signer?.uid||auth.currentUser.uid===result.signer.uid));
     if(result.signer?.identityType==="email-link"&&!result.signer?.emailVerified)throw new Error("Verify the invitation email link before continuing.");
     if(result.signer?.identityType!=="email-link"&&!assignedAccount)throw new Error("Sign in as the account assigned to this signing task.");
-    const savedProfile=(assignedAccount||verifiedProfileOwner)?await getMySignatureProfile().catch(()=>null):null;
+    const retrievedProfile=(assignedAccount||verifiedProfileOwner)?await getMySignatureProfile().catch(()=>null):null;
+    const savedProfile=retrievedProfile?.status==="Active"?retrievedProfile:null;
     const gatewayStatus=await fetchGatewaySigningResource("/api/sign/status",token);
     let initialEvidence=null;
     if(gatewayStatus.status==="Completed"&&result.signer?.uid){
