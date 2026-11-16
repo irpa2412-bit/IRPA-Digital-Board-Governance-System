@@ -83,7 +83,10 @@ test("email link opens once, changes status to opened and exposes only its contr
   assert.equal(stored.signers[0].emailLinkOpenCount,1);
   const pdf=await getSigningPdf(f.ctx,f.token,null);
   assert.equal(pdf.fileName,"email-link.pdf");
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
+  const resumed=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  assert.equal(resumed.ok,true);
+  const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the redeemed invitation must not redeem it a second time");
 });
 
 test("expired, tampered, unknown and revoked links return the same neutral response",async()=>{
