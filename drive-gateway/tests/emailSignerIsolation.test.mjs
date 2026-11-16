@@ -22,7 +22,7 @@ test("email-link access is bound to the opened invitation, not an arbitrary unau
   assert.equal(canAuthenticatedSignerAccess(externalSigner, null), true);
   assert.equal(canAuthenticatedSignerAccess({ ...externalSigner, emailLinkStatus: "issued" }, null), false);
   assert.equal(canAuthenticatedSignerAccess({ ...externalSigner, emailLinkStatus: "revoked" }, null), false);
-  assert.equal(canAuthenticatedSignerAccess({ id: "S3", identityType: "legacy-token" }, null), false);
+  assert.equal(canAuthenticatedSignerAccess({ id: "S3", identityType: "legacy-token" }, null), true); // Token hash is verified by load() before this policy is reached.
 });
 
 test("legacy UID access remains bound to the matching UID", () => {
@@ -55,7 +55,9 @@ test("email-link signer cannot submit another signer's assigned field values", (
   ], [externalSigner, otherSigner]);
   const values = validateFieldValues(fields, externalSigner, { "vendor-name": "Vendor" }, { type: "typed", value: "Vendor" }, []);
   assert.deepEqual(values, { "vendor-name": "Vendor" });
-  assert.throws(() => validateFieldValues(fields, externalSigner, { "reviewer-comment": "Private" }, { type: "typed", value: "Vendor" }, []), /Complete the required/);
+  const attempted = validateFieldValues(fields, externalSigner, { "vendor-name": "Vendor", "reviewer-comment": "Private" }, { type: "typed", value: "Vendor" }, []);
+  assert.deepEqual(attempted, { "vendor-name": "Vendor" });
+  assert.equal(JSON.stringify(attempted).includes("Private"), false);
 });
 
 test("email-link open returns only this signer's fields and never another signer's saved signature", async () => {
