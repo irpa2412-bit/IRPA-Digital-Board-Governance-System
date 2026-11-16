@@ -418,6 +418,7 @@ test("G5-09 — retry persistence", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const token = s.tokenFor("g5.signer@example.org");
+  assert.equal((await route(get("/api/sign/email/open", { token }), s.ctx)).status, 200);
 
   s.storage.failPutWhen = (n) => n === 4;
   assert.equal(
