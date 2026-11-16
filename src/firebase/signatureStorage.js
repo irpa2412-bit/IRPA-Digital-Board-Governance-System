@@ -492,6 +492,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => ({
       email:String(recipient.email || "").trim().toLowerCase(),
+      authorityRole:String(recipient.authorityRole||"").trim(),
       name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
       order:envelope.signingMode === "Parallel" ? 1 : index + 1
     })),
