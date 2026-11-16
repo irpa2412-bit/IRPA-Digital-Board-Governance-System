@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { omitUndefinedFirestoreFields } from "../src/firebase/firestorePayload.js";
 
 const signingService = readFileSync(
@@ -49,5 +50,37 @@ test("workflow-history sanitizer preserves null and rejects undefined array entr
   assert.throws(
     () => omitUndefinedFirestoreFields({ fields: ["ok", undefined] }),
     /Undefined array entry/
+  );
+});
+
+test("every signing-application reference to the sanitizer is declared in module scope", () => {
+  const roots = ["src", "drive-gateway/src"];
+  const sourceFiles = [];
+  const visit = directory => {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      if (statSync(path).isDirectory()) visit(path);
+      else if (/\\.(?:mjs|js|jsx|ts|tsx)$/.test(name)) sourceFiles.push(path);
+    }
+  };
+  roots.forEach(visit);
+
+  const references = [];
+  for (const path of sourceFiles) {
+    const source = readFileSync(path, "utf8");
+    if (!source.includes("omitUndefinedFirestoreFields")) continue;
+    const declared =
+      /\\bimport\\s*\\{[^}]*\\bomitUndefinedFirestoreFields\\b[^}]*\\}\\s*from\\s*["'][^"']+["']/.test(source) ||
+      /\\bexport\\s+function\\s+omitUndefinedFirestoreFields\\b/.test(source) ||
+      /\\bfunction\\s+omitUndefinedFirestoreFields\\b/.test(source) ||
+      /\\bconst\\s+omitUndefinedFirestoreFields\\s*=/.test(source);
+    assert.ok(declared, `${relative(process.cwd(), path)} references the sanitizer without a module-scope declaration/import`);
+    references.push(relative(process.cwd(), path));
+  }
+
+  assert.deepEqual(
+    references.sort(),
+    ["src/firebase/firestorePayload.js", "src/firebase/signaturePlatform.js"].sort(),
+    "the sanitizer should have one implementation module and one signing-service consumer"
   );
 });
