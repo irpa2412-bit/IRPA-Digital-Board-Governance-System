@@ -96,3 +96,26 @@ test("32 a non-signing pending signer can receive a reminder with a rotated toke
   const signed=await route(post("/api/sign/submit",{token:refreshed,consent:true,signature:{type:"typed",value:"Amina"} },"u2"),s.ctx);
   assert.equal(signed.status,200);
 });
+
+test("33 failed completion notice retries only the undelivered recipient",async()=>{
+  const s=setup(),original=s.ctx.sendCompletionNotice;let failOnce=true;
+  s.ctx.sendCompletionNotice=async notice=>{if(notice.to==="two@example.org"&&failOnce){failOnce=false;throw new Error("temporary SMTP failure")}return original(notice)};
+  const id=await env(s,[{name:"Signer Two",email:"two@example.org",uid:"u2",order:1},{name:"Signer Three",email:"three@example.org",uid:"u3",order:2}]);
+  const first=await route(post("/api/sign/submit",{token:s.tokenFor("two@example.org"),consent:true,signature:{type:"typed",value:"Signer Two"} },"u2"),s.ctx);
+  assert.equal(first.status,200);
+  const last=await route(post("/api/sign/submit",{token:s.tokenFor("three@example.org"),consent:true,signature:{type:"typed",value:"Signer Three"} },"u3"),s.ctx);
+  assert.equal(last.status,200);assert.equal((await last.json()).completed,true);
+  let completed=await s.meta.get("envelopes",id);
+  assert.equal(completed.completion.notifications["two@example.org"].status,"Failed");
+  assert.equal(completed.completion.notifications["owner@example.org"].status,"Sent");
+  assert.equal(completed.completion.notifications["three@example.org"].status,"Sent");
+  const retry=await route(post("/api/envelopes/"+id+"/retry-completion",{},"u1"),s.ctx);
+  assert.equal(retry.status,200);
+  completed=await s.meta.get("envelopes",id);
+  assert.equal(completed.completion.notifications["two@example.org"].status,"Sent");
+  assert.equal(completed.completion.notifications["owner@example.org"].status,"Sent");
+  assert.equal(completed.completion.notifications["three@example.org"].status,"Sent");
+  assert.equal(s.notices.filter(notice=>notice.to==="owner@example.org").length,1);
+  assert.equal(s.notices.filter(notice=>notice.to==="three@example.org").length,1);
+  assert.equal(s.notices.filter(notice=>notice.to==="two@example.org").length,1);
+});
