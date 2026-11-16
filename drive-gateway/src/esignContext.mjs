@@ -108,8 +108,7 @@ export class EsignRecordDurableObject {
           const pair=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
           const publicKeyJwk=await crypto.subtle.exportKey("jwk",pair.publicKey);
           const privatePkcs8=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
-          const privateKey=await crypto.subtle.importKey("pkcs8",privatePkcs8,{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
-          record={keyId,envelopeId,signerId,emailHash,privateKey,publicKeyJwk:{kty:publicKeyJwk.kty,crv:publicKeyJwk.crv,x:publicKeyJwk.x,y:publicKeyJwk.y,ext:true},createdAt:new Date().toISOString()};
+          record={keyId,envelopeId,signerId,emailHash,privatePkcs8:new Uint8Array(privatePkcs8),publicKeyJwk:{kty:publicKeyJwk.kty,crv:publicKeyJwk.crv,x:publicKeyJwk.x,y:publicKeyJwk.y,ext:true},createdAt:new Date().toISOString()};
           await this.state.storage.put(recordKey,record);
         }
         return Response.json({ok:true,keyId,publicKeyJwk:record.publicKeyJwk});
@@ -123,7 +122,8 @@ export class EsignRecordDurableObject {
         let payload;
         try{payload=JSON.parse(canonicalPayload)}catch{return Response.json({ok:false,error:"Invalid canonical signer payload."},{status:400})}
         if(payload.envelopeId!==record.envelopeId||payload.signerId!==record.signerId||payload.signerIdentityType!=="email-link"||payload.signerIdentityHash!==record.emailHash||payload.keyId!==keyId)return Response.json({ok:false,error:"Signer-key identity mismatch."},{status:403});
-        const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},record.privateKey,new TextEncoder().encode(canonicalPayload));
+        const privateKey=await crypto.subtle.importKey("pkcs8",record.privatePkcs8,{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+        const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},privateKey,new TextEncoder().encode(canonicalPayload));
         const bytes=new Uint8Array(signature);let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
         return Response.json({ok:true,signature:btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")});
       }
