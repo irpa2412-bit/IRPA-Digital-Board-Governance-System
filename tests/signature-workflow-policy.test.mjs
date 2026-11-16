@@ -205,6 +205,13 @@ test("email invitation tokens scope fields to one signer and never expose anothe
   assert.match(rules, /allow delete:if false/);
 });
 
+test("Gateway-linked envelopes cannot fall back to client-side UID signing",()=>{
+  const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  const firebase=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+  assert.match(portal,/selected\.gatewayEnvelopeId&&!window\.sessionStorage\.getItem\("irpaGatewaySigningToken"\)/);
+  assert.match(firebase,/envelope\?\.gatewayEnvelopeId&&\(typeof window==="undefined"\|\|!window\.sessionStorage\?\.getItem\("irpaGatewaySigningToken"\)\)/);
+});
+
 test("email invitations carry owner-assigned PDF fields and permitted action into the Gateway",()=>{
   const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
   const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
