@@ -209,8 +209,8 @@ test("email invitations carry owner-assigned PDF fields and permitted action int
   const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
   const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
   const signing=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
-  assert.match(storage,/const signerIdByAssignment=new Map/);
-  assert.match(storage,/signerId:signerIdByAssignment\.get/);
+  assert.match(storage,/const signerIdByAssignment\s*=\s*new Map/);
+  assert.match(storage,/signerId:\s*signerIdByAssignment\.get/);
   assert.match(storage,/permittedAction:String\(recipient\.permittedAction/);
   assert.match(portal,/fields:env\.fields\|\|\[\]/);
   assert.match(portal,/gatewayRecipients=\[\.\.\.\(ownerSigningEnabled\?/);
