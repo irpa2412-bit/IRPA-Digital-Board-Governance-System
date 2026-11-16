@@ -133,6 +133,10 @@ test("portal Signature Lifecycle self-test reports stages, HTTP status and detai
   assert.doesNotMatch(selfTest, /console\.log\([^)]*base64/i);
   assert.match(viteConfig, /manualChunks\(id\)/);
   assert.match(viteConfig, /return "signing-workspace"/);
+  assert.match(viteConfig, /return "document-lifecycle-module"/);
+  assert.match(frontendDeploy, /Verify live DocumentLifecycleModule SHA-256/);
+  assert.match(frontendDeploy, /local_sha=.*sha256sum/);
+  assert.match(frontendDeploy, /live_sha=.*sha256sum/);
   assert.match(frontendDeploy, /Verify live signing-workspace chunk/);
   assert.match(frontendDeploy, /curl --fail/);
   assert.match(frontendDeploy, /cmp -s "\$local_chunk" "\$live_chunk"/);
