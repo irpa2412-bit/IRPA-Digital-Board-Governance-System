@@ -134,6 +134,8 @@ function submit(token, signature) {
 async function completeSingle(s, signature) {
   const envelopeId = await createEnvelope(s);
   const token = s.tokenFor("g5.signer@example.org");
+  const opened = await route(get("/api/sign/open", { token }), s.ctx);
+  assert.equal(opened.status, 200);
   const response = await route(submit(token, signature), s.ctx);
   assert.equal(response.status, 200);
   const body = await response.json();
