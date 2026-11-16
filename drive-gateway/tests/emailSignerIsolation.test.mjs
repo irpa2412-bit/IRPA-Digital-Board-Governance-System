@@ -23,7 +23,7 @@ test("email-link access is bound to the opened invitation, not an arbitrary unau
   assert.equal(canAuthenticatedSignerAccess(externalSigner, null), true);
   assert.equal(canAuthenticatedSignerAccess({ ...externalSigner, emailLinkStatus: "issued" }, null), false);
   assert.equal(canAuthenticatedSignerAccess({ ...externalSigner, emailLinkStatus: "revoked" }, null), false);
-  assert.equal(canAuthenticatedSignerAccess({ id: "S3", identityType: "legacy-token" }, null), true); // Token hash is verified by load() before this policy is reached.
+  assert.equal(canAuthenticatedSignerAccess({ id: "S3", identityType: "legacy-token" }, null), false);
 });
 
 test("legacy UID access remains bound to the matching UID", () => {
