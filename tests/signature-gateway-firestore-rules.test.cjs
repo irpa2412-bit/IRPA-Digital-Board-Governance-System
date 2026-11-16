@@ -147,3 +147,16 @@ test("authenticated external signer can update only the signing workflow fields 
   });
   await assertSucceeds(batch.commit());
 });
+
+
+test("signing workflow does not attempt to rewrite immutable document archive metadata", async () => {
+  const source = fs.readFileSync("src/firebase/signaturePlatform.js", "utf8");
+  for (const field of [
+    "documentArchiveCategory:envelope.documentArchiveCategory",
+    "documentType:envelope.documentType",
+    "documentUploadedAt:envelope.documentUploadedAt",
+    "documentUploadDestinationKey:envelope.documentUploadDestinationKey"
+  ]) {
+    assert.equal(source.includes(field), false, `signing workflow must not write ${field}`);
+  }
+});
