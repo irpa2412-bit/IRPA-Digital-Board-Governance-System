@@ -88,7 +88,7 @@ export async function createEnvelope(ctx,user,body){
     if(uid)seenUids.add(uid);
     const signerId=`S${i+1}`,secret=randomHex(32),emailLink=s?.identityType==="email-link",authority=emailLink?await ctx.verifyEmailSignerAuthority?.(email,s?.authorityRole||""):null;
     if(emailLink&&authority?.verified!==true)throw new HttpError(403,"The email address does not match a current registered signing authority.");
-    if(!uid&&!emailLink&&!ctx.allowReturnTokens)throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
+    if(!uid&&!emailLink&&!ctx.allowLegacyTestSigners)throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
     const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
     const finalSecret=issued?.token||secret;secrets.push(finalSecret);
     signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,name:validateName(emailLink?(authority?.name||email):(s?.name||email)),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:emailLink?"email-link":uid?"account":"legacy-token",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{},authorityVerification:{authorityRole:authority.authorityRole,sourceCollection:authority.sourceCollection,sourceRecordId:authority.sourceRecordId,verifiedAt:ctx.now().toISOString()}}:{})});
