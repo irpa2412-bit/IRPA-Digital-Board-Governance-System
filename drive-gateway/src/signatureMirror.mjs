@@ -18,7 +18,10 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       status: s.status || "", signedAt: s.signedAt || null,
       role: s.role || prior?.role || prior?.action || "",
       action: s.action || prior?.action || prior?.role || "",
-      authorityRole: s.authorityVerification?.authorityRole || ""
+      authorityRole: s.authorityVerification?.authorityRole || "",
+      ownerDeclaredParticulars:s.declaredParticulars||{},
+      signerDeclarations:s.signerDeclarations||{},
+      declarationDiscrepancy:s.declarationDiscrepancy||null
     };
   });
   const lastSignedByUid = [...signers].reverse().find(s => s.uid && s.status === "Signed")?.uid || null;
@@ -60,6 +63,9 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
         envelopeId,
         event: "Gateway Signer Signed",
         actorUid: signer.uid || "",
+        actorEmail: signer.email || "",
+        signerId: assignedSigner?.id || null,
+        declarationDiscrepancy: assignedSigner?.declarationDiscrepancy || null,
         signedAt: signer.signedAt || timestamp
       });
     }
