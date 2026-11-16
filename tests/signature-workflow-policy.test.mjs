@@ -182,22 +182,29 @@ test("signature assignment and signing handlers synchronously reject repeated su
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
 });
 
-test("verified register authority, not a racy Signer Identity read, gates signing", () => {
-  const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
+test("email invitation tokens scope fields to one signer and never expose another saved signature profile", () => {
   const gatewayPortal = fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx", import.meta.url), "utf8");
-  const identity = fs.readFileSync(new URL("../src/firebase/signerIdentity.js", import.meta.url), "utf8");
+  const gateway = fs.readFileSync(new URL("../drive-gateway/src/signing.mjs", import.meta.url), "utf8");
+  const rules = fs.readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
-  const authorityCheck = platform.indexOf("const authorityVerification=await verifyManualSigningAuthority(manualAuthorityIdentification)");
-  const identityEnsure = platform.indexOf("await ensureMySignerIdentity(profile,{organisationName:IRPA_ORGANISATION})", authorityCheck);
-  const authorityPersist = platform.indexOf("await updateMySignerAuthority({authorityRole:authorityVerification.authorityRole,authorityStatus:\"Current\"", identityEnsure);
-  assert.ok(authorityCheck >= 0 && identityEnsure > authorityCheck && authorityPersist > identityEnsure, "verify the register authority before persisting the Signer Identity mirror");
-  assert.match(platform, /updateMySignerAuthority\(\{authorityRole:authorityVerification\.authorityRole,authorityStatus:"Current"/);
-  assert.doesNotMatch(platform, /const signerIdentity=await getMySignerIdentity\(\);if\(!signerIdentity\?\.authorityRole/);
-  assert.match(gatewayPortal, /const savedProfile=await getMySignatureProfile\(\)\.catch\(\(\)=>null\);\s*const identity=await getMySignerIdentity\(\)\.catch\(\(\)=>null\);/);
-  assert.match(gatewayPortal, /const persistedAuthority=await updateMySignerAuthority\(\{authorityRole:verifiedAuthority\.authorityRole,authorityStatus:"Current"/);
-  assert.doesNotMatch(gatewayPortal, /identity\?\.authorityRole\|\|identity\.authorityRole==="Not yet assigned"/);
-  assert.match(identity, /fetch\(gateway\+"\/api\/signature\/authority"/);
-  assert.match(platform, /return await syncGatewaySigningMirror\(status\.externalReference,after\)/);
-  assert.match(platform, /Gateway signing audit chain verification failed; the Signature Portal workflow was not advanced/);
+  assert.match(gateway, /signerById=new Map/);
+  assert.match(gateway, /signerId:assigned\.id/);
+  assert.match(gateway, /f\.signerId===signer\.id/);
+  assert.match(gateway, /identityType==="email-link"\) return signer\.emailLinkStatus==="opened"/);
+  assert.doesNotMatch(gateway, /ctx\.verifyEmailSignerAuthority|ctx\.verifySigningAuthority/);
+  assert.match(app, /<GatewaySigningPortal token=\{emailSigningToken\} emailLink\/>/);
+  assert.match(gatewayPortal, /fetchGatewaySigningResource\("\/api\/sign\/email\/open",token\)/);
+  assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
+  assert.match(gatewayPortal, /const assignedAccount=Boolean\(result\.signer\?\.uid&&auth\.currentUser\?\.uid===result\.signer\.uid\)/);
+  assert.match(gatewayPortal, /assignedAccount\?await getMySignatureProfile\(\)\.catch\(\(\)=>null\):null/);
+  assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|updateMySignerAuthority|manualAuthority/);
+  assert.match(rules, /match \/signatureProfiles\/\{uid\}\{allow read:if admin\(\)\|\|\(signatureProfileUser\(\)&&self\(uid\)\)/);
+  assert.match(rules, /allow delete:if false/);
 });
 
+test("account-bound signer access remains restricted to the matching Firebase UID", () => {
+  const gateway = fs.readFileSync(new URL("../drive-gateway/src/signing.mjs", import.meta.url), "utf8");
+  assert.match(gateway, /return Boolean\(user\?\.uid\)&&user\.uid===signer\.uid/);
+  assert.match(gateway, /if\(!signer\?\.uid\) return false/);
+});
