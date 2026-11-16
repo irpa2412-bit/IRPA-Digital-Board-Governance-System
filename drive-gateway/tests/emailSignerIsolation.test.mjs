@@ -113,3 +113,23 @@ test("email-link open returns only this signer's fields and never another signer
   assert.equal(JSON.stringify(result).includes("PRIVATE-SAVED-SIGNATURE"), false);
   assert.equal(JSON.stringify(result).includes("reviewer-uid"), false);
 });
+
+
+test("required checkbox fields accept only an explicit checked value and signature fields retain independent specimens",()=>{
+  const fields=validateEnvelopeFields([
+    {fieldId:"agree",signerId:"S1",type:"Checkbox",required:true,page:1},
+    {fieldId:"sig-a",signerId:"S1",type:"Signature",required:true,page:1},
+    {fieldId:"sig-b",signerId:"S1",type:"Signature",required:true,page:1},
+    {fieldId:"initials",signerId:"S1",type:"Initials",required:true,page:1},
+  ],[externalSigner]);
+  const app=(fieldId,value)=>({fieldId,page:1,x:10,y:80,width:24,height:9,confirmed:true,value});
+  const markA="data:image/png;base64,"+"A".repeat(100);
+  const markB="data:image/png;base64,"+"B".repeat(100);
+  const markI="data:image/png;base64,"+"C".repeat(100);
+  assert.throws(()=>validateFieldValues(fields,externalSigner,{agree:"false"},{type:"typed",value:"Vendor"},[app("sig-a",markA),app("sig-b",markB),app("initials",markI)]),/required checkbox/);
+  const values=validateFieldValues(fields,externalSigner,{agree:"true"},{type:"typed",value:"Vendor"},[app("sig-a",markA),app("sig-b",markB),app("initials",markI)]);
+  assert.equal(values.agree,"true");
+  assert.equal(values["sig-a"],markA);
+  assert.equal(values["sig-b"],markB);
+  assert.equal(values.initials,markI);
+});

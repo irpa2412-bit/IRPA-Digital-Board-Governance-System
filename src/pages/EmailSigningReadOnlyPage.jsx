@@ -16,7 +16,7 @@ export default function EmailSigningReadOnlyPage({token}) {
   const [fieldValues,setFieldValues]=useState({});
   const [selectedFieldId,setSelectedFieldId]=useState("");
   const [fieldApplications,setFieldApplications]=useState([]);
-  const [signatureValue,setSignatureValue]=useState("");
+  const [signatureMarks,setSignatureMarks]=useState({});
   const [typedSignature,setTypedSignature]=useState("");
   const [consent,setConsent]=useState(false);
   const canvasRef=useRef(null);
@@ -53,6 +53,16 @@ export default function EmailSigningReadOnlyPage({token}) {
 
   const selectedField=(record?.fields||[]).find(field=>field.fieldId===selectedFieldId)||null;
   const signatureFields=(record?.fields||[]).filter(field=>["Signature","Initials"].includes(field.type));
+  const signatureValue=signatureFields.map(field=>fieldApplications.find(item=>item.fieldId===field.fieldId)?.value).find(Boolean)||"";
+  useEffect(()=>{
+    const canvas=canvasRef.current,value=selectedField?signatureMarks[selectedField.fieldId]:null;
+    if(!canvas)return;
+    const context=canvas.getContext("2d");context.clearRect(0,0,canvas.width,canvas.height);
+    if(!value)return;
+    const image=new Image();
+    image.onload=()=>{context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);};
+    image.src=value;
+  },[selectedFieldId,signatureMarks,selectedField]);
   const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
   const isFieldComplete=field=>fieldApplications.some(item=>item.fieldId===field.fieldId)||(!["Signature","Initials"].includes(field.type)&&fieldValues[field.fieldId]!==undefined&&String(fieldValues[field.fieldId]).trim()!=="");
 
@@ -72,14 +82,14 @@ export default function EmailSigningReadOnlyPage({token}) {
     ctx.lineWidth=2.4;ctx.lineCap="round";ctx.strokeStyle="#111827";ctx.lineTo(p.x,p.y);ctx.stroke();
   }
   function stopDrawing(){drawingRef.current=false;}
-  function clearPad(){const c=canvasRef.current;if(c)c.getContext("2d").clearRect(0,0,c.width,c.height);setSignatureValue("");setFieldApplications(current=>current.filter(item=>!signatureFields.some(field=>field.fieldId===item.fieldId)));}
+  function clearPad(){const c=canvasRef.current;if(c)c.getContext("2d").clearRect(0,0,c.width,c.height);if(selectedField)setSignatureMarks(current=>{const next={...current};delete next[selectedField.fieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
   function confirmField(){
     if(!selectedField)return;
     if(["Signature","Initials"].includes(selectedField.type)){
       const value=canvasRef.current?.toDataURL("image/png")||"";
       if(!value||value.length<100){setError("Draw your mark in the signing area before confirming this field.");return;}
-      setSignatureValue(value);
-      setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId).map(item=>signatureFields.some(field=>field.fieldId===item.fieldId)?{...item,value}:item),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,confirmed:true,value}]);
+      setSignatureMarks(current=>({...current,[selectedField.fieldId]:value}));
+      setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,confirmed:true,value}]);
     }else{
       const value=fieldValues[selectedField.fieldId];
       if(value===undefined||String(value).trim()===""){setError("Complete this assigned field before confirming it.");return;}
