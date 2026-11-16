@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
@@ -26,6 +27,29 @@ async function fixture({authority=true,failMail=false}={}) {
   const token=new URL(sent[0].link).searchParams.get("emailSignToken");
   return {ctx,sent,created,envelope,token,now:value=>{now=value}};
 }
+
+test("invalid token failures are rate-limited by token and IP with one neutral response",async()=>{
+  const f=await fixture();
+  const repeated="ENV-UNKNOWN.S1."+"a".repeat(64);
+  let message="";
+  for(let index=0;index<8;index++){
+    await assert.rejects(()=>openEmailSigning(f.ctx,repeated,"198.51.100.21"),error=>{message=error.message;return error.message===genericEmailSigningFailure();});
+  }
+  await assert.rejects(()=>openEmailSigning(f.ctx,repeated,"198.51.100.21"),error=>error.message===genericEmailSigningFailure());
+  for(let index=0;index<12;index++){
+    const secret=index.toString(16).padStart(64,"0");
+    await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+secret,"198.51.100.21"),error=>error.message===genericEmailSigningFailure());
+  }
+  await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+"f".repeat(64),"198.51.100.21"),error=>error.message===genericEmailSigningFailure());
+  assert.equal(message,genericEmailSigningFailure());
+});
+
+test("signer-list mutations retain Firestore-style compare-and-set and UID duplicate protection",()=>{
+  const source=fs.readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
+  assert.match(source,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
+  assert.match(source,/if\(uid&&seenUids\.has\(uid\)\)throw new HttpError\(400,"Duplicate signer UID\."/);
+  assert.match(source,/if\(seenEmails\.has\(email\)\)throw new HttpError\(400,"Duplicate signer email\."/);
+});
 
 test("email-link signer is stored with token hash, email hash, expiry and issued status; mail is sent once",async()=>{
   const f=await fixture();
