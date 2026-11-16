@@ -85,7 +85,7 @@ export async function createEnvelope(ctx,user,body){
     seenEmails.add(email);
     if(uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
     if(uid)seenUids.add(uid);
-    const signerId=`S${i+1}`,secret=randomHex(32),authority=uid?null:await ctx.verifyEmailSignerAuthority(email);
+    const signerId=`S${i+1}`,secret=randomHex(32),authority=uid?null:await ctx.verifyEmailSignerAuthority(email,s?.authorityRole||"");
     if(!uid&&authority?.verified!==true)throw new HttpError(403,"The email address does not match a current registered signing authority.");
     const issued=uid?null:await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))});
     const finalSecret=issued?.token||secret;secrets.push(finalSecret);
