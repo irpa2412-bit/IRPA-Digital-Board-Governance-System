@@ -14,7 +14,7 @@ const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
-import { sendInvitationEmail, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
@@ -212,6 +212,35 @@ async function verifyGatewaySigningAuthority(env,user,manualAuthorityIdentificat
     authoritySourceRecordId:match.id,
     verificationMethod:"Authenticated Gateway Member/Employee Register Match"
   };
+}
+
+async function verifyGatewayEmailSignerAuthority(env,email) {
+  const normalized=String(email||"").trim().toLowerCase();
+  if(!normalized)return {verified:false};
+  const adminToken=await getFirestoreAdminAccessToken(env);
+  const matches=[];
+  for(const collectionName of ["members","employees"]){
+    const rows=await getFirestoreDocumentsByField(env,collectionName,"email",normalized,adminToken);
+    for(const row of rows){
+      const id=String(row.name||"").split("/").pop();
+      const profile={id,...(firestoreDocumentToPlain(row)||{}),sourceCollection:collectionName};
+      const status=String(profile.status||profile.employmentStatus||profile.registrationStatus||"").trim().toLowerCase();
+      if(!["active","activated"].includes(status)||profile.accountActivated===false)continue;
+      matches.push(profile);
+    }
+  }
+  if(matches.length!==1)return {verified:false};
+  const profile=matches[0];
+  const identityId=String(profile.uid||profile.id||"");
+  if(!identityId||!(/^[A-Za-z0-9_-]{1,150}$/).test(identityId))return {verified:false};
+  const identityDoc=await getFirestoreDocument(env,"signerIdentities/"+identityId,adminToken);
+  if(!identityDoc?.fields)return {verified:false};
+  const identity=firestoreDocumentToPlain(identityDoc)||{};
+  const authorityRole=resolveGatewayAuthorityLabel(profile,identity.authorityRole||"");
+  if(!authorityRole||String(identity.authorityStatus||"").trim()!=="Current")return {verified:false};
+  const expiry=identity.authorityExpiresAt||identity.authorityExpiry||identity.validUntil||null;
+  if(expiry&&Date.parse(String(expiry))<=Date.now())return {verified:false};
+  return {verified:true,authorityRole,sourceCollection:profile.sourceCollection,sourceRecordId:profile.id,department:String(profile.department||""),unit:String(profile.unit||profile.unitName||""),name:String(profile.displayName||profile.fullName||profile.name||identity.signerName||normalized),verificationMethod:"Server-side active Member/Employee register and current Signer Identity role match"};
 }
 
 const communicationsSiteRouter = createCommunicationsSiteRouter({
@@ -494,7 +523,8 @@ export default {
               const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
               return {uid:claims.user_id,email:claims.email||"",token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
-            sendInvitation: async ({to,name,link}) => sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            verifyEmailSignerAuthority: email => verifyGatewayEmailSignerAuthority(env,email),
             logger: console,
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
