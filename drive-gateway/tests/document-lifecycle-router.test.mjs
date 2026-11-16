@@ -284,3 +284,39 @@ test("Worker signature completion refuses an envelope without canonical signer q
   assert.match((await response.json()).error,/quorum is incomplete/);
   assert.equal(state.writes.length,0);
 });
+
+test("canonical completion requires archive and owner/signer copies and records final archive and notice status",async()=>{
+  const envelopeId="firebase-env-canonical";
+  const finalHash="a".repeat(64);
+  const completedAt="2026-11-16T08:00:00.000Z";
+  const canonical={externalReference:envelopeId,documentId:"LIFE-test",status:"Completed",signers:[{id:"S1",uid:"signer-9",status:"Signed",signedAt:completedAt}],completion:{primaryStorageId:"signed-pdf-1",finalHash,completedAt,lastSignedByUid:"signer-9",cryptographicEvidenceIds:["evidence-1"],files:[{kind:"archive",id:"archive-file-1",path:"archives/final/document.pdf",archiveKey:"board-governance"},{kind:"owner-copy",id:"owner-copy-1"},{kind:"signer-copy",id:"signer-copy-1",signerId:"S1"}],notifications:{"owner@test.invalid":{status:"Sent"},"signer@test.invalid":{status:"Sent"}}}};
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"original-file",classification:"Internal",ownerUid:"emp-1",authorizedUids:["emp-1"],archiveCategory:"Governance Documents",title:"Test",reference:"IRPA-DOC-1",status:"PENDING_SIGNATURE"}}},envelopes:{[envelopeId]:{documentId:"LIFE-test",status:"Completed",gatewayEnvelopeId:"gateway-env-1",signedDocumentUrl:"https://drive.google.com/file/d/signed-pdf-1/view"}},writes:[],deletedFiles:[],verifyCanonicalSignatureEnvelope:async()=>({ok:true,envelope:canonical,finalHash,lastSignedByUid:"signer-9"})};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/signature-complete",{documentId:"LIFE-test",envelopeId}),env);
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.finalArchiveStatus,"ARCHIVED");
+  assert.equal(result.completionNoticeSentCount,2);
+  const saved=state.docs["LIFE-test"].plain;
+  assert.equal(saved.status,"SIGNED");
+  assert.equal(saved.finalArchiveStatus,"ARCHIVED");
+  assert.equal(saved.finalArchiveFileId,"archive-file-1");
+  assert.equal(saved.finalArchivePath,"archives/final/document.pdf");
+  assert.equal(saved.finalArchiveTarget,"board-governance");
+  assert.equal(saved.finalArchiveCategory,"Governance Documents");
+  assert.equal(saved.ownerCompletedFileId,"owner-copy-1");
+  assert.equal(saved.completionNoticeSentCount,2);
+  assert.equal(saved.signedSourceFileId,"signed-pdf-1");
+  assert.equal(saved.fileId,"original-file");
+});
+
+test("canonical completion refuses to mark Signed when a required signer archive copy is missing",async()=>{
+  const envelopeId="firebase-env-missing-copy";
+  const canonical={externalReference:envelopeId,documentId:"LIFE-test",status:"Completed",signers:[{id:"S1",uid:"signer-9",status:"Signed",signedAt:"2026-11-16T08:00:00.000Z"}],completion:{primaryStorageId:"signed-pdf-1",finalHash:"b".repeat(64),completedAt:"2026-11-16T08:00:00.000Z",cryptographicEvidenceIds:["evidence-1"],files:[{kind:"archive",id:"archive-file-1"},{kind:"owner-copy",id:"owner-copy-1"}]}};
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"original-file",classification:"Internal",ownerUid:"emp-1",authorizedUids:["emp-1"],archiveCategory:"Governance Documents",title:"Test",reference:"IRPA-DOC-1",status:"PENDING_SIGNATURE"}}},envelopes:{[envelopeId]:{documentId:"LIFE-test",status:"Completed",gatewayEnvelopeId:"gateway-env-1"}},writes:[],deletedFiles:[],verifyCanonicalSignatureEnvelope:async()=>({ok:true,envelope:canonical,finalHash:"b".repeat(64),lastSignedByUid:"signer-9"})};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/signature-complete",{documentId:"LIFE-test",envelopeId}),env);
+  assert.equal(response.status,409);
+  assert.match((await response.json()).error,/missing the final archive file, owner copy or a required signer copy/);
+  assert.equal(state.writes.length,0);
+});
