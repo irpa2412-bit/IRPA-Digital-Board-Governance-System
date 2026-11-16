@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { getIdToken } from "firebase/auth";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs } from "firebase/firestore";
+import { runSignatureFirestore } from "../firebase/signatureFirestoreDiagnostics.js";
+const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDoc(ref));
+const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDocs(ref));
 import { auth, db } from "../firebase/config";
 import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
 import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
