@@ -54,7 +54,7 @@ test("the Worker refuses unconfirmed and non-assigned signature field applicatio
 });
 
 test("the signing view keeps server-side visibility filtering for later signers", () => {
-  assert.match(worker, /fields:\(env\.fields\|\|\[\]\)\.filter\(f=>f\.signerUid===signer\.uid\)/);
+  assert.match(worker, /fields:\(env\.fields\|\|\[\]\)\.filter\(f=>f\.signerId===signer\.id\|\|\(!f\.signerId&&signer\.uid&&f\.signerUid===signer\.uid\)\)/);
   assert.match(gatewayPortal, /const fields=opened\.fields\|\|\[\]/);
 });
 
@@ -73,4 +73,15 @@ test("signature confirmation palette is a fixed bottom sheet and closes only aft
   assert.match(platform, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:6/);
+});
+
+test("all signer types are authenticated by transaction identity, not IRPA register authority", () => {
+  assert.doesNotMatch(worker, /verifySigningAuthority\(user,manualAuthorityIdentification\)/);
+  assert.doesNotMatch(worker, /Current IRPA Member\/Employee signing authority could not be verified/);
+  assert.match(worker, /else assertSignerAuthentication\(s0,user\)/);
+  assert.match(worker, /if\(!declared\.name\|\|!declared\.occupation\)throw new HttpError\(400/);
+  assert.match(worker, /signerDeclarations:declared/);
+  assert.match(gatewayPortal, /Your occupation \/ capacity/);
+  assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|Member\/Employee Register|Registered signing authority/);
+  assert.match(gatewayPortal, /declarations,consent/);
 });
