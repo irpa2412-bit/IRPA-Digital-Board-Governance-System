@@ -32,10 +32,11 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
   for (const signer of signers.filter(s => s.status === "Signed")) {
-    const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===((envelope.signers||[]).find(s=>s.uid===signer.uid)?.id||""));
+    const assignedSigner=(envelope.signers||[]).find(x=>(x.uid&&x.uid===signer.uid)||(x.email&&x.email===signer.email));
+    const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""));
     if(!signerCopy?.id)throw new Error("Completed signer archive copy is missing for an assigned signer.");
     const signerArchiveUrl="https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view";
-    const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid);
+    const signatureRecordId="gateway-"+envelopeId+"-"+clean(assignedSigner?.id||signer.uid||signer.email);
     await updateDocument("signatures/"+signatureRecordId,{
       envelopeId,documentId:clean(existing.documentId||envelope.documentId),
       recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
@@ -76,7 +77,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
         finalHash: completion.finalHash, completedAt: completion.completedAt, source: "drive-gateway"
       },
       actorUid: lastSignedByUid || "",
-      actorEmail: signers.find(s => s.uid === lastSignedByUid)?.email || "",
+      actorEmail: signers.find(s => s.uid === lastSignedByUid)?.email || [...signers].reverse().find(s => s.status === "Signed")?.email || "",
       createdAt: timestamp
     });
   }
