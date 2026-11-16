@@ -27,12 +27,13 @@
     "check:no-billing-deps": "node scripts/check-no-billing-deps.mjs",
     "test:no-billing-deps": "node --test tests/no-billing-deps.test.mjs",
     "test:workflow-deployment-policy": "node --test tests/workflow-production-deploy-policy.test.mjs",
-    "test:all": "npm run test:org-structure-authority && npm run test:policies-strategic-plan-portal && npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio",
+    "test:all": "npm run test:org-structure-authority && npm run test:policies-strategic-plan-portal && npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:signature-firestore-diagnostics && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio",
     "test:org-structure-authority": "node --test tests/org-structure-authority.test.mjs tests/signature-authority-matrix.test.mjs tests/org-structure-portal-alignment.test.mjs tests/job-description-intranet-workflow.test.mjs",
     "test:policies-strategic-plan-portal": "node --test tests/policies-strategic-plan-portal.test.mjs",
     "test:org-structure-portal-alignment": "node --test tests/org-structure-portal-alignment.test.mjs",
     "test:signature-authority-matrix": "node --test tests/signature-authority-matrix.test.mjs",
-    "test:job-description-intranet": "node --test tests/job-description-intranet-workflow.test.mjs"
+    "test:job-description-intranet": "node --test tests/job-description-intranet-workflow.test.mjs",
+    "test:signature-firestore-diagnostics": "node --test tests/signature-firestore-diagnostics.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
