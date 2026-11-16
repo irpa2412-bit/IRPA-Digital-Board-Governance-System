@@ -321,42 +321,26 @@ test("Gateway completed-PDF verification requires the invited UID even for a val
 });
 
 
-test("Production-mode Gateway signing fails closed without server-side Member/Employee authority verification", async () => {
-  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
-  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
-  await assert.rejects(
-    ()=>sign(fixture.ctx,{
-      token:fixture.token,
-      signature:{type:"typed",value:"Member Signer"},
-      consent:true,
-      manualAuthorityIdentification:"Board Member",
-      user:{uid:"member-uid",email:"member@example.org"}
-    }),
-    error=>error.status===503&&error.message.includes("Signing authority verification is not configured on this gateway.")
-  );
-  const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
-  assert.equal(current.signers[0].status,"Pending");
+test("Production-mode signing no longer depends on Member/Employee authority-register verification", async () => {
+  const source=await import("node:fs");
+  const signingSource=source.readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
+  assert.doesNotMatch(signingSource,/ctx\.verifySigningAuthority/);
+  assert.doesNotMatch(signingSource,/manualAuthorityIdentification/);
 });
 
-test("Production-mode Gateway signing records the server-verified authority in the audit chain", async () => {
+test("signing audit records the assigned signer without inventing registered authority evidence", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
-  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
-  fixture.ctx.verifySigningAuthority=async(user,manualAuthorityIdentification)=>{
-    assert.equal(user.uid,"member-uid");
-    assert.equal(manualAuthorityIdentification,"Board Member");
-    return {verified:true,authorityRole:"Board Member",authoritySourceCollection:"members",authoritySourceRecordId:"member-uid",verificationMethod:"Authenticated Gateway Member/Employee Register Match"};
-  };
   const result=await sign(fixture.ctx,{
     token:fixture.token,
     signature:{type:"typed",value:"Member Signer"},
     consent:true,
-    manualAuthorityIdentification:"Board Member",
     user:{uid:"member-uid",email:"member@example.org"}
   });
   assert.equal(result.status,"InProgress");
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
-  assert.equal(current.signers[0].authorityVerification.authorityRole,"Board Member");
-  assert.equal(current.events.at(-1).authoritySourceCollection,"members");
+  assert.equal(current.signers[0].authorityVerification,null);
+  assert.equal(current.events.at(-1).signerId,"S1");
+  assert.equal(current.events.at(-1).authoritySourceCollection,undefined);
 });
 
 
