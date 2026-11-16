@@ -169,7 +169,7 @@ test("owner remains selectable for field assignment and each signature field rem
 
 test("signature assignment and signing handlers synchronously reject repeated submissions", () => {
   assert.match(portal, /const addSignerInFlightRef=useRef\(false\),signInFlightRef=useRef\(false\)/);
-  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)\n/);
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)\n\s*\}/);
   assert.ok(addSigner, "the signer assignment handler must exist");
   assert.match(addSigner[1], /if\(addSignerInFlightRef\.current\|\|busy\)return/);
   assert.match(addSigner[1], /addSignerInFlightRef\.current=true/);
