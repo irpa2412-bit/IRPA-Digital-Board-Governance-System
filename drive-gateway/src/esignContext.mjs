@@ -1,4 +1,5 @@
-import { createCloudflareSignerKeyProvider } from "./cryptographicGate.mjs";
+import { createCloudflareSignerKeyProvider, importPublicKeyJwk } from "./cryptographicGate.mjs";
+import { sha256Hex } from "./util.mjs";
 import { Conflict, VersionConflict } from "./adapters.mjs";
 
 const mockRecords = new Map();
@@ -93,6 +94,40 @@ export class EsignRecordDurableObject {
         return Response.json({ok:true,reference,year});
       }
 
+
+      if(body.operation==="signer-key-ensure"){
+        const keyId=String(body.keyId||"");
+        const envelopeId=String(body.envelopeId||"");
+        const signerId=String(body.signerId||"");
+        const emailHash=String(body.emailHash||"").toLowerCase();
+        if(!/^EMAIL-[0-9a-f]{64}$/.test(keyId)||!/^S\\d{1,2}$/.test(signerId)||!envelopeId||!/^[0-9a-f]{64}$/.test(emailHash))return Response.json({ok:false,error:"Invalid signer-key identity."},{status:400});
+        const recordKey="emailSignerKey:"+keyId;
+        let record=await this.state.storage.get(recordKey);
+        if(record&&(record.envelopeId!==envelopeId||record.signerId!==signerId||record.emailHash!==emailHash))return Response.json({ok:false,error:"Signer-key identity conflict."},{status:409});
+        if(!record){
+          const pair=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
+          const publicKeyJwk=await crypto.subtle.exportKey("jwk",pair.publicKey);
+          const privatePkcs8=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
+          const privateKey=await crypto.subtle.importKey("pkcs8",privatePkcs8,{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+          record={keyId,envelopeId,signerId,emailHash,privateKey,publicKeyJwk:{kty:publicKeyJwk.kty,crv:publicKeyJwk.crv,x:publicKeyJwk.x,y:publicKeyJwk.y,ext:true},createdAt:new Date().toISOString()};
+          await this.state.storage.put(recordKey,record);
+        }
+        return Response.json({ok:true,keyId,publicKeyJwk:record.publicKeyJwk});
+      }
+
+      if(body.operation==="signer-key-sign"){
+        const keyId=String(body.keyId||"");
+        const record=await this.state.storage.get("emailSignerKey:"+keyId);
+        const canonicalPayload=String(body.canonicalPayload||"");
+        if(!record||!canonicalPayload||canonicalPayload.length>100000)return Response.json({ok:false,error:"Signer key is unavailable."},{status:404});
+        let payload;
+        try{payload=JSON.parse(canonicalPayload)}catch{return Response.json({ok:false,error:"Invalid canonical signer payload."},{status:400})}
+        if(payload.envelopeId!==record.envelopeId||payload.signerId!==record.signerId||payload.signerIdentityType!=="email-link"||payload.signerIdentityHash!==record.emailHash||payload.keyId!==keyId)return Response.json({ok:false,error:"Signer-key identity mismatch."},{status:403});
+        const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},record.privateKey,new TextEncoder().encode(canonicalPayload));
+        const bytes=new Uint8Array(signature);let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+        return Response.json({ok:true,signature:btoa(binary).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,"")});
+      }
+
       if (body.op === "get") return Response.json({ok:true, value:await this.state.storage.get("record") || null});
       if (body.op === "create") {
         if (await this.state.storage.get("record")) return Response.json({ok:false,error:"exists"},{status:409});
@@ -182,10 +217,30 @@ function driveStorage(env, helpers) {
   };
 }
 export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInvitation,logger,now,driveHelpers,...rest}) {
+  const meta=env.DRIVE_MOCK==="true"?mockMeta():doMeta(env);
+  const baseKeyProvider=env.DRIVE_MOCK==="true"?null:createCloudflareSignerKeyProvider(env);
+  const keyProvider=baseKeyProvider?{
+    getSignerKey:uid=>baseKeyProvider.getSignerKey(uid),
+    async getSignerKeyForSigner(signer){
+      if(!env.ESIGN_DO)throw new Error("Gateway Durable Object key custody is not configured.");
+      if(!signer?.envelopeId||!signer?.id||!signer?.emailHash)throw new Error("Email-link signer key identity is incomplete.");
+      const keyId="EMAIL-"+await sha256Hex(String(signer.envelopeId)+"|"+String(signer.id)+"|"+String(signer.emailHash).toLowerCase());
+      const objectName="email-signer-key:"+keyId;
+      const stub=env.ESIGN_DO.get(env.ESIGN_DO.idFromName(objectName));
+      const ensure=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-ensure",keyId,envelopeId:signer.envelopeId,signerId:signer.id,emailHash:String(signer.emailHash).toLowerCase()})});
+      const ensured=await ensure.json();if(!ensure.ok||!ensured.ok)throw new Error("Gateway signer key could not be provisioned.");
+      const publicKey=await importPublicKeyJwk(ensured.publicKeyJwk);
+      return{keyId,publicKey,publicKeyJwk:ensured.publicKeyJwk,signCanonicalPayload:async canonicalPayload=>{
+        const response=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-sign",keyId,canonicalPayload})});
+        const result=await response.json();if(!response.ok||!result.ok||!result.signature)throw new Error("Gateway signer key could not seal the signing evidence.");
+        return result.signature;
+      }};
+    }
+  }:null;
   return {
     ...rest,
     env,
-    meta:env.DRIVE_MOCK==="true"?mockMeta():doMeta(env),
+    meta,
     storage:driveStorage(env,driveHelpers),
     verifyUser,
     verifySigningAuthority,
@@ -193,7 +248,7 @@ export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInv
     logger:logger||console,
     now:now||(()=>new Date()),
     config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14,emailLinkTtlDays:Math.max(1,Math.min(30,Number(env.IRPA_EMAIL_SIGNING_LINK_TTL_DAYS)||7))},
-    crypto:env.DRIVE_MOCK==="true"?null:{keyProvider:createCloudflareSignerKeyProvider(env)},
+    crypto:env.DRIVE_MOCK==="true"?null:{keyProvider},
     allowReturnTokens:env.DRIVE_MOCK==="true"||(env.IRPA_ENVIRONMENT==="staging"&&env.IRPA_STAGING_CRYPTO_TEST_MODE==="true"),
     allowLegacyTestSigners:env.DRIVE_MOCK==="true"
   };
