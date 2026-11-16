@@ -81,7 +81,138 @@ function inspectFields(fields = {}) {
   return { matched, fields: metadata, hasBytesField, hasBase64Field, hasChunksField, chunkCount };
 }
 
-function safeCollectionId(value) {
+
+const AFFECTED_DOCUMENT_IDS = [
+  "IRPA-DOC-2026-MUKF0WMY-DQSQXXO2-9DF470D8",
+  "k8M9oVewTBEv5WfgpQU5",
+  "fAGDKKhypGGR6F7PRcLe",
+  "h3ynycNR7Zqyl9GBoCLk"
+];
+
+function scalar(fields, names) {
+  for (const name of names) {
+    const value = fields?.[name];
+    if (!value) continue;
+    for (const key of ["stringValue", "integerValue", "doubleValue", "booleanValue", "timestampValue"]) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) return value[key];
+    }
+  }
+  return null;
+}
+
+function chunkIndex(document, fallback) {
+  const fields = document.fields || {};
+  const value = scalar(fields, ["index", "chunkIndex", "sequence", "chunkNumber", "part"]);
+  if (value !== null && Number.isInteger(Number(value)) && Number(value) >= 0) return Number(value);
+  const id = String(document.name || "").split("/").pop();
+  const match = id.match(/(?:chunk[-_]?|part[-_]?)(\d+)$/i) || id.match(/(\d+)$/);
+  return match ? Number(match[1]) : fallback;
+}
+
+function chunkPayload(fields) {
+  for (const [name, value] of Object.entries(fields || {})) {
+    if (/^(data|bytes|chunk|content|payload|dataBase64|chunkData|contentBase64)$/i.test(name)) {
+      if (typeof value?.bytesValue === "string") return Uint8Array.from(atob(value.bytesValue), char => char.charCodeAt(0));
+      if (typeof value?.stringValue === "string") {
+        if (/base64/i.test(name)) {
+          const raw = value.stringValue.replace(/\s/g, "");
+          try { return Uint8Array.from(atob(raw), char => char.charCodeAt(0)); } catch { return new Uint8Array(); }
+        }
+        return new TextEncoder().encode(value.stringValue);
+      }
+    }
+  }
+  return new Uint8Array();
+}
+
+function pdfPageCount(bytes) {
+  const text = new TextDecoder("latin1").decode(bytes);
+  const matches = text.match(/\/Type\s*\/Page(?!s)\b/g);
+  return matches ? matches.length : null;
+}
+
+async function inspectBlobRecord(deps, base, token, collectionPath, documentId) {
+  const pathParts = String(collectionPath || "").split("/").filter(Boolean);
+  if (!pathParts.length || pathParts.length > 8 || pathParts.some(part => !/^[A-Za-z0-9_-]{1,150}$/.test(part))) {
+    throw new Error("A valid blob collection path is required.");
+  }
+  if (!/^[A-Za-z0-9_-]{1,180}$/.test(String(documentId || ""))) throw new Error("A valid blob record ID is required.");
+  const parentPath = pathParts.join("/") + "/" + documentId;
+  const parentUrl = base + "/" + parentPath.split("/").map(encodeURIComponent).join("/");
+  const headers = { Authorization: "Bearer " + token };
+  const parent = await firestoreRequest(deps, parentUrl, { method: "GET", headers });
+  const parentFields = parent.fields || {};
+  const collections = await firestoreRequest(deps, parentUrl + ":listCollectionIds?pageSize=100", {
+    method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ pageSize: 100 })
+  });
+  const subcollections = [];
+  let reconstructed = [];
+  for (const collectionId of (collections.collectionIds || []).filter(safeCollectionId)) {
+    const childUrl = parentUrl + "/" + encodeURIComponent(collectionId) + "?pageSize=1000";
+    const childResult = await firestoreRequest(deps, childUrl, { method: "GET", headers });
+    if (childResult.nextPageToken) throw new Error("Chunk subcollection exceeds the 1,000-document per-record inspection limit; no partial reconstruction was reported.");
+    const documents = childResult.documents || [];
+    const indexed = documents.map((doc, position) => ({
+      index: chunkIndex(doc, position),
+      fields: Object.entries(doc.fields || {}).map(([name, value]) => ({
+        name, type: firestoreValueType(value),
+        sizeBytes: value?.bytesValue ? base64Size(value.bytesValue) : value?.stringValue ? (/base64/i.test(name) ? base64Size(value.stringValue) : utf8Size(value.stringValue)) : 0
+      })),
+      payload: chunkPayload(doc.fields || {})
+    })).sort((a, b) => a.index - b.index);
+    const indexes = indexed.map(item => item.index);
+    const contiguous = indexes.length > 0 && indexes.every((value, index) => value === index);
+    const totalChunks = scalar(parentFields, ["totalChunks"]);
+    const expectedSize = scalar(parentFields, ["fileSize", "size", "byteLength", "expectedSize"]);
+    const chunks = indexed.map(item => item.payload);
+    reconstructed = chunks;
+    const joinedLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+    const joined = new Uint8Array(joinedLength);
+    let offset = 0;
+    for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.byteLength; }
+    const digest = await crypto.subtle.digest("SHA-256", joined);
+    const sha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    const header = new TextDecoder("latin1").decode(joined.subarray(0, 5)) === "%PDF-";
+    const linkedDocuments = [];
+    for (const linkedId of AFFECTED_DOCUMENT_IDS) {
+      const linkedUrl = base + "/documents/" + encodeURIComponent(linkedId);
+      try {
+        const linked = await firestoreRequest(deps, linkedUrl, { method: "GET", headers });
+        const reference = scalar(linked.fields || {}, ["emergencyArchiveRef", "emergencyReference", "emergencyStorageRef", "fileId", "storageUri"]);
+        const linkedSize = scalar(linked.fields || {}, ["fileSize"]);
+        linkedDocuments.push({
+          documentReference: linkedId,
+          hasBlob: reference !== null && String(reference).includes(documentId),
+          emergencyReferencePresent: reference !== null,
+          expectedFileSize: linkedSize,
+          byteLengthMatches: linkedSize === null ? null : Number(linkedSize) === joinedLength
+        });
+      } catch (error) {
+        if (error.status !== 404) throw error;
+        linkedDocuments.push({ documentReference: linkedId, hasBlob: false, recordFound: false });
+      }
+    }
+    subcollections.push({
+      collectionId, chunkDocumentCount: documents.length,
+      chunks: indexed.map(({ index, fields }) => ({ index, fields })),
+      indexesContiguous: contiguous, totalChunksParent: totalChunks,
+      totalChunksMatchesActual: totalChunks === null ? null : Number(totalChunks) === documents.length,
+      byteLength: joinedLength, startsWithPdfHeader: header,
+      mimeTypeImplied: header ? "application/pdf" : "application/octet-stream",
+      sha256, pdfPageCount: header ? pdfPageCount(joined) : null,
+      expectedParentSize: expectedSize,
+      parentSizeMatches: expectedSize === null ? null : Number(expectedSize) === joinedLength,
+      linkedDocuments
+    });
+  }
+  return {
+    ok: true, collectionPath: pathParts.join("/"), documentId,
+    parentFields: Object.entries(parentFields).map(([name, value]) => ({ name, type: firestoreValueType(value) })),
+    subcollectionIds: (collections.collectionIds || []).filter(safeCollectionId),
+    subcollections
+  };
+}
+\nfunction safeCollectionId(value) {
   const id = String(value || "");
   return /^[A-Za-z][A-Za-z0-9_-]{0,99}$/.test(id) ? id : "";
 }
@@ -119,7 +250,7 @@ export function createEmergencyStorageDiscoveryRoute(deps) {
     let body;
     try { body = await request.json(); } catch { return json({ ok: false, error: "A valid JSON request is required." }, 400, cors); }
     const action = String(body?.action || "");
-    if (!["collections", "scan", "audit"].includes(action)) return json({ ok: false, error: "Unsupported emergency-storage discovery action." }, 400, cors);
+    if (!["collections", "scan", "inspectBlob", "audit"].includes(action)) return json({ ok: false, error: "Unsupported emergency-storage discovery action." }, 400, cors);
 
     try {
       const token = await deps.getFirestoreAdminAccessToken(env);
@@ -133,6 +264,13 @@ export function createEmergencyStorageDiscoveryRoute(deps) {
           body: JSON.stringify({ pageSize: PAGE_SIZE, ...(pageToken ? { pageToken } : {}) })
         });
         return json({ ok: true, collectionIds: Array.isArray(result.collectionIds) ? result.collectionIds.filter(safeCollectionId) : [], nextPageToken: result.nextPageToken || null }, 200, cors);
+      }
+
+      if (action === "inspectBlob") {
+        const collectionPath = String(body.collectionPath || "");
+        const documentId = String(body.documentId || "");
+        const result = await inspectBlobRecord(deps, base, token, collectionPath, documentId);
+        return json(result, 200, cors);
       }
 
       if (action === "scan") {

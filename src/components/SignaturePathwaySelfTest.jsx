@@ -127,6 +127,7 @@ export default function SignaturePathwaySelfTest() {
     let authorized = false;
     let completed = false;
     let auditTime = null;
+    let blobInspections = [];
     try {
       await requireAdministrator();
       authorized = true;
@@ -149,7 +150,14 @@ export default function SignaturePathwaySelfTest() {
         } while (cursor);
         scannedCollectionIds.push(collectionId);
       }
+      for (let index = 0; index < hits.length; index += 1) {
+        const hit = hits[index];
+        setDiscoveryProgress("Record " + (index + 1) + " of " + hits.length + ": inspecting one emergency blob");
+        const detail = await emergencyStorageRequest({ action: "inspectBlob", collectionPath: hit.collectionPath, documentId: hit.documentId });
+        blobInspections.push(detail);
+      }
       completed = true;
+      setDiscoveryProgress("Record " + hits.length + " of " + hits.length + " inspected.");
     } catch (error) {
       setDiscoveryError(error?.message || "Emergency-storage discovery failed.");
     } finally {
@@ -164,7 +172,7 @@ export default function SignaturePathwaySelfTest() {
           setDiscoveryError(previous => [previous, "Audit event could not be confirmed: " + (error?.message || "unknown error")].filter(Boolean).join(" "));
         }
       }
-      setDiscovery({ hits, scannedCollectionIds, collectionCount: scannedCollectionIds.length, auditTime, completed });
+      setDiscovery({ hits, scannedCollectionIds, collectionCount: scannedCollectionIds.length, auditTime, completed, blobInspections });
       setDiscoveryProgress(completed
         ? "Discovery complete. " + scannedCollectionIds.length + " collections scanned; " + hits.length + " hit(s)."
         : "Scan incomplete. " + scannedCollectionIds.length + " collection(s) completed; no negative conclusion can be drawn.");
@@ -183,7 +191,7 @@ export default function SignaturePathwaySelfTest() {
           "Base64 field: " + (hit.hasBase64Field ? "yes" : "no"),
           "Chunks field: " + (hit.hasChunksField ? "yes" : "no"),
           "Chunk count: " + hit.chunkCount
-        ].join("\n")).join("\n\n")
+        ].join("\n")).join("\n\n") + "\n\nBlob measurements: " + JSON.stringify(discovery.blobInspections || [])
       : (discovery.completed ? "no emergency storage found in " + discovery.collectionCount + " collections scanned" : "Scan incomplete; no conclusion about emergency storage can be drawn") + "\nCollections scanned: " + discovery.scannedCollectionIds.join(", ");
     const report = "Emergency storage discovery report\n" + lines + "\n\nAudit time: " + (discovery.auditTime || "not returned");
     navigator.clipboard.writeText(report).then(() => setDiscoveryProgress("Emergency-storage report copied to clipboard.")).catch(error => setDiscoveryError("Copy failed: " + (error?.message || "Clipboard access unavailable.")));
@@ -254,7 +262,7 @@ export default function SignaturePathwaySelfTest() {
   return <section className="panel">
     <div className="panel-heading"><div><span className="eyebrow">ADMINISTRATOR DIAGNOSTICS</span><h2>Signature Pathway Self-Test</h2><p className="panel-description">Read-only inspection of every registered controlled document: Drive metadata, controlled-route download, SHA-256, byte size, PDF page count, per-page extractable text and non-blank rendering. Flags a final page with zero text or a render failure. No document, Drive file or Firestore record is repaired or changed.</p></div></div>
     <div className="panel" style={{padding:12,marginBottom:14}}>
-      <div><strong>Find emergency storage</strong><p className="panel-description">Administrator-only, read-only scan of root Firestore collections for emergency-storage references and the four affected identifiers. File contents are never returned. Each collection page is requested separately.</p></div>
+      <div><strong>Find emergency storage</strong><p className="panel-description">Administrator-only inspection of one emergency blob per Worker request. Chunk payloads are reconstructed in Worker memory only; responses contain metadata and measurements, never file bytes.</p></div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
         <button type="button" onClick={findEmergencyStorage} disabled={discoveryBusy}>{discoveryBusy ? "Scanning…" : "Find emergency storage"}</button>
         <button type="button" className="secondary-button" onClick={copyEmergencyStorageReport} disabled={!discovery}>Copy Report</button>
@@ -275,6 +283,17 @@ export default function SignaturePathwaySelfTest() {
         <strong>{discovery.completed ? "no emergency storage found in " + discovery.collectionCount + " collections scanned" : "Scan incomplete; no conclusion about emergency storage can be drawn"}</strong>
         <div style={{fontSize:13,marginTop:5}}>Collections scanned: {discovery.scannedCollectionIds.length ? discovery.scannedCollectionIds.join(", ") : "(none)"}</div>
       </div>)}
+      {discovery.blobInspections?.length > 0 && <div style={{overflowX:"auto",marginTop:12}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead><tr><th style={{textAlign:"left",padding:7}}>Blob record</th><th style={{textAlign:"left",padding:7}}>Subcollection</th><th style={{textAlign:"left",padding:7}}>Chunks / indexes</th><th style={{textAlign:"left",padding:7}}>Reconstruction measurements</th></tr></thead>
+          <tbody>{discovery.blobInspections.flatMap(record => (record.subcollections || []).map(sub => <tr key={record.documentId + "/" + sub.collectionId}>
+            <td style={{padding:7,verticalAlign:"top"}}>{record.documentId}</td>
+            <td style={{padding:7,verticalAlign:"top"}}>{sub.collectionId}</td>
+            <td style={{padding:7,verticalAlign:"top"}}>{sub.chunkDocumentCount} · contiguous: {sub.indexesContiguous ? "yes" : "no"} · parent totalChunks: {sub.totalChunksParent ?? "not set"}</td>
+            <td style={{padding:7,verticalAlign:"top"}}>{sub.byteLength} bytes · PDF: {sub.startsWithPdfHeader ? "yes" : "no"} · SHA-256: {sub.sha256} · pages: {sub.pdfPageCount ?? "not parsed"} · parent size match: {sub.parentSizeMatches === null ? "unknown" : sub.parentSizeMatches ? "yes" : "no"}</td>
+          </tr>))}</tbody>
+        </table>
+      </div>}
     </div>
     <div aria-label="Self-test totals" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8,marginBottom:14}}>
       <div className="panel" style={{padding:10}}><strong>{summarizeSelfTestResults(results).documentsReadable}</strong><div className="muted" style={{fontSize:12}}>Documents readable</div></div>
