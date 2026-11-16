@@ -18,6 +18,8 @@ beforeEach(async () => {
     const db = context.firestore();
     await db.doc("systemSettings/actualDataAccess").set({enabled:true,status:"OPEN",finalTestsAttested:true});
     await db.doc("members/assigned-signer").set({uid:"assigned-signer",status:"Active",role:"Board Member"});
+    await db.doc("signatureProfiles/assigned-signer").set({uid:"assigned-signer",email:"signer@example.test",signaturePath:"signatureProfiles/assigned-signer/private.png"});
+    await db.doc("signatureProfiles/other-signer").set({uid:"other-signer",email:"other@example.test",signaturePath:"signatureProfiles/other-signer/private.png"});
     await db.doc("signatureEnvelopes/gateway-envelope").set({
       senderUid:"assigned-signer",ownerUid:"assigned-signer",envelopeReference:"ENV-GATEWAY",
       documentId:"DOC-GATEWAY",participantUids:["assigned-signer"],actionUids:["assigned-signer"],
@@ -87,5 +89,17 @@ test("legacy envelope participant signing updates remain subject to the existing
 test("legacy non-Gateway envelope audit event creation remains available to an active member", async () => {
   await assertSucceeds(signerDb().doc("signatureEvents/legacy-event").set({
     envelopeId:"legacy-envelope",actorUid:"assigned-signer",event:"Legacy Signature Submitted"
+  }));
+});
+
+test("a signer can read only their own saved Signature Profile", async () => {
+  const db=signerDb();
+  await assertSucceeds(db.doc("signatureProfiles/assigned-signer").get());
+  await assertFails(db.doc("signatureProfiles/other-signer").get());
+  await assertFails(testEnv.unauthenticatedContext().firestore().doc("signatureProfiles/assigned-signer").get());
+});
+test("a signer cannot overwrite another person's saved Signature Profile", async () => {
+  await assertFails(signerDb().doc("signatureProfiles/other-signer").set({
+    uid:"other-signer",email:"other@example.test",signaturePath:"attacker-controlled.png"
   }));
 });
