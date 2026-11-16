@@ -84,6 +84,7 @@ test("all signer types are authenticated by transaction identity, not IRPA regis
   assert.match(gatewayPortal, /Your occupation \/ capacity/);
   assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|Member\/Employee Register|Registered signing authority/);
   assert.doesNotMatch(service, /current signing authority has not been registered|A Current authority is required to sign|Your Signature Application is not active/);
+  assert.doesNotMatch(platform, /verifyManualSigningAuthority|authorityVerification\?\.verified|Verify Authority/);
   assert.match(platform, /occupation:signerAuthorityRole\.trim\(\),capacity:""/);
   assert.match(gatewayPortal, /declarations,consent/);
 });
