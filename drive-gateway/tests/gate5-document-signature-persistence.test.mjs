@@ -268,6 +268,7 @@ test("G5-03 — original document preservation", async () => {
           name: "Gate Five Signer",
           email: "g5.signer@example.org",
           order: 1,
+          identityType: "email-link",
         },
       ],
       archives: ["legal-contracts", "board-governance"],
@@ -276,6 +277,7 @@ test("G5-03 — original document preservation", async () => {
   );
   assert.equal(envelopeIdResponse.status, 201);
   const token = s.tokenFor("g5.signer@example.org");
+  assert.equal((await route(get("/api/sign/email/open", { token }), s.ctx)).status, 200);
   assert.equal(
     (await route(
       submit(token, { type: "typed", value: "Preservation Signature" }),
@@ -382,6 +384,7 @@ test("G5-08 — partial completion rollback", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const token = s.tokenFor("g5.signer@example.org");
+  assert.equal((await route(get("/api/sign/email/open", { token }), s.ctx)).status, 200);
 
   s.storage.failPutWhen = (n) => n === 4;
   const response = await route(
