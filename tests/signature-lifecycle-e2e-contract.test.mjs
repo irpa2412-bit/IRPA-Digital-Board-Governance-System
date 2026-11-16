@@ -56,6 +56,8 @@ test("4. signing enforces signer assignment, authority, consent, order and dupli
   assert.match(portal, /signInFlightRef/);
   assert.match(signing, /idempotent:true/);
   assert.match(signing, /ifVersion:c\._v/);
+  assert.match(gateway, /currentDocument:existing\?\{updateTime:existing\.updateTime\}/);
+  assert.match(gateway, /idempotent:true/);
 });
 
 test("5. final completion is server-verified and binds the final PDF hash and audit evidence", () => {
