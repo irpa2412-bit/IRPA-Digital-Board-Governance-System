@@ -2936,7 +2936,8 @@ async function sendSignatureInvitation(request, env) {
       { onFailure: async (error, attempt) => console.error("IRPA signature invitation SMTP failure", {recipientDomain:recipientDomain(email),attempt,error:safeMailError(error)}) }
     );
     const sentAt = new Date().toISOString();
-    await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, await getFirestoreAdminAccessToken(env), {
+    const adminToken = await getFirestoreAdminAccessToken(env);
+    await updateFirestoreDocument(env, `signatureEnvelopes/${envelopeId}`, adminToken, {
       invitationStatus:{stringValue:"Sent"},
       invitationDeliveryStatus:{stringValue:"Sent"},
       invitationSentAt:{timestampValue:sentAt},
@@ -2944,7 +2945,11 @@ async function sendSignatureInvitation(request, env) {
       invitationDeliveryError:{stringValue:""},
       invitationDeliveryMessageId:{stringValue:String(messageId)}
     }, ["invitationStatus","invitationDeliveryStatus","invitationSentAt","invitationDeliverySentAt","invitationDeliveryError","invitationDeliveryMessageId"]);
-    return json({ok:true,envelopeId,signerUid,email,deliveryStatus:"Sent",sentAt,messageId},200,corsHeaders(request));
+    const auditId = "gateway-invitation-sent-" + envelopeId + "-" + crypto.randomUUID().slice(0,8);
+    const audit = {envelopeId,event:"Signing Invitation Sent",details:{signerUid,signerName:name,workflowRole:role,deliveryStatus:"Sent",providerResponseId:String(messageId||"")},actorUid:claims.user_id,actorEmail:String(claims.email||""),createdAt:sentAt,source:"authenticated-gateway"};
+    const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
+    await commitSignatureWorkflowWrites(env,adminToken,[{update:{name:base+"/signatureEvents/"+auditId,fields:signatureDraftFirestoreValue(audit).mapValue.fields},currentDocument:{exists:false}}]);
+    return json({ok:true,envelopeId,signerUid,email,deliveryStatus:"Sent",sentAt,messageId,auditId},200,corsHeaders(request));
   } catch (error) {
     const failedAt = new Date().toISOString();
     const safeError = safeMailError(error);
