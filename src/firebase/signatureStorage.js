@@ -457,7 +457,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   });
   const resolveSignerId=field=>{
     const key=String(field?.signerId||field?.signerUid||"").trim().toLowerCase();
-    return signerAssignmentByKey.get(key)||(/^S\\d{1,2}$/.test(key)?key:null);
+    return signerAssignmentByKey.get(key)||(/^S\d{1,2}$/.test(key)?key:null);
   };
   if ((envelope.fields || []).some(field => !resolveSignerId(field) || !ordered.some((recipient,index)=>"S"+String(index+1)===resolveSignerId(field)))) {
     throw new Error("A signing field is assigned to a view-only, optional, or unknown signer. Correct the field assignments before Gateway activation.");
