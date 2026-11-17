@@ -515,7 +515,7 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
     else if(field.type==="Name")gatewayFields[field.fieldId]=profile?.displayName||u.displayName||u.email||"";
     else if(field.type==="Date")gatewayFields[field.fieldId]=new Date().toISOString().slice(0,10);
   }
-  await submitGatewaySignature({token,signature,fieldValues:gatewayFields,fieldApplications,signatureConfirmed:true,consent:true,declarations:{name:String(profile?.displayName||u.displayName||u.email||"").trim(),occupation:String(manualAuthorityIdentification||"").trim(),capacity:""}});
+  await submitGatewaySignature({token,signature,fieldValues:gatewayFields,fieldApplications,signatureConfirmed:true,consent:true,declarations:{name:String(profile?.displayName||u.displayName||u.email||"").trim(),title:""}});
   const after=await fetchGatewaySigningStatus(token);
   if(after.envelopeId!==status.envelopeId||after.signer?.uid!==u.uid||after.signer?.status!=="Signed")throw new Error("Gateway did not persist the authenticated signer action. No Firebase completion was recorded.");
   const gatewaySigners=Array.isArray(after.signers)?after.signers:[];
