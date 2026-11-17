@@ -298,7 +298,7 @@ export async function retryCompletion(ctx,user,id){const e=await ctx.meta.get("e
 export async function retryCompletedDocumentDistribution(ctx,user,id){return retryFailedSignatureDistributions(ctx,user,id)}
 export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");for(const signer of c.signers||[])if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="used"){signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);signer.emailLinkStatus="revoked";}return{patch:{status:"Voided",signers:c.signers,events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
 
-export async function resendInvitation(ctx,user,id,signerId){
+export async function resendInvitation(ctx,user,id,signerId,mailMetadata={}){
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
   if(["Completed","Voided","Declined"].includes(envelope.status))throw new HttpError(409,"This signing envelope is no longer active.");
@@ -321,7 +321,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   });
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
-  try{const assignedFields=(envelope.fields||[]).filter(field=>field.signerId===target.id);const role=signingInvitationRole(target.authorityRole||target.role||"");const action=signingInvitationAction(assignedFields,role);await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt,role,action,fieldCount:assignedFields.length});}
+  try{const assignedFields=(envelope.fields||[]).filter(field=>field.signerId===target.id);const role=signingInvitationRole(mailMetadata?.role||target.authorityRole||target.role||"");const action=signingInvitationAction(assignedFields,role);await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt,role,action,fieldCount:assignedFields.length});}
   catch(error){
     await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer){signer.invitation="Failed";if(emailLink)signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
