@@ -121,7 +121,7 @@ export default function EmailSigningReadOnlyPage({token}){
   }else if(fieldValues[selectedField.fieldId]===undefined||String(fieldValues[selectedField.fieldId]).trim()===""){setError("Complete this assigned field before confirming it.");return;}
   setError("");
   const next=fields.find(field=>field.fieldId!==selectedField.fieldId&&!complete(field));
-  if(next){setSelectedFieldId(next.fieldId);setPageNum(Number(next.page||1));}
+  if(next){setSelectedFieldId(next.fieldId);const targetPage=Number(next.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}}
  }
  function clearPad(){const canvas=signatureCanvasRef.current;if(canvas)canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);setSignatureMarks(current=>{const next={...current};delete next[selectedFieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
  function enterReview(){
@@ -129,7 +129,7 @@ export default function EmailSigningReadOnlyPage({token}){
   if(incomplete.length){setSelectedFieldId(incomplete[0].fieldId);setPageNum(Number(incomplete[0].page||1));setError("Complete every required field before reviewing the signature placement.");return;}
   if(!signatureFields.length&&typedSignature.trim().length<2){setError("Enter your typed signature before reviewing the document.");return;}
   if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
-  setError("");setReviewMode(true);setPageNum(1);
+  setError("");setReviewMode(true);if(pageNum!==1){setPageRendered(false);setPageNum(1);}
  }
  async function submit(){
   if(!reviewMode){setError("Review the complete document and signature placement before submitting.");return;}
@@ -186,9 +186,9 @@ export default function EmailSigningReadOnlyPage({token}){
     <section style={{border:"1px solid #9ca3af",borderRadius:8,padding:12,marginTop:12}}>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><div><h2 style={{fontSize:18,margin:"0 0 4px"}}>Complete document review</h2><p style={{fontSize:13,color:"#4b5563",margin:0}}>Read every page before deciding. Assigned signature and initials locations are marked directly on the document.</p></div><strong>Page {pageNum} of {pageCount||"…"}</strong></div>
      <div style={{display:"flex",gap:8,justifyContent:"center",margin:"12px 0",flexWrap:"wrap"}}>
-      <button type="button" disabled={!pdfDocument||pageNum<=1} onClick={()=>setPageNum(n=>n-1)} style={{...buttonStyle,opacity:!pdfDocument||pageNum<=1?.45:1}}>Previous page</button>
+      <button type="button" disabled={!pdfDocument||pageNum<=1} onClick={()=>{setPageRendered(false);setPageNum(n=>n-1);}} style={{...buttonStyle,opacity:(!pdfDocument||pageNum<=1)?0.45:1}}>Previous page</button>
       <span style={{fontSize:13,padding:10}}>Page {pageNum} / {pageCount}</span>
-      <button type="button" disabled={!pdfDocument||pageNum>=pageCount} onClick={()=>setPageNum(n=>n+1)} style={{...buttonStyle,opacity:!pdfDocument||pageNum>=pageCount?.45:1}}>Next page</button>
+      <button type="button" disabled={!pdfDocument||pageNum>=pageCount} onClick={()=>{setPageRendered(false);setPageNum(n=>n+1);}} style={{...buttonStyle,opacity:(!pdfDocument||pageNum>=pageCount)?0.45:1}}>Next page</button>
      </div>
      <div ref={pageHostRef} style={{width:"100%",overflowX:"auto",padding:"4px 0"}}>
       <div style={{position:"relative",width:pageSize.width,maxWidth:"100%",aspectRatio:String(pageSize.width)+"/"+String(pageSize.height),margin:"0 auto",background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,.2)"}}>
@@ -216,7 +216,7 @@ export default function EmailSigningReadOnlyPage({token}){
     </section>
     {!!fields.length&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
      <h2 style={{fontSize:18}}>Your assigned fields</h2>
-     <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{fields.map(field=><button key={field.fieldId} type="button" disabled={reviewMode||signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);setPageNum(Number(field.page||1));setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:reviewMode||signingClosed?.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
+     <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{fields.map(field=><button key={field.fieldId} type="button" disabled={reviewMode||signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);const targetPage=Number(field.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:(reviewMode||signingClosed)?0.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
      {selectedField&&<div style={{marginTop:14,padding:12,border:"1px solid #9ca3af",borderRadius:8}}>
       <h3 style={{fontSize:16,marginTop:0}}>Complete: {selectedField.placeholder||selectedField.type} · Page {selectedField.page}</h3>
       {["Signature","Initials"].includes(selectedField.type)?<><p style={{fontSize:13}}>Draw your {selectedField.type.toLowerCase()} below. Applying it places the stamp in the highlighted document location.</p><canvas ref={signatureCanvasRef} width={520} height={180} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={()=>{drawingRef.current=false;}} onPointerCancel={()=>{drawingRef.current=false;}} style={{width:"100%",height:150,border:"1px solid #6b7280",borderRadius:6,touchAction:"none",background:"#fff"}}/><div style={{display:"flex",gap:8,marginTop:8}}><button type="button" disabled={reviewMode||signingClosed} onClick={clearPad} style={{...buttonStyle,background:"#6b7280"}}>Clear mark</button><button type="button" disabled={reviewMode||signingClosed} onClick={confirmField} style={buttonStyle}>Apply stamp to document</button></div></>:<><label style={{display:"block",margin:"8px 0"}}>{selectedField.type}{selectedField.required?" (required)":""}{selectedField.type==="Checkbox"?<input type="checkbox" disabled={reviewMode||signingClosed} checked={fieldValues[selectedField.fieldId]==="true"} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.checked?"true":"false"}))}/>:<input style={inputStyle} disabled={reviewMode||signingClosed} type={selectedField.type==="Date"?"date":"text"} value={fieldValues[selectedField.fieldId]||""} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.value}))} placeholder={selectedField.placeholder||"Enter your response"}/>}</label><button type="button" disabled={reviewMode||signingClosed} onClick={confirmField} style={buttonStyle}>Confirm field value</button></>}
@@ -225,13 +225,13 @@ export default function EmailSigningReadOnlyPage({token}){
     {!signatureFields.length&&<label style={{display:"block",margin:"14px 0"}}>Typed signature<input style={inputStyle} disabled={reviewMode||signingClosed} value={typedSignature} onChange={e=>setTypedSignature(e.target.value)} placeholder="Type your full name as your signature"/></label>}
     <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"18px 0"}}><input type="checkbox" checked={consent} disabled={signingClosed} onChange={e=>setConsent(e.target.checked)}/><span>I have reviewed the complete document, understand its contents and the marked signature location(s), and consent to apply my electronic signature.</span></label>
     {!record.canSign&&<p role="status">Your assignment is waiting for the preceding action. You may review the document, but cannot submit yet.</p>}
-    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)} onClick={enterReview} style={{...buttonStyle,opacity:!canReview||!pdfDocument||Boolean(pageError)?.5:1}}>Review document with applied signature</button>}
+    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError))?0.5:1}}>Review document with applied signature</button>}
     {reviewMode&&!signingClosed&&<section style={{marginTop:16,padding:12,border:"2px solid #174a78",borderRadius:8}}>
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Your signature has not been submitted yet.</p>
      <button type="button" onClick={()=>setReviewMode(false)} style={{...buttonStyle,background:"#4b5563",marginRight:8}}>Return to editing</button>
-     <button type="button" disabled={submitting||!record.canSign||!pageRendered||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:submitting||!record.canSign||!pageRendered||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)?.5:1}}>{submitting?"Submitting…":"Submit"}</button>
-     <button type="button" disabled={revoking||submitting} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:revoking||submitting?.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
+     <button type="button" disabled={submitting||!record.canSign||!pageRendered||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
+     <button type="button" disabled={revoking||submitting} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}
     {revoked&&<p role="status" style={{marginTop:14}}>The invitation is revoked and cannot be used again.</p>}
