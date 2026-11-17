@@ -1,7 +1,183 @@
-import {PDFDocument,StandardFonts,rgb} from "pdf-lib"; import {HttpError,sha256Hex} from "./util.mjs";
-export const MAX_PDF_BYTES=10*1024*1024,MAX_PAGES=500,MAX_SIGNERS=8; const ascii=(b,s,e)=>String.fromCharCode(...b.subarray(s,e));
-export async function validatePdf(bytes){if(!(bytes instanceof Uint8Array)||!bytes.length)throw new HttpError(400,"The uploaded file is empty.");if(bytes.length>MAX_PDF_BYTES)throw new HttpError(413,"Uploaded documents must not exceed 10 MB.");if(ascii(bytes,0,5)!=="%PDF-")throw new HttpError(400,"The uploaded file is not a valid PDF.");if(!ascii(bytes,Math.max(0,bytes.length-1024),bytes.length).includes("%%EOF"))throw new HttpError(400,"The PDF is incomplete or truncated.");let d;try{d=await PDFDocument.load(bytes,{updateMetadata:false})}catch{throw new HttpError(400,"The PDF is corrupted, encrypted, or unsupported.")}const p=d.getPageCount();if(p<1||p>MAX_PAGES)throw new HttpError(400,"The PDF page count is not supported.");return{pageCount:p,hash:await sha256Hex(bytes)}}
-export function decodePngDataUrl(v){const b64=v.slice("data:image/png;base64,".length),bin=atob(b64),o=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)o[i]=bin.charCodeAt(i);return o}
-export async function validateSignatureInput(s){if(s?.type==="typed"){const v=typeof s.value==="string"?s.value.trim():"";if(v.length<2||v.length>100||/[\u0000-\u001f\u007f<>]/.test(v))throw new HttpError(400,"Invalid typed signature.");return{type:"typed",value:v}}if(s?.type==="drawn"){const v=s.value;if(typeof v!=="string"||v.length>140000||!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(v))throw new HttpError(400,"Invalid drawn signature.");try{const b=decodePngDataUrl(v);if(b[0]!==137||b[1]!==80||b[2]!==78||b[3]!==71)throw 0;const t=await PDFDocument.create();await t.embedPng(b)}catch{throw new HttpError(400,"Invalid drawn signature image.")}return{type:"drawn",value:v}}throw new HttpError(400,"A signature is required.")}
-function safeText(f,s,max){let o="";for(const ch of String(s??"").slice(0,max)){try{f.encodeText(ch);o+=ch}catch{o+="?"}}return o}
-export async function buildSignedPdf(originalBytes,info){const d=await PDFDocument.load(originalBytes),f=await d.embedFont(StandardFonts.Helvetica),b=await d.embedFont(StandardFonts.HelveticaBold),i=await d.embedFont(StandardFonts.HelveticaOblique),originalPages=d.getPages();for(const field of info.fields||[]){const signer=(info.signers||[]).find(s=>(field.signerId&&s.id===field.signerId)||(s.uid&&s.uid===field.signerUid));if(!signer)continue;const value=signer.fieldValues?.[field.fieldId];if(value==null||value==="")continue;const page=originalPages[Number(field.page||1)-1];if(!page)throw new HttpError(400,"A signing field references a missing PDF page.");const size=page.getSize(),x=Number(field.x||0)/100*size.width,h=Number(field.height||8)/100*size.height,w=Number(field.width||24)/100*size.width,y=size.height-(Number(field.y||80)/100*size.height)-h;if(field.type==="Signature"||field.type==="Initials"){if(typeof value==="string"&&value.startsWith("data:image/png;base64,")){const png=await d.embedPng(decodePngDataUrl(value)),fit=png.scaleToFit(Math.max(1,w),Math.max(1,h));page.drawImage(png,{x,y,width:fit.width,height:fit.height})}else{page.drawText(safeText(i,value,100),{x,y:y+Math.min(h*.25,4),size:Math.max(7,Math.min(16,h*.6)),font:i,maxWidth:w})}}else if(field.type==="Checkbox"){page.drawRectangle({x,y,width:Math.min(w,h),height:Math.min(w,h),borderWidth:1,borderColor:rgb(.1,.1,.1)});if(value==="true")page.drawText("X",{x:x+2,y:y+1,size:Math.max(7,Math.min(12,h*.6)),font:f,color:rgb(0,0,0)})}else{page.drawText(safeText(f,String(value),Math.max(1,Math.floor(w/4))),{x,y:y+Math.min(h*.2,3),size:Math.max(7,Math.min(16,h*.6)),font:f,color:rgb(.05,.05,.08),maxWidth:w})}}let p=d.addPage([595.28,841.89]);let y=800;const line=(t,o={})=>{const ff=o.f||f,size=o.size||9;p.drawText(safeText(ff,t,105),{x:56,y,size,font:ff,color:rgb(.12,.12,.12)});y-=size+5};line("Electronic Signature Certificate",{f:b,size:16});y-=6;line(`Envelope: ${info.envelopeId}`);line(`Document: ${info.documentId} - ${info.title}`);line("Original document SHA-256:");line(info.originalHash,{size:7.5});line("Audit trail chain head (SHA-256):");line(info.chainHead,{size:7.5});line(`Completed: ${info.completedAt}`);y-=10;for(const s of info.signers){if(y<130){p=d.addPage([595.28,841.89]);y=800}const top=y;p.drawRectangle({x:50,y:top-94,width:495,height:98,borderColor:rgb(.6,.6,.6),borderWidth:.7});p.drawText(safeText(b,s.name,40),{x:56,y:top-12,size:10,font:b});p.drawText(safeText(f,s.email,40),{x:56,y:top-25,size:8.5,font:f});p.drawText(safeText(f,`Signed: ${s.signedAt}`,40),{x:56,y:top-37,size:8.5,font:f});p.drawText(safeText(f,`IP: ${s.ip||"n/a"}`,40),{x:56,y:top-49,size:8.5,font:f});p.drawText(safeText(f,`Method: ${s.signatureType}`,40),{x:56,y:top-61,size:8.5,font:f});p.drawText(safeText(f,`Owner declared: ${s.declarationDiscrepancy?.ownerDeclared?.name||s.name||""} | Occupation: ${s.declarationDiscrepancy?.ownerDeclared?.occupation||"n/a"} | Capacity: ${s.declarationDiscrepancy?.ownerDeclared?.capacity||"n/a"}`,90),{x:56,y:top-73,size:7,font:f});p.drawText(safeText(f,`Signer declared: ${s.signerDeclarations?.name||s.name||""} | Occupation: ${s.signerDeclarations?.occupation||"n/a"} | Capacity: ${s.signerDeclarations?.capacity||"n/a"}`,90),{x:56,y:top-84,size:7,font:f});p.drawText(safeText(b,s.declarationDiscrepancy?.detected?`DISCREPANCY NOTED: ${(s.declarationDiscrepancy.fields||[]).join(", ")}`:"Declaration comparison: no discrepancy recorded",90),{x:56,y:top-94,size:6.5,font:b,color:s.declarationDiscrepancy?.detected?rgb(.65,.2,.1):rgb(.12,.12,.12)});if(s.signatureType==="drawn"){const png=await d.embedPng(decodePngDataUrl(s.signatureValue)),z=png.scaleToFit(170,50);p.drawImage(png,{x:340,y:top-60,width:z.width,height:z.height})}else p.drawText(safeText(i,s.signatureValue,28),{x:340,y:top-40,size:18,font:i});y-=104}if(Array.isArray(info.events)&&info.events.length){if(y<150){p=d.addPage([595.28,841.89]);y=800}y-=8;line("Transaction event chronology",{f:b,size:12});for(const event of info.events){if(y<70){p=d.addPage([595.28,841.89]);y=800}const label=[event.at||"",event.type||"event",event.signerId?`Signer ${event.signerId}`:"",event.deliveryStatus?`Delivery ${event.deliveryStatus}`:""].filter(Boolean).join(" | ");line(label,{size:7.5})}}return d.save()}
+import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
+import { HttpError, sha256Hex } from "./util.mjs";
+import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
+
+export const MAX_PDF_BYTES = 10 * 1024 * 1024;
+export const MAX_PAGES = 500;
+export const MAX_SIGNERS = 8;
+const ascii = (bytes, start, end) => String.fromCharCode(...bytes.subarray(start, end));
+
+export async function validatePdf(bytes) {
+  if (!(bytes instanceof Uint8Array) || !bytes.length) throw new HttpError(400, "The uploaded file is empty.");
+  if (bytes.length > MAX_PDF_BYTES) throw new HttpError(413, "Uploaded documents must not exceed 10 MB.");
+  if (ascii(bytes, 0, 5) !== "%PDF-") throw new HttpError(400, "The uploaded file is not a valid PDF.");
+  if (!ascii(bytes, Math.max(0, bytes.length - 1024), bytes.length).includes("%%EOF")) throw new HttpError(400, "The PDF is incomplete or truncated.");
+  let document;
+  try { document = await PDFDocument.load(bytes, { updateMetadata: false }); }
+  catch { throw new HttpError(400, "The PDF is corrupted, encrypted, or unsupported."); }
+  const pageCount = document.getPageCount();
+  if (pageCount < 1 || pageCount > MAX_PAGES) throw new HttpError(400, "The PDF page count is not supported.");
+  return { pageCount, hash: await sha256Hex(bytes) };
+}
+
+export function decodePngDataUrl(value) {
+  const base64 = value.slice("data:image/png;base64,".length);
+  const binary = atob(base64);
+  const output = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) output[index] = binary.charCodeAt(index);
+  return output;
+}
+
+export async function validateSignatureInput(signature) {
+  if (signature?.type === "typed") {
+    const value = typeof signature.value === "string" ? signature.value.trim() : "";
+    if (value.length < 2 || value.length > 100 || /[\u0000-\u001f\u007f<>]/.test(value)) throw new HttpError(400, "Invalid typed signature.");
+    return { type: "typed", value };
+  }
+  if (signature?.type === "drawn") {
+    const value = signature.value;
+    if (typeof value !== "string" || value.length > 140000 || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) throw new HttpError(400, "Invalid drawn signature.");
+    try {
+      const bytes = decodePngDataUrl(value);
+      if (bytes[0] !== 137 || bytes[1] !== 80 || bytes[2] !== 78 || bytes[3] !== 71) throw new Error("Invalid PNG signature.");
+      const probe = await PDFDocument.create();
+      await probe.embedPng(bytes);
+    } catch { throw new HttpError(400, "Invalid drawn signature image."); }
+    return { type: "drawn", value };
+  }
+  throw new HttpError(400, "A signature is required.");
+}
+
+function safeText(font, value, maxLength) {
+  let output = "";
+  for (const character of String(value ?? "").slice(0, maxLength)) {
+    try { font.encodeText(character); output += character; }
+    catch { output += "?"; }
+  }
+  return output;
+}
+
+/** Convert a field rectangle in the visible, rotated crop box into PDF user space. */
+export function getPdfFieldBox(page, field) {
+  const crop = page.getCropBox();
+  const rotation = ((Number(page.getRotation()?.angle || 0) % 360) + 360) % 360;
+  if (![0, 90, 180, 270].includes(rotation)) throw new HttpError(400, "The PDF page rotation is not supported for signature placement.");
+  const swapsAxes = rotation === 90 || rotation === 270;
+  const visibleWidth = swapsAxes ? crop.height : crop.width;
+  const visibleHeight = swapsAxes ? crop.width : crop.height;
+  const left = Number(field.x ?? 0) / 100 * visibleWidth;
+  const top = Number(field.y ?? 0) / 100 * visibleHeight;
+  const width = Number(field.width ?? 24) / 100 * visibleWidth;
+  const height = Number(field.height ?? 8) / 100 * visibleHeight;
+  if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0 ||
+      left < 0 || top < 0 || left + width > visibleWidth + 0.01 || top + height > visibleHeight + 0.01) {
+    throw new HttpError(400, "The signature field is outside the visible PDF page.");
+  }
+  if (rotation === 0) return { x: crop.x + left, y: crop.y + crop.height - top - height, width, height, rotation };
+  if (rotation === 90) return { x: crop.x + top, y: crop.y + left, width: height, height: width, rotation };
+  if (rotation === 180) return { x: crop.x + crop.width - left - width, y: crop.y + top, width, height, rotation };
+  return { x: crop.x + crop.width - top - height, y: crop.y + crop.height - left - width, width: height, height: width, rotation };
+}
+
+function drawFittedSignature(page, image, fieldBox) {
+  const displayedFit = fitSignatureImage(image.width, image.height, { x: 0, y: 0, width: fieldBox.rotation % 180 ? fieldBox.height : fieldBox.width, height: fieldBox.rotation % 180 ? fieldBox.width : fieldBox.height });
+  const width = fieldBox.rotation % 180 ? displayedFit.height : displayedFit.width;
+  const height = fieldBox.rotation % 180 ? displayedFit.width : displayedFit.height;
+  const x = fieldBox.x + (fieldBox.width - width) / 2;
+  const y = fieldBox.y + (fieldBox.height - height) / 2;
+  page.drawImage(image, { x, y, width, height, ...(fieldBox.rotation ? { rotate: degrees(360 - fieldBox.rotation) } : {}) });
+  return { x, y, width, height };
+}
+
+export async function buildSignedPdf(originalBytes, info) {
+  const document = await PDFDocument.load(originalBytes);
+  const regular = await document.embedFont(StandardFonts.Helvetica);
+  const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const italic = await document.embedFont(StandardFonts.HelveticaOblique);
+  const pages = document.getPages();
+
+  for (const field of info.fields || []) {
+    const signer = (info.signers || []).find(item => (field.signerId && item.id === field.signerId) || (item.uid && item.uid === field.signerUid));
+    if (!signer) continue;
+    const value = signer.fieldValues?.[field.fieldId];
+    if (value == null || value === "") continue;
+    const page = pages[Number(field.page || 1) - 1];
+    if (!page) throw new HttpError(400, "A signing field references a missing PDF page.");
+    const fieldBox = getPdfFieldBox(page, field);
+    const { x, y, width, height } = fieldBox;
+
+    if (field.type === "Signature" || field.type === "Initials") {
+      if (typeof value === "string" && value.startsWith("data:image/png;base64,")) {
+        const png = await document.embedPng(decodePngDataUrl(value));
+        drawFittedSignature(page, png, fieldBox);
+      } else {
+        page.drawText(safeText(italic, value, 100), {
+          x, y: y + Math.min(height * 0.25, 4),
+          size: Math.max(7, Math.min(16, height * 0.6)),
+          font: italic, maxWidth: width
+        });
+      }
+    } else if (field.type === "Checkbox") {
+      page.drawRectangle({ x, y, width: Math.min(width, height), height: Math.min(width, height), borderWidth: 1, borderColor: rgb(0.1, 0.1, 0.1) });
+      if (value === "true") page.drawText("X", { x: x + 2, y: y + 1, size: Math.max(7, Math.min(12, height * 0.6)), font: regular, color: rgb(0, 0, 0) });
+    } else {
+      page.drawText(safeText(regular, String(value), Math.max(1, Math.floor(width / 4))), {
+        x, y: y + Math.min(height * 0.2, 3),
+        size: Math.max(7, Math.min(16, height * 0.6)),
+        font: regular, color: rgb(0.05, 0.05, 0.08), maxWidth: width
+      });
+    }
+  }
+
+  let certificatePage = document.addPage([595.28, 841.89]);
+  let y = 800;
+  const line = (value, options = {}) => {
+    const font = options.font || regular, size = options.size || 9;
+    certificatePage.drawText(safeText(font, value, 105), { x: 56, y, size, font, color: rgb(0.12, 0.12, 0.12) });
+    y -= size + 5;
+  };
+  line("Electronic Signature Certificate", { font: bold, size: 16 });
+  y -= 6;
+  line(`Envelope: ${info.envelopeId}`);
+  line(`Document: ${info.documentId} - ${info.title}`);
+  line("Original document SHA-256:");
+  line(info.originalHash, { size: 7.5 });
+  line("Audit trail chain head (SHA-256):");
+  line(info.chainHead, { size: 7.5 });
+  line(`Completed: ${info.completedAt}`);
+  y -= 10;
+
+  for (const signer of info.signers) {
+    if (y < 130) { certificatePage = document.addPage([595.28, 841.89]); y = 800; }
+    const top = y;
+    certificatePage.drawRectangle({ x: 50, y: top - 94, width: 495, height: 98, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.7 });
+    certificatePage.drawText(safeText(bold, signer.name, 40), { x: 56, y: top - 12, size: 10, font: bold });
+    certificatePage.drawText(safeText(regular, signer.email, 40), { x: 56, y: top - 25, size: 8.5, font: regular });
+    certificatePage.drawText(safeText(regular, `Signed: ${signer.signedAt}`, 40), { x: 56, y: top - 37, size: 8.5, font: regular });
+    certificatePage.drawText(safeText(regular, `IP: ${signer.ip || "n/a"}`, 40), { x: 56, y: top - 49, size: 8.5, font: regular });
+    certificatePage.drawText(safeText(regular, `Method: ${signer.signatureType}`, 40), { x: 56, y: top - 61, size: 8.5, font: regular });
+    certificatePage.drawText(safeText(regular, `Owner declared: ${signer.declarationDiscrepancy?.ownerDeclared?.name || signer.name || ""} | Occupation: ${signer.declarationDiscrepancy?.ownerDeclared?.occupation || "n/a"} | Capacity: ${signer.declarationDiscrepancy?.ownerDeclared?.capacity || "n/a"}`, 90), { x: 56, y: top - 73, size: 7, font: regular });
+    certificatePage.drawText(safeText(regular, `Signer declared: ${signer.signerDeclarations?.name || signer.name || ""} | Occupation: ${signer.signerDeclarations?.occupation || "n/a"} | Capacity: ${signer.signerDeclarations?.capacity || "n/a"}`, 90), { x: 56, y: top - 84, size: 7, font: regular });
+    certificatePage.drawText(safeText(bold, signer.declarationDiscrepancy?.detected ? `DISCREPANCY NOTED: ${(signer.declarationDiscrepancy.fields || []).join(", ")}` : "Declaration comparison: no discrepancy recorded", 90), { x: 56, y: top - 94, size: 6.5, font: bold, color: signer.declarationDiscrepancy?.detected ? rgb(0.65, 0.2, 0.1) : rgb(0.12, 0.12, 0.12) });
+    if (signer.signatureType === "drawn" && typeof signer.signatureValue === "string" && signer.signatureValue.startsWith("data:image/png;base64,")) {
+      const png = await document.embedPng(decodePngDataUrl(signer.signatureValue));
+      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: 170, height: 50 });
+      certificatePage.drawImage(png, { x: fit.x, y: fit.y, width: fit.width, height: fit.height });
+    } else {
+      certificatePage.drawText(safeText(italic, signer.signatureValue, 28), { x: 340, y: top - 40, size: 18, font: italic });
+    }
+    y -= 104;
+  }
+
+  if (Array.isArray(info.events) && info.events.length) {
+    if (y < 150) { certificatePage = document.addPage([595.28, 841.89]); y = 800; }
+    y -= 8;
+    line("Transaction event chronology", { font: bold, size: 12 });
+    for (const event of info.events) {
+      if (y < 70) { certificatePage = document.addPage([595.28, 841.89]); y = 800; }
+      const label = [event.at || "", event.type || "event", event.signerId ? `Signer ${event.signerId}` : "", event.deliveryStatus ? `Delivery ${event.deliveryStatus}` : ""].filter(Boolean).join(" | ");
+      line(label, { size: 7.5 });
+    }
+  }
+  return document.save();
+}
