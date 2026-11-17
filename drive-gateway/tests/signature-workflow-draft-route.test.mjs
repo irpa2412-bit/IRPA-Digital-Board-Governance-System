@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const worker = fs.readFileSync("src/index.js", "utf8");
 const client = fs.readFileSync("../src/firebase/signaturePlatform.js", "utf8");
+const storage = fs.readFileSync("../src/firebase/signatureStorage.js", "utf8");
 const selfTest = fs.readFileSync("../src/components/SignaturePathwaySelfTest.jsx", "utf8");
 const batch = fs.readFileSync("../src/utils/controlledDocumentDiagnosticBatch.mjs", "utf8");
 const rules = fs.readFileSync("../firestore.rules", "utf8");
@@ -65,6 +66,6 @@ test("signature owner activation, append-only audit, signer mirror and signed-do
   assert.match(client,/\/api\/signature-workflow\/audit/);
   assert.match(client,/\/api\/signature-workflow\/mirror/);
   assert.match(client,/\/api\/signature-workflow\/signed-documents/);
-  assert.match(client,/\/api\/sign\/submit/);
+  assert.match(storage,/\/api\/sign\/submit/);
   assert.doesNotMatch(client,/await updateDoc\(doc\(db,ENVELOPE_COLLECTION/);
 });
