@@ -133,15 +133,15 @@ const signed=await readJson(signedResponse,"Staging signing and cryptographic co
 assert.equal(signed.status,"Completed");
 assert.equal(signed.completed,true);
 
-const status=await signingJson("/api/sign/status",signingToken,"Completed signing status");
+const status=await signingJson("/api/sign/status",sessionToken,"Completed signing status");
 assert.equal(status.status,"Completed");
 assert.equal(status.externalReference,externalReference);
 assert.equal(status.auditChainValid,true);
 assert.equal(status.completion.cryptographicEvidenceIds.length,1);
-assert.equal(status.signers[0].uid,expectedUid);
-assert.equal(status.completion.finalHash,await sha256(new Uint8Array(await (await fetch(base+"/api/sign/pdf",{headers:{...authHeaders,"x-signing-token":signingToken}})).arrayBuffer())));
+assert.equal(status.signers[0].uid,undefined);
+assert.equal(status.completion.finalHash,await sha256(new Uint8Array(await (await fetch(base+"/api/sign/pdf",{headers:{"x-signing-token":sessionToken}})).arrayBuffer())));
 
-const pdfResponse=await fetch(base+"/api/sign/pdf",{headers:{...authHeaders,"x-signing-token":signingToken}});
+const pdfResponse=await fetch(base+"/api/sign/pdf",{headers:{"x-signing-token":sessionToken}});
 assert.equal(pdfResponse.ok,true,"Completed PDF retrieval failed.");
 const completedBytes=new Uint8Array(await pdfResponse.arrayBuffer());
 const completedHash=await sha256(completedBytes);
@@ -161,7 +161,7 @@ assert.equal(evidenceResult.documentHash,completedHash);
 assert.equal(evidenceResult.evidence.length,1);
 const evidence=evidenceResult.evidence[0];
 assert.equal(evidence.envelopeId,envelope.envelopeId);
-assert.equal(evidence.signerUid,expectedUid);
+assert.equal(evidence.signerUid,null);
 assert.equal(evidence.keyId,expectedKeyId,"Gateway did not use the exact ephemeral key injected for this staging signer.");
 assert.equal(evidence.documentHash,completedHash);
 assert.equal(evidence.status,"SEALED");
@@ -173,7 +173,8 @@ const evidenceSignatureValid=await webcrypto.subtle.verify({name:"ECDSA",hash:"S
 assert.equal(evidenceSignatureValid,true,"Persisted evidence signature did not independently verify.");
 assert.equal(JSON.parse(evidence.canonicalPayload).documentHash,completedHash);
 assert.equal(JSON.parse(evidence.canonicalPayload).envelopeId,envelope.envelopeId);
-assert.equal(JSON.parse(evidence.canonicalPayload).signerUid,expectedUid);
+assert.equal(JSON.parse(evidence.canonicalPayload).signerUid,null);
+assert.equal(JSON.parse(evidence.canonicalPayload).signerIdentityType,"email-link");
 
 const tamperedBytes=new Uint8Array(completedBytes);
 tamperedBytes[tamperedBytes.length-1]^=1;
@@ -185,16 +186,20 @@ assert.equal(tamperedResponse.status,409,"Gateway did not reject a tampered comp
 
 const beforeRetry=status.eventCount;
 const retryResponse=await fetch(base+"/api/sign/submit",{
-  method:"POST",headers:{...authHeaders,"content-type":"application/json"},
-  body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},manualAuthorityIdentification:effectiveAuthority,consent:true})
+  method:"POST",headers:{"content-type":"application/json"},
+  body:JSON.stringify({token:sessionToken,signature:{type:"field-applications"},fieldApplications:[{fieldId:"staging-signature",confirmed:true,page:1,x:8,y:30,width:45,height:10,value:signaturePng}],fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer"},declarations:{name:"IRPA Staging Crypto Test Signer",title:"Staging acceptance signer"},signatureConfirmed:true,consent:true})
 });
 const retry=await readJson(retryResponse,"Idempotent signing retry");
 assert.equal(retry.idempotent,true);
-const afterRetry=await signingJson("/api/sign/status",signingToken,"Post-retry status");
+const afterRetry=await signingJson("/api/sign/status",sessionToken,"Post-retry status");
 assert.equal(afterRetry.eventCount,beforeRetry,"Idempotent retry changed the Gateway audit chain.");
 assert.equal(afterRetry.completion.cryptographicEvidenceIds.length,1,"Idempotent retry duplicated cryptographic evidence.");
 assert.equal(afterRetry.auditChainValid,true);
 
+console.log("STAGE_FINAL_SIGNER_COMPLETED=PASS");
+console.log("STAGE_CRYPTO_EVIDENCE=PASS");
+console.log("STAGE_TAMPER_REJECTION=PASS");
+console.log("STAGE_IDEMPOTENT_RETRY=PASS");
 console.log("STAGING_RUNTIME_CRYPTO_ACCEPTANCE=PASS");
 console.log(JSON.stringify({
   project,
