@@ -178,4 +178,9 @@ test("staging and production reject UID-only and UID-bound account signers",asyn
       error=>error?.status===400&&error.message.includes("Every staging and production signer must use an email-link identity without a Firebase UID")
     );
   }
+  const accepted=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"member@example.org",identityType:"email-link",name:"Registered Member"}]});
+  assert.equal(accepted.status,"Sent");
+  const saved=await ctx.meta.get("envelopes",accepted.envelopeId);
+  assert.equal(saved.signers[0].uid,null);
+  assert.equal(saved.signers[0].identityType,"email-link");
 });
