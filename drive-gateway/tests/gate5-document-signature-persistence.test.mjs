@@ -134,16 +134,17 @@ function submit(token, signature) {
 
 async function completeSingle(s, signature) {
   const envelopeId = await createEnvelope(s);
-  const token = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token }), s.ctx);
+  const invitationToken = s.tokenFor("g5.signer@example.org");
+  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
   assert.equal(opened.status, 200);
-  const response = await route(submit(token, signature), s.ctx);
+  const sessionToken=(await opened.json()).sessionToken;
+  const response = await route(submit(sessionToken, signature), s.ctx);
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.completed, true);
   const state = await s.meta.get("envelopes", envelopeId);
   assert.equal(state.status, "Completed");
-  return { envelopeId, state };
+  return { envelopeId, state, token:sessionToken };
 }
 
 async function getFinalPdf(s, token) {
@@ -205,12 +206,10 @@ async function completionFiles(s, state) {
 
 test("G5-01 — typed signature punching", async () => {
   const s = setup();
-  const { state } = await completeSingle(s, {
+  const { state, token } = await completeSingle(s, {
     type: "typed",
     value: "Gate Five Typed Signature",
   });
-
-  const token = s.tokenFor("g5.signer@example.org");
   const { response, bytes } = await getFinalPdf(s, token);
   assert.equal(response.status, 200);
   assert.equal(
@@ -229,12 +228,10 @@ test("G5-01 — typed signature punching", async () => {
 
 test("G5-02 — drawn signature punching", async () => {
   const s = setup();
-  const { state } = await completeSingle(s, {
+  const { state, token } = await completeSingle(s, {
     type: "drawn",
     value: PNG,
   });
-
-  const token = s.tokenFor("g5.signer@example.org");
   const { response, bytes } = await getFinalPdf(s, token);
   assert.equal(response.status, 200);
   assert.equal(await sha256Hex(bytes), state.completion.finalHash);
@@ -343,11 +340,10 @@ test("G5-05 — all-copy equality", async () => {
 
 test("G5-06 — retrieval equality", async () => {
   const s = setup();
-  const { state } = await completeSingle(s, {
+  const { state, token } = await completeSingle(s, {
     type: "typed",
     value: "Retrieval Equality",
   });
-  const token = s.tokenFor("g5.signer@example.org");
   const { response, bytes } = await getFinalPdf(s, token);
   assert.equal(response.status, 200);
   assert.equal(await sha256Hex(bytes), state.completion.finalHash);
@@ -359,7 +355,7 @@ test("G5-06 — retrieval equality", async () => {
 
 test("G5-07 — signed-PDF tamper detection", async () => {
   const s = setup();
-  const { state } = await completeSingle(s, {
+  const { state, token } = await completeSingle(s, {
     type: "typed",
     value: "Tamper Detection",
   });
@@ -368,7 +364,6 @@ test("G5-07 — signed-PDF tamper detection", async () => {
   tampered[tampered.length - 1] ^= 0xff;
   s.storage.objs.get(state.completion.primaryStorageId).bytes = tampered;
 
-  const token = s.tokenFor("g5.signer@example.org");
   const response = await route(
     get("/api/sign/pdf", { token }),
     s.ctx,
@@ -383,8 +378,10 @@ test("G5-07 — signed-PDF tamper detection", async () => {
 test("G5-08 — partial completion rollback", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
-  const token = s.tokenFor("g5.signer@example.org");
-  assert.equal((await route(get("/api/sign/email/open", { token }), s.ctx)).status, 200);
+  const invitationToken = s.tokenFor("g5.signer@example.org");
+  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  assert.equal(opened.status, 200);
+  const token=(await opened.json()).sessionToken;
 
   s.storage.failPutWhen = (n) => n === 4;
   const response = await route(
@@ -417,8 +414,10 @@ test("G5-08 — partial completion rollback", async () => {
 test("G5-09 — retry persistence", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
-  const token = s.tokenFor("g5.signer@example.org");
-  assert.equal((await route(get("/api/sign/email/open", { token }), s.ctx)).status, 200);
+  const invitationToken = s.tokenFor("g5.signer@example.org");
+  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  assert.equal(opened.status, 200);
+  const token=(await opened.json()).sessionToken;
 
   s.storage.failPutWhen = (n) => n === 4;
   assert.equal(
