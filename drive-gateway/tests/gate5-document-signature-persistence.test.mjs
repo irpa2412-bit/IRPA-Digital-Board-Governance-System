@@ -40,7 +40,7 @@ function setup() {
     sendEmailVerificationCode: async item => codes.push(item),
     config: { appUrl: "https://app.example.test", ttlDays: 14 },
   });
-  ctx.env.DRIVE_KV=kv;
+  ctx.env={...(ctx.env||{}),DRIVE_KV:kv};
   return {
     ctx,
     storage,
