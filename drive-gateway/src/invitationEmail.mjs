@@ -103,24 +103,29 @@ export async function sendInvitationEmail({email,name,link,meetingAccess=null,sm
 
 
 
-export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}) {
+export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt,role="",action="Sign",fieldCount=0}) {
   const safeName=validateName(name);
   if(!safeName)throw new Error("Invalid name");
   const safeLink=new URL(link).toString();
   const clean=(value,max=180)=>String(value||"").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,max);
   const safeTitle=clean(title)||"A controlled IRPA document";
   const safeOwner=clean(ownerName)||"IRPA Document Owner";
+  const safeRole=clean(role,120)||"Signer";
+  const safeAction=["Sign","Initial","Approve","Review","Authorise"].includes(String(action))?String(action):"Sign";
+  const safeFieldCount=Math.max(0,Math.min(100,Number.isFinite(Number(fieldCount))?Math.floor(Number(fieldCount)):0));
   const safeExpiry=clean(expiresAt,80)||"the expiry date shown on the invitation page";
-  const subject="IRPA secure document-signing invitation";
-  const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\nLink expiry: "+safeExpiry+"\n\nOpen your single-use secure link:\n"+safeLink+"\n\nOpening the link verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.\n\nThis link does not independently verify your legal identity or institutional authority. Do not forward it. If you did not expect this invitation, contact IRPA Administration.";
-  const html="<p>Dear "+escapeHtml(safeName)+",</p><p>"+escapeHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeHtml(safeExpiry)+"</p><p><a href=\""+escapeHtml(safeLink)+"\">Open secure document link</a></p><p>This is a private, single-use link. Opening it verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.</p><p>This link does not independently verify your legal identity or institutional authority. Do not forward it.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
+  const request=safeOwner+" of IRPA has asked you to "+safeAction.toLowerCase()+" "+safeTitle+".";
+  const securityNote="This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.";
+  const contact="If this email is unexpected, contact the document owner or IRPA Administration.";
+  const subject="Signature requested: "+safeTitle;
+  const text="Dear "+safeName+",\n\n"+request+"\n\nYour role: "+safeRole+"\nAssigned action: "+safeAction+"\nFields to complete: "+safeFieldCount+"\nLink expiry: "+safeExpiry+"\n\nReview and sign: "+safeLink+"\n\n"+securityNote+"\n\n"+contact+"\n\nIRPA Administration";
+  const html="<p>Dear "+escapeHtml(safeName)+",</p><p>"+escapeHtml(request)+"</p><p><strong>Your role:</strong> "+escapeHtml(safeRole)+"<br><strong>Assigned action:</strong> "+escapeHtml(safeAction)+"<br><strong>Fields to complete:</strong> "+safeFieldCount+"<br><strong>Link expiry:</strong> "+escapeHtml(safeExpiry)+"</p><p><a href=\""+escapeHtml(safeLink)+"\" style=\"display:inline-block;padding:12px 18px;background:#14532d;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:700\">Review and sign</a></p><p>Plain-text link: "+escapeHtml(safeLink)+"</p><p>"+escapeHtml(securityNote)+"</p><p>"+escapeHtml(contact)+"</p><p>IRPA Administration</p>";
   return {subject,text,html};
 }
-
-export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,smtpSend,logger=console,sleep}) {
+export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,role,action,fieldCount,smtpSend,logger=console,sleep}) {
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
-  const message=buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt});
+  const message=buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt,role,action,fieldCount});
   return sendWithRetry(()=>smtpSend({to,...message}),{logger,sleep});
 }
 

@@ -16,8 +16,8 @@ function fixture(authorityVerification=null){
     signers:[{
       id:"S1",uid:null,identityType:"email-link",name:"External Signer",email:"signer@example.org",
       status:"Signed",signedAt:"2026-11-17T09:00:00.000Z",
-      declaredParticulars:{name:"External Signer",occupation:"Consultant",capacity:"Supplier"},
-      signerDeclarations:{name:"External Signer",occupation:"Consultant",capacity:"Supplier"},
+      declaredParticulars:{name:"External Signer",title:"Independent Consultant"},
+      signerDeclarations:{name:"External Signer",title:"Independent Consultant"},
       declarationDiscrepancy:{detected:false,fields:[]},
       authorityVerification
     }]
@@ -45,19 +45,20 @@ test("email-link signer declaration is preserved separately and never marked as 
   assert.equal(signature.signerIdentityType,"email-link");
   assert.equal(signature.workflowRole,"Review");
   assert.equal(signature.signatureAuthority,"");
-  assert.equal(signature.signatureAuthorityVerificationStatus,"NotVerified");
-  assert.equal(signature.signerDeclarations.occupation,"Consultant");
-  assert.equal(signature.ownerDeclaredParticulars.occupation,"Consultant");
+  assert.equal(signature.signatureAuthorityVerificationStatus,"NotRequired");
+  assert.equal(signature.signatureAuthority,"");
+  assert.equal(signature.signerDeclarations.title,"Independent Consultant");
+  assert.equal(signature.ownerDeclaredParticulars.title,"Independent Consultant");
   const signerEvent=f.updates.find(item=>item.path.startsWith("signatureEvents/gateway-signed-"))?.data;
   assert.equal(signerEvent.actorUid,"");
   assert.equal(signerEvent.actorEmail,"signer@example.org");
   assert.equal(signerEvent.signerId,"S1");
 });
 
-test("authority is marked verified only when an explicit verified authority result is present",async()=>{
+test("email-link identity remains NotRequired even when legacy authority metadata is present",async()=>{
   const f=fixture({verified:true,authorityRole:"Board Secretary",sourceCollection:"employees",sourceRecordId:"employee-001"});
   await persistCompletedSignatureEnvelope({...f,getDocument:f.getDocument,updateDocument:f.updateDocument,now:()=>"2026-11-17T09:02:00.000Z"});
   const signature=f.updates.find(item=>item.path.startsWith("signatures/"))?.data;
-  assert.equal(signature.signatureAuthority,"Board Secretary");
-  assert.equal(signature.signatureAuthorityVerificationStatus,"Verified");
+  assert.equal(signature.signatureAuthority,"");
+  assert.equal(signature.signatureAuthorityVerificationStatus,"NotRequired");
 });

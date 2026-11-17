@@ -9,15 +9,10 @@ test("unbound legacy signers are rejected; email-link identity requires redeemed
   assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"email-link",emailLinkStatus:"opened"},null),true);
 });
 
-test("UID-bound signer requires the matching authenticated UID",()=>{
-  assert.equal(canAuthenticatedSignerAccess({uid:"member-123"},null),false);
-  assert.equal(canAuthenticatedSignerAccess({uid:"member-123"},{uid:"other-user"}),false);
-  assert.equal(canAuthenticatedSignerAccess({uid:"member-123"},{uid:"member-123"}),true);
-});
-
-test("UID-bound signer comparison is exact and cannot be bypassed by email alone",()=>{
-  assert.equal(canAuthenticatedSignerAccess({uid:"member-123"},{uid:"member-123",email:"different@example.com"}),true);
-  assert.equal(canAuthenticatedSignerAccess({uid:"member-123"},{uid:"member-124",email:"member@example.com"}),false);
+test("email-link identity is accepted only after email verification and does not require a Firebase UID",()=>{
+  assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"email-link",emailLinkStatus:"issued"},null),false);
+  assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"email-link",emailLinkStatus:"opened"},null),true);
+  assert.equal(canAuthenticatedSignerAccess({uid:"local-profile-uid",identityType:"email-link",emailLinkStatus:"opened"},null),true);
 });
 
 import {createHash} from "node:crypto";
@@ -26,58 +21,16 @@ import {readFileSync} from "node:fs";
 const pdfSource=readFileSync(new URL("../src/pdf.mjs",import.meta.url),"utf8");
 const signingSource=readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
 
-test("staging signing does not require IRPA register authority but retains signer authentication and declarations",async()=>{
-  const secret="a".repeat(64);
-  const hash=createHash("sha256").update(secret).digest("hex");
-  const envelope={
-    id:"ENV-staging-test",
-    documentId:"DOC-staging-test",
-    documentHash:"unused-before-source-check",
-    expiresAt:"2999-01-01T00:00:00.000Z",
-    status:"Sent",
-    signingMode:"Sequential",
-    events:[],
-    signers:[{id:"S1",uid:"staging-user",identityType:"account",status:"Pending",order:1,tokenHash:hash}]
-  };
-  const ctx={
-    env:{IRPA_ENVIRONMENT:"staging"},
-    now:()=>new Date("2026-10-24T00:00:00.000Z"),
-    meta:{get:async(collection,id)=>collection==="envelopes"&&id===envelope.id?envelope:null},
-    storage:{get:async()=>null}
-  };
-  await assert.rejects(
-    sign(ctx,{
-      token:envelope.id+".S1."+secret,
-      signature:{type:"typed",value:"Staging test signer"},
-      consent:true,
-      declarations:{name:"Staging Test Signer",occupation:"Independent Test Signer"},
-      user:{uid:"other-user",email:"staging@example.invalid",token:"staging-id-token"}
-    }),
-    error=>error?.status===403&&error.message==="Sign in as the invited signer to continue."
-  );
-  await assert.rejects(
-    sign(ctx,{
-      token:envelope.id+".S1."+secret,
-      signature:{type:"typed",value:"Staging test signer"},
-      consent:true,
-      declarations:{name:"Staging Test Signer",occupation:"Independent Test Signer"},
-      user:{uid:"staging-user",email:"staging@example.invalid",token:"staging-id-token"}
-    }),
-    error=>error?.status===409&&error.message==="The source document is unavailable."
-  );
-  await assert.rejects(
-    sign(ctx,{
-      token:envelope.id+".S1."+secret,
-      signature:{type:"typed",value:"Staging test signer"},
-      consent:true,
-      user:{uid:"staging-user",email:"staging@example.invalid",token:"staging-id-token"}
-    }),
-    error=>error?.status===400&&error.message==="Enter your name and occupation/capacity for this document before signing."
-  );
+test("staging signing requires only verified invited email and a declared name, not register authority or account login",async()=>{
+  const secret="a".repeat(64),hash=createHash("sha256").update(secret).digest("hex");
+  const envelope={id:"ENV-staging-test",documentId:"DOC-staging-test",documentHash:"unused-before-source-check",expiresAt:"2999-01-01T00:00:00.000Z",status:"Sent",signingMode:"Sequential",events:[],signers:[{id:"S1",uid:null,email:"staging@example.invalid",identityType:"email-link",emailLinkStatus:"opened",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:1,tokenHash:hash}]};
+  const ctx={env:{IRPA_ENVIRONMENT:"staging"},now:()=>new Date("2026-10-24T00:00:00.000Z"),meta:{get:async(collection,id)=>collection==="envelopes"&&id===envelope.id?envelope:null},storage:{get:async()=>null}};
+  await assert.rejects(()=>sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Staging test signer"},consent:true,declarations:{title:"Optional title"},user:null}),error=>error?.status===400&&error.message==="Enter your full name before signing.");
+  await assert.rejects(()=>sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Staging test signer"},consent:true,declarations:{name:"Staging Test Signer"},user:null}),error=>error?.status===409&&error.message==="The source document is unavailable.");
 });
 
-test("production Gateway envelope accepts an explicitly invited authenticated account signer",async()=>{
-  const bytes=new TextEncoder().encode("%PDF-1.7\\naccount signer test");
+test("production Gateway envelope accepts an invited email-link signer with optional local profile association",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\naccount signer test");
   const documentHash=createHash("sha256").update(bytes).digest("hex");
   const document={id:"DOC-account-test",ownerUid:"owner-uid",status:"Stored",primaryStorageId:"source",sha256:documentHash,fileSize:bytes.byteLength};
   let envelope=null;
@@ -93,23 +46,23 @@ test("production Gateway envelope accepts an explicitly invited authenticated ac
       update:async(collection,id,patch)=>{if(collection==="envelopes"&&envelope?.id===id)envelope={...envelope,...patch,_v:envelope._v+1};}
     }
   };
-  const result=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Owner"},{documentId:document.id,archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"account",uid:"account-signer-1",email:"signer@irpa.or.tz",name:"Account Signer",order:1}],fields:[{fieldId:"signature-1",type:"Signature",signerUid:"account-signer-1",page:1,x:10,y:80,width:24,height:9,required:true}]});
+  const result=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Owner"},{documentId:document.id,archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",uid:"account-signer-1",email:"signer@irpa.or.tz",name:"Email Link Signer",routingPosition:1}],fields:[{fieldId:"signature-1",type:"Signature",signerUid:"account-signer-1",page:1,x:10,y:80,width:24,height:9,required:true}]});
   assert.equal(result.ok,true);
-  assert.equal(envelope.signers[0].identityType,"account");
+  assert.equal(envelope.signers[0].identityType,"email-link");
   assert.equal(envelope.signers[0].uid,"account-signer-1");
   assert.equal(result.invitations[0].status,"Sent");
 });
 
 test("assigned Date field is persisted from the Gateway signedAt timestamp, not the device value",async()=>{
   const secret="b".repeat(64),tokenHash=createHash("sha256").update(secret).digest("hex");
-  const bytes=new TextEncoder().encode("%PDF-1.7\\nauthoritative date test");
+  const bytes=new TextEncoder().encode("%PDF-1.7\nauthoritative date test");
   const documentHash=createHash("sha256").update(bytes).digest("hex");
   const envelope={
     id:"ENV-date-test",documentId:"DOC-date-test",documentHash,expiresAt:"2999-01-01T00:00:00.000Z",
     status:"Sent",signingMode:"Sequential",events:[],_v:1,
     signers:[
-      {id:"S1",uid:"signer-uid",identityType:"account",status:"Pending",order:1,tokenHash},
-      {id:"S2",uid:"next-signer",identityType:"account",status:"Pending",order:2,tokenHash:"c".repeat(64)}
+      {id:"S1",uid:"signer-uid",email:"signer@irpa.or.tz",identityType:"email-link",emailLinkStatus:"opened",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:1,routingPosition:1,tokenHash},
+      {id:"S2",uid:"next-signer",email:"next@irpa.or.tz",identityType:"email-link",emailLinkStatus:"waiting",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:2,routingPosition:2,tokenHash:"c".repeat(64)}
     ],
     fields:[{fieldId:"date-1",type:"Date",page:1,x:10,y:80,width:24,height:6,signerId:"S1",signerUid:"signer-uid",required:true}]
   };
@@ -124,7 +77,7 @@ test("assigned Date field is persisted from the Gateway signedAt timestamp, not 
       update:async(collection,id,patch)=>{assert.equal(collection,"envelopes");assert.equal(id,envelope.id);Object.assign(envelope,patch);envelope._v++;}
     }
   };
-  const result=await sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Account Signer"},fieldValues:{"date-1":"wrong device clock"},consent:true,declarations:{name:"Account Signer",occupation:"Test Signer"},user:{uid:"signer-uid",email:"signer@irpa.or.tz",token:"verified-id-token"}});
+  const result=await sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Account Signer"},fieldValues:{"date-1":"wrong device clock"},consent:true,declarations:{name:"Email Link Signer"},user:null});
   assert.equal(result.status,"InProgress");
   assert.equal(envelope.signers[0].signedAt,at);
   assert.equal(envelope.signers[0].fieldValues["date-1"],at);

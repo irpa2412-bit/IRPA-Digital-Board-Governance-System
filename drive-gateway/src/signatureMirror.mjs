@@ -14,12 +14,10 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   const signers = (envelope.signers || []).map(s => {
     const prior = priorSigners.find(p => (s.uid && p.uid === s.uid) || (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()));
     return {
-      uid: s.uid || null, profileUid:s.profileUid||s.uid||null, signerId:s.id||null, identityType:s.identityType||"account", name: s.name || "", email: s.email || "",
+      uid: s.uid || null, profileUid:s.profileUid||s.uid||null, signerId:s.id||null, identityType:s.identityType||"email-link", name: s.name || "", email: s.email || "",
       status: s.status || "", signedAt: s.signedAt || null,
       role: s.role || prior?.role || prior?.action || "",
       action: s.action || prior?.action || prior?.role || "",
-      authorityRole: s.authorityVerification?.verified===true ? s.authorityVerification.authorityRole || "" : "",
-      authorityVerified: s.authorityVerification?.verified===true,
       ownerDeclaredParticulars:s.declaredParticulars||{},
       signerDeclarations:s.signerDeclarations||{},
       declarationDiscrepancy:s.declarationDiscrepancy||null
@@ -48,8 +46,8 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       documentTitle:clean(existing.title||envelope.title),
       signerUid:signer.profileUid||signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
       workflowRole:signer.role||signer.action||"",
-      signatureAuthority:signer.authorityVerified?signer.authorityRole:"",
-      signatureAuthorityVerificationStatus:signer.authorityVerified?"Verified":"NotVerified",
+      signatureAuthority:"",
+      signatureAuthorityVerificationStatus:"NotRequired",
       ownerDeclaredParticulars:assignedSigner?.declaredParticulars||{},
       signerDeclarations:assignedSigner?.signerDeclarations||{},
       declarationDiscrepancy:assignedSigner?.declarationDiscrepancy||null,

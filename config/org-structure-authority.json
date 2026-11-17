@@ -3359,9 +3359,9 @@
       "Volunteer engagement is distinct from employment and conveys no implied financial, procurement, banking, administrator, security, research or production authority."
     ],
     "technicalModel": {
-      "status": "IMPLEMENTED_IN_DRAFT_CODE_NOT_A_LEGAL_SIGNATORY_APPOINTMENT",
+      "status": "PRESERVED_GOVERNANCE_REFERENCE_NOT_USED_IN_SIGNING_PATH",
       "policyStatus": "POLICY_MODEL_ONLY_PENDING_RUNTIME_CROSSWALK_AND_TESTS",
-      "authoritySource": "Current authenticated Member and Employee register entries for the signer",
+      "authoritySource": "Governance reference only; not used for signer identity, assignment, email verification, signing access, or completion.",
       "acceptedRoleFields": [
         "role",
         "boardPosition",
@@ -3395,11 +3395,11 @@
       ],
       "ambiguousTitles": "Exact-match only; ambiguous director titles are not normalised into one another.",
       "administratorRecognition": "Administrator mode is derived from authenticated administrator context; the job title Administrator alone cannot select administrator mode or grant administrator authority.",
-      "limitation": "The technical selector and verifier do not appoint signatories or override Board resolutions, bank mandates, approved delegations, separation of duties, or server-side controls.",
-      "defaultDecision": "DENY",
+      "limitation": "This matrix remains governance reference data. It does not gate email-link signer identity, assignment, invitation, signing access or completion, and it does not appoint signatories or override Board resolutions, bank mandates, approved delegations, separation of duties, or server-side controls.",
+      "defaultDecision": "NOT_APPLICABLE_TO_EMAIL_LINK_SIGNING",
       "noAppointmentByTitle": true,
       "noImplicitDepartmentAuthority": true,
-      "multiRoleCapacitySelection": "Required; evaluate the selected capacity and its delegation independently",
+      "multiRoleCapacitySelection": "Not required for email-link signing; signer title is optional and is not used to authorize the signing action.",
       "serverSideEnforcementRequired": true,
       "effectiveAuthoritySource": "Approved organisational appointment + job description + current written delegation + instrument-specific controls must also authorise the selected action."
     },
