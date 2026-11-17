@@ -381,6 +381,7 @@ export default {
       if (pathname === "/api/signature-workflow/adoption" && request.method === "POST") return await recordSignatureAdoptionRoute(request, env);
       if (pathname === "/api/signature-workflow/mirror" && request.method === "POST") return await syncSignatureWorkflowMirrorRoute(request, env);
       if (pathname === "/api/signature-workflow/signed-documents" && request.method === "GET") return await getMySignedDocumentsRoute(request, env);
+      if (pathname === "/api/signature-workflow/certificate" && request.method === "POST") return await saveSignatureCertificateRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
       if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
@@ -1415,6 +1416,53 @@ async function syncSignatureWorkflowMirrorRoute(request, env) {
   ]);
   return json({ok:true,envelopeId,status:update.status,currentSignerUid:update.currentSignerUid,writePath:"authenticated-gateway",atomic:true},200,corsHeaders(request));
 }
+async function saveSignatureCertificateRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(()=>({}));
+  const envelopeId = cleanId(body.envelopeId||"");
+  const certificateHash = String(body.certificateHash||"").trim().toLowerCase();
+  const finalDocumentHash = String(body.finalDocumentHash||"").trim().toLowerCase();
+  const certificatePath = String(body.certificatePath||"").trim();
+  const certificateArchivePath = String(body.certificateArchivePath||"").trim();
+  const certificateUrl = String(body.certificateUrl||"").trim();
+  const certificateArchiveUrl = String(body.certificateArchiveUrl||"").trim();
+  const folderId = String(body.certificateArchiveFolderId||"").trim();
+  const folderLink = body.certificateArchiveFolderLink==null?null:String(body.certificateArchiveFolderLink).trim();
+  if (!envelopeId || !/^[a-f0-9]{64}$/.test(certificateHash) || !/^[a-f0-9]{64}$/.test(finalDocumentHash) || !folderId ||
+      !certificatePath.startsWith("signatureEnvelopes/"+envelopeId+"/certificate-") ||
+      !certificateArchivePath.startsWith("signatureEnvelopes/"+envelopeId+"/certificate-archive-") ||
+      ![certificateUrl,certificateArchiveUrl].every(value=>{try{return new URL(value).protocol==="https:";}catch{return false;}})) {
+    return json({ok:false,error:"Valid certificate references and completed-document hashes are required."},400,corsHeaders(request));
+  }
+  const token = await getFirestoreAdminAccessToken(env);
+  const raw = await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
+  if (!raw?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+  const envelope = firestoreDocumentToPlain(raw)||{};
+  const uid = String(claims.user_id||"");
+  if (uid!==String(envelope.ownerUid||envelope.senderUid||"")) return json({ok:false,error:"Only the original document owner may archive the completion certificate."},403,corsHeaders(request));
+  const gatewayEnvelopeId = String(envelope.gatewayEnvelopeId||"");
+  if (!gatewayEnvelopeId) return json({ok:false,error:"The portal envelope has no authoritative Gateway reference."},409,corsHeaders(request));
+  const gatewayContext = buildEsignContext({env,verifyUser:async()=>({uid,isAdmin:false}),sendInvitation:async()=>{},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
+  const statusResponse = await esignRoute(new Request("https://gateway.internal/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/status",{method:"GET"}),gatewayContext);
+  if (!statusResponse.ok) return json({ok:false,error:"Gateway completion status could not be verified."},502,corsHeaders(request));
+  const status = await statusResponse.json();
+  if (status.status!=="Completed" || status.externalReference!==envelopeId || status.completion?.finalHash!==finalDocumentHash) {
+    return json({ok:false,error:"Certificate does not match the authoritative completed Gateway document."},409,corsHeaders(request));
+  }
+  const now = new Date().toISOString();
+  const update = {
+    certificatePath,certificateUrl,certificateHash,certificateArchivePath,certificateArchiveUrl,
+    certificateArchiveFolderId:folderId,certificateArchiveFolderLink:folderLink,
+    certificateArchiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1",updatedAt:now
+  };
+  const base = "projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents";
+  await commitSignatureWorkflowWrites(env,token,[{
+    update:{name:base+"/signatureEnvelopes/"+envelopeId,fields:signatureDraftFirestoreValue(update).mapValue.fields},
+    updateMask:{fieldPaths:Object.keys(update)},currentDocument:{exists:true}
+  }]);
+  return json({ok:true,envelopeId,certificateHash,writePath:"authenticated-gateway"},200,corsHeaders(request));
+}
+
 async function getMySignedDocumentsRoute(request, env) {
   const claims = await authenticateFirebaseRequest(request, env), uid = String(claims.user_id||""), token = await getFirestoreAdminAccessToken(env);
   const response = await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatures"}],where:{fieldFilter:{field:{fieldPath:"signerUid"},op:"EQUAL",value:{stringValue:uid}}},limit:200}})});
