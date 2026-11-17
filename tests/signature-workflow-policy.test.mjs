@@ -66,9 +66,13 @@ test("Signature Portal palette queries include document owner and signature owne
 });
 
 // Source-contract checks follow the current handler shape, including signerUid ownership and whitespace-safe finally blocks.
-test("adding the first signing officer creates a signature field assigned to that officer", () => {
-  assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"\}\)/);
+test("adding a participant does not auto-place fields or silently reassign existing fields", () => {
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
+  assert.ok(addSigner);
+  assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
+  assert.doesNotMatch(addSigner[1], /nextFields\.push\(\{\.\.\.makeField/);
+  assert.match(addSigner[1], /Choose Signature, Initials or another field tool, then tap the PDF/);
+  assert.match(portal, /const f=makeField\(type,fields\.length,selectedAssigneeUid,pageNum\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
@@ -129,7 +133,7 @@ test("signature PDF palette uses controlled-document authorization during Draft 
 test("owner signature requirement is separate from explicit signer-field assignment", () => {
   const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
   const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
-  assert.match(portal, /const f=makeField\(type,fields\.length,activeAssigneeUid\|\|"",pageNum\)/);
+  assert.match(portal, /const f=makeField\(type,fields\.length,selectedAssigneeUid,pageNum\)/);
   assert.match(portal, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]:\[\]/);
   assert.match(portal, /ownerSigningEnabled&&!fields\.some\(f=>f\?\.type==="Signature"&&f\.required!==false&&f\.signerUid===documentOwner\.uid\)/);
   assert.match(platform, /ownerSigningEnabled=false/);
@@ -154,17 +158,21 @@ test("owner signature palette action remains available and explicitly assigns a 
   assert.ok(portal.includes("ownerSigner=null"));
   assert.ok(portal.includes("ownerSigner={ownerSigningEnabled?documentOwner:null}"));
   assert.ok(portal.includes('data-owner-signature-placement="true"'));
-  assert.ok(portal.includes("Place Owner Signature — Page {pageNum}"));
-  assert.ok(portal.includes('const addOwnerSignatureAt=(x=50,y=20)=>{if(!ownerSigner?.uid)'));
-  assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
-  assert.ok(portal.includes("f.required=true"));
+  assert.ok(portal.includes("Select Owner Signature Field"));
+  assert.ok(portal.includes('const addOwnerSignatureAt=()=>{if(!pdf||pageError)'));
+  assert.ok(portal.includes('if(!ownerSigner?.uid)'));
+  assert.ok(portal.includes('selectAssignee(ownerSigner.uid)'));
+  assert.ok(portal.includes('setPendingFieldType("Signature")'));
+  assert.ok(portal.includes('The document owner already has a Signature field. The existing field is selected.'));
+  assert.ok(portal.includes('required:type!=="Checkbox"'));
   assert.ok(portal.includes("commit([...fields,f]);setSelectedField(f.fieldId)"));
 });
 
 test("owner remains selectable for field assignment and each signature field remains bound to its PDF page", () => {
   assert.ok(portal.includes("{recipients.map(r=><option key={r.uid} value={r.uid}>"));
   assert.ok(portal.includes("const pageFields=fields.filter(f=>Number(f.page)===pageNum)"));
-  assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
+  assert.ok(portal.includes('selectAssignee(ownerSigner.uid)'));
+  assert.ok(portal.includes('setPendingFieldType("Signature")'));
   assert.ok(portal.includes('ownerSigningEnabled?[{...documentOwner,optionalSigning:false,actionRequired:true}]:[]'));
 });
 
@@ -180,4 +188,87 @@ test("signature assignment and signing handlers synchronously reject repeated su
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
   assert.match(sign[1], /signInFlightRef\.current=true/);
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
+});
+
+
+test("palette tools support responsive tap-to-place and desktop drag placement", () => {
+  const css = fs.readFileSync(new URL("../src/styles/signature-portal.css", import.meta.url), "utf8");
+  assert.match(portal, /const\[canDrag,setCanDrag\]=useState\(false\)/);
+  assert.match(portal, /window\.matchMedia\("\(pointer:fine\)"\)/);
+  assert.match(portal, /draggable=\{canDrag\}/);
+  assert.match(portal, /onClick=\{placePendingField\}/);
+  assert.match(portal, /aria-pressed=\{pendingFieldType===t\}/);
+  assert.match(portal, /Select, then tap PDF/);
+  assert.match(css, /\.signature-field-tools\{display:grid/);
+  assert.match(css, /@media \(max-width:900px\)/);
+  assert.match(css, /@media \(hover:none\)/);
+  assert.match(css, /\.signature-pdf-placement-active/);
+});
+
+test("participant creation and field assignment are performed inside the PDF palette", () => {
+  assert.match(portal, /PEOPLE & FIELD ASSIGNMENT/);
+  assert.match(portal, /onAddSigner=\{addSigner\}/);
+  assert.match(portal, /onMoveSigner=\{moveSigner\}/);
+  assert.match(portal, /onSelectAssignee=\{setActiveAssigneeUid\}/);
+  assert.match(portal, /const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setPendingFieldType\("".*?onSelectAssignee\?\.\(uid\)\}/);
+  assert.match(portal, /onOwnerSigningChange=\{changeOwnerSigning\}/);
+  assert.match(portal, /Assign fields to this person/);
+  assert.match(portal, /FIELDS ON THIS DOCUMENT/);
+  assert.doesNotMatch(portal, /<h3>Signer Hierarchy<\/h3>/);
+  assert.doesNotMatch(portal, /<div className="panel signature-workflow-hierarchy"/);
+});
+
+test("duplicate participant identities are reused and rapid repeated add actions are locked before asynchronous work", () => {
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
+  assert.ok(addSigner, "the palette participant handler must exist");
+  assert.match(addSigner[1], /const duplicate=recipients\.find\(x=>\(registered&&x\.uid===registered\.uid\)\|\|\(registeredEmail&&String\(x\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===registeredEmail\)\)/);
+  assert.match(addSigner[1], /The existing signer record has been selected; no duplicate was created/);
+  assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
+  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
+  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(registeredEmail))'));
+  assert.ok(addSigner[1].includes("email:registeredEmail,role,"));
+  assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
+  assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
+});
+
+
+test("envelope creation requires every participant to have at least one explicitly assigned field", () => {
+  assert.match(portal, /if\(!orderedRecipients\.length&&!ownerSigningEnabled\)/);
+  assert.match(portal, /const recipientsWithoutFields=orderedRecipients\.filter\(recipient=>!fields\.some\(field=>field\.signerUid===recipient\.uid\)\)/);
+  assert.match(portal, /Assign at least one field to each participant in the palette before creating the envelope/);
+});
+
+
+test("owner identity is never added as a duplicate signer and reorder controls exclude the owner row", () => {
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
+  assert.ok(addSigner);
+  assert.match(addSigner[1], /const ownerEmail=String\(documentOwner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(addSigner[1], /const isOwnerDuplicate=/);
+  assert.match(addSigner[1], /setOwnerSigningEnabled\(true\)/);
+  assert.match(portal, /const signerRecipients=recipients\.filter\(r=>r\.uid!==ownerSigner\?\.uid\)/);
+  assert.match(portal, /disabled=\{signerIndex===0\}/);
+  assert.match(portal, /disabled=\{signerIndex===signerRecipients\.length-1\}/);
+});
+
+
+test("envelope creation blocks duplicate participant UIDs and case-insensitive emails, including the owner", () => {
+  assert.match(portal, /const seenSignerUids=new Set\(\[documentOwner\.uid\]\)/);
+  assert.match(portal, /const ownerEmailKey=String\(documentOwner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(portal, /const seenSignerEmails=new Set\(ownerEmailKey\?\[ownerEmailKey\]:\[\]\)/);
+  assert.match(portal, /if\(seenSignerUids\.has\(uid\)\|\|\(emailKey&&seenSignerEmails\.has\(emailKey\)\)\)/);
+  assert.match(portal, /Duplicate participants were detected by signer identity or email/);
+});
+
+test("document owner can save and close preparation before all fields are assigned, then resume the draft",()=>{
+  assert.match(portal,/async function saveAndClosePreparation\(\)/);
+  assert.match(portal,/saveSignatureWorkflowDraft\(\{envelopeId:draftEnvelopeId/);
+  assert.match(portal,/Save Draft & Close Preparation/);
+  assert.match(portal,/Continue Preparation/);
+  assert.match(portal,/The draft remains inactive; no signer invitations were sent/);
+});
+
+test("Sign a Document is available to every active Signature Profile holder, not owner-only",()=>{
+  assert.match(portal,/\["Profile","Sign a Document","Envelopes","My Documents","Signature Pathway Self-Test"\]/);
+  assert.match(portal,/An active Signature Profile is required before starting a signing document/);
+  assert.doesNotMatch(portal,/documentOwner\.uid===auth\.currentUser\?\.uid[^\n]*Sign a Document/);
 });

@@ -104,3 +104,34 @@ test("legacy signing persists signer-declared authority safely when institutiona
   assert.doesNotMatch(service, /signerAuthority\.(?:authorityRole|authorityDepartment|authorityUnit|authorityStatus|authoritySourceCollection|authoritySourceRecordId)/);
   assert.match(service, /signatureAuthorityVerificationStatus:"Signer-declared; not independently verified"/);
 });
+
+test("Gateway envelopes include registered account signers and the owner when explicitly required", () => {
+  assert.match(storage, /const accountSigner = Boolean\(r\?\.uid\) && !emailLink/);
+  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
+  assert.match(storage, /\{uid:String\(recipient\.uid\)\}/);
+  assert.match(platform, /checked=\{ownerSigningEnabled\}/);
+  assert.match(platform, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]/);
+});
+
+test("Gateway signer field routing preserves authenticated account UIDs", () => {
+  assert.match(storage, /recipient\.uid/);
+  assert.match(storage, /signerAssignmentByKey/);
+  assert.match(storage, /signerId:resolveSignerId\(field\)/);
+});
+
+test("registered IRPA signers use authenticated account identity and their saved Signature Profile", () => {
+  assert.match(platform, /identityType:"account"/);
+  assert.match(platform, /recipient\.identityType==="email-link"\?"email-link":"account"/);
+  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
+  assert.match(storage, /uid:String\(recipient\.uid\)/);
+  assert.match(gatewayPortal, /getMySignatureProfile\(\)/);
+  assert.match(gatewayPortal, /savedSignatureUrl=\{profile\?\.signatureUrl\|\|""\}/);
+  assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
+});
+
+test("Date fields are presented as server-stamped date and time, not client calendar dates", () => {
+  assert.match(platform, /SERVER_TIMESTAMP_PENDING/);
+  assert.match(platform, /Gateway server date and time when you submit your signature/);
+  assert.match(gatewayPortal, /SERVER_TIMESTAMP_PENDING/);
+  assert.match(gatewayPortal, /Gateway server date and time will be recorded on submission/);
+});

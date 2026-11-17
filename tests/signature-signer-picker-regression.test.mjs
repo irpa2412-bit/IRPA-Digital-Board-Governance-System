@@ -25,11 +25,13 @@ test("draft envelope preserves controlled-document origin without bypassing actu
   assert.match(rules, /match \/signatureEnvelopes\/\{id\}.*actualCreateAllowed\(\)/);
 });
 
-test("selected signer is visible before saving and the add action is disabled during saves", () => {
-  assert.match(portal, /const selectedSignerMember=useMemo\(\(\)=>members\.find\(x=>x\.uid===selectedSigner\)/);
-  assert.match(portal, /selectedSignerMember&&!recipients\.some\(r=>r\.uid===selectedSignerMember\.uid\)/);
-  assert.match(portal, /Not yet saved to workflow/);
-  assert.match(portal, /Click “Add signer \/ next level” to save this officer into the workflow ladder and field-assignment list/);
-  assert.match(portal, /disabled=\{busy\|\|\(!selectedSigner&&!signerEmail\)\}/);
-  assert.match(portal, /busy\?"Saving signer…":"Add signer \/ next level"/);
+test("participant selection and addition are performed directly in the PDF palette", () => {
+  assert.match(portal, /PEOPLE & FIELD ASSIGNMENT/);
+  assert.match(portal, /onAddSigner=\{addSigner\}/);
+  assert.match(portal, /Assign fields to this person/);
+  assert.match(portal, /disabled=\{busy\|\|\(!selectedSigner&&!String\(signerEmail\|\|""\)\.trim\(\)\)\}/);
+  assert.match(portal, /const duplicate=recipients\.find/);
+  assert.match(portal, /The existing signer record has been selected; no duplicate was created/);
+  assert.match(portal, /addSignerInFlightRef\.current=true/);
+  assert.match(portal, /window\.matchMedia\("\(pointer:fine\)"\)/);
 });

@@ -76,7 +76,11 @@ export async function createEnvelope(ctx,user,body){
   if(!["Sequential","Parallel"].includes(signingMode))throw new HttpError(400,"Unsupported signing mode.");
   if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
-  if(cryptoRequired&&input.some(s=>s?.identityType!=="email-link"||s?.uid))throw new HttpError(400,"Every staging and production signer must use an email-link identity without a Firebase UID. Select the signer by email and verify the invitation.");
+  if(cryptoRequired&&input.some(s=>{
+    const emailLink=s?.identityType==="email-link"&&!s?.uid;
+    const account=s?.identityType==="account"&&typeof s?.uid==="string"&&s.uid.trim().length>0;
+    return !emailLink&&!account;
+  }))throw new HttpError(400,"Every staging and production signer must use either a verified email-link identity or an authenticated IRPA account identity.");
   // Email-link possession is transaction-scoped mailbox control, not an authority-register lookup.
   const sourceBytes=await ctx.storage.get(doc.primaryStorageId);
   if(!sourceBytes)throw new HttpError(409,"The stored document failed its integrity check.");
@@ -216,7 +220,12 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     if(s.status==="Signed")return{patch:null,result:{idempotent:true,status:cur.status}};
     if(!can(cur,s))throw new HttpError(409,"It is not yet your turn to sign.");
     const at=ctx.now().toISOString();
-    s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=checkedFieldValues;
+    const signedFieldValues={...checkedFieldValues};
+    for(const field of cur.fields||[]){
+      const assignedToSigner=field.signerId===s.id||(!field.signerId&&s.uid&&field.signerUid===s.uid);
+      if(assignedToSigner&&field.type==="Date")signedFieldValues[field.fieldId]=at;
+    }
+    s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=signedFieldValues;
     s.signerDeclarations=declared;
     s.declarationDiscrepancy={detected:discrepancyFields.length>0,fields:discrepancyFields,ownerDeclared:{...ownerDeclared},signerDeclared:{...declared},detectedAt:at};
     s.authorityVerification=null;s.ip=ip||null;s.userAgent=cleanText(userAgent||"",200)||null;
