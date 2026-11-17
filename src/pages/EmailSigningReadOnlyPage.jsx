@@ -145,6 +145,7 @@ export default function EmailSigningReadOnlyPage({token}){
    const result=await response.json().catch(()=>({}));
    if(!response.ok||result.ok===false)throw new Error(result.error||"The signing action could not be completed.");
    setSigningClosed(true);
+   if(result.status==="CompletionFailed"){setSuccess("Your signature was recorded, but final PDF completion failed. The envelope is marked CompletionFailed. Do not submit again; contact the document owner for controlled recovery.");return;}
    if(result.completed===true){
     try{
      const finalResponse=await fetch(gateway+"/api/sign/pdf",{headers:{"x-signing-token":activeToken},credentials:"omit",cache:"no-store"});
