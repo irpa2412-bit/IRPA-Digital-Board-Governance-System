@@ -90,6 +90,8 @@ test("signer must review the rendered document and applied stamps before submit 
   assert.match(page,/Your signature has not been submitted yet/);
   assert.match(page,/result.status==="CompletionFailed"/);
   assert.match(page,/Do not submit again/);
+  assert.match(page,/finalizationFailed/);
+  assert.match(page,/record.signer\?\.status!=="Pending"/);
   assert.match(page,/Changes to assigned fields update this preview/);
   assert.doesNotMatch(page,/Return to editing/);
   assert.ok(!page.includes("disabled={reviewMode||signingClosed}"));
