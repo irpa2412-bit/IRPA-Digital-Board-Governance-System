@@ -244,3 +244,12 @@ test("owner identity is never added as a duplicate signer and reorder controls e
   assert.match(portal, /disabled=\{signerIndex===0\}/);
   assert.match(portal, /disabled=\{signerIndex===signerRecipients\.length-1\}/);
 });
+
+
+test("envelope creation blocks duplicate participant UIDs and case-insensitive emails, including the owner", () => {
+  assert.match(portal, /const seenSignerUids=new Set\(\[documentOwner\.uid\]\)/);
+  assert.match(portal, /const ownerEmailKey=String\(documentOwner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(portal, /const seenSignerEmails=new Set\(ownerEmailKey\?\[ownerEmailKey\]:\[\]\)/);
+  assert.match(portal, /if\(seenSignerUids\.has\(uid\)\|\|\(emailKey&&seenSignerEmails\.has\(emailKey\)\)\)/);
+  assert.match(portal, /Duplicate participants were detected by signer identity or email/);
+});
