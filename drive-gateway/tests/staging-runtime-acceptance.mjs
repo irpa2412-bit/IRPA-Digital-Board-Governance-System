@@ -227,17 +227,19 @@ assert.equal(emailParts.length,2,"The staging signer email must be a valid addre
 const routeEmail=tag=>emailParts[0]+"+"+stamp+"-"+tag+"@"+emailParts[1];
 
 console.log("STAGE_1_EMAIL_LINK_IDENTITY=PASS");
+const attendancePdf=await PDFDocument.create();attendancePdf.addPage([300,200]).drawText("Optional attendance sheet — staging test",{x:24,y:150,size:12});const attendanceBytes=await attendancePdf.save();const attendanceDocumentId="DOC-STAGING-ATT-"+stamp;const attendanceForm=new FormData();attendanceForm.append("documentId",attendanceDocumentId);attendanceForm.append("title","Optional Attendance Sheet");attendanceForm.append("classification","Restricted");attendanceForm.append("archives","board-governance");attendanceForm.append("file",new Blob([attendanceBytes],{type:"application/pdf"}),"optional-attendance-sheet.pdf");const attendanceUpload=await readJson(await fetch(base+"/api/documents",{method:"POST",headers:authHeaders,body:attendanceForm}),"Optional attendance attachment upload");assert.equal(attendanceUpload.documentId,attendanceDocumentId);
 const sequential=await createRoutedEnvelope("SEQUENTIAL",[
   {email:routeEmail("one"),name:"Routing Signer One",routingPosition:1},
   {email:routeEmail("two"),name:"Routing Signer Two",routingPosition:2},
   {email:routeEmail("three"),name:"Routing Signer Three",routingPosition:3}
-]);
+],[{documentId:attendanceDocumentId}]);
 assert.deepEqual(sequential.invitations.map(item=>item.status),["Sent","Waiting","Waiting"]);
 const earlyResponse=await fetch(base+"/api/sign/email/open",{headers:{"x-signing-token":sequential.tokens[1]}});
 assert.equal(earlyResponse.status,409);
 assert.match((await earlyResponse.json()).error,/Not your turn yet/);
 console.log("STAGE_2_EARLY_LINK_BLOCKED=PASS");
 const sequentialOne=await openVerifiedSession(sequential.tokens[0],"Position 1 signer");
+assert.equal(sequentialOne.attachments.length,1);assert.equal(sequentialOne.attachments[0].title,"Optional Attendance Sheet");const attachmentResponse=await fetch(base+"/api/sign/email/attachments/A1",{headers:{"x-signing-token":sequentialOne.sessionToken}});assert.equal(attachmentResponse.ok,true);assert.equal(attachmentResponse.headers.get("x-content-sha256"),sequentialOne.attachments[0].hash);assert.equal(await sha256(new Uint8Array(await attachmentResponse.arrayBuffer())),sequentialOne.attachments[0].hash);console.log("STAGE_OPTIONAL_ATTACHMENT_HASH_AND_VISIBILITY=PASS");
 const sequentialOneResult=await submitEmailSigner(sequentialOne,"Routing Signer One","Position 1 signer");
 assert.equal(sequentialOneResult.completed,false);
 const tokenTwo=sequentialOneResult.releasedTokens?.find(item=>item.signerId==="S2")?.token;
@@ -324,7 +326,7 @@ const reminderTwo=await fetch(base+reminderPath,{method:"POST",headers:authHeade
 assert.equal(reminderTwo.status,429,"A second reminder inside one hour must be rejected.");
 console.log("STAGE_10_REMINDER_HOURLY_LIMIT=PASS");
 
-const finalRoutingPdf=await fetch(base+"/api/sign/pdf",{headers:{"x-signing-token":sequentialThree}});
+const finalRoutingPdf=await fetch(base+"/api/sign/pdf",{headers:{"x-signing-token":sequentialThree.sessionToken}});
 assert.equal(finalRoutingPdf.ok,true);
 const routingPdfBytes=new Uint8Array(await finalRoutingPdf.arrayBuffer());
 assert.ok(routingPdfBytes.length>1000);
