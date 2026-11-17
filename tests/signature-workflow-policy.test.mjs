@@ -209,6 +209,8 @@ test("participant creation and field assignment are performed inside the PDF pal
   assert.match(portal, /PEOPLE & FIELD ASSIGNMENT/);
   assert.match(portal, /onAddSigner=\{addSigner\}/);
   assert.match(portal, /onMoveSigner=\{moveSigner\}/);
+  assert.match(portal, /onSelectAssignee=\{setActiveAssigneeUid\}/);
+  assert.match(portal, /const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setPendingFieldType\("".*?onSelectAssignee\?\.\(uid\)\}/);
   assert.match(portal, /onOwnerSigningChange=\{changeOwnerSigning\}/);
   assert.match(portal, /Assign fields to this person/);
   assert.match(portal, /FIELDS ON THIS DOCUMENT/);
