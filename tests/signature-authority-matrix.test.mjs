@@ -23,11 +23,11 @@ test("Board governance role catalogue retains distinct offices while signer assi
   assert.doesNotMatch(source,/Current Signing Authority|authorityRegisterRecords|authorityDepartments|authorityRole/);
   assert.doesNotMatch(firebaseSource,/BOARD_SIGNING_ROLES|verifyManualSigningAuthority|findManualAuthorityMatch/);
 });
-test("Board Member display remains singular while accepting the legacy plural spelling", () => {
-  assert.match(source, /normalized==="board member"\|\|normalized==="board members"\) return "Board Member"/);
-  assert.match(source, /r==="board member"\|\|r==="board members"/);
+test("governance role catalogue retains singular Board Member and legacy plural normalisation",()=>{
+  assert.ok(catalogue.roles.some(item=>item.title==="Board Member"));
+  assert.equal(normalizeManualAuthority("Board Members"),"board member");
+  assert.equal(resolveManualAuthorityLabel({role:"Board Member"},"Board Members"),"Board Member");
 });
-
 test("signer authority verification recognises multiple roles stored on one member or employee record", () => {
   const dualRoleRecord = {
     uid: "dual-role-test",
