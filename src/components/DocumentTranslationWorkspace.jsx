@@ -43,7 +43,7 @@ async function extractDocumentText(bytes,fileName){
  const ext=fileExtension(fileName);
  let text="";
  if(ext==="pdf"){
-  const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+  const pdf=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
   const pages=[];
   for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n);const content=await page.getTextContent();pages.push(content.items.map(item=>item.str||"").join(" "));}
   text=pages.join("\n\n");
