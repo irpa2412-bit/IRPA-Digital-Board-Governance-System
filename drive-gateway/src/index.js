@@ -417,6 +417,12 @@ export default {
       if (url.pathname === "/api/delete" && request.method === "POST") {
         return await deleteDriveFile(request, env);
       }
+      if (url.pathname === "/api/signature/distribution/download-copy" && request.method === "POST") {
+        return await downloadMySignatureCopy(request, env);
+      }
+      if (url.pathname === "/api/signature/distribution/delete-copy" && request.method === "POST") {
+        return await deleteMySignatureCopy(request, env);
+      }
 
       if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
         try {
@@ -2921,6 +2927,92 @@ async function smtpSend(env,{to,subject,text,html,attachments=[]}) {
     try { writer.releaseLock(); } catch {}
     try { socket.close(); } catch {}
   }
+}
+
+async function getMySignatureCopyAccess(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(() => ({}));
+  const recordId = String(body.recordId || "").trim();
+  if (!/^[A-Za-z0-9_-]{3,240}$/.test(recordId)) {
+    return {response:json({ok:false,error:"A valid personal document record ID is required."},400,corsHeaders(request))};
+  }
+  const adminToken = await getFirestoreAdminAccessToken(env);
+  const raw = await getFirestoreDocument(env, "signatures/" + recordId, adminToken);
+  if (!raw) return {response:json({ok:false,error:"The personal signed-document copy was not found."},404,corsHeaders(request))};
+  const record = firestoreDocumentToPlain(raw) || {};
+  if (String(record.signerUid || "") !== String(claims.user_id || "")) {
+    return {response:json({ok:false,error:"You are not authorized to access this personal copy."},403,corsHeaders(request))};
+  }
+  if (record.personalCopyDeleted === true) {
+    return {response:json({ok:false,error:"This personal copy has already been deleted."},404,corsHeaders(request))};
+  }
+  const fileId = String(record.signerArchiveFileId || "").trim();
+  const gatewayEnvelopeId = String(record.gatewayEnvelopeId || "").trim();
+  const finalHash = String(record.gatewayDocumentHash || "").trim();
+  if (!fileId || !gatewayEnvelopeId || !/^[a-f0-9]{64}$/i.test(finalHash)) {
+    return {response:json({ok:false,error:"The personal copy record is incomplete."},409,corsHeaders(request))};
+  }
+  const accessToken = await getDriveAccessToken(env);
+  let metadata;
+  try {
+    metadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,size,description,trashed");
+  } catch {
+    return {response:json({ok:false,error:"The personal copy is no longer available in its archive."},404,corsHeaders(request))};
+  }
+  const description = parseDescription(metadata.description || "");
+  const validPersonalCopy = description.archive === "my-documents"
+    && description.state === "Final Completed Document"
+    && description.copyKind && ["owner-copy","signer-copy"].includes(description.copyKind)
+    && String(description.envelopeId || "") === gatewayEnvelopeId
+    && String(description.recipientUid || "") === String(claims.user_id || "")
+    && String(description.finalHash || "") === finalHash
+    && String(metadata.mimeType || "") === "application/pdf"
+    && metadata.trashed !== true;
+  if (!validPersonalCopy) {
+    return {response:json({ok:false,error:"The requested file is not the authenticated user's personal completed-document copy."},403,corsHeaders(request))};
+  }
+  const portalEnvelope = record.envelopeId
+    ? firestoreDocumentToPlain(await getFirestoreDocument(env, "signatureEnvelopes/" + String(record.envelopeId), adminToken))
+    : null;
+  const authoritativeFileId = String(portalEnvelope?.signedPdfReference || "");
+  if (authoritativeFileId && authoritativeFileId === fileId) {
+    return {response:json({ok:false,error:"The authoritative executed document cannot be deleted as a personal copy."},409,corsHeaders(request))};
+  }
+  return {claims,record,recordId,fileId,finalHash,accessToken,adminToken,metadata};
+}
+
+async function downloadMySignatureCopy(request, env) {
+  const access = await getMySignatureCopyAccess(request, env);
+  if (access.response) return access.response;
+  const media = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(access.fileId) + "?alt=media", {
+    headers:{Authorization:"Bearer " + access.accessToken}
+  });
+  if (!media.ok) return json({ok:false,error:"Google Drive could not retrieve your personal signed-document copy."},502,corsHeaders(request));
+  const bytes = new Uint8Array(await media.arrayBuffer());
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
+  const actualHash = Array.from(digest).map(value=>value.toString(16).padStart(2,"0")).join("");
+  if (actualHash !== access.finalHash) return json({ok:false,error:"The personal copy failed its completed-document integrity check."},409,corsHeaders(request));
+  return json({ok:true,fileName:access.metadata.name||"completed-signed-document.pdf",contentType:"application/pdf",finalHash:actualHash,base64:uint8ToBase64(bytes)},200,corsHeaders(request));
+}
+
+async function deleteMySignatureCopy(request, env) {
+  const access = await getMySignatureCopyAccess(request, env);
+  if (access.response) return access.response;
+  const deleted = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(access.fileId), {
+    method:"DELETE",
+    headers:{Authorization:"Bearer " + access.accessToken}
+  });
+  if (!deleted.ok && deleted.status !== 404) {
+    return json({ok:false,error:"Google Drive could not delete your personal copy."},502,corsHeaders(request));
+  }
+  const deletedAt = new Date().toISOString();
+  const fields = {
+    personalCopyDeleted:{booleanValue:true},
+    personalCopyDeletedAt:{timestampValue:deletedAt},
+    personalCopyDeletedByUid:{stringValue:String(access.claims.user_id)}
+  };
+  await updateFirestoreDocument(env,"signatures/" + access.recordId,access.adminToken,fields,Object.keys(fields));
+  return json({ok:true,deleted:true,recordId:access.recordId,deletedAt,authoritativeDocumentRetained:true,auditTrailRetained:true},200,corsHeaders(request));
 }
 
 async function deleteDriveFile(request, env) {
