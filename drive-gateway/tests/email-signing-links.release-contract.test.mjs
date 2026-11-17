@@ -29,7 +29,8 @@ test("external guest signing page is routed before account authentication and su
   assert.match(page,/Complete document review/);
   assert.ok(page.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
   assert.match(page,/STAMP APPLIED/);
-  assert.match(page,/Review document with applied signature/);
+  assert.match(page,/Review complete document and signature placement/);
+  assert.match(page,/You may still revoke this request/);
   assert.match(page,/Your declaration for this document/);
   assert.match(page,/Submit/);
   assert.match(page,/Revoke/);
