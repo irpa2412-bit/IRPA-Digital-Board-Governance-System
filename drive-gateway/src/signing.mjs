@@ -40,7 +40,7 @@ export function validateEnvelopeFields(fields,signers){
     const assigned=requestedSignerId?byId.get(requestedSignerId):(signerUid?(signers||[]).find(item=>item.uid===signerUid):null);
     if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||(signerUid&&assigned.uid!==signerUid)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
     ids.add(fieldId);
-    return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160),responsibility:cleanText(f?.responsibility||"",40)};
+    return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,signerEmail:assigned.email||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160),responsibility:cleanText(f?.responsibility||"",40)};
   });
 }
 export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
