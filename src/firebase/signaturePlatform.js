@@ -305,6 +305,7 @@ export async function sendSignatureInvitation(envelope, recipient) {
   if(!(envelope.participantUids||[]).includes(recipient.uid))throw new Error("The selected signer is not a participant in this envelope.");
   const cleanEmail=String(recipient.email).trim().toLowerCase();
   const result=await sendSignatureMail(envelope,recipient);
+  await recordEnvelopeEvent(envelope.id,"Signing Invitation Sent",{signerUid:recipient.uid,signerName:recipient.name||"",workflowRole:recipient.role||"Signer",deliveryStatus:result.deliveryStatus||"Sent"});
   return {...result,envelopeId:envelope.id,signerUid:recipient.uid,signerEmail:cleanEmail,emailRequested:true,requestedByUid:u.uid};
 }
 export async function attachGatewayEmailLinkEnvelope(envelopeId,gatewayResult){
@@ -434,6 +435,7 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
   const after=await fetchGatewaySigningStatus(token);
   if(after.envelopeId!==status.envelopeId||after.signer?.uid!==u.uid||after.signer?.status!=="Signed")throw new Error("Gateway did not persist the authenticated signer action. No Firebase completion was recorded.");
   const gatewaySigners=Array.isArray(after.signers)?after.signers:[];
+  if(after.status!=="Completed")await syncGatewaySigningMirror(envelope.id,after);
   const nextGatewaySigner=gatewaySigners.find(s=>s.status!=="Signed");
   const completed=after.status==="Completed";
   let finalHash=null;
@@ -483,6 +485,7 @@ async function releaseNextSigner(envelope,nextRecipient){
   if(!nextRecipient?.email)return {sent:false};
   try{
     const result=await sendSignatureMail(envelope,nextRecipient);
+    await recordEnvelopeEvent(envelope.id,"Next Signer Invitation Sent",{signerUid:nextRecipient.uid||"",signerName:nextRecipient.name||"",workflowRole:nextRecipient.role||"Signer",deliveryStatus:result.deliveryStatus||"Sent"});
     return {sent:true,email:nextRecipient.email,deliveryStatus:result.deliveryStatus||"Sent"};
   }catch(error){
     console.error("IRPA next-signer invitation sender error",{firebaseErrorCode:error?.code||""});
