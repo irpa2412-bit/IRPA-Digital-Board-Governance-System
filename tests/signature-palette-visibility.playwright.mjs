@@ -113,13 +113,13 @@ async function runViewport(name,viewport){
  const restoredInk=await canvas.evaluate(countDarkInk);
  console.log("RESTORED_INK_PIXELS "+name+": "+restoredInk);
  assert.ok(restoredInk>10,"handwritten ink must survive restoring the original viewport before Confirm");
- await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-before-confirm.png",fullPage:true});
  const confirmButton=page.getByRole("button",{name:"Confirm Initials"});
  await confirmButton.evaluate(button=>{window.__signatureConfirmButtonClick=false;button.addEventListener("click",()=>{window.__signatureConfirmButtonClick=true},{once:true})});
  await confirmButton.click();
  console.log("CONFIRM_BUTTON_CLICK_EVENT "+name+": "+await page.evaluate(()=>window.__signatureConfirmButtonClick));
  console.log("PAD_ON_CONFIRM_FIELD "+name+": "+await page.evaluate(()=>window.__signaturePadOnConfirmField||null));
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-initial-page-1");
+ await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-after-confirm.png",fullPage:true});
  console.log("PASS "+name+": Draw + explicit Confirm");
  // Navigate to page 2 and use the saved specimen.
  await page.getByRole("button",{name:"Next page"}).click();
