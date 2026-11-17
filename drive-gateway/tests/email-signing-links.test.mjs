@@ -7,7 +7,6 @@ import {
   consumeEmailSigningToken,
   revokeEmailSigningToken,
   hashNormalizedEmail,
-  resolveEmailSignerAuthority,
   genericEmailSigningFailure
 } from "../src/emailSigningLinks.mjs";
 import { sha256Hex } from "../src/util.mjs";
@@ -73,24 +72,13 @@ test("token use is single-use and cannot be consumed twice", async () => {
   assert.throws(()=>consumeEmailSigningToken(used,{now:NOW}),/unavailable/i);
 });
 
-test("authority is derived from an active register email match and matrix role, never client-supplied role", async () => {
-  const result=resolveEmailSignerAuthority({
-    email:"Board.Secretary@Example.org",
-    memberRecords:[{id:"m1",email:"board.secretary@example.org",status:"Active",role:"Board Secretary"}],
-    employeeRecords:[],
-    matrix:[{role:"Board Secretary",canSign:true,active:true}],
-    now:NOW
-  });
-  assert.equal(result.verified,true);
-  assert.equal(result.authorityRole,"Board Secretary");
-  const denied=resolveEmailSignerAuthority({
-    email:"board.secretary@example.org",
-    memberRecords:[{id:"m1",email:"board.secretary@example.org",status:"Inactive",role:"Board Secretary"}],
-    employeeRecords:[],
-    matrix:[{role:"Board Secretary",canSign:true,active:true}],
-    now:NOW
-  });
-  assert.equal(denied.verified,false);
+test("email-link signer identity depends on one-time invited email control, not register or matrix roles",async()=>{
+  const issued=await createEmailSigningToken({envelopeId:"ENV-EMAIL01",signerId:"S1",email:"external@example.org",now:NOW});
+  assert.equal(issued.record.emailHash,await hashNormalizedEmail("external@example.org"));
+  assert.equal(canAuthenticatedSignerAccess({identityType:"email-link",emailLinkStatus:"issued"},null),false);
+  assert.equal(canAuthenticatedSignerAccess({identityType:"email-link",emailLinkStatus:"opened"},null),true);
+  assert.equal(issued.record.authorityRole,undefined);
+  assert.equal(issued.record.sourceCollection,undefined);
 });
 
 test("email hashing normalizes whitespace and case", async () => {
