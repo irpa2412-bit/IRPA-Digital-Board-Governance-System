@@ -6,7 +6,7 @@ import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInv
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
-import {openSigning,sign} from "../src/signing.mjs";
+import {openSigning,sign,declineSigning} from "../src/signing.mjs";
 
 const NOW=new Date("2026-11-16T08:00:00.000Z");
 async function fixture({authority=true,failMail=false}={}) {
@@ -183,4 +183,20 @@ test("staging and production reject UID-only and UID-bound account signers",asyn
   const saved=await ctx.meta.get("envelopes",accepted.envelopeId);
   assert.equal(saved.signers[0].uid,null);
   assert.equal(saved.signers[0].identityType,"email-link");
+});
+
+test("email-link signer can revoke before submission and the session token is invalidated",async()=>{
+  const f=await fixture();
+  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.23");
+  const revoked=await declineSigning(f.ctx,{token:opened.sessionToken,reason:"Signer revoked before submission.",ip:"198.51.100.23",user:null});
+  assert.equal(revoked.revoked,true);
+  assert.equal(revoked.status,"Declined");
+  const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(stored.status,"Declined");
+  assert.equal(stored.signers[0].status,"Declined");
+  assert.equal(stored.signers[0].emailLinkStatus,"revoked");
+  assert.equal(stored.signers[0].emailLinkTokenHistory.at(-1).status,"revoked_by_signer");
+  assert.equal(stored.events.at(-1).type,"email_link.revoked_by_signer");
+  await assert.rejects(()=>getSigningPdf(f.ctx,opened.sessionToken,null));
+  await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Signer"},declarations:{name:"Signer",occupation:"Officer"},consent:true,user:null}));
 });
