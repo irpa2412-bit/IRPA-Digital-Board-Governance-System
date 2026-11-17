@@ -437,13 +437,22 @@ test("G5-09 — retry persistence", async () => {
     s.ctx,
   );
   assert.equal(retry.status, 200);
-  assert.deepEqual(await retry.json(), {
-    ok: true,
-    completed: true,
-    completion: JSON.parse(
-      JSON.stringify((await s.meta.get("envelopes", envelopeId)).completion),
-    ),
-  });
+  const retryBody = await retry.json();
+  assert.equal(retryBody.ok, true);
+  assert.equal(retryBody.completed, true);
+  assert.deepEqual(retryBody.completion, JSON.parse(
+    JSON.stringify((await s.meta.get("envelopes", envelopeId)).completion),
+  ));
+  // Completion remains successful even when post-completion email delivery
+  // cannot be performed in this persistence-only fixture. The failures must
+  // be reported explicitly rather than masking or rolling back the signed PDF.
+  assert.equal(retryBody.distribution.total, 2);
+  assert.equal(retryBody.distribution.failed, 2);
+  assert.equal(retryBody.distribution.complete, false);
+  assert.deepEqual(
+    retryBody.distribution.deliveries.map((delivery) => delivery.lastError),
+    ["RECIPIENT_EMAIL_MISSING", "EMAIL_TRANSPORT_NOT_CONFIGURED"],
+  );
 
   const state = await s.meta.get("envelopes", envelopeId);
   assert.equal(state.status, "Completed");

@@ -8,6 +8,11 @@ const router=read("../src/router.mjs");
 const app=read("../../src/App.jsx");
 const page=read("../../src/pages/EmailSigningReadOnlyPage.jsx");
 const storage=read("../../src/firebase/signatureStorage.js");
+const portal=read("../../src/pages/SignaturePlatform.jsx");
+const documentReader=read("../../src/components/DocumentReader.jsx");
+const translation=read("../../src/components/DocumentTranslationWorkspace.jsx");
+const pathwaySelfTest=read("../../src/components/SignaturePathwaySelfTest.jsx");
+const gatewayPortal=read("../../src/pages/GatewaySigningPortal.jsx");
 const mail=read("../src/invitationEmail.mjs");
 
 test("email-link routes return only the invited signer's assigned fields and controlled PDF",()=>{
@@ -25,9 +30,16 @@ test("email-link routes return only the invited signer's assigned fields and con
 test("external guest signing page is routed before account authentication and submits through the token-only Gateway path",()=>{
   assert.match(app,/emailSignToken/);
   assert.ok(app.indexOf("emailSigningToken=params.get")<app.indexOf("if(!user)return <AuthScreen/>"));
-  assert.match(page,/Controlled document preview/);
+  assert.match(page,/Complete document review/);
+  assert.ok(page.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
+  assert.match(page,/STAMP APPLIED/);
+  assert.match(page,/Review complete document and signature placement/);
+  assert.match(page,/You may still revoke this request/);
   assert.match(page,/Your declaration for this document/);
-  assert.match(page,/Confirm and submit my assigned action/);
+  assert.match(page,/Submit/);
+  assert.match(page,/Revoke/);
+  assert.ok(page.includes("/api/sign/decline"));
+  assert.doesNotMatch(page,/<iframe/);
   assert.match(page,/\/api\/sign\/submit/);
   assert.match(page,/credentials:"omit"/);
   assert.doesNotMatch(page,/verifyManualSigningAuthority|manualAuthorityIdentification/);
@@ -64,4 +76,34 @@ test("owner resend rotates the link and revoke remains an owner-controlled opera
   assert.match(signing,/email_link\.revoked/);
   assert.match(router,/pathname==="\/api\/sign\/open"/);
   assert.match(router,/pathname==="\/api\/sign\/submit"/);
+});
+
+test("PDF.js receives independent byte buffers for the signing viewer and owner integrity panel",()=>{
+  assert.ok(portal.includes("source={data:bytes.slice()}"));
+  assert.ok(portal.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
+  assert.ok(page.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
+});
+test("signer must review the rendered document and applied stamps before submit or revoke",()=>{
+  assert.match(page,/Review complete document and signature placement/);
+  assert.match(page,/Final review — signature not yet submitted/);
+  assert.match(page,/Navigate through every page above/);
+  assert.match(page,/Your signature has not been submitted yet/);
+  assert.match(page,/result.status==="CompletionFailed"/);
+  assert.match(page,/Do not submit again/);
+  assert.match(page,/finalizationFailed/);
+  assert.match(page,/record.signer\?\.status!=="Pending"/);
+  assert.match(page,/Changes to assigned fields update this preview/);
+  assert.doesNotMatch(page,/Return to editing/);
+  assert.ok(!page.includes("disabled={reviewMode||signingClosed}"));
+  assert.match(signing,/email_link\.revoked_by_signer/);
+  assert.match(signing,/emailLinkStatus="revoked"/);
+});
+
+test("all application PDF.js entry points copy caller-owned bytes before worker transfer",()=>{
+  assert.equal(documentReader.split("pdfjsLib.getDocument({data:bytes.slice()})").length-1,2);
+  assert.ok(translation.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
+  assert.ok(pathwaySelfTest.includes("pdfjsLib.getDocument({ data: bytes.slice() }).promise"));
+  assert.ok(gatewayPortal.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
+  assert.ok(portal.includes("source={data:bytes.slice()}"));
+  assert.ok(portal.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
 });

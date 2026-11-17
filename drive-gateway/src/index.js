@@ -13,7 +13,7 @@ const OAUTH_STATE_TTL = 600;
 const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
-import { escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
@@ -417,6 +417,12 @@ export default {
       if (url.pathname === "/api/delete" && request.method === "POST") {
         return await deleteDriveFile(request, env);
       }
+      if (url.pathname === "/api/signature/distribution/download-copy" && request.method === "POST") {
+        return await downloadMySignatureCopy(request, env);
+      }
+      if (url.pathname === "/api/signature/distribution/delete-copy" && request.method === "POST") {
+        return await deleteMySignatureCopy(request, env);
+      }
 
       if (url.pathname === "/api/invitations/redeem" && request.method === "POST") {
         try {
@@ -528,6 +534,25 @@ export default {
               return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
+              const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
+              const safeName=String(name||"IRPA participant").slice(0,160);
+              const roles=Array.isArray(recipientRoles)?recipientRoles.join(", "):"Signing participant";
+              const subject="Completed signed document: "+safeTitle;
+              const text="Dear "+safeName+",\n\nThe signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.\n\nDocument: "+safeTitle+"\nYour role: "+roles+"\nCompleted: "+String(completedAt||"")+"\nSHA-256: "+String(finalHash||"")+"\n\nKeep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.";
+              const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
+              return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
+            },
+            resolveEmailLinkProfileUid: async email => {
+              const normalized=String(email||"").trim().toLowerCase();
+              if(!normalized)return null;
+              const adminToken=await getFirestoreAdminAccessToken(env);
+              const rows=await getFirestoreDocumentsByField(env,"signatureProfiles","email",normalized,adminToken);
+              const active=(rows||[]).map(row=>({id:String(row.name||"").split("/").pop(),...(firestoreDocumentToPlain(row)||{})}))
+                .filter(profile=>String(profile.email||"").trim().toLowerCase()===normalized&&String(profile.status||"").trim().toLowerCase()==="active");
+              if(active.length>1)throw new Error("Multiple active Signature Profiles match the email-link recipient; personal archive routing is ambiguous.");
+              return active.length===1?String(active[0].uid||active[0].id):null;
+            },
             verifyEmailSignerAuthority: (email,authorityRole) => verifyGatewayEmailSignerAuthority(env,email,authorityRole),
             logger: console,
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
@@ -2844,7 +2869,7 @@ async function enforceMailRateLimit(env, uid) {
 }
 
 
-async function smtpSend(env,{to,subject,text,html}) {
+async function smtpSend(env,{to,subject,text,html,attachments=[]}) {
   const toEmail = normalizeRecipientEmail(to);
   const cleanSubject = validateMailHeader(subject, "Subject");
   if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
@@ -2889,19 +2914,7 @@ async function smtpSend(env,{to,subject,text,html}) {
     await command("MAIL FROM:<"+SMTP_FROM+">","2");
     await command("RCPT TO:<"+toEmail+">","2");
     await command("DATA","3");
-    const boundary="IRPA-"+crypto.randomUUID();
-    const mime=[
-      "From: \"IRPA Administration\" <"+SMTP_FROM+">",
-      "To: <"+toEmail+">",
-      "Subject: "+cleanSubject,
-      "MIME-Version: 1.0",
-      "Content-Type: multipart/alternative; boundary=\""+boundary+"\"","",
-      "--"+boundary,
-      "Content-Type: text/plain; charset=UTF-8","Content-Transfer-Encoding: 8bit","",text,"",
-      "--"+boundary,
-      "Content-Type: text/html; charset=UTF-8","Content-Transfer-Encoding: 8bit","",html,"",
-      "--"+boundary+"--",""
-    ].join("\r\n");
+    const mime=buildMailMimeMessage({from:`"IRPA Administration" <${SMTP_FROM}>`,to:toEmail,subject:cleanSubject,text,html,attachments});
     await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
     let accepted;
     try {
@@ -2924,6 +2937,92 @@ async function smtpSend(env,{to,subject,text,html}) {
     try { writer.releaseLock(); } catch {}
     try { socket.close(); } catch {}
   }
+}
+
+async function getMySignatureCopyAccess(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(() => ({}));
+  const recordId = String(body.recordId || "").trim();
+  if (!/^[A-Za-z0-9_-]{3,240}$/.test(recordId)) {
+    return {response:json({ok:false,error:"A valid personal document record ID is required."},400,corsHeaders(request))};
+  }
+  const adminToken = await getFirestoreAdminAccessToken(env);
+  const raw = await getFirestoreDocument(env, "signatures/" + recordId, adminToken);
+  if (!raw) return {response:json({ok:false,error:"The personal signed-document copy was not found."},404,corsHeaders(request))};
+  const record = firestoreDocumentToPlain(raw) || {};
+  if (String(record.signerUid || "") !== String(claims.user_id || "")) {
+    return {response:json({ok:false,error:"You are not authorized to access this personal copy."},403,corsHeaders(request))};
+  }
+  if (record.personalCopyDeleted === true) {
+    return {response:json({ok:false,error:"This personal copy has already been deleted."},404,corsHeaders(request))};
+  }
+  const fileId = String(record.signerArchiveFileId || "").trim();
+  const gatewayEnvelopeId = String(record.gatewayEnvelopeId || "").trim();
+  const finalHash = String(record.gatewayDocumentHash || "").trim();
+  if (!fileId || !gatewayEnvelopeId || !/^[a-f0-9]{64}$/i.test(finalHash)) {
+    return {response:json({ok:false,error:"The personal copy record is incomplete."},409,corsHeaders(request))};
+  }
+  const accessToken = await getDriveAccessToken(env);
+  let metadata;
+  try {
+    metadata = await driveFetch(env, accessToken, "/drive/v3/files/" + encodeURIComponent(fileId) + "?fields=id,name,mimeType,size,description,trashed");
+  } catch {
+    return {response:json({ok:false,error:"The personal copy is no longer available in its archive."},404,corsHeaders(request))};
+  }
+  const description = parseDescription(metadata.description || "");
+  const validPersonalCopy = description.archive === "my-documents"
+    && description.state === "Final Completed Document"
+    && description.copyKind && ["owner-copy","signer-copy"].includes(description.copyKind)
+    && String(description.envelopeId || "") === gatewayEnvelopeId
+    && String(description.recipientUid || "") === String(claims.user_id || "")
+    && String(description.finalHash || "") === finalHash
+    && String(metadata.mimeType || "") === "application/pdf"
+    && metadata.trashed !== true;
+  if (!validPersonalCopy) {
+    return {response:json({ok:false,error:"The requested file is not the authenticated user's personal completed-document copy."},403,corsHeaders(request))};
+  }
+  const portalEnvelope = record.envelopeId
+    ? firestoreDocumentToPlain(await getFirestoreDocument(env, "signatureEnvelopes/" + String(record.envelopeId), adminToken))
+    : null;
+  const authoritativeFileId = String(portalEnvelope?.signedPdfReference || "");
+  if (authoritativeFileId && authoritativeFileId === fileId) {
+    return {response:json({ok:false,error:"The authoritative executed document cannot be deleted as a personal copy."},409,corsHeaders(request))};
+  }
+  return {claims,record,recordId,fileId,finalHash,accessToken,adminToken,metadata};
+}
+
+async function downloadMySignatureCopy(request, env) {
+  const access = await getMySignatureCopyAccess(request, env);
+  if (access.response) return access.response;
+  const media = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(access.fileId) + "?alt=media", {
+    headers:{Authorization:"Bearer " + access.accessToken}
+  });
+  if (!media.ok) return json({ok:false,error:"Google Drive could not retrieve your personal signed-document copy."},502,corsHeaders(request));
+  const bytes = new Uint8Array(await media.arrayBuffer());
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
+  const actualHash = Array.from(digest).map(value=>value.toString(16).padStart(2,"0")).join("");
+  if (actualHash !== access.finalHash) return json({ok:false,error:"The personal copy failed its completed-document integrity check."},409,corsHeaders(request));
+  return json({ok:true,fileName:access.metadata.name||"completed-signed-document.pdf",contentType:"application/pdf",finalHash:actualHash,base64:uint8ToBase64(bytes)},200,corsHeaders(request));
+}
+
+async function deleteMySignatureCopy(request, env) {
+  const access = await getMySignatureCopyAccess(request, env);
+  if (access.response) return access.response;
+  const deleted = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(access.fileId), {
+    method:"DELETE",
+    headers:{Authorization:"Bearer " + access.accessToken}
+  });
+  if (!deleted.ok && deleted.status !== 404) {
+    return json({ok:false,error:"Google Drive could not delete your personal copy."},502,corsHeaders(request));
+  }
+  const deletedAt = new Date().toISOString();
+  const fields = {
+    personalCopyDeleted:{booleanValue:true},
+    personalCopyDeletedAt:{timestampValue:deletedAt},
+    personalCopyDeletedByUid:{stringValue:String(access.claims.user_id)}
+  };
+  await updateFirestoreDocument(env,"signatures/" + access.recordId,access.adminToken,fields,Object.keys(fields));
+  return json({ok:true,deleted:true,recordId:access.recordId,deletedAt,authoritativeDocumentRetained:true,auditTrailRetained:true},200,corsHeaders(request));
 }
 
 async function deleteDriveFile(request, env) {

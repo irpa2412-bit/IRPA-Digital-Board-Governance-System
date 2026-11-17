@@ -14,7 +14,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   const signers = (envelope.signers || []).map(s => {
     const prior = priorSigners.find(p => (s.uid && p.uid === s.uid) || (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()));
     return {
-      uid: s.uid || null, signerId:s.id||null, identityType:s.identityType||"account", name: s.name || "", email: s.email || "",
+      uid: s.uid || null, profileUid:s.profileUid||s.uid||null, signerId:s.id||null, identityType:s.identityType||"account", name: s.name || "", email: s.email || "",
       status: s.status || "", signedAt: s.signedAt || null,
       role: s.role || prior?.role || prior?.action || "",
       action: s.action || prior?.action || prior?.role || "",
@@ -46,7 +46,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
       documentReference:clean(existing.documentReference||existing.envelopeReference||envelope.externalReference),
       documentTitle:clean(existing.title||envelope.title),
-      signerUid:signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
+      signerUid:signer.profileUid||signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
       workflowRole:signer.role||signer.action||"",
       signatureAuthority:signer.authorityVerified?signer.authorityRole:"",
       signatureAuthorityVerificationStatus:signer.authorityVerified?"Verified":"NotVerified",
@@ -54,7 +54,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       signerDeclarations:assignedSigner?.signerDeclarations||{},
       declarationDiscrepancy:assignedSigner?.declarationDiscrepancy||null,
       signatureStatus:"Signed",status:"Signed",signedAt:signer.signedAt||timestamp,
-      signerArchiveUrl,signerArchiveFileId:signerCopy.id,
+      signerArchiveUrl,signerArchiveFileId:signerCopy.id,copyRole:"Signer",personalCopyDeleted:false,
       gatewayEnvelopeId:envelope.id,gatewayDocumentHash:completion.finalHash,
       cryptographicEvidenceStatus:(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner?.id)?"Verified":"GatewayAuditOnly",archiveProtocol:(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner?.id)?"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1":"IRPA-GATEWAY-AUDIT-CHAIN-1",
       immutable:true
@@ -73,6 +73,41 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
         signedAt: signer.signedAt || timestamp
       });
     }
+  }
+  const ownerUid = clean(envelope.createdBy);
+  const ownerCopy = (completion.files || []).find(file => file?.kind === "owner-copy");
+  const ownerAlreadySigner = ownerUid && signers.some(signer => (signer.uid === ownerUid || signer.profileUid === ownerUid) && signer.status === "Signed");
+  if (ownerUid && ownerCopy?.id && !ownerAlreadySigner) {
+    const ownerArchiveUrl = "https://drive.google.com/file/d/" + encodeURIComponent(ownerCopy.id) + "/view";
+    const ownerRecordId = "gateway-" + envelopeId + "-" + ownerUid;
+    await updateDocument("signatures/" + ownerRecordId, {
+      envelopeId,
+      documentId: clean(existing.documentId || envelope.documentId),
+      recordOrigin: existing.recordOrigin || "PRODUCTION",
+      trialData: existing.trialData === true,
+      documentReference: clean(existing.documentReference || existing.envelopeReference || envelope.externalReference),
+      documentTitle: clean(existing.title || envelope.title),
+      signerUid: ownerUid,
+      signerId: null,
+      signerIdentityType: "account",
+      signerEmail: clean(envelope.ownerEmail),
+      signerName: clean(envelope.ownerName) || "Document Owner",
+      workflowRole: "Document Owner",
+      signatureAuthority: "",
+      signatureAuthorityVerificationStatus: "NotRequired",
+      signatureStatus: "Owner Copy",
+      status: "Completed",
+      signedAt: completion.completedAt || timestamp,
+      signerArchiveUrl: ownerArchiveUrl,
+      signerArchiveFileId: ownerCopy.id,
+      copyRole: "Owner",
+      personalCopyDeleted: false,
+      gatewayEnvelopeId: envelope.id,
+      gatewayDocumentHash: completion.finalHash,
+      cryptographicEvidenceStatus: "NotApplicable",
+      archiveProtocol: "IRPA-GATEWAY-OWNER-COPY-1",
+      immutable: true
+    });
   }
   const eventId = "gateway-completed-" + envelopeId;
   const completionEventPath = "signatureEvents/" + eventId;
