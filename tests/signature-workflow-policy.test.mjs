@@ -198,7 +198,7 @@ test("palette tools support responsive tap-to-place and desktop drag placement",
   assert.match(portal, /draggable=\{canDrag\}/);
   assert.match(portal, /onClick=\{placePendingField\}/);
   assert.match(portal, /aria-pressed=\{pendingFieldType===t\}/);
-  assert.match(portal, /Tap tool, then tap PDF/);
+  assert.match(portal, /Select, then tap PDF/);
   assert.match(css, /\.signature-field-tools\{display:grid/);
   assert.match(css, /@media \(max-width:900px\)/);
   assert.match(css, /@media \(hover:none\)/);
