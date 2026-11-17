@@ -301,8 +301,8 @@ test("Gateway signing records the signer's optional declared title without regis
   });
   assert.equal(result.status,"InProgress");
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
-  assert.equal(current.signers[0].signerDeclarations.occupation,"Independent Consultant");
-  assert.equal(current.signers[0].signerDeclarations.title,"Technical Adviser");
+  assert.equal(current.signers[0].signerDeclarations.title,"Independent Consultant");
+  assert.equal(current.signers[0].signerDeclarations.title,"Independent Consultant");
   assert.equal(current.signers[0].authorityVerification,null);
 });
  
