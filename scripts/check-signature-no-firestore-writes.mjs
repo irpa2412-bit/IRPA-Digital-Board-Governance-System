@@ -11,8 +11,12 @@ const entrypoints = [
   "attachGatewayEmailLinkEnvelope","getMySignedDocuments","releaseNextSigner"
 ];
 function functionBody(name) {
-  const pattern = new RegExp("^(?:export\\s+)?(?:async\\s+)?function\\s+"+name+"\\s*\\([^\\n]*?\\)\\s*\\{","m");
-  const match = pattern.exec(source);
+  const patterns = [
+    new RegExp("^(?:export\\s+)?(?:async\\s+)?function\\s+"+name+"\\s*\\([^\\n]*?\\)\\s*\\{","m"),
+    new RegExp("^(?:export\\s+)?const\\s+"+name+"\\s*=\\s*(?:async\\s*)?\\([^\\n]*?\\)\\s*=>\\s*\\{","m")
+  ];
+  let match=null;
+  for (const pattern of patterns) { match=pattern.exec(source); if(match)break; }
   if (!match) return null;
   const open = match.index + match[0].lastIndexOf("{");
   let depth=0,quote=null,escape=false,lineComment=false,blockComment=false;
@@ -29,7 +33,7 @@ function functionBody(name) {
   }
   throw new Error("Unbalanced function body: "+name);
 }
-const definitions=new Set([...source.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/gm)].map(match=>match[1]));
+const definitions=new Set([...source.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/gm),...source.matchAll(/^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^\n]*?\)\s*=>\s*\{/gm)].map(match=>match[1]));
 const visited=new Set(),queue=[...entrypoints],failures=[];
 while(queue.length){
   const name=queue.shift();
