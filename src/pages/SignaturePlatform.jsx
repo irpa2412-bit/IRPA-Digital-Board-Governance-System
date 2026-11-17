@@ -394,7 +394,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  useEffect(()=>{if(signerOnly||initialDocument?.id)return;const context=readWorkflowContext();if(context?.documentId){setInitiateDocumentId(context.documentId);setTab("Sign a Document");setSigningCircle("Initiated");setMessage(`Signing initiated from ${context.module||"a governance portal"} for document ${context.documentReference||context.documentId}.`)}else if(context?.meetingId||context?.authorizationRequestId){setTab("Sign a Document");setSigningCircle("Initiated");setMessage(`Signing initiated from ${context.module||"a governance portal"}. Select a document from the archive or upload a new document.`)}},[signerOnly,initialDocument]);
  const selectedDoc=useMemo(()=>docs.find(x=>x.id===documentId),[docs,documentId]);
  const selectedSignerMember=useMemo(()=>members.find(x=>x.uid===selectedSigner)||members.find(x=>String(x.email||"").trim().toLowerCase()===String(signerEmail||"").trim().toLowerCase()),[members,selectedSigner,signerEmail]);
- const documentOwner=useMemo(()=>({uid:auth.currentUser?.uid,name:auth.currentUser?.displayName||auth.currentUser?.email||"Document Owner",email:auth.currentUser?.email||"",role:"Document Owner",routingOrder:1,status:"Owner"}),[auth.currentUser?.uid,auth.currentUser?.displayName,auth.currentUser?.email]);
+ const documentOwner=useMemo(()=>({uid:auth.currentUser?.uid,identityType:"email-link",name:auth.currentUser?.displayName||auth.currentUser?.email||"Document Owner",email:auth.currentUser?.email||"",role:"Document Owner",routingOrder:1,status:"Owner"}),[auth.currentUser?.uid,auth.currentUser?.displayName,auth.currentUser?.email]);
  const workflowRecipients=useMemo(()=>[...(ownerSigningEnabled?[{...documentOwner,optionalSigning:false,actionRequired:true}]:[]),...recipients.filter(r=>r.uid!==documentOwner.uid).map((r,i)=>({...r,routingOrder:signingMode==="Sequential"?i+(ownerSigningEnabled?2:1):r.routingOrder||1}))],[documentOwner,recipients,signingMode,ownerSigningEnabled]);
  useEffect(()=>{if(selectedDoc){setDocumentUrl(controlledPdfUrl(selectedDoc))}else setDocumentUrl("")},[selectedDoc]);
  async function revokeApplication(){
@@ -565,7 +565,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   let next;
   if(registered){
     if(recipients.some(x=>x.uid===registered.uid)){setMessage("This officer is already in the signer hierarchy.");return;}
-    next={uid:registered.uid,name:registered.name||registered.email,email:registered.email||email,role,institutionalRole:registered.boardPosition||registered.role||"",occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
+    next={uid:registered.uid,identityType:"email-link",name:registered.name||registered.email,email:registered.email||email,role,institutionalRole:registered.boardPosition||registered.role||"",occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
   }else{
     
     const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(email));
@@ -601,21 +601,21 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     let env=draftEnvelopeId
       ?await finalizeSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled})
       :await createSignatureEnvelope({title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled});
-    const emailLinkRecipients=orderedRecipients.filter(recipient=>recipient.identityType==="email-link");
+    const emailLinkRecipients=workflowRecipients.filter(recipient=>recipient.identityType==="email-link");
     if(emailLinkRecipients.length&&!env.gatewayEnvelopeId){
       setDraftEnvelopeId(env.id);
       setMessage("Creating the isolated Gateway email-link preview and sending invitations…");
       const sourceFileId=String(documentUrl||"").startsWith("drive://")?String(documentUrl).slice("drive://".length):(selectedDoc?.driveFileId||selectedDoc?.fileId||selectedDoc?.archiveFileId||selectedDoc?.sourceFileId||"");
       if(!sourceFileId)throw new Error("The controlled PDF has no verified Google Drive file ID for the email-link preview.");
       const sourceBytes=await downloadControlledDocumentBytes(sourceFileId,documentId);
-      const gatewayResult=await createGatewaySignatureEnvelope({envelope:{...env,ownerUid:auth.currentUser?.uid,senderUid:auth.currentUser?.uid,recipients:emailLinkRecipients,fields:[]},sourceBytes});
+      const gatewayResult=await createGatewaySignatureEnvelope({envelope:{...env,ownerUid:auth.currentUser?.uid,senderUid:auth.currentUser?.uid,recipients:emailLinkRecipients,fields},sourceBytes});
       try{await attachGatewayEmailLinkEnvelope(env.id,gatewayResult);}
       catch(error){await voidGatewaySignatureEnvelope(gatewayResult.gatewayEnvelopeId,"Email-link envelope could not be linked to its owner record");throw error;}
       env={...env,...gatewayResult,gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent"};
     }
     setEnvelopes(prev=>[env,...prev.filter(item=>item.id!==env.id)]);
     setDraftEnvelopeId(null);setTitle("");setDocumentId("");setDocumentUrl("");setRecipients([]);setFields([]);setSelectedField(null);setOwnerSigningEnabled(false);setTab("Envelopes");
-    setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend; the login-based signing path is unchanged.":emailLinkRecipients.length?"Envelope created. Email-link invitations were issued; recipients can open a read-only document preview without a DBGS account.":"Envelope created as Draft.");
+    setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend.":emailLinkRecipients.length?"Envelope created. Email-link invitations were issued; recipients can open a read-only document preview without a DBGS account.":"Envelope created as Draft.");
   }catch(x){
     console.error("IRPA Signature Portal: Create Draft Envelope failed",{errorType:x?.name||"Error"});
     setMessage((draftEnvelopeId?"Draft saved; email-link setup did not finish: ":"Create Draft Envelope was not completed: ")+(x.message||"Unable to create envelope."));
