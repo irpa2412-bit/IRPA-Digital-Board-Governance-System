@@ -137,6 +137,9 @@ async function runViewport(name,viewport){
  await confirmButton.click();
  console.log("CONFIRM_BUTTON_CLICK_EVENT "+name+": "+await page.evaluate(()=>window.__signatureConfirmButtonClick));
  console.log("PAD_ON_CONFIRM_FIELD "+name+": "+await page.evaluate(()=>window.__signaturePadOnConfirmField||null));
+ assert.equal(await page.evaluate(()=>window.__signaturePadOnConfirmField||null),"initial-page-1","Confirm must apply to the exact assigned initials field");
+ assert.ok(await page.evaluate(()=>window.__signaturePadOnConfirmValueLength||0)>0,"Confirm must receive a non-empty prepared PNG specimen");
+ assert.equal(await page.getByTestId("envelope-state").innerText(),"Confirmed fields: 2","the initials confirmation must persist as a second field value");
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-initial-page-1");
  await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-after-confirm.png",fullPage:true});
  console.log("PASS "+name+": Draw + explicit Confirm");
