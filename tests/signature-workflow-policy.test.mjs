@@ -258,3 +258,17 @@ test("envelope creation blocks duplicate participant UIDs and case-insensitive e
   assert.match(portal, /if\(seenSignerUids\.has\(uid\)\|\|\(emailKey&&seenSignerEmails\.has\(emailKey\)\)\)/);
   assert.match(portal, /Duplicate participants were detected by signer identity or email/);
 });
+
+test("document owner can save and close preparation before all fields are assigned, then resume the draft",()=>{
+  assert.match(portal,/async function saveAndClosePreparation\(\)/);
+  assert.match(portal,/saveSignatureWorkflowDraft\(\{envelopeId:draftEnvelopeId/);
+  assert.match(portal,/Save Draft & Close Preparation/);
+  assert.match(portal,/Continue Preparation/);
+  assert.match(portal,/The draft remains inactive; no signer invitations were sent/);
+});
+
+test("Sign a Document is available to every active Signature Profile holder, not owner-only",()=>{
+  assert.match(portal,/\["Profile","Sign a Document","Envelopes","My Documents","Signature Pathway Self-Test"\]/);
+  assert.match(portal,/An active Signature Profile is required before starting a signing document/);
+  assert.doesNotMatch(portal,/documentOwner\.uid===auth\.currentUser\?\.uid[^\n]*Sign a Document/);
+});
