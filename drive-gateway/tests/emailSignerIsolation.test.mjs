@@ -115,6 +115,29 @@ test("email-link open returns only this signer's fields and never another signer
 });
 
 
+test("required fields are rejected server-side until every required assigned field is complete",()=>{
+  const fields=validateEnvelopeFields([
+    {fieldId:"name",signerId:"S1",type:"Name",required:true,page:1},
+    {fieldId:"date",signerId:"S1",type:"Date",required:true,page:2},
+  ],[externalSigner]);
+  assert.throws(()=>validateFieldValues(fields,externalSigner,{name:"Vendor"},{type:"typed",value:"Vendor"},[]),/required date field/);
+  assert.deepEqual(validateFieldValues(fields,externalSigner,{name:"Vendor",date:"2026-11-17"},{type:"typed",value:"Vendor"},[]),{name:"Vendor",date:"2026-11-17"});
+});
+
+test("confirmed signature specimens support the bounded aggregate request budget",()=>{
+  const fields=validateEnvelopeFields([
+    {fieldId:"sig-a",signerId:"S1",type:"Signature",required:true,page:1},
+    {fieldId:"sig-b",signerId:"S1",type:"Initials",required:true,page:2},
+  ],[externalSigner]);
+  const app=(fieldId,value)=>({fieldId,page:fieldId==="sig-a"?1:2,x:10,y:80,width:24,height:9,confirmed:true,value});
+  const markA="data:image/png;base64,"+"A".repeat(110000);
+  const markB="data:image/png;base64,"+"B".repeat(110000);
+  const values=validateFieldValues(fields,externalSigner,{}, {type:"typed",value:"Vendor"},[app("sig-a",markA),app("sig-b",markB)]);
+  assert.equal(values["sig-a"],markA);
+  assert.equal(values["sig-b"],markB);
+  assert.throws(()=>validateFieldValues(fields,externalSigner,{}, {type:"typed",value:"Vendor"},[app("sig-a","data:image/png;base64,"+"A".repeat(120001)),app("sig-b",markB)]),/no larger than 120 KB/);
+});
+
 test("required checkbox fields accept only an explicit checked value and signature fields retain independent specimens",()=>{
   const fields=validateEnvelopeFields([
     {fieldId:"agree",signerId:"S1",type:"Checkbox",required:true,page:1},
