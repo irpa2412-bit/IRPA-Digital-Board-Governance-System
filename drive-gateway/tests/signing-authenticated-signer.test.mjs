@@ -21,7 +21,7 @@ test("UID-bound signer comparison is exact and cannot be bypassed by email alone
 });
 
 import {createHash} from "node:crypto";
-import {sign} from "../src/signing.mjs";
+import {createEnvelope,sign} from "../src/signing.mjs";
 
 test("staging signing does not require IRPA register authority but retains signer authentication and declarations",async()=>{
   const secret="a".repeat(64);
@@ -71,4 +71,58 @@ test("staging signing does not require IRPA register authority but retains signe
     }),
     error=>error?.status===400&&error.message==="Enter your name and occupation/capacity for this document before signing."
   );
+});
+
+test("production Gateway envelope accepts an explicitly invited authenticated account signer",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\naccount signer test");
+  const documentHash=createHash("sha256").update(bytes).digest("hex");
+  const document={id:"DOC-account-test",ownerUid:"owner-uid",status:"Stored",primaryStorageId:"source",sha256:documentHash,fileSize:bytes.byteLength};
+  let envelope=null;
+  const ctx={
+    env:{IRPA_ENVIRONMENT:"production",DRIVE_MOCK:"false"},
+    config:{ttlDays:7,emailLinkTtlDays:7,appUrl:"https://irpa.or.tz"},
+    now:()=>new Date("2026-11-17T10:15:30.000Z"),
+    storage:{get:async id=>id==="source"?bytes:null},
+    sendInvitation:async()=>{},
+    meta:{
+      get:async(collection,id)=>collection==="documents"&&id===document.id?document:collection==="envelopes"&&envelope?.id===id?envelope:null,
+      create:async(collection,id,value)=>{if(collection==="envelopes")envelope={...value,_v:1};},
+      update:async(collection,id,patch)=>{if(collection==="envelopes"&&envelope?.id===id)envelope={...envelope,...patch,_v:envelope._v+1};}
+    }
+  };
+  const result=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Owner"},{documentId:document.id,archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"account",uid:"account-signer-1",email:"signer@irpa.or.tz",name:"Account Signer",order:1}],fields:[{fieldId:"signature-1",type:"Signature",signerUid:"account-signer-1",page:1,x:10,y:80,width:24,height:9,required:true}]});
+  assert.equal(result.ok,true);
+  assert.equal(envelope.signers[0].identityType,"account");
+  assert.equal(envelope.signers[0].uid,"account-signer-1");
+  assert.equal(result.invitations[0].status,"Sent");
+});
+
+test("assigned Date field is persisted from the Gateway signedAt timestamp, not the device value",async()=>{
+  const secret="b".repeat(64),tokenHash=createHash("sha256").update(secret).digest("hex");
+  const bytes=new TextEncoder().encode("%PDF-1.7\\nauthoritative date test");
+  const documentHash=createHash("sha256").update(bytes).digest("hex");
+  const envelope={
+    id:"ENV-date-test",documentId:"DOC-date-test",documentHash,expiresAt:"2999-01-01T00:00:00.000Z",
+    status:"Sent",signingMode:"Sequential",events:[],_v:1,
+    signers:[
+      {id:"S1",uid:"signer-uid",identityType:"account",status:"Pending",order:1,tokenHash},
+      {id:"S2",uid:"next-signer",identityType:"account",status:"Pending",order:2,tokenHash:"c".repeat(64)}
+    ],
+    fields:[{fieldId:"date-1",type:"Date",page:1,x:10,y:80,width:24,height:6,signerId:"S1",signerUid:"signer-uid",required:true}]
+  };
+  const document={id:envelope.documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:"source",sha256:documentHash,fileSize:bytes.byteLength};
+  const at="2026-11-17T10:15:30.000Z";
+  const ctx={
+    env:{IRPA_ENVIRONMENT:"production"},
+    now:()=>new Date(at),
+    storage:{get:async id=>id==="source"?bytes:null},
+    meta:{
+      get:async(collection,id)=>collection==="envelopes"&&id===envelope.id?envelope:collection==="documents"&&id===document.id?document:null,
+      update:async(collection,id,patch)=>{assert.equal(collection,"envelopes");assert.equal(id,envelope.id);Object.assign(envelope,patch);envelope._v++;}
+    }
+  };
+  const result=await sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Account Signer"},fieldValues:{"date-1":"wrong device clock"},consent:true,declarations:{name:"Account Signer",occupation:"Test Signer"},user:{uid:"signer-uid",email:"signer@irpa.or.tz",token:"verified-id-token"}});
+  assert.equal(result.status,"InProgress");
+  assert.equal(envelope.signers[0].signedAt,at);
+  assert.equal(envelope.signers[0].fieldValues["date-1"],at);
 });
