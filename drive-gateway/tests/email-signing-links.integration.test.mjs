@@ -10,15 +10,17 @@ import {openSigning,sign,declineSigning} from "../src/signing.mjs";
 
 const NOW=new Date("2026-11-16T08:00:00.000Z");
 async function fixture({authority=true,failMail=false}={}) {
-  const sent=[];
+  const sent=[],verificationCodes=[],logs=[],kvStore=new Map();
+  const kv={get:async key=>kvStore.get(key)||null,put:async(key,value)=>{kvStore.set(key,value);},delete:async key=>{kvStore.delete(key);}};
   let now=NOW;
   const ctx=buildEsignContext({
-    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7",DRIVE_KV:kv},
     now:()=>new Date(now),
     verifyUser:async()=>null,
     verifyEmailSignerAuthority:async email=>authority?({verified:true,authorityRole:"Board Secretary",sourceCollection:"members",sourceRecordId:"member-doc-1",name:"Registered Board Secretary"}):({verified:false}),
     sendInvitation:async message=>{sent.push(message);if(failMail)throw new Error("SMTP rejected");},
-    logger:{error(){}}
+    sendEmailVerificationCode:async message=>{verificationCodes.push(message);},
+    logger:{error:(...args)=>logs.push(args)}
   });
   const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
   const source=await ctx.storage.put({path:"source/email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
@@ -27,7 +29,7 @@ async function fixture({authority=true,failMail=false}={}) {
   const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{documentId,externalReference:"IRPA-EXT-"+Math.random().toString(16).slice(2,10),archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",email:"Board.Secretary@example.org",name:"Client supplied name",authorityRole:"Board Secretary",order:1,role:"Client supplied role"}]});
   const envelope=await ctx.meta.get("envelopes",created.envelopeId);
   const token=new URL(sent[0].link).searchParams.get("emailSignToken");
-  return {ctx,sent,created,envelope,token,now:value=>{now=value}};
+  return {ctx,sent,verificationCodes,logs,kvStore,created,envelope,token,now:value=>{now=value}};
 }
 
 test("invalid token failures are rate-limited by token and IP with one neutral response",async()=>{
@@ -72,6 +74,29 @@ test("email-link signer is stored with token hash, email hash, expiry and issued
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
 });
 
+test("a no-session email-link visit shows the email-code step and only redeems the single-use token after code confirmation",async()=>{
+  const f=await fixture();
+  const {route}=await import("../src/router.mjs");
+  const openedResponse=await route(new Request("https://gw.test/api/sign/email/open",{headers:{"x-signing-token":f.token}}),f.ctx);
+  const openedBody=await openedResponse.json();
+  assert.equal(openedResponse.status,200);
+  assert.equal(openedBody.requiresEmailCode,true);
+  assert.equal(f.verificationCodes.length,1);
+  assert.match(f.verificationCodes[0].code,/^\d{6}$/);
+  assert.equal((await f.ctx.meta.get("envelopes",f.created.envelopeId)).signers[0].emailLinkStatus,"issued");
+  const page=fs.readFileSync(new URL("../../../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
+  assert.match(page,/Confirm your email/);
+  assert.match(page,/Confirm email and continue/);
+  const confirmedResponse=await route(new Request("https://gw.test/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:f.token,code:f.verificationCodes[0].code})}),f.ctx);
+  const confirmed=await confirmedResponse.json();
+  assert.equal(confirmedResponse.status,200);
+  assert.equal(confirmed.ok,true);
+  assert.notEqual(confirmed.sessionToken,f.token);
+  assert.equal((await f.ctx.meta.get("envelopes",f.created.envelopeId)).signers[0].emailLinkStatus,"opened");
+  assert.equal(f.logs.some(entry=>JSON.stringify(entry).includes(f.token)),false,"raw invitation tokens must never appear in logs");
+  const replay=await route(new Request("https://gw.test/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:f.token,code:f.verificationCodes[0].code})}),f.ctx);
+  assert.equal(replay.status,404,"a redeemed invitation token cannot be confirmed again");
+});
 test("email link opens once, changes status to opened and exposes only its controlled PDF",async()=>{
   const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
