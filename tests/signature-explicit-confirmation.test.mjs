@@ -104,3 +104,19 @@ test("legacy signing persists signer-declared authority safely when institutiona
   assert.doesNotMatch(service, /signerAuthority\.(?:authorityRole|authorityDepartment|authorityUnit|authorityStatus|authoritySourceCollection|authoritySourceRecordId)/);
   assert.match(service, /signatureAuthorityVerificationStatus:"Signer-declared; not independently verified"/);
 });
+
+
+test("Gateway envelopes include registered account signers and the owner when explicitly required", () => {
+  assert.match(storage, /const accountSigner = Boolean\(r\?\.uid\) && !emailLink/);
+  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
+  assert.match(storage, /\{uid:String\(recipient\.uid\)\}/);
+  assert.match(platform, /checked=\{ownerSigningEnabled\}/);
+  assert.match(platform, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]/);
+});
+
+test("new palette fields are assigned to the selected action signer by default", () => {
+  assert.match(platform, /aria-label="Assignee for new fields"/);
+  assert.match(platform, /makeField\(type,fields\.length,assignee\.uid,pageNum\)/);
+  assert.match(platform, /ASSIGN NEW FIELDS TO/);
+  assert.match(platform, /Assigned addressee/);
+});
