@@ -52,10 +52,10 @@ test("existing Firestore rules are unchanged and their actual-data gate remains 
 });
 
 test("signature owner activation, append-only audit, signer mirror and signed-document list are Gateway-only",()=>{
-  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/activate"/);
-  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/audit"/);
-  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/mirror"/);
-  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/signed-documents"/);
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/activate"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/audit"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/mirror"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/signed-documents"'));
   assert.match(worker,/Only the original document owner may activate this signing workflow/);
   assert.match(worker,/currentDocument:\\{exists:false\\}/);
   assert.match(worker,/cryptographicEvidenceStatus:row.cryptographicEvidenceStatus/);
