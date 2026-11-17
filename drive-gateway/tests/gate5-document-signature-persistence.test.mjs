@@ -273,8 +273,10 @@ test("G5-03 — original document preservation", async () => {
     s.ctx,
   );
   assert.equal(envelopeIdResponse.status, 201);
-  const token = s.tokenFor("g5.signer@example.org");
-  assert.equal((await route(get("/api/sign/email/open", { token }), s.ctx)).status, 200);
+  const invitationToken = s.tokenFor("g5.signer@example.org");
+  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  assert.equal(opened.status, 200);
+  const token=(await opened.json()).sessionToken;
   assert.equal(
     (await route(
       submit(token, { type: "typed", value: "Preservation Signature" }),
