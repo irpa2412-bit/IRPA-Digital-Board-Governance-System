@@ -284,7 +284,7 @@ test("Production-mode Gateway signing does not require Member/Employee authority
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].status,"Signed");
   assert.equal(current.signers[0].signerDeclarations.title,"Board Member");
-  assert.equal(current.signers[0].authorityVerification,null);
+  assert.equal(current.signers[0].authorityVerification,undefined);
   assert.equal(Object.hasOwn(current.events.at(-1),"authoritySourceCollection"),false);
 });
 
