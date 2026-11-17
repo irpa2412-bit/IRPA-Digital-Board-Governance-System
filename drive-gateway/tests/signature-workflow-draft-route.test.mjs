@@ -57,14 +57,14 @@ test("signature owner activation, append-only audit, signer mirror and signed-do
   assert.ok(worker.includes('pathname === "/api/signature-workflow/mirror"'));
   assert.ok(worker.includes('pathname === "/api/signature-workflow/signed-documents"'));
   assert.match(worker,/Only the original document owner may activate this signing workflow/);
-  assert.match(worker,/currentDocument:\\{exists:false\\}/);
+  assert.match(worker,/currentDocument:\{exists:false\}/);
   assert.match(worker,/cryptographicEvidenceStatus:row.cryptographicEvidenceStatus/);
   assert.match(worker,/signerArchiveUrl:row.signerArchiveUrl/);
-  assert.doesNotMatch(worker,/documents:\\s*rows\\.filter/);
+  assert.doesNotMatch(worker,/documents:\s*rows\.filter/);
   assert.match(client,/\/api\/signature-workflow\/activate/);
   assert.match(client,/\/api\/signature-workflow\/audit/);
   assert.match(client,/\/api\/signature-workflow\/mirror/);
   assert.match(client,/\/api\/signature-workflow\/signed-documents/);
   assert.match(client,/\/api\/sign\/submit/);
-  assert.doesNotMatch(client,/await updateDoc\\(doc\\(db,ENVELOPE_COLLECTION/);
+  assert.doesNotMatch(client,/await updateDoc\(doc\(db,ENVELOPE_COLLECTION/);
 });
