@@ -518,7 +518,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   }
   const invitations=Array.isArray(result.invitations)?result.invitations:[];
   const invitationFailures=invitations.filter(item=>item.status!=="Sent").length;
-  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":"Sent",gatewayInvitationFailures:invitationFailures,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":"Sent",gatewayInvitationFailures:invitationFailures,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),gatewaySignerAssignments:ordered.map((recipient,index)=>({signerId:"S"+String(index+1),uid:recipient.uid||null,email:String(recipient.email||"").trim().toLowerCase(),routingOrder:Number(recipient.routingOrder||index+1)})),existing:result.existing === true};
 }
 
 export async function getGatewaySignatureEnvelopeStatus(envelopeId) {
