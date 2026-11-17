@@ -457,7 +457,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   });
   const resolveSignerId=field=>{
     const key=String(field?.signerId||field?.signerUid||"").trim().toLowerCase();
-    return signerAssignmentByKey.get(key)||(/^S\\d{1,2}$/.test(key)?key:null);
+    return signerAssignmentByKey.get(key)||(/^S\d{1,2}$/.test(key)?key:null);
   };
   if ((envelope.fields || []).some(field => !resolveSignerId(field) || !ordered.some((recipient,index)=>"S"+String(index+1)===resolveSignerId(field)))) {
     throw new Error("A signing field is assigned to a view-only, optional, or unknown signer. Correct the field assignments before Gateway activation.");
@@ -515,6 +515,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
         ...(!emailLink && recipient.uid ? {uid:String(recipient.uid)} : {}),
         email:String(recipient.email || "").trim().toLowerCase(),
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
+        role:String(recipient.institutionalRole||recipient.authorityRole||recipient.role||""),
         occupation:String(recipient.occupation||recipient.capacity||"").trim(),
         capacity:String(recipient.capacity||"").trim(),
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
@@ -548,9 +549,9 @@ export async function retryGatewaySignatureDistribution(envelopeId) {
   return data;
 }
 
-export async function resendGatewayEmailInvitation(envelopeId,signerId) {
+export async function resendGatewayEmailInvitation(envelopeId,signerId,{role=""}={}) {
   if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
-  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/resend",{method:"POST",body:JSON.stringify({})});
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/resend",{method:"POST",body:JSON.stringify({role:String(role||"")})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data.ok===false)throw new Error(data.error||"Unable to resend the email signing invitation.");
   return data;
