@@ -534,6 +534,14 @@ export default {
               return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt,role,action,fieldCount}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,role,action,fieldCount,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendEmailVerificationCode: async ({to,name,code,expiresAt}) => {
+              const safeName=String(name||"IRPA signer").replace(/[\r\n\u2028\u2029]+/g," ").slice(0,120);
+              const safeExpiry=String(expiresAt||"10 minutes from delivery").replace(/[\r\n\u2028\u2029]+/g," ").slice(0,80);
+              const subject="Your IRPA signing email confirmation code";
+              const text="Dear "+safeName+",\n\nYour IRPA signing email confirmation code is: "+String(code||"")+"\n\nThis code expires at "+safeExpiry+". Enter it only on the secure IRPA signing page. Do not share it with anyone.\n\nIRPA Administration";
+              const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>Your IRPA signing email confirmation code is:</p><p style=\"font-size:24px;font-weight:700;letter-spacing:5px\">"+escapeMailHtml(code||"")+"</p><p>This code expires at "+escapeMailHtml(safeExpiry)+". Enter it only on the secure IRPA signing page. Do not share it with anyone.</p><p>IRPA Administration</p>";
+              return smtpSend(env,{to,subject,text,html});
+            },
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA participant").slice(0,160);
