@@ -28,8 +28,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
       name: "Institutional Signer",
       order: 1,
       uid: signerUid,
-      identityType: signerUid ? "account" : "email-link",
-      ...(signerUid ? {} : { emailLinkStatus: "opened", emailLinkExpiresAt: "2099-01-01T00:00:00.000Z" }),
+      identityType:"email-link",emailLinkStatus:"opened",emailLinkExpiresAt:"2099-01-01T00:00:00.000Z",emailVerifiedAt:NOW.toISOString(),
       status: "Pending",
       tokenHash,
       invitation: "Sent"
@@ -76,7 +75,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     token: envelopeId + "." + signerId + "." + secret,
     envelope,
     ctx: {
-      env: {},
+      env: {DRIVE_KV:{get:async()=>null,put:async()=>{},delete:async()=>{}}},
       now: () => new Date(NOW),
       config: { appUrl: "https://example.test", ttlDays: 14 },
       logger: { error() {} },
@@ -102,42 +101,26 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
         async put({bytes}) { const id="stored-test-"+storedFiles.size;storedFiles.set(id,bytes);return {id}; },
         async delete(id) { storedFiles.delete(id); }
       },
-      sendInvitation: null,
+      sendInvitation: async()=>{},
+      sendEmailVerificationCode: async()=>{},
       allowReturnTokens: true
     }
   };
 }
 
-test("Member: unauthenticated and wrong UID cannot open an institutional signing link", async () => {
-  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
-  await assert.rejects(
-    () => openSigning(fixture.ctx, fixture.token, null),
-    error => error.status === 403 && error.message.includes("invited signer")
-  );
-  await assert.rejects(
-    () => openSigning(fixture.ctx, fixture.token, { uid: "other-member", email: "member@example.org" }),
-    error => error.status === 403
-  );
+test("verified invited email identity opens without Firebase authentication, regardless of a local profile UID",async()=>{
+  const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
+  const opened=await openSigning(fixture.ctx,fixture.token,null);
+  assert.equal(opened.canSign,true);
+  assert.equal(opened.signer.authenticated,true);
+  const otherSession=await openSigning(fixture.ctx,fixture.token,{uid:"different-user",email:"different@example.org"});
+  assert.equal(otherSession.canSign,true);
+  const pdf=await getSigningPdf(fixture.ctx,fixture.token,null);
+  assert.deepEqual(pdf.bytes,ORIGINAL);
 });
 
-test("Member: matching Firebase UID can open and retrieve the signing PDF", async () => {
-  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
-  const opened = await openSigning(fixture.ctx, fixture.token, {
-    uid: "member-uid",
-    email: "member@example.org"
-  });
-  assert.equal(opened.canSign, true);
-  assert.equal(opened.signer.authenticated, true);
 
-  const pdf = await getSigningPdf(fixture.ctx, fixture.token, {
-    uid: "member-uid",
-    email: "member@example.org"
-  });
-  assert.equal(pdf.fileName, "controlled-test.pdf");
-  assert.deepEqual(pdf.bytes, ORIGINAL);
-});
-
-test("Member: matching UID can complete its signing action and the envelope advances", async () => {
+test("email-verified signer can complete its signing action and the envelope advances", async () => {
   const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
   const result = await sign(fixture.ctx, { declarations: { name: "Institutional Signer", occupation: "Test Occupation" },
     token: fixture.token,
@@ -145,7 +128,7 @@ test("Member: matching UID can complete its signing action and the envelope adva
     consent: true,
     ip: "127.0.0.1",
     userAgent: "controlled-test",
-    user: { uid: "member-uid", email: "member@example.org" }
+    user:null
   });
   assert.equal(result.ok, true);
   assert.equal(result.status, "InProgress");
@@ -153,67 +136,32 @@ test("Member: matching UID can complete its signing action and the envelope adva
   assert.equal(fixture.ctx.meta ? (await fixture.ctx.meta.get("envelopes", fixture.envelope.id)).signers[0].status : null, "Signed");
 });
 
-test("Employee: matching Firebase UID is accepted; email alone is not an identity substitute", async () => {
-  const fixture = await makeFixture({ signerUid: "employee-uid", signerEmail: "employee@example.org" });
-  await assert.rejects(
-    () => openSigning(fixture.ctx, fixture.token, { uid: "different-uid", email: "employee@example.org" }),
-    error => error.status === 403
-  );
-  const opened = await openSigning(fixture.ctx, fixture.token, {
-    uid: "employee-uid",
-    email: "employee@example.org"
-  });
-  assert.equal(opened.signer.authenticated, true);
+test("employee signer is identified by invited email verification, not an account UID",async()=>{
+  const fixture=await makeFixture({signerUid:"employee-uid",signerEmail:"employee@example.org"});
+  const opened=await openSigning(fixture.ctx,fixture.token,null);
+  assert.equal(opened.signer.authenticated,true);
+  assert.equal(opened.signer.identityType,"email-link");
 });
 
-test("Employee: authenticated router path passes the verified UID to open and submit", async () => {
-  const fixture = await makeFixture({ signerUid: "employee-uid", signerEmail: "employee@example.org" });
-  fixture.ctx.verifyUser = async () => ({ uid: "employee-uid", email: "employee@example.org" });
 
-  const openRequest = new Request("https://example.test/api/sign/open", {
-    headers: { "x-signing-token": fixture.token }
-  });
-  const openResponse = await route(openRequest, fixture.ctx);
-  assert.equal(openResponse.status, 200);
-  const openBody = await openResponse.json();
-  assert.equal(openBody.signer.authenticated, true);
-  assert.equal(openBody.canSign, true);
-
-  const submitRequest = new Request("https://example.test/api/sign/submit", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      token: fixture.token,
-      signature: { type: "typed", value: "Employee Signer" },
-      declarations: { name: "Employee Signer", occupation: "Employee" },
-      consent: true
-    })
-  });
-  const submitResponse = await route(submitRequest, fixture.ctx);
-  assert.equal(submitResponse.status, 200);
-  const submitBody = await submitResponse.json();
-  assert.equal(submitBody.ok, true);
-  assert.equal(submitBody.status, "InProgress");
+test("email-link router requires a one-time code and submits with no Firebase session",async()=>{
+  const fixture=await makeFixture({signerUid:null,signerEmail:"employee@example.org"});
+  const codes=[];fixture.ctx.sendEmailVerificationCode=async value=>codes.push(value);
+  const openResponse=await route(new Request("https://example.test/api/sign/email/open",{headers:{"x-signing-token":fixture.token}}),fixture.ctx);
+  assert.equal(openResponse.status,200);assert.equal((await openResponse.json()).requiresEmailCode,true);assert.equal(codes.length,1);
+  const confirmResponse=await route(new Request("https://example.test/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:fixture.token,code:codes[0].code})}),fixture.ctx);
+  assert.equal(confirmResponse.status,200);const sessionToken=(await confirmResponse.json()).sessionToken;
+  const submitResponse=await route(new Request("https://example.test/api/sign/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:sessionToken,signature:{type:"typed",value:"Employee Signer"},declarations:{name:"Employee Signer"},consent:true})}),fixture.ctx);
+  assert.equal(submitResponse.status,200);assert.equal((await submitResponse.json()).status,"InProgress");
 });
 
-test("UID-bound signer can decline only with the matching authenticated UID", async () => {
-  const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
-  await assert.rejects(
-    () => declineSigning(fixture.ctx, {
-      token: fixture.token,
-      reason: "controlled negative-path test",
-      user: { uid: "wrong-user" }
-    }),
-    error => error.status === 403
-  );
-  const result = await declineSigning(fixture.ctx, {
-    token: fixture.token,
-    reason: "controlled positive-path test",
-    user: { uid: "member-uid" }
-  });
-  assert.equal(result.ok, true);
-  assert.equal(result.status, "Declined");
+
+test("email-verified signer can decline with no Firebase account",async()=>{
+  const fixture=await makeFixture({signerUid:null,signerEmail:"member@example.org"});
+  const result=await declineSigning(fixture.ctx,{token:fixture.token,reason:"controlled decline test",user:null});
+  assert.equal(result.ok,true);assert.equal(result.status,"Declined");
 });
+
 
 test("Redeemed email-link signer remains usable without a Firebase authentication session", async () => {
   const fixture = await makeFixture({ signerUid: null, signerEmail: "external@example.org" });
@@ -243,7 +191,7 @@ test("Gateway signing refuses missing required assigned fields before mutating t
     {fieldId:"approval-reason",type:"Text",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true}
   ];
   await assert.rejects(
-    () => sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+    () => sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
       token:fixture.token,
       signature:{type:"typed",value:"Member Signer"},
       fieldValues:{},
@@ -262,7 +210,7 @@ test("Gateway signing stores only the authenticated signer's assigned field valu
     {fieldId:"member-name",type:"Name",page:1,x:10,y:20,width:30,height:8,signerUid:"member-uid",required:true},
     {fieldId:"second-name",type:"Name",page:1,x:50,y:20,width:30,height:8,signerUid:"second-user",required:true}
   ];
-  const result=await sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+  const result=await sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
     token:fixture.token,
     signature:{type:"typed",value:"Member Signer"},
     fieldValues:{"member-name":"Member Name","second-name":"Injected Other Signer"},
@@ -276,16 +224,16 @@ test("Gateway signing stores only the authenticated signer's assigned field valu
 });
 
 
-test("Gateway idempotent signing retry still requires the invited authenticated UID", async () => {
+test("Gateway idempotent signing retry is accepted for the same email-verified signer", async () => {
   const fixture = await makeFixture({ signerUid:"member-uid", signerEmail:"member@example.org" });
-  await sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+  await sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
     token:fixture.token,
     signature:{type:"typed",value:"Member Signer"},
     consent:true,
     user:{uid:"member-uid",email:"member@example.org"}
   });
   await assert.rejects(
-    () => sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+    () => sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
       token:fixture.token,
       signature:{type:"typed",value:"Member Signer"},
       consent:true,
@@ -313,7 +261,7 @@ test("Gateway completed-PDF verification accepts the exact hash and rejects tamp
   );
 });
 
-test("Gateway completed-PDF verification requires the invited UID even for a valid hash", async () => {
+test("Gateway completed-PDF verification is available to the email-verified signer without a UID", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
   fixture.envelope.status="Completed";
   fixture.envelope.completion={finalHash:await sha256Hex(ORIGINAL),cryptographicEvidenceIds:[]};
@@ -328,7 +276,7 @@ test("Production-mode Gateway signing does not require Member/Employee authority
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
   fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
   const result=await sign(fixture.ctx,{
-    declarations:{name:"Institutional Signer",occupation:"Board Member"},
+    declarations:{name:"Institutional Signer",title:"Board Member"},
     token:fixture.token,
     signature:{type:"typed",value:"Member Signer"},
     consent:true,
@@ -342,10 +290,10 @@ test("Production-mode Gateway signing does not require Member/Employee authority
   assert.equal(Object.hasOwn(current.events.at(-1),"authoritySourceCollection"),false);
 });
 
-test("Gateway signing records the signer's declared occupation without register verification", async () => {
+test("Gateway signing records the signer's optional declared title without register verification", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
   const result=await sign(fixture.ctx,{
-    declarations:{name:"Institutional Signer",occupation:"Independent Consultant",capacity:"Technical Adviser"},
+    declarations:{name:"Institutional Signer",title:"Independent Consultant"},
     token:fixture.token,
     signature:{type:"typed",value:"Member Signer"},
     consent:true,
@@ -361,7 +309,7 @@ test("Gateway signing records the signer's declared occupation without register 
 test("signature application without explicit confirmation is rejected", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org",secondSigner:false});
   fixture.envelope.fields=[{fieldId:"page-three-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"member-uid",required:true}];
-  await assert.rejects(()=>sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+  await assert.rejects(()=>sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
     token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
     fieldValues:{"page-three-signature":SIGNATURE_PNG},consent:true,
     user:{uid:"member-uid",email:"member@example.org"}
@@ -375,7 +323,7 @@ test("confirmed signature is rendered on the saved third-page field position", a
   const field={fieldId:"page-three-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"member-uid",required:true};
   fixture.envelope.fields=[field];
   fixture.envelope.archiveTargets=["completed-signed"];
-  const result=await sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+  const result=await sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
     token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
     fieldValues:{},fieldApplications:[{...field,confirmed:true,value:SIGNATURE_PNG}],
     signatureConfirmed:true,consent:true,
@@ -399,7 +347,7 @@ test("confirmed signature is rendered on the saved third-page field position", a
 test("a non-assigned signer cannot apply another officer's signature field", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
   fixture.envelope.fields=[{fieldId:"other-signature",type:"Signature",page:3,x:20,y:30,width:35,height:10,signerUid:"second-user",required:true}];
-  await assert.rejects(()=>sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
+  await assert.rejects(()=>sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
     token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
     fieldApplications:[{fieldId:"other-signature",confirmed:true,page:3,x:20,y:30,width:35,height:10,value:SIGNATURE_PNG}],
     signatureConfirmed:true,consent:true,user:{uid:"member-uid",email:"member@example.org"}
