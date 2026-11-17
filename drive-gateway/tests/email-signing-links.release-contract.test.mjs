@@ -93,10 +93,19 @@ test("signer must review the rendered document and applied stamps before submit 
   assert.match(page,/finalizationFailed/);
   assert.match(page,/record.signer\?\.status!=="Pending"/);
   assert.match(page,/Changes to assigned fields update this preview/);
+  assert.match(page,/data-signing-field-id=/);
+  assert.match(page,/scrollIntoView\(\{behavior:"smooth",block:"center",inline:"center"\}\)/);
+  assert.match(page,/type:"field-applications",value:"confirmed"/);
+  assert.match(page,/Submit will be rejected until all are completed/);
+  assert.match(page,/Complete all required assigned fields before submitting/);
+  assert.doesNotMatch(page,/incomplete.length>0\|\|/);
   assert.doesNotMatch(page,/Return to editing/);
   assert.ok(!page.includes("disabled={reviewMode||signingClosed}"));
   assert.match(signing,/email_link\.revoked_by_signer/);
   assert.match(signing,/emailLinkStatus="revoked"/);
+  assert.match(signing,/value.length>120000/);
+  assert.match(signing,/JSON.stringify\(out\).length>240000/);
+  assert.match(signing,/signature\?\.type==="field-applications"/);
 });
 
 test("all application PDF.js entry points copy caller-owned bytes before worker transfer",()=>{

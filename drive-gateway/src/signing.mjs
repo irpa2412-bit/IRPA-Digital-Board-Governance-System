@@ -46,26 +46,26 @@ export function validateFieldValues(fields,signer,values,signature,fieldApplicat
       if(!Number.isFinite(submitted)||submitted!==saved)throw new HttpError(409,"The confirmed signature field page or position differs from the saved assignment.");
     }
     const value=application.value;
-    if(typeof value!=="string"||!value.startsWith("data:image/png;base64,"))throw new HttpError(400,"Confirmed signature fields require an explicit PNG signature specimen.");
+    if(typeof value!=="string"||!value.startsWith("data:image/png;base64,")||value.length>120000)throw new HttpError(400,"Confirmed signature fields require a PNG specimen no larger than 120 KB.");
     applications.set(field.fieldId,value);
   }
   for(const f of assigned){
     let value=values&&Object.prototype.hasOwnProperty.call(values,f.fieldId)?values[f.fieldId]:undefined;
     if(f.type==="Signature"||f.type==="Initials"){
       value=applications.get(f.fieldId);
-      if(!value){if(f.required)throw new HttpError(400,"Tap the assigned "+f.type.toLowerCase()+" field and confirm it before signing.");continue}
+      if(!value)throw new HttpError(400,"Tap the assigned "+f.type.toLowerCase()+" field and confirm it before signing.");
       // Each assigned Signature/Initials field carries its own confirmed specimen; signer-level evidence remains a separate transaction event.
     }else if(f.type==="Checkbox"){
       value=value===true||value==="true"?"true":value===false||value==="false"?"false":"";
-      if(f.required&&value!=="true")throw new HttpError(400,"Complete the required checkbox field.");
+      if(value==="")throw new HttpError(400,"Complete the assigned checkbox field.");if(f.required&&value!=="true")throw new HttpError(400,"Complete the required checkbox field.");
     }else{
       value=String(value??"").trim();
-      if(f.required&&!value)throw new HttpError(400,"Complete the required "+f.type.toLowerCase()+" field.");
+      if(!value)throw new HttpError(400,"Complete the assigned "+f.type.toLowerCase()+" field.");
       if(value.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
     }
     out[f.fieldId]=value;
   }
-  if(JSON.stringify(out).length>60000)throw new HttpError(413,"Assigned signing field values exceed the permitted request size.");
+  if(JSON.stringify(out).length>240000)throw new HttpError(413,"Assigned signing field values exceed the permitted request size. Reduce the signature image size and try again.");
   return out;
 }
 export async function createEnvelope(ctx,user,body){
@@ -198,7 +198,7 @@ export async function getSigningPdf(ctx,token,user=null){const{env,signer}=await
 export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[],signatureConfirmed=false,consent,declarations={},ip,userAgent,user}){
   if(consent!==true)throw new HttpError(400,"Consent to sign electronically is required.");
   if(signatureConfirmed!==true&&Array.isArray(fieldApplications)&&fieldApplications.length>0)throw new HttpError(400,"A signature field cannot be applied without an explicit Confirm action.");
-  const sig=await validateSignatureInput(signature),loaded=await load(ctx,token),e0=loaded.env,s0=loaded.signer;
+  const sig=signature?.type==="field-applications"&&Array.isArray(fieldApplications)&&fieldApplications.length?await validateSignatureInput({type:"drawn",value:fieldApplications[0]?.value}):await validateSignatureInput(signature),loaded=await load(ctx,token),e0=loaded.env,s0=loaded.signer;
   if(s0.identityType==="email-link"){if(s0.emailLinkStatus!=="opened")throw new HttpError(401,genericEmailSigningFailure());}
   else assertSignerAuthentication(s0,user);
   if(!await verifyChain(e0.events))throw new HttpError(409,"Signing audit chain failed verification.");

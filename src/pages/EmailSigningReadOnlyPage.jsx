@@ -84,6 +84,12 @@ export default function EmailSigningReadOnlyPage({token}){
  },[pdfDocument,pageNum,viewerWidth]);
 
  useEffect(()=>{
+  if(!pageRendered||!selectedFieldId)return;
+  const target=pageHostRef.current?.querySelector(`[data-signing-field-id="${CSS.escape(selectedFieldId)}"]`);
+  target?.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
+ },[selectedFieldId,pageRendered,pageNum]);
+
+ useEffect(()=>{
   const canvas=signatureCanvasRef.current;if(!canvas)return;
   const ratio=Math.max(1,Math.min(2,window.devicePixelRatio||1));
   canvas.width=Math.round(520*ratio);canvas.height=Math.round(180*ratio);
@@ -104,7 +110,7 @@ export default function EmailSigningReadOnlyPage({token}){
   if(field.type==="Checkbox")return field.required?value==="true":value!==undefined;
   return value!==undefined&&String(value).trim()!=="";
  };
- const incomplete=fields.filter(field=>field.required&&!complete(field));
+ const incomplete=fields.filter(field=>!complete(field));
  const canReview=Boolean(record)&&pageRendered;
  const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
 
@@ -135,11 +141,11 @@ export default function EmailSigningReadOnlyPage({token}){
   if(!record?.canSign){setError("This assignment is not yet available for signing.");return;}
   if(!declarations.name.trim()||!declarations.occupation.trim()){setError("Enter your name and occupation/capacity for this document.");return;}
   if(!consent){setError("Confirm your consent only after reviewing the document and signature placement.");return;}
-  if(incomplete.length){setError("A required assigned field is incomplete.");return;}
+  if(incomplete.length){setError("Complete all required assigned fields before submitting: "+incomplete.map(field=>field.placeholder||field.type+" · Page "+field.page).join(", ")+".");return;}
   if(!signatureFields.length&&typedSignature.trim().length<2){setError("Enter your typed signature before submitting.");return;}
   setSubmitting(true);setError("");setSuccess("");
   const gateway=getGoogleDriveGatewayUrl(),activeToken=signingToken||token;
-  const signature=signatureValue?{type:"drawn",value:signatureValue}:{type:"typed",value:typedSignature.trim()||declarations.name.trim()};
+  const signature=fieldApplications.length?{type:"field-applications",value:"confirmed"}:signatureValue?{type:"drawn",value:signatureValue}:{type:"typed",value:typedSignature.trim()||declarations.name.trim()};
   try{
    const response=await fetch(gateway+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json","x-signing-token":activeToken},credentials:"omit",cache:"no-store",body:JSON.stringify({token:activeToken,signature,fieldValues,fieldApplications,signatureConfirmed:true,declarations,consent:true})});
    const result=await response.json().catch(()=>({}));
@@ -196,7 +202,7 @@ export default function EmailSigningReadOnlyPage({token}){
        {!completedDocument&&pageFields.map(field=>{
         const application=applicationFor(field.fieldId),value=fieldValues[field.fieldId],color=fieldColors[field.type]||"#475569";
         const label=["Signature","Initials"].includes(field.type)?(application?"STAMP APPLIED":field.type.toUpperCase()+" — SIGN HERE"):field.type==="Checkbox"?(value==="true"?"✓ CHECKED":"☐ CHECKBOX"):(value?String(value):field.placeholder||field.type.toUpperCase()+" — COMPLETE");
-        return <div key={field.fieldId} role="button" tabIndex={signingClosed?-1:0} aria-label={field.type+" field assigned to you, page "+pageNum} onClick={()=>{if(!signingClosed)setSelectedFieldId(field.fieldId);}} onKeyDown={event=>{if(!signingClosed&&(event.key==="Enter"||event.key===" ")){event.preventDefault();setSelectedFieldId(field.fieldId);}}} style={{position:"absolute",left:String(field.x)+"%",top:String(field.y)+"%",width:String(field.width)+"%",height:String(field.height)+"%",boxSizing:"border-box",border:"2px "+(application||complete(field)?"solid":"dashed")+" "+color,background:application?"rgba(22,163,74,.16)":"rgba(255,251,235,.88)",borderRadius:4,zIndex:5,display:"flex",alignItems:"center",justifyContent:"center",padding:3,overflow:"hidden",cursor:signingClosed?"default":"pointer",outline:selectedFieldId===field.fieldId?"3px solid #111827":"none"}}>
+        return <div key={field.fieldId} data-signing-field-id={field.fieldId} role="button" tabIndex={signingClosed?-1:0} aria-label={field.type+" field assigned to you, page "+pageNum} onClick={()=>{if(!signingClosed)setSelectedFieldId(field.fieldId);}} onKeyDown={event=>{if(!signingClosed&&(event.key==="Enter"||event.key===" ")){event.preventDefault();setSelectedFieldId(field.fieldId);}}} style={{position:"absolute",left:String(field.x)+"%",top:String(field.y)+"%",width:String(field.width)+"%",height:String(field.height)+"%",boxSizing:"border-box",border:"2px "+(application||complete(field)?"solid":"dashed")+" "+color,background:application?"rgba(22,163,74,.16)":"rgba(255,251,235,.88)",borderRadius:4,zIndex:5,display:"flex",alignItems:"center",justifyContent:"center",padding:3,overflow:"hidden",cursor:signingClosed?"default":"pointer",outline:selectedFieldId===field.fieldId?"3px solid #111827":"none"}}>
          {application?<img src={application.value} alt={field.type+" stamp preview"} style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}}/>:<span style={{fontSize:"clamp(7px,1.5vw,12px)",fontWeight:800,color:"#111827",textAlign:"center",lineHeight:1.15,overflowWrap:"anywhere"}}>{label}</span>}
         </div>;
        })}
@@ -229,8 +235,8 @@ export default function EmailSigningReadOnlyPage({token}){
     {reviewMode&&!signingClosed&&<section style={{marginTop:16,padding:12,border:"2px solid #174a78",borderRadius:8}}>
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Changes to assigned fields update this preview. Your signature has not been submitted yet.</p>
-     {incomplete.length>0&&<p role="status" style={{fontSize:13,color:"#92400e"}}>{incomplete.length} required field(s) remain incomplete. Use the assigned-field controls above to complete them; the preview updates as you make changes. You may still revoke this request.</p>}
-     <button type="button" disabled={submitting||!record.canSign||!pageRendered||incomplete.length>0||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||incomplete.length>0||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
+     {incomplete.length>0&&<p role="status" style={{fontSize:13,color:"#92400e"}}>{incomplete.length} required field(s) remain incomplete: {incomplete.map(field=>field.placeholder||field.type+" · Page "+field.page).join(", ")}. Submit will be rejected until all are completed. You may still revoke this request.</p>}
+     <button type="button" disabled={submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
      <button type="button" disabled={revoking||submitting||record.signer?.status!=="Pending"} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}
