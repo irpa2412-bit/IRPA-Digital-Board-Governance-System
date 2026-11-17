@@ -68,7 +68,7 @@ test("Signature Portal palette queries include document owner and signature owne
 // Source-contract checks follow the current handler shape, including signerUid ownership and whitespace-safe finally blocks.
 test("adding a signer creates one default signature field without reassigning other unassigned fields", () => {
   assert.match(portal, /const nextFields=\[\.\.\.fields\]/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Signature — place and review on the document before sending"\}\)/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>f\.type==="Signature"&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Signature — place and review on the document before sending"\}\)/);
   assert.doesNotMatch(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
