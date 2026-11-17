@@ -145,6 +145,14 @@ export async function getMySignatureProfile(){
   return migrated;
 }
 
+async function imagePixelDimensions(file){
+  if(!file||typeof createImageBitmap!=="function")return null;
+  let bitmap;
+  try{bitmap=await createImageBitmap(file);return{width:bitmap.width,height:bitmap.height};}
+  catch{return null;}
+  finally{bitmap?.close?.();}
+}
+
 export async function saveMySignatureProfile({signatureFile,initialsFile,displayName,initials,method="Upload"}){
   const u=user();
   const cleanDisplayName=String(displayName||u.displayName||"").trim();
@@ -164,6 +172,7 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
   if(folder.ownerUid&&folder.ownerUid!==u.uid)throw new Error("SIGNATURE PATHWAY / PROFILE STORAGE: the Google Drive Signature Profile folder is not owned by the authenticated profile.");
 
   const folderId=folder.folderId;
+  const [signatureDimensions,initialsDimensions]=await Promise.all([imagePixelDimensions(signatureFile),imagePixelDimensions(initialsFile)]);
   let signature;
   let initialsAsset=null;
   try{
@@ -191,10 +200,14 @@ export async function saveMySignatureProfile({signatureFile,initialsFile,display
     signatureUrl:signature.displayUrl,
     signatureDriveUrl:signature.driveUrl,
     signatureSha256:signature.sha,
+    signaturePixelWidth:signatureDimensions?.width||null,
+    signaturePixelHeight:signatureDimensions?.height||null,
     initialsPath:initialsAsset?.path||null,
     initialsUrl:initialsAsset?.displayUrl||null,
     initialsDriveUrl:initialsAsset?.driveUrl||null,
     initialsSha256:initialsAsset?.sha||null,
+    initialsPixelWidth:initialsDimensions?.width||null,
+    initialsPixelHeight:initialsDimensions?.height||null,
     status:"Active",
     adoptionDate:serverTimestamp(),
     updatedAt:serverTimestamp()
