@@ -107,7 +107,7 @@ export async function createEnvelope(ctx,user,body){
   e.events=await chainEvents([],{type:"envelope.created",at:e.createdAt,actor:user.uid,documentHash:sourceHash,signerCount:signers.length});
   let reservationKey=null;
   if(externalReference){
-    reservationKey=await sha256Hex(user.uid+"\\n"+externalReference);
+    reservationKey=await sha256Hex(user.uid+"\n"+externalReference);
     try{await ctx.meta.create("externalReferences",reservationKey,{ownerUid:user.uid,externalReference,envelopeId:id,createdAt:e.createdAt});}
     catch(error){
       if(!(error instanceof Conflict))throw error;
@@ -160,10 +160,39 @@ async function consumeEmailLinkRateLimit(ctx,key,maxAttempts,now){
   throw new HttpError(401,genericEmailSigningFailure());
 }
 
+export async function releaseRoutingPosition(ctx,id,position){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||["Completed","Voided","Declined"].includes(envelope.status))return{released:0};
+  const eligible=envelope.signers.filter(s=>s.status==="Pending"&&Number(s.routingPosition??s.order??1)===Number(position));
+  let released=0;
+  for(const target of eligible){
+    const now=ctx.now(),secret=randomHex(32),issued=await createEmailSigningToken({envelopeId:id,signerId:target.id,email:target.email,now,ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))});
+    const committed=await mutate(ctx,id,async current=>{
+      const signer=current.signers.find(item=>item.id===target.id);
+      if(!signer||signer.status!=="Pending"||!can(current,signer))return{patch:null,result:false};
+      signer.tokenHash=issued.record.tokenHash;signer.emailHash=issued.record.emailHash;signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=issued.record.expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkOpenedAt=null;signer.invitation="Pending";
+      return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.issued",signerId:signer.id,routingPosition:position,emailHash:signer.emailHash,expiresAt:signer.emailLinkExpiresAt,at:now.toISOString()})},result:true};
+    });
+    if(!committed)continue;
+    if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
+    const link=ctx.config.appUrl+"/?emailSignToken="+encodeURIComponent(issued.token);
+    try{
+      await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||"IRPA Document Owner",expiresAt:issued.record.expiresAt,role:String(target.declaredParticulars?.title||target.title||""),action:"Sign",fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});
+      await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(!signer)return{patch:null};signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.delivered",signerId:signer.id,routingPosition:position,at:ctx.now().toISOString()})}};});
+      released++;
+    }catch(error){
+      await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(signer){signer.invitation="Failed";signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.delivery_failed",signerId:target.id,routingPosition:position,at:ctx.now().toISOString(),errorType:String(error?.name||"Error")})}};});
+      throw error;
+    }
+  }
+  return{released,position};
+}
+
 export async function openEmailSigning(ctx,token,ip=""){
   const now=ctx.now(),ipHash=await sha256Hex(String(ip||"unknown"));
   try{
-    const parts=tokenParts(token);
+    const parts=tokenParts(token),earlyEnvelope=await ctx.meta.get("envelopes",parts[0]),earlySigner=earlyEnvelope?.signers?.find(item=>item.id===parts[1]);
+    if(earlySigner&&earlyEnvelope&&safeEqual(await sha256Hex(parts[2]),earlySigner.tokenHash)&&!can(earlyEnvelope,earlySigner))throw new HttpError(409,"Not your turn yet. Your invitation will become active after every signer in the previous position has signed.");
     const tokenHash=await sha256Hex(parts[2]);
     await consumeEmailLinkRateLimit(ctx,"token:"+tokenHash,8,now);
     await consumeEmailLinkRateLimit(ctx,"ip:"+ipHash,20,now);
@@ -192,7 +221,8 @@ export async function openEmailSigning(ctx,token,ip=""){
     }
     const preview=await openSigning(ctx,sessionToken,null);
     return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt,envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars,sessionToken};
-  }catch{
+  }catch(error){
+    if(error instanceof HttpError&&error.status===409)throw error;
     throw new HttpError(401,genericEmailSigningFailure());
   }
 }
