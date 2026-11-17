@@ -80,14 +80,15 @@ export function getPdfFieldBox(page, field) {
 }
 
 export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {
-  const displayedFit = fitSignatureImage(imageWidth, imageHeight, {
+  const rotated = fieldBox.rotation === 90 || fieldBox.rotation === 270;
+  const fit = fitSignatureImage(imageWidth, imageHeight, {
     x: 0,
     y: 0,
-    width: fieldBox.rotation % 180 ? fieldBox.height : fieldBox.width,
-    height: fieldBox.rotation % 180 ? fieldBox.width : fieldBox.height
+    width: rotated ? fieldBox.height : fieldBox.width,
+    height: rotated ? fieldBox.width : fieldBox.height
   });
-  const width = fieldBox.rotation % 180 ? displayedFit.height : displayedFit.width;
-  const height = fieldBox.rotation % 180 ? displayedFit.width : displayedFit.height;
+  const width = fit.width;
+  const height = fit.height;
   return {
     x: fieldBox.x + (fieldBox.width - width) / 2,
     y: fieldBox.y + (fieldBox.height - height) / 2,
