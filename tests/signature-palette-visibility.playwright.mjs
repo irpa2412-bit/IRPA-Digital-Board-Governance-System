@@ -132,6 +132,13 @@ async function runViewport(name,viewport){
  const restoredInk=await canvas.evaluate(countDarkInk);
  console.log("RESTORED_INK_PIXELS "+name+": "+restoredInk);
  assert.ok(restoredInk>10,"handwritten ink must survive restoring the original viewport before Confirm");
+ await canvas.evaluate(el=>{const trace={windowResizeEvents:0,dimensionMutations:[]};window.addEventListener("resize",()=>{trace.windowResizeEvents+=1});const observer=new MutationObserver(records=>{for(const record of records)trace.dimensionMutations.push({attribute:record.attributeName,width:el.width,height:el.height})});observer.observe(el,{attributes:true,attributeFilter:["width","height"]});window.__paletteResizeTrace=trace;window.__paletteResizeObserver=observer});
+ const beforeCapture=await canvas.evaluate(el=>({width:el.width,height:el.height,ink:countDarkInk(el)}));
+ await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-before-confirm.png",fullPage:true});
+ const afterCapture=await canvas.evaluate(el=>({width:el.width,height:el.height,ink:countDarkInk(el),trace:window.__paletteResizeTrace}));
+ console.log("PRECONFIRM_SCREENSHOT_CANVAS "+name+": "+JSON.stringify({beforeCapture,afterCapture}));
+ assert.ok(afterCapture.ink>10,"pre-confirm screenshot/layout capture must not clear handwritten ink");
+ window.__paletteResizeObserver?.disconnect();
  const confirmButton=page.getByRole("button",{name:"Confirm Initials"});
  await confirmButton.evaluate(button=>{window.__signatureConfirmButtonClick=false;button.addEventListener("click",()=>{window.__signatureConfirmButtonClick=true},{once:true})});
  await confirmButton.click();
