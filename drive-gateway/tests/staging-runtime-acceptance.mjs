@@ -215,10 +215,10 @@ async function openVerifiedSession(token,label){
   const confirmed=await fetch(base+"/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token,code:challenge.testOnlyCode})});
   const session=await readJson(confirmed,label+" email-code confirmation");
   assert.ok(session.sessionToken);
-  return session.sessionToken;
+  return {sessionToken:session.sessionToken,attachments:session.attachments||[]};
 }
-async function submitEmailSigner(sessionToken,name,label){
-  const response=await fetch(base+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:sessionToken,signature:{type:"typed",value:name},declarations:{name},consent:true})});
+async function submitEmailSigner(session,name,label){
+  const response=await fetch(base+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:session.sessionToken||session,signature:{type:"typed",value:name},declarations:{name},consent:true})});
   return readJson(response,label+" signature submission");
 }
 const baseEmail=email.toLowerCase();
