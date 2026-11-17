@@ -49,7 +49,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     const ctx=canvasRef.current.getContext("2d"),p=point(e);
     ctx.beginPath();ctx.moveTo(last.current.x,last.current.y);ctx.lineTo(p.x,p.y);ctx.stroke();last.current=p;
   };
-  const end=()=>{drawing.current=false;last.current=null};
+  const end=event=>{drawing.current=false;last.current=null;const canvas=canvasRef.current;try{if(canvas&&event?.pointerId!==undefined&&canvas.hasPointerCapture?.(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch{}};
   const clear=()=>{
     const canvas=canvasRef.current;
     if(canvas){const rect=canvas.getBoundingClientRect();const ratio=Math.max(1,window.devicePixelRatio||1);const context=canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);context.clearRect(0,0,rect.width,rect.height);}
