@@ -79,14 +79,30 @@ export function getPdfFieldBox(page, field) {
   return { x: crop.x + crop.width - top - height, y: crop.y + crop.height - left - width, width: height, height: width, rotation };
 }
 
-function drawFittedSignature(page, image, fieldBox) {
-  const displayedFit = fitSignatureImage(image.width, image.height, { x: 0, y: 0, width: fieldBox.rotation % 180 ? fieldBox.height : fieldBox.width, height: fieldBox.rotation % 180 ? fieldBox.width : fieldBox.height });
+export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {
+  const displayedFit = fitSignatureImage(imageWidth, imageHeight, {
+    x: 0,
+    y: 0,
+    width: fieldBox.rotation % 180 ? fieldBox.height : fieldBox.width,
+    height: fieldBox.rotation % 180 ? fieldBox.width : fieldBox.height
+  });
   const width = fieldBox.rotation % 180 ? displayedFit.height : displayedFit.width;
   const height = fieldBox.rotation % 180 ? displayedFit.width : displayedFit.height;
-  const x = fieldBox.x + (fieldBox.width - width) / 2;
-  const y = fieldBox.y + (fieldBox.height - height) / 2;
-  page.drawImage(image, { x, y, width, height, ...(fieldBox.rotation ? { rotate: degrees(360 - fieldBox.rotation) } : {}) });
-  return { x, y, width, height };
+  return {
+    x: fieldBox.x + (fieldBox.width - width) / 2,
+    y: fieldBox.y + (fieldBox.height - height) / 2,
+    width,
+    height
+  };
+}
+
+function drawFittedSignature(page, image, fieldBox) {
+  const geometry = getSignatureDrawGeometry(image.width, image.height, fieldBox);
+  page.drawImage(image, {
+    ...geometry,
+    ...(fieldBox.rotation ? { rotate: degrees(360 - fieldBox.rotation) } : {})
+  });
+  return geometry;
 }
 
 export async function buildSignedPdf(originalBytes, info) {
