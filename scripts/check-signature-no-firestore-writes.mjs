@@ -14,8 +14,8 @@ const entrypoints = [
 function functionBody(name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
   const patterns = [
-    new RegExp("^(?:export\\s+)?(?:async\\s+)?function\\s+"+escaped+"\\s*\\([^\\n]*?\\)\\s*\\{","m"),
-    new RegExp("^(?:export\\s+)?const\\s+"+escaped+"\\s*=\\s*(?:async\\s*)?\\([^\\n]*?\\)\\s*=>\\s*\\{","m")
+    new RegExp("^(?:export\s+)?(?:async\s+)?function\s+"+escaped+"\s*\\([^\\n]*?\\)\s*\\{","m"),
+    new RegExp("^(?:export\s+)?const\s+"+escaped+"\s*=\s*(?:async\s*)?\\([^\\n]*?\\)\s*=>\s*\\{","m")
   ];
   let match=null;
   for (const pattern of patterns) { match=pattern.exec(source); if(match)break; }
@@ -36,8 +36,8 @@ function functionBody(name) {
   throw new Error("Unbalanced function body: "+name);
 }
 const definitions = new Map();
-for(const match of source.matchAll(/^(?:export\\s+)?(?:async\\s+)?function\\s+([A-Za-z_$][\\w$]*)\\s*\\(/gm))definitions.set(match[1],true);
-for(const match of source.matchAll(/^(?:export\\s+)?const\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:async\\s*)?\\([^\\n]*?\\)\\s*=>\\s*\\{/gm))definitions.set(match[1],true);
+for(const match of source.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\\(/gm))definitions.set(match[1],true);
+for(const match of source.matchAll(/^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\\([^\\n]*?\\)\s*=>\s*\\{/gm))definitions.set(match[1],true);
 const visited=new Set(),queue=[...entrypoints],failures=[];
 while(queue.length){
   const name=queue.shift();
@@ -45,7 +45,7 @@ while(queue.length){
   visited.add(name);
   const body=functionBody(name);
   if(body===null)continue;
-  for(const match of body.matchAll(/\\b([A-Za-z_$][\\w$]*)\\s*\\(/g)){
+  for(const match of body.matchAll(/\b([A-Za-z_$][\w$]*)\s*\\(/g)){
     const called=match[1];
     if(forbidden.has(called))failures.push({function:name,operation:called});
     if(definitions.has(called)&&!visited.has(called))queue.push(called);
@@ -53,8 +53,8 @@ while(queue.length){
 }
 for(const file of ["src/pages/SignaturePlatform.jsx","src/pages/GatewaySigningPortal.jsx"]){
   const text=fs.readFileSync(path.join(root,file),"utf8");
-  if(/from\\s*["']firebase\\/firestore["']/.test(text))failures.push({file,operation:"direct Firestore SDK import"});
-  for(const op of forbidden)if(new RegExp("\\b"+op+"\\s*\\(").test(text))failures.push({file,operation:op});
+  if(/from\s*["']firebase\/firestore["']/.test(text))failures.push({file,operation:"direct Firestore SDK import"});
+  for(const op of forbidden)if(new RegExp("\b"+op+"\s*\\(").test(text))failures.push({file,operation:op});
 }
 if(failures.length){
   console.error("FAIL: direct Firestore write SDK call is reachable from the signing flow.");
