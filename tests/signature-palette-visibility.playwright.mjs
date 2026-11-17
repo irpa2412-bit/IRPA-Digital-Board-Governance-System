@@ -1,3 +1,4 @@
+/* global sessionStorage, Image, devicePixelRatio */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -7,13 +8,31 @@ import { chromium } from "playwright";
 mkdirSync("test-results",{recursive:true});
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4173","--strictPort"],{stdio:"ignore"});
 let browser,activePage=null,activeViewport="unknown",activeCanvasBox=null;
+const browserMessages=[];
 async function waitForServer(){
  for(let i=0;i<60;i++){try{const r=await fetch("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");if(r.ok)return}catch{}await delay(500)}
  throw new Error("Vite test server did not become ready");
 }
+async function printPlacementDiagnostics(page,testId){
+ const details=await page.evaluate(async()=>{
+  const placed=[...document.querySelectorAll("[data-testid^='placed-']")].map(el=>{
+   const r=el.getBoundingClientRect(),s=getComputedStyle(el),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+   return {testId:el.getAttribute("data-testid"),box:{x:r.x,y:r.y,width:r.width,height:r.height},display:s.display,visibility:s.visibility,opacity:s.opacity,covered:!!top&&!(top===el||el.contains(top)||el.parentElement?.contains(top)),coveringElement:top?.outerHTML?.slice(0,240)||null};
+  });
+  const pad=[...document.querySelectorAll("canvas")].find(el=>el.getAttribute("aria-label")==="Draw signature");
+  const r=pad?.getBoundingClientRect(),s=pad?getComputedStyle(pad):null;
+  const stored=(()=>{try{return JSON.parse(window.sessionStorage.getItem("signature-envelope-fixture")||"{}")}catch{return {}}})();
+  const specimen=stored?.values?.["initial-page-1"]||null;
+  let decoded=null;
+  if(typeof specimen==="string"&&specimen.startsWith("data:")) decoded=await new Promise(resolve=>{const img=new window.Image();img.onload=()=>resolve({width:img.naturalWidth,height:img.naturalHeight,dataUrlLength:specimen.length});img.onerror=()=>resolve({width:null,height:null,dataUrlLength:specimen.length,decodeError:true});img.src=specimen});
+  return {placed,pad:pad?{widthAttribute:pad.width,heightAttribute:pad.height,cssRect:{x:r.x,y:r.y,width:r.width,height:r.height},devicePixelRatio:window.devicePixelRatio,transform:s.transform}:null,specimen:{pixelWidth:decoded?.width??null,pixelHeight:decoded?.height??null,dataUrlLength:decoded?.dataUrlLength??(typeof specimen==="string"?specimen.length:0)}};
+ });
+ console.error("PLACED_TIMEOUT_DIAGNOSTICS:",JSON.stringify({testId,...details,consoleAndPageErrors:browserMessages}));
+ await page.screenshot({path:"test-results/signature-palette-"+activeViewport+"-failure.png",fullPage:true});
+}
 async function assertPlacedSignatureVisibleAndUncovered(page,testId){
  const placed=page.getByTestId(testId);
- await placed.waitFor({state:"visible"});
+ try{await placed.waitFor({state:"visible",timeout:30000})}catch(error){if(testId==="placed-initial-page-1")await printPlacementDiagnostics(page,testId);throw error;}
  assert.equal(await placed.evaluate(el=>el instanceof HTMLImageElement&&el.complete&&el.naturalWidth>0),true,"confirmed signature image must load and be visible");
  const imageBox=await placed.boundingBox(),pdfBox=await page.getByTestId("pdf-page").boundingBox();
  assert.ok(imageBox&&pdfBox,"confirmed signature and PDF page must both have visible bounds");
@@ -39,8 +58,8 @@ async function assertDockDoesNotCoverPdf(page,fieldTestId){
 async function runViewport(name,viewport){
  const context=await browser.newContext({viewport});
  const page=await context.newPage();activePage=page;activeViewport=name;
- page.on("pageerror",error=>console.error("PAGE_ERROR:",error.message));
- page.on("console",message=>{if(message.type()==="error")console.error("BROWSER_CONSOLE_ERROR:",message.text())});
+ page.on("pageerror",error=>{browserMessages.push({kind:"pageerror",message:error.message});console.error("PAGE_ERROR:",error.message)});
+ page.on("console",message=>{const item={kind:"console",type:message.type(),text:message.text()};browserMessages.push(item);console.log("BROWSER_CONSOLE:",JSON.stringify(item))});
  await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
  await page.getByRole("heading",{name:/Signing ceremony/}).waitFor();
  assert.equal(await page.getByTestId("page-number").innerText(),"1");
@@ -106,14 +125,30 @@ async function runViewport(name,viewport){
  await page.waitForTimeout(150);
  const countDarkInk=el=>{const p=el.getContext("2d").getImageData(0,0,el.width,el.height).data;let count=0;for(let i=0;i<p.length;i+=4)if(p[i+3]>0&&p[i]<100&&p[i+1]<100&&p[i+2]<100)count++;return count;};
  const resizedInk=await canvas.evaluate(countDarkInk);
+ console.log("RESIZED_INK_PIXELS "+name+": "+resizedInk);
  assert.ok(resizedInk>10,"handwritten ink must survive responsive canvas resize before Confirm");
  await page.setViewportSize(viewport);
  await page.waitForTimeout(150);
  const restoredInk=await canvas.evaluate(countDarkInk);
+ console.log("RESTORED_INK_PIXELS "+name+": "+restoredInk);
  assert.ok(restoredInk>10,"handwritten ink must survive restoring the original viewport before Confirm");
+ await canvas.evaluate(el=>{const trace={windowResizeEvents:0,dimensionMutations:[]};window.addEventListener("resize",()=>{trace.windowResizeEvents+=1});const observer=new window.MutationObserver(records=>{for(const record of records)trace.dimensionMutations.push({attribute:record.attributeName,width:el.width,height:el.height})});observer.observe(el,{attributes:true,attributeFilter:["width","height"]});window.__paletteResizeTrace=trace;window.__paletteResizeObserver=observer});
+ const beforeCapture=await canvas.evaluate(el=>{const p=el.getContext("2d").getImageData(0,0,el.width,el.height).data;let ink=0;for(let i=0;i<p.length;i+=4)if(p[i+3]>0&&p[i]<100&&p[i+1]<100&&p[i+2]<100)ink++;return {width:el.width,height:el.height,ink}});
  await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-before-confirm.png",fullPage:true});
- await page.getByRole("button",{name:"Confirm Initials"}).click();
+ const afterCapture=await canvas.evaluate(el=>{const p=el.getContext("2d").getImageData(0,0,el.width,el.height).data;let ink=0;for(let i=0;i<p.length;i+=4)if(p[i+3]>0&&p[i]<100&&p[i+1]<100&&p[i+2]<100)ink++;return {width:el.width,height:el.height,ink,trace:window.__paletteResizeTrace}});
+ console.log("PRECONFIRM_SCREENSHOT_CANVAS "+name+": "+JSON.stringify({beforeCapture,afterCapture}));
+ assert.ok(afterCapture.ink>10,"pre-confirm screenshot/layout capture must not clear handwritten ink");
+ await page.evaluate(()=>window.__paletteResizeObserver?.disconnect());
+ const confirmButton=page.getByRole("button",{name:"Confirm Initials"});
+ await confirmButton.evaluate(button=>{window.__signatureConfirmButtonClick=false;button.addEventListener("click",()=>{window.__signatureConfirmButtonClick=true},{once:true})});
+ await confirmButton.click();
+ console.log("CONFIRM_BUTTON_CLICK_EVENT "+name+": "+await page.evaluate(()=>window.__signatureConfirmButtonClick));
+ console.log("PAD_ON_CONFIRM_FIELD "+name+": "+await page.evaluate(()=>window.__signaturePadOnConfirmField||null));
+ assert.equal(await page.evaluate(()=>window.__signaturePadOnConfirmField||null),"initial-page-1","Confirm must apply to the exact assigned initials field");
+ assert.ok(await page.evaluate(()=>window.__signaturePadOnConfirmValueLength||0)>0,"Confirm must receive a non-empty prepared PNG specimen");
+ assert.equal(await page.getByTestId("envelope-state").innerText(),"Confirmed fields: 2","the initials confirmation must persist as a second field value");
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-initial-page-1");
+ await page.screenshot({path:"test-results/signature-palette-"+name+"-draw-after-confirm.png",fullPage:true});
  console.log("PASS "+name+": Draw + explicit Confirm");
  // Navigate to page 2 and use the saved specimen.
  await page.getByRole("button",{name:"Next page"}).click();
@@ -160,3 +195,5 @@ try{
  process.exitCode=1
 }
 finally{await browser?.close();server.kill("SIGTERM")}
+
+// CI retest trigger: preserve strict signature palette assertions.

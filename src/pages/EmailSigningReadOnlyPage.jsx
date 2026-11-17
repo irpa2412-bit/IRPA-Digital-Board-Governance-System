@@ -1,5 +1,7 @@
 import React,{useEffect,useRef,useState} from "react";
 import {getGoogleDriveGatewayUrl} from "../firebase/gatewayUrl";
+import {fitSignatureImage} from "../utils/signatureImageFit.mjs";
+import {trimSignatureCanvas} from "../utils/signatureImageCanvas.mjs";
 
 const NEUTRAL="This signing link is unavailable. Contact the document owner for a new invitation.";
 const inputStyle={width:"100%",boxSizing:"border-box",padding:"10px",border:"1px solid #9ca3af",borderRadius:7,fontSize:15};
@@ -51,6 +53,7 @@ export default function EmailSigningReadOnlyPage({token}) {
     return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl);};
   },[token]);
 
+  useEffect(()=>{const canvas=canvasRef.current;if(!canvas)return;const ratio=Math.max(1,window.devicePixelRatio||1);canvas.width=Math.round(520*ratio);canvas.height=Math.round(180*ratio);},[]);
   const selectedField=(record?.fields||[]).find(field=>field.fieldId===selectedFieldId)||null;
   const signatureFields=(record?.fields||[]).filter(field=>["Signature","Initials"].includes(field.type));
   const signatureValue=signatureFields.map(field=>fieldApplications.find(item=>item.fieldId===field.fieldId)?.value).find(Boolean)||"";
@@ -60,7 +63,7 @@ export default function EmailSigningReadOnlyPage({token}) {
     const context=canvas.getContext("2d");context.clearRect(0,0,canvas.width,canvas.height);
     if(!value)return;
     const image=new Image();
-    image.onload=()=>{context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);};
+    image.onload=()=>{context.clearRect(0,0,canvas.width,canvas.height);const fit=fitSignatureImage(image.naturalWidth||image.width,image.naturalHeight||image.height,{x:0,y:0,width:canvas.width,height:canvas.height});context.drawImage(image,fit.x,fit.y,fit.width,fit.height);};
     image.src=value;
   },[selectedFieldId,signatureMarks,selectedField]);
   const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
@@ -79,14 +82,14 @@ export default function EmailSigningReadOnlyPage({token}) {
   function draw(event){
     if(!drawingRef.current)return;
     const p=point(event),ctx=canvasRef.current?.getContext("2d");if(!ctx)return;
-    ctx.lineWidth=2.4;ctx.lineCap="round";ctx.strokeStyle="#111827";ctx.lineTo(p.x,p.y);ctx.stroke();
+    ctx.lineWidth=2.4*Math.max(1,window.devicePixelRatio||1);ctx.lineCap="round";ctx.strokeStyle="#111827";ctx.lineTo(p.x,p.y);ctx.stroke();
   }
   function stopDrawing(){drawingRef.current=false;}
   function clearPad(){const c=canvasRef.current;if(c)c.getContext("2d").clearRect(0,0,c.width,c.height);if(selectedField)setSignatureMarks(current=>{const next={...current};delete next[selectedField.fieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
   function confirmField(){
     if(!selectedField)return;
     if(["Signature","Initials"].includes(selectedField.type)){
-      const value=canvasRef.current?.toDataURL("image/png")||"";
+      let value="";try{value=trimSignatureCanvas(canvasRef.current,{padding:4}).dataUrl;}catch(error){setError(error?.message||"Draw your mark in the signing area before confirming this field.");return;}
       if(!value||value.length<100){setError("Draw your mark in the signing area before confirming this field.");return;}
       setSignatureMarks(current=>({...current,[selectedField.fieldId]:value}));
       setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,confirmed:true,value}]);

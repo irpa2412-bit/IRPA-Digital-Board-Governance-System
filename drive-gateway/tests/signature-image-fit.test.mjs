@@ -1,0 +1,223 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { deflateSync } from "node:zlib";
+import { PDFDocument, PDFName, PDFPage, degrees } from "pdf-lib";
+import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
+import { findSignatureInkBounds, requireSignatureInkBounds, removeWhitePixels } from "../../src/utils/signatureImageCanvas.mjs";
+import { buildSignedPdf, getPdfFieldBox, getSignatureDrawGeometry } from "../src/pdf.mjs";
+
+function close(actual, expected, epsilon = 0.01) {
+  assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} to be within ${epsilon} of ${expected}`);
+}
+
+test("fit preserves a tall signature in a wide box", () => {
+  const fit = fitSignatureImage(100, 300, { x: 0, y: 0, width: 400, height: 100 });
+  close(fit.width, 100 / 3);
+  close(fit.height, 100);
+  close(fit.width / fit.height, 1 / 3);
+});
+
+test("fit preserves a wide signature in a tall box", () => {
+  const fit = fitSignatureImage(300, 100, { x: 0, y: 0, width: 100, height: 400 });
+  close(fit.width, 100);
+  close(fit.height, 100 / 3);
+  close(fit.width / fit.height, 3);
+});
+
+test("fit handles a tiny field without upscaling", () => {
+  const fit = fitSignatureImage(300, 100, { x: 4, y: 8, width: 5, height: 2 });
+  close(fit.width, 5);
+  close(fit.height, 5 / 3);
+  assert.ok(fit.scale < 1);
+});
+
+test("fit handles an exact-size field", () => {
+  const fit = fitSignatureImage(300, 100, { x: 10, y: 20, width: 300, height: 100 });
+  assert.deepEqual(fit, { x: 10, y: 20, width: 300, height: 100, scale: 1 });
+});
+
+test("fit refuses zero or invalid dimensions", () => {
+  assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 0, height: 200 }), RangeError);
+  assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 200, height: 0 }), RangeError);
+  assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 0, height: 200 }), RangeError);
+});
+
+
+test("short flat strokes, a single dot, and tall vertical strokes retain minimum nonzero crops and proportional fits", () => {
+  const cases = [
+    { name: "short flat horizontal stroke", points: [[30, 20], [34, 20]], expectedRatio: 5 },
+    { name: "single dot", points: [[32, 20]], expectedRatio: 1 },
+    { name: "tall vertical stroke", points: [[32, 8], [32, 35]], expectedRatio: 1 / 5 }
+  ];
+  for (const specimen of cases) {
+    const width = 64, height = 48;
+    const rgba = new Uint8ClampedArray(width * height * 4);
+    for (const [px, py] of specimen.points) {
+      for (let y = py - 2; y <= py + 2; y += 1) for (let x = px - 2; x <= px + 2; x += 1) {
+        const i = (y * width + x) * 4;
+        rgba[i] = 17; rgba[i + 1] = 24; rgba[i + 2] = 39; rgba[i + 3] = 255;
+      }
+    }
+    const bounds = findSignatureInkBounds(rgba, width, height, 0);
+    assert.ok(bounds && bounds.width >= 8 && bounds.height >= 8, specimen.name + " must retain a minimum nonzero crop");
+    const fitted = fitSignatureImage(bounds.width, bounds.height, { x: 0, y: 0, width: 120, height: 60 });
+    assert.ok(fitted.width > 0 && fitted.height > 0, specimen.name + " must produce a nonzero fitted size");
+    assert.ok(fitted.width <= 120 && fitted.height <= 60, specimen.name + " must fit inside its field");
+    close(fitted.width / fitted.height, bounds.width / bounds.height);
+  }
+});
+
+test("fit falls back to the field box when saved specimen pixel dimensions are missing", () => {
+  const fitted = fitSignatureImage(undefined, 0, { x: 4, y: 8, width: 120, height: 40 });
+  assert.deepEqual(fitted, { x: 4, y: 8, width: 120, height: 40, scale: 1 });
+});
+
+test("ink trimming finds the tight bounds and adds fixed padding", () => {
+  const width = 10, height = 8;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < width * height; index += 1) {
+    rgba[index * 4] = 255; rgba[index * 4 + 1] = 255; rgba[index * 4 + 2] = 255; rgba[index * 4 + 3] = 255;
+  }
+  for (let y = 2; y <= 4; y += 1) for (let x = 4; x <= 5; x += 1) {
+    const index = (y * width + x) * 4;
+    rgba[index] = 10; rgba[index + 1] = 20; rgba[index + 2] = 30; rgba[index + 3] = 255;
+  }
+  const bounds = findSignatureInkBounds(rgba, width, height, 2);
+  assert.deepEqual(bounds, { x: 1, y: 0, width: 8, height: 8 });
+  assert.ok(bounds.x <= 2 && bounds.y <= 0, "the padded crop must include the top-left padding");
+  assert.ok(bounds.x + bounds.width >= 8 && bounds.y + bounds.height >= 7, "the padded crop must include the bottom-right padding");
+});
+
+test("trim export removes white pixels while retaining ink transparency", () => {
+  const rgba = new Uint8ClampedArray([255,255,255,255, 17,24,39,255, 245,245,245,255, 17,24,39,80]);
+  removeWhitePixels(rgba);
+  assert.equal(rgba[3], 0);
+  assert.equal(rgba[7], 255);
+  assert.equal(rgba[11], 255);
+  assert.equal(rgba[15], 80);
+});
+
+test("ink trimming refuses an empty or white-only pad", () => {
+  const rgba = new Uint8ClampedArray(10 * 8 * 4);
+  for (let index = 0; index < 80; index += 1) {
+    rgba[index * 4] = 255; rgba[index * 4 + 1] = 255; rgba[index * 4 + 2] = 255; rgba[index * 4 + 3] = 255;
+  }
+  assert.equal(findSignatureInkBounds(rgba, 10, 8, 4), null);
+  assert.throws(() => requireSignatureInkBounds(rgba, 10, 8, 4), /pad is empty/);
+});
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function pngChunk(type, data) {
+  const name = Buffer.from(type), length = Buffer.alloc(4), checksum = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  checksum.writeUInt32BE(crc32(Buffer.concat([name, data])));
+  return Buffer.concat([length, name, data, checksum]);
+}
+function createPng(width, height) {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
+  header[8] = 8; header[9] = 6;
+  const rows = Buffer.alloc(height * (1 + width * 4));
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (1 + width * 4);
+    rows[row] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const offset = row + 1 + x * 4;
+      rows[offset] = 20; rows[offset + 1] = 30; rows[offset + 2] = 40; rows[offset + 3] = 255;
+    }
+  }
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(rows)),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+function makeField(fieldId, type, x, y, width, height) {
+  return { fieldId, type, page: 1, x, y, width, height, signerId: "S1", signerUid: "user-1" };
+}
+
+test("PDF finalizer draws 300x100 signatures and initials proportionally inside 200x200 and 400x40 boxes", async () => {
+  const source = await PDFDocument.create();
+  source.addPage([1200, 1000]);
+  const sourceBytes = await source.save();
+  const pngBytes = createPng(300, 100);
+  const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
+  const fields = [
+    makeField("signature-square", "Signature", 0, 0, 100 / 6, 20),
+    makeField("signature-wide", "Signature", 50, 0, 100 / 3, 4),
+    makeField("initials-square", "Initials", 0, 30, 100 / 6, 20),
+    makeField("initials-wide", "Initials", 50, 30, 100 / 3, 4)
+  ];
+  const fieldValues = Object.fromEntries(fields.map(field => [field.fieldId, dataUrl]));
+  const actualDraws = [];
+  const originalDrawImage = PDFPage.prototype.drawImage;
+  PDFPage.prototype.drawImage = function(image, options) {
+    if (image.width === 300 && image.height === 100) actualDraws.push({ ...options });
+    return originalDrawImage.call(this, image, options);
+  };
+  let result;
+  try {
+    result = await buildSignedPdf(sourceBytes, {
+      envelopeId: "envelope-1", documentId: "document-1", title: "Test",
+      originalHash: "original", chainHead: "chain", completedAt: new Date(0).toISOString(),
+      fields,
+      signers: [{ id: "S1", uid: "user-1", name: "Signer", email: "signer@example.test", signedAt: new Date(0).toISOString(), signatureType: "drawn", signatureValue: dataUrl, fieldValues }]
+    });
+  } finally {
+    PDFPage.prototype.drawImage = originalDrawImage;
+  }
+
+  const completed = await PDFDocument.load(result);
+  assert.equal(completed.getPageCount(), 2);
+  const page = completed.getPages()[0];
+  const xObjects = page.node.Resources().lookup(PDFName.of("XObject"));
+  assert.ok(xObjects, "PDF page must contain embedded signature image resources");
+  const imageObjects = xObjects.entries().map(([, ref]) => completed.context.lookup(ref)).filter(object => {
+    const subtype = object?.dict?.lookup?.(PDFName.of("Subtype"));
+    return subtype?.toString?.() === "/Image";
+  });
+  assert.ok(imageObjects.some(object => object.dict.lookup(PDFName.of("Width")).asNumber() === 300 &&
+    object.dict.lookup(PDFName.of("Height")).asNumber() === 100), "the original 300x100 PNG must remain embedded at its natural pixel dimensions");
+
+  assert.equal(actualDraws.length, 5, "four assigned field stamps plus one certificate stamp must be drawn");
+  const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+  fields.forEach((field, index) => {
+    const box = getPdfFieldBox(sourcePage, field);
+    const drawn = actualDraws[index];
+    close(drawn.width / drawn.height, 3, 0.01);
+    assert.ok(drawn.x >= box.x - 0.01 && drawn.y >= box.y - 0.01, field.fieldId + " must start inside its box");
+    assert.ok(drawn.x + drawn.width <= box.x + box.width + 0.01, field.fieldId + " must fit horizontally");
+    assert.ok(drawn.y + drawn.height <= box.y + box.height + 0.01, field.fieldId + " must fit vertically");
+    if (field.fieldId.endsWith("square")) {
+      close(box.width, 200);
+      close(box.height, 200);
+    } else {
+      close(box.width, 400);
+      close(box.height, 40);
+    }
+  });
+});
+test("PDF field geometry respects a non-zero crop box and 90-degree page rotation", async () => {
+  const document = await PDFDocument.create();
+  const page = document.addPage([1200, 1000]);
+  page.setCropBox(20, 30, 1000, 800);
+  page.setRotation(degrees(90));
+  const box = getPdfFieldBox(page, { x: 10, y: 20, width: 30, height: 10 });
+  assert.ok(box.x >= 20 && box.y >= 30);
+  assert.ok(box.x + box.width <= 1020);
+  assert.ok(box.y + box.height <= 830);
+  const geometry = getSignatureDrawGeometry(300, 100, box);
+  close(geometry.width / geometry.height, 3);
+  const rotatedBounds = { x: box.x + (box.width - geometry.height) / 2, y: box.y + (box.height - geometry.width) / 2, width: geometry.height, height: geometry.width };
+  assert.ok(rotatedBounds.x >= box.x - 0.01 && rotatedBounds.y >= box.y - 0.01);
+  assert.ok(rotatedBounds.x + rotatedBounds.width <= box.x + box.width + 0.01);
+  assert.ok(rotatedBounds.y + rotatedBounds.height <= box.y + box.height + 0.01);
+});
