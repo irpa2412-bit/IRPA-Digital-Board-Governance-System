@@ -117,6 +117,7 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
   assert.equal(resent.deliveryStatus,"Sent");
   const newToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
   assert.notEqual(newToken,oldToken);
+  assert.notEqual(newToken,oldSession);
   const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(current.signers[0].emailLinkStatus,"issued");
   assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"revoked");
