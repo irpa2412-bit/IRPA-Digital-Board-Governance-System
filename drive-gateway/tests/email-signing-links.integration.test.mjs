@@ -154,3 +154,19 @@ test("duplicate email signer is refused and login-bound signing remains UID auth
   assert.equal(canAuthenticatedSignerAccess({uid:"registered-uid"},{uid:"registered-uid"}),true);
   assert.equal(canAuthenticatedSignerAccess({uid:"registered-uid"},{uid:"guest"}),false);
 });
+
+
+test("staging and production reject UID-only and UID-bound account signers",async()=>{
+  const f=await fixture();
+  const ctx={...f.ctx,env:{...f.ctx.env,IRPA_ENVIRONMENT:"staging"}};
+  const owner={uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false};
+  for(const signer of [
+    {email:"member@example.org",uid:"registered-member-uid",name:"Registered Member"},
+    {email:"member@example.org",uid:"registered-member-uid",identityType:"email-link",name:"Registered Member"}
+  ]){
+    await assert.rejects(
+      ()=>createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[signer]}),
+      error=>error?.status===400&&error.message.includes("Every staging and production signer must use an email-link identity without a Firebase UID")
+    );
+  }
+});
