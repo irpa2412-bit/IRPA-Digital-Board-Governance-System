@@ -45,7 +45,7 @@ function attachmentBase64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
   }
   const encoded = btoa(binary);
-  return encoded.match(/.{1,76}/g)?.join("\\r\\n") || "";
+  return encoded.match(/.{1,76}/g)?.join("\r\n") || "";
 }
 
 export function buildMailMimeMessage({from, to, subject, text, html, attachments = []}) {
@@ -70,7 +70,7 @@ export function buildMailMimeMessage({from, to, subject, text, html, attachments
     "",
     "--" + alternativeBoundary + "--",
     ""
-  ].join("\\r\\n");
+  ].join("\r\n");
   const headers = [
     "From: " + cleanFrom,
     "To: <" + cleanTo + ">",
@@ -83,7 +83,7 @@ export function buildMailMimeMessage({from, to, subject, text, html, attachments
       "Content-Type: multipart/alternative; boundary=\"" + alternativeBoundary + "\"",
       "",
       alternative
-    ].join("\\r\\n");
+    ].join("\r\n");
   }
   const attachment = attachments[0] || {};
   const bytes = attachment.bytes instanceof Uint8Array
@@ -117,5 +117,5 @@ export function buildMailMimeMessage({from, to, subject, text, html, attachments
     "",
     "--" + mixedBoundary + "--",
     ""
-  ].join("\\r\\n");
+  ].join("\r\n");
 }
