@@ -248,7 +248,7 @@ export default function SignaturePathwaySelfTest() {
             const fileId = result.fileId || driveFileId(item);
             if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
             const bytes = await downloadControlledDocumentBytes(fileId, item.documentId);
-            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
             const pages = [];
             try {
               for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
