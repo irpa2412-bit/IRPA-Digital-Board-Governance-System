@@ -32,13 +32,13 @@ async function original(ctx,e){const d=await ctx.meta.get("documents",e.document
 export function validateEnvelopeFields(fields,signers){
   if(fields==null)return[];
   if(!Array.isArray(fields)||fields.length>100)throw new HttpError(400,"Invalid signing fields.");
-  const ids=new Set(),byId=new Map((signers||[]).map(x=>[x.id,x])),uids=new Set((signers||[]).map(x=>x.uid).filter(Boolean));
+  const ids=new Set(),byId=new Map((signers||[]).map(x=>[x.id,x]));
   const allowed=new Set(["Signature","Initials","Date","Number","Text","Comment","Remarks","Checkbox","Name"]);
   return fields.map(f=>{
     const fieldId=cleanSegment(f?.fieldId,100),type=String(f?.type||"");
-    const page=Number(f?.page||1),x=Number(f?.x??10),y=Number(f?.y??80),width=Number(f?.width??24),height=Number(f?.height??9),requestedSignerId=String(f?.signerId||""),signerUid=String(f?.signerUid||"");
-    const assigned=requestedSignerId?byId.get(requestedSignerId):(signerUid?(signers||[]).find(item=>item.uid===signerUid):null);
-    if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||(signerUid&&assigned.uid!==signerUid)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
+    const page=Number(f?.page||1),x=Number(f?.x??10),y=Number(f?.y??80),width=Number(f?.width??24),height=Number(f?.height??9),requestedSignerId=String(f?.signerId||""),signerUid=String(f?.signerUid||""),signerEmail=String(f?.signerEmail||"").trim().toLowerCase();
+    const assigned=requestedSignerId?byId.get(requestedSignerId):(signerUid?(signers||[]).find(item=>item.uid===signerUid):signerEmail?(signers||[]).find(item=>String(item.email||"").trim().toLowerCase()===signerEmail):null);
+    if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||(signerUid&&assigned.uid!==signerUid)||(signerEmail&&String(assigned.email||"").trim().toLowerCase()!==signerEmail)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
     ids.add(fieldId);
     return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,signerEmail:assigned.email||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160),responsibility:cleanText(f?.responsibility||"",40)};
   });
