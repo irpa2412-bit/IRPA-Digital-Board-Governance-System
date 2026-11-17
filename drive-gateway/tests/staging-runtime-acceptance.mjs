@@ -7,9 +7,8 @@ const project=process.env.STAGING_FIREBASE_PROJECT_ID||"";
 const email=process.env.STAGING_CRYPTO_TEST_EMAIL||"";
 const password=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
 const expectedUid=process.env.STAGING_CRYPTO_TEST_SIGNER_UID||"";
-const expectedKeyId=process.env.STAGING_CRYPTO_TEST_KEY_ID||"";
 const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
-for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_CRYPTO_TEST_KEY_ID:expectedKeyId,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
+for(const [name,value] of Object.entries({STAGING_FIREBASE_WEB_API_KEY:apiKey,STAGING_FIREBASE_PROJECT_ID:project,STAGING_CRYPTO_TEST_EMAIL:email,STAGING_CRYPTO_TEST_PASSWORD:password,STAGING_CRYPTO_TEST_SIGNER_UID:expectedUid,STAGING_GATEWAY_URL:base}))assert.ok(value,name+" is required.");
 assert.notEqual(project,"irpa-digital-board-governance","Production Firebase project is forbidden in staging acceptance.");
 
 const loginResponse=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
@@ -162,7 +161,7 @@ assert.equal(evidenceResult.evidence.length,1);
 const evidence=evidenceResult.evidence[0];
 assert.equal(evidence.envelopeId,envelope.envelopeId);
 assert.equal(evidence.signerUid,null);
-assert.equal(evidence.keyId,expectedKeyId,"Gateway did not use the exact ephemeral key injected for this staging signer.");
+assert.match(evidence.keyId,/^EMAIL-[0-9a-f]{64}$/,"Gateway must derive a signer key from the envelope and verified email.");
 assert.equal(evidence.documentHash,completedHash);
 assert.equal(evidence.status,"SEALED");
 assert.equal("privateKey" in evidence,false);
@@ -335,7 +334,7 @@ console.log("STAGE_11_COMPLETION_CERTIFICATE_PDF=PASS");
 console.log("STAGING_RUNTIME_CRYPTO_ACCEPTANCE=PASS");
 console.log(JSON.stringify({
   project,
-  signerUid:expectedUid,
+  ownerUid:expectedUid,
   envelopeId:envelope.envelopeId,
   sourceHash:originalHash,
   completedHash:completedHash,
