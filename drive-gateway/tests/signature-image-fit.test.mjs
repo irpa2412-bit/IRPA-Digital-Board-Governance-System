@@ -41,6 +41,36 @@ test("fit refuses zero or invalid dimensions", () => {
   assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 0, height: 200 }), RangeError);
 });
 
+
+test("short flat strokes, a single dot, and tall vertical strokes retain minimum nonzero crops and proportional fits", () => {
+  const cases = [
+    { name: "short flat horizontal stroke", points: [[30, 20], [34, 20]], expectedRatio: 5 },
+    { name: "single dot", points: [[32, 20]], expectedRatio: 1 },
+    { name: "tall vertical stroke", points: [[32, 8], [32, 35]], expectedRatio: 1 / 5 }
+  ];
+  for (const specimen of cases) {
+    const width = 64, height = 48;
+    const rgba = new Uint8ClampedArray(width * height * 4);
+    for (const [px, py] of specimen.points) {
+      for (let y = py - 2; y <= py + 2; y += 1) for (let x = px - 2; x <= px + 2; x += 1) {
+        const i = (y * width + x) * 4;
+        rgba[i] = 17; rgba[i + 1] = 24; rgba[i + 2] = 39; rgba[i + 3] = 255;
+      }
+    }
+    const bounds = findSignatureInkBounds(rgba, width, height, 0);
+    assert.ok(bounds && bounds.width >= 8 && bounds.height >= 8, specimen.name + " must retain a minimum nonzero crop");
+    const fitted = fitSignatureImage(bounds.width, bounds.height, { x: 0, y: 0, width: 120, height: 60 });
+    assert.ok(fitted.width > 0 && fitted.height > 0, specimen.name + " must produce a nonzero fitted size");
+    assert.ok(fitted.width <= 120 && fitted.height <= 60, specimen.name + " must fit inside its field");
+    close(fitted.width / fitted.height, bounds.width / bounds.height);
+  }
+});
+
+test("fit falls back to the field box when saved specimen pixel dimensions are missing", () => {
+  const fitted = fitSignatureImage(undefined, 0, { x: 4, y: 8, width: 120, height: 40 });
+  assert.deepEqual(fitted, { x: 4, y: 8, width: 120, height: 40, scale: 1 });
+});
+
 test("ink trimming finds the tight bounds and adds fixed padding", () => {
   const width = 10, height = 8;
   const rgba = new Uint8ClampedArray(width * height * 4);
