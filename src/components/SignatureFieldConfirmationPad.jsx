@@ -52,7 +52,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
   const end=()=>{drawing.current=false;last.current=null};
   const clear=()=>{
     const canvas=canvasRef.current;
-    if(canvas){const rect=canvas.getBoundingClientRect();const ratio=Math.max(1,window.devicePixelRatio||1);canvas.getContext("2d").clearRect(0,0,rect.width*ratio,rect.height*ratio);}
+    if(canvas){const rect=canvas.getBoundingClientRect();const ratio=Math.max(1,window.devicePixelRatio||1);const context=canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);context.clearRect(0,0,rect.width,rect.height);}
     if(mode==="Use my saved signature")setMode("Draw");
     setTyped("");dirtyRef.current=false;setDirty(false);setError("");
   };
