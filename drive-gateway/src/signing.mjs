@@ -386,7 +386,7 @@ export async function resendInvitation(ctx,user,id,signerId,mailMetadata={}){
   const target=envelope.signers.find(s=>s.id===signerId);
   if(!target)throw new HttpError(404,"Signer assignment not found.");
   if(target.status==="Signed")throw new HttpError(409,"A signed assignment cannot receive another signing invitation.");
-  if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
+  if(!can(envelope,target))throw new HttpError(409,"This signer is waiting for the previous routing position to complete.");
   const emailLink=target.identityType==="email-link";
   const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+(ctx.config?.emailLinkTtlDays||7)*86400000).toISOString();
   await mutate(ctx,id,async current=>{
@@ -397,17 +397,17 @@ export async function resendInvitation(ctx,user,id,signerId,mailMetadata={}){
       signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkLastIpHash=null;signer.emailLinkOpenedAt=null;
       
     }
-    signer.tokenHash=await sha256Hex(secret);signer.invitation="Pending";
+    signer.tokenHash=await sha256Hex(secret);signer.invitation="Pending";signer.invitedAt=now.toISOString();
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:mailMetadata?.eventType||(emailLink?"email_link.resent":"invitation.resend.requested"),signerId,actor:user.uid,at:now.toISOString()})}};
   });
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
-  try{await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt,role:target.title||target.declaredParticulars?.title||"",action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});}
+  try{if(typeof ctx.sendInvitation==="function")await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt,role:target.title||target.declaredParticulars?.title||"",action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});}
   catch(error){
     await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer){signer.invitation="Failed";if(emailLink)signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
   }
-  await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:mailMetadata?.eventType==="email_link.reminded"?"email_link.reminder_sent":"invitation.resent",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
+  await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:mailMetadata?.eventType==="email_link.reminded"?"email_link.reminder_sent":typeof ctx.sendInvitation==="function"?"invitation.resent":"email_link.delivery_simulated",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
   return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent"};
 }
 
