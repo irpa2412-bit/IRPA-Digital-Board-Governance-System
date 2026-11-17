@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 
 mkdirSync("test-results",{recursive:true});
 const server=spawn("npx",["vite","--host","127.0.0.1","--port","4173","--strictPort"],{stdio:"ignore"});
-let browser,activePage=null,activeViewport="unknown",activeCanvasBox=null;
+let browser,activePage=null,activeViewport="unknown",activeCanvasBox=null;\nconst browserMessages=[];
 async function waitForServer(){
  for(let i=0;i<60;i++){try{const r=await fetch("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");if(r.ok)return}catch{}await delay(500)}
  throw new Error("Vite test server did not become ready");
