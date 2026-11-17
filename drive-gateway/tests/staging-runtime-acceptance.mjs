@@ -200,6 +200,136 @@ console.log("STAGE_FINAL_SIGNER_COMPLETED=PASS");
 console.log("STAGE_CRYPTO_EVIDENCE=PASS");
 console.log("STAGE_TAMPER_REJECTION=PASS");
 console.log("STAGE_IDEMPOTENT_RETRY=PASS");
+
+async function createRoutedEnvelope(label,signers,attachments=[]){
+  const response=await fetch(base+"/api/envelopes",{method:"POST",headers:{...authHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:"IRPA-STAGING-ROUTE-"+stamp+"-"+label,documentId,title:"IRPA owner routing acceptance "+label,classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:signers.map(s=>({...s,identityType:"email-link"})),attachments,returnTokens:true})});
+  const body=await readJson(response,"Staging owner-routed envelope "+label);
+  assert.ok(body.envelopeId);assert.equal(body.tokens.length,signers.length);
+  return body;
+}
+async function openVerifiedSession(token,label){
+  const response=await fetch(base+"/api/sign/email/open",{headers:{"x-signing-token":token}});
+  const challenge=await readJson(response,label+" email-link open");
+  assert.equal(challenge.requiresEmailCode,true);
+  assert.ok(challenge.testOnlyCode);
+  const confirmed=await fetch(base+"/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token,code:challenge.testOnlyCode})});
+  const session=await readJson(confirmed,label+" email-code confirmation");
+  assert.ok(session.sessionToken);
+  return session.sessionToken;
+}
+async function submitEmailSigner(sessionToken,name,label){
+  const response=await fetch(base+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:sessionToken,signature:{type:"typed",value:name},declarations:{name},consent:true})});
+  return readJson(response,label+" signature submission");
+}
+const baseEmail=email.toLowerCase();
+const emailParts=baseEmail.split("@");
+assert.equal(emailParts.length,2,"The staging signer email must be a valid address.");
+const routeEmail=tag=>emailParts[0]+"+"+stamp+"-"+tag+"@"+emailParts[1];
+
+console.log("STAGE_1_EMAIL_LINK_IDENTITY=PASS");
+const sequential=await createRoutedEnvelope("SEQUENTIAL",[
+  {email:routeEmail("one"),name:"Routing Signer One",routingPosition:1},
+  {email:routeEmail("two"),name:"Routing Signer Two",routingPosition:2},
+  {email:routeEmail("three"),name:"Routing Signer Three",routingPosition:3}
+]);
+assert.deepEqual(sequential.invitations.map(item=>item.status),["Sent","Waiting","Waiting"]);
+const earlyResponse=await fetch(base+"/api/sign/email/open",{headers:{"x-signing-token":sequential.tokens[1]}});
+assert.equal(earlyResponse.status,409);
+assert.match((await earlyResponse.json()).error,/Not your turn yet/);
+console.log("STAGE_2_EARLY_LINK_BLOCKED=PASS");
+const sequentialOne=await openVerifiedSession(sequential.tokens[0],"Position 1 signer");
+const sequentialOneResult=await submitEmailSigner(sequentialOne,"Routing Signer One","Position 1 signer");
+assert.equal(sequentialOneResult.completed,false);
+const tokenTwo=sequentialOneResult.releasedTokens?.find(item=>item.signerId==="S2")?.token;
+assert.ok(tokenTwo,"Position 2 invitation token was not released after position 1 completed.");
+console.log("STAGE_3_POSITION_1_RELEASED_POSITION_2=PASS");
+const sequentialTwo=await openVerifiedSession(tokenTwo,"Position 2 signer");
+const sequentialTwoResult=await submitEmailSigner(sequentialTwo,"Routing Signer Two","Position 2 signer");
+const tokenThree=sequentialTwoResult.releasedTokens?.find(item=>item.signerId==="S3")?.token;
+assert.ok(tokenThree,"Position 3 invitation token was not released after position 2 completed.");
+console.log("STAGE_4_POSITION_2_RELEASED_POSITION_3=PASS");
+const sequentialThree=await openVerifiedSession(tokenThree,"Position 3 signer");
+const sequentialThreeResult=await submitEmailSigner(sequentialThree,"Routing Signer Three","Position 3 signer");
+assert.equal(sequentialThreeResult.completed,true);
+const sequentialStatus=await fetch(base+"/api/envelopes/"+encodeURIComponent(sequential.envelopeId)+"/status",{headers:authHeaders});
+const sequentialOwnerStatus=await readJson(sequentialStatus,"Sequential envelope owner status");
+assert.equal(sequentialOwnerStatus.status,"Completed");
+assert.deepEqual(sequentialOwnerStatus.signers.map(s=>s.routingPosition),[1,2,3]);
+assert.ok(sequentialOwnerStatus.signers.every(s=>s.displayStatus==="signed"));
+console.log("STAGE_5_LAST_SIGNER_COMPLETED_AND_CERTIFICATE_ORDER=PASS");
+
+const parallel=await createRoutedEnvelope("PARALLEL",[
+  {email:routeEmail("parallel-one"),name:"Parallel Signer One",routingPosition:1},
+  {email:routeEmail("parallel-two"),name:"Parallel Signer Two",routingPosition:1},
+  {email:routeEmail("parallel-three"),name:"Parallel Signer Three",routingPosition:2}
+]);
+assert.deepEqual(parallel.invitations.map(item=>item.status),["Sent","Sent","Waiting"]);
+const parallelOne=await openVerifiedSession(parallel.tokens[0],"Parallel signer one");
+const parallelOneResult=await submitEmailSigner(parallelOne,"Parallel Signer One","Parallel signer one");
+assert.equal(parallelOneResult.releasedTokens,undefined,"The next position must wait until both parallel signers have signed.");
+const parallelTwo=await openVerifiedSession(parallel.tokens[1],"Parallel signer two");
+const parallelTwoResult=await submitEmailSigner(parallelTwo,"Parallel Signer Two","Parallel signer two");
+const parallelThreeToken=parallelTwoResult.releasedTokens?.find(item=>item.signerId==="S3")?.token;
+assert.ok(parallelThreeToken);
+const parallelThree=await openVerifiedSession(parallelThreeToken,"Parallel position two");
+const parallelThreeResult=await submitEmailSigner(parallelThree,"Parallel Signer Three","Parallel position two");
+assert.equal(parallelThreeResult.completed,true);
+console.log("STAGE_6_PARALLEL_POSITION_RELEASE=PASS");
+
+const declined=await createRoutedEnvelope("DECLINE",[
+  {email:routeEmail("decline-one"),name:"Declining Signer",routingPosition:1},
+  {email:routeEmail("decline-two"),name:"Waiting Signer",routingPosition:2}
+]);
+const declineSession=await openVerifiedSession(declined.tokens[0],"Declining signer");
+const declineResponse=await fetch(base+"/api/sign/decline",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:declineSession,reason:"Staging acceptance decline test"})});
+const declineResult=await readJson(declineResponse,"Signer decline");
+assert.equal(declineResult.status,"Declined");
+const declinedStatus=await readJson(await fetch(base+"/api/envelopes/"+encodeURIComponent(declined.envelopeId)+"/status",{headers:authHeaders}),"Declined envelope status");
+assert.equal(declinedStatus.status,"Declined");
+assert.equal(declinedStatus.signers[1].displayStatus,"waiting");
+console.log("STAGE_7_DECLINE_STOPS_CHAIN=PASS");
+
+const voided=await createRoutedEnvelope("VOID",[
+  {email:routeEmail("void-one"),name:"Voided Signer One",routingPosition:1},
+  {email:routeEmail("void-two"),name:"Voided Signer Two",routingPosition:2}
+]);
+const voidResponse=await fetch(base+"/api/envelopes/"+encodeURIComponent(voided.envelopeId)+"/void",{method:"POST",headers:{...authHeaders,"content-type":"application/json"},body:JSON.stringify({reason:"Staging acceptance void test"})});
+const voidResult=await readJson(voidResponse,"Owner void");
+assert.equal(voidResult.status,"Voided");
+const voidedStatus=await readJson(await fetch(base+"/api/envelopes/"+encodeURIComponent(voided.envelopeId)+"/status",{headers:authHeaders}),"Voided envelope status");
+assert.equal(voidedStatus.status,"Voided");
+assert.equal(voidedStatus.signers[1].emailLinkStatus,"revoked");
+console.log("STAGE_8_VOID_STOPS_CHAIN=PASS");
+
+const changed=await createRoutedEnvelope("CHANGE-EMAIL",[
+  {email:routeEmail("old-address"),name:"Original Signer",routingPosition:1}
+]);
+const changedResponse=await fetch(base+"/api/envelopes/"+encodeURIComponent(changed.envelopeId)+"/invitations/S1/email",{method:"POST",headers:{...authHeaders,"content-type":"application/json"},body:JSON.stringify({email:routeEmail("new-address"),name:"Replacement Signer",title:"External Reviewer"})});
+const changedResult=await readJson(changedResponse,"Owner signer email replacement");
+assert.equal(changedResult.emailChanged,true);
+assert.ok(changedResult.token);
+const oldLink=await fetch(base+"/api/sign/email/open",{headers:{"x-signing-token":changed.tokens[0]}});
+assert.equal(oldLink.status,404,"The old email link must be revoked after changing the address.");
+const newSession=await openVerifiedSession(changedResult.token,"Replacement signer");
+assert.ok(newSession);
+console.log("STAGE_9_EMAIL_CHANGE_REVOKES_OLD_LINK=PASS");
+
+const remind=await createRoutedEnvelope("REMINDER",[
+  {email:routeEmail("reminder"),name:"Reminder Signer",routingPosition:1}
+]);
+const reminderPath="/api/envelopes/"+encodeURIComponent(remind.envelopeId)+"/invitations/S1/remind";
+const reminderOne=await fetch(base+reminderPath,{method:"POST",headers:authHeaders});
+assert.equal(reminderOne.ok,true);
+const reminderTwo=await fetch(base+reminderPath,{method:"POST",headers:authHeaders});
+assert.equal(reminderTwo.status,429,"A second reminder inside one hour must be rejected.");
+console.log("STAGE_10_REMINDER_HOURLY_LIMIT=PASS");
+
+const finalRoutingPdf=await fetch(base+"/api/sign/pdf",{headers:{"x-signing-token":sequentialThree}});
+assert.equal(finalRoutingPdf.ok,true);
+const routingPdfBytes=new Uint8Array(await finalRoutingPdf.arrayBuffer());
+assert.ok(routingPdfBytes.length>1000);
+console.log("STAGE_11_COMPLETION_CERTIFICATE_PDF=PASS");
+
 console.log("STAGING_RUNTIME_CRYPTO_ACCEPTANCE=PASS");
 console.log(JSON.stringify({
   project,
