@@ -57,6 +57,10 @@ jobs:
         working-directory: drive-gateway
         run: npm test
 
+      - name: Run signature image fit and PDF stamp regression
+        working-directory: drive-gateway
+        run: node --test tests/signature-image-fit.test.mjs
+
       - name: Run root security and document regression suites
         run: |
           set -euo pipefail
