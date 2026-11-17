@@ -29,6 +29,12 @@ export function findSignatureInkBounds(data, width, height, padding = 4) {
   return { x, y, width: endX - x, height: endY - y };
 }
 
+export function requireSignatureInkBounds(data, width, height, padding = 4) {
+  const bounds = findSignatureInkBounds(data, width, height, padding);
+  if (!bounds) throw new Error("The signature pad is empty. Add visible ink before saving.");
+  return bounds;
+}
+
 /**
  * Crop a canvas/image to its ink bounds, retaining transparent pixels and
  * preserving the source's device-pixel dimensions.
@@ -47,8 +53,7 @@ export function trimSignatureCanvas(source, { padding = 4, devicePixelRatio = 1 
   if (!probeContext) throw new Error("Signature image processing is unavailable.");
   probeContext.drawImage(source, 0, 0, width, height);
   const image = probeContext.getImageData(0, 0, width, height);
-  const bounds = findSignatureInkBounds(image.data, width, height, Math.max(0, Math.round(Number(padding) * Number(devicePixelRatio || 1))));
-  if (!bounds) throw new Error("The signature pad is empty. Add visible ink before saving.");
+  const bounds = requireSignatureInkBounds(image.data, width, height, Math.max(0, Math.round(Number(padding) * Number(devicePixelRatio || 1))));
   const output = document.createElement("canvas");
   output.width = bounds.width;
   output.height = bounds.height;
