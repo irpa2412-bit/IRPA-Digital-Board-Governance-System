@@ -5,6 +5,7 @@ import fs from "node:fs";
 const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
 const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
 const gateway=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+const invitation=fs.readFileSync(new URL("../drive-gateway/src/invitationEmail.mjs",import.meta.url),"utf8");
 
 test("registered member and employee assignments are routed through email-link identity",()=>{
   const registered=portal.match(/if\(registered\)\{([\s\S]*?)\}else\{/);
@@ -27,7 +28,7 @@ test("all workflow recipients and their assigned PDF fields are sent to the Gate
 
 test("Gateway email-link signing is independent of Firebase UID authentication",()=>{
   assert.match(gateway,/if\(s0\.identityType==="email-link"\)\{if\(s0\.emailLinkStatus!=="opened"\)/);
-  assert.match(gateway,/emailLink\?\$\{ctx\.config\.appUrl\}\/\?emailSignToken=/);
+  assert.match(invitation,/emailSignToken=/);
 });
 
 test("new staging and production Gateway envelopes reject account-only or UID-bound signers",()=>{
