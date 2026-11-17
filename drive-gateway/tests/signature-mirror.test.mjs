@@ -32,8 +32,8 @@ test("completion mirror creates a signer-specific signature register record from
     },
     getDocument,updateDocument,now:()=>"2026-11-15T10:02:01.000Z"
   });
-  const chair = writes.find(x=>x.path==="signatures/gateway-IRPA-ENV-TEST-chair-uid")?.fields;
-  const secretary = writes.find(x=>x.path==="signatures/gateway-IRPA-ENV-TEST-secretary-uid")?.fields;
+  const chair = writes.find(x=>x.path==="signatures/gateway-IRPA-ENV-TEST-S1")?.fields;
+  const secretary = writes.find(x=>x.path==="signatures/gateway-IRPA-ENV-TEST-S2")?.fields;
   assert.equal(chair.recordOrigin,"TRIAL");
   assert.equal(chair.trialData,true);
   assert.equal(chair.signerArchiveFileId,"chair-copy");
