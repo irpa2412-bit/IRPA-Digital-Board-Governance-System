@@ -93,7 +93,7 @@ test("signer must review the rendered document and applied stamps before submit 
 });
 
 test("all application PDF.js entry points copy caller-owned bytes before worker transfer",()=>{
-  assert.equal((documentReader.match(/pdfjsLib\\.getDocument\\(\\{data:bytes\\.slice\\(\\)\\}\\)/g)||[]).length,2);
+  assert.equal(documentReader.split("pdfjsLib.getDocument({data:bytes.slice()})").length-1,2);
   assert.ok(translation.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
   assert.ok(pathwaySelfTest.includes("pdfjsLib.getDocument({ data: bytes.slice() }).promise"));
   assert.ok(gatewayPortal.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
