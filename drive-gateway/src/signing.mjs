@@ -178,7 +178,7 @@ export async function releaseRoutingPosition(ctx,id,position){
     const committed=await mutate(ctx,id,async current=>{
       const signer=current.signers.find(item=>item.id===target.id);
       if(!signer||signer.status!=="Pending"||!can(current,signer))return{patch:null,result:false};
-      signer.tokenHash=issued.record.tokenHash;signer.emailHash=issued.record.emailHash;signer.invitedAt=now.toISOString();signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=issued.record.expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkOpenedAt=null;signer.invitation="Pending";
+      signer.tokenHash=issued.record.tokenHash;signer.emailHash=issued.record.emailHash;signer.invitedAt=now.toISOString();signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=issued.record.expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkOpenedAt=null;signer.openedAt=null;signer.invitedAt=now.toISOString();signer.invitation="Pending";
       return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.issued",signerId:signer.id,routingPosition:position,emailHash:signer.emailHash,expiresAt:signer.emailLinkExpiresAt,at:now.toISOString()})},result:true};
     });
     if(!committed)continue;
@@ -319,7 +319,7 @@ export async function retryCompletion(ctx,user,id){const e=await ctx.meta.get("e
 export async function retryCompletedDocumentDistribution(ctx,user,id){return retryFailedSignatureDistributions(ctx,user,id)}
 export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");for(const signer of c.signers||[])if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="used"){signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);signer.emailLinkStatus="revoked";}return{patch:{status:"Voided",signers:c.signers,events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
 
-export async function resendInvitation(ctx,user,id,signerId){
+export async function resendInvitation(ctx,user,id,signerId,mailMetadata={}){
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
   if(["Completed","Voided","Declined"].includes(envelope.status))throw new HttpError(409,"This signing envelope is no longer active.");
@@ -338,7 +338,7 @@ export async function resendInvitation(ctx,user,id,signerId){
       
     }
     signer.tokenHash=await sha256Hex(secret);signer.invitation="Pending";
-    return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:emailLink?"email_link.resent":"invitation.resend.requested",signerId,actor:user.uid,at:now.toISOString()})}};
+    return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:mailMetadata?.eventType||(emailLink?"email_link.resent":"invitation.resend.requested"),signerId,actor:user.uid,at:now.toISOString()})}};
   });
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
@@ -347,8 +347,47 @@ export async function resendInvitation(ctx,user,id,signerId){
     await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer){signer.invitation="Failed";if(emailLink)signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
   }
-  await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resent",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
+  await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:mailMetadata?.eventType==="email_link.reminded"?"email_link.reminder_sent":"invitation.resent",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
   return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent"};
+}
+
+export async function changeSignerEmail(ctx,user,id,signerId,{email,name,title}={}){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  const target=envelope.signers.find(s=>s.id===signerId);
+  if(!target||target.status!=="Pending"||target.emailLinkOpenedAt||target.emailLinkStatus==="opened")throw new HttpError(409,"A signer email can only be changed before the invitation is opened.");
+  const nextEmail=validateEmail(email).trim().toLowerCase();
+  if(envelope.signers.some(s=>s.id!==signerId&&String(s.email||"").trim().toLowerCase()===nextEmail))throw new HttpError(409,"That email address is already assigned to this envelope.");
+  await mutate(ctx,id,async current=>{
+    const signer=current.signers.find(s=>s.id===signerId);
+    if(!signer||signer.status!=="Pending"||signer.emailLinkOpenedAt||signer.emailLinkStatus==="opened")throw new HttpError(409,"A signer email can only be changed before the invitation is opened.");
+    const at=ctx.now().toISOString();
+    signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked_email_changed",revokedAt:at}].slice(-10);
+    const previousEmailHash=signer.emailHash;
+    signer.email=nextEmail;signer.emailHash=await sha256Hex(nextEmail);signer.emailLinkStatus="revoked";signer.invitation="Revoked";
+    if(name!==undefined)signer.name=validateName(name);
+    if(title!==undefined){signer.title=cleanText(title,120);signer.declaredParticulars={...(signer.declaredParticulars||{}),title:signer.title};}
+    return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"signer.email_changed",signerId,actor:user.uid,previousEmailHash,nextEmailHash:signer.emailHash,at})}};
+  });
+  const result=await resendInvitation(ctx,user,id,signerId,{eventType:"email_link.reissued_after_email_change"});
+  return{...result,emailChanged:true};
+}
+
+export async function remindInvitation(ctx,user,id,signerId){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  const signer=envelope.signers.find(s=>s.id===signerId);
+  if(!signer||signer.status!=="Pending"||signer.invitation!=="Sent")throw new HttpError(409,"Only an invited, unsigned signer can receive a reminder.");
+  const now=ctx.now(),last=Date.parse(String(signer.lastReminderAt||""));
+  if(Number.isFinite(last)&&now.getTime()-last<60*60*1000)throw new HttpError(429,"A reminder was already sent to this signer within the last hour.");
+  await mutate(ctx,id,async current=>{
+    const target=current.signers.find(s=>s.id===signerId);
+    const prior=Date.parse(String(target?.lastReminderAt||""));
+    if(!target||target.status!=="Pending"||(Number.isFinite(prior)&&now.getTime()-prior<60*60*1000))throw new HttpError(429,"A reminder was already sent to this signer within the last hour.");
+    target.lastReminderAt=now.toISOString();
+    return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.reminder_requested",signerId,actor:user.uid,at:now.toISOString()})}};
+  });
+  return resendInvitation(ctx,user,id,signerId,{eventType:"email_link.reminded"});
 }
 
 export async function revokeInvitation(ctx,user,id,signerId){
