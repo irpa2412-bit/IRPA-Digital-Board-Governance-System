@@ -6,28 +6,32 @@ import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInv
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
-import {openSigning,sign,declineSigning} from "../src/signing.mjs";
+import {openSigning,sign,declineSigning,voidEnvelope} from "../src/signing.mjs";
+import {route} from "../src/router.mjs";
 
 const NOW=new Date("2026-11-16T08:00:00.000Z");
-async function fixture({authority=true,failMail=false}={}) {
-  const sent=[];
+async function fixture({failMail=false,signers=null}={}) {
+  const sent=[],verificationCodes=[],kvStore=new Map();
+  const kv={get:async key=>kvStore.get(key)||null,put:async(key,value)=>{kvStore.set(key,value);},delete:async key=>{kvStore.delete(key);}};
   let now=NOW;
   const ctx=buildEsignContext({
-    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7",DRIVE_KV:kv},
     now:()=>new Date(now),
     verifyUser:async()=>null,
-    verifyEmailSignerAuthority:async email=>authority?({verified:true,authorityRole:"Board Secretary",sourceCollection:"members",sourceRecordId:"member-doc-1",name:"Registered Board Secretary"}):({verified:false}),
     sendInvitation:async message=>{sent.push(message);if(failMail)throw new Error("SMTP rejected");},
+    sendEmailVerificationCode:async message=>{verificationCodes.push(message);},
     logger:{error(){}}
   });
   const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
   const source=await ctx.storage.put({path:"source/email-link.pdf",bytes,contentType:"application/pdf",metadata:{}});
   const documentId="DOC-EMAIL-"+Math.random().toString(16).slice(2,10);
   await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"email-link.pdf",title:"Email Link Governance Instrument",classification:"Restricted"});
-  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{documentId,externalReference:"IRPA-EXT-"+Math.random().toString(16).slice(2,10),archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",email:"Board.Secretary@example.org",name:"Client supplied name",authorityRole:"Board Secretary",order:1,role:"Client supplied role"}]});
+  ctx.allowReturnTokens=true;
+  const signerInputs=signers||[{identityType:"email-link",email:"Board.Secretary@example.org",name:"Client supplied name",title:"Board Secretary",routingPosition:1}];
+  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{documentId,externalReference:"IRPA-EXT-"+Math.random().toString(16).slice(2,10),archives:["board-governance"],signingMode:"Sequential",signers:signerInputs,returnTokens:true});
   const envelope=await ctx.meta.get("envelopes",created.envelopeId);
-  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
-  return {ctx,sent,created,envelope,token,now:value=>{now=value}};
+  const token=sent[0]?new URL(sent[0].link).searchParams.get("emailSignToken"):created.tokens?.[0];
+  return {ctx,sent,verificationCodes,kvStore,created,envelope,tokens:created.tokens||[],token,now:value=>{now=value}};
 }
 
 test("invalid token failures are rate-limited by token and IP with one neutral response",async()=>{
@@ -66,7 +70,7 @@ test("email-link signer is stored with token hash, email hash, expiry and issued
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
   assert.equal(signer.authorityVerification,undefined);
   assert.equal(signer.name,"Client supplied name");
-  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",occupation:"",capacity:""});
+  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",title:"Board Secretary"});
   assert.equal(f.sent.length,1);
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
@@ -125,7 +129,7 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
 
 
 test("external email-link signer can declare and sign without a Firebase UID or authority-register match",async()=>{
-  const f=await fixture({authority:false});
+  const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.22");
   assert.equal(opened.ok,true);
   assert.equal(opened.signer.identityType,"email-link");
@@ -133,7 +137,7 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   const signed=await sign(f.ctx,{
     token:opened.sessionToken,
     signature:{type:"typed",value:"Vendor Signer"},
-    declarations:{name:"Vendor Signer",occupation:"External Consultant",capacity:"Contractor"},
+    declarations:{name:"Vendor Signer",title:"External Consultant"},
     consent:true,
     user:null
   });
@@ -141,7 +145,7 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   assert.equal(signed.status,"Completed");
   const completed=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(completed.signers[0].uid,null);
-  assert.equal(completed.signers[0].signerDeclarations.occupation,"External Consultant");
+  assert.equal(completed.signers[0].signerDeclarations.title,"External Consultant");
   assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
   assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
   const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
@@ -205,5 +209,5 @@ test("email-link signer can revoke before submission and the session token is in
   assert.equal(stored.signers[0].emailLinkTokenHistory.at(-1).status,"revoked_by_signer");
   assert.equal(stored.events.at(-1).type,"email_link.revoked_by_signer");
   await assert.rejects(()=>getSigningPdf(f.ctx,opened.sessionToken,null));
-  await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Signer"},declarations:{name:"Signer",occupation:"Officer"},consent:true,user:null}));
+  await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Signer"},declarations:{name:"Signer",title:"Officer"},consent:true,user:null}));
 });
