@@ -119,11 +119,12 @@ test("Gateway signer field routing preserves authenticated account UIDs", () => 
   assert.match(storage, /signerId:resolveSignerId\(field\)/);
 });
 
-test("registered IRPA signers use authenticated account identity and their saved Signature Profile", () => {
+test("registered IRPA signers retain local UID assignment while every Gateway invitation uses email-link identity and the signer can explicitly apply a saved Signature Profile", () => {
   assert.match(platform, /identityType:"account"/);
-  assert.match(platform, /recipient\.identityType==="email-link"\?"email-link":"account"/);
+  assert.match(platform, /const gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:"email-link"\}\)\)/);
+  assert.match(storage, /for\(const key of \[recipient\.id,recipient\.signerId,recipient\.uid,recipient\.email\]/);
+  assert.match(storage, /signerId:resolveSignerId\(field\)/);
   assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
-  assert.match(storage, /uid:String\(recipient\.uid\)/);
   assert.match(gatewayPortal, /getMySignatureProfile\(\)/);
   assert.match(gatewayPortal, /savedSignatureUrl=\{profile\?\.signatureUrl\|\|""\}/);
   assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
