@@ -61,7 +61,7 @@ test("assigned Date field is persisted from the Gateway signedAt timestamp, not 
     id:"ENV-date-test",documentId:"DOC-date-test",documentHash,expiresAt:"2999-01-01T00:00:00.000Z",
     status:"Sent",signingMode:"Sequential",events:[],_v:1,
     signers:[
-      {id:"S1",uid:"signer-uid",email:"signer@irpa.or.tz",identityType:"email-link",emailLinkStatus:"opened",status:"Pending",order:1,routingPosition:1,tokenHash},
+      {id:"S1",uid:"signer-uid",email:"signer@irpa.or.tz",identityType:"email-link",emailLinkStatus:"opened",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:1,routingPosition:1,tokenHash},
       {id:"S2",uid:"next-signer",email:"next@irpa.or.tz",identityType:"email-link",emailLinkStatus:"waiting",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:2,routingPosition:2,tokenHash:"c".repeat(64)}
     ],
     fields:[{fieldId:"date-1",type:"Date",page:1,x:10,y:80,width:24,height:6,signerId:"S1",signerUid:"signer-uid",required:true}]
