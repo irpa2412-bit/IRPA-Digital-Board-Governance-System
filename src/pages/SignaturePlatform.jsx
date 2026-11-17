@@ -584,6 +584,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   if(!title.trim()){setMessage("Enter the envelope title before adding a signer.");return;}
   if(!documentId||!documentUrl){setMessage("Select a controlled PDF before adding a signer.");return;}
   const registeredEmail=String(registered?.email||email).trim().toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registeredEmail)){setMessage("The selected participant must have a valid email address before they can be assigned.");return;}
   const ownerEmail=String(documentOwner.email||"").trim().toLowerCase();
   const isOwnerDuplicate=!!(registered&&registered.uid===documentOwner.uid)||(!!registeredEmail&&!!ownerEmail&&registeredEmail===ownerEmail);
   if(isOwnerDuplicate){
@@ -615,7 +616,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   try{
     let next;
     if(registered){
-      next={uid:registered.uid,identityType:"email-link",name:registered.name||registered.email,email:registered.email||email,role,institutionalRole:registered.boardPosition||registered.role||"",occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
+      next={uid:registered.uid,identityType:"email-link",name:registered.name||registered.email,email:registeredEmail,role,institutionalRole:registered.boardPosition||registered.role||"",occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
     }else{
       if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error("Enter a valid email address for the external participant.");
       const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(email));
