@@ -50,3 +50,21 @@ test("existing Firestore rules are unchanged and their actual-data gate remains 
   assert.match(rules, /match \/signatureEnvelopes\/\{id\}.*actualCreateAllowed\(\)/);
   assert.match(rules, /function actualCreateAllowed\(\)\{return actualDataAccessOpen\(\)\|\|trialDataRecord\(request\.resource\.data\);\}/);
 });
+
+test("signature owner activation, append-only audit, signer mirror and signed-document list are Gateway-only",()=>{
+  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/activate"/);
+  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/audit"/);
+  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/mirror"/);
+  assert.match(worker,/pathname === "\\/api\\/signature-workflow\\/signed-documents"/);
+  assert.match(worker,/Only the original document owner may activate this signing workflow/);
+  assert.match(worker,/currentDocument:\\{exists:false\\}/);
+  assert.match(worker,/cryptographicEvidenceStatus:row.cryptographicEvidenceStatus/);
+  assert.match(worker,/signerArchiveUrl:row.signerArchiveUrl/);
+  assert.doesNotMatch(worker,/documents:\\s*rows\\.filter/);
+  assert.match(client,/\/api\/signature-workflow\/activate/);
+  assert.match(client,/\/api\/signature-workflow\/audit/);
+  assert.match(client,/\/api\/signature-workflow\/mirror/);
+  assert.match(client,/\/api\/signature-workflow\/signed-documents/);
+  assert.match(client,/\/api\/sign\/submit/);
+  assert.doesNotMatch(client,/await updateDoc\\(doc\\(db,ENVELOPE_COLLECTION/);
+});
