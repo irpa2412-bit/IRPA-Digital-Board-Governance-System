@@ -66,14 +66,14 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
         const value=typed.trim().slice(0,80);
         if(!value)throw new Error("Enter your name before confirming.");
         const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
-        const font="italic 72px cursive";ctx.font=font;
+        const dpr=Math.max(1,window.devicePixelRatio||1);const font=`italic ${72*dpr}px cursive`;ctx.font=font;
         const metrics=ctx.measureText(value);
         const left=Math.max(0,metrics.actualBoundingBoxLeft||0),right=Math.max(1,metrics.actualBoundingBoxRight||metrics.width);
         const ascent=Math.max(1,metrics.actualBoundingBoxAscent||60),descent=Math.max(0,metrics.actualBoundingBoxDescent||12);
-        const padding=8;canvas.width=Math.ceil(left+right+padding*2);canvas.height=Math.ceil(ascent+descent+padding*2);
+        const padding=8*dpr;canvas.width=Math.ceil(left+right+padding*2);canvas.height=Math.ceil(ascent+descent+padding*2);
         const textContext=canvas.getContext("2d");textContext.font=font;textContext.fillStyle="#111827";textContext.textBaseline="alphabetic";
         textContext.fillText(value,padding+left,padding+ascent);
-        specimen=trimSignatureCanvas(canvas,{padding:4});
+        specimen=trimSignatureCanvas(canvas,{padding:4,devicePixelRatio:dpr});
       }else{
         const src=field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl;
         if(!src)throw new Error("No saved "+label+" is available. Choose Draw or Type instead.");
