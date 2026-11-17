@@ -49,7 +49,7 @@ test("completed gateway signing updates portal envelope, appends trail event, an
 
 test("per-signer and completion audit events use stable IDs and are idempotent", async () => {
   const envelopeId = "IRPA-ENV-IDEMPOTENT";
-  const docs = new Map([[ "signatureEnvelopes/" + envelopeId, { documentId: "DOC-99", status: "In Progress" } ]]);
+  const docs = new Map([[ "signatureEnvelopes/" + envelopeId, { documentId: "DOC-99", status: "In Progress" } ],["documents/DOC-99",{id:"DOC-99",status:"PENDING_SIGNATURE"}]]);
   const writes = [];
   const getDocument = async path => docs.get(path) || null;
   const updateDocument = async (path, fields) => {

@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const worker = fs.readFileSync("src/index.js", "utf8");
 const client = fs.readFileSync("../src/firebase/signaturePlatform.js", "utf8");
+const storage = fs.readFileSync("../src/firebase/signatureStorage.js", "utf8");
 const selfTest = fs.readFileSync("../src/components/SignaturePathwaySelfTest.jsx", "utf8");
 const batch = fs.readFileSync("../src/utils/controlledDocumentDiagnosticBatch.mjs", "utf8");
 const rules = fs.readFileSync("../firestore.rules", "utf8");
@@ -49,4 +50,25 @@ test("new controlled uploads verify the exact canonical document ID in Drive met
 test("existing Firestore rules are unchanged and their actual-data gate remains explicit", () => {
   assert.match(rules, /match \/signatureEnvelopes\/\{id\}.*actualCreateAllowed\(\)/);
   assert.match(rules, /function actualCreateAllowed\(\)\{return actualDataAccessOpen\(\)\|\|trialDataRecord\(request\.resource\.data\);\}/);
+});
+
+test("signature owner activation, append-only audit, signer mirror and signed-document list are Gateway-only",()=>{
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/activate"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/audit"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/mirror"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/signed-documents"'));
+  assert.ok(worker.includes('pathname === "/api/signature-workflow/certificate"'));
+  assert.match(worker,/Only the original document owner may activate this signing workflow/);
+  assert.match(worker,/Only the original document owner may archive the completion certificate/);
+  assert.match(worker,/Certificate does not match the authoritative completed Gateway document/);
+  assert.match(worker,/currentDocument:\{exists:false\}/);
+  assert.match(worker,/cryptographicEvidenceStatus:row.cryptographicEvidenceStatus/);
+  assert.match(worker,/signerArchiveUrl:row.signerArchiveUrl/);
+  assert.doesNotMatch(worker,/documents:\s*rows\.filter/);
+  assert.match(client,/\/api\/signature-workflow\/activate/);
+  assert.match(client,/\/api\/signature-workflow\/audit/);
+  assert.match(client,/\/api\/signature-workflow\/mirror/);
+  assert.match(client,/\/api\/signature-workflow\/signed-documents/);
+  assert.match(storage,/\/api\/sign\/submit/);
+  assert.doesNotMatch(client,/await updateDoc\(doc\(db,ENVELOPE_COLLECTION/);
 });

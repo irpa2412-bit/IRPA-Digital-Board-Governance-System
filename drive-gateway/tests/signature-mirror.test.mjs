@@ -6,7 +6,7 @@ test("completion mirror creates a signer-specific signature register record from
   const documents = new Map([["signatureEnvelopes/IRPA-ENV-TEST", {
     id:"IRPA-ENV-TEST",documentId:"DOC-TEST",documentReference:"IRPA-DOC-TEST",recordOrigin:"TRIAL",trialData:true,
     title:"Test governance resolution",signers:[]
-  }]]);
+  }],["documents/DOC-TEST",{id:"DOC-TEST",ownerUid:"owner-uid"}]]);
   const writes = [];
   const getDocument = async path => documents.get(path) || null;
   const updateDocument = async (path, fields) => {
@@ -43,6 +43,10 @@ test("completion mirror creates a signer-specific signature register record from
   assert.equal(secretary.signerArchiveFileId,"secretary-copy");
   assert.equal(secretary.signatureAuthority,"Board Secretary");
   assert.equal(secretary.status,"Signed");
+  const documentMirror=writes.find(x=>x.path==="documents/DOC-TEST")?.fields;
+  assert.equal(documentMirror.signatureStatus,"Completed");
+  assert.equal(documentMirror.lastCompletedDocumentHash,"a".repeat(64));
+  assert.equal(documentMirror.gatewayArchiveState,"Final Completed Document");
 });
 
 
@@ -57,7 +61,7 @@ test("email signer mirror includes signer ID, declarations and verified per-sign
   await persistCompletedSignatureEnvelope({
     envelope,
     completion:{finalHash:"d".repeat(64),completedAt:"2026-11-16T15:11:00.000Z",primaryStorageId:"archive-email",files:[{kind:"signer-copy",signerId:"S1",id:"external-copy"}],signerEvidence:[{signerId:"S1",evidenceId:"CRYPTO-EMAIL-1",identityType:"email-link"}]},
-    getDocument:async()=>({documentId:"DOC-EMAIL"}),
+    getDocument:async path=>path==="signatureEnvelopes/IRPA-ENV-EMAIL"?{documentId:"DOC-EMAIL"}:path==="documents/DOC-EMAIL"?{id:"DOC-EMAIL"}:null,
     updateDocument:async(path,fields)=>writes.push({path,fields}),
     now:()=>"2026-11-16T15:11:01.000Z"
   });
@@ -79,7 +83,7 @@ test("completion mirror fails closed when an assigned signer archive copy is mis
       {id:"S1",uid:"signer-uid",name:"Signer",email:"signer@example.test",status:"Signed"}
     ]},
     completion:{finalHash:"b".repeat(64),completedAt:"2026-11-15T10:02:00.000Z",primaryStorageId:"archive-file",files:[{kind:"archive",id:"archive-file"}]},
-    getDocument:async path=>path==="signatureEnvelopes/IRPA-ENV-MISSING"?{documentId:"DOC-MISSING"}:null,
+    getDocument:async path=>path==="signatureEnvelopes/IRPA-ENV-MISSING"?{documentId:"DOC-MISSING"}:path==="documents/DOC-MISSING"?{id:"DOC-MISSING"}:null,
     updateDocument:async(path,fields)=>updates.push({path,fields})
   }),/archive copy is missing/);
   assert.equal(updates.some(x=>x.path.startsWith("signatures/")),false);

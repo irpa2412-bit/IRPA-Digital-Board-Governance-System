@@ -34,6 +34,31 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
     lastSignedByUid, gatewayStatus: "Completed", gatewayFinalHash: completion.finalHash,
     gatewaySigningStatus: "Completed", gatewayStatusUpdatedAt: timestamp, updatedAt: timestamp
   });
+  const documentId = clean(existing.documentId || envelope.documentId);
+  if (!documentId) throw new Error("Completed signature mirror is missing its controlled document ID.");
+  const documentPath = "documents/" + documentId;
+  const sourceDocument = await getDocument(documentPath);
+  if (!sourceDocument) throw new Error("The controlled document mirror was not found for signature completion.");
+  const primaryArchive = (completion.files || []).find(file => file?.kind === "archive") || null;
+  await updateDocument(documentPath, {
+    signatureEnvelopeId: envelopeId,
+    signatureStatus: "Completed",
+    workflowActionStatus: "Signed",
+    lastWorkflowAction: "Signature",
+    lastWorkflowActionUid: lastSignedByUid || "",
+    lastWorkflowActionAt: completion.completedAt || timestamp,
+    completedDocumentUrl: signedDocumentUrl,
+    ownerCompletedDocumentUrl: signedDocumentUrl,
+    ownerCompletedDocumentPath: primaryArchive?.path || signedDocumentUrl,
+    ownerRecordStatus: "Completed",
+    lastCompletedDocumentHash: completion.finalHash,
+    gatewayArchiveStorageId: primaryArchive?.id || signedFileId,
+    gatewayArchivePath: primaryArchive?.path || "",
+    gatewayArchiveState: "Final Completed Document",
+    gatewaySigningStatus: "Completed",
+    gatewayFinalHash: completion.finalHash,
+    updatedAt: timestamp
+  });
   for (const signer of signers.filter(s => s.status === "Signed")) {
     const assignedSigner=(envelope.signers||[]).find(x=>(x.uid&&x.uid===signer.uid)||(x.email&&x.email===signer.email));
     const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""));

@@ -49,14 +49,11 @@ async function main(){
     if(process.env.GITHUB_SHA) assert.equal(gatewayVersion,process.env.GITHUB_SHA,"Staging gateway version does not match this workflow commit.");
     console.log("Gateway version: "+gatewayVersion);
   });
-  let admin,signer,adminAccess,signerHeaders,adminHeaders,identity;
-  await step("Authenticate staging admin and signer; verify signer authority",async()=>{
+  let admin,signer,adminAccess,signerHeaders,adminHeaders;
+  await step("Authenticate staging admin and signer",async()=>{
     [admin,signer,adminAccess]=await Promise.all([signIn(adminEmail,adminPassword),signIn(signerEmail,signerPassword),adminToken()]);
     signerHeaders={Authorization:"Bearer "+signer.idToken,"x-irpa-staging-diagnostics":"1"};
     adminHeaders={Authorization:"Bearer "+admin.idToken,"x-irpa-staging-diagnostics":"1"};
-    identity=await readDoc(adminAccess,"signerIdentities",signer.localId);
-    assert.equal(identity.authorityStatus,"Current","Signer authority must be Current.");
-    assert.ok(identity.authorityRole&&identity.authorityRole!=="Not yet assigned","Signer needs registered authority.");
   });
   const stamp=Date.now().toString(36),documentId="DOC-STAGING-LIFECYCLE-"+stamp,portalEnvelopeId="STAGING-SIGN-"+stamp;
   let sourceHash="",gatewayEnvelopeId="",signingToken="",clientDocumentStateRejected=false,clientEnvelopeStateRejected=false,signedFileReference="",signedPdfHash="",gatewayFinalHash="",controlledRetrievalVerified=false;
@@ -66,22 +63,26 @@ async function main(){
     page.drawText("Synthetic test only; not an operational record.",{x:48,y:730,size:10});
     const bytes=await pdf.save();sourceHash=await sha(bytes);
     const form=new FormData();form.append("documentId",documentId);form.append("title","Staging Signature Lifecycle Acceptance");form.append("classification","Internal");form.append("archives","board-governance");form.append("status","SIGNED");form.append("signatureStatus","COMPLETED");form.append("file",new Blob([bytes],{type:"application/pdf"}),"staging-signature-lifecycle.pdf");
-    const uploaded=await jsonResponse(await checkedFetch(base+"/api/documents",{method:"POST",headers:signerHeaders,body:form}),"Staging controlled-document upload");
+    const uploaded=await jsonResponse(await checkedFetch(base+"/api/documents",{method:"POST",headers:adminHeaders,body:form}),"Staging controlled-document upload");
     assert.equal(uploaded.documentId,documentId);assert.equal(uploaded.sha256,sourceHash);assert.notEqual(uploaded.status,"SIGNED","Gateway must not accept a client-supplied SIGNED state.");assert.notEqual(uploaded.signatureStatus,"COMPLETED","Gateway must not accept a client-supplied Completed signature state.");clientDocumentStateRejected=true;
   });
   await step("Assign Authorization Officer and seed staging lifecycle records",async()=>{
     const now=new Date().toISOString();
     await createDoc(adminAccess,"documents",documentId,{documentId,title:"Staging Signature Lifecycle Acceptance",ownerUid:admin.localId,ownerEmail:admin.email||adminEmail,classification:"Restricted",archiveCategory:"Administrative Documents",status:"PENDING_SIGNATURE",fileName:"staging-signature-lifecycle.pdf",recordOrigin:"STAGING",createdAt:now,updatedAt:now});
-    await createDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId,{envelopeReference:portalEnvelopeId,title:"Staging Signature Lifecycle Acceptance",documentId,senderUid:signer.localId,status:"In Progress",signingMode:"Sequential",participantUids:[admin.localId,signer.localId],actionUids:[signer.localId],currentSignerUid:signer.localId,signers:[{uid:signer.localId,name:"IRPA Staging Authorization Officer",email:signer.email||signerEmail,role:"Authorization Officer",action:"Authorization",order:1,status:"Pending"}],createdAt:now,recordOrigin:"STAGING"});
-    const seeded=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);assert.equal(seeded.documentId,documentId);assert.equal(seeded.signers?.[0]?.role,"Authorization Officer");
+    await createDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId,{envelopeReference:portalEnvelopeId,title:"Staging Signature Lifecycle Acceptance",documentId,ownerUid:admin.localId,senderUid:admin.localId,status:"Draft",signingMode:"Sequential",participantUids:[admin.localId,signer.localId],actionUids:[signer.localId],currentSignerUid:signer.localId,recipients:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",routingOrder:1,actionRequired:true,identityType:"account",status:"Current"}],signers:[{uid:signer.localId,name:"IRPA Staging Authorization Officer",email:signer.email||signerEmail,role:"Authorization Officer",action:"Authorization",order:1,status:"Pending"}],createdAt:now,recordOrigin:"STAGING"});
+    const seeded=await readDoc(adminAccess,"signatureEnvelopes",portalEnvelopeId);assert.equal(seeded.documentId,documentId);assert.equal(seeded.signers?.[0]?.role,"Authorization Officer");assert.equal(seeded.status,"Draft");assert.equal(seeded.ownerUid,admin.localId);
   });
   await step("Create linked signing envelope",async()=>{
-    const b=await jsonResponse(await checkedFetch(base+"/api/envelopes",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:portalEnvelopeId,returnTokens:true,documentId,title:"Staging Signature Lifecycle Acceptance",status:"Completed",signatureStatus:"COMPLETED",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",action:"Authorization",order:1}],fields:[{fieldId:"staging-authorization-name",type:"Name",page:1,x:8,y:18,width:50,height:8,signerUid:signer.localId,required:true},{fieldId:"staging-authorization-signature",type:"Signature",page:1,x:8,y:30,width:50,height:10,signerUid:signer.localId,required:true}]})}),"Linked staging envelope creation");
+    const b=await jsonResponse(await checkedFetch(base+"/api/envelopes",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({externalReference:portalEnvelopeId,returnTokens:true,documentId,title:"Staging Signature Lifecycle Acceptance",status:"Completed",signatureStatus:"COMPLETED",classification:"Restricted",archives:["board-governance"],signingMode:"Sequential",signers:[{uid:signer.localId,email:signer.email||signerEmail,name:"IRPA Staging Authorization Officer",role:"Authorization Officer",action:"Authorization",order:1}],fields:[{fieldId:"staging-authorization-name",type:"Name",page:1,x:8,y:18,width:50,height:8,signerUid:signer.localId,required:true},{fieldId:"staging-authorization-signature",type:"Signature",page:1,x:8,y:30,width:50,height:10,signerUid:signer.localId,required:true}]})}),"Linked staging envelope creation");
     gatewayEnvelopeId=b.envelopeId;assert.ok(gatewayEnvelopeId,"Gateway envelope ID missing.");assert.equal(b.status,"Sent","Gateway must ignore client-supplied Completed envelope status.");assert.ok(Array.isArray(b.tokens)&&b.tokens.length===1,"Staging signing token missing.");signingToken=b.tokens[0];clientEnvelopeStateRejected=true;
+  await step("Owner activates and sends the Gateway signing workflow",async()=>{
+    const activation=await jsonResponse(await checkedFetch(base+"/api/signature-workflow/activate",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({envelopeId:portalEnvelopeId,gatewayEnvelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:sourceHash,gatewaySigningStatus:b.status,gatewayInvitationStatus:"Sent",gatewaySignerAssignments:[{signerId:"S1",uid:signer.localId,email:signer.email||signerEmail,routingOrder:1}]})}),"Owner Gateway activation");
+    assert.equal(activation.ok,true);assert.equal(activation.status,"In Progress");assert.equal(activation.gatewayEnvelopeId,gatewayEnvelopeId);
+  });
   });
   await step("Sign as the assigned Authorization Officer",async()=>{
     const opened=await jsonResponse(await checkedFetch(base+"/api/sign/open",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Open Authorization Officer signing task");assert.equal(opened.canSign,true);
-    const signed=await jsonResponse(await checkedFetch(base+"/api/sign/submit",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Authorization Officer"},fieldValues:{"staging-authorization-name":"IRPA Staging Authorization Officer","staging-authorization-signature":"IRPA Staging Authorization Officer"},manualAuthorityIdentification:identity.authorityRole,consent:true})}),"Authorization Officer signature");
+    const signed=await jsonResponse(await checkedFetch(base+"/api/sign/submit",{method:"POST",headers:{...signerHeaders,"content-type":"application/json"},body:JSON.stringify({token:signingToken,signature:{type:"typed",value:"IRPA Staging Authorization Officer"},fieldValues:{"staging-authorization-name":"IRPA Staging Authorization Officer","staging-authorization-signature":"IRPA Staging Authorization Officer"},declarations:{name:"IRPA Staging Authorization Officer",occupation:"Staging Test Authorization Officer",capacity:"Staging"},consent:true})}),"Authorization Officer signature");
     assert.equal(signed.status,"Completed");assert.equal(signed.completed,true);
     const status=await jsonResponse(await checkedFetch(base+"/api/sign/status",{headers:{...signerHeaders,"x-signing-token":signingToken}}),"Completed gateway envelope status");assert.equal(status.status,"Completed");assert.equal(status.externalReference,portalEnvelopeId);assert.equal(status.signers?.length,1);assert.equal(status.signers[0].status,"Signed");assert.ok(status.completion?.finalHash,"Completed envelope has no finalHash.");gatewayFinalHash=status.completion.finalHash;assert.ok(Array.isArray(status.completion?.files)&&status.completion.files.some(f=>f?.id),"Completed envelope has no signed-file reference.");signedFileReference=status.completion.files.find(f=>f?.id)?.id||"";const pdfResponse=await checkedFetch(base+"/api/sign/pdf",{headers:{...signerHeaders,"x-signing-token":signingToken}});const signedBytes=Buffer.from(await pdfResponse.arrayBuffer());signedPdfHash=await sha(signedBytes);assert.equal(signedPdfHash,status.completion.finalHash,"Retrieved signed PDF SHA-256 differs from the gateway finalHash.");assert.equal(pdfResponse.headers.get("x-document-sha256"),signedPdfHash,"Signed PDF hash header differs from retrieved PDF SHA-256.");const unrelated=await globalThis.fetch(base+"/api/sign/pdf",{headers:{...adminHeaders,"x-signing-token":signingToken}});const unrelatedBody=redact(await unrelated.clone().text().catch(()=> ""));assert.ok([401,403].includes(unrelated.status),"Unrelated user was not denied controlled retrieval; HTTP "+unrelated.status+" body: "+unrelatedBody);controlledRetrievalVerified=true;
   });
@@ -117,7 +118,7 @@ async function main(){
     const rows=await r.json().catch(()=>[]);
     assert.equal(r.ok,true,"Could not query staging signature trail (HTTP "+r.status+")");
     const events=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));
-    assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);assert.ok(events.some(x=>x.actorUid===signer.localId&&x.event!=="Gateway Signing Completed"),"Signature trail lacks a signer-specific signatureEvents entry for "+signer.localId);
+    assert.ok(events.some(x=>x.event==="Workflow Activated and Sent"&&x.actorUid===admin.localId),"Signature trail lacks owner activation and send event.");assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);assert.ok(events.some(x=>x.actorUid===signer.localId&&x.event!=="Gateway Signing Completed"),"Signature trail lacks a signer-specific signatureEvents entry for "+signer.localId);
   });
   await postCheck("Lifecycle SIGNED",async()=>{
     const r=await checkedFetch(base+"/api/document-lifecycle/signature-complete",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({documentId,envelopeId:portalEnvelopeId})});
@@ -132,6 +133,26 @@ async function main(){
     assert.equal(r.ok,true,"Could not query lifecycle audit collection (HTTP "+r.status+")");
     const records=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));
     assert.ok(records.some(x=>x.action==="DOCUMENT_LIFECYCLE_SIGNATURE_COMPLETED"),"Lifecycle audit lacks DOCUMENT_LIFECYCLE_SIGNATURE_COMPLETED for "+documentId);
+  });
+  await postCheck("Authenticated signed-document list",async()=>{
+    const r=await checkedFetch(base+"/api/signature-workflow/signed-documents",{headers:signerHeaders});
+    const body=await r.json().catch(()=>({}));
+    assert.equal(r.ok,true,"Signed-document list failed (HTTP "+r.status+").");
+    const row=(body.documents||[]).find(item=>item.documentId===documentId&&item.signerUid===signer.localId);
+    assert.ok(row,"Signed-document list did not include this signer's archived document.");
+    assert.ok(row.signerArchiveUrl,"Signed-document list omitted the signer archive URL.");
+    assert.equal(Object.hasOwn(row,"signaturePaneRecords"),false,"Signed-document list exposed signature pane data.");
+    assert.equal(Object.hasOwn(row,"signatureData"),false,"Signed-document list exposed signature data.");
+  });
+  await postCheck("Per-signer archive mirror",async()=>{
+    const archive=await readDoc(adminAccess,"signatures","gateway-"+portalEnvelopeId+"-"+signer.localId);
+    assert.equal(archive.signerUid,signer.localId,"Signer archive UID mismatch.");
+    assert.equal(archive.status,"Signed","Signer archive record is not Signed.");
+    assert.ok(archive.signerArchiveUrl,"Signer archive URL is missing.");
+    assert.ok(archive.signerArchiveFileId,"Signer archive file reference is missing.");
+    const doc=await readDoc(adminAccess,"documents",documentId);
+    assert.equal(doc.gatewayArchiveState,"Final Completed Document","Controlled document archive state was not mirrored.");
+    assert.ok(doc.ownerCompletedDocumentUrl,"Controlled document completion URL is missing.");
   });
   await postCheck("Approval / persisted signed document",async()=>{
     const doc=await readDoc(adminAccess,"documents",documentId);

@@ -8,6 +8,8 @@ on:
       - "src/firebase/signatureStorage.js"
       - "src/firebase/firestorePayload.js"
       - "tests/signature-workflow-history-integration.test.mjs"
+      - "tests/signature-no-firestore-writes.test.mjs"
+      - "scripts/check-signature-no-firestore-writes.mjs"
       - ".github/workflows/signature-security-regression.yml"
   push:
     branches:
@@ -66,7 +68,8 @@ jobs:
         run: |
           set -euo pipefail
           npx firebase emulators:exec --only firestore --project demo-irpa-signature "npm run test:security-rules && npm run test:meeting-category"
-          node --test tests/signature-workflow-history-integration.test.mjs tests/signature-firestore-diagnostics.test.mjs
+          node --test tests/signature-workflow-history-integration.test.mjs tests/signature-firestore-diagnostics.test.mjs tests/signature-no-firestore-writes.test.mjs
+          npm run check:signature-no-firestore-writes
           npm run test:pdf-page-rendering
           npm run test:fundraising-registry
           npm run test:portal-navigation
