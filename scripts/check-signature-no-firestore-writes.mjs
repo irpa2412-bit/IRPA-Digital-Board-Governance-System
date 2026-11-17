@@ -8,7 +8,7 @@ const entrypoints = [
   "createSignatureEnvelope","saveSignatureWorkflowDraft","finalizeSignatureWorkflowDraft",
   "startSignatureWorkflow","sendSignatureInvitation","signEnvelope","signEnvelopeThroughGateway",
   "syncGatewaySigningMirror","recordEnvelopeEvent","recordSignatureAdoption",
-  "attachGatewayEmailLinkEnvelope","getMySignedDocuments","releaseNextSigner"
+  "attachGatewayEmailLinkEnvelope","getMySignedDocuments","releaseNextSigner","createCompletionCertificate"
 ];
 function functionBody(name) {
   const patterns = [
