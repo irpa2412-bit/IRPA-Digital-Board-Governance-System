@@ -516,11 +516,14 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     if(!uploaded.ok||uploadedData.ok===false)throw new Error(uploadedData.error||"An optional attachment could not be stored in the Gateway.");
     gatewayAttachments.push({documentId:attachmentDocumentId,title:attachmentTitle,fileName,contentType,optional:true,sha256:await sha256HexBytes(bytes)});
   }
-  const fields = (envelope.fields || []).map(field => ({
-    fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
-    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),required:field.required === true,
-    placeholder:field.placeholder || ""
-  }));
+  const fields = (envelope.fields || []).map(field => {
+    const assigned=ordered.find(recipient=>recipient.uid===field.signerUid||(String(recipient.email||"").trim().toLowerCase()===String(field.signerEmail||"").trim().toLowerCase()&&String(field.signerEmail||"").trim()!==""));
+    return {
+      fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
+      width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),signerEmail:assigned?.email||field.signerEmail||null,required:field.required === true,
+      placeholder:field.placeholder || ""
+    };
+  });
   const payload = {
     externalReference:envelope.id,
     documentId,
@@ -531,13 +534,12 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     signers:ordered.map((recipient,index) => {
       const emailLink = recipient.identityType === "email-link";
       return {
-        identityType:emailLink ? "email-link" : "account",
-        ...(!emailLink && recipient.uid ? {uid:String(recipient.uid)} : {}),
+        identityType:"email-link",
         email:String(recipient.email || "").trim().toLowerCase(),
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
-        occupation:String(recipient.occupation||recipient.capacity||"").trim(),
-        capacity:String(recipient.capacity||"").trim(),
-        order:envelope.signingMode === "Parallel" ? 1 : index + 1
+        title:String(recipient.title||"").trim(),
+        routingPosition:Math.max(1,Math.min(99,Number(recipient.routingOrder||1))),
+        order:Math.max(1,Math.min(99,Number(recipient.routingOrder||1)))
       };
     }),
     fields,
