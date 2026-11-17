@@ -84,7 +84,7 @@ test("a no-session email-link visit shows the email-code step and only redeems t
   assert.equal(f.verificationCodes.length,1);
   assert.match(f.verificationCodes[0].code,/^\d{6}$/);
   assert.equal((await f.ctx.meta.get("envelopes",f.created.envelopeId)).signers[0].emailLinkStatus,"issued");
-  const page=fs.readFileSync(new URL("../../../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
+  const page=fs.readFileSync(new URL("../../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
   assert.match(page,/Confirm your email/);
   assert.match(page,/Confirm email and continue/);
   const confirmedResponse=await route(new Request("https://gw.test/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:f.token,code:f.verificationCodes[0].code})}),f.ctx);
