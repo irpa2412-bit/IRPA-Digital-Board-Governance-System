@@ -496,6 +496,26 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     const data = await existingResponse.json().catch(() => ({}));
     throw new Error(data.error || ("The Gateway could not verify the existing source document (HTTP " + existingResponse.status + ")."));
   }
+  const gatewayAttachments=[];
+  for(let index=0;index<(envelope.attachments||[]).length;index++){
+    const attachment=envelope.attachments[index];
+    const bytes=attachment.bytes instanceof Uint8Array?attachment.bytes:new Uint8Array(attachment.bytes||[]);
+    if(bytes.length<1)throw new Error("An optional attachment is empty: "+String(attachment.title||"attachment"));
+    const attachmentDocumentId=("ATT-"+String(envelope.id)+"-"+String(index+1)).replace(/[^A-Za-z0-9_-]/g,"-").slice(0,64);
+    const attachmentTitle=String(attachment.title||attachment.fileName||"Optional attachment").trim().slice(0,180);
+    const contentType=String(attachment.contentType||"application/pdf");
+    const fileName=String(attachment.fileName||("attachment-"+(index+1)+".pdf")).replace(/[\r\n"]/g,"").slice(0,180);
+    const form=new FormData();
+    form.append("documentId",attachmentDocumentId);
+    form.append("title",attachmentTitle);
+    form.append("classification",classification);
+    form.append("archives",archiveKey);
+    form.append("file",new Blob([bytes],{type:contentType}),fileName);
+    const uploaded=await gatewayAuthenticatedRequest("/api/documents",{method:"POST",body:form,contentType:null});
+    const uploadedData=await uploaded.json().catch(()=>({}));
+    if(!uploaded.ok||uploadedData.ok===false)throw new Error(uploadedData.error||"An optional attachment could not be stored in the Gateway.");
+    gatewayAttachments.push({documentId:attachmentDocumentId,title:attachmentTitle,fileName,contentType,optional:true,sha256:await sha256HexBytes(bytes)});
+  }
   const fields = (envelope.fields || []).map(field => ({
     fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
     width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),required:field.required === true,
@@ -520,7 +540,8 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
       };
     }),
-    fields
+    fields,
+    attachments:gatewayAttachments
   };
   const response = await gatewayAuthenticatedRequest("/api/envelopes", {method:"POST",body:JSON.stringify(payload)});
   const result = await response.json().catch(() => ({}));
