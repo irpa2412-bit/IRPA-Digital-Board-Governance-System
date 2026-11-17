@@ -155,6 +155,8 @@ test("touch-responsive signature palette assignment is narrowly allowlisted with
   assert.match(workflow, /changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
   assert.match(workflow, /changed\.includes\("src\/styles\/signature-portal\.css"\)/);
   assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-palette-signer-management\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-signer-picker-regression\.test\.mjs"\)/);
   assert.match(workflow, /!signaturePaletteDirectAssignmentRepair/);
   assert.match(workflow, /signaturePaletteDirectAssignmentRepair &&/);
   assert.ok(workflow.includes('"src/styles/signature-portal.css"'));
