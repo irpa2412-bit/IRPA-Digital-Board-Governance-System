@@ -1,57 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  gatewayAuthorityCandidates,
-  normalizeGatewayAuthority,
-  resolveGatewayAuthorityLabel
-} from "../src/signatureAuthority.mjs";
+import {readFileSync} from "node:fs";
 
-test("gateway verifies multiple registered roles on one authenticated member or employee record", () => {
-  const record = { roles: ["Board Secretary", "Executive Director"] };
-  const candidates = gatewayAuthorityCandidates(record);
-  assert.ok(candidates.includes("board secretary"));
-  assert.ok(candidates.includes("executive director"));
-  assert.equal(resolveGatewayAuthorityLabel(record, "Executive Director"), "Executive Director");
+const read=path=>readFileSync(new URL(path,import.meta.url),"utf8");
+const signing=read("../src/signing.mjs");
+const emailLinks=read("../src/emailSigningLinks.mjs");
+const router=read("../src/router.mjs");
+const gateway=read("../src/index.js");
+
+test("email-link signing does not import or call the signature authority matrix",()=>{
+  assert.doesNotMatch(signing,/signatureAuthority|verify.*Authority|authorityRole/);
+  assert.doesNotMatch(emailLinks,/signatureAuthority|resolveEmailSignerAuthority|authorityRole/);
+  assert.doesNotMatch(gateway,/verifyGatewaySigningAuthority|verifyGatewayEmailSignerAuthority|verifySigningAuthority/);
+  assert.doesNotMatch(router,/signing-authority\/verify|authority\/verify/);
 });
 
-test("gateway accepts structured roleAssignments without stringifying objects", () => {
-  const record = {
-    roleAssignments: [
-      { role: "Board Treasurer" },
-      { title: "Communications Officer" }
-    ]
-  };
-  const candidates = gatewayAuthorityCandidates(record);
-  assert.ok(candidates.includes("board treasurer"));
-  assert.ok(candidates.includes("communications officer"));
+test("email possession and a declared name are the signer identity contract",()=>{
+  assert.match(signing,/identityType:"email-link"/);
+  assert.match(signing,/emailLinkStatus/);
+  assert.match(signing,/if\(!declared\.name\)throw new HttpError\(400/);
+  assert.doesNotMatch(signing,/declared\.occupation|declared\.capacity/);
 });
 
-test("gateway normalizer handles prefixes and repeated whitespace", () => {
-  assert.equal(normalizeGatewayAuthority("  IRPA   Board Secretary  "), "board secretary");
-  assert.equal(normalizeGatewayAuthority("The   Executive Director"), "executive director");
-});
-
-test("gateway supports the legacy Board Members plural spelling without merging ambiguous director titles", () => {
-  assert.equal(normalizeGatewayAuthority("Board Members"), "board member");
-  assert.equal(resolveGatewayAuthorityLabel({ role: "Board Member" }, "Board Members"), "Board Member");
-  assert.notEqual(normalizeGatewayAuthority("Director Field"), normalizeGatewayAuthority("Field Director"));
-  assert.notEqual(normalizeGatewayAuthority("Director Research"), normalizeGatewayAuthority("Research Director"));
-});
-
-test("department and unit labels cannot be used as signing authority", () => {
-  const unitOnly = { unit: "Finance Unit", unitName: "Procurement Unit" };
-  assert.deepEqual(gatewayAuthorityCandidates(unitOnly), []);
-  assert.equal(resolveGatewayAuthorityLabel(unitOnly, "Finance Unit"), null);
-});
-
-test("gateway accepts the same scalar authority fields as the client verifier", () => {
-  const record = {
-    designation: "Board Secretary",
-    jobTitle: "Executive Director",
-    authorityRole: "Governance Signatory"
-  };
-  const candidates = gatewayAuthorityCandidates(record);
-  assert.ok(candidates.includes("board secretary"));
-  assert.ok(candidates.includes("executive director"));
-  assert.ok(candidates.includes("governance signatory"));
+test("email-link confirmation is required before opening the signing session",()=>{
+  assert.match(signing,/requestEmailSigningCode/);
+  assert.match(signing,/confirmEmailSigningCode/);
+  assert.match(router,/\/api\/sign\/email\/confirm/);
+  assert.match(signing,/Not your turn yet/);
 });
