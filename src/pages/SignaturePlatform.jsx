@@ -591,6 +591,9 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setActiveAssigneeUid(documentOwner.uid);
     setSelectedSigner("");
     setSignerEmail("");
+    setSignerRole("Review");
+    setSignerAuthorityRole("");
+    setSignerCapacity("");
     setMessage("This address belongs to the document owner. The owner has been selected once; no separate signer record was created. Assign the owner's field using the palette.");
     return;
   }
