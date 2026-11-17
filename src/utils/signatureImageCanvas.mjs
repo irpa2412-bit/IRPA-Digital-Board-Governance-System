@@ -29,6 +29,14 @@ export function findSignatureInkBounds(data, width, height, padding = 4) {
   return { x, y, width: endX - x, height: endY - y };
 }
 
+export function removeWhitePixels(data) {
+  if (!data || data.length % 4 !== 0) throw new RangeError("A valid RGBA pixel buffer is required.");
+  for (let index = 0; index < data.length; index += 4) {
+    if (data[index + 3] > 0 && data[index] >= 250 && data[index + 1] >= 250 && data[index + 2] >= 250) data[index + 3] = 0;
+  }
+  return data;
+}
+
 export function requireSignatureInkBounds(data, width, height, padding = 4) {
   const bounds = findSignatureInkBounds(data, width, height, padding);
   if (!bounds) throw new Error("The signature pad is empty. Add visible ink before saving.");
@@ -41,8 +49,8 @@ export function requireSignatureInkBounds(data, width, height, padding = 4) {
  */
 export function trimSignatureCanvas(source, { padding = 4, devicePixelRatio = 1 } = {}) {
   if (!source) throw new Error("A signature canvas is required.");
-  const width = Number(source.width || source.naturalWidth);
-  const height = Number(source.height || source.naturalHeight);
+  const width = Number(source.naturalWidth || source.width);
+  const height = Number(source.naturalHeight || source.height);
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
     throw new Error("The signature image has no drawable pixels.");
   }
@@ -61,5 +69,8 @@ export function trimSignatureCanvas(source, { padding = 4, devicePixelRatio = 1 
   if (!context) throw new Error("Signature image processing is unavailable.");
   context.clearRect(0, 0, output.width, output.height);
   context.drawImage(probe, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
+  const cropped = context.getImageData(0, 0, output.width, output.height);
+  removeWhitePixels(cropped.data);
+  context.putImageData(cropped, 0, 0);
   return { dataUrl: output.toDataURL("image/png"), width: output.width, height: output.height, canvas: output };
 }
