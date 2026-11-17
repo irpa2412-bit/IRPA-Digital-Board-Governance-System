@@ -617,7 +617,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     if(registered){
       next={uid:registered.uid,identityType:"email-link",name:registered.name||registered.email,email:registered.email||email,role,institutionalRole:registered.boardPosition||registered.role||"",occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
     }else{
-      if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))throw new Error("Enter a valid email address for the external participant.");
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error("Enter a valid email address for the external participant.");
       const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(email));
       const emailHash=Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,"0")).join("");
       next={uid:"email-link-"+emailHash.slice(0,24),identityType:"email-link",name:email,email,role,institutionalRole:"",occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending",emailLinkStatus:"Not issued"};
