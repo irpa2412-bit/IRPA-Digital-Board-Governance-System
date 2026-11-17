@@ -138,6 +138,18 @@ test("confirmed signature specimens support the bounded aggregate request budget
   assert.throws(()=>validateFieldValues(fields,externalSigner,{}, {type:"typed",value:"Vendor"},[app("sig-a","data:image/png;base64,"+"A".repeat(120001)),app("sig-b",markB)]),/no larger than 120 KB/);
 });
 
+
+test("every assigned field must be completed, including fields not marked required",()=>{
+  const fields=validateEnvelopeFields([
+    {fieldId:"name",signerId:"S1",type:"Name",required:true,page:1},
+    {fieldId:"comment",signerId:"S1",type:"Comment",required:false,page:2},
+    {fieldId:"optional-check",signerId:"S1",type:"Checkbox",required:false,page:2},
+  ],[externalSigner]);
+  assert.throws(()=>validateFieldValues(fields,externalSigner,{name:"Vendor"},{type:"typed",value:"Vendor"},[]),/Complete the assigned comment field/);
+  assert.throws(()=>validateFieldValues(fields,externalSigner,{name:"Vendor",comment:"Reviewed"},{type:"typed",value:"Vendor"},[]),/Complete the assigned checkbox field/);
+  assert.deepEqual(validateFieldValues(fields,externalSigner,{name:"Vendor",comment:"Reviewed","optional-check":false},{type:"typed",value:"Vendor"},[]),{name:"Vendor",comment:"Reviewed","optional-check":"false"});
+});
+
 test("required checkbox fields accept only an explicit checked value and signature fields retain independent specimens",()=>{
   const fields=validateEnvelopeFields([
     {fieldId:"agree",signerId:"S1",type:"Checkbox",required:true,page:1},
