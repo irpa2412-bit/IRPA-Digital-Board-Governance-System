@@ -35,7 +35,7 @@ test("tapping an assigned signature field opens Draw, Type and saved-signature c
   assert.match(platform, /data-signature-field-id=\{f\.fieldId\} onClick=\{\(\)=>activate\(f\)\}/);
   assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
   for (const label of ["Draw", "Type", "Use my saved signature", "Confirm"]) assert.ok(pad.includes(label), label);
-  assert.match(pad, /onConfirm\(dataUrl\)/);
+  assert.match(pad, /await onConfirm\(specimen\.dataUrl\)/);
   assert.match(gatewayPortal, /confirmed:true,page:Number\(field\.page\|\|1\)/);
 });
 
@@ -43,7 +43,7 @@ test("each signature application carries the saved page and coordinates and the 
   assert.match(service, /page:Number\(field\.page\|\|1\),x:Number\(field\.x\?\?0\),y:Number\(field\.y\?\?0\),width:Number\(field\.width\?\?24\),height:Number\(field\.height\?\?9\)/);
   assert.match(worker, /application\.confirmed!==true/);
   assert.match(worker, /submitted!==saved/);
-  assert.match(pdf, /originalPages\[Number\(field\.page\|\|1\)-1\]/);
+  assert.match(pdf, /pages\[Number\(field\.page\s*\|\|\s*1\)\s*-\s*1\]/);
   assert.match(gatewayPortal, /fields\.filter\(field=>Number\(field\.page\|\|1\)===pageNum\)/);
 });
 
@@ -69,7 +69,7 @@ test("signature confirmation palette is a fixed bottom sheet and closes only aft
   assert.match(pad, /aria-modal="false"/);
   assert.match(pad, /Nothing is applied until you tap Confirm/);
   assert.match(pad, /onClick=\{onCancel\}/, "Cancel must discard the unconfirmed signature");
-  assert.match(pad, /async function confirm\(\)[\s\S]*?await onConfirm\(dataUrl\)/, "Draw, Type and saved-signature data are applied only by explicit Confirm");
+  assert.match(pad, /async function confirm\(\)[\s\S]*?await onConfirm\(specimen\.dataUrl\)/, "Trimmed Draw, Type and saved-signature specimens are applied only by explicit Confirm");
   assert.match(platform, /height:"auto"/, "the PDF canvas must retain responsive automatic height sizing");
   assert.match(platform, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:5/);
