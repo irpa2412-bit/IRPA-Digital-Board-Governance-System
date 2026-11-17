@@ -120,7 +120,7 @@ test("required fields are rejected server-side until every required assigned fie
     {fieldId:"name",signerId:"S1",type:"Name",required:true,page:1},
     {fieldId:"date",signerId:"S1",type:"Date",required:true,page:2},
   ],[externalSigner]);
-  assert.throws(()=>validateFieldValues(fields,externalSigner,{name:"Vendor"},{type:"typed",value:"Vendor"},[]),/required date field/);
+  assert.throws(()=>validateFieldValues(fields,externalSigner,{name:"Vendor"},{type:"typed",value:"Vendor"},[]),/assigned date field/);
   assert.deepEqual(validateFieldValues(fields,externalSigner,{name:"Vendor",date:"2026-11-17"},{type:"typed",value:"Vendor"},[]),{name:"Vendor",date:"2026-11-17"});
 });
 
