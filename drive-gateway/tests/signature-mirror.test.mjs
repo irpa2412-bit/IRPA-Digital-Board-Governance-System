@@ -17,8 +17,8 @@ test("completion mirror creates a signer-specific signature register record from
     envelope:{
       id:"ENV-TEST",externalReference:"IRPA-ENV-TEST",documentId:"DOC-TEST",title:"Test governance resolution",
       signers:[
-        {id:"S1",uid:"chair-uid",name:"Chair",email:"chair@example.test",role:"Board Chairperson",status:"Signed",signedAt:"2026-11-15T10:00:00.000Z",authorityVerification:{authorityRole:"Board Chairperson"}},
-        {id:"S2",uid:"secretary-uid",name:"Secretary",email:"secretary@example.test",role:"Board Secretary",status:"Signed",signedAt:"2026-11-15T10:01:00.000Z",authorityVerification:{authorityRole:"Board Secretary"}}
+        {id:"S1",uid:"chair-uid",name:"Chair",email:"chair@example.test",role:"Board Chairperson",status:"Signed",signedAt:"2026-11-15T10:00:00.000Z",authorityVerification:{verified:true,authorityRole:"Board Chairperson"}},
+        {id:"S2",uid:"secretary-uid",name:"Secretary",email:"secretary@example.test",role:"Board Secretary",status:"Signed",signedAt:"2026-11-15T10:01:00.000Z",authorityVerification:{verified:true,authorityRole:"Board Secretary"}}
       ]
     },
     completion:{
@@ -67,6 +67,8 @@ test("email signer mirror includes signer ID, declarations and verified per-sign
   assert.equal(record.signerId,"S1");
   assert.equal(record.signerIdentityType,"email-link");
   assert.equal(record.cryptographicEvidenceStatus,"Verified");
+  assert.equal(record.signatureAuthority,"");
+  assert.equal(record.signatureAuthorityVerificationStatus,"NotVerified");
   assert.deepEqual(record.ownerDeclaredParticulars,{name:"Owner Name",occupation:"Supplier"});
   assert.deepEqual(record.signerDeclarations,{name:"External Name",occupation:"Consultant"});
   assert.equal(record.declarationDiscrepancy.detected,true);
