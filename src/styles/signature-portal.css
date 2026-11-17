@@ -71,7 +71,7 @@
 .signature-palette-person-details{min-width:0;overflow-wrap:anywhere;}
 .signature-palette-person-details strong,
 .signature-palette-person-details small{display:block;color:#f8fafc;line-height:1.4;}
-.signature-palette-person-details small{opacity:.82;font-size:11px;}
+.signature-palette-person-details small{opacity:.82;font-size:12px;}
 .signature-palette-select-person[aria-pressed="true"]{background:#166534;border:2px solid #86efac;box-shadow:0 0 0 2px rgba(134,239,172,.16);}
 .signature-palette-person-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
 .signature-palette-person-actions button{min-height:42px;padding:7px 8px;border:1px solid #64748b;border-radius:7px;background:#172033;color:#f8fafc;font-size:12px;font-weight:700;}
