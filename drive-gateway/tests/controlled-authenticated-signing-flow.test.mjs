@@ -73,11 +73,12 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
   }]]);
   const storedFiles = new Map();
   const rateLimits = new Map();
+  const kvStore = new Map();
   return {
     token: envelopeId + "." + signerId + "." + secret,
     envelope,
     ctx: {
-      env: {DRIVE_KV:{get:async()=>null,put:async()=>{},delete:async()=>{}}},
+      env: {DRIVE_KV:{get:async key=>kvStore.get(key)||null,put:async(key,value)=>kvStore.set(key,value),delete:async key=>kvStore.delete(key)}},
       now: () => new Date(NOW),
       config: { appUrl: "https://example.test", ttlDays: 14 },
       logger: { error() {} },
