@@ -23,7 +23,7 @@ const signingSource=readFileSync(new URL("../src/signing.mjs",import.meta.url),"
 
 test("staging signing requires only verified invited email and a declared name, not register authority or account login",async()=>{
   const secret="a".repeat(64),hash=createHash("sha256").update(secret).digest("hex");
-  const envelope={id:"ENV-staging-test",documentId:"DOC-staging-test",documentHash:"unused-before-source-check",expiresAt:"2999-01-01T00:00:00.000Z",status:"Sent",signingMode:"Sequential",events:[],signers:[{id:"S1",uid:null,email:"staging@example.invalid",identityType:"email-link",emailLinkStatus:"opened",status:"Pending",order:1,tokenHash:hash}]};
+  const envelope={id:"ENV-staging-test",documentId:"DOC-staging-test",documentHash:"unused-before-source-check",expiresAt:"2999-01-01T00:00:00.000Z",status:"Sent",signingMode:"Sequential",events:[],signers:[{id:"S1",uid:null,email:"staging@example.invalid",identityType:"email-link",emailLinkStatus:"opened",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:1,tokenHash:hash}]};
   const ctx={env:{IRPA_ENVIRONMENT:"staging"},now:()=>new Date("2026-10-24T00:00:00.000Z"),meta:{get:async(collection,id)=>collection==="envelopes"&&id===envelope.id?envelope:null},storage:{get:async()=>null}};
   await assert.rejects(()=>sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Staging test signer"},consent:true,declarations:{title:"Optional title"},user:null}),error=>error?.status===400&&error.message==="Enter your full name before signing.");
   await assert.rejects(()=>sign(ctx,{token:envelope.id+".S1."+secret,signature:{type:"typed",value:"Staging test signer"},consent:true,declarations:{name:"Staging Test Signer"},user:null}),error=>error?.status===409&&error.message==="The source document is unavailable.");
@@ -62,7 +62,7 @@ test("assigned Date field is persisted from the Gateway signedAt timestamp, not 
     status:"Sent",signingMode:"Sequential",events:[],_v:1,
     signers:[
       {id:"S1",uid:"signer-uid",email:"signer@irpa.or.tz",identityType:"email-link",emailLinkStatus:"opened",status:"Pending",order:1,routingPosition:1,tokenHash},
-      {id:"S2",uid:"next-signer",email:"next@irpa.or.tz",identityType:"email-link",emailLinkStatus:"waiting",status:"Pending",order:2,routingPosition:2,tokenHash:"c".repeat(64)}
+      {id:"S2",uid:"next-signer",email:"next@irpa.or.tz",identityType:"email-link",emailLinkStatus:"waiting",emailLinkExpiresAt:"2999-01-01T00:00:00.000Z",status:"Pending",order:2,routingPosition:2,tokenHash:"c".repeat(64)}
     ],
     fields:[{fieldId:"date-1",type:"Date",page:1,x:10,y:80,width:24,height:6,signerId:"S1",signerUid:"signer-uid",required:true}]
   };
