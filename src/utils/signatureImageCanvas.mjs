@@ -24,9 +24,27 @@ export function findSignatureInkBounds(data, width, height, padding = 4) {
   if (right < left || bottom < top) return null;
   const x = Math.max(0, left - pad);
   const y = Math.max(0, top - pad);
-  const endX = Math.min(w, right + pad + 1);
-  const endY = Math.min(h, bottom + pad + 1);
-  return { x, y, width: endX - x, height: endY - y };
+  // Keep very flat strokes and single-point initials drawable after trimming.
+  // Expand around the ink centre while respecting the source image boundaries.
+  const minWidth = Math.min(w, 8);
+  const minHeight = Math.min(h, 8);
+  let endX = Math.min(w, right + pad + 1);
+  let endY = Math.min(h, bottom + pad + 1);
+  let cropX = x;
+  let cropY = y;
+  if (endX - cropX < minWidth) {
+    const extra = minWidth - (endX - cropX);
+    cropX = Math.max(0, cropX - Math.ceil(extra / 2));
+    endX = Math.min(w, cropX + minWidth);
+    cropX = Math.max(0, endX - minWidth);
+  }
+  if (endY - cropY < minHeight) {
+    const extra = minHeight - (endY - cropY);
+    cropY = Math.max(0, cropY - Math.ceil(extra / 2));
+    endY = Math.min(h, cropY + minHeight);
+    cropY = Math.max(0, endY - minHeight);
+  }
+  return { x: cropX, y: cropY, width: endX - cropX, height: endY - cropY };
 }
 
 export function removeWhitePixels(data) {
