@@ -7,6 +7,16 @@ async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d{1,2}$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
 async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");if(!safeEqual(await sha256Hex(secret),s.tokenHash))throw new HttpError(403,"This signing link is not valid.");if(s.identityType==="email-link"&&(!["issued","opened"].includes(s.emailLinkStatus)||!Number.isFinite(Date.parse(s.emailLinkExpiresAt))||ctx.now().getTime()>=Date.parse(s.emailLinkExpiresAt)))throw new HttpError(401,genericEmailSigningFailure());return{env:e,signer:s}}
 function active(ctx,e){if(["Voided","Declined"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");if(ctx.now()>new Date(e.expiresAt))throw new HttpError(403,"This signing link has expired.")}
+function signingActionForFields(fields=[]){
+  const responsibilities=(fields||[]).map(field=>String(field?.responsibility||"").trim().toLowerCase());
+  if(responsibilities.some(value=>/authori[sz]/.test(value)))return "Authorise";
+  if(responsibilities.some(value=>/approv/.test(value)))return "Approve";
+  const types=new Set((fields||[]).map(field=>String(field?.type||"")));
+  if(types.has("Initials")&&!types.has("Signature"))return "Initial";
+  if(types.has("Signature"))return "Sign";
+  if(types.has("Initials"))return "Initial";
+  return "Review";
+}
 const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>Number(x.routingPosition??x.order??1)>=Number(s.routingPosition??s.order??1)||x.status==="Signed");
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
@@ -30,7 +40,7 @@ export function validateEnvelopeFields(fields,signers){
     const assigned=requestedSignerId?byId.get(requestedSignerId):(signerUid?(signers||[]).find(item=>item.uid===signerUid):null);
     if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||(signerUid&&assigned.uid!==signerUid)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
     ids.add(fieldId);
-    return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160)};
+    return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160),responsibility:cleanText(f?.responsibility||"",40)};
   });
 }
 export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
@@ -124,7 +134,7 @@ export async function createEnvelope(ctx,user,body){
   for(let i=0;i<signers.length;i++){
     if(Number(signers[i].routingPosition||signers[i].order||1)!==firstPosition)continue;
     const token=id+"."+signers[i].id+"."+secrets[i];
-    if(ctx.sendInvitation){try{const link=ctx.config.appUrl+"/?emailSignToken="+encodeURIComponent(token);await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink:true,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt,role:String(input[i]?.title||input[i]?.role||""),action:"Sign",fieldCount:fields.filter(f=>f.signerId===signers[i].id).length});signers[i].invitation="Sent";signers[i].invitedAt=ctx.now().toISOString();}
+    if(ctx.sendInvitation){try{const link=ctx.config.appUrl+"/?emailSignToken="+encodeURIComponent(token);await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink:true,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt,role:String(input[i]?.title||input[i]?.role||""),action:signingActionForFields(fields.filter(f=>f.signerId===signers[i].id)),fieldCount:fields.filter(f=>f.signerId===signers[i].id).length});signers[i].invitation="Sent";signers[i].invitedAt=ctx.now().toISOString();}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
     else signers[i].invitation="Sent";
   }
@@ -175,7 +185,7 @@ export async function releaseRoutingPosition(ctx,id,position){
     if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
     const link=ctx.config.appUrl+"/?emailSignToken="+encodeURIComponent(issued.token);
     try{
-      await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||"IRPA Document Owner",expiresAt:issued.record.expiresAt,role:String(target.declaredParticulars?.title||target.title||""),action:"Sign",fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});
+      await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||"IRPA Document Owner",expiresAt:issued.record.expiresAt,role:String(target.declaredParticulars?.title||target.title||""),action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});
       await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(!signer)return{patch:null};signer.invitation="Sent";signer.invitedAt=ctx.now().toISOString();return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.delivered",signerId:signer.id,routingPosition:position,at:signer.invitedAt})}};});
       released++;
     }catch(error){
@@ -332,7 +342,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   });
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
-  try{await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt});}
+  try{await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt,role:target.title||target.declaredParticulars?.title||"",action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});}
   catch(error){
     await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer){signer.invitation="Failed";if(emailLink)signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
