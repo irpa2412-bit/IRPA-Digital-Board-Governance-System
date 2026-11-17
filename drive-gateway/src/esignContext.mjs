@@ -216,7 +216,7 @@ function driveStorage(env, helpers) {
     async delete(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}); if(!r.ok&&r.status!==404) throw new Error("Google Drive deletion failed.");}
   };
 }
-export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInvitation,sendCompletionEmail,logger,now,driveHelpers,...rest}) {
+export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInvitation,sendCompletionEmail,resolveEmailLinkProfileUid,logger,now,driveHelpers,...rest}) {
   const meta=env.DRIVE_MOCK==="true"?mockMeta():doMeta(env);
   const baseKeyProvider=env.DRIVE_MOCK==="true"?null:createCloudflareSignerKeyProvider(env);
   const keyProvider=baseKeyProvider?{
@@ -245,6 +245,8 @@ export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInv
     verifyUser,
     verifySigningAuthority,
     sendInvitation,
+    sendCompletionEmail,
+    resolveEmailLinkProfileUid,
     logger:logger||console,
     now:now||(()=>new Date()),
     config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14,emailLinkTtlDays:Math.max(1,Math.min(30,Number(env.IRPA_EMAIL_SIGNING_LINK_TTL_DAYS)||7))},
