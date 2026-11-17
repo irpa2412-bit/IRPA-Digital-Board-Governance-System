@@ -60,7 +60,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     try{
       let specimen;
       if(mode==="Draw"){
-        if(!dirty)throw new Error("Draw your signature first, or choose Type or Use my saved signature.");
+        if(!dirtyRef.current)throw new Error("Draw your signature first, or choose Type or Use my saved signature.");
         specimen=trimSignatureCanvas(canvasRef.current,{padding:4,devicePixelRatio:Math.max(1,window.devicePixelRatio||1)});
       }else if(mode==="Type"){
         const value=typed.trim().slice(0,80);
