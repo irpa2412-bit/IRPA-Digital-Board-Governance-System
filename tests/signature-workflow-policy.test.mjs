@@ -161,7 +161,7 @@ test("owner signature palette action remains available and explicitly assigns a 
   assert.ok(portal.includes("Select Owner Signature Field"));
   assert.ok(portal.includes('const addOwnerSignatureAt=()=>{if(!pdf||pageError)'));
   assert.ok(portal.includes('if(!ownerSigner?.uid)'));
-  assert.ok(portal.includes('setSelectedAssigneeUid(ownerSigner.uid)'));
+  assert.ok(portal.includes('selectAssignee(ownerSigner.uid)'));
   assert.ok(portal.includes('setPendingFieldType("Signature")'));
   assert.ok(portal.includes('The document owner already has a Signature field. The existing field is selected.'));
   assert.ok(portal.includes('required:type!=="Checkbox"'));
@@ -171,7 +171,7 @@ test("owner signature palette action remains available and explicitly assigns a 
 test("owner remains selectable for field assignment and each signature field remains bound to its PDF page", () => {
   assert.ok(portal.includes("{recipients.map(r=><option key={r.uid} value={r.uid}>"));
   assert.ok(portal.includes("const pageFields=fields.filter(f=>Number(f.page)===pageNum)"));
-  assert.ok(portal.includes('setSelectedAssigneeUid(ownerSigner.uid)'));
+  assert.ok(portal.includes('selectAssignee(ownerSigner.uid)'));
   assert.ok(portal.includes('setPendingFieldType("Signature")'));
   assert.ok(portal.includes('ownerSigningEnabled?[{...documentOwner,optionalSigning:false,actionRequired:true}]:[]'));
 });
