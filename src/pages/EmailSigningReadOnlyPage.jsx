@@ -105,7 +105,7 @@ export default function EmailSigningReadOnlyPage({token}){
   return value!==undefined&&String(value).trim()!=="";
  };
  const incomplete=fields.filter(field=>field.required&&!complete(field));
- const canReview=Boolean(record)&&pageRendered&&!incomplete.length&&(signatureFields.length>0||typedSignature.trim().length>=2);
+ const canReview=Boolean(record)&&pageRendered;
  const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
 
  function canvasPoint(event){const canvas=signatureCanvasRef.current,rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*(canvas.width/rect.width),y:(event.clientY-rect.top)*(canvas.height/rect.height)};}
@@ -126,8 +126,6 @@ export default function EmailSigningReadOnlyPage({token}){
  function clearPad(){const canvas=signatureCanvasRef.current;if(canvas)canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);setSignatureMarks(current=>{const next={...current};delete next[selectedFieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
  function enterReview(){
   if(!record){setError("The signing assignment is unavailable.");return;}
-  if(incomplete.length){setSelectedFieldId(incomplete[0].fieldId);setPageNum(Number(incomplete[0].page||1));setError("Complete every required field before reviewing the signature placement.");return;}
-  if(!signatureFields.length&&typedSignature.trim().length<2){setError("Enter your typed signature before reviewing the document.");return;}
   if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
   setError("");setReviewMode(true);if(pageNum!==1){setPageRendered(false);setPageNum(1);}
  }
@@ -138,6 +136,7 @@ export default function EmailSigningReadOnlyPage({token}){
   if(!declarations.name.trim()||!declarations.occupation.trim()){setError("Enter your name and occupation/capacity for this document.");return;}
   if(!consent){setError("Confirm your consent only after reviewing the document and signature placement.");return;}
   if(incomplete.length){setError("A required assigned field is incomplete.");return;}
+  if(!signatureFields.length&&typedSignature.trim().length<2){setError("Enter your typed signature before submitting.");return;}
   setSubmitting(true);setError("");setSuccess("");
   const gateway=getGoogleDriveGatewayUrl(),activeToken=signingToken||token;
   const signature=signatureValue?{type:"drawn",value:signatureValue}:{type:"typed",value:typedSignature.trim()||declarations.name.trim()};
@@ -204,7 +203,7 @@ export default function EmailSigningReadOnlyPage({token}){
      </div>
      {pageError&&<p role="alert" style={{color:"#991b1b",background:"#fee2e2",padding:10,borderRadius:6}}>This page could not be rendered: {pageError}. Do not submit until it is visible.</p>}
      {!pdfDocument&&!loading&&<p role="alert">The complete document is not available for review. Signing is disabled.</p>}
-     <p style={{fontSize:12,color:"#4b5563",margin:"10px 0 0"}}>The PDF is delivered through the invited signer’s controlled Gateway session and is not published as a public file.</p>
+     <p style={{fontSize:12,color:"#4b5563",margin:"10px 0 0"}}>The PDF is delivered through the invited signer’s controlled Gateway session and is not published as a public file. The final signed PDF appends an IRPA signature-evidence certificate after the source document.</p>
     </section>
     <section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
      <h2 style={{fontSize:18}}>Your declaration for this document</h2>
@@ -225,12 +224,13 @@ export default function EmailSigningReadOnlyPage({token}){
     {!signatureFields.length&&<label style={{display:"block",margin:"14px 0"}}>Typed signature<input style={inputStyle} disabled={reviewMode||signingClosed} value={typedSignature} onChange={e=>setTypedSignature(e.target.value)} placeholder="Type your full name as your signature"/></label>}
     <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"18px 0"}}><input type="checkbox" checked={consent} disabled={signingClosed} onChange={e=>setConsent(e.target.checked)}/><span>I have reviewed the complete document, understand its contents and the marked signature location(s), and consent to apply my electronic signature.</span></label>
     {!record.canSign&&<p role="status">Your assignment is waiting for the preceding action. You may review the document, but cannot submit yet.</p>}
-    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError))?0.5:1}}>Review document with applied signature</button>}
+    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError))?0.5:1}}>Review complete document and signature placement</button>}
     {reviewMode&&!signingClosed&&<section style={{marginTop:16,padding:12,border:"2px solid #174a78",borderRadius:8}}>
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Your signature has not been submitted yet.</p>
+     {incomplete.length>0&&<p role="status" style={{fontSize:13,color:"#92400e"}}>{incomplete.length} required field(s) remain incomplete. Return to editing to complete them before submission. You may still revoke this request.</p>}
      <button type="button" onClick={()=>setReviewMode(false)} style={{...buttonStyle,background:"#4b5563",marginRight:8}}>Return to editing</button>
-     <button type="button" disabled={submitting||!record.canSign||!pageRendered||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
+     <button type="button" disabled={submitting||!record.canSign||!pageRendered||incomplete.length>0||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||incomplete.length>0||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
      <button type="button" disabled={revoking||submitting} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}
