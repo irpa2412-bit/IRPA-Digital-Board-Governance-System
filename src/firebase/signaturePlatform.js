@@ -301,11 +301,12 @@ export async function getMySignedDocuments(){
 export async function sendSignatureInvitation(envelope, recipient) {
   const u=user();
   if(!envelope?.id)throw new Error("A valid signing envelope is required.");
-  if(!recipient?.uid||!recipient?.email)throw new Error("The signer must have a valid account UID and email address.");
-  if(!(envelope.participantUids||[]).includes(recipient.uid))throw new Error("The selected signer is not a participant in this envelope.");
+  if(!recipient?.email)throw new Error("The signer must have a valid email address.");
+  const assigned=(envelope.recipients||[]).some(item=>(recipient.uid&&item.uid===recipient.uid)||String(item.email||"").trim().toLowerCase()===String(recipient.email||"").trim().toLowerCase());
+  if(!assigned)throw new Error("The selected signer is not a participant in this envelope.");
   const cleanEmail=String(recipient.email).trim().toLowerCase();
   const result=await sendSignatureMail(envelope,recipient);
-  await recordEnvelopeEvent(envelope.id,"Signing Invitation Sent",{signerUid:recipient.uid,signerName:recipient.name||"",workflowRole:recipient.role||"Signer",deliveryStatus:result.deliveryStatus||"Sent"});
+  await recordEnvelopeEvent(envelope.id,"Signing Invitation Sent",{signerUid:recipient.uid||null,signerName:recipient.name||"",workflowRole:recipient.role||"Signer",deliveryStatus:result.deliveryStatus||"Sent"});
   return {...result,envelopeId:envelope.id,signerUid:recipient.uid,signerEmail:cleanEmail,emailRequested:true,requestedByUid:u.uid};
 }
 export async function attachGatewayEmailLinkEnvelope(envelopeId,gatewayResult){
