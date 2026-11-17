@@ -53,14 +53,14 @@ export function validateFieldValues(fields,signer,values,signature,fieldApplicat
     let value=values&&Object.prototype.hasOwnProperty.call(values,f.fieldId)?values[f.fieldId]:undefined;
     if(f.type==="Signature"||f.type==="Initials"){
       value=applications.get(f.fieldId);
-      if(!value){if(f.required)throw new HttpError(400,"Tap the assigned "+f.type.toLowerCase()+" field and confirm it before signing.");continue}
+      if(!value)throw new HttpError(400,"Tap the assigned "+f.type.toLowerCase()+" field and confirm it before signing.");
       // Each assigned Signature/Initials field carries its own confirmed specimen; signer-level evidence remains a separate transaction event.
     }else if(f.type==="Checkbox"){
       value=value===true||value==="true"?"true":value===false||value==="false"?"false":"";
-      if(f.required&&value!=="true")throw new HttpError(400,"Complete the required checkbox field.");
+      if(value==="")throw new HttpError(400,"Complete the assigned checkbox field.");if(f.required&&value!=="true")throw new HttpError(400,"Complete the required checkbox field.");
     }else{
       value=String(value??"").trim();
-      if(f.required&&!value)throw new HttpError(400,"Complete the required "+f.type.toLowerCase()+" field.");
+      if(!value)throw new HttpError(400,"Complete the assigned "+f.type.toLowerCase()+" field.");
       if(value.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
     }
     out[f.fieldId]=value;
