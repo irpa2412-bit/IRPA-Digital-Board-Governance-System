@@ -35,7 +35,7 @@ test("tapping an assigned signature field opens Draw, Type and saved-signature c
   assert.match(platform, /data-signature-field-id=\{f\.fieldId\} onClick=\{\(\)=>activate\(f\)\}/);
   assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
   for (const label of ["Draw", "Type", "Use my saved signature", "Confirm"]) assert.ok(pad.includes(label), label);
-  assert.match(pad, /await onConfirm\(specimen\.dataUrl\)/);
+  assert.match(pad, /await onConfirm\(specimen\.dataUrl,field\)/);
   assert.match(gatewayPortal, /confirmed:true,page:Number\(field\.page\|\|1\)/);
 });
 
