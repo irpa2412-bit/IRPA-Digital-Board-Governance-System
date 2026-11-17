@@ -159,9 +159,11 @@ test("owner signature palette action remains available and explicitly assigns a 
   assert.ok(portal.includes("ownerSigner={ownerSigningEnabled?documentOwner:null}"));
   assert.ok(portal.includes('data-owner-signature-placement="true"'));
   assert.ok(portal.includes("Select Owner Signature Field"));
-  assert.ok(portal.includes('const addOwnerSignatureAt=(x=50,y=20)=>{if(!pdf||pageError)'));
+  assert.ok(portal.includes('const addOwnerSignatureAt=()=>{if(!pdf||pageError)'));
   assert.ok(portal.includes('if(!ownerSigner?.uid)'));
-  assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
+  assert.ok(portal.includes('setSelectedAssigneeUid(ownerSigner.uid)'));
+  assert.ok(portal.includes('setPendingFieldType("Signature")'));
+  assert.ok(portal.includes('The document owner already has a Signature field. The existing field is selected.'));
   assert.ok(portal.includes("f.required=true"));
   assert.ok(portal.includes("commit([...fields,f]);setSelectedField(f.fieldId)"));
 });
