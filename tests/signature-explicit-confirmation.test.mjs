@@ -106,17 +106,17 @@ test("legacy signing persists signer-declared authority safely when institutiona
 });
 
 test("Gateway envelopes include registered account signers and the owner when explicitly required", () => {
-  assert.match(storage, /const accountSigner = Boolean\\(r\\?\\.uid\\) && !emailLink/);
-  assert.match(storage, /identityType:emailLink \\? "email-link" : "account"/);
-  assert.match(storage, /\\{uid:String\\(recipient\\.uid\\)\\}/);
-  assert.match(platform, /checked=\\{ownerSigningEnabled\\}/);
-  assert.match(platform, /ownerSigningEnabled\\?\\[\\{\\.\\.\\.documentOwner,optionalSigning:false,actionRequired:true\\}\\]/);
+  assert.match(storage, /const accountSigner = Boolean\(r\?\.uid\) && !emailLink/);
+  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
+  assert.match(storage, /\{uid:String\(recipient\.uid\)\}/);
+  assert.match(platform, /checked=\{ownerSigningEnabled\}/);
+  assert.match(platform, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]/);
 });
 
 test("Gateway signer field routing preserves authenticated account UIDs", () => {
-  assert.match(storage, /recipient\\.uid/);
+  assert.match(storage, /recipient\.uid/);
   assert.match(storage, /signerAssignmentByKey/);
-  assert.match(storage, /signerId:resolveSignerId\\(field\\)/);
+  assert.match(storage, /signerId:resolveSignerId\(field\)/);
 });
 
 test("registered IRPA signers use authenticated account identity and their saved Signature Profile", () => {
