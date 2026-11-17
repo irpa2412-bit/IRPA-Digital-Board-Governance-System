@@ -37,13 +37,15 @@ test("Gateway invitation plain-text body uses real line breaks, not escaped newl
   assert.doesNotMatch(message.text,/\\n/);
 });
 
-test("initial Gateway invitation contains the portal envelope ID and a one-time signer token",async()=>{
+test("initial Gateway invitation is a single-use email-link and does not use the account-activation route",async()=>{
   const f=await fixture();
   assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].emailLink,true);
   const url=new URL(f.sent[0].link);
-  assert.equal(url.pathname,"/sign");
-  assert.equal(url.searchParams.get("signEnvelope"),f.externalReference);
-  assert.match(url.searchParams.get("gatewayToken"),/^ENV-[0-9a-f]+\.S1\.[0-9a-f]{64}$/);
+  assert.equal(url.pathname,"/");
+  assert.match(url.searchParams.get("emailSignToken"),/^ENV-[0-9a-f]+\.S1\.[0-9a-f]{64}$/);
+  assert.equal(url.searchParams.has("gatewayToken"),false);
+  assert.equal(url.searchParams.has("signEnvelope"),false);
 });
 
 test("owner can resend a failed or missing Gateway invitation with a rotated token",async()=>{
