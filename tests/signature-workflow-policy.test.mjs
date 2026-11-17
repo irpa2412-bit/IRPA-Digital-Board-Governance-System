@@ -66,10 +66,13 @@ test("Signature Portal palette queries include document owner and signature owne
 });
 
 // Source-contract checks follow the current handler shape, including signerUid ownership and whitespace-safe finally blocks.
-test("adding a signer creates one default signature field without reassigning other unassigned fields", () => {
-  assert.match(portal, /const nextFields=\[\.\.\.fields\]/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>f\.type==="Signature"&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Signature — place and review on the document before sending"\}\)/);
-  assert.doesNotMatch(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
+test("adding a participant does not auto-place fields or silently reassign existing fields", () => {
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
+  assert.ok(addSigner);
+  assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
+  assert.doesNotMatch(addSigner[1], /nextFields\.push\(\{\.\.\.makeField/);
+  assert.match(addSigner[1], /Choose Signature, Initials or another field tool, then tap the PDF/);
+  assert.match(portal, /const f=makeField\(type,fields\.length,selectedAssigneeUid,pageNum\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
@@ -218,4 +221,11 @@ test("duplicate participant identities are reused and rapid repeated add actions
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
   assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
   assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
+});
+
+
+test("envelope creation requires every participant to have at least one explicitly assigned field", () => {
+  assert.match(portal, /if\(!orderedRecipients\.length&&!ownerSigningEnabled\)/);
+  assert.match(portal, /const recipientsWithoutFields=orderedRecipients\.filter\(recipient=>!fields\.some\(field=>field\.signerUid===recipient\.uid\)\)/);
+  assert.match(portal, /Assign at least one field to each participant in the palette before creating the envelope/);
 });
