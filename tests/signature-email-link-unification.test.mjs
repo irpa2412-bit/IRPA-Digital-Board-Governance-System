@@ -29,7 +29,8 @@ test("all workflow recipients and their assigned PDF fields are sent to the Gate
 
 test("Gateway email-link signing is independent of Firebase UID authentication",()=>{
   assert.match(gateway,/if\(s0\.identityType==="email-link"\)\{if\(s0\.emailLinkStatus!=="opened"\)/);
-  assert.match(invitation,/emailSignToken=/);
+  assert.match(gateway,/emailSignToken=/);
+  assert.match(invitation,/single-use secure link/);
 });
 
 test("new staging and production Gateway envelopes reject account-only or UID-bound signers",()=>{
