@@ -52,3 +52,9 @@ test("the invitation bearer token is consumed once and the signer session surviv
   assert.match(emailPage,/sessionStorage\.setItem\(sessionKey,session\)/);
   assert.match(emailPage,/x-signing-token":activeToken/);
 });
+
+test("email-link possession is not misrepresented as legal identity or institutional authority",()=>{
+  assert.match(emailPage,/confirms control of the invited email address/);
+  assert.match(emailPage,/does not independently verify your legal identity or authority to bind an organisation/);
+  assert.match(emailPage,/delegation or approval process/);
+});
