@@ -122,7 +122,7 @@ test("verified invited email identity opens without Firebase authentication, reg
 
 test("email-verified signer can complete its signing action and the envelope advances", async () => {
   const fixture = await makeFixture({ signerUid: "member-uid", signerEmail: "member@example.org" });
-  const result = await sign(fixture.ctx, { declarations: { name: "Institutional Signer", occupation: "Test Occupation" },
+  const result = await sign(fixture.ctx, { declarations: { name: "Institutional Signer", title: "Optional Test Title" },
     token: fixture.token,
     signature: { type: "typed", value: "Member Signer" },
     consent: true,
@@ -285,7 +285,7 @@ test("Production-mode Gateway signing does not require Member/Employee authority
   assert.equal(result.status,"InProgress");
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].status,"Signed");
-  assert.equal(current.signers[0].signerDeclarations.occupation,"Board Member");
+  assert.equal(current.signers[0].signerDeclarations.title,"Board Member");
   assert.equal(current.signers[0].authorityVerification,null);
   assert.equal(Object.hasOwn(current.events.at(-1),"authoritySourceCollection"),false);
 });
@@ -302,7 +302,7 @@ test("Gateway signing records the signer's optional declared title without regis
   assert.equal(result.status,"InProgress");
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].signerDeclarations.occupation,"Independent Consultant");
-  assert.equal(current.signers[0].signerDeclarations.capacity,"Technical Adviser");
+  assert.equal(current.signers[0].signerDeclarations.title,"Technical Adviser");
   assert.equal(current.signers[0].authorityVerification,null);
 });
  
