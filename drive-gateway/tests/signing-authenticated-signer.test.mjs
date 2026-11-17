@@ -22,6 +22,7 @@ test("UID-bound signer comparison is exact and cannot be bypassed by email alone
 
 import {createHash} from "node:crypto";
 import {createEnvelope,sign} from "../src/signing.mjs";
+import {formatServerSigningTimestamp} from "../src/pdf.mjs";
 import {readFileSync} from "node:fs";
 const pdfSource=readFileSync(new URL("../src/pdf.mjs",import.meta.url),"utf8");
 const signingSource=readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
@@ -136,4 +137,11 @@ test("signed PDF Date fields are rendered from the server UTC signing timestamp"
   assert.match(pdfSource,/field\.type === "Date" && serverDateTime/);
   assert.match(pdfSource,/new Date\(signer\.signedAt\)\.toISOString\(\)/);
   assert.match(pdfSource,/UTC/);
+});
+
+
+test("server signing timestamp formatting preserves UTC and removes milliseconds from the PDF label",()=>{
+  assert.equal(formatServerSigningTimestamp("2026-11-17T10:15:30.000Z"),"2026-11-17 10:15:30 UTC");
+  assert.equal(formatServerSigningTimestamp("2026-11-17T10:15:30.125Z"),"2026-11-17 10:15:30 UTC");
+  assert.equal(formatServerSigningTimestamp("not-a-timestamp"),null);
 });
