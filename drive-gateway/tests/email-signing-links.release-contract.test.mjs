@@ -80,7 +80,7 @@ test("PDF.js receives independent byte buffers for the signing viewer and owner 
   assert.ok(page.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
 });
 test("signer must review the rendered document and applied stamps before submit or revoke",()=>{
-  assert.match(page,/Review document with applied signature/);
+  assert.match(page,/Review complete document and signature placement/);
   assert.match(page,/Final review — signature not yet submitted/);
   assert.match(page,/Navigate through every page above/);
   assert.match(page,/Your signature has not been submitted yet/);
