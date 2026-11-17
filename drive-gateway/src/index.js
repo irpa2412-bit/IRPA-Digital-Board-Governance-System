@@ -1314,7 +1314,7 @@ async function activateSignatureWorkflowRoute(request, env) {
   if (uid !== ownerUid) return json({ok:false,error:"Only the original document owner may activate this signing workflow."},403,corsHeaders(request));
   if (envelope.status !== "Draft") return json({ok:false,error:"Only a saved Draft can be activated.",status:envelope.status},409,corsHeaders(request));
   const now = new Date().toISOString();
-  const update = {status:envelope.currentSignerUid?"In Progress":"Shared",workflowStartedAt:now,workflowStartedByUid:uid,gatewayEnvelopeId,gatewayDocumentId:body.gatewayDocumentId||null,gatewayOriginalHash:body.gatewayOriginalHash||null,gatewaySigningStatus:body.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:body.gatewayInvitationStatus||"Sent",gatewayInvitationFailures:Number(body.gatewayInvitationFailures||0),updatedAt:now};
+  const update = {status:envelope.currentSignerUid?"In Progress":"Shared",workflowStartedAt:now,workflowStartedByUid:uid,gatewayEnvelopeId,gatewayDocumentId:body.gatewayDocumentId||null,gatewayOriginalHash:body.gatewayOriginalHash||null,gatewaySigningStatus:body.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:body.gatewayInvitationStatus||"Sent",gatewayInvitationFailures:Number(body.gatewayInvitationFailures||0),gatewaySignerAssignments:Array.isArray(body.gatewaySignerAssignments)?body.gatewaySignerAssignments.map(item=>({signerId:String(item.signerId||""),uid:item.uid||null,email:String(item.email||"").trim().toLowerCase(),routingOrder:Number(item.routingOrder||0)})):[],updatedAt:now};
   const eventId = "gateway-activated-" + envelopeId + "-" + crypto.randomUUID().slice(0,8);
   const event = {envelopeId,event:"Workflow Activated and Sent",details:{gatewayEnvelopeId,ownerUid:uid,deliveryStatus:update.gatewayInvitationStatus},actorUid:uid,actorEmail:String(claims.email||""),createdAt:now};
   const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
@@ -1375,16 +1375,29 @@ async function syncSignatureWorkflowMirrorRoute(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const body = await request.json().catch(()=>({}));
   const envelopeId = cleanId(body.envelopeId||""), gatewayEnvelopeId = cleanId(body.gatewayEnvelopeId||"");
-  const gatewayStatus = body.gatewayStatus || {};
-  if (!envelopeId || !gatewayEnvelopeId || !["InProgress","Sent"].includes(String(gatewayStatus.status||""))) return json({ok:false,error:"A verified non-completed Gateway status is required."},400,corsHeaders(request));
+  const suppliedStatus = body.gatewayStatus || {};
+  if (!envelopeId || !gatewayEnvelopeId) return json({ok:false,error:"Envelope and Gateway references are required."},400,corsHeaders(request));
   const token = await getFirestoreAdminAccessToken(env), raw = await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
   if (!raw?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
   const envelope = firestoreDocumentToPlain(raw)||{}, uid = String(claims.user_id||""), participants = Array.isArray(envelope.participantUids)?envelope.participantUids:[];
-  if (!participants.includes(uid) || String(envelope.gatewayEnvelopeId||"")!==gatewayEnvelopeId || String(gatewayStatus.envelopeId||"")!==gatewayEnvelopeId || String(gatewayStatus.externalReference||"")!==envelopeId) return json({ok:false,error:"Gateway status is not linked to this authenticated participant and envelope."},403,corsHeaders(request));
+  if (!participants.includes(uid) || String(envelope.gatewayEnvelopeId||"")!==gatewayEnvelopeId || String(suppliedStatus.envelopeId||"")!==gatewayEnvelopeId || String(suppliedStatus.externalReference||"")!==envelopeId) return json({ok:false,error:"Gateway status is not linked to this authenticated participant and envelope."},403,corsHeaders(request));
+  const gatewayContext = buildEsignContext({env,verifyUser:async()=>({uid:String(envelope.ownerUid||envelope.senderUid||""),isAdmin:false}),sendInvitation:async()=>{},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
+  const statusResponse = await esignRoute(new Request("https://gateway.internal/api/envelopes/"+encodeURIComponent(gatewayEnvelopeId)+"/status",{method:"GET"}),gatewayContext);
+  if (!statusResponse.ok) return json({ok:false,error:"Gateway could not independently verify the signing status."},502,corsHeaders(request));
+  const gatewayStatus = await statusResponse.json();
+  if (gatewayStatus.envelopeId!==gatewayEnvelopeId || gatewayStatus.externalReference!==envelopeId || !["InProgress","Sent"].includes(String(gatewayStatus.status||"")) || gatewayStatus.auditChainValid!==true) return json({ok:false,error:"Gateway signing status or audit chain did not verify."},409,corsHeaders(request));
   const gatewaySigners = Array.isArray(gatewayStatus.signers)?gatewayStatus.signers:[];
-  const recipients = (Array.isArray(envelope.recipients)?envelope.recipients:[]).map(recipient=>{const signer=gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid);if(!signer||!["Signed","Pending"].includes(String(signer.status||"")))return recipient;return{...recipient,status:signer.status==="Signed"?"Signed":recipient.status==="Current"?"Pending":recipient.status,completedAt:signer.signedAt||recipient.completedAt||null};});
-  const pending = gatewaySigners.filter(item=>item.status==="Pending").sort((a,b)=>Number(a.order||0)-Number(b.order||0)), now = new Date().toISOString();
-  const update = {recipients,status:"In Progress",currentSignerUid:gatewayStatus.signingMode==="Parallel"?null:(pending[0]?.uid||null),gatewaySigningStatus:String(gatewayStatus.status),gatewayBridgeStatus:"Connected",gatewayAuditChainValid:gatewayStatus.auditChainValid===true,gatewayStatusUpdatedAt:now,updatedAt:now};
+  const assignments = Array.isArray(envelope.gatewaySignerAssignments)?envelope.gatewaySignerAssignments:[];
+  const recipients = (Array.isArray(envelope.recipients)?envelope.recipients:[]).map(recipient=>{
+    const assignment=assignments.find(item=>item.uid===recipient.uid||String(item.email||"").toLowerCase()===String(recipient.email||"").toLowerCase());
+    const signer=gatewaySigners.find(item=>item.id===assignment?.signerId);
+    if(!signer||!["Signed","Pending"].includes(String(signer.status||"")))return recipient;
+    return{...recipient,status:signer.status==="Signed"?"Signed":recipient.status==="Current"?"Pending":recipient.status,completedAt:signer.signedAt||recipient.completedAt||null};
+  });
+  const pending = gatewaySigners.filter(item=>item.status==="Pending").sort((a,b)=>Number(a.order||0)-Number(b.order||0));
+  const nextAssignment=assignments.find(item=>item.signerId===pending[0]?.id);
+  const now = new Date().toISOString();
+  const update = {recipients,status:"In Progress",currentSignerUid:gatewayStatus.signingMode==="Parallel"?null:(nextAssignment?.uid||null),gatewaySigningStatus:String(gatewayStatus.status),gatewayBridgeStatus:"Connected",gatewayAuditChainValid:true,gatewayStatusUpdatedAt:now,updatedAt:now};
   const eventId="gateway-status-"+envelopeId+"-"+crypto.randomUUID().slice(0,8), event={envelopeId,event:"Gateway Signing Status Verified",details:{gatewayEnvelopeId,gatewayStatus:update.gatewaySigningStatus,auditChainValid:update.gatewayAuditChainValid},actorUid:uid,actorEmail:String(claims.email||""),createdAt:now};
   const base="projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents";
   await commitSignatureWorkflowWrites(env,token,[
