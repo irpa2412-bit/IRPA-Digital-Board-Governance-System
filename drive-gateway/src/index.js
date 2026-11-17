@@ -2696,6 +2696,7 @@ async function withInvitationRetry(operation, stage) {
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  if(!admin?.fields?.active?.booleanValue)return json({ok:false,error:"Active administrator access is required to send a workspace activation invitation."},403,corsHeaders(request));
   await enforceMailRateLimit(env, claims.user_id);
   const data = await request.json();
   const invitationId = cleanId(data.invitationId || "");
@@ -2718,7 +2719,6 @@ async function sendMemberInvitation(request, env) {
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
   const role=String(fields.role?.stringValue||"IRPA Member").trim();
-  if(!admin?.fields?.active?.booleanValue)return json({ok:false,error:"Active administrator access is required to send a workspace activation invitation."},403,corsHeaders(request));
   const appUrl=String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const invitationSecret=randomBase64Url(32);
   const invitationTokenHash=await sha256Hex(invitationSecret);
