@@ -537,7 +537,8 @@ export async function createCompletionCertificate(envelope){
   const archiveRef=ref(null,archivePath);
   await uploadBytes(archiveRef,bytes,{contentType:"application/pdf",purpose:"Signature Certificate Archive",folderId:archive.folderId,customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:envelope.latestDocumentHash||"",archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1"}});
   const archiveUrl=await getDownloadURL(archiveRef);
-  await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{
+  await postSignatureWorkflowRoute("/api/signature-workflow/certificate",{
+    envelopeId:envelope.id,
     certificatePath:path,
     certificateUrl:url,
     certificateHash,
@@ -546,7 +547,7 @@ export async function createCompletionCertificate(envelope){
     certificateArchiveFolderId:archive.folderId,
     certificateArchiveFolderLink:archive.archiveUidLink||null,
     certificateArchiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1",
-    updatedAt:serverTimestamp()
+    finalDocumentHash:envelope.latestDocumentHash||""
   });
   await recordEnvelopeEvent(envelope.id,"Certificate Generated and Archived",{certificateHash,archiveFolderId:archive.folderId,archiveUrl,actorUid:u.uid});
   return url;
