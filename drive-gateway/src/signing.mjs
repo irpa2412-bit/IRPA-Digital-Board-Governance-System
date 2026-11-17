@@ -186,6 +186,43 @@ export async function releaseRoutingPosition(ctx,id,position){
   return{released,position};
 }
 
+export async function requestEmailSigningCode(ctx,token,ip=""){
+  const now=ctx.now();
+  try{
+    const parts=tokenParts(token),tokenHash=await sha256Hex(parts[2]),earlyEnvelope=await ctx.meta.get("envelopes",parts[0]),earlySigner=earlyEnvelope?.signers?.find(item=>item.id===parts[1]);
+    if(earlySigner&&earlyEnvelope&&safeEqual(await sha256Hex(parts[2]),earlySigner.tokenHash)&&!can(earlyEnvelope,earlySigner))throw new HttpError(409,"Not your turn yet. Your invitation will become active after every signer in the previous position has signed.");
+    const loaded=await load(ctx,token),signer=loaded.signer;
+    if(signer.identityType!=="email-link"||!["issued","opened"].includes(signer.emailLinkStatus)||now.getTime()>=Date.parse(signer.emailLinkExpiresAt))throw new Error("unavailable");
+    if(signer.emailLinkStatus==="opened")return await openEmailSigning(ctx,token,ip);
+    const kv=ctx.env?.DRIVE_KV;
+    if(!kv||typeof kv.put!=="function"||typeof kv.get!=="function"||typeof kv.delete!=="function"||typeof ctx.sendEmailVerificationCode!=="function")throw new HttpError(503,"Email verification is temporarily unavailable.");
+    const ipHash=await sha256Hex(String(ip||"unknown"));
+    await consumeEmailLinkRateLimit(ctx,"code-send:"+tokenHash,3,now);
+    await consumeEmailLinkRateLimit(ctx,"code-ip:"+ipHash,10,now);
+    const code=String(Number.parseInt(randomHex(4),16)%1000000).padStart(6,"0");
+    const expiresAt=new Date(now.getTime()+10*60*1000).toISOString();
+    await kv.put("email-signing-code:"+tokenHash,JSON.stringify({codeHash:await sha256Hex(code+tokenHash),expiresAt}),{expirationTtl:600});
+    await ctx.sendEmailVerificationCode({to:signer.email,name:signer.name,code,expiresAt});
+    return {ok:true,requiresEmailCode:true,message:"Enter the 6-digit code sent to your email address to continue signing."};
+  }catch(error){if(error instanceof HttpError&&(error.status===503||error.status===409))throw error;throw new HttpError(401,genericEmailSigningFailure());}
+}
+
+export async function confirmEmailSigningCode(ctx,token,code,ip=""){
+  try{
+    const parts=tokenParts(token),tokenHash=await sha256Hex(parts[2]);
+    const loaded=await load(ctx,token);
+    if(loaded.signer.identityType!=="email-link"||loaded.signer.emailLinkStatus!=="issued")throw new Error("unavailable");
+    const kv=ctx.env?.DRIVE_KV;
+    if(!kv||typeof kv.get!=="function"||typeof kv.delete!=="function")throw new Error("unavailable");
+    const ipHash=await sha256Hex(String(ip||"unknown"));
+    await consumeEmailLinkRateLimit(ctx,"code-verify:"+tokenHash+":"+ipHash,5,ctx.now());
+    const raw=await kv.get("email-signing-code:"+tokenHash);
+    const challenge=raw?JSON.parse(raw):null;
+    if(!challenge||!/^\d{6}$/.test(String(code||""))||Date.parse(challenge.expiresAt)<=ctx.now().getTime()||!safeEqual(await sha256Hex(String(code)+tokenHash),String(challenge.codeHash||"")))throw new Error("unavailable");
+    await kv.delete("email-signing-code:"+tokenHash);
+    return await openEmailSigning(ctx,token,ip);
+  }catch{throw new HttpError(401,genericEmailSigningFailure());}
+}
 export async function openEmailSigning(ctx,token,ip=""){
   const now=ctx.now(),ipHash=await sha256Hex(String(ip||"unknown"));
   try{
