@@ -51,6 +51,7 @@ export default function EmailSigningReadOnlyPage({token}) {
     return()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl);};
   },[token]);
 
+  useEffect(()=>{const canvas=canvasRef.current;if(!canvas)return;const ratio=Math.max(1,window.devicePixelRatio||1);canvas.width=Math.round(520*ratio);canvas.height=Math.round(180*ratio);},[]);
   const selectedField=(record?.fields||[]).find(field=>field.fieldId===selectedFieldId)||null;
   const signatureFields=(record?.fields||[]).filter(field=>["Signature","Initials"].includes(field.type));
   const signatureValue=signatureFields.map(field=>fieldApplications.find(item=>item.fieldId===field.fieldId)?.value).find(Boolean)||"";
@@ -79,7 +80,7 @@ export default function EmailSigningReadOnlyPage({token}) {
   function draw(event){
     if(!drawingRef.current)return;
     const p=point(event),ctx=canvasRef.current?.getContext("2d");if(!ctx)return;
-    ctx.lineWidth=2.4;ctx.lineCap="round";ctx.strokeStyle="#111827";ctx.lineTo(p.x,p.y);ctx.stroke();
+    ctx.lineWidth=2.4*Math.max(1,window.devicePixelRatio||1);ctx.lineCap="round";ctx.strokeStyle="#111827";ctx.lineTo(p.x,p.y);ctx.stroke();
   }
   function stopDrawing(){drawingRef.current=false;}
   function clearPad(){const c=canvasRef.current;if(c)c.getContext("2d").clearRect(0,0,c.width,c.height);if(selectedField)setSignatureMarks(current=>{const next={...current};delete next[selectedField.fieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
