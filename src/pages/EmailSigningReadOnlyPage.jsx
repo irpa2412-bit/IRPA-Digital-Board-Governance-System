@@ -110,7 +110,7 @@ export default function EmailSigningReadOnlyPage({token}){
   if(field.type==="Checkbox")return field.required?value==="true":value!==undefined;
   return value!==undefined&&String(value).trim()!=="";
  };
- const incomplete=fields.filter(field=>field.required&&!complete(field));
+ const incomplete=fields.filter(field=>!complete(field));
  const canReview=Boolean(record)&&pageRendered;
  const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
 
