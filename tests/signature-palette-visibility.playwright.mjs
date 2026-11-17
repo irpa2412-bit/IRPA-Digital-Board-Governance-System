@@ -185,3 +185,5 @@ try{
  process.exitCode=1
 }
 finally{await browser?.close();server.kill("SIGTERM")}
+
+// CI retest trigger: preserve strict signature palette assertions.
