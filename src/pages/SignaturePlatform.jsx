@@ -1,12 +1,11 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import"../styles/signature-portal.css";
-import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthorityRegisterEntries,getControlledDocumentsForSigning,getRecords}from"../firebase/data";
+import{getCurrentEmployeeProfile,getCurrentMemberProfile,getControlledDocumentsForSigning,getRecords}from"../firebase/data";
 import{createGatewaySignatureEnvelope,voidGatewaySignatureEnvelope,downloadControlledDocumentBytes,downloadSignatureBytes,resendFailedGatewaySignatureInvitations,getGatewaySignatureEnvelopeStatus,retryGatewaySignatureDistribution,resendGatewayEmailInvitation,revokeGatewayEmailInvitation}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{resolveExpectedIntegrity,hasIntegrityMismatch,sha256Hex as signatureSha256}from"../utils/documentIntegrity.mjs";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
 import{createCompletionCertificate,createSignatureEnvelope,attachGatewayEmailLinkEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,getMySignedDocuments,downloadMySignedDocumentCopy,deleteMySignedDocumentCopy,saveMySignatureProfile,signEnvelope,saveSignatureWorkflowDraft,finalizeSignatureWorkflowDraft,startSignatureWorkflow,revokeSignatureApplication,migrateExistingSignatureProfile}from"../firebase/signaturePlatform";
-import{updateMySignerAuthority}from"../firebase/signerIdentity";
 import ControlledDocumentUpload from"../components/ControlledDocumentUpload";
 import SignatureFieldConfirmationPad from"../components/SignatureFieldConfirmationPad";
 import{trimSignatureCanvas}from"../utils/signatureImageCanvas.mjs";
@@ -243,7 +242,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  const[isAdmin,setIsAdmin]=useState(false);
  useEffect(()=>{let alive=true;(async()=>{try{const token=await auth.currentUser?.getIdTokenResult();if(alive)setIsAdmin(auth.currentUser?.email?.toLowerCase()==="irpa2412@gmail.com"||token?.claims?.admin===true);}catch{if(alive)setIsAdmin(auth.currentUser?.email?.toLowerCase()==="irpa2412@gmail.com");}})();return()=>{alive=false}},[]);
  const[tab,setTab]=useState("Profile"),[profile,setProfile]=useState(null),[signerIdentity,setSignerIdentity]=useState(null),[docs,setDocs]=useState([]),[envelopes,setEnvelopes]=useState([]),[signedDocuments,setSignedDocuments]=useState([]),[members,setMembers]=useState([]),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[revokeOpen,setRevokeOpen]=useState(false),[revokeBusy,setRevokeBusy]=useState(false);
- const[authorityMember,setAuthorityMember]=useState(null),[authorityEmployee,setAuthorityEmployee]=useState(null),[authorityRegisterEntries,setAuthorityRegisterEntries]=useState([]),[authorityDepartment,setAuthorityDepartment]=useState(""),[authorityUnit,setAuthorityUnit]=useState(""),[authorityRole,setAuthorityRole]=useState(""),[authorityStatus,setAuthorityStatus]=useState("Current"),[authorityReference,setAuthorityReference]=useState(""),[authorityEffectiveAt,setAuthorityEffectiveAt]=useState(""),[authorityExpiresAt,setAuthorityExpiresAt]=useState(""),[authorityBusy,setAuthorityBusy]=useState(false);
+ const[authorityMember,setAuthorityMember]=useState(null),[authorityEmployee,setAuthorityEmployee]=useState(null);
  const[displayName,setDisplayName]=useState(""),[initials,setInitials]=useState(""),[servedSignatureSrc,setServedSignatureSrc]=useState(""),[servedInitialsSrc,setServedInitialsSrc]=useState(""),[signatureFile,setSignatureFile]=useState(null),[initialsFile,setInitialsFile]=useState(null),[drawnSignature,setDrawnSignature]=useState(""),[replacementMode,setReplacementMode]=useState(false);
  const[title,setTitle]=useState(""),[documentId,setDocumentId]=useState(""),[documentUrl,setDocumentUrl]=useState(""),[signingMode,setSigningMode]=useState("Sequential"),[selectedSigner,setSelectedSigner]=useState(""),[draftEnvelopeId,setDraftEnvelopeId]=useState(null),[signerEmail,setSignerEmail]=useState(""),[signerRole,setSignerRole]=useState(""),[signerAuthorityRole,setSignerAuthorityRole]=useState(""),[signerCapacity,setSignerCapacity]=useState(""),[recipients,setRecipients]=useState([]),[fields,setFields]=useState([]),[activeAssigneeUid,setActiveAssigneeUid]=useState(""),[selectedField,setSelectedField]=useState(null),[preparationPage,setPreparationPage]=useState(1),[fieldValues,setFieldValues]=useState({}),[ownerSigningEnabled,setOwnerSigningEnabled]=useState(false),[initiateTitle,setInitiateTitle]=useState(""),[initiateDocumentId,setInitiateDocumentId]=useState(""),[initiateSigningMode,setInitiateSigningMode]=useState("Sequential"),[initiatedDocument,setInitiatedDocument]=useState(null),[signingCircle,setSigningCircle]=useState("Initiated"),[signDocumentPickerOpen,setSignDocumentPickerOpen]=useState(false),[signDocumentPickerMode,setSignDocumentPickerMode]=useState("source");
  useEffect(()=>{
@@ -338,23 +337,12 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       try{
         const identity=await getMySignerIdentity();
         setSignerIdentity(identity);
-        if(identity){
-          setAuthorityRole(identity.authorityRole&&identity.authorityRole!=="Not yet assigned"?identity.authorityRole:"");
-          setAuthorityStatus(identity.authorityStatus&&identity.authorityStatus!=="Unspecified"?identity.authorityStatus:"Current");
-          setAuthorityReference(identity.authorityReference||"");
-          setAuthorityEffectiveAt(identity.authorityEffectiveAt||"");
-          setAuthorityExpiresAt(identity.authorityExpiresAt||"");
-        }
-        const [memberRecord,employeeRecord,registerEntries]=await Promise.all([
+        const [memberRecord,employeeRecord]=await Promise.all([
           getCurrentMemberProfile().catch(()=>null),
-          getCurrentEmployeeProfile().catch(()=>null),
-          getCurrentSigningAuthorityRegisterEntries().catch(()=>[])
+          getCurrentEmployeeProfile().catch(()=>null)
         ]);
         setAuthorityMember(memberRecord);
         setAuthorityEmployee(employeeRecord);
-        setAuthorityRegisterEntries(Array.isArray(registerEntries)?registerEntries:[]);
-        setAuthorityDepartment(identity?.authorityDepartment||registerEntries?.find(x=>x.department)?.department||employeeRecord?.department||memberRecord?.department||"");
-        setAuthorityUnit(identity?.authorityUnit||registerEntries?.find(x=>x.department===(identity?.authorityDepartment||""))?.unit||registerEntries?.find(x=>x.department===(identity?.authorityDepartment||""))?.unitName||employeeRecord?.unit||employeeRecord?.unitName||memberRecord?.unit||memberRecord?.unitName||"");
       }catch(identityError){
         console.warn("IRPA Signature Portal: Signer Identity record unavailable.",identityError);
         setSignerIdentity(null);
@@ -435,146 +423,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   finally{setRevokeBusy(false)}
  }
  async function migrateProfileNow(){if(busy)return;setBusy(true);setMessage("Migrating your existing Signature Profile into the new Signer Identity layer…");try{const result=await migrateExistingSignatureProfile();if(result?.identity)setSignerIdentity(result.identity);setMessage(result?.migrated?"Migration verified. Your existing Signature Profile was retained and linked to the new Signer Identity record.":"No existing Signature Profile was found to migrate.");}catch(error){setMessage("MIGRATION FAILED: "+(error?.message||"No changes were made."));}finally{setBusy(false)}}
- const authorityRegisterRecords=useMemo(()=>{
-   const sourceEntries=authorityRegisterEntries.length?authorityRegisterEntries:[authorityMember,authorityEmployee].filter(Boolean);
-   const records=[];
-   for(const record of sourceEntries){
-     const sourceCollection=record.sourceCollection||"register";
-     const department=String(record.department||"").trim();
-     const unit=String(record.unit||record.unitName||"").trim();
-     const values=[
-       record.role,record.boardPosition,
-       ...(Array.isArray(record.roles)?record.roles:[]),
-       ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
-       ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
-       ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
-     ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-     for(const value of [...new Set(values)]){
-       records.push({...record,sourceCollection,sourceRecordId:record.id||record.uid||"",department,unit,role:value});
-     }
-   }
-   return records.filter(item=>item.department||item.unit||item.role);
- },[authorityRegisterEntries,authorityMember,authorityEmployee]);
- const authorityDepartments=useMemo(()=>{
-   // Department choices are derived from the authenticated user's institutional
-   // records. Employee register data is the primary source; signing-authority
-   // register entries may add only departments already recorded for this user.
-   const employeeDepartments=[
-     authorityEmployee?.department,
-     ...(Array.isArray(authorityEmployee?.departments)?authorityEmployee.departments:[])
-   ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-   const registeredDepartments=authorityRegisterRecords
-     .map(x=>String(x.department||"").trim())
-     .filter(Boolean);
-   const memberDepartments=[
-     authorityMember?.department,
-     ...(Array.isArray(authorityMember?.departments)?authorityMember.departments:[])
-   ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-   const source=employeeDepartments.length
-     ? [...employeeDepartments,...registeredDepartments]
-     : [...registeredDepartments,...memberDepartments];
-   return [...new Set(source)];
- },[authorityRegisterRecords,authorityEmployee,authorityMember]);
- const authorityOptions=useMemo(()=>{
-   const department=String(authorityDepartment||"").trim().toLowerCase();
-   if(department==="board of directors"){
-     // Board capacity is a fixed five-role institutional selector aligned to
-     // the approved role catalogue. Keep Board Member singular for exact matching.
-     return [
-       {role:"Board Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-chairperson"},
-       {role:"Board Vice Chairperson",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-vice-chairperson"},
-       {role:"Board Secretary",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-secretary"},
-       {role:"Board Treasurer",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-treasurer"},
-       {role:"Board Member",unit:"Board of Directors",sourceCollection:"governance",sourceRecordId:"board-member"}
-     ];
-   }
-   const options=[];
-   for(const record of authorityRegisterRecords.filter(x=>x.department===authorityDepartment)){
-     const values=[
-       record.role,record.boardPosition,record.designation,record.jobTitle,record.position,record.title,record.authorityRole,record.unit,record.unitName,
-       ...(Array.isArray(record.roles)?record.roles:[]),
-       ...(Array.isArray(record.assignedRoles)?record.assignedRoles:[]),
-       ...(Array.isArray(record.selectedRoles)?record.selectedRoles:[]),
-       ...(Array.isArray(record.roleAssignments)?record.roleAssignments:[])
-     ].flatMap(value=>{
-       const candidates=value&&typeof value==="object"?[value.role,value.title,value.designation,value.position]:[value];
-       return candidates.flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean));
-     });
-     for(const role of [...new Set(values)]){
-       if(!options.some(x=>x.role.toLowerCase()===role.toLowerCase())){
-         options.push({role,unit:record.unit||record.unitName||"",sourceCollection:record.sourceCollection,sourceRecordId:record.sourceRecordId});
-       }
-     }
-   }
-   return options.sort((a,b)=>a.role.localeCompare(b.role));
- },[authorityRegisterRecords,authorityDepartment]);
- const authorityDisplayLabel=(role,department=authorityDepartment)=>{
-   const normalized=String(role||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
-   if(String(department||"").trim().toLowerCase()==="board of directors"){
-     if(/(^| )chairperson$|^board chairperson$|^chairman$|^chairwoman$/.test(normalized)) return "Board Chairperson";
-     if(/(^| )vice chairperson$|^board vice chairperson$|^vice chairman$|^vice chairwoman$/.test(normalized)) return "Board Vice Chairperson";
-     if(/(^| )board secretary$|^secretary$/.test(normalized)) return "Board Secretary";
-     if(normalized==="board member"||normalized==="board members") return "Board Member";
-   }
-   return role;
- };
- const authorityCapacityPriority=(role,department=authorityDepartment)=>{
-   const label=authorityDisplayLabel(role,department);
-   if(label==="Board Chairperson")return 0;
-   if(label==="Board Vice Chairperson")return 1;
-   if(label==="Board Secretary")return 2;
-   if(label==="Board Members")return 3;
-   return 4;
- };
- const isPermanentExecutiveAuthority=(department=authorityDepartment,role=authorityRole)=>{
-   const d=String(department||"").trim().toLowerCase();
-   const r=String(role||"").trim().toLowerCase();
-   return d==="executive office"&&(r==="executive director"||r==="executive office");
- };
- const isBoardMemberAuthority=(department=authorityDepartment,role=authorityRole)=>{
-   const d=String(department||"").trim().toLowerCase();
-   const r=String(role||"").trim().toLowerCase();
-   return d==="board of directors"&&(r==="board member"||r==="board members");
- };
- async function saveSignerAuthority(e){
-   e.preventDefault();
-   if(authorityBusy)return;
-   if(!authorityDepartment||!authorityRole){
-     setMessage("Select the registered department and current signing authority before saving.");
-     return;
-   }
-   setAuthorityBusy(true);
-   setMessage("Saving your registered signing authority…");
-   try{
-     const selectedAuthority=authorityOptions.find(x=>x.role===authorityRole);
-     await updateMySignerAuthority({
-       authorityRole,
-       authorityStatus:isPermanentExecutiveAuthority()?"Current":authorityStatus,
-       authorityReference,
-       authorityEffectiveAt:isBoardMemberAuthority()?authorityEffectiveAt:"",
-       authorityExpiresAt:isBoardMemberAuthority()?authorityExpiresAt:"",
-       authorityDepartment,
-       authorityUnit:selectedAuthority?.unit||authorityUnit||authorityDepartment
-     });
-     // Re-read the persisted trust record from Firestore. Do not rely on the
-     // callable response shape, because the identity panel must reflect the
-     // exact record that will survive a full page refresh.
-     const persisted=await getMySignerIdentity();
-     if(!persisted)throw new Error("The authority update returned without a persisted Signer Identity record.");
-     setSignerIdentity(persisted);
-     setAuthorityRole(persisted.authorityRole||"");
-     setAuthorityStatus(persisted.authorityStatus||"Current");
-     setAuthorityReference(persisted.authorityReference||"");
-     setAuthorityEffectiveAt(persisted.authorityEffectiveAt||"");
-     setAuthorityExpiresAt(persisted.authorityExpiresAt||"");
-     setAuthorityDepartment(persisted.authorityDepartment||authorityDepartment);
-     setAuthorityUnit(persisted.authorityUnit||authorityUnit||persisted.authorityDepartment||"");
-     setMessage("SUCCESS: the current signing authority is saved and re-read from the persistent Signer Identity record.");
-   }catch(error){
-     setMessage("SIGNING AUTHORITY UPDATE FAILED: "+(error?.message||"No changes were made."));
-   }finally{setAuthorityBusy(false)}
- }
- async function saveProfile(e){e.preventDefault();setBusy(true);setMessage("");try{let file=signatureFile;if(!file&&drawnSignature){const blob=await(await fetch(drawnSignature)).blob();file=new File([blob],"IRPA-handwritten-signature.png",{type:"image/png"})}if(!file)throw new Error("Upload a signature image or use the on-screen signing pad.");const p=await saveMySignatureProfile({signatureFile:file,initialsFile,displayName,initials,method:drawnSignature?"Direct Handwritten Capture":"Upload"});setProfile(p);setSignatureFile(null);setInitialsFile(null);setDrawnSignature("");e.target.reset();setMessage(drawnSignature?"Handwritten signature captured and saved to your Signature Profile.":"Signature profile saved successfully.")}catch(x){setMessage(x.message||"Unable to save signature profile.")}finally{setBusy(false)}}
+async function saveProfile(e){e.preventDefault();setBusy(true);setMessage("");try{let file=signatureFile;if(!file&&drawnSignature){const blob=await(await fetch(drawnSignature)).blob();file=new File([blob],"IRPA-handwritten-signature.png",{type:"image/png"})}if(!file)throw new Error("Upload a signature image or use the on-screen signing pad.");const p=await saveMySignatureProfile({signatureFile:file,initialsFile,displayName,initials,method:drawnSignature?"Direct Handwritten Capture":"Upload"});setProfile(p);setSignatureFile(null);setInitialsFile(null);setDrawnSignature("");e.target.reset();setMessage(drawnSignature?"Handwritten signature captured and saved to your Signature Profile.":"Signature profile saved successfully.")}catch(x){setMessage(x.message||"Unable to save signature profile.")}finally{setBusy(false)}}
  async function saveDrawnSignature(dataUrl){if(busy)throw new Error("A signature save is already in progress.");if(!String(displayName||"").trim())throw new Error("Enter your Display name before saving the signature specimen.");setBusy(true);setMessage("Saving your handwritten signature to your Signature Profile…");try{const blob=await(await fetch(dataUrl)).blob();const file=new File([blob],"IRPA-handwritten-signature.png",{type:"image/png"});const p=await saveMySignatureProfile({signatureFile:file,initialsFile,displayName,initials,method:"Direct Handwritten Capture"});setProfile(p);setDrawnSignature("");setSignatureFile(null);setReplacementMode(false);setMessage("SUCCESS: your handwritten signature is now the CURRENT SIGNATURE and will be reused for future documents.");return p;}catch(x){const msg=x?.message||"Unable to save the signature specimen.";setMessage("ERROR: "+msg);throw x}finally{setBusy(false)}}
  async function addSigner(){
   if(addSignerInFlightRef.current||busy)return;
