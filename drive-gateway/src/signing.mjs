@@ -194,7 +194,7 @@ export async function releaseRoutingPosition(ctx,id,position){
       return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.issued",signerId:signer.id,routingPosition:position,emailHash:signer.emailHash,expiresAt:signer.emailLinkExpiresAt,at:now.toISOString()})},result:true};
     });
     if(!committed)continue;
-    const link=(ctx.config?.appUrl||"https://irpa-digital-board-governance.web.app")+"/?emailSignToken="+encodeURIComponent(issued.token);
+    const link=(ctx.config?.appUrl||"https://irpa-digital-board-governance.web.app")+"/?emailSignToken="+encodeURIComponent(id+"."+target.id+"."+issued.token);
     try{
       if(typeof ctx.sendInvitation==="function")await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||"IRPA Document Owner",expiresAt:issued.record.expiresAt,role:String(target.declaredParticulars?.title||target.title||""),action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});
       await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(!signer)return{patch:null};signer.invitation="Sent";signer.invitedAt=ctx.now().toISOString();return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:typeof ctx.sendInvitation==="function"?"email_link.delivered":"email_link.delivery_simulated",signerId:signer.id,routingPosition:position,at:signer.invitedAt})}};});
