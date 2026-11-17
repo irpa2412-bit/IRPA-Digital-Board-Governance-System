@@ -1,5 +1,7 @@
 import React,{useEffect,useRef,useState} from "react";
 import {getGoogleDriveGatewayUrl} from "../firebase/gatewayUrl";
+import {fitSignatureImage} from "../utils/signatureImageFit.mjs";
+import {trimSignatureCanvas} from "../utils/signatureImageCanvas.mjs";
 
 const NEUTRAL="This signing link is unavailable. Contact the document owner for a new invitation.";
 const inputStyle={width:"100%",boxSizing:"border-box",padding:"10px",border:"1px solid #9ca3af",borderRadius:7,fontSize:15};
