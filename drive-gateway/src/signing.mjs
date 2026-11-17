@@ -87,7 +87,6 @@ export async function createEnvelope(ctx,user,body){
   if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
   if(cryptoRequired&&input.some(s=>s?.identityType!=="email-link"))throw new HttpError(400,"Every signer must use the invited email-link identity.");
-  // Email-link possession is transaction-scoped mailbox control, not an authority-register lookup.
   const sourceBytes=await ctx.storage.get(doc.primaryStorageId);
   if(!sourceBytes)throw new HttpError(409,"The stored document failed its integrity check.");
   await verifySourceDocumentIntegrity(sourceBytes,{},doc);
@@ -100,7 +99,7 @@ export async function createEnvelope(ctx,user,body){
     seenEmails.add(email);
     if(uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
     if(uid)seenUids.add(uid);
-    const signerId=`S${i+1}`,secret=randomHex(32),emailLink=true,authority=null;
+    const signerId=`S${i+1}`,secret=randomHex(32),emailLink=true;
     const profileUid=emailLink&&typeof ctx.resolveEmailLinkProfileUid==="function"?await ctx.resolveEmailLinkProfileUid(email):null;
     if(!uid&&!emailLink&&!ctx.allowLegacyTestSigners)throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
     const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config?.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
@@ -326,7 +325,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=signedFieldValues;
     s.signerDeclarations=declared;
     s.declarationDiscrepancy={detected:discrepancyFields.length>0,fields:discrepancyFields,ownerDeclared:{...ownerDeclared},signerDeclared:{...declared},detectedAt:at};
-    s.authorityVerification=null;s.ip=ip||null;s.userAgent=cleanText(userAgent||"",200)||null;
+    s.ip=ip||null;s.userAgent=cleanText(userAgent||"",200)||null;
     const currentPosition=Number(s.routingPosition??s.order??1),positionComplete=cur.signers.filter(x=>Number(x.routingPosition??x.order??1)===currentPosition).every(x=>x.status==="Signed"),last=cur.signers.every(x=>x.status==="Signed");
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events:await chainEvents(cur.events,{type:"signer.signed",signerId:s.id,routingPosition:currentPosition,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy})},result:{idempotent:false,winner:last,positionComplete,nextPosition:positionComplete?Math.min(...cur.signers.filter(x=>x.status!=="Signed"&&Number(x.routingPosition??x.order??1)>currentPosition).map(x=>Number(x.routingPosition??x.order??1)),Infinity):null,status:last?"Completing":"InProgress"}};
   });
