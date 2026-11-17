@@ -313,7 +313,7 @@ export async function attachGatewayEmailLinkEnvelope(envelopeId,gatewayResult){
   const result=await postSignatureWorkflowRoute("/api/signature-workflow/activate",{
     envelopeId,gatewayEnvelopeId:gatewayResult.gatewayEnvelopeId,gatewayDocumentId:gatewayResult.gatewayDocumentId||null,
     gatewayOriginalHash:gatewayResult.gatewayOriginalHash||null,gatewaySigningStatus:gatewayResult.gatewaySigningStatus||"Sent",
-    gatewayInvitationStatus:gatewayResult.gatewayInvitationStatus||"Sent",gatewayInvitationFailures:Number(gatewayResult.gatewayInvitationFailures||0)
+    gatewayInvitationStatus:gatewayResult.gatewayInvitationStatus||"Sent",gatewayInvitationFailures:Number(gatewayResult.gatewayInvitationFailures||0),gatewaySignerAssignments:Array.isArray(gatewayResult.gatewaySignerAssignments)?gatewayResult.gatewaySignerAssignments:[]
   });
   return {gatewayEnvelopeId:gatewayResult.gatewayEnvelopeId,gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent",status:result.status};
 }
@@ -335,7 +335,7 @@ export async function startSignatureWorkflow(envelope){
   let gateway=null;
   try{
     if(envelope.gatewayEnvelopeId){
-      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",gatewayInvitationStatus:envelope.gatewayInvitationStatus||"Sent",existing:true};
+      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",gatewayInvitationStatus:envelope.gatewayInvitationStatus||"Sent",gatewaySignerAssignments:Array.isArray(envelope.gatewaySignerAssignments)?envelope.gatewaySignerAssignments:[],existing:true};
     }else{
       const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
       gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
@@ -347,7 +347,7 @@ export async function startSignatureWorkflow(envelope){
       gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent",
       gatewayInvitationFailures:Number(gateway.gatewayInvitationFailures||0),gatewaySignerAssignments:Array.isArray(gateway.gatewaySignerAssignments)?gateway.gatewaySignerAssignments:[]
     });
-    return {...envelope,status:activated.status,workflowStartedAt:new Date().toISOString(),gatewayEnvelopeId:gateway.gatewayEnvelopeId,gatewayDocumentId:gateway.gatewayDocumentId||null,gatewayOriginalHash:gateway.gatewayOriginalHash||null,gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent"};
+    return {...envelope,status:activated.status,workflowStartedAt:new Date().toISOString(),gatewayEnvelopeId:gateway.gatewayEnvelopeId,gatewayDocumentId:gateway.gatewayDocumentId||null,gatewayOriginalHash:gateway.gatewayOriginalHash||null,gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent",gatewaySignerAssignments:gateway.gatewaySignerAssignments||[]};
   }catch(error){
     if(gateway?.gatewayEnvelopeId&&!gateway.existing){
       try{await voidGatewaySignatureEnvelope(gateway.gatewayEnvelopeId,"Signature Portal activation mirror could not be committed");}
