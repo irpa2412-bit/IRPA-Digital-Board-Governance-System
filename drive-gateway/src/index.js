@@ -376,6 +376,10 @@ export default {
       if (pathname === "/api/signature-workflow/view" && request.method === "GET") return await getSignatureWorkflowViewRoute(request, env);
       if (pathname === "/api/signature-workflow/add-signer-dry-run" && request.method === "POST") return await addSignerDryRunRoute(request, env);
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
+      if (pathname === "/api/signature-workflow/activate" && request.method === "POST") return await activateSignatureWorkflowRoute(request, env);
+      if (pathname === "/api/signature-workflow/audit" && request.method === "POST") return await appendSignatureWorkflowAuditRoute(request, env);
+      if (pathname === "/api/signature-workflow/mirror" && request.method === "POST") return await syncSignatureWorkflowMirrorRoute(request, env);
+      if (pathname === "/api/signature-workflow/signed-documents" && request.method === "GET") return await getMySignedDocumentsRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
       if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
@@ -1277,6 +1281,101 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     return json({ok:true,envelopeId,draft:envelope,writePath:"authenticated-worker",atomic:true},200,corsHeaders(request));
   } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
 }
+async function commitSignatureWorkflowWrites(env, token, writes) {
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents:commit", {
+    method:"POST", headers:{Authorization:"Bearer " + token,"Content-Type":"application/json"}, body:JSON.stringify({writes})
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(()=>({}));
+    const error = detail?.error || {};
+    const failure = new Error(String(error.message || "Signature Gateway mirror commit failed.").replace(/[\\r\\n]/g," ").slice(0,220));
+    failure.status = response.status;
+    throw failure;
+  }
+}
+function signatureAuditDetails(input) {
+  const allowed = ["signerUid","signerName","workflowRole","status","originalDocumentHash","signedDocumentHash","nextSignerUid","nextSignerName","nextSignerRole","requiredActionCount","gatewayEnvelopeId","gatewayStatus","finalHash","cryptographicEvidenceCount","auditChainValid","deliveryStatus","providerResponseId","attemptedAt","maskedAddress","error","action","ownerSignatureRequired","assignedOwnerSignatureFieldIds","fieldCount","recipientCount"];
+  return Object.fromEntries(allowed.filter(key => input && Object.prototype.hasOwnProperty.call(input,key)).map(key => [key,input[key]]));
+}
+async function activateSignatureWorkflowRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(()=>({}));
+  const envelopeId = cleanId(body.envelopeId || "");
+  const gatewayEnvelopeId = cleanId(body.gatewayEnvelopeId || "");
+  if (!envelopeId || !gatewayEnvelopeId) return json({ok:false,error:"Envelope and Gateway references are required."},400,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env);
+  const path = "signatureEnvelopes/" + envelopeId;
+  const raw = await getFirestoreDocument(env,path,token);
+  if (!raw?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+  const envelope = firestoreDocumentToPlain(raw) || {};
+  const uid = String(claims.user_id || "");
+  const ownerUid = String(envelope.ownerUid || envelope.senderUid || "");
+  if (uid !== ownerUid) return json({ok:false,error:"Only the original document owner may activate this signing workflow."},403,corsHeaders(request));
+  if (envelope.status !== "Draft") return json({ok:false,error:"Only a saved Draft can be activated.",status:envelope.status},409,corsHeaders(request));
+  const now = new Date().toISOString();
+  const update = {status:envelope.currentSignerUid?"In Progress":"Shared",workflowStartedAt:now,workflowStartedByUid:uid,gatewayEnvelopeId,gatewayDocumentId:body.gatewayDocumentId||null,gatewayOriginalHash:body.gatewayOriginalHash||null,gatewaySigningStatus:body.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:body.gatewayInvitationStatus||"Sent",gatewayInvitationFailures:Number(body.gatewayInvitationFailures||0),updatedAt:now};
+  const eventId = "gateway-activated-" + envelopeId + "-" + crypto.randomUUID().slice(0,8);
+  const event = {envelopeId,event:"Workflow Activated and Sent",details:{gatewayEnvelopeId,ownerUid:uid,deliveryStatus:update.gatewayInvitationStatus},actorUid:uid,actorEmail:String(claims.email||""),createdAt:now};
+  const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
+  const docPatch = {signatureStatus:signatureDraftFirestoreValue(update.status),signatureEnvelopeId:signatureDraftFirestoreValue(envelopeId),workflowStartedAt:signatureDraftFirestoreValue(now),updatedAt:signatureDraftFirestoreValue(now)};
+  const writes = [
+    {update:{name:base+"/"+path,fields:signatureDraftFirestoreValue(update).mapValue.fields},updateMask:{fieldPaths:Object.keys(update)},currentDocument:{exists:true}},
+    {update:{name:base+"/documents/"+String(envelope.documentId),fields:docPatch},updateMask:{fieldPaths:Object.keys(docPatch)},currentDocument:{exists:true}},
+    {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
+  ];
+  await commitSignatureWorkflowWrites(env,token,writes);
+  return json({ok:true,envelopeId,status:update.status,gatewayEnvelopeId,writePath:"authenticated-gateway",atomic:true},200,corsHeaders(request));
+}
+async function appendSignatureWorkflowAuditRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(()=>({}));
+  const envelopeId = cleanId(body.envelopeId || "");
+  const eventName = String(body.event || "").trim().slice(0,100);
+  if (!envelopeId || !eventName) return json({ok:false,error:"Envelope ID and audit event are required."},400,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env);
+  const raw = await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
+  if (!raw?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+  const envelope = firestoreDocumentToPlain(raw) || {};
+  const uid = String(claims.user_id || "");
+  const participants = Array.isArray(envelope.participantUids) ? envelope.participantUids : [];
+  if (uid !== String(envelope.ownerUid || envelope.senderUid || "") && !participants.includes(uid)) return json({ok:false,error:"This account is not an actor on the signing envelope."},403,corsHeaders(request));
+  const now = new Date().toISOString(), eventId = "gateway-audit-" + envelopeId + "-" + crypto.randomUUID().slice(0,12);
+  const event = {envelopeId,event:eventName,details:signatureAuditDetails(body.details||{}),actorUid:uid,actorEmail:String(claims.email||""),createdAt:now,source:"authenticated-gateway"};
+  const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
+  await commitSignatureWorkflowWrites(env,token,[{update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}]);
+  return json({ok:true,eventId,envelopeId,createdAt:now,writePath:"authenticated-gateway"},201,corsHeaders(request));
+}
+async function syncSignatureWorkflowMirrorRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(()=>({}));
+  const envelopeId = cleanId(body.envelopeId||""), gatewayEnvelopeId = cleanId(body.gatewayEnvelopeId||"");
+  const gatewayStatus = body.gatewayStatus || {};
+  if (!envelopeId || !gatewayEnvelopeId || !["InProgress","Sent"].includes(String(gatewayStatus.status||""))) return json({ok:false,error:"A verified non-completed Gateway status is required."},400,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env), raw = await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
+  if (!raw?.fields) return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+  const envelope = firestoreDocumentToPlain(raw)||{}, uid = String(claims.user_id||""), participants = Array.isArray(envelope.participantUids)?envelope.participantUids:[];
+  if (!participants.includes(uid) || String(envelope.gatewayEnvelopeId||"")!==gatewayEnvelopeId || String(gatewayStatus.envelopeId||"")!==gatewayEnvelopeId || String(gatewayStatus.externalReference||"")!==envelopeId) return json({ok:false,error:"Gateway status is not linked to this authenticated participant and envelope."},403,corsHeaders(request));
+  const gatewaySigners = Array.isArray(gatewayStatus.signers)?gatewayStatus.signers:[];
+  const recipients = (Array.isArray(envelope.recipients)?envelope.recipients:[]).map(recipient=>{const signer=gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid);if(!signer||!["Signed","Pending"].includes(String(signer.status||"")))return recipient;return{...recipient,status:signer.status==="Signed"?"Signed":recipient.status==="Current"?"Pending":recipient.status,completedAt:signer.signedAt||recipient.completedAt||null};});
+  const pending = gatewaySigners.filter(item=>item.status==="Pending").sort((a,b)=>Number(a.order||0)-Number(b.order||0)), now = new Date().toISOString();
+  const update = {recipients,status:"In Progress",currentSignerUid:gatewayStatus.signingMode==="Parallel"?null:(pending[0]?.uid||null),gatewaySigningStatus:String(gatewayStatus.status),gatewayBridgeStatus:"Connected",gatewayAuditChainValid:gatewayStatus.auditChainValid===true,gatewayStatusUpdatedAt:now,updatedAt:now};
+  const eventId="gateway-status-"+envelopeId+"-"+crypto.randomUUID().slice(0,8), event={envelopeId,event:"Gateway Signing Status Verified",details:{gatewayEnvelopeId,gatewayStatus:update.gatewaySigningStatus,auditChainValid:update.gatewayAuditChainValid},actorUid:uid,actorEmail:String(claims.email||""),createdAt:now};
+  const base="projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents";
+  await commitSignatureWorkflowWrites(env,token,[
+    {update:{name:base+"/signatureEnvelopes/"+envelopeId,fields:signatureDraftFirestoreValue(update).mapValue.fields},updateMask:{fieldPaths:Object.keys(update)},currentDocument:{exists:true}},
+    {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
+  ]);
+  return json({ok:true,envelopeId,status:update.status,currentSignerUid:update.currentSignerUid,writePath:"authenticated-gateway",atomic:true},200,corsHeaders(request));
+}
+async function getMySignedDocumentsRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env), uid = String(claims.user_id||""), token = await getFirestoreAdminAccessToken(env);
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:runQuery",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({structuredQuery:{from:[{collectionId:"signatures"}],where:{fieldFilter:{field:{fieldPath:"signerUid"},op:"EQUAL",value:{stringValue:uid}}},limit:200}})});
+  if(!response.ok)return json({ok:false,error:"Unable to retrieve signed documents."},502,corsHeaders(request));
+  const rows=(await response.json()).filter(item=>item.document).map(item=>({id:String(item.document.name||"").split("/").pop(),...(firestoreDocumentToPlain(item.document)||{})}));
+  const documents=rows.filter(row=>row.signerUid===uid&&row.status==="Signed"&&row.signerArchiveUrl).sort((a,b)=>String(b.signedAt||"").localeCompare(String(a.signedAt||"")));
+  return json({ok:true,documents},200,{...corsHeaders(request),"Cache-Control":"no-store"});
+}
+
 async function reconcileSignatureDocumentIds(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
