@@ -165,24 +165,31 @@ test("duplicate email signer is refused and login-bound signing remains UID auth
 });
 
 
-test("staging and production reject UID-only and UID-bound account signers",async()=>{
+test("staging and production accept UID-bound account signers and verified email-link guests only",async()=>{
   const f=await fixture();
   const ctx={...f.ctx,env:{...f.ctx.env,IRPA_ENVIRONMENT:"staging"}};
   const owner={uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false};
   for(const signer of [
     {email:"member@example.org",uid:"registered-member-uid",name:"Registered Member"},
-    {email:"member@example.org",uid:"registered-member-uid",identityType:"email-link",name:"Registered Member"}
+    {email:"member@example.org",uid:"registered-member-uid",identityType:"email-link",name:"Registered Member"},
+    {email:"member@example.org",uid:"registered-member-uid",identityType:"other",name:"Registered Member"},
+    {email:"member@example.org",identityType:"account",name:"Missing UID"}
   ]){
     await assert.rejects(
       ()=>createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[signer]}),
-      error=>error?.status===400&&error.message.includes("Every staging and production signer must use an email-link identity without a Firebase UID")
+      error=>error?.status===400&&error.message.includes("Every staging and production signer must use either a verified email-link identity or an authenticated IRPA account identity")
     );
   }
-  const accepted=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"member@example.org",identityType:"email-link",name:"Registered Member"}]});
-  assert.equal(accepted.status,"Sent");
-  const saved=await ctx.meta.get("envelopes",accepted.envelopeId);
-  assert.equal(saved.signers[0].uid,null);
-  assert.equal(saved.signers[0].identityType,"email-link");
+  const account=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"member@example.org",uid:"registered-member-uid",identityType:"account",name:"Registered Member"}]});
+  assert.equal(account.status,"Sent");
+  const accountSaved=await ctx.meta.get("envelopes",account.envelopeId);
+  assert.equal(accountSaved.signers[0].uid,"registered-member-uid");
+  assert.equal(accountSaved.signers[0].identityType,"account");
+  const guest=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"guest@example.org",identityType:"email-link",name:"External Guest"}]});
+  assert.equal(guest.status,"Sent");
+  const guestSaved=await ctx.meta.get("envelopes",guest.envelopeId);
+  assert.equal(guestSaved.signers[0].uid,null);
+  assert.equal(guestSaved.signers[0].identityType,"email-link");
 });
 
 test("email-link signer can revoke before submission and the session token is invalidated",async()=>{
