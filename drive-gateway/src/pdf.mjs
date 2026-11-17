@@ -2,6 +2,11 @@ import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 import { HttpError, sha256Hex } from "./util.mjs";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
 
+export function formatServerSigningTimestamp(value) {
+  if (!value || !Number.isFinite(Date.parse(value))) return null;
+  return new Date(value).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+}
+
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_PAGES = 500;
 export const MAX_SIGNERS = 8;
@@ -116,9 +121,7 @@ export async function buildSignedPdf(originalBytes, info) {
   for (const field of info.fields || []) {
     const signer = (info.signers || []).find(item => (field.signerId && item.id === field.signerId) || (item.uid && item.uid === field.signerUid));
     if (!signer) continue;
-    const serverDateTime = signer.signedAt && Number.isFinite(Date.parse(signer.signedAt))
-      ? new Date(signer.signedAt).toISOString().replace("T", " ").replace(/\\.\\d{3}Z$/, " UTC")
-      : null;
+    const serverDateTime = formatServerSigningTimestamp(signer.signedAt);
     const value = field.type === "Date" && serverDateTime
       ? serverDateTime
       : signer.fieldValues?.[field.fieldId];
