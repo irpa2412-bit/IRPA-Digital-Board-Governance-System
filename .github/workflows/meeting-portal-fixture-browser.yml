@@ -172,6 +172,7 @@ jobs:
             "src/firebase/signatureStorage.js",
             "src/firebase/signatureWorkflowPolicy.js",
             "src/pages/SignaturePlatform.jsx",
+            "src/styles/signature-portal.css",
             "tests/signature-workflow-policy.test.mjs",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
@@ -234,6 +235,11 @@ jobs:
             changed.includes("tests/signature-workflow-policy.test.mjs") &&
             changed.includes("tests/firestore.rules.test.cjs") &&
             changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "src/firebase/data.js", "firestore.rules", "tests/signature-workflow-policy.test.mjs", "tests/firestore.rules.test.cjs"].includes(path));
+          const signaturePaletteDirectAssignmentRepair =
+            changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("src/styles/signature-portal.css") &&
+            changed.includes("tests/signature-workflow-policy.test.mjs") &&
+            changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "src/styles/signature-portal.css", "tests/signature-workflow-policy.test.mjs"].includes(path));
           const signaturePdfUrlHandoffRepair = changed.includes("src/pages/SignaturePlatform.jsx") &&
             changed.includes("tests/signature-workflow-policy.test.mjs") &&
             changed.every(path => [".github/workflows/meeting-portal-fixture-browser.yml", "tests/meeting-isolation-guard.test.mjs", "src/pages/SignaturePlatform.jsx", "tests/signature-workflow-policy.test.mjs"].includes(path));
@@ -439,7 +445,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
