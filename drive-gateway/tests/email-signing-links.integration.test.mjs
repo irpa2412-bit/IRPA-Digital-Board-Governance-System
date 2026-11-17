@@ -128,7 +128,7 @@ test("owner revoke invalidates a guest link; resend rotates token and revokes th
 });
 
 
-test("external email-link signer can declare and sign without a Firebase UID or authority-register match",async()=>{
+test("external email-link signer declares a required name and optional title without a Firebase UID",async()=>{
   const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.22");
   assert.equal(opened.ok,true);
@@ -137,7 +137,7 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   const signed=await sign(f.ctx,{
     token:opened.sessionToken,
     signature:{type:"typed",value:"Vendor Signer"},
-    declarations:{name:"Vendor Signer",title:"External Consultant"},
+    declarations:{name:"Vendor Signer"},
     consent:true,
     user:null
   });
@@ -145,11 +145,13 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   assert.equal(signed.status,"Completed");
   const completed=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(completed.signers[0].uid,null);
-  assert.equal(completed.signers[0].signerDeclarations.title,"External Consultant");
+  assert.deepEqual(completed.signers[0].signerDeclarations,{name:"Vendor Signer",title:""});
   assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
   assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
   const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
   assert.equal(pdf.fileName.includes("-signed-"),true);
+  const replay=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Vendor Signer"},declarations:{name:"Vendor Signer"},consent:true,user:null});
+  assert.equal(replay.idempotent,true,"a second submission must not create another signature");
 });
 
 test("email-link invitations do not require register, authority-matrix or Firebase UID matches",async()=>{
@@ -169,26 +171,25 @@ test("duplicate email signer is refused and login-bound signing remains UID auth
 });
 
 
-test("staging and production accept UID-bound account signers and verified email-link guests only",async()=>{
+test("staging and production require email-link identity for every signer, retaining optional profile UID association",async()=>{
   const f=await fixture();
   const ctx={...f.ctx,env:{...f.ctx.env,IRPA_ENVIRONMENT:"staging"}};
   const owner={uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false};
   for(const signer of [
     {email:"member@example.org",uid:"registered-member-uid",name:"Registered Member"},
-    {email:"member@example.org",uid:"registered-member-uid",identityType:"email-link",name:"Registered Member"},
-    {email:"member@example.org",uid:"registered-member-uid",identityType:"other",name:"Registered Member"},
-    {email:"member@example.org",identityType:"account",name:"Missing UID"}
+    {email:"member@example.org",uid:"registered-member-uid",identityType:"account",name:"Registered Member"},
+    {email:"member@example.org",identityType:"other",name:"Invalid identity"}
   ]){
     await assert.rejects(
       ()=>createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[signer]}),
-      error=>error?.status===400&&error.message.includes("Every staging and production signer must use either a verified email-link identity or an authenticated IRPA account identity")
+      error=>error?.status===400&&error.message.includes("Every signer must use the invited email-link identity")
     );
   }
-  const account=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"member@example.org",uid:"registered-member-uid",identityType:"account",name:"Registered Member"}]});
-  assert.equal(account.status,"Sent");
-  const accountSaved=await ctx.meta.get("envelopes",account.envelopeId);
-  assert.equal(accountSaved.signers[0].uid,"registered-member-uid");
-  assert.equal(accountSaved.signers[0].identityType,"account");
+  const registered=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"member@example.org",uid:"registered-member-uid",identityType:"email-link",name:"Registered Member"}]});
+  assert.equal(registered.status,"Sent");
+  const registeredSaved=await ctx.meta.get("envelopes",registered.envelopeId);
+  assert.equal(registeredSaved.signers[0].uid,"registered-member-uid");
+  assert.equal(registeredSaved.signers[0].identityType,"email-link");
   const guest=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"guest@example.org",identityType:"email-link",name:"External Guest"}]});
   assert.equal(guest.status,"Sent");
   const guestSaved=await ctx.meta.get("envelopes",guest.envelopeId);
