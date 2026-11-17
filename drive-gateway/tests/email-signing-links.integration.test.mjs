@@ -98,6 +98,101 @@ test("email link opens once, changes status to opened and exposes only its contr
   assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the session must not redeem the invitation a second time");
 });
 
+test("no-session invitation opens only the email-code step and consumes the token after code confirmation",async()=>{
+  const f=await fixture();
+  const page=fs.readFileSync(new URL("../../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
+  assert.match(page,/Confirm your email/);
+  assert.match(page,/Confirm email and continue/);
+  const openResponse=await route(new Request("https://gateway.example.test/api/sign/email/open",{headers:{"x-signing-token":f.token}}),f.ctx);
+  const openBody=await openResponse.json();
+  assert.equal(openResponse.status,200);
+  assert.equal(openBody.requiresEmailCode,true);
+  assert.equal(f.verificationCodes.length,1);
+  assert.match(f.verificationCodes[0].code,/^\d{6}$/);
+  const before=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(before.signers[0].emailLinkStatus,"issued");
+  const confirmResponse=await route(new Request("https://gateway.example.test/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:f.token,code:f.verificationCodes[0].code})}),f.ctx);
+  const confirmed=await confirmResponse.json();
+  assert.equal(confirmResponse.status,200);
+  assert.equal(confirmed.ok,true);
+  assert.notEqual(confirmed.sessionToken,f.token);
+  const after=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(after.signers[0].emailLinkStatus,"opened");
+  const replay=await route(new Request("https://gateway.example.test/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:f.token,code:f.verificationCodes[0].code})}),f.ctx);
+  assert.equal(replay.status,404);
+});
+
+test("three owner-routed signers receive invitations stage by stage; early links cannot sign",async()=>{
+  const f=await fixture({signers:[
+    {identityType:"email-link",email:"one@example.org",name:"Signer One",routingPosition:1},
+    {identityType:"email-link",email:"two@example.org",name:"Signer Two",routingPosition:2},
+    {identityType:"email-link",email:"three@example.org",name:"Signer Three",routingPosition:3}
+  ]});
+  assert.equal(f.sent.length,1);
+  assert.equal(f.envelope.signers[0].invitation,"Sent");
+  assert.equal(f.envelope.signers[1].invitation,"Waiting");
+  assert.equal(f.envelope.signers[2].invitation,"Waiting");
+  const early=await route(new Request("https://gateway.example.test/api/sign/email/open",{headers:{"x-signing-token":f.tokens[1]}}),f.ctx);
+  assert.equal(early.status,409);
+  assert.match((await early.json()).error,/Not your turn yet/);
+  const first=await openEmailSigning(f.ctx,f.tokens[0]);
+  await sign(f.ctx,{token:first.sessionToken,signature:{type:"typed",value:"Signer One"},declarations:{name:"Signer One"},consent:true,user:null});
+  assert.equal(f.sent.length,2);
+  const afterOne=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(afterOne.signers[1].emailLinkStatus,"issued");
+  assert.equal(afterOne.signers[2].emailLinkStatus,"waiting");
+  const secondToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
+  const second=await openEmailSigning(f.ctx,secondToken);
+  await sign(f.ctx,{token:second.sessionToken,signature:{type:"typed",value:"Signer Two"},declarations:{name:"Signer Two"},consent:true,user:null});
+  assert.equal(f.sent.length,3);
+  const thirdToken=new URL(f.sent[2].link).searchParams.get("emailSignToken");
+  const third=await openEmailSigning(f.ctx,thirdToken);
+  const completed=await sign(f.ctx,{token:third.sessionToken,signature:{type:"typed",value:"Signer Three"},declarations:{name:"Signer Three"},consent:true,user:null});
+  assert.equal(completed.completed,true);
+  const final=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(final.status,"Completed");
+  assert.deepEqual(final.signers.map(s=>s.routingPosition),[1,2,3]);
+});
+
+test("same-position signers are parallel and next position waits for every signer in the group",async()=>{
+  const f=await fixture({signers:[
+    {identityType:"email-link",email:"one@example.org",name:"Signer One",routingPosition:1},
+    {identityType:"email-link",email:"two@example.org",name:"Signer Two",routingPosition:1},
+    {identityType:"email-link",email:"three@example.org",name:"Signer Three",routingPosition:2}
+  ]});
+  assert.equal(f.sent.length,2);
+  const first=await openEmailSigning(f.ctx,f.tokens[0]);
+  await sign(f.ctx,{token:first.sessionToken,signature:{type:"typed",value:"Signer One"},declarations:{name:"Signer One"},consent:true,user:null});
+  assert.equal(f.sent.length,2);
+  const beforeSecond=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(beforeSecond.signers[2].emailLinkStatus,"waiting");
+  const second=await openEmailSigning(f.ctx,f.tokens[1]);
+  await sign(f.ctx,{token:second.sessionToken,signature:{type:"typed",value:"Signer Two"},declarations:{name:"Signer Two"},consent:true,user:null});
+  assert.equal(f.sent.length,3);
+  const afterSecond=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(afterSecond.signers[2].emailLinkStatus,"issued");
+});
+
+test("decline and owner void stop routing and do not release later invitations",async()=>{
+  const declined=await fixture({signers:[
+    {identityType:"email-link",email:"one@example.org",name:"Signer One",routingPosition:1},
+    {identityType:"email-link",email:"two@example.org",name:"Signer Two",routingPosition:2}
+  ]});
+  const opened=await openEmailSigning(declined.ctx,declined.tokens[0]);
+  await declineSigning(declined.ctx,{token:opened.sessionToken,reason:"I decline this request.",user:null});
+  assert.equal(declined.sent.length,1);
+  assert.equal((await declined.ctx.meta.get("envelopes",declined.created.envelopeId)).status,"Declined");
+  const voided=await fixture({signers:[
+    {identityType:"email-link",email:"one@example.org",name:"Signer One",routingPosition:1},
+    {identityType:"email-link",email:"two@example.org",name:"Signer Two",routingPosition:2}
+  ]});
+  await voidEnvelope(voided.ctx,{uid:"owner-uid",isAdmin:false},voided.created.envelopeId,"Owner voided the test envelope.");
+  assert.equal(voided.sent.length,1);
+  const saved=await voided.ctx.meta.get("envelopes",voided.created.envelopeId);
+  assert.equal(saved.status,"Voided");
+  assert.equal(saved.signers[1].emailLinkStatus,"revoked");
+});
+
 test("expired, tampered, unknown and revoked links return the same neutral response",async()=>{
   const f=await fixture();
   const wrong=f.token.slice(0,-1)+(f.token.endsWith("0")?"1":"0");
