@@ -130,7 +130,7 @@ test("signature PDF palette uses controlled-document authorization during Draft 
 test("owner signature requirement is separate from explicit signer-field assignment", () => {
   const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
   const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
-  assert.match(portal, /const f=makeField\(type,fields\.length,activeAssigneeUid\|\|"",pageNum\)/);
+  assert.match(portal, /const f=makeField\(type,fields\.length,selectedAssigneeUid,pageNum\)/);
   assert.match(portal, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]:\[\]/);
   assert.match(portal, /ownerSigningEnabled&&!fields\.some\(f=>f\?\.type==="Signature"&&f\.required!==false&&f\.signerUid===documentOwner\.uid\)/);
   assert.match(platform, /ownerSigningEnabled=false/);
@@ -155,8 +155,9 @@ test("owner signature palette action remains available and explicitly assigns a 
   assert.ok(portal.includes("ownerSigner=null"));
   assert.ok(portal.includes("ownerSigner={ownerSigningEnabled?documentOwner:null}"));
   assert.ok(portal.includes('data-owner-signature-placement="true"'));
-  assert.ok(portal.includes("Place Owner Signature — Page {pageNum}"));
-  assert.ok(portal.includes('const addOwnerSignatureAt=(x=50,y=20)=>{if(!ownerSigner?.uid)'));
+  assert.ok(portal.includes("Select Owner Signature Field"));
+  assert.ok(portal.includes('const addOwnerSignatureAt=(x=50,y=20)=>{if(!pdf||pageError)'));
+  assert.ok(portal.includes('if(!ownerSigner?.uid)'));
   assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
   assert.ok(portal.includes("f.required=true"));
   assert.ok(portal.includes("commit([...fields,f]);setSelectedField(f.fieldId)"));
