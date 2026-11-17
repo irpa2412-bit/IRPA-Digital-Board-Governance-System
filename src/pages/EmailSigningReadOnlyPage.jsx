@@ -15,12 +15,35 @@ export default function EmailSigningReadOnlyPage({token}){
  const [pdfDocument,setPdfDocument]=useState(null),[pageCount,setPageCount]=useState(0),[pageNum,setPageNum]=useState(1);
  const [pageSize,setPageSize]=useState({width:760,height:980}),[viewerWidth,setViewerWidth]=useState(760),[pageRendered,setPageRendered]=useState(false);
  const [error,setError]=useState(""),[pageError,setPageError]=useState(""),[loading,setLoading]=useState(true);
+ const [requiresEmailCode,setRequiresEmailCode]=useState(false),[verificationCode,setVerificationCode]=useState(""),[confirmingCode,setConfirmingCode]=useState(false);
  const [submitting,setSubmitting]=useState(false),[revoking,setRevoking]=useState(false),[success,setSuccess]=useState("");
  const [declarations,setDeclarations]=useState({name:"",title:""}),[fieldValues,setFieldValues]=useState({});
  const [selectedFieldId,setSelectedFieldId]=useState(""),[fieldApplications,setFieldApplications]=useState([]),[signatureMarks,setSignatureMarks]=useState({});
  const [typedSignature,setTypedSignature]=useState(""),[consent,setConsent]=useState(false),[reviewMode,setReviewMode]=useState(false);
  const [signingClosed,setSigningClosed]=useState(false),[revoked,setRevoked]=useState(false),[finalizationFailed,setFinalizationFailed]=useState(false),[completedDocument,setCompletedDocument]=useState(false);
  const pageCanvasRef=useRef(null),pageHostRef=useRef(null),signatureCanvasRef=useRef(null),drawingRef=useRef(false);
+
+ async function loadOpenedSession(metadata,isCancelled=()=>false){
+  if(isCancelled())return null;
+  const session=String(metadata.sessionToken||token);setSigningToken(session);
+  const parts=String(token).split("."),sessionKey=parts.length===3?"irpaEmailSigningSession:"+parts[0]+"."+parts[1]:"";
+  try{if(sessionKey)window.sessionStorage.setItem(sessionKey,session);}catch{}
+  const fields=Array.isArray(metadata.fields)?metadata.fields:[];
+  setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
+  setDeclarations({name:"",title:""});
+  setSelectedFieldId(fields[0]?.fieldId||"");
+  const gateway=getGoogleDriveGatewayUrl();
+  const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
+  if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
+  if(!String(response.headers.get("content-type")||"").toLowerCase().includes("application/pdf"))throw new Error("The signing service did not return a PDF. Signing has been stopped.");
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  if(isCancelled())return null;
+  if(bytes.length<5||String.fromCharCode(...bytes.subarray(0,5))!=="%PDF-")throw new Error("The controlled document response is not a valid PDF.");
+  const loadedPdf=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
+  if(isCancelled()){await loadedPdf.destroy();return null;}
+  setPageCount(loadedPdf.numPages);setPageNum(1);
+  return loadedPdf;
+ }
 
  useEffect(()=>{
   let cancelled=false,loadedPdf=null;
@@ -33,29 +56,32 @@ export default function EmailSigningReadOnlyPage({token}){
     const gateway=getGoogleDriveGatewayUrl();if(!gateway)throw new Error(NEUTRAL);
     const opened=await fetch(gateway+"/api/sign/email/open",{headers:{"x-signing-token":activeToken,Accept:"application/json"},cache:"no-store",credentials:"omit"});
     const metadata=await opened.json().catch(()=>({}));
-    if(!opened.ok||metadata.ok!==true)throw new Error(NEUTRAL);
+    if(!opened.ok||metadata.ok!==true)throw new Error(metadata.error||NEUTRAL);
     if(cancelled)return;
-    const session=String(metadata.sessionToken||activeToken);setSigningToken(session);
-    try{if(sessionKey)window.sessionStorage.setItem(sessionKey,session);}catch{}
-    const fields=Array.isArray(metadata.fields)?metadata.fields:[];
-    setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
-    setDeclarations({name:"",title:""});
-    setSelectedFieldId(fields[0]?.fieldId||"");
-    const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
-    if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
-    if(!String(response.headers.get("content-type")||"").toLowerCase().includes("application/pdf"))throw new Error("The signing service did not return a PDF. Signing has been stopped.");
-    const bytes=new Uint8Array(await response.arrayBuffer());
-    if(cancelled)return;
-    if(bytes.length<5||String.fromCharCode(...bytes.subarray(0,5))!=="%PDF-")throw new Error("The controlled document response is not a valid PDF.");
-    loadedPdf=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
-    if(cancelled){await loadedPdf.destroy();return;}
-    setPdfDocument(loadedPdf);setPageCount(loadedPdf.numPages);setPageNum(1);
+    if(metadata.requiresEmailCode===true){setRequiresEmailCode(true);return;}
+    loadedPdf=await loadOpenedSession(metadata,()=>cancelled);
+    if(loadedPdf&&!cancelled)setPdfDocument(loadedPdf);
    }catch(e){if(!cancelled)setError(e?.message||NEUTRAL);}
    finally{if(!cancelled)setLoading(false);}
   })();
   return()=>{cancelled=true;if(loadedPdf)loadedPdf.destroy().catch(()=>{});};
  },[token]);
 
+ async function confirmEmailCode(event){
+  event.preventDefault();
+  if(!/^\d{6}$/.test(verificationCode)){setError("Enter the 6-digit code from your IRPA email.");return;}
+  setConfirmingCode(true);setError("");setLoading(true);
+  try{
+   const gateway=getGoogleDriveGatewayUrl();
+   const response=await fetch(gateway+"/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json",Accept:"application/json"},credentials:"omit",cache:"no-store",body:JSON.stringify({token,code:verificationCode})});
+   const metadata=await response.json().catch(()=>({}));
+   if(!response.ok||metadata.ok!==true)throw new Error(metadata.error||NEUTRAL);
+   const loadedPdf=await loadOpenedSession(metadata);
+   if(loadedPdf)setPdfDocument(loadedPdf);
+   setRequiresEmailCode(false);setVerificationCode("");
+  }catch(e){setError(e?.message||NEUTRAL);}
+  finally{setLoading(false);setConfirmingCode(false);}
+ }
  useEffect(()=>{
   if(!pdfDocument)return;
   const resize=()=>setViewerWidth(Math.max(280,Math.floor(pageHostRef.current?.clientWidth||760)-16));
@@ -184,6 +210,15 @@ export default function EmailSigningReadOnlyPage({token}){
   <section style={{maxWidth:1100,margin:"0 auto",background:"#fff",border:"1px solid #d1d5db",borderRadius:12,padding:16}}>
    <h1 style={{fontSize:20,margin:"0 0 10px"}}>IRPA — Secure document signing</h1>
    {loading&&<p role="status">Verifying the secure invitation and loading the complete controlled document…</p>}
+   {requiresEmailCode&&!record&&<section aria-label="Email confirmation" style={{border:"1px solid #9ca3af",borderRadius:8,padding:16,marginTop:12}}>
+    <h2 style={{fontSize:18,margin:"0 0 8px"}}>Confirm your email</h2>
+    <p>We sent a 6-digit confirmation code to the email address invited to sign. Enter the code to open the controlled signing session. No account or password is needed.</p>
+    <form onSubmit={confirmEmailCode} style={{display:"grid",gap:10,maxWidth:420}}>
+     <label htmlFor="irpa-email-signing-code">Email confirmation code</label>
+     <input id="irpa-email-signing-code" aria-label="Email confirmation code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={verificationCode} onChange={event=>setVerificationCode(event.target.value.replace(/[^0-9]/g,"").slice(0,6))} style={inputStyle}/>
+     <button type="submit" disabled={confirmingCode||verificationCode.length!==6} style={{...buttonStyle,opacity:confirmingCode||verificationCode.length!==6?0.55:1}}>{confirmingCode?"Confirming…":"Confirm email and continue"}</button>
+    </form>
+   </section>}
    {error&&<p role="alert" style={{color:"#991b1b",background:"#fee2e2",padding:10,borderRadius:7}}>{error}</p>}
    {success&&<p role="status" style={{color:revoked||finalizationFailed?"#7f1d1d":"#14532d",background:revoked||finalizationFailed?"#fee2e2":"#dcfce7",padding:10,borderRadius:7}}>{success}</p>}
    {record&&!error&&<>
@@ -236,7 +271,7 @@ export default function EmailSigningReadOnlyPage({token}){
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Changes to assigned fields update this preview. Your signature has not been submitted yet.</p>
      {incomplete.length>0&&<p role="status" style={{fontSize:13,color:"#92400e"}}>{incomplete.length} required field(s) remain incomplete: {incomplete.map(field=>field.placeholder||field.type+" · Page "+field.page).join(", ")}. Submit will be rejected until all are completed. You may still revoke this request.</p>}
-     <button type="button" disabled={submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
+     <button type="button" disabled={submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
      <button type="button" disabled={revoking||submitting||record.signer?.status!=="Pending"} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}
