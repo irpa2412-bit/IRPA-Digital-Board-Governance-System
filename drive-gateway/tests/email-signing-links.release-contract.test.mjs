@@ -9,6 +9,10 @@ const app=read("../../src/App.jsx");
 const page=read("../../src/pages/EmailSigningReadOnlyPage.jsx");
 const storage=read("../../src/firebase/signatureStorage.js");
 const portal=read("../../src/pages/SignaturePlatform.jsx");
+const documentReader=read("../../src/components/DocumentReader.jsx");
+const translation=read("../../src/components/DocumentTranslationWorkspace.jsx");
+const pathwaySelfTest=read("../../src/components/SignaturePathwaySelfTest.jsx");
+const gatewayPortal=read("../../src/pages/GatewaySigningPortal.jsx");
 const mail=read("../src/invitationEmail.mjs");
 
 test("email-link routes return only the invited signer's assigned fields and controlled PDF",()=>{
@@ -86,4 +90,13 @@ test("signer must review the rendered document and applied stamps before submit 
   assert.match(page,/Your signature has not been submitted yet/);
   assert.match(signing,/email_link\.revoked_by_signer/);
   assert.match(signing,/emailLinkStatus="revoked"/);
+});
+
+test("all application PDF.js entry points copy caller-owned bytes before worker transfer",()=>{
+  assert.equal((documentReader.match(/pdfjsLib\\.getDocument\\(\\{data:bytes\\.slice\\(\\)\\}\\)/g)||[]).length,2);
+  assert.ok(translation.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
+  assert.ok(pathwaySelfTest.includes("pdfjsLib.getDocument({ data: bytes.slice() }).promise"));
+  assert.ok(gatewayPortal.includes("pdfjsLib.getDocument({data:bytes.slice()})"));
+  assert.ok(portal.includes("source={data:bytes.slice()}"));
+  assert.ok(portal.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
 });
