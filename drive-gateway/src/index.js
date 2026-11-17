@@ -378,6 +378,7 @@ export default {
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
       if (pathname === "/api/signature-workflow/activate" && request.method === "POST") return await activateSignatureWorkflowRoute(request, env);
       if (pathname === "/api/signature-workflow/audit" && request.method === "POST") return await appendSignatureWorkflowAuditRoute(request, env);
+      if (pathname === "/api/signature-workflow/adoption" && request.method === "POST") return await recordSignatureAdoptionRoute(request, env);
       if (pathname === "/api/signature-workflow/mirror" && request.method === "POST") return await syncSignatureWorkflowMirrorRoute(request, env);
       if (pathname === "/api/signature-workflow/signed-documents" && request.method === "GET") return await getMySignedDocumentsRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
@@ -1344,6 +1345,31 @@ async function appendSignatureWorkflowAuditRoute(request, env) {
   const base = "projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents";
   await commitSignatureWorkflowWrites(env,token,[{update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}]);
   return json({ok:true,eventId,envelopeId,createdAt:now,writePath:"authenticated-gateway"},201,corsHeaders(request));
+}
+async function recordSignatureAdoptionRoute(request, env) {
+  const claims = await authenticateFirebaseRequest(request, env);
+  const body = await request.json().catch(()=>({}));
+  const documentId = cleanId(body.documentId || ""), fieldId = String(body.fieldId || "").trim().slice(0,120);
+  if (!documentId || !fieldId) return json({ok:false,error:"Document and signature field references are required."},400,corsHeaders(request));
+  const token = await getFirestoreAdminAccessToken(env);
+  const document = await getFirestoreDocument(env,"documents/"+documentId,token);
+  if (!document?.fields) return json({ok:false,error:"Controlled document not found."},404,corsHeaders(request));
+  const fields = document.fields, uid = String(claims.user_id||"");
+  const ownerUid = String(fields.ownerUid?.stringValue || fields.uploadedByUid?.stringValue || fields.createdByUid?.stringValue || fields.signatureOwnerUid?.stringValue || "");
+  const admin = await getFirestoreDocument(env,"adminProfiles/"+uid,token);
+  const isAdmin = Boolean(admin?.fields?.active?.booleanValue===true && admin?.fields?.role?.stringValue==="Administrator");
+  if (uid!==ownerUid&&!isAdmin) return json({ok:false,error:"Only the controlled-document owner or an administrator may record signature adoption."},403,corsHeaders(request));
+  const profile = body.signatureProfile || {}, now = new Date().toISOString();
+  const recordId = "gateway-adoption-"+documentId+"-"+uid+"-"+fieldId.replace(/[^A-Za-z0-9_-]/g,"-");
+  const record = {documentId,documentReference:String(body.documentReference||""),fieldId,signerUid:uid,signerEmail:String(claims.email||""),signerName:String(claims.name||claims.email||"Signer"),signatureMethod:String(profile.method||"Gateway"),signatureSha256:String(profile.signatureSha256||""),status:"Signed",signedAt:now,createdAt:now,immutable:true,recordOrigin:String(fields.recordOrigin?.stringValue||"PRODUCTION")};
+  const eventId = "gateway-adoption-event-"+crypto.randomUUID().slice(0,12);
+  const event = {envelopeId:documentId,event:"Signature Adoption Recorded",details:{fieldId,signerUid:uid,signatureMethod:record.signatureMethod},actorUid:uid,actorEmail:String(claims.email||""),createdAt:now,source:"authenticated-gateway"};
+  const base="projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents";
+  await commitSignatureWorkflowWrites(env,token,[
+    {update:{name:base+"/signatures/"+recordId,fields:signatureDraftFirestoreValue(record).mapValue.fields},currentDocument:{exists:false}},
+    {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
+  ]);
+  return json({ok:true,recordId,writePath:"authenticated-gateway"},201,corsHeaders(request));
 }
 async function syncSignatureWorkflowMirrorRoute(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
