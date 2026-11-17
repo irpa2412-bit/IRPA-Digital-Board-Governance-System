@@ -138,6 +138,8 @@ function submit(token, signature) {
   });
 }
 
+async function redeemInvitation(s, invitationToken) { const opened=await route(get("/api/sign/email/open",{token:invitationToken}),s.ctx); assert.equal(opened.status,200); const request=await opened.json(); assert.equal(request.requiresEmailCode,true); const code=s.codes.at(-1)?.code; assert.match(String(code),/^\d{6}$/); const confirmed=await route(post("/api/sign/email/confirm",{token:invitationToken,code}),s.ctx); assert.equal(confirmed.status,200); return (await confirmed.json()).sessionToken; }
+
 async function completeSingle(s, signature) {
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
@@ -284,9 +286,7 @@ test("G5-03 — original document preservation", async () => {
   );
   assert.equal(envelopeIdResponse.status, 201);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
-  assert.equal(opened.status, 200);
-  const token=(await opened.json()).sessionToken;
+  const token=await redeemInvitation(s,invitationToken);
   assert.equal(
     (await route(
       submit(token, { type: "typed", value: "Preservation Signature" }),
