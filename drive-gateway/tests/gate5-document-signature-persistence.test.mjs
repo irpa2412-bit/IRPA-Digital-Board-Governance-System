@@ -20,6 +20,9 @@ function setup() {
   const storage = memoryStorage();
   const meta = memoryMeta();
   const invites = [];
+  const codes=[];
+  const kvStore=new Map();
+  const kv={get:async key=>kvStore.get(key)||null,put:async(key,value)=>kvStore.set(key,value),delete:async key=>kvStore.delete(key)};
   const clock = { t: new Date("2026-10-07T10:00:00Z") };
   const users = {
     u1: { uid: "u1" },
@@ -34,13 +37,16 @@ function setup() {
       users[(r.headers.get("authorization") || "").replace("Bearer ", "")] ||
       null,
     sendInvitation: async (i) => invites.push(i),
+    sendEmailVerificationCode: async item => codes.push(item),
     config: { appUrl: "https://app.example.test", ttlDays: 14 },
   });
+  ctx.env.DRIVE_KV=kv;
   return {
     ctx,
     storage,
     meta,
     invites,
+    codes,
     tokenFor: (email) =>
       (()=>{const u=new URL(invites.find((i) => i.to === email).link);return u.searchParams.get("emailSignToken")||u.searchParams.get("gatewayToken")})(),
   };
@@ -82,7 +88,7 @@ const post = (path, body, user = "u1") =>
       "content-type": "application/json",
       authorization: `Bearer ${user}`,
     },
-    body: JSON.stringify(path === "/api/sign/submit" && !body.declarations ? { ...body, declarations: { name: "G5 Test Signer", occupation: "Test Occupation", capacity: "" } } : body),
+    body: JSON.stringify(path === "/api/sign/submit" && !body.declarations ? { ...body, declarations: { name: "G5 Test Signer" } } : body),
   });
 
 const get = (path, options = {}) =>
@@ -137,7 +143,11 @@ async function completeSingle(s, signature) {
   const invitationToken = s.tokenFor("g5.signer@example.org");
   const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
   assert.equal(opened.status, 200);
-  const sessionToken=(await opened.json()).sessionToken;
+  assert.equal((await opened.clone().json()).requiresEmailCode,true);
+  const code=s.codes.filter(item=>item.to==="g5.signer@example.org").at(-1).code;
+  const confirmed=await route(post("/api/sign/email/confirm",{token:invitationToken,code}),s.ctx);
+  assert.equal(confirmed.status,200);
+  const sessionToken=(await confirmed.json()).sessionToken;
   const response = await route(submit(sessionToken, signature), s.ctx);
   assert.equal(response.status, 200);
   const body = await response.json();
