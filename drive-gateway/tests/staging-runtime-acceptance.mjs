@@ -71,9 +71,9 @@ const envelopePayload={
   classification:"Restricted",
   archives:["board-governance"],
   signingMode:"Sequential",
-  signers:[{uid:expectedUid,email,name:"IRPA Staging Crypto Test Signer",order:1}],
+  signers:[{identityType:"email-link",email,name:"IRPA Staging Crypto Test Signer",title:"Staging acceptance signer",routingPosition:1}],
   fields:[
-    {fieldId:"staging-name",type:"Name",page:1,x:8,y:18,width:45,height:8,signerUid:expectedUid,required:true},
+    {fieldId:"staging-name",type:"Name",page:1,x:8,y:18,width:45,height:8,signerEmail:email,required:true},
     {fieldId:"staging-signature",type:"Signature",page:1,x:8,y:30,width:45,height:10,signerUid:expectedUid,required:true}
   ]
 };
@@ -100,20 +100,32 @@ if (envelope.invitations?.[0]?.status !== "Sent") {
 assert.equal(envelope.invitations?.[0]?.status,"Sent","Staging invitation transport did not confirm delivery.");
 assert.ok(Array.isArray(envelope.tokens)&&envelope.tokens.length===1,"Staging-only acceptance token was not returned.");
 const signingToken=envelope.tokens[0];
-const opened=await signingJson("/api/sign/open",signingToken,"Authenticated signing open");
+console.log("STAGE_ENVELOPE_CREATED=PASS");
+const openResponse=await fetch(base+"/api/sign/email/open",{headers:{"x-signing-token":signingToken}});
+const openChallenge=await readJson(openResponse,"No-session email-link open");
+assert.equal(openChallenge.requiresEmailCode,true);
+assert.ok(openChallenge.testOnlyCode,"Staging-only one-time code was not returned to the acceptance runner.");
+console.log("STAGE_EMAIL_LINK_NO_SESSION=PASS");
+const confirmResponse=await fetch(base+"/api/sign/email/confirm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:signingToken,code:openChallenge.testOnlyCode})});
+const opened=await readJson(confirmResponse,"Email code confirmation");
+const sessionToken=opened.sessionToken;
+assert.ok(sessionToken);
 assert.equal(opened.signer.authenticated,true);
-assert.equal(opened.signer.uid,undefined,"Signer UID must not be exposed by the open endpoint.");
+assert.equal(opened.signer.uid,undefined);
 assert.equal(opened.canSign,true);
 assert.equal(opened.fields.length,2);
-assert.equal(opened.fields.every(field=>field.signerUid===expectedUid),true);
-
+assert.equal(opened.fields.every(field=>field.signerEmail===email),true);
+console.log("STAGE_EMAIL_CODE_VERIFICATION=PASS");
+const signaturePng="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg==";
 const signedResponse=await fetch(base+"/api/sign/submit",{
-  method:"POST",headers:{...authHeaders,"content-type":"application/json"},
+  method:"POST",headers:{"content-type":"application/json"},
   body:JSON.stringify({
-    token:signingToken,
-    signature:{type:"typed",value:"IRPA Staging Crypto Test Signer"},
-    fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer","staging-signature":"IRPA Staging Crypto Test Signer"},
-    manualAuthorityIdentification:effectiveAuthority,
+    token:sessionToken,
+    signature:{type:"field-applications"},
+    fieldApplications:[{fieldId:"staging-signature",confirmed:true,page:1,x:8,y:30,width:45,height:10,value:signaturePng}],
+    fieldValues:{"staging-name":"IRPA Staging Crypto Test Signer"},
+    declarations:{name:"IRPA Staging Crypto Test Signer",title:"Staging acceptance signer"},
+    signatureConfirmed:true,
     consent:true
   })
 });
