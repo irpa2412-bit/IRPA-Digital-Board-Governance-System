@@ -82,7 +82,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
         specimen=trimSignatureCanvas(img,{padding:4});
       }
       if(!specimen.dataUrl.startsWith("data:image/png;base64,"))throw new Error("The signature image could not be prepared.");
-      await onConfirm(specimen.dataUrl);
+      await onConfirm(specimen.dataUrl,field);
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
   }
   return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,maxHeight:"70vh",overflowY:"auto",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)",paddingBottom:"env(safe-area-inset-bottom)"}}>
