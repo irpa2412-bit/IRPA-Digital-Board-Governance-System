@@ -345,7 +345,7 @@ export async function startSignatureWorkflow(envelope){
       gatewayDocumentId:gateway.gatewayDocumentId||null,gatewayOriginalHash:gateway.gatewayOriginalHash||null,
       gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",
       gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent",
-      gatewayInvitationFailures:Number(gateway.gatewayInvitationFailures||0)
+      gatewayInvitationFailures:Number(gateway.gatewayInvitationFailures||0),gatewaySignerAssignments:Array.isArray(gateway.gatewaySignerAssignments)?gateway.gatewaySignerAssignments:[]
     });
     return {...envelope,status:activated.status,workflowStartedAt:new Date().toISOString(),gatewayEnvelopeId:gateway.gatewayEnvelopeId,gatewayDocumentId:gateway.gatewayDocumentId||null,gatewayOriginalHash:gateway.gatewayOriginalHash||null,gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent"};
   }catch(error){
@@ -436,7 +436,10 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
   if(after.envelopeId!==status.envelopeId||after.signer?.uid!==u.uid||after.signer?.status!=="Signed")throw new Error("Gateway did not persist the authenticated signer action. No Firebase completion was recorded.");
   const gatewaySigners=Array.isArray(after.signers)?after.signers:[];
   if(after.status!=="Completed")await syncGatewaySigningMirror(envelope.id,after);
+  const assignments=Array.isArray(envelope.gatewaySignerAssignments)?envelope.gatewaySignerAssignments:[];
+  const signerUidFor=signer=>signer?.uid||assignments.find(item=>item.signerId===signer?.id)?.uid||null;
   const nextGatewaySigner=gatewaySigners.find(s=>s.status!=="Signed");
+  const nextGatewaySignerUid=signerUidFor(nextGatewaySigner);
   const completed=after.status==="Completed";
   let finalHash=null;
   let evidence=null;
@@ -449,11 +452,12 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
     finalHash=pdfCheck.documentHash;
   }
   const updatedRecipients=(envelope.recipients||[]).map(r=>{
-    const gs=gatewaySigners.find(s=>s.uid===r.uid);
+    const assignment=assignments.find(item=>item.uid===r.uid||String(item.email||"").toLowerCase()===String(r.email||"").toLowerCase());
+    const gs=gatewaySigners.find(s=>s.id===assignment?.signerId)||gatewaySigners.find(s=>s.uid===r.uid);
     if(!gs)return r;
-    return {...r,status:gs.status==="Signed"?"Signed":(!completed&&envelope.signingMode!=="Parallel"&&nextGatewaySigner?.uid===r.uid?"Current":(r.status||"Pending")),completedAt:gs.signedAt||r.completedAt||null};
+    return {...r,status:gs.status==="Signed"?"Signed":(!completed&&envelope.signingMode!=="Parallel"&&nextGatewaySignerUid===r.uid?"Current":(r.status||"Pending")),completedAt:gs.signedAt||r.completedAt||null};
   });
-  const update={status:completed?"Completed":"In Progress",recipients:updatedRecipients,lastSignedByUid:u.uid,gatewaySigningStatus:after.status,gatewayBridgeStatus:"Connected",gatewayLastSignerUid:u.uid,gatewayEvidenceStatus:completed?"Verified":"Awaiting all required signatures",gatewayAuditChainValid:completed?evidence.auditChainValid:null,...(completed?{latestDocumentHash:finalHash,originalDocumentHash:status.documentHash,completedAt:after.completion?.completedAt||new Date().toISOString(),signerArchiveStatus:"Gateway archives and evidence verified"}:{currentSignerUid:envelope.signingMode==="Sequential"?(nextGatewaySigner?.uid||null):null})};
+  const update={status:completed?"Completed":"In Progress",recipients:updatedRecipients,lastSignedByUid:u.uid,gatewaySigningStatus:after.status,gatewayBridgeStatus:"Connected",gatewayLastSignerUid:u.uid,gatewayEvidenceStatus:completed?"Verified":"Awaiting all required signatures",gatewayAuditChainValid:completed?evidence.auditChainValid:null,...(completed?{latestDocumentHash:finalHash,originalDocumentHash:status.documentHash,completedAt:after.completion?.completedAt||new Date().toISOString(),signerArchiveStatus:"Gateway archives and evidence verified"}:{currentSignerUid:envelope.signingMode==="Sequential"?nextGatewaySignerUid:null})};
   return {...envelope,...update,id:envelope.id,gatewayEnvelopeId:after.envelopeId,gatewayCompletion:after.completion||null,gatewayEvidence:evidence||null};
 }
 
