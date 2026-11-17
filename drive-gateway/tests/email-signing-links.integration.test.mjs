@@ -106,10 +106,13 @@ test("expired, tampered, unknown and revoked links return the same neutral respo
 test("owner revoke invalidates a guest link; resend rotates token and revokes the previous hash",async()=>{
   const f=await fixture();
   const oldToken=f.token;
+  const opened=await openEmailSigning(f.ctx,oldToken,"198.51.100.10");
+  const oldSession=opened.sessionToken;
   await revokeInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   const revoked=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(revoked.signers[0].emailLinkStatus,"revoked");
   await assert.rejects(()=>openEmailSigning(f.ctx,oldToken,"198.51.100.10"));
+  await assert.rejects(()=>getSigningPdf(f.ctx,oldSession,null));
   const resent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   assert.equal(resent.deliveryStatus,"Sent");
   const newToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
