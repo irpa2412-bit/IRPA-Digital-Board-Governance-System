@@ -69,7 +69,7 @@ test("signature confirmation palette is a fixed bottom sheet and closes only aft
   assert.match(pad, /aria-modal="false"/);
   assert.match(pad, /Nothing is applied until you tap Confirm/);
   assert.match(pad, /onClick=\{onCancel\}/, "Cancel must discard the unconfirmed signature");
-  assert.match(pad, /async function confirm\(\)[\s\S]*?await onConfirm\(specimen\.dataUrl\)/, "Trimmed Draw, Type and saved-signature specimens are applied only by explicit Confirm");
+  assert.match(pad, /async function confirm\(\)[\s\S]*?await onConfirm\(specimen\.dataUrl,field\)/, "Trimmed Draw, Type and saved-signature specimens are applied only by explicit Confirm");
   assert.match(platform, /height:"auto"/, "the PDF canvas must retain responsive automatic height sizing");
   assert.match(platform, /zIndex:5/);
   assert.match(gatewayPortal, /zIndex:5/);
