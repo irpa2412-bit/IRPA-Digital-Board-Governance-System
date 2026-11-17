@@ -171,7 +171,8 @@ test("owner signature palette action remains available and explicitly assigns a 
 test("owner remains selectable for field assignment and each signature field remains bound to its PDF page", () => {
   assert.ok(portal.includes("{recipients.map(r=><option key={r.uid} value={r.uid}>"));
   assert.ok(portal.includes("const pageFields=fields.filter(f=>Number(f.page)===pageNum)"));
-  assert.ok(portal.includes('makeField("Signature",fields.length,ownerSigner.uid,pageNum)'));
+  assert.ok(portal.includes('setSelectedAssigneeUid(ownerSigner.uid)'));
+  assert.ok(portal.includes('setPendingFieldType("Signature")'));
   assert.ok(portal.includes('ownerSigningEnabled?[{...documentOwner,optionalSigning:false,actionRequired:true}]:[]'));
 });
 
