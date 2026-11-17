@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
 const platform = read("../src/pages/SignaturePlatform.jsx");
 const gatewayPortal = read("../src/pages/GatewaySigningPortal.jsx");
+const emailLinkPortal = read("../src/pages/EmailSigningReadOnlyPage.jsx");
 const pad = read("../src/components/SignatureFieldConfirmationPad.jsx");
 const service = read("../src/firebase/signaturePlatform.js");
 const storage = read("../src/firebase/signatureStorage.js");
@@ -76,59 +77,57 @@ test("signature confirmation palette is a fixed bottom sheet and closes only aft
   assert.match(gatewayPortal, /zIndex:6/);
 });
 
-test("all signer types are authenticated by transaction identity, not IRPA register authority", () => {
-  assert.doesNotMatch(worker, /verifySigningAuthority\(user,manualAuthorityIdentification\)/);
-  assert.doesNotMatch(worker, /Current IRPA Member\/Employee signing authority could not be verified/);
-  assert.match(worker, /else assertSignerAuthentication\(s0,user\)/);
-  assert.match(worker, /if\(!declared\.name\|\|!declared\.occupation\)throw new HttpError\(400/);
-  assert.match(worker, /signerDeclarations:declared/);
-  assert.match(gatewayPortal, /Your occupation \*/);
-  assert.match(gatewayPortal, /Additional capacity \(optional\)/);
-  assert.doesNotMatch(gatewayPortal, /verifyManualSigningAuthority|Member\/Employee Register|Registered signing authority/);
-  assert.doesNotMatch(service, /current signing authority has not been registered|A Current authority is required to sign|Your Signature Application is not active/);
-  assert.doesNotMatch(platform, /verifyManualSigningAuthority|authorityVerification\?\.verified|Verify Authority/);
-  assert.match(platform, /occupation:signerAuthorityRole\.trim\(\),capacity:signerCapacity\.trim\(\)/);
-  assert.match(gatewayPortal, /declarations,consent/);
+test("email verification and a declared name are the only signer identity gates; title is optional",()=>{
+  assert.doesNotMatch(worker,/verifySigningAuthority|verifyEmailSignerAuthority|verifyManualSigningAuthority|Current IRPA Member\/Employee signing authority/);
+  assert.match(worker,/if\(!declared\.name\)throw new HttpError\(400/);
+  assert.match(worker,/signerDeclarations:declared/);
+  assert.doesNotMatch(worker,/declared\.occupation|declared\.capacity|authorityRole/);
+  assert.doesNotMatch(gatewayPortal,/Your occupation \*|Additional capacity/);
+  assert.doesNotMatch(emailLinkPortal,/Occupation \/ capacity|Additional capacity|authority/);
+  assert.match(gatewayPortal,/Title \(optional\)/);
+  assert.match(emailLinkPortal,/Title \(optional\)/);
+  assert.doesNotMatch(platform,/Current Signing Authority|Participant role \/ action|Verify Authority/);
+  assert.match(platform,/Signer title \(optional\)/);
+  assert.doesNotMatch(service,/verifyManualSigningAuthority|findManualAuthorityMatch|resolveManualAuthorityLabel/);
 });
-
-test("final PDF certificate prints owner-recorded and signer-declared occupation and capacity separately", () => {
-  assert.match(certificate, /Owner declared: .*Occupation: .*Capacity:/);
-  assert.match(certificate, /Signer declared: .*Occupation: .*Capacity:/);
+test("final PDF certificate records owner routing order, declared name, verified email, timeline and hashes",()=>{
+  assert.match(certificate,/Position .*routingPosition/);
+  assert.match(certificate,/Verified email:/);
+  assert.match(certificate,/Invitation:/);
+  assert.match(certificate,/Opened:/);
+  assert.match(certificate,/Signed:/);
+  assert.match(certificate,/Document hash before signing:/);
+  assert.match(certificate,/Document hash after signatures \(pre-certificate\):/);
+  assert.match(certificate,/sort\(\(a,b\)=>Number\(a\.routingPosition/);
 });
-
-test("legacy signing persists signer-declared authority safely when institutional authority metadata is null", () => {
-  assert.match(service, /const signerAuthority=null/);
-  assert.match(service, /signatureAuthorityDepartment:authorityVerification\.authorityDepartment\|\|signerAuthority\?\.authorityDepartment\|\|""/);
-  assert.match(service, /signatureAuthorityUnit:authorityVerification\.authorityUnit\|\|signerAuthority\?\.authorityUnit\|\|""/);
-  assert.match(service, /signatureAuthorityStatus:signerAuthority\?\.authorityStatus\|\|""/);
-  assert.doesNotMatch(service, /signerAuthority\.(?:authorityRole|authorityDepartment|authorityUnit|authorityStatus|authoritySourceCollection|authoritySourceRecordId)/);
-  assert.match(service, /signatureAuthorityVerificationStatus:"Signer-declared; not independently verified"/);
+test("legacy signing path does not prompt for or verify register authority",()=>{
+  assert.doesNotMatch(service,/verifyManualSigningAuthority|findManualAuthorityMatch|resolveManualAuthorityLabel/);
+  assert.match(service,/declarations:\{name:String\(profile/);
+  assert.doesNotMatch(service,/occupation:String\(manualAuthorityIdentification/);
+  assert.doesNotMatch(gatewayPortal,/occupation|capacity/);
 });
-
-test("Gateway envelopes include registered account signers and the owner when explicitly required", () => {
-  assert.match(storage, /const accountSigner = Boolean\(r\?\.uid\) && !emailLink/);
-  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
-  assert.match(storage, /\{uid:String\(recipient\.uid\)\}/);
-  assert.match(platform, /checked=\{ownerSigningEnabled\}/);
-  assert.match(platform, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]/);
+test("Gateway envelopes route every participant through email-link identity; owner signs only when explicitly enabled",()=>{
+  assert.match(storage,/identityType:"email-link"/);
+  assert.doesNotMatch(storage,/identityType:emailLink \? "email-link" : "account"/);
+  assert.match(storage,/\{\.\.\.\(recipient\.uid \? \{uid:String\(recipient\.uid\)\} : \{\}\)\}/);
+  assert.match(platform,/checked=\{ownerSigningEnabled\}/);
+  assert.match(platform,/ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]/);
 });
-
-test("Gateway signer field routing preserves authenticated account UIDs", () => {
-  assert.match(storage, /recipient\.uid/);
-  assert.match(storage, /signerAssignmentByKey/);
-  assert.match(storage, /signerId:resolveSignerId\(field\)/);
+test("Gateway field assignment preserves local profile associations without using them as signer identity",()=>{
+  assert.match(storage,/recipient\.uid/);
+  assert.match(storage,/signerAssignmentByKey/);
+  assert.match(storage,/signerId:resolveSignerId\(field\)/);
+  assert.match(storage,/identityType:"email-link"/);
+  assert.match(storage,/routingPosition:Math\.max/);
 });
-
-test("registered IRPA signers use authenticated account identity and their saved Signature Profile", () => {
-  assert.match(platform, /identityType:"account"/);
-  assert.match(platform, /recipient\.identityType==="email-link"\?"email-link":"account"/);
-  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
-  assert.match(storage, /uid:String\(recipient\.uid\)/);
-  assert.match(gatewayPortal, /getMySignatureProfile\(\)/);
-  assert.match(gatewayPortal, /savedSignatureUrl=\{profile\?\.signatureUrl\|\|""\}/);
-  assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
+test("registered profile holders can retain saved signature profiles while invitations remain email-link",()=>{
+  assert.doesNotMatch(platform,/identityType:"account"/);
+  assert.match(platform,/identityType:"email-link"/);
+  assert.match(platform,/gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:"email-link"\}\)\)/);
+  assert.match(gatewayPortal,/getMySignatureProfile\(\)/);
+  assert.match(gatewayPortal,/savedSignatureUrl=\{profile\?\.signatureUrl\|\|""\}/);
+  assert.match(gatewayPortal,/onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
 });
-
 test("Date fields are presented as server-stamped date and time, not client calendar dates", () => {
   assert.match(platform, /SERVER_TIMESTAMP_PENDING/);
   assert.match(platform, /Gateway server date and time when you submit your signature/);
