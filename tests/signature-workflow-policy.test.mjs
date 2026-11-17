@@ -66,9 +66,10 @@ test("Signature Portal palette queries include document owner and signature owne
 });
 
 // Source-contract checks follow the current handler shape, including signerUid ownership and whitespace-safe finally blocks.
-test("adding the first signing officer creates a signature field assigned to that officer", () => {
-  assert.match(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
-  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Read-only preview first; email verification and signing are enabled in Step 2"\}\)/);
+test("adding a signer creates one default signature field without reassigning other unassigned fields", () => {
+  assert.match(portal, /const nextFields=\[\.\.\.fields\]/);
+  assert.match(portal, /if\(!nextFields\.some\(f=>\["Signature","Initials"\]\.includes\(f\.type\)&&f\.signerUid===next\.uid\)\)nextFields\.push\(\{\.\.\.makeField\("Signature",nextFields\.length,next\.uid,preparationPage\),placeholder:"Signature — place and review on the document before sending"\}\)/);
+  assert.doesNotMatch(portal, /const nextFields=fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
   assert.match(portal, /onPageChange=\{setPreparationPage\}/);
   assert.match(portal, /fields:nextFields/);
   assert.match(portal, /setFields\(nextFields\)/);
@@ -180,4 +181,40 @@ test("signature assignment and signing handlers synchronously reject repeated su
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
   assert.match(sign[1], /signInFlightRef\.current=true/);
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
+});
+
+
+test("palette tools support responsive tap-to-place and desktop drag placement", () => {
+  const css = fs.readFileSync(new URL("../src/styles/signature-portal.css", import.meta.url), "utf8");
+  assert.match(portal, /const\[canDrag,setCanDrag\]=useState\(false\)/);
+  assert.match(portal, /window\.matchMedia\("\(pointer:fine\)"\)/);
+  assert.match(portal, /draggable=\{canDrag\}/);
+  assert.match(portal, /onClick=\{placePendingField\}/);
+  assert.match(portal, /aria-pressed=\{pendingFieldType===t\}/);
+  assert.match(portal, /Tap tool, then tap PDF/);
+  assert.match(css, /\.signature-field-tools\{display:grid/);
+  assert.match(css, /@media \(max-width:900px\)/);
+  assert.match(css, /@media \(hover:none\)/);
+  assert.match(css, /\.signature-pdf-placement-active/);
+});
+
+test("participant creation and field assignment are performed inside the PDF palette", () => {
+  assert.match(portal, /PEOPLE & FIELD ASSIGNMENT/);
+  assert.match(portal, /onAddSigner=\{addSigner\}/);
+  assert.match(portal, /onMoveSigner=\{moveSigner\}/);
+  assert.match(portal, /onOwnerSigningChange=\{changeOwnerSigning\}/);
+  assert.match(portal, /Assign fields to this person/);
+  assert.match(portal, /FIELDS ON THIS DOCUMENT/);
+  assert.doesNotMatch(portal, /<h3>Signer Hierarchy<\/h3>/);
+  assert.doesNotMatch(portal, /<div className="panel signature-workflow-hierarchy"/);
+});
+
+test("duplicate participant identities are reused and rapid repeated add actions are locked before asynchronous work", () => {
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
+  assert.ok(addSigner, "the palette participant handler must exist");
+  assert.match(addSigner[1], /const duplicate=recipients\.find\(x=>\(registered&&x\.uid===registered\.uid\)\|\|\(registeredEmail&&String\(x\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===registeredEmail\)\)/);
+  assert.match(addSigner[1], /The existing signer record has been selected; no duplicate was created/);
+  assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
+  assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
+  assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
 });
