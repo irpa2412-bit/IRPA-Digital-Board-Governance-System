@@ -10,7 +10,8 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     if(!canvas)return;
     const resize=()=>{
       const rect=canvas.getBoundingClientRect();
-      if(!rect.width||!rect.height)return;
+      // Ignore transient collapsed layout measurements: resizing the backing canvas to 1px during a viewport transition irreversibly destroys in-progress ink.
+      if(rect.width<64||rect.height<48)return;
       if(canvasSize.current.width===rect.width&&canvasSize.current.height===rect.height)return;
       const ratio=Math.max(1,window.devicePixelRatio||1);
       const previous=document.createElement("canvas");
