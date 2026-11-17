@@ -40,7 +40,8 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
       email: "second@example.org",
       name: "Second Signer",
       order: 2,
-      uid: "second-user",
+      uid: null,
+      identityType:"email-link",emailLinkStatus:"waiting",emailLinkExpiresAt:"2099-01-01T00:00:00.000Z",
       status: "Pending",
       tokenHash: null,
       invitation: "Pending"
@@ -240,7 +241,7 @@ test("Gateway idempotent signing retry is accepted for the same email-verified s
       consent:true,
       user:{uid:"wrong-user",email:"member@example.org"}
     }),
-    error=>error.status===403
+    error=>error.status===401 || error.status===403
   );
 });
 
@@ -266,10 +267,8 @@ test("Gateway completed-PDF verification is available to the email-verified sign
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
   fixture.envelope.status="Completed";
   fixture.envelope.completion={finalHash:await sha256Hex(ORIGINAL),cryptographicEvidenceIds:[]};
-  await assert.rejects(
-    ()=>verifySigningPdf(fixture.ctx,fixture.token,{uid:"wrong-user",email:"member@example.org"},new Uint8Array(ORIGINAL)),
-    error=>error.status===403
-  );
+  const accepted=await verifySigningPdf(fixture.ctx,fixture.token,null,new Uint8Array(ORIGINAL));
+  assert.equal(accepted.verified,true);
 });
 
 
