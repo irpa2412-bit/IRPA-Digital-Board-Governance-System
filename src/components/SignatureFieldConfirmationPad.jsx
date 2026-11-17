@@ -1,4 +1,5 @@
 import React,{useLayoutEffect,useRef,useState}from"react";
+import{trimSignatureCanvas}from"../utils/signatureImageCanvas.mjs";
 
 export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="",savedInitialsUrl="",onConfirm,onCancel}){
   const canvasRef=useRef(null),drawing=useRef(false),last=useRef(null),canvasSize=useRef({width:0,height:0}),dirtyRef=useRef(false);
@@ -12,9 +13,6 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       if(!rect.width||!rect.height)return;
       if(canvasSize.current.width===rect.width&&canvasSize.current.height===rect.height)return;
       const ratio=Math.max(1,window.devicePixelRatio||1);
-      // Preserve confirmed-in-progress ink if layout/scrollbar changes resize the
-      // canvas. Resetting its backing dimensions without restoring pixels silently
-      // discarded initials on desktop and mobile before the signer tapped Confirm.
       const previous=document.createElement("canvas");
       const hadInk=dirtyRef.current&&canvas.width>0&&canvas.height>0;
       if(hadInk){previous.width=canvas.width;previous.height=canvas.height;previous.getContext("2d").drawImage(canvas,0,0);}
@@ -24,80 +22,67 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       const ctx=canvas.getContext("2d");
       ctx.setTransform(ratio,0,0,ratio,0,0);
       ctx.clearRect(0,0,rect.width,rect.height);
-      if(hadInk)ctx.drawImage(previous,0,0,previous.width,previous.height,0,0,rect.width,rect.height);
-      ctx.lineCap="round";
-      ctx.lineJoin="round";
-      ctx.lineWidth=5;
-      ctx.strokeStyle="#111827";
+      if(hadInk){
+        const scale=Math.min(canvas.width/previous.width,canvas.height/previous.height);
+        const width=previous.width*scale,height=previous.height*scale;
+        ctx.drawImage(previous,0,0,previous.width,previous.height,(rect.width-width/ratio)/2,(rect.height-height/ratio)/2,width/ratio,height/ratio);
+      }
+      ctx.lineCap="round";ctx.lineJoin="round";ctx.lineWidth=5;ctx.strokeStyle="#111827";
       setError("");
     };
     resize();
     const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(resize):null;
-    observer?.observe(canvas);
-    window.addEventListener("resize",resize);
+    observer?.observe(canvas);window.addEventListener("resize",resize);
     return()=>{observer?.disconnect();window.removeEventListener("resize",resize)};
   },[mode,field?.fieldId]);
-  const point=e=>{
-    const rect=canvasRef.current.getBoundingClientRect();
-    return{x:e.clientX-rect.left,y:e.clientY-rect.top};
-  };
+  const point=e=>{const rect=canvasRef.current.getBoundingClientRect();return{x:e.clientX-rect.left,y:e.clientY-rect.top};};
   const start=e=>{
-    if(mode!=="Draw")return;
-    e.preventDefault();
+    if(mode!=="Draw")return;e.preventDefault();
     const canvas=canvasRef.current,ctx=canvas.getContext("2d"),p=point(e);
-    drawing.current=true;
-    last.current=p;
+    drawing.current=true;last.current=p;
     try{canvas.setPointerCapture(e.pointerId)}catch{}
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,2.5,0,Math.PI*2);
-    ctx.fillStyle="#111827";
-    ctx.fill();
-    dirtyRef.current=true;
-    setDirty(true);
+    ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);ctx.fillStyle="#111827";ctx.fill();
+    dirtyRef.current=true;setDirty(true);
   };
   const move=e=>{
-    if(mode!=="Draw"||!drawing.current||!last.current)return;
-    e.preventDefault();
+    if(mode!=="Draw"||!drawing.current||!last.current)return;e.preventDefault();
     const ctx=canvasRef.current.getContext("2d"),p=point(e);
-    ctx.beginPath();
-    ctx.moveTo(last.current.x,last.current.y);
-    ctx.lineTo(p.x,p.y);
-    ctx.stroke();
-    last.current=p;
+    ctx.beginPath();ctx.moveTo(last.current.x,last.current.y);ctx.lineTo(p.x,p.y);ctx.stroke();last.current=p;
   };
   const end=()=>{drawing.current=false;last.current=null};
   const clear=()=>{
     const canvas=canvasRef.current;
-    if(canvas){
-      const rect=canvas.getBoundingClientRect();
-      canvas.getContext("2d").clearRect(0,0,rect.width,rect.height);
-    }
+    if(canvas){const rect=canvas.getBoundingClientRect();const ratio=Math.max(1,window.devicePixelRatio||1);canvas.getContext("2d").clearRect(0,0,rect.width*ratio,rect.height*ratio);}
     if(mode==="Use my saved signature")setMode("Draw");
-    setTyped("");
-    dirtyRef.current=false;
-    setDirty(false);
-    setError("");
+    setTyped("");dirtyRef.current=false;setDirty(false);setError("");
   };
   async function confirm(){
     try{
-      let dataUrl="";
+      let specimen;
       if(mode==="Draw"){
         if(!dirty)throw new Error("Draw your signature first, or choose Type or Use my saved signature.");
-        dataUrl=canvasRef.current.toDataURL("image/png");
+        specimen=trimSignatureCanvas(canvasRef.current,{padding:4,devicePixelRatio:Math.max(1,window.devicePixelRatio||1)});
       }else if(mode==="Type"){
-        if(!typed.trim())throw new Error("Enter your name before confirming.");
-        const canvas=document.createElement("canvas");canvas.width=900;canvas.height=240;
-        const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#111827";ctx.font="italic 72px cursive";ctx.textBaseline="middle";ctx.fillText(typed.trim().slice(0,80),24,120,850);dataUrl=canvas.toDataURL("image/png");
+        const value=typed.trim().slice(0,80);
+        if(!value)throw new Error("Enter your name before confirming.");
+        const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+        const font="italic 72px cursive";ctx.font=font;
+        const metrics=ctx.measureText(value);
+        const left=Math.max(0,metrics.actualBoundingBoxLeft||0),right=Math.max(1,metrics.actualBoundingBoxRight||metrics.width);
+        const ascent=Math.max(1,metrics.actualBoundingBoxAscent||60),descent=Math.max(0,metrics.actualBoundingBoxDescent||12);
+        const padding=8;canvas.width=Math.ceil(left+right+padding*2);canvas.height=Math.ceil(ascent+descent+padding*2);
+        const textContext=canvas.getContext("2d");textContext.font=font;textContext.fillStyle="#111827";textContext.textBaseline="alphabetic";
+        textContext.fillText(value,padding+left,padding+ascent);
+        specimen=trimSignatureCanvas(canvas,{padding:4});
       }else{
         const src=field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl;
         if(!src)throw new Error("No saved "+label+" is available. Choose Draw or Type instead.");
         const img=new Image();img.crossOrigin="anonymous";img.src=src;
-        await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error("The saved specimen could not be loaded. Choose Draw or Type instead."))});
-        const canvas=document.createElement("canvas");canvas.width=900;canvas.height=240;
-        const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);dataUrl=canvas.toDataURL("image/png");
+        await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error("The saved specimen could not be loaded. Choose Draw or Type instead."));});
+        specimen=trimSignatureCanvas(img,{padding:4});
       }
-      if(!dataUrl.startsWith("data:image/png;base64,"))throw new Error("The signature image could not be prepared.");
-      await onConfirm(dataUrl);
+      if(!specimen.dataUrl.startsWith("data:image/png;base64,"))throw new Error("The signature image could not be prepared.");
+      await onConfirm(specimen.dataUrl);
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
   }
   return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,maxHeight:"70vh",overflowY:"auto",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)",paddingBottom:"env(safe-area-inset-bottom)"}}>
