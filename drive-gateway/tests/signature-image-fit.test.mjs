@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deflateSync } from "node:zlib";
-import { PDFDocument, PDFName } from "pdf-lib";
+import { PDFDocument, PDFName, degrees } from "pdf-lib";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
 import { findSignatureInkBounds, requireSignatureInkBounds } from "../../src/utils/signatureImageCanvas.mjs";
 import { buildSignedPdf, getPdfFieldBox, getSignatureDrawGeometry } from "../src/pdf.mjs";
@@ -146,7 +146,7 @@ test("PDF field geometry respects a non-zero crop box and 90-degree page rotatio
   const document = await PDFDocument.create();
   const page = document.addPage([1200, 1000]);
   page.setCropBox(20, 30, 1000, 800);
-  page.setRotation({ angle: 90 });
+  page.setRotation(degrees(90));
   const box = getPdfFieldBox(page, { x: 10, y: 20, width: 30, height: 10 });
   assert.ok(box.x >= 20 && box.y >= 30);
   assert.ok(box.x + box.width <= 1020);
