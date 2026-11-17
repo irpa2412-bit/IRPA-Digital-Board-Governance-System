@@ -675,7 +675,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       env={...env,...gatewayResult,gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent"};
     }
     setEnvelopes(prev=>[env,...prev.filter(item=>item.id!==env.id)]);
-    setDraftEnvelopeId(null);setTitle("");setDocumentId("");setDocumentUrl("");setRecipients([]);setFields([]);setSelectedField(null);setOwnerSigningEnabled(false);setTab("Envelopes");
+    setDraftEnvelopeId(null);setTitle("");setDocumentId("");setDocumentUrl("");setRecipients([]);setFields([]);setActiveAssigneeUid("");setSelectedField(null);setOwnerSigningEnabled(false);setTab("Envelopes");
     setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend.":emailLinkRecipients.length?"Envelope created. Email-link invitations were issued; recipients can open a read-only document preview without a DBGS account.":"Envelope created as Draft.");
   }catch(x){
     console.error("IRPA Signature Portal: Create Draft Envelope failed",{errorType:x?.name||"Error"});
@@ -738,12 +738,12 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
          <div style={{display:"flex",alignItems:"end"}}><button type="button" className="text-button" onClick={async()=>{if(busy)return;setBusy(true);try{setDocs(await getControlledDocumentsForSigning());setMessage("System archive refreshed.");}catch(error){setMessage(error?.message||"Unable to refresh archive.")}finally{setBusy(false)}}} disabled={busy}>↻ Refresh Archive</button></div>
        </div>
        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
-         <button type="button" onClick={()=>{const d=initiatedDocument||docs.find(x=>x.id===initiateDocumentId);if(!d){setMessage("Select a system document first.");return;}setDocumentId(d.id);setDocumentUrl(controlledPdfUrl(d));setTitle(initiateTitle.trim()||d.title||d.reference||"Signing Document");setDraftEnvelopeId(null);setFields([]);setRecipients([]);setSelectedField(null);setSigningCircle("Document Selected");setSignDocumentPickerOpen(false);setTab("Prepare Envelope");setMessage("System document selected. Prepare Envelope is now open.")}} disabled={busy||!initiateDocumentId}>Save & Continue</button>
+         <button type="button" onClick={()=>{const d=initiatedDocument||docs.find(x=>x.id===initiateDocumentId);if(!d){setMessage("Select a system document first.");return;}setDocumentId(d.id);setDocumentUrl(controlledPdfUrl(d));setTitle(initiateTitle.trim()||d.title||d.reference||"Signing Document");setDraftEnvelopeId(null);setFields([]);setRecipients([]);setActiveAssigneeUid("");setSelectedField(null);setSigningCircle("Document Selected");setSignDocumentPickerOpen(false);setTab("Prepare Envelope");setMessage("System document selected. Prepare Envelope is now open.")}} disabled={busy||!initiateDocumentId}>Save & Continue</button>
          <button type="button" className="secondary-button" onClick={()=>setSignDocumentPickerMode("source")} disabled={busy}>Back</button>
        </div>
      </div>}
      {signDocumentPickerMode==="device"&&<div style={{marginTop:14}}>
-       <ControlledDocumentUpload purpose="Signing Document" compact submitLabel="Prepare Envelope" onUploaded={doc=>{setInitiatedDocument(doc);setInitiateDocumentId(doc.id);setInitiateTitle(v=>v||doc.title||doc.fileName||"Signing Document");setDocumentId(doc.id);setDocumentUrl(controlledPdfUrl(doc));setTitle(v=>v||doc.title||doc.fileName||"Signing Document");setDraftEnvelopeId(null);setFields([]);setRecipients([]);setSelectedField(null);setSigningCircle("Document Selected");setSignDocumentPickerOpen(false);setTab("Prepare Envelope");setMessage("Document prepared from the selected archive and opened in Signature Portal → Prepare Envelope.")}}/>
+       <ControlledDocumentUpload purpose="Signing Document" compact submitLabel="Prepare Envelope" onUploaded={doc=>{setInitiatedDocument(doc);setInitiateDocumentId(doc.id);setInitiateTitle(v=>v||doc.title||doc.fileName||"Signing Document");setDocumentId(doc.id);setDocumentUrl(controlledPdfUrl(doc));setTitle(v=>v||doc.title||doc.fileName||"Signing Document");setDraftEnvelopeId(null);setFields([]);setRecipients([]);setActiveAssigneeUid("");setSelectedField(null);setSigningCircle("Document Selected");setSignDocumentPickerOpen(false);setTab("Prepare Envelope");setMessage("Document prepared from the selected archive and opened in Signature Portal → Prepare Envelope.")}}/>
        <div style={{display:"flex",gap:8,marginTop:10}}><button type="button" className="secondary-button" onClick={()=>setSignDocumentPickerMode("source")} disabled={busy}>Back</button></div>
      </div>}
    </div>
