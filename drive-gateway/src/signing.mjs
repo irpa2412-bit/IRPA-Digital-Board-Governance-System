@@ -311,7 +311,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   const declared={name:cleanText(declarations?.name||"",160),title:cleanText(declarations?.title||"",160)};
   if(!declared.name)throw new HttpError(400,"Enter your full name before signing.");
   const ownerDeclared=s0.declaredParticulars||{};
-  const discrepancyFields=["name","title"].filter(key=>String(ownerDeclared[key]||"").trim()!==""&&String(ownerDeclared[key]||"").trim().toLowerCase()!==String(declared[key]||"").trim().toLowerCase());
+  const discrepancyFields=["name"].filter(key=>String(ownerDeclared[key]||"").trim()!==""&&String(ownerDeclared[key]||"").trim().toLowerCase()!==String(declared[key]||"").trim().toLowerCase());
   await original(ctx,e0);
   const out=await mutate(ctx,e0.id,async cur=>{
     const s=cur.signers.find(x=>x.id===s0.id);
@@ -344,7 +344,7 @@ export async function declineSigning(ctx,{token,reason,ip,user}){
     const at=ctx.now().toISOString(),emailLink=s.identityType==="email-link";
     s.status="Declined";
     if(emailLink){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"revoked_by_signer",revokedAt:at}].slice(-10);s.emailLinkStatus="revoked";}
-    return{patch:{signers:cur.signers,status:"Declined",events:await chainEvents(cur.events,{type:"signer.declined",signerId:s.id,routingPosition:s.routingPosition||s.order,at,ip:ip||null,reason:cleanText(reason||"",300),identityType:s.identityType||"email-link"})}};
+    let events=await chainEvents(cur.events,{type:"signer.declined",signerId:s.id,routingPosition:s.routingPosition||s.order,at,ip:ip||null,reason:cleanText(reason||"",300),identityType:s.identityType||"email-link"});if(emailLink)events=await chainEvents(events,{type:"email_link.revoked_by_signer",signerId:s.id,at});return{patch:{signers:cur.signers,status:"Declined",events}};
   });
   if(env.ownerEmail&&typeof ctx.sendWorkflowNotice==="function"){
     try{await ctx.sendWorkflowNotice({to:env.ownerEmail,name:env.ownerName||"Document owner",title:env.title,notice:(signer.name||"A signer")+" declined the signing request. Reason: "+cleanText(reason||"No reason supplied",300)+". The routing chain has stopped."});}
