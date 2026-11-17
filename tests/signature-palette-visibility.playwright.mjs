@@ -21,11 +21,11 @@ async function printPlacementDiagnostics(page,testId){
   });
   const pad=[...document.querySelectorAll("canvas")].find(el=>el.getAttribute("aria-label")==="Draw signature");
   const r=pad?.getBoundingClientRect(),s=pad?getComputedStyle(pad):null;
-  const stored=(()=>{try{return JSON.parse(sessionStorage.getItem("signature-envelope-fixture")||"{}")}catch{return {}}})();
+  const stored=(()=>{try{return JSON.parse(window.sessionStorage.getItem("signature-envelope-fixture")||"{}")}catch{return {}}})();
   const specimen=stored?.values?.["initial-page-1"]||null;
   let decoded=null;
-  if(typeof specimen==="string"&&specimen.startsWith("data:")) decoded=await new Promise(resolve=>{const img=new Image();img.onload=()=>resolve({width:img.naturalWidth,height:img.naturalHeight,dataUrlLength:specimen.length});img.onerror=()=>resolve({width:null,height:null,dataUrlLength:specimen.length,decodeError:true});img.src=specimen});
-  return {placed,pad:pad?{widthAttribute:pad.width,heightAttribute:pad.height,cssRect:{x:r.x,y:r.y,width:r.width,height:r.height},devicePixelRatio,transform:s.transform}:null,specimen:{pixelWidth:decoded?.width??null,pixelHeight:decoded?.height??null,dataUrlLength:decoded?.dataUrlLength??(typeof specimen==="string"?specimen.length:0)}};
+  if(typeof specimen==="string"&&specimen.startsWith("data:")) decoded=await new Promise(resolve=>{const img=new window.Image();img.onload=()=>resolve({width:img.naturalWidth,height:img.naturalHeight,dataUrlLength:specimen.length});img.onerror=()=>resolve({width:null,height:null,dataUrlLength:specimen.length,decodeError:true});img.src=specimen});
+  return {placed,pad:pad?{widthAttribute:pad.width,heightAttribute:pad.height,cssRect:{x:r.x,y:r.y,width:r.width,height:r.height},devicePixelRatio:window.devicePixelRatio,transform:s.transform}:null,specimen:{pixelWidth:decoded?.width??null,pixelHeight:decoded?.height??null,dataUrlLength:decoded?.dataUrlLength??(typeof specimen==="string"?specimen.length:0)}};
  });
  console.error("PLACED_TIMEOUT_DIAGNOSTICS:",JSON.stringify({testId,...details,consoleAndPageErrors:browserMessages}));
  await page.screenshot({path:"test-results/signature-palette-"+activeViewport+"-failure.png",fullPage:true});
