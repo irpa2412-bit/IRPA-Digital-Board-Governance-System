@@ -184,7 +184,7 @@ export async function releaseRoutingPosition(ctx,id,position){
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope||["Completed","Voided","Declined"].includes(envelope.status))return{released:0};
   const eligible=envelope.signers.filter(s=>s.status==="Pending"&&Number(s.routingPosition??s.order??1)===Number(position));
-  let released=0;
+  let released=0;const testTokens=[];
   for(const target of eligible){
     const now=ctx.now(),secret=randomHex(32),issued=await createEmailSigningToken({envelopeId:id,signerId:target.id,email:target.email,now,ttlDays:ctx.config?.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))});
     const committed=await mutate(ctx,id,async current=>{
@@ -198,13 +198,13 @@ export async function releaseRoutingPosition(ctx,id,position){
     try{
       if(typeof ctx.sendInvitation==="function")await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||"IRPA Document Owner",expiresAt:issued.record.expiresAt,role:String(target.declaredParticulars?.title||target.title||""),action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});
       await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(!signer)return{patch:null};signer.invitation="Sent";signer.invitedAt=ctx.now().toISOString();return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:typeof ctx.sendInvitation==="function"?"email_link.delivered":"email_link.delivery_simulated",signerId:signer.id,routingPosition:position,at:signer.invitedAt})}};});
-      released++;
+      released++;if(ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"&&ctx.allowReturnTokens===true)testTokens.push({signerId:target.id,token:issued.token});
     }catch(error){
       await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(signer){signer.invitation="Failed";signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.delivery_failed",signerId:target.id,routingPosition:position,at:ctx.now().toISOString(),errorType:String(error?.name||"Error")})}};});
       throw error;
     }
   }
-  return{released,position};
+  return{released,position,...(testTokens.length?{testTokens}:{})};
 }
 
 export async function requestEmailSigningCode(ctx,token,ip=""){
@@ -224,7 +224,7 @@ export async function requestEmailSigningCode(ctx,token,ip=""){
     const expiresAt=new Date(now.getTime()+10*60*1000).toISOString();
     await kv.put("email-signing-code:"+tokenHash,JSON.stringify({codeHash:await sha256Hex(code+tokenHash),expiresAt}),{expirationTtl:600});
     await ctx.sendEmailVerificationCode({to:signer.email,name:signer.name,code,expiresAt});
-    return {ok:true,requiresEmailCode:true,message:"Enter the 6-digit code sent to your email address to continue signing."};
+    return {ok:true,requiresEmailCode:true,message:"Enter the 6-digit code sent to your email address to continue signing.",...(ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?{testOnlyCode:code}: {})};
   }catch(error){if(error instanceof HttpError&&(error.status===503||error.status===409))throw error;throw new HttpError(401,genericEmailSigningFailure());}
 }
 
@@ -330,7 +330,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events:await chainEvents(cur.events,{type:"signer.signed",signerId:s.id,routingPosition:currentPosition,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy})},result:{idempotent:false,winner:last,positionComplete,nextPosition:positionComplete?Math.min(...cur.signers.filter(x=>x.status!=="Signed"&&Number(x.routingPosition??x.order??1)>currentPosition).map(x=>Number(x.routingPosition??x.order??1)),Infinity):null,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
-  if(!out.winner){if(out.positionComplete&&Number.isFinite(out.nextPosition))await releaseRoutingPosition(ctx,e0.id,out.nextPosition);return{ok:true,status:"InProgress",completed:false};}
+  if(!out.winner){const released=out.positionComplete&&Number.isFinite(out.nextPosition)?await releaseRoutingPosition(ctx,e0.id,out.nextPosition):{released:0};return{ok:true,status:"InProgress",completed:false,...(released.testTokens?{releasedTokens:released.testTokens}:{})};}
   const done=await finalizeEnvelope(ctx,e0.id);
   return done.completed?{ok:true,status:"Completed",completed:true}:{ok:true,status:"CompletionFailed",completed:false};
 }
@@ -407,7 +407,7 @@ export async function resendInvitation(ctx,user,id,signerId,mailMetadata={}){
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
   }
   await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer)signer.invitation="Sent";return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:mailMetadata?.eventType==="email_link.reminded"?"email_link.reminder_sent":typeof ctx.sendInvitation==="function"?"invitation.resent":"email_link.delivery_simulated",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
-  return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent"};
+  return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",...(ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"&&ctx.allowReturnTokens===true?{token}:{})};
 }
 
 export async function changeSignerEmail(ctx,user,id,signerId,{email,name,title}={}){
