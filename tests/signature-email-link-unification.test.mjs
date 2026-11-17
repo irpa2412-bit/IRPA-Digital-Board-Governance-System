@@ -5,6 +5,7 @@ import fs from "node:fs";
 const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
 const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
 const gateway=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+const emailPage=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
 const invitation=fs.readFileSync(new URL("../drive-gateway/src/invitationEmail.mjs",import.meta.url),"utf8");
 
 test("registered member and employee assignments are routed through email-link identity",()=>{
@@ -42,4 +43,12 @@ test("assigned workflow role is not misrepresented as the signer's occupation or
 
 test("Gateway envelopes cannot be signed through the parallel in-app UID workflow",()=>{
   assert.match(portal,/if\(selected\.gatewayEnvelopeId\)throw new Error\("This envelope must be signed through its email-link invitation/);
+});
+
+test("the invitation bearer token is consumed once and the signer session survives a page refresh",()=>{
+  assert.match(gateway,/sessionToken/);
+  assert.match(gateway,/invitationTokenConsumed:true/);
+  assert.match(emailPage,/sessionStorage\.getItem\(sessionKey\)/);
+  assert.match(emailPage,/sessionStorage\.setItem\(sessionKey,session\)/);
+  assert.match(emailPage,/x-signing-token":activeToken/);
 });
