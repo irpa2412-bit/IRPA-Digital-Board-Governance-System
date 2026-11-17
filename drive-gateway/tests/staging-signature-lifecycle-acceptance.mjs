@@ -118,7 +118,7 @@ async function main(){
     const rows=await r.json().catch(()=>[]);
     assert.equal(r.ok,true,"Could not query staging signature trail (HTTP "+r.status+")");
     const events=(Array.isArray(rows)?rows:[]).filter(x=>x.document).map(x=>plain(x.document));
-    assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);assert.ok(events.some(x=>x.actorUid===signer.localId&&x.event!=="Gateway Signing Completed"),"Signature trail lacks a signer-specific signatureEvents entry for "+signer.localId);
+    assert.ok(events.some(x=>x.event==="Workflow Activated and Sent"&&x.actorUid===admin.localId),"Signature trail lacks owner activation and send event.");assert.ok(events.some(x=>x.event==="Gateway Signing Completed"&&x.actorUid===signer.localId),"Signature trail lacks Gateway Signing Completed for final signer "+signer.localId);assert.ok(events.some(x=>x.actorUid===signer.localId&&x.event!=="Gateway Signing Completed"),"Signature trail lacks a signer-specific signatureEvents entry for "+signer.localId);
   });
   await postCheck("Lifecycle SIGNED",async()=>{
     const r=await checkedFetch(base+"/api/document-lifecycle/signature-complete",{method:"POST",headers:{...adminHeaders,"content-type":"application/json"},body:JSON.stringify({documentId,envelopeId:portalEnvelopeId})});
@@ -143,6 +143,16 @@ async function main(){
     assert.ok(row.signerArchiveUrl,"Signed-document list omitted the signer archive URL.");
     assert.equal(Object.hasOwn(row,"signaturePaneRecords"),false,"Signed-document list exposed signature pane data.");
     assert.equal(Object.hasOwn(row,"signatureData"),false,"Signed-document list exposed signature data.");
+  });
+  await postCheck("Per-signer archive mirror",async()=>{
+    const archive=await readDoc(adminAccess,"signatures","gateway-"+portalEnvelopeId+"-"+signer.localId);
+    assert.equal(archive.signerUid,signer.localId,"Signer archive UID mismatch.");
+    assert.equal(archive.status,"Signed","Signer archive record is not Signed.");
+    assert.ok(archive.signerArchiveUrl,"Signer archive URL is missing.");
+    assert.ok(archive.signerArchiveFileId,"Signer archive file reference is missing.");
+    const doc=await readDoc(adminAccess,"documents",documentId);
+    assert.equal(doc.gatewayArchiveState,"Final Completed Document","Controlled document archive state was not mirrored.");
+    assert.ok(doc.ownerCompletedDocumentUrl,"Controlled document completion URL is missing.");
   });
   await postCheck("Approval / persisted signed document",async()=>{
     const doc=await readDoc(adminAccess,"documents",documentId);
