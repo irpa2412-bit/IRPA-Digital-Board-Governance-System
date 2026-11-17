@@ -138,7 +138,7 @@ async function runViewport(name,viewport){
  const afterCapture=await canvas.evaluate(el=>{const p=el.getContext("2d").getImageData(0,0,el.width,el.height).data;let ink=0;for(let i=0;i<p.length;i+=4)if(p[i+3]>0&&p[i]<100&&p[i+1]<100&&p[i+2]<100)ink++;return {width:el.width,height:el.height,ink,trace:window.__paletteResizeTrace}});
  console.log("PRECONFIRM_SCREENSHOT_CANVAS "+name+": "+JSON.stringify({beforeCapture,afterCapture}));
  assert.ok(afterCapture.ink>10,"pre-confirm screenshot/layout capture must not clear handwritten ink");
- window.__paletteResizeObserver?.disconnect();
+ await page.evaluate(()=>window.__paletteResizeObserver?.disconnect());
  const confirmButton=page.getByRole("button",{name:"Confirm Initials"});
  await confirmButton.evaluate(button=>{window.__signatureConfirmButtonClick=false;button.addEventListener("click",()=>{window.__signatureConfirmButtonClick=true},{once:true})});
  await confirmButton.click();
