@@ -164,7 +164,7 @@ test("owner signature palette action remains available and explicitly assigns a 
   assert.ok(portal.includes('setSelectedAssigneeUid(ownerSigner.uid)'));
   assert.ok(portal.includes('setPendingFieldType("Signature")'));
   assert.ok(portal.includes('The document owner already has a Signature field. The existing field is selected.'));
-  assert.ok(portal.includes("f.required=true"));
+  assert.ok(portal.includes('required:type!=="Checkbox"'));
   assert.ok(portal.includes("commit([...fields,f]);setSelectedField(f.fieldId)"));
 });
 
