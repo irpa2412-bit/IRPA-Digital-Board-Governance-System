@@ -2,7 +2,7 @@ import { arrayUnion as firestoreArrayUnion, collection as firestoreCollection, d
 import { runSignatureFirestore, wrapSignatureBatch } from "./signatureFirestoreDiagnostics.js";
 import { requireSupportedSignatureRoutingMode } from "./signatureWorkflowPolicy.js";
 import { omitUndefinedFirestoreFields } from "./firestorePayload.js";
-import { createGatewaySignatureEnvelope, voidGatewaySignatureEnvelope, downloadSignatureBytes, downloadControlledDocumentBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes, fetchGatewaySigningStatus, fetchGatewaySigningResource, submitGatewaySignature, verifyGatewaySignedPdf } from "./signatureStorage";
+import { createGatewaySignatureEnvelope, resendGatewayEmailInvitation, voidGatewaySignatureEnvelope, downloadSignatureBytes, downloadControlledDocumentBytes, ensureSignatureWorkflowFolder, ensureSignedDocumentArchive, ensureSignatureProfileFolder, finalizeSignatureProfileArchives, getDownloadURL, ref, uploadBytes, fetchGatewaySigningStatus, fetchGatewaySigningResource, submitGatewaySignature, verifyGatewaySignedPdf } from "./signatureStorage";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
@@ -25,19 +25,22 @@ const writeBatch=(...args)=>wrapSignatureBatch(firestoreWriteBatch(...args),{scr
 
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
 const GATEWAY_URL=getGoogleDriveGatewayUrl();
-const CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED=import.meta.env.VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED==="true";
+
 async function sendSignatureMail(envelope,recipient){
   if(!auth.currentUser) throw new Error("Authentication is required. Sign in again before sending the signing invitation.");
-  try{
-    const token=await auth.currentUser.getIdToken();
-    const response=await fetch(`${GATEWAY_URL}/api/signature-invitations/send`,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({envelopeId:envelope.id,signerUid:recipient.uid,signerEmail:recipient.email,signerName:recipient.name,role:recipient.role})});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok||data.ok===false) throw new Error(data.error||"The IRPA mail server could not send the signature invitation.");
-    return data;
-  }catch(error){
-    console.error("IRPA signature invitation sender error",{firebaseErrorCode:error?.code||""});
-    throw new Error(error?.message||"The signature invitation could not be sent. Check the invitation status and try again.");
+  if(envelope?.gatewayEnvelopeId&&!isViewOnlyRecipient(recipient)){
+    const ordered=(envelope.recipients||[]).filter(item=>Boolean(item?.email)&&item.actionRequired!==false&&item.optionalSigning!==true&&!item.accessOnly&&!VIEW_ONLY_ROLES.includes(String(item?.role||"").trim())).sort((a,b)=>Number(a.routingOrder||1)-Number(b.routingOrder||1));
+    const index=ordered.findIndex(item=>item.uid===recipient?.uid||String(item.email||"").trim().toLowerCase()===String(recipient?.email||"").trim().toLowerCase());
+    if(index<0)throw new Error("The signer is not assigned to the Gateway email-link envelope.");
+    const result=await resendGatewayEmailInvitation(envelope.gatewayEnvelopeId,"S"+String(index+1),{role:recipient.institutionalRole||recipient.authorityRole||recipient.role||""});
+    return {...result,deliveryStatus:result.deliveryStatus||"Sent"};
   }
+  if(!isViewOnlyRecipient(recipient))throw new Error("Gateway email-link signing is required. The legacy account-bound signing invitation is disabled.");
+  const token=await auth.currentUser.getIdToken();
+  const response=await fetch(GATEWAY_URL+"/api/signature-invitations/send",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({envelopeId:envelope.id,signerUid:recipient.uid,signerEmail:recipient.email,signerName:recipient.name,role:recipient.role})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false)throw new Error(data.error||"The IRPA mail server could not send the view-only invitation.");
+  return data;
 }
 const VIEW_ONLY_ROLES=["View Only","Read Only","Information / FYI","Observer"];
 const BOARD_SIGNING_ROLES=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
@@ -360,13 +363,11 @@ export async function startSignatureWorkflow(envelope){
   const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);
   const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid)||actionRecipients[0]||null;
   let gateway=null;
-  if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED){
-    if(envelope.gatewayEnvelopeId){
-      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",existing:true};
-    }else{
-      const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
-      gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
-    }
+  if(envelope.gatewayEnvelopeId){
+    gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",existing:true};
+  }else{
+    const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
+    gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
   }
   const update={
     status:envelope.currentSignerUid?"In Progress":"Shared",

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { handleSendInvitationEmail, buildInvitationMessage, sendWithRetry, isRetryableMailError } from "../src/invitationEmail.mjs";
 import { queueInductionEmail } from "../../functions/queueInductionEmail.mjs";
 
@@ -158,4 +159,14 @@ test("SMTP AUTH PLAIN fails closed on rejected credentials and unsafe usernames"
   };
   await assert.rejects(authenticateSmtpPlain(options),/authentication was rejected/i);
   await assert.rejects(authenticateSmtpPlain({...options,username:"smtp-user\r\nAUTH LOGIN"}),/username is invalid/i);
+});
+test("workspace activation email is restricted to an explicit active-administrator invitation",()=>{
+  const source=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  const start=source.indexOf("async function sendMemberInvitation(");
+  const end=source.indexOf("async function sendSignatureInvitation(",start);
+  assert.ok(start>=0&&end>start,"member activation must have a distinct sender");
+  const sender=source.slice(start,end);
+  assert.match(sender,/if\(!admin\?\.fields\?\.active\?\.booleanValue\)return json/);
+  assert.doesNotMatch(sender,/meetingOrganizer/);
+  assert.match(source,/url\.pathname === "\/api\/invitations\/send"/);
 });

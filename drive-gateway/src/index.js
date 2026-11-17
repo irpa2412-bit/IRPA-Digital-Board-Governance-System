@@ -533,7 +533,15 @@ export default {
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
               return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
             },
-            sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt,role,action,fieldCount}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,role,action,fieldCount,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendEmailVerificationCode: async ({to,name,code,expiresAt}) => {
+              const safeName=String(name||"IRPA signer").replace(/[\r\n\u2028\u2029]+/g," ").slice(0,120);
+              const safeExpiry=String(expiresAt||"10 minutes from delivery").replace(/[\r\n\u2028\u2029]+/g," ").slice(0,80);
+              const subject="Your IRPA signing email confirmation code";
+              const text="Dear "+safeName+",\n\nYour IRPA signing email confirmation code is: "+String(code||"")+"\n\nThis code expires at "+safeExpiry+". Enter it only on the secure IRPA signing page. Do not share it with anyone.\n\nIRPA Administration";
+              const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>Your IRPA signing email confirmation code is:</p><p style=\"font-size:24px;font-weight:700;letter-spacing:5px\">"+escapeMailHtml(code||"")+"</p><p>This code expires at "+escapeMailHtml(safeExpiry)+". Enter it only on the secure IRPA signing page. Do not share it with anyone.</p><p>IRPA Administration</p>";
+              return smtpSend(env,{to,subject,text,html});
+            },
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA participant").slice(0,160);
@@ -2688,6 +2696,7 @@ async function withInvitationRetry(operation, stage) {
 async function sendMemberInvitation(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  if(!admin?.fields?.active?.booleanValue)return json({ok:false,error:"Active administrator access is required to send a workspace activation invitation."},403,corsHeaders(request));
   await enforceMailRateLimit(env, claims.user_id);
   const data = await request.json();
   const invitationId = cleanId(data.invitationId || "");
@@ -2710,9 +2719,6 @@ async function sendMemberInvitation(request, env) {
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
   const role=String(fields.role?.stringValue||"IRPA Member").trim();
-  let meetingOrganizer=false;
-  if(data.meetingAccess){const meetingId=cleanId(data.meetingAccess.meetingId||"");if(meetingId){const meetingDoc=await getFirestoreDocument(env,`meetings/${meetingId}`,claims.token);const mf=meetingDoc?.fields||{};const actorEmail=String(claims.email||"").trim().toLowerCase();meetingOrganizer=String(mf.initiatorUid?.stringValue||"")===claims.user_id||String(mf.chairpersonUid?.stringValue||"")===claims.user_id||String(mf.secretaryUid?.stringValue||"")===claims.user_id||Boolean(actorEmail&&[mf.initiatorEmail?.stringValue,mf.chairpersonEmail?.stringValue,mf.secretaryEmail?.stringValue].some(v=>String(v||"").trim().toLowerCase()===actorEmail));}}
-  if(!admin?.fields?.active?.booleanValue&&!meetingOrganizer)return json({ok:false,error:"Administrator or authorised meeting organiser access is required to send this invitation."},403,corsHeaders(request));
   const appUrl=String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const invitationSecret=randomBase64Url(32);
   const invitationTokenHash=await sha256Hex(invitationSecret);

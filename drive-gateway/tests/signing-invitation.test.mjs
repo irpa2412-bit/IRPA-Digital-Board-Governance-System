@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
 import { createEnvelope, getEnvelopeStatus, resendInvitation } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
-import { buildInvitationMessage } from "../src/invitationEmail.mjs";
+import { buildEmailSigningInvitationMessage, sendEmailSigningInvitation } from "../src/invitationEmail.mjs";
 
 async function fixture({failResend=false}={}) {
   const sent=[];
@@ -11,7 +11,7 @@ async function fixture({failResend=false}={}) {
   const ctx=buildEsignContext({
     env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
     verifyUser:async()=>null,
-    sendInvitation:async invitation=>{calls++;if(failResend&&calls>1)throw new Error("SMTP unavailable");sent.push(invitation);},
+    sendInvitation:async invitation=>{calls++;if(failResend&&calls>1)throw new Error("SMTP unavailable");sent.push({...invitation,...buildEmailSigningInvitationMessage(invitation)});},
     logger:{error(){}}
   });
   const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA test PDF");
@@ -25,36 +25,64 @@ async function fixture({failResend=false}={}) {
   const created=await createEnvelope(ctx,{uid:"owner-uid",isAdmin:false},{
     documentId,externalReference,title:"Invitation test",classification:"Restricted",
     archives:["board-governance"],signingMode:"Sequential",
-    signers:[{uid:"signer-uid",email:"signer@example.test",name:"Assigned Signer",order:1}],
-    fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,signerUid:"signer-uid",required:true}]
+    signers:[{identityType:"email-link",email:"signer@example.test",name:"Assigned Signer",authorityRole:"Board Secretary",order:1}],
+    fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,signerId:"S1",required:true}]
   });
   return{ctx,sent,created,externalReference};
 }
 
+test("signing invitation has the required plain-text and HTML content and sends no document attachment",async()=>{
+  const link="https://irpa.example.test/?emailSignToken=ENV-abc.S1.secret-token";
+  const message=buildEmailSigningInvitationMessage({name:"Amina",link,title:"Board Resolution 2026-04",ownerName:"Daniel Mollel",role:"Board Secretary",action:"Sign",fieldCount:3,expiresAt:"2026-11-23T08:00:00.000Z"});
+  assert.equal(message.subject,"Signature requested: Board Resolution 2026-04");
+  for(const value of ["Dear Amina","Daniel Mollel of IRPA has asked you to review and sign Board Resolution 2026-04.","Your role: Board Secretary","Assigned action: Sign","Fields to complete: 3","2026-11-23T08:00:00.000Z","Review and sign:",link,"This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.","contact the document owner or IRPA Administration","IRPA Administration"])assert.ok(message.text.includes(value),value);
+  for(const value of ["Dear Amina","Board Resolution 2026-04","Board Secretary","Assigned action:</strong> Sign","Fields to complete:</strong> 3","2026-11-23T08:00:00.000Z",">Review and sign</a>",link,"This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.","IRPA Administration"])assert.ok(message.html.includes(value),value);
+  assert.equal(message.text.replace(link,"").includes("secret-token"),false);
+  assert.equal(message.html.split(link).join("").includes("secret-token"),false);
+  assert.doesNotMatch(message.text,/Assigned action: Document Owner/);
+  let delivered;
+  await sendEmailSigningInvitation({email:"signer@example.test",name:"Amina",link,title:"Board Resolution 2026-04",ownerName:"Daniel Mollel",role:"Board Secretary",action:"Sign",fieldCount:3,expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async message=>{delivered=message;return {messageId:"mail-1"};},logger:{error(){}}});
+  assert.equal(delivered.to,"signer@example.test");
+  assert.equal(Object.hasOwn(delivered,"attachments"),false);
+});
 test("Gateway invitation plain-text body uses real line breaks, not escaped newline text",()=>{
-  const message=buildInvitationMessage({name:"Assigned Signer",link:"https://irpa.example.test/sign?gatewayToken=token&signEnvelope=IRPA-ENV-1"});
+  const message=buildEmailSigningInvitationMessage({name:"Assigned Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Invitation test",ownerName:"Document Owner"});
   assert.ok(message.text.includes("\n\n"));
   assert.doesNotMatch(message.text,/\\n/);
 });
 
-test("initial Gateway invitation contains the portal envelope ID and a one-time signer token",async()=>{
+test("initial Gateway invitation is a single-use email-link and does not use the account-activation route",async()=>{
   const f=await fixture();
   assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].emailLink,true);
+  assert.equal(f.sent[0].role,"Board Secretary");
+  assert.equal(f.sent[0].action,"Sign");
+  assert.equal(f.sent[0].fieldCount,1);
+  assert.equal(f.sent[0].subject,"Signature requested: Invitation test");
+  assert.doesNotMatch(f.sent[0].text,/create your password|activate your account/i);
+  assert.doesNotMatch(f.sent[0].html,/Activate My Account|create your password|activate your account/i);
   const url=new URL(f.sent[0].link);
-  assert.equal(url.pathname,"/sign");
-  assert.equal(url.searchParams.get("signEnvelope"),f.externalReference);
-  assert.match(url.searchParams.get("gatewayToken"),/^ENV-[0-9a-f]+\.S1\.[0-9a-f]{64}$/);
+  assert.equal(url.pathname,"/");
+  assert.match(url.searchParams.get("emailSignToken"),/^ENV-[0-9a-f]+\.S1\.[0-9a-f]{64}$/);
+  assert.equal(url.searchParams.has("gatewayToken"),false);
+  assert.equal(url.searchParams.has("signEnvelope"),false);
 });
 
 test("owner can resend a failed or missing Gateway invitation with a rotated token",async()=>{
   const f=await fixture();
-  const original=new URL(f.sent[0].link).searchParams.get("gatewayToken");
-  const result=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  const original=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  const result=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1",{role:"Board Secretary"});
   assert.equal(result.deliveryStatus,"Sent");
   assert.equal(f.sent.length,2);
+  assert.equal(f.sent[1].emailLink,true);
+  assert.equal(f.sent[1].role,"Board Secretary");
+  assert.equal(f.sent[1].action,"Sign");
+  assert.equal(f.sent[1].fieldCount,1);
+  assert.doesNotMatch(f.sent[1].text,/create your password|activate your account/i);
+  assert.doesNotMatch(f.sent[1].html,/Activate My Account|create your password|activate your account/i);
   const replacement=new URL(f.sent[1].link);
-  assert.equal(replacement.searchParams.get("signEnvelope"),f.externalReference);
-  assert.notEqual(replacement.searchParams.get("gatewayToken"),original);
+  assert.notEqual(replacement.searchParams.get("emailSignToken"),original);
+  assert.equal(replacement.searchParams.has("gatewayToken"),false);
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
   assert.equal(status.signers[0].invitation,"Sent");
 });
@@ -69,4 +97,20 @@ test("failed Gateway invitation retry remains explicitly Failed and does not rep
 test("another user cannot resend a signer invitation",async()=>{
   const f=await fixture();
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"intruder-uid",isAdmin:false},f.created.envelopeId,"S1"),/Not authorized/);
+});
+
+
+
+test("signer assignment and resend use only the signing mail transport; no workspace activation or reminder transport is coupled to signing",async()=>{
+  const source=await import("node:fs");
+  const signingSource=source.readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
+  const routerSource=source.readFileSync(new URL("../src/router.mjs",import.meta.url),"utf8");
+  assert.doesNotMatch(signingSource,/sendMemberInvitation|buildInvitationMessage|api\/invitations\/send/);
+  assert.match(signingSource,/ctx\.sendInvitation\(\{to:signers\[i\]\.email/);
+  assert.match(signingSource,/ctx\.sendInvitation\(\{to:target\.email/);
+  assert.equal(routerSource.includes("/remind"),false);
+  const f=await fixture();
+  assert.equal(f.sent.length,1,"assignment sends exactly one signing invitation");
+  assert.equal(f.sent[0].emailLink,true);
+  assert.match(f.sent[0].link,/emailSignToken=/);
 });
