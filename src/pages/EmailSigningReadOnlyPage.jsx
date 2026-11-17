@@ -19,7 +19,7 @@ export default function EmailSigningReadOnlyPage({token}){
  const [declarations,setDeclarations]=useState({name:"",occupation:"",capacity:""}),[fieldValues,setFieldValues]=useState({});
  const [selectedFieldId,setSelectedFieldId]=useState(""),[fieldApplications,setFieldApplications]=useState([]),[signatureMarks,setSignatureMarks]=useState({});
  const [typedSignature,setTypedSignature]=useState(""),[consent,setConsent]=useState(false),[reviewMode,setReviewMode]=useState(false);
- const [signingClosed,setSigningClosed]=useState(false),[revoked,setRevoked]=useState(false),[completedDocument,setCompletedDocument]=useState(false);
+ const [signingClosed,setSigningClosed]=useState(false),[revoked,setRevoked]=useState(false),[finalizationFailed,setFinalizationFailed]=useState(false),[completedDocument,setCompletedDocument]=useState(false);
  const pageCanvasRef=useRef(null),pageHostRef=useRef(null),signatureCanvasRef=useRef(null),drawingRef=useRef(false);
 
  useEffect(()=>{
@@ -145,7 +145,7 @@ export default function EmailSigningReadOnlyPage({token}){
    const result=await response.json().catch(()=>({}));
    if(!response.ok||result.ok===false)throw new Error(result.error||"The signing action could not be completed.");
    setSigningClosed(true);
-   if(result.status==="CompletionFailed"){setSuccess("Your signature was recorded, but final PDF completion failed. The envelope is marked CompletionFailed. Do not submit again; contact the document owner for controlled recovery.");return;}
+   if(result.status==="CompletionFailed"){setFinalizationFailed(true);setSuccess("Your signature was recorded, but final PDF completion failed. The envelope is marked CompletionFailed. Do not submit again; contact the document owner for controlled recovery.");return;}
    if(result.completed===true){
     try{
      const finalResponse=await fetch(gateway+"/api/sign/pdf",{headers:{"x-signing-token":activeToken},credentials:"omit",cache:"no-store"});
@@ -161,7 +161,7 @@ export default function EmailSigningReadOnlyPage({token}){
   finally{setSubmitting(false);}
  }
  async function revoke(){
-  if(!reviewMode||!record||signingClosed)return;
+  if(!reviewMode||!record||record.signer?.status!=="Pending"||signingClosed)return;
   if(!window.confirm("Revoke this signing request? Your signature will not be submitted, and the envelope will be marked declined."))return;
   setRevoking(true);setError("");setSuccess("");
   try{
@@ -179,7 +179,7 @@ export default function EmailSigningReadOnlyPage({token}){
    <h1 style={{fontSize:20,margin:"0 0 10px"}}>IRPA — Secure document signing</h1>
    {loading&&<p role="status">Verifying the secure invitation and loading the complete controlled document…</p>}
    {error&&<p role="alert" style={{color:"#991b1b",background:"#fee2e2",padding:10,borderRadius:7}}>{error}</p>}
-   {success&&<p role="status" style={{color:revoked?"#7f1d1d":"#14532d",background:revoked?"#fee2e2":"#dcfce7",padding:10,borderRadius:7}}>{success}</p>}
+   {success&&<p role="status" style={{color:revoked||finalizationFailed?"#7f1d1d":"#14532d",background:revoked||finalizationFailed?"#fee2e2":"#dcfce7",padding:10,borderRadius:7}}>{success}</p>}
    {record&&!error&&<>
     <h2 style={{fontSize:17,margin:"8px 0"}}>{record.title}</h2><p style={{fontSize:13,margin:"4px 0"}}>Invited by: {record.ownerName}</p>
     <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?new Date(record.expiresAt).toLocaleString():"As stated in your invitation"}</p>
@@ -231,7 +231,7 @@ export default function EmailSigningReadOnlyPage({token}){
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Changes to assigned fields update this preview. Your signature has not been submitted yet.</p>
      {incomplete.length>0&&<p role="status" style={{fontSize:13,color:"#92400e"}}>{incomplete.length} required field(s) remain incomplete. Use the assigned-field controls above to complete them; the preview updates as you make changes. You may still revoke this request.</p>}
      <button type="button" disabled={submitting||!record.canSign||!pageRendered||incomplete.length>0||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||incomplete.length>0||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
-     <button type="button" disabled={revoking||submitting} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
+     <button type="button" disabled={revoking||submitting||record.signer?.status!=="Pending"} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}
     {revoked&&<p role="status" style={{marginTop:14}}>The invitation is revoked and cannot be used again.</p>}
