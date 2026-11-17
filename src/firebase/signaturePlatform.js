@@ -506,13 +506,15 @@ export async function createCompletionCertificate(envelope){
   const u=user();
   if(!envelope?.id)throw new Error("A signing envelope is required.");
   if(envelope.status!=="Completed")throw new Error("The completion certificate can only be archived after all required signing actions are completed.");
+  const finalDocumentHash=String(envelope.gatewayFinalHash||finalDocumentHash).trim().toLowerCase();
+  if(!/^[a-f0-9]{64}$/.test(finalDocumentHash))throw new Error("The authoritative completed-document hash is unavailable; the certificate cannot be archived.");
   const pdf=await PDFDocument.create();
   const page=pdf.addPage([595,842]);
   const font=await pdf.embedFont(StandardFonts.Helvetica);
   const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
   page.drawText("IRPA DIGITAL GOVERNANCE SYSTEM",{x:48,y:790,size:11,font:bold,color:rgb(.15,.2,.3)});
   page.drawText("CERTIFICATE OF COMPLETION",{x:48,y:750,size:24,font:bold});
-  const rows=[["Envelope",envelope.envelopeReference],["Subject",envelope.title],["Document",envelope.documentReference],["Status",envelope.status],["Completed",new Date().toISOString()],["Final document hash",envelope.latestDocumentHash||"—"]];
+  const rows=[["Envelope",envelope.envelopeReference],["Subject",envelope.title],["Document",envelope.documentReference],["Status",envelope.status],["Completed",new Date().toISOString()],["Final document hash",finalDocumentHash]];
   let y=700;
   for(const [a,b]of rows){page.drawText(a,{x:48,y,size:10,font:bold});page.drawText(String(b),{x:190,y,size:10,font});y-=34;}
   page.drawText("SIGNER EVENTS",{x:48,y:y-10,size:13,font:bold});y-=40;
@@ -522,7 +524,7 @@ export async function createCompletionCertificate(envelope){
   const certificateHash=await hashBytes(bytes);
   const path=`signatureEnvelopes/${envelope.id}/certificate-${certificateHash}.pdf`;
   const r=ref(null,path);
-  await uploadBytes(r,bytes,{contentType:"application/pdf",purpose:"Signature Certificate",customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:envelope.latestDocumentHash||""}});
+  await uploadBytes(r,bytes,{contentType:"application/pdf",purpose:"Signature Certificate",customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:finalDocumentHash}});
   const url=await getDownloadURL(r);
   const archive=await ensureSignedDocumentArchive({
     documentId:envelope.documentId,
@@ -535,7 +537,7 @@ export async function createCompletionCertificate(envelope){
   });
   const archivePath=`signatureEnvelopes/${envelope.id}/certificate-archive-${certificateHash}.pdf`;
   const archiveRef=ref(null,archivePath);
-  await uploadBytes(archiveRef,bytes,{contentType:"application/pdf",purpose:"Signature Certificate Archive",folderId:archive.folderId,customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:envelope.latestDocumentHash||"",archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1"}});
+  await uploadBytes(archiveRef,bytes,{contentType:"application/pdf",purpose:"Signature Certificate Archive",folderId:archive.folderId,customMetadata:{envelopeId:envelope.id,certificateHash,finalDocumentHash:finalDocumentHash,archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1"}});
   const archiveUrl=await getDownloadURL(archiveRef);
   await postSignatureWorkflowRoute("/api/signature-workflow/certificate",{
     envelopeId:envelope.id,
@@ -547,7 +549,7 @@ export async function createCompletionCertificate(envelope){
     certificateArchiveFolderId:archive.folderId,
     certificateArchiveFolderLink:archive.archiveUidLink||null,
     certificateArchiveProtocol:"IRPA-SIGNATURE-CERTIFICATE-V1",
-    finalDocumentHash:envelope.latestDocumentHash||""
+    finalDocumentHash:finalDocumentHash
   });
   await recordEnvelopeEvent(envelope.id,"Certificate Generated and Archived",{certificateHash,archiveFolderId:archive.folderId,archiveUrl,actorUid:u.uid});
   return url;
