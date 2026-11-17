@@ -95,14 +95,19 @@ test("registered login-based signing access remains UID-bound", () => {
   assert.equal(canAuthenticatedSignerAccess({uid:"member-1"},{uid:"other"}),false);
 });
 
-test("email invitation has real plain-text newlines and one HTML/plain-text SMTP send",async()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
-  assert.match(message.text,/\nDocument: Board Policy/);
-  assert.doesNotMatch(message.text,/\\n/);
-  assert.match(message.html,/href=/);
-  let calls=0;
-  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);return {ok:true};},logger:{warn(){},error(){}}});
+test("signing invitation contains complete action-specific content in text and HTML and never attaches the source document",async()=>{
+  const link="https://irpa.example.test/?emailSignToken=ENV-abc.S1.secret-token";
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link,title:"Board Policy 2026",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",role:"Board Secretary",action:"Approve",fieldCount:4});
+  assert.equal(message.subject,"Signature requested: Board Policy 2026");
+  for(const value of ["Dear A Signer","Document Owner of IRPA has asked you to approve Board Policy 2026.","Your role: Board Secretary","Assigned action: Approve","Fields to complete: 4","Link expiry: 2026-11-23T08:00:00.000Z","Review and sign: "+link,"This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.","If this email is unexpected, contact the document owner or IRPA Administration.","IRPA Administration"])assert.ok(message.text.includes(value),value);
+  for(const value of ["Dear A Signer","Board Policy 2026","Board Secretary","Approve","Fields to complete:</strong> 4","2026-11-23T08:00:00.000Z",">Review and sign</a>","Plain-text link: "+link,"This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.","If this email is unexpected, contact the document owner or IRPA Administration.","IRPA Administration"])assert.ok(message.html.includes(value),value);
+  assert.equal(message.text.split(link).length-1,1);
+  assert.equal(message.html.split(link).length-1,2,"the button href and visible plain-text link both contain the token");
+  let calls=0,delivered;
+  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link,title:"Board Policy 2026",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",role:"Board Secretary",action:"Approve",fieldCount:4,smtpSend:async payload=>{calls++;delivered=payload;return {ok:true};},logger:{warn(){},error(){}}});
   assert.equal(calls,1);
+  assert.equal(Object.hasOwn(delivered,"attachments"),false);
+  assert.equal(delivered.subject,message.subject);
 });
 
 test("mail delivery is delegated once to the existing Worker invitation sender", () => {
