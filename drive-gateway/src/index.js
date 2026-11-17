@@ -543,6 +543,16 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
+            resolveEmailLinkProfileUid: async email => {
+              const normalized=String(email||"").trim().toLowerCase();
+              if(!normalized)return null;
+              const adminToken=await getFirestoreAdminAccessToken(env);
+              const rows=await getFirestoreDocumentsByField(env,"signatureProfiles","email",normalized,adminToken);
+              const active=(rows||[]).map(row=>({id:String(row.name||"").split("/").pop(),...(firestoreDocumentToPlain(row)||{})}))
+                .filter(profile=>String(profile.email||"").trim().toLowerCase()===normalized&&String(profile.status||"").trim().toLowerCase()==="active");
+              if(active.length>1)throw new Error("Multiple active Signature Profiles match the email-link recipient; personal archive routing is ambiguous.");
+              return active.length===1?String(active[0].uid||active[0].id):null;
+            },
             verifyEmailSignerAuthority: (email,authorityRole) => verifyGatewayEmailSignerAuthority(env,email,authorityRole),
             logger: console,
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
