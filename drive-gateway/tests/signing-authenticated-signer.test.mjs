@@ -22,6 +22,9 @@ test("UID-bound signer comparison is exact and cannot be bypassed by email alone
 
 import {createHash} from "node:crypto";
 import {createEnvelope,sign} from "../src/signing.mjs";
+import {readFileSync} from "node:fs";
+const pdfSource=readFileSync(new URL("../src/pdf.mjs",import.meta.url),"utf8");
+const signingSource=readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
 
 test("staging signing does not require IRPA register authority but retains signer authentication and declarations",async()=>{
   const secret="a".repeat(64);
@@ -125,4 +128,12 @@ test("assigned Date field is persisted from the Gateway signedAt timestamp, not 
   assert.equal(result.status,"InProgress");
   assert.equal(envelope.signers[0].signedAt,at);
   assert.equal(envelope.signers[0].fieldValues["date-1"],at);
+});
+
+test("signed PDF Date fields are rendered from the server UTC signing timestamp",()=>{
+  assert.match(signingSource,/if\(assignedToSigner&&field\.type==="Date"\)signedFieldValues\[field\.fieldId\]=at/);
+  assert.match(signingSource,/s\.fieldValues=signedFieldValues/);
+  assert.match(pdfSource,/field\.type === "Date" && serverDateTime/);
+  assert.match(pdfSource,/new Date\(signer\.signedAt\)\.toISOString\(\)/);
+  assert.match(pdfSource,/UTC/);
 });
