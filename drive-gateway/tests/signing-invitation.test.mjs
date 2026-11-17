@@ -11,7 +11,7 @@ async function fixture({failResend=false}={}) {
   const ctx=buildEsignContext({
     env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
     verifyUser:async()=>null,
-    sendInvitation:async invitation=>{calls++;if(failResend&&calls>1)throw new Error("SMTP unavailable");sent.push(invitation);},
+    sendInvitation:async invitation=>{calls++;if(failResend&&calls>1)throw new Error("SMTP unavailable");sent.push({...invitation,...buildEmailSigningInvitationMessage(invitation)});},
     logger:{error(){}}
   });
   const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA test PDF");
@@ -41,6 +41,9 @@ test("initial Gateway invitation is a single-use email-link and does not use the
   const f=await fixture();
   assert.equal(f.sent.length,1);
   assert.equal(f.sent[0].emailLink,true);
+  assert.equal(f.sent[0].subject,"IRPA secure document-signing invitation");
+  assert.doesNotMatch(f.sent[0].text,/create your password|activate your account/i);
+  assert.doesNotMatch(f.sent[0].html,/Activate My Account|create your password|activate your account/i);
   const url=new URL(f.sent[0].link);
   assert.equal(url.pathname,"/");
   assert.match(url.searchParams.get("emailSignToken"),/^ENV-[0-9a-f]+\.S1\.[0-9a-f]{64}$/);
@@ -54,6 +57,9 @@ test("owner can resend a failed or missing Gateway invitation with a rotated tok
   const result=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   assert.equal(result.deliveryStatus,"Sent");
   assert.equal(f.sent.length,2);
+  assert.equal(f.sent[1].emailLink,true);
+  assert.doesNotMatch(f.sent[1].text,/create your password|activate your account/i);
+  assert.doesNotMatch(f.sent[1].html,/Activate My Account|create your password|activate your account/i);
   const replacement=new URL(f.sent[1].link);
   assert.notEqual(replacement.searchParams.get("emailSignToken"),original);
   assert.equal(replacement.searchParams.has("gatewayToken"),false);
@@ -71,4 +77,20 @@ test("failed Gateway invitation retry remains explicitly Failed and does not rep
 test("another user cannot resend a signer invitation",async()=>{
   const f=await fixture();
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"intruder-uid",isAdmin:false},f.created.envelopeId,"S1"),/Not authorized/);
+});
+
+
+
+test("signer assignment and resend use only the signing mail transport; no workspace activation or reminder transport is coupled to signing",async()=>{
+  const source=await import("node:fs");
+  const signingSource=source.readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
+  const routerSource=source.readFileSync(new URL("../src/router.mjs",import.meta.url),"utf8");
+  assert.doesNotMatch(signingSource,/sendMemberInvitation|buildInvitationMessage|api\/invitations\/send/);
+  assert.match(signingSource,/ctx\.sendInvitation\(\{to:signers\[i\]\.email/);
+  assert.match(signingSource,/ctx\.sendInvitation\(\{to:target\.email/);
+  assert.equal(routerSource.includes("/remind"),false);
+  const f=await fixture();
+  assert.equal(f.sent.length,1,"assignment sends exactly one signing invitation");
+  assert.equal(f.sent[0].emailLink,true);
+  assert.match(f.sent[0].link,/emailSignToken=/);
 });
