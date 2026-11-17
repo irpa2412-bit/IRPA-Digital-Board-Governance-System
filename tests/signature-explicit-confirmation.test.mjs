@@ -118,3 +118,20 @@ test("Gateway signer field routing preserves authenticated account UIDs", () => 
   assert.match(storage, /signerAssignmentByKey/);
   assert.match(storage, /signerId:resolveSignerId\\(field\\)/);
 });
+
+test("registered IRPA signers use authenticated account identity and their saved Signature Profile", () => {
+  assert.match(platform, /identityType:"account"/);
+  assert.match(platform, /recipient\.identityType==="email-link"\?"email-link":"account"/);
+  assert.match(storage, /identityType:emailLink \? "email-link" : "account"/);
+  assert.match(storage, /uid:String\(recipient\.uid\)/);
+  assert.match(gatewayPortal, /getMySignatureProfile\(\)/);
+  assert.match(gatewayPortal, /savedSignatureUrl=\{profile\?\.signatureUrl\|\|""\}/);
+  assert.match(gatewayPortal, /onClick=\{\(\)=>isSignature\?setSignaturePad\(field\):null\}/);
+});
+
+test("Date fields are presented as server-stamped date and time, not client calendar dates", () => {
+  assert.match(platform, /SERVER_TIMESTAMP_PENDING/);
+  assert.match(platform, /Gateway server date and time when you submit your signature/);
+  assert.match(gatewayPortal, /SERVER_TIMESTAMP_PENDING/);
+  assert.match(gatewayPortal, /Gateway server date and time will be recorded on submission/);
+});
