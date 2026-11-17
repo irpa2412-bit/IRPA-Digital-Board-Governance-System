@@ -3610,8 +3610,8 @@ export async function commitFirestoreDocumentAndAudit(env, documentId, _firebase
   if(!response.ok){
     let googleError={};
     try{googleError=(await response.clone().json())?.error||{};}catch{}
-    const googleStatus=String(googleError.status||"UNKNOWN").replace(/[\\r\\n]/g," ").slice(0,100);
-    const googleMessage=String(googleError.message||"No Google error message returned").replace(/[\\r\\n]/g," ").slice(0,500);
+    const googleStatus=String(googleError.status||"UNKNOWN").replace(/[\r\n]/g," ").slice(0,100);
+    const googleMessage=String(googleError.message||"No Google error message returned").replace(/[\r\n]/g," ").slice(0,500);
     console.error("Firestore atomic document/audit commit failed", {httpStatus:response.status,googleStatus,googleMessage});
     const error=new Error(`Unable to atomically commit the document and its audit event (HTTP ${response.status}; ${googleStatus}: ${googleMessage}).`);
     error.googleStatus=googleStatus;
@@ -3658,8 +3658,8 @@ async function updateFirestoreDocument(env, path, firebaseToken, fields, updateM
       const body = await response.clone().json();
       googleError = body?.error || {};
     } catch {}
-    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\\r\\n]/g, " ").slice(0, 100);
-    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\\r\\n]/g, " ").slice(0, 500);
+    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\r\n]/g, " ").slice(0, 100);
+    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\r\n]/g, " ").slice(0, 500);
     throw new Error(`Firestore PATCH ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
   }
   return response.json();
@@ -3676,8 +3676,8 @@ async function getFirestoreDocument(env, path, firebaseToken) {
       const body = await response.clone().json();
       googleError = body?.error || {};
     } catch {}
-    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\\r\\n]/g, " ").slice(0, 100);
-    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\\r\\n]/g, " ").slice(0, 500);
+    const googleStatus = String(googleError.status || "UNKNOWN").replace(/[\r\n]/g, " ").slice(0, 100);
+    const googleMessage = String(googleError.message || "No Google error message returned").replace(/[\r\n]/g, " ").slice(0, 500);
     throw new Error(`Firestore GET ${path} failed: HTTP ${response.status} ${googleStatus} ${googleMessage}`);
   }
   return response.json();
