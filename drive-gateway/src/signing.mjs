@@ -68,6 +68,24 @@ export function validateFieldValues(fields,signer,values,signature,fieldApplicat
   if(JSON.stringify(out).length>240000)throw new HttpError(413,"Assigned signing field values exceed the permitted request size. Reduce the signature image size and try again.");
   return out;
 }
+function signingInvitationAction(fields,role=""){
+  const types=new Set((Array.isArray(fields)?fields:[]).map(field=>String(field?.type||"").trim().toLowerCase()));
+  if(types.has("signature"))return "Sign";
+  if(types.has("initials"))return "Initial";
+  if(types.has("approve")||types.has("approval"))return "Approve";
+  if(types.has("review"))return "Review";
+  if(types.has("authorise")||types.has("authorize")||types.has("authorisation")||types.has("authorization"))return "Authorise";
+  const normalized=String(role||"").toLowerCase();
+  if(/approv/.test(normalized))return "Approve";
+  if(/review/.test(normalized))return "Review";
+  if(/authori[sz]/.test(normalized))return "Authorise";
+  if(/initial/.test(normalized))return "Initial";
+  return "Sign";
+}
+function signingInvitationRole(value=""){
+  const role=cleanText(value||"",120);
+  return !role||/^document owner$/i.test(role)?"IRPA Authorised Signatory":role;
+}
 export async function createEnvelope(ctx,user,body){
   if(!ctx.sendInvitation&&!ctx.allowReturnTokens)throw new HttpError(500,"Invitation transport is not configured.");
   const doc=ID_RE.test(String(body?.documentId||""))&&await ctx.meta.get("documents",body.documentId);
@@ -126,7 +144,7 @@ export async function createEnvelope(ctx,user,body){
   catch(error){if(reservationKey)await ctx.meta.delete("externalReferences",reservationKey).catch(()=>{});throw error;}
   for(let i=0;i<signers.length;i++){
     const token=`${id}.${signers[i].id}.${secrets[i]}`;
-    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
+    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;const assignedFields=fields.filter(field=>field.signerId===signers[i].id);const role=signingInvitationRole(input[i]?.authorityRole||input[i]?.role||input[i]?.institutionalRole||"");const action=signingInvitationAction(assignedFields,role);await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt,role,action,fieldCount:assignedFields.length});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
     else signers[i].invitation="Sent";
   }
@@ -267,7 +285,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   });
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
-  try{await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt});}
+  try{const assignedFields=(envelope.fields||[]).filter(field=>field.signerId===target.id);const role=signingInvitationRole(target.authorityRole||target.role||"");const action=signingInvitationAction(assignedFields,role);await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt,role,action,fieldCount:assignedFields.length});}
   catch(error){
     await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer){signer.invitation="Failed";if(emailLink)signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
