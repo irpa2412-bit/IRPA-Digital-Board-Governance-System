@@ -129,7 +129,7 @@ test("signature PDF palette uses controlled-document authorization during Draft 
 test("owner signature requirement is separate from explicit signer-field assignment", () => {
   const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
   const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
-  assert.match(portal, /const f=makeField\(type,fields\.length,"",pageNum\)/);
+  assert.match(portal, /const f=makeField\(type,fields\.length,activeAssigneeUid\|\|"",pageNum\)/);
   assert.match(portal, /ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]:\[\]/);
   assert.match(portal, /ownerSigningEnabled&&!fields\.some\(f=>f\?\.type==="Signature"&&f\.required!==false&&f\.signerUid===documentOwner\.uid\)/);
   assert.match(platform, /ownerSigningEnabled=false/);
