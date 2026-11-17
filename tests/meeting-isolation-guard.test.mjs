@@ -148,3 +148,16 @@ test("main-branch push runs the isolated fixture without requiring a PR source d
   assert.match(workflow, /const isMainPush = eventName === "push" && process\.env\.GITHUB_REF === "refs\/heads\/main"/);
   assert.match(workflow, /if \(!isMainPush && eventName !== "workflow_dispatch"/);
 });
+
+
+test("touch-responsive signature palette assignment is narrowly allowlisted with its paired policy test", () => {
+  assert.match(workflow, /const signaturePaletteDirectAssignmentRepair =/);
+  assert.match(workflow, /changed\.includes\("src\/pages\/SignaturePlatform\.jsx"\)/);
+  assert.match(workflow, /changed\.includes\("src\/styles\/signature-portal\.css"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-workflow-policy\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-palette-signer-management\.test\.mjs"\)/);
+  assert.match(workflow, /changed\.includes\("tests\/signature-signer-picker-regression\.test\.mjs"\)/);
+  assert.match(workflow, /!signaturePaletteDirectAssignmentRepair/);
+  assert.match(workflow, /signaturePaletteDirectAssignmentRepair &&/);
+  assert.ok(workflow.includes('"src/styles/signature-portal.css"'));
+});

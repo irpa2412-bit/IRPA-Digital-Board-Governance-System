@@ -5,8 +5,8 @@ import fs from "node:fs";
 const source=fs.readFileSync("src/pages/SignaturePlatform.jsx","utf8");
 
 test("palette field placement assigns new fields to the active signer, including an owner-only workflow",()=>{
-  assert.match(source,/const addAt=\(type,x=50,y=20\)=>\{if\(!recipients\.length&&!activeAssigneeUid\)/);
-  assert.match(source,/makeField\(type,fields\.length,activeAssigneeUid\|\|"",pageNum\)/);
+  assert.match(source,/const addAt=\(type,x=50,y=20\)=>\{if\(!pdf\|\|pageError\)/);
+  assert.match(source,/makeField\(type,fields\.length,selectedAssigneeUid,pageNum\)/);
   assert.ok(source.includes('recipients={workflowRecipients} ownerSigner={ownerSigningEnabled?documentOwner:null}'));
 });
 
@@ -26,6 +26,16 @@ test("palette roll-down exposes signer removal while protecting the document own
 });
 
 test("removing an assigned signer leaves their fields explicitly unassigned for reassignment",()=>{
-  assert.ok(source.includes('Their fields are now unassigned; assign them to another signer or the document owner before creating the envelope.'));
+  assert.ok(source.includes('Their fields are now unassigned and can be reassigned in the palette.'));
   assert.ok(source.includes('Assign every field to the document owner or an assigned signer before creating the envelope.'));
+});
+
+
+test("participants are added once and selected directly from the palette for field placement",()=>{
+  assert.ok(source.includes('PEOPLE & FIELD ASSIGNMENT'));
+  assert.ok(source.includes('onAddSigner={addSigner}'));
+  assert.ok(source.includes('Assign fields to this person'));
+  assert.ok(source.includes('FIELDS ON THIS DOCUMENT'));
+  assert.ok(source.includes('const duplicate=recipients.find'));
+  assert.ok(source.includes('The existing signer record has been selected; no duplicate was created.'));
 });
