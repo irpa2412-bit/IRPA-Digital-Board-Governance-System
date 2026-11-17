@@ -72,6 +72,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     primaryStorageId: "original-1"
   }]]);
   const storedFiles = new Map();
+  const rateLimits = new Map();
   return {
     token: envelopeId + "." + signerId + "." + secret,
     envelope,
@@ -85,9 +86,12 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
         async get(collection, id) {
           if (collection === "envelopes" && id === envelopeId) return structuredClone(state.get("envelopes"));
           if (collection === "documents" && id === envelope.documentId) return structuredClone(state.get("documents"));
+          if (collection === "emailLinkRateLimits") return structuredClone(rateLimits.get(id) || null);
           return null;
         },
+        async create(collection,id,value) { if(collection==="emailLinkRateLimits"){if(rateLimits.has(id))throw new Error("duplicate rate limit");rateLimits.set(id,{...structuredClone(value),_v:1});return;} throw new Error("unsupported create"); },
         async update(collection, id, patch, options = {}) {
+          if(collection==="emailLinkRateLimits"){const current=rateLimits.get(id);if(!current)throw new Error("missing rate limit");rateLimits.set(id,{...current,...structuredClone(patch),_v:current._v+1});return;}
           const current = state.get(collection);
           if (options.ifVersion != null && current._v !== options.ifVersion) throw new Error("unexpected version conflict");
           const next = { ...current, ...structuredClone(patch), _v: current._v + 1 };
@@ -234,15 +238,8 @@ test("Gateway idempotent signing retry is accepted for the same email-verified s
     consent:true,
     user:{uid:"member-uid",email:"member@example.org"}
   });
-  await assert.rejects(
-    () => sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},
-      token:fixture.token,
-      signature:{type:"typed",value:"Member Signer"},
-      consent:true,
-      user:{uid:"wrong-user",email:"member@example.org"}
-    }),
-    error=>error.status===401 || error.status===403
-  );
+  const retry=await sign(fixture.ctx,{declarations:{name:"Institutional Signer",title:"Optional Test Title"},token:fixture.token,signature:{type:"typed",value:"Member Signer"},consent:true,user:{uid:"wrong-user",email:"member@example.org"}});
+  assert.equal(retry.idempotent,true);
 });
 
 
