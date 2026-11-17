@@ -26,6 +26,12 @@ const DEFAULTS={Signature:{width:28,height:10},Initials:{width:16,height:8},Date
 function makeField(type,i,uid,page=1){const d=DEFAULTS[type]||DEFAULTS.Text;return{fieldId:`FIELD-${Date.now()}-${i}`,type,page,x:8,y:12,width:d.width,height:d.height,required:type!=="Checkbox",signerUid:uid,responsibility:type==="Signature"?"Signature":type==="Initials"?"Initial":type==="Date"?"Date":type==="Comment"?"Comment":type==="Remarks"?"Remarks":type==="Number"?"Number Entry":type==="Checkbox"?"Approval":"Review",placeholder:type==="Comment"?"Enter comment":type==="Remarks"?"Enter remarks":type==="Number"?"Enter number":""};}
 
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+function maskRegisterEmail(value){
+ const email=String(value||"").trim();
+ const at=email.lastIndexOf("@");
+ if(at<1)return email?"***":"unavailable";
+ return `${email.slice(0,1)}***@${email.slice(at+1)}`;
+}
 async function openOriginalPdf(url,documentId,envelopeId,signingStage=false){
  if(!url)return;
  if(!String(url).startsWith("drive://")){window.open(url,"_blank","noopener,noreferrer");return;}
