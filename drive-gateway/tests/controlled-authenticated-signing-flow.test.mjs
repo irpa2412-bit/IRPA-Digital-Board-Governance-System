@@ -146,6 +146,7 @@ test("employee signer is identified by invited email verification, not an accoun
 
 test("email-link router requires a one-time code and submits with no Firebase session",async()=>{
   const fixture=await makeFixture({signerUid:null,signerEmail:"employee@example.org"});
+  fixture.envelope.signers[0].emailLinkStatus="issued";
   const codes=[];fixture.ctx.sendEmailVerificationCode=async value=>codes.push(value);
   const openResponse=await route(new Request("https://example.test/api/sign/email/open",{headers:{"x-signing-token":fixture.token}}),fixture.ctx);
   assert.equal(openResponse.status,200);assert.equal((await openResponse.json()).requiresEmailCode,true);assert.equal(codes.length,1);
