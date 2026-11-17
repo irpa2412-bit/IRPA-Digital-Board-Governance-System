@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
-import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation} from "../src/signing.mjs";
+import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,changeSignerEmail,remindInvitation} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
@@ -290,6 +290,31 @@ test("staging and production require email-link identity for every signer, retai
   const guestSaved=await ctx.meta.get("envelopes",guest.envelopeId);
   assert.equal(guestSaved.signers[0].uid,null);
   assert.equal(guestSaved.signers[0].identityType,"email-link");
+});
+
+test("owner can change signer email before opening; old invitation token is revoked and a new link is issued",async()=>{
+  const f=await fixture();
+  const oldToken=f.token;
+  const changed=await changeSignerEmail(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1",{email:"replacement@example.org",name:"Replacement Signer",title:"External Reviewer"});
+  assert.equal(changed.emailChanged,true);
+  const replacementToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
+  assert.notEqual(replacementToken,oldToken);
+  await assert.rejects(()=>openEmailSigning(f.ctx,oldToken),error=>error.message===genericEmailSigningFailure());
+  const saved=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(saved.signers[0].email,"replacement@example.org");
+  assert.equal(saved.signers[0].name,"Replacement Signer");
+  assert.equal(saved.signers[0].title,"External Reviewer");
+  assert.equal(saved.signers[0].emailLinkStatus,"issued");
+  assert.equal(saved.signers[0].emailLinkTokenHistory.at(-1).status,"revoked");
+});
+
+test("owner reminders are rate-limited to one per signer per hour",async()=>{
+  const f=await fixture();
+  const first=await remindInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  assert.equal(first.deliveryStatus,"Sent");
+  await assert.rejects(()=>remindInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),error=>error.status===429&&/last hour/.test(error.message));
+  const saved=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.ok(saved.signers[0].lastReminderAt);
 });
 
 test("email-link signer can revoke before submission and the session token is invalidated",async()=>{
