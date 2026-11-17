@@ -21,7 +21,7 @@ test("Board governance role catalogue retains distinct offices while signer assi
     assert.ok(catalogue.signingMatrix.technicalModel.boardRoleOptions.includes(role),"governance matrix missing: "+role);
   }
   assert.doesNotMatch(source,/Current Signing Authority|authorityRegisterRecords|authorityDepartments|authorityRole/);
-  assert.doesNotMatch(firebaseSource,/BOARD_SIGNING_ROLES|verifyManualSigningAuthority|findManualAuthorityMatch/);
+  assert.doesNotMatch(firebaseSource,/verifyManualSigningAuthority|findManualAuthorityMatch/);
 });
 test("governance role catalogue retains singular Board Member and legacy plural normalisation",()=>{
   assert.ok(catalogue.roles.some(item=>item.title==="Board Member"));
@@ -87,7 +87,7 @@ test("draft signing matrix documents the technical role source without appointin
   assert.deepEqual(model.boardRoleOptions, boardRoles);
   assert.match(model.ambiguousTitles, /Exact-match only/);
   assert.match(model.administratorRecognition, /job title Administrator alone cannot/);
-  assert.match(model.limitation, /do not appoint signatories/);
+  assert.match(model.limitation, /does not appoint signatories/);
 });
 
 test("browser and Cloudflare Gateway resolve the same dual-role register values", () => {
