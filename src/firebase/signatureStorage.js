@@ -437,7 +437,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error("Only the authenticated document owner can connect this signing workflow to the Gateway.");
   }
   const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
-  const actionRecipients = recipients.filter(r => r?.identityType === "email-link" && String(r?.email||"").trim() && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
+  const actionRecipients = recipients.filter(r => String(r?.email||"").trim() && (r?.uid || r?.identityType === "email-link") && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
   if (!actionRecipients.length) throw new Error("At least one authorized action signer is required.");
   const ordered = [...actionRecipients].sort((a,b) => Number(a.routingOrder || 1) - Number(b.routingOrder || 1));
   const signerAssignmentByKey = new Map();
@@ -501,7 +501,8 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => ({
-      identityType:"email-link",
+      identityType:recipient.identityType === "email-link" && !recipient.uid ? "email-link" : "account",
+      uid:recipient.uid || null,
       email:String(recipient.email || "").trim().toLowerCase(),
       name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
       occupation:String(recipient.occupation||recipient.capacity||recipient.role||"").trim(),
