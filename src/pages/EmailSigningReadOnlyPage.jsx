@@ -29,7 +29,7 @@ export default function EmailSigningReadOnlyPage({token}){
   const parts=String(token).split("."),sessionKey=parts.length===3?"irpaEmailSigningSession:"+parts[0]+"."+parts[1]:"";
   try{if(sessionKey)window.sessionStorage.setItem(sessionKey,session);}catch{}
   const fields=Array.isArray(metadata.fields)?metadata.fields:[];
-  setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
+  setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,attachments:Array.isArray(metadata.attachments)?metadata.attachments:[],canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
   setDeclarations({name:"",title:""});
   setSelectedFieldId(fields[0]?.fieldId||"");
   const gateway=getGoogleDriveGatewayUrl();
@@ -206,6 +206,15 @@ export default function EmailSigningReadOnlyPage({token}){
   finally{setRevoking(false);}
  }
 
+ async function openOptionalAttachment(attachment){
+  try{
+   const gateway=getGoogleDriveGatewayUrl(),activeToken=signingToken||token;
+   const response=await fetch(gateway+"/api/sign/email/attachments/"+encodeURIComponent(attachment.id),{headers:{"x-signing-token":activeToken},credentials:"omit",cache:"no-store"});
+   if(!response.ok)throw new Error("The optional attachment could not be retrieved or failed integrity verification.");
+   const bytes=await response.arrayBuffer(),blob=new Blob([bytes],{type:attachment.contentType||"application/octet-stream"}),url=URL.createObjectURL(blob);
+   window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(error){setError(error?.message||"Unable to open the optional attachment.");}
+ }
  return <main style={{minHeight:"100vh",background:"#f3f4f6",color:"#111827",padding:"20px 12px",boxSizing:"border-box"}}>
   <section style={{maxWidth:1100,margin:"0 auto",background:"#fff",border:"1px solid #d1d5db",borderRadius:12,padding:16}}>
    <h1 style={{fontSize:20,margin:"0 0 10px"}}>IRPA — Secure document signing</h1>
@@ -224,6 +233,11 @@ export default function EmailSigningReadOnlyPage({token}){
    {record&&!error&&<>
     <h2 style={{fontSize:17,margin:"8px 0"}}>{record.title}</h2><p style={{fontSize:13,margin:"4px 0"}}>Invited by: {record.ownerName}</p>
     <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?new Date(record.expiresAt).toLocaleString():"As stated in your invitation"}</p>
+    {record.attachments?.length>0&&<section aria-label="Optional envelope attachments" style={{border:"1px solid #9ca3af",borderRadius:8,padding:12,marginTop:12}}>
+     <h2 style={{fontSize:16,margin:"0 0 8px"}}>Optional attachments</h2>
+     <p style={{fontSize:13,color:"#4b5563"}}>These attachments are provided for review. They are not required fields and do not block signing.</p>
+     {record.attachments.map(item=><div key={item.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"8px 0",borderTop:"1px solid #e5e7eb"}}><div><strong>{item.title||item.fileName}</strong><small style={{display:"block"}}>{item.fileName} · SHA-256 {item.hash}</small></div><button type="button" onClick={()=>openOptionalAttachment(item)} style={buttonStyle}>Open attachment</button></div>)}
+    </section>}
     <section style={{border:"1px solid #9ca3af",borderRadius:8,padding:12,marginTop:12}}>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><div><h2 style={{fontSize:18,margin:"0 0 4px"}}>Complete document review</h2><p style={{fontSize:13,color:"#4b5563",margin:0}}>Read every page before deciding. Assigned signature and initials locations are marked directly on the document.</p></div><strong>Page {pageNum} of {pageCount||"…"}</strong></div>
      <div style={{display:"flex",gap:8,justifyContent:"center",margin:"12px 0",flexWrap:"wrap"}}>
