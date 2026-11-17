@@ -29,3 +29,16 @@ test("Gateway email-link signing is independent of Firebase UID authentication",
   assert.match(gateway,/if\(s0\.identityType==="email-link"\)\{if\(s0\.emailLinkStatus!=="opened"\)/);
   assert.match(gateway,/emailLink\?\$\{ctx\.config\.appUrl\}\/\?emailSignToken=/);
 });
+
+test("new staging and production Gateway envelopes reject account-only or UID-bound signers",()=>{
+  assert.match(gateway,/if\(cryptoRequired&&input\.some\(s=>s\?\.identityType!=="email-link"\|\|s\?\.uid\)\)/);
+});
+
+test("assigned workflow role is not misrepresented as the signer's occupation or capacity",()=>{
+  assert.match(storage,/occupation:String\(recipient\.occupation\|\|recipient\.capacity\|\|""\)\.trim\(\)/);
+  assert.doesNotMatch(storage,/occupation:String\(recipient\.occupation\|\|recipient\.capacity\|\|recipient\.role/);
+});
+
+test("Gateway envelopes cannot be signed through the parallel in-app UID workflow",()=>{
+  assert.match(portal,/if\(selected\.gatewayEnvelopeId\)throw new Error\("This envelope must be signed through its email-link invitation/);
+});
