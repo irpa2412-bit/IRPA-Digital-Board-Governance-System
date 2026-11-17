@@ -652,6 +652,19 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     if(!documentId||!documentUrl)throw new Error("Select a controlled PDF before creating the draft envelope.");
     if(ownerSigningEnabled&&!fields.some(f=>f?.type==="Signature"&&f.required!==false&&f.signerUid===documentOwner.uid))throw new Error("Explicitly assign a required Signature field to the document owner before creating the envelope.");
     const orderedRecipients=recipients.filter(r=>r.uid!==documentOwner.uid).map((r,i)=>({...r,routingOrder:signingMode==="Sequential"?i+(ownerSigningEnabled?2:1):r.routingOrder||1}));
+    const seenSignerUids=new Set([documentOwner.uid]);
+    const ownerEmailKey=String(documentOwner.email||"").trim().toLowerCase();
+    const seenSignerEmails=new Set(ownerEmailKey?[ownerEmailKey]:[]);
+    const duplicateRecipients=[];
+    for(const recipient of orderedRecipients){
+      const uid=String(recipient.uid||"").trim();
+      const emailKey=String(recipient.email||"").trim().toLowerCase();
+      if(!uid)throw new Error("Every participant must have a unique signer identity before the envelope can be created.");
+      if(seenSignerUids.has(uid)||(emailKey&&seenSignerEmails.has(emailKey))){duplicateRecipients.push(recipient);continue;}
+      seenSignerUids.add(uid);
+      if(emailKey)seenSignerEmails.add(emailKey);
+    }
+    if(duplicateRecipients.length)throw new Error("Duplicate participants were detected by signer identity or email: "+duplicateRecipients.map(recipient=>recipient.name||recipient.email).join(", ")+". Remove duplicate people in the palette and reassign their fields before creating the envelope.");
     const signerUids=new Set([...orderedRecipients.map(r=>r.uid),...(ownerSigningEnabled?[documentOwner.uid]:[])]);
     if(!orderedRecipients.length&&!ownerSigningEnabled)throw new Error("Add at least one participant in the PDF palette before creating the envelope.");
     const recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>field.signerUid===recipient.uid));
