@@ -229,3 +229,15 @@ test("envelope creation requires every participant to have at least one explicit
   assert.match(portal, /const recipientsWithoutFields=orderedRecipients\.filter\(recipient=>!fields\.some\(field=>field\.signerUid===recipient\.uid\)\)/);
   assert.match(portal, /Assign at least one field to each participant in the palette before creating the envelope/);
 });
+
+
+test("owner identity is never added as a duplicate signer and reorder controls exclude the owner row", () => {
+  const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
+  assert.ok(addSigner);
+  assert.match(addSigner[1], /const ownerEmail=String\(documentOwner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(addSigner[1], /const isOwnerDuplicate=/);
+  assert.match(addSigner[1], /setOwnerSigningEnabled\(true\)/);
+  assert.match(portal, /const signerRecipients=recipients\.filter\(r=>r\.uid!==ownerSigner\?\.uid\)/);
+  assert.match(portal, /disabled=\{signerIndex===0\}/);
+  assert.match(portal, /disabled=\{signerIndex===signerRecipients\.length-1\}/);
+});
