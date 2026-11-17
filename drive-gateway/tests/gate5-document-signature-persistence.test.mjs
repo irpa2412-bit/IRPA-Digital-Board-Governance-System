@@ -391,9 +391,7 @@ test("G5-08 — partial completion rollback", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
-  assert.equal(opened.status, 200);
-  const token=(await opened.json()).sessionToken;
+  const token=await redeemInvitation(s,invitationToken);
 
   s.storage.failPutWhen = (n) => n === 4;
   const response = await route(
