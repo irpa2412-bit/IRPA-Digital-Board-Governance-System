@@ -6,10 +6,8 @@ import { createGatewaySignatureEnvelope, voidGatewaySignatureEnvelope, downloadS
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { auth, db } from "./config";
 import { ensureMySignerIdentity, getMySignerIdentity, recordSignerAuthenticationEvidence, IRPA_ORGANISATION } from "./signerIdentity";
-import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 import { readWorkflowContext } from "./workflowLinks";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
-import { findManualAuthorityMatch, resolveManualAuthorityLabel } from "../utils/signatureAuthority.mjs";
 import { resolveSourceDocumentIntegrity } from "./signatureSourceIntegrity.js";
 const SIGNATURE_SCREEN="Signature workflow";
 const SIGNATURE_USER_TYPE="logged-in owner or signer";
@@ -55,26 +53,6 @@ function nextActionRecipient(recipients,currentUid){const list=recipients||[];co
 function user(){if(!auth.currentUser)throw new Error("Authentication is required.");return auth.currentUser;}
 function isTrialSignatureMode(){try{const environment=String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase();const authority=String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase();const verified=window.sessionStorage.getItem("irpaActualDataAccessVerified")==="true";return environment!=="ACTUAL"||(authority==="ADMINISTRATOR"&&!verified)}catch{return true}}
 function matchesSignatureEnvironment(record={}){const trial=String(record.recordOrigin||"PRODUCTION").toUpperCase()==="TRIAL"||record.trialData===true||record.isTrial===true;return trial===isTrialSignatureMode()}
-export async function verifyManualSigningAuthority(manualAuthorityIdentification){
-  const input=String(manualAuthorityIdentification||"").trim();
-  if(!input) throw new Error("Enter the signing authority you are declaring before signing.");
-  const entries=await getCurrentSigningAuthorityRegisterEntries();
-  const match=findManualAuthorityMatch(entries,input);
-  if(!match){
-    throw new Error("SYSTEM VERIFICATION FAILED: the manually entered signing authority does not match an active IRPA Member or Employee Register entry for this authenticated account.");
-  }
-  const verifiedRole=resolveManualAuthorityLabel(match,input);
-  return {
-    verified:true,
-    manualAuthorityIdentification:String(manualAuthorityIdentification).trim(),
-    authorityRole:verifiedRole,
-    authorityDepartment:String(match.department||"").trim(),
-    authorityUnit:String(match.unit||match.unitName||"").trim(),
-    authoritySourceCollection:String(match.sourceCollection||"").trim(),
-    authoritySourceRecordId:String(match.sourceRecordId||match.id||"").trim(),
-    verificationMethod:"Authenticated Member/Employee Register Match"
-  };
-}
 async function hashBytes(bytes){const d=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(d)).map(b=>b.toString(16).padStart(2,"0")).join("");}
 async function hash(file){return hashBytes(await file.arrayBuffer());}
 async function cropSignatureImage(file){
