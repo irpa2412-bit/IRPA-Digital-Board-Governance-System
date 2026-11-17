@@ -279,7 +279,33 @@ export async function getSignatureEnvelopes(){
   const body=await fetchServerFilteredSignatureEnvelopes("/api/signature-workflow/list");
   return (Array.isArray(body.envelopes)?body.envelopes:[]).filter(matchesSignatureEnvironment).sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
 }
-export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(!matchesSignatureEnvironment(data))return null;if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&x.status==="Signed"&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
+export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(!matchesSignatureEnvironment(data))return null;if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&!x.personalCopyDeleted&&((x.status==="Signed")||(x.copyRole==="Owner"&&x.status==="Completed"))&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
+async function mySignatureCopyRequest(path,recordId){
+  user();
+  if(!auth.currentUser)throw new Error("Authentication is required to manage My Documents copies.");
+  if(!recordId)throw new Error("A My Documents record is required.");
+  const token=await auth.currentUser.getIdToken();
+  const response=await fetch(`${GATEWAY_URL}${path}`,{
+    method:"POST",
+    headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+    body:JSON.stringify({recordId}),
+    cache:"no-store"
+  });
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok||body?.ok!==true)throw new Error(body?.error||"The personal signed-document copy could not be processed.");
+  return body;
+}
+export async function downloadMySignedDocumentCopy(recordId){
+  const result=await mySignatureCopyRequest("/api/signature/distribution/download-copy",recordId);
+  if(!result.base64)throw new Error("The Gateway returned no completed signed PDF.");
+  const binary=atob(result.base64),bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return{bytes,fileName:result.fileName||"completed-signed-document.pdf",contentType:result.contentType||"application/pdf"};
+}
+export async function deleteMySignedDocumentCopy(recordId){
+  return mySignatureCopyRequest("/api/signature/distribution/delete-copy",recordId);
+}
+
 export async function sendSignatureInvitation(envelope, recipient) {
   const u = user();
   if (!envelope?.id) throw new Error("A valid signing envelope is required.");
