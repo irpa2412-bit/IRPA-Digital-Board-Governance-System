@@ -47,9 +47,9 @@ while(queue.length){
     if(definitions.has(called)&&!visited.has(called))queue.push(called);
   }
 }
-for(const file of ["src/pages/SignaturePlatform.jsx","src/pages/GatewaySigningPortal.jsx"]){
+for(const file of ["src/firebase/signatureStorage.js","src/pages/SignaturePlatform.jsx","src/pages/GatewaySigningPortal.jsx","src/components/DocumentLifecycleModule.jsx"]){
   const text=fs.readFileSync(path.join(root,file),"utf8");
-  if(/from\s*["']firebase\/firestore["']/.test(text))failures.push({file,operation:"direct Firestore SDK import"});
+  if(file!=="src/components/DocumentLifecycleModule.jsx" && /from\s*["']firebase\/firestore["']/.test(text))failures.push({file,operation:"direct Firestore SDK import"});
   for(const op of forbidden)if(new RegExp("\\b"+op+"\\s*\\(").test(text))failures.push({file,operation:op});
 }
 if(failures.length){
