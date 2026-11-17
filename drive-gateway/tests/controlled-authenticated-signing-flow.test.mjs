@@ -250,7 +250,7 @@ test("Gateway signing refuses missing required assigned fields before mutating t
       consent:true,
       user:{uid:"member-uid",email:"member@example.org"}
     }),
-    error=>error.status===400&&error.message.includes("required text field")
+    error=>error.status===400&&error.message.includes("assigned text field")
   );
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].status,"Pending");
