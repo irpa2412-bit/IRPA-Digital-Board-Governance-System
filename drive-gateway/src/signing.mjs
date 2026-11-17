@@ -75,7 +75,7 @@ export async function createEnvelope(ctx,user,body){
   if(!["Sequential","Parallel"].includes(signingMode))throw new HttpError(400,"Unsupported signing mode.");
   if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
-  if(cryptoRequired&&input.some(s=>!s?.uid&&s?.identityType!=="email-link"))throw new HttpError(400,"Every production signer must be UID-bound or explicitly use the verified email-link path.");
+  if(cryptoRequired&&input.some(s=>s?.identityType!=="email-link"||s?.uid))throw new HttpError(400,"Every staging and production signer must use an email-link identity without a Firebase UID. Select the signer by email and verify the invitation.");
   // Email-link possession is transaction-scoped mailbox control, not an authority-register lookup.
   const sourceBytes=await ctx.storage.get(doc.primaryStorageId);
   if(!sourceBytes)throw new HttpError(409,"The stored document failed its integrity check.");
@@ -164,22 +164,28 @@ export async function openEmailSigning(ctx,token,ip=""){
     const loaded=await load(ctx,token);
     if(loaded.signer.identityType!=="email-link"||!["issued","opened"].includes(loaded.signer.emailLinkStatus)||now.getTime()>=Date.parse(loaded.signer.emailLinkExpiresAt))throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env);
+    let sessionToken=token;
     if(loaded.signer.emailLinkStatus==="issued"){
+      const sessionSecret=randomHex(32);
+      sessionToken=loaded.env.id+"."+loaded.signer.id+"."+sessionSecret;
+      const sessionHash=await sha256Hex(sessionSecret);
       await mutate(ctx,loaded.env.id,async current=>{
         const signer=current.signers.find(item=>item.id===loaded.signer.id);
         if(!signer||signer.identityType!=="email-link"||signer.emailLinkStatus!=="issued")throw new HttpError(401,genericEmailSigningFailure());
         const opened=await markEmailSigningTokenOpened({tokenHash:signer.tokenHash,expiresAt:signer.emailLinkExpiresAt,status:signer.emailLinkStatus,attemptCount:signer.emailLinkAttemptCount,openCount:signer.emailLinkOpenCount,ipAttempts:signer.emailLinkIpAttempts},{token:parts[2],now,ipHash,maxAttempts:8});
+        signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"used",usedAt:now.toISOString()}].slice(-10);
+        signer.tokenHash=sessionHash;
         signer.emailLinkStatus=opened.status;
         signer.emailLinkOpenCount=opened.openCount;
         signer.emailLinkAttemptCount=opened.attemptCount;
         signer.emailLinkIpAttempts=opened.ipAttempts;
         signer.emailLinkLastIpHash=opened.lastIpHash;
         signer.emailLinkOpenedAt=opened.openedAt;
-        return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash})}};
+        return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash,sessionTokenHash:sessionHash,invitationTokenConsumed:true})}};
       });
     }
-    const preview=await openSigning(ctx,token,null);
-    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt,envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars};
+    const preview=await openSigning(ctx,sessionToken,null);
+    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt,envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars,sessionToken};
   }catch{
     throw new HttpError(401,genericEmailSigningFailure());
   }

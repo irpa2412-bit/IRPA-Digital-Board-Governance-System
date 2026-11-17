@@ -9,6 +9,7 @@ const buttonStyle={padding:"10px 14px",border:0,borderRadius:7,background:"#174a
 
 export default function EmailSigningReadOnlyPage({token}) {
   const [record,setRecord]=useState(null);
+  const [signingToken,setSigningToken]=useState("");
   const [pdfUrl,setPdfUrl]=useState("");
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(true);
@@ -27,21 +28,27 @@ export default function EmailSigningReadOnlyPage({token}) {
   useEffect(()=>{
     let cancelled=false,objectUrl="";
     if(!token){setError(NEUTRAL);setLoading(false);return;}
-    try{window.history.replaceState({},document.title,window.location.pathname+window.location.hash);}catch{}
+    const tokenParts=String(token).split(".");
+    const sessionKey=tokenParts.length===3?"irpaEmailSigningSession:"+tokenParts[0]+"."+tokenParts[1]:"";
+    let activeToken=token;
+    try{const stored=sessionKey?window.sessionStorage.getItem(sessionKey):"";if(stored)activeToken=stored;}catch{}
     (async()=>{
       try{
         const gateway=getGoogleDriveGatewayUrl();
         if(!gateway)throw new Error(NEUTRAL);
-        const headers={"x-signing-token":token,Accept:"application/json"};
+        const headers={"x-signing-token":activeToken,Accept:"application/json"};
         const opened=await fetch(gateway+"/api/sign/email/open",{method:"GET",headers,cache:"no-store",credentials:"omit"});
         const metadata=await opened.json().catch(()=>({}));
         if(!opened.ok||metadata.ok!==true)throw new Error(NEUTRAL);
         if(cancelled)return;
+        const session=String(metadata.sessionToken||activeToken);
+        setSigningToken(session);
+        try{if(sessionKey)window.sessionStorage.setItem(sessionKey,session);}catch{}
         const fields=Array.isArray(metadata.fields)?metadata.fields:[];
         setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
         setDeclarations({name:metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"",occupation:"",capacity:""});
         setSelectedFieldId(fields[0]?.fieldId||"");
-        const pdf=await fetch(gateway+"/api/sign/email/pdf",{method:"GET",headers:{"x-signing-token":token},cache:"no-store",credentials:"omit"});
+        const pdf=await fetch(gateway+"/api/sign/email/pdf",{method:"GET",headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
         if(!pdf.ok)throw new Error(NEUTRAL);
         const blob=await pdf.blob();
         if(blob.type!=="application/pdf"||cancelled)throw new Error(NEUTRAL);
@@ -112,11 +119,12 @@ export default function EmailSigningReadOnlyPage({token}) {
     try{
       const gateway=getGoogleDriveGatewayUrl();
       const signature=signatureValue?{type:"drawn",value:signatureValue}:{type:"typed",value:typedSignature.trim()||declarations.name.trim()};
-      const response=await fetch(gateway+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json","x-signing-token":token},credentials:"omit",cache:"no-store",body:JSON.stringify({token,signature,fieldValues,fieldApplications,signatureConfirmed:true,declarations,consent:true})});
+      const activeToken=signingToken||token;
+      const response=await fetch(gateway+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json","x-signing-token":activeToken},credentials:"omit",cache:"no-store",body:JSON.stringify({token:activeToken,signature,fieldValues,fieldApplications,signatureConfirmed:true,declarations,consent:true})});
       const result=await response.json().catch(()=>({}));
       if(!response.ok||result.ok===false)throw new Error(result.error||"The signing action could not be completed.");
       if(result.completed===true){
-        const pdf=await fetch(gateway+"/api/sign/pdf",{headers:{"x-signing-token":token},credentials:"omit",cache:"no-store"});
+        const pdf=await fetch(gateway+"/api/sign/pdf",{headers:{"x-signing-token":activeToken},credentials:"omit",cache:"no-store"});
         if(!pdf.ok)throw new Error("Your signature was recorded, but the completed PDF is not yet available.");
         const blob=await pdf.blob();const url=URL.createObjectURL(blob);setPdfUrl(current=>{if(current)URL.revokeObjectURL(current);return url;});
         setSuccess("Signing completed. The completed PDF is available below.");
@@ -135,7 +143,7 @@ export default function EmailSigningReadOnlyPage({token}) {
         {pdfUrl&&<iframe title="Controlled document preview" src={pdfUrl} sandbox="allow-same-origin" style={{display:"block",width:"100%",height:"55vh",border:"1px solid #9ca3af",background:"#fff"}}/>}
         <section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
           <h2 style={{fontSize:18}}>Your declaration for this document</h2>
-          <p style={{fontSize:13,color:"#4b5563"}}>These are your transaction-specific declarations. They are recorded with the signing evidence; they are not checked against an IRPA authority register.</p>
+          <p style={{fontSize:13,color:"#4b5563"}}>Opening this link confirms control of the invited email address; it does not independently verify your legal identity or authority to bind an organisation. Your transaction-specific declaration is recorded with the signing evidence, but is not checked against an IRPA authority register. Institutional authority must be established through the relevant organisation’s delegation or approval process.</p>
           <p style={{fontSize:13,background:"#f3f4f6",padding:10,borderRadius:7}}><strong>Owner-recorded particulars for this assignment:</strong> {record.ownerDeclaredParticulars?.name||"Not supplied"} · {record.ownerDeclaredParticulars?.occupation||record.ownerDeclaredParticulars?.capacity||"Occupation/capacity not supplied"}</p>
           <label style={{display:"block",margin:"10px 0"}}>Full name<input style={inputStyle} value={declarations.name} onChange={e=>setDeclaration("name",e.target.value)} autoComplete="name"/></label>
           <label style={{display:"block",margin:"10px 0"}}>Occupation / capacity<input style={inputStyle} value={declarations.occupation} onChange={e=>setDeclaration("occupation",e.target.value)} placeholder="Enter your occupation or capacity"/></label>
