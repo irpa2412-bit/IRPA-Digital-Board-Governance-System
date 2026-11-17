@@ -88,6 +88,9 @@ test("signer must review the rendered document and applied stamps before submit 
   assert.match(page,/Final review — signature not yet submitted/);
   assert.match(page,/Navigate through every page above/);
   assert.match(page,/Your signature has not been submitted yet/);
+  assert.match(page,/Changes to assigned fields update this preview/);
+  assert.doesNotMatch(page,/Return to editing/);
+  assert.doesNotMatch(page,/disabled=\\{reviewMode\\|\\|signingClosed\\}/);
   assert.match(signing,/email_link\.revoked_by_signer/);
   assert.match(signing,/emailLinkStatus="revoked"/);
 });
