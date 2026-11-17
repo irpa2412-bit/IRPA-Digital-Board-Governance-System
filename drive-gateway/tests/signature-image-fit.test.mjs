@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deflateSync } from "node:zlib";
-import { PDFDocument, PDFName, degrees } from "pdf-lib";
+import { PDFDocument, PDFName, PDFPage, degrees } from "pdf-lib";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
 import { findSignatureInkBounds, requireSignatureInkBounds, removeWhitePixels } from "../../src/utils/signatureImageCanvas.mjs";
 import { buildSignedPdf, getPdfFieldBox, getSignatureDrawGeometry } from "../src/pdf.mjs";
@@ -110,7 +110,7 @@ function makeField(fieldId, type, x, y, width, height) {
   return { fieldId, type, page: 1, x, y, width, height, signerId: "S1", signerUid: "user-1" };
 }
 
-test("PDF finalizer embeds 300x100 signatures and initials without distortion in wide and tall boxes", async () => {
+test("PDF finalizer draws 300x100 signatures and initials proportionally inside 200x200 and 400x40 boxes", async () => {
   const source = await PDFDocument.create();
   source.addPage([1200, 1000]);
   const sourceBytes = await source.save();
@@ -123,12 +123,24 @@ test("PDF finalizer embeds 300x100 signatures and initials without distortion in
     makeField("initials-wide", "Initials", 50, 30, 100 / 3, 4)
   ];
   const fieldValues = Object.fromEntries(fields.map(field => [field.fieldId, dataUrl]));
-  const result = await buildSignedPdf(sourceBytes, {
-    envelopeId: "envelope-1", documentId: "document-1", title: "Test",
-    originalHash: "original", chainHead: "chain", completedAt: new Date(0).toISOString(),
-    fields,
-    signers: [{ id: "S1", uid: "user-1", name: "Signer", email: "signer@example.test", signedAt: new Date(0).toISOString(), signatureType: "drawn", signatureValue: dataUrl, fieldValues }]
-  });
+  const actualDraws = [];
+  const originalDrawImage = PDFPage.prototype.drawImage;
+  PDFPage.prototype.drawImage = function(image, options) {
+    if (image.width === 300 && image.height === 100) actualDraws.push({ ...options });
+    return originalDrawImage.call(this, image, options);
+  };
+  let result;
+  try {
+    result = await buildSignedPdf(sourceBytes, {
+      envelopeId: "envelope-1", documentId: "document-1", title: "Test",
+      originalHash: "original", chainHead: "chain", completedAt: new Date(0).toISOString(),
+      fields,
+      signers: [{ id: "S1", uid: "user-1", name: "Signer", email: "signer@example.test", signedAt: new Date(0).toISOString(), signatureType: "drawn", signatureValue: dataUrl, fieldValues }]
+    });
+  } finally {
+    PDFPage.prototype.drawImage = originalDrawImage;
+  }
+
   const completed = await PDFDocument.load(result);
   assert.equal(completed.getPageCount(), 2);
   const page = completed.getPages()[0];
@@ -141,16 +153,24 @@ test("PDF finalizer embeds 300x100 signatures and initials without distortion in
   assert.ok(imageObjects.some(object => object.dict.lookup(PDFName.of("Width")).asNumber() === 300 &&
     object.dict.lookup(PDFName.of("Height")).asNumber() === 100), "the original 300x100 PNG must remain embedded at its natural pixel dimensions");
 
-  for (const field of fields) {
-    const box = getPdfFieldBox(page, field);
-    const drawn = getSignatureDrawGeometry(300, 100, box);
-    close(drawn.width / drawn.height, 3);
-    assert.ok(drawn.x >= box.x - 0.01 && drawn.y >= box.y - 0.01);
-    assert.ok(drawn.x + drawn.width <= box.x + box.width + 0.01);
-    assert.ok(drawn.y + drawn.height <= box.y + box.height + 0.01);
-  }
+  assert.equal(actualDraws.length, 5, "four assigned field stamps plus one certificate stamp must be drawn");
+  const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+  fields.forEach((field, index) => {
+    const box = getPdfFieldBox(sourcePage, field);
+    const drawn = actualDraws[index];
+    close(drawn.width / drawn.height, 3, 0.01);
+    assert.ok(drawn.x >= box.x - 0.01 && drawn.y >= box.y - 0.01, field.fieldId + " must start inside its box");
+    assert.ok(drawn.x + drawn.width <= box.x + box.width + 0.01, field.fieldId + " must fit horizontally");
+    assert.ok(drawn.y + drawn.height <= box.y + box.height + 0.01, field.fieldId + " must fit vertically");
+    if (field.fieldId.endsWith("square")) {
+      close(box.width, 200);
+      close(box.height, 200);
+    } else {
+      close(box.width, 400);
+      close(box.height, 40);
+    }
+  });
 });
-
 test("PDF field geometry respects a non-zero crop box and 90-degree page rotation", async () => {
   const document = await PDFDocument.create();
   const page = document.addPage([1200, 1000]);
