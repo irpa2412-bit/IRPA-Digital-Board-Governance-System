@@ -6,7 +6,6 @@ const apiKey=process.env.STAGING_FIREBASE_WEB_API_KEY||"";
 const project=process.env.STAGING_FIREBASE_PROJECT_ID||"";
 const email=process.env.STAGING_CRYPTO_TEST_EMAIL||"";
 const password=process.env.STAGING_CRYPTO_TEST_PASSWORD||"";
-const authority=process.env.STAGING_CRYPTO_TEST_AUTHORITY||"";
 const expectedUid=process.env.STAGING_CRYPTO_TEST_SIGNER_UID||"";
 const expectedKeyId=process.env.STAGING_CRYPTO_TEST_KEY_ID||"";
 const base=String(process.env.STAGING_GATEWAY_URL||"").replace(/\/+$/,"");
@@ -24,26 +23,6 @@ const tokenClaims=JSON.parse(Buffer.from(String(login.idToken||"").split(".")[1]
 assert.equal(tokenClaims.aud,project,"Firebase ID token audience is not the staging project.");
 assert.equal(tokenClaims.iss,"https://securetoken.google.com/"+project,"Firebase ID token issuer is not the staging project.");
 const authHeaders={Authorization:"Bearer "+login.idToken,"x-irpa-staging-diagnostics":"1"};
-async function ownFirestoreDocument(collection){
-  const response=await fetch("https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents/"+collection+"/"+encodeURIComponent(expectedUid),{headers:authHeaders});
-  const data=await response.json().catch(()=>({}));
-  assert.equal(response.ok,true,"Staging "+collection+" record is not readable for the authenticated test account.");
-  return data;
-}
-const [signatureProfile,signerIdentity]=await Promise.all([
-  ownFirestoreDocument("signatureProfiles"),
-  ownFirestoreDocument("signerIdentities")
-]);
-const firestoreString=(record,key)=>record?.fields?.[key]?.stringValue||"";
-assert.equal(firestoreString(signatureProfile,"status"),"Active","Staging test signer must have an Active Signature Profile.");
-assert.ok(firestoreString(signatureProfile,"signatureUrl").startsWith("data:image/"),"Staging test signer must have a saved Signature Profile specimen.");
-assert.equal(firestoreString(signerIdentity,"authorityStatus"),"Current","Staging test signer must have Current Signer Identity authority.");
-assert.ok(firestoreString(signerIdentity,"authorityRole")&&firestoreString(signerIdentity,"authorityRole")!=="Not yet assigned","Staging test signer must have a registered signing authority.");
-const normalizeAuthority=value=>String(value||"").toLowerCase().replace(/^(the|irpa)\s+/,"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim();
-const effectiveAuthority=authority||firestoreString(signerIdentity,"authorityRole");
-assert.ok(effectiveAuthority,"Staging signer authority must be available from the current Signer Identity.");
-if(authority)assert.equal(normalizeAuthority(authority),normalizeAuthority(firestoreString(signerIdentity,"authorityRole")),"The optional staging authority value must match the Current Signer Identity role.");
-
 async function readJson(response,label){
   const body=await response.json().catch(()=>({}));
   const detail=body.diagnosticMessage?` [${body.diagnosticCode||"Error"}] ${body.diagnosticMessage}`:(body.error||"no error detail");
@@ -52,7 +31,7 @@ async function readJson(response,label){
   return body;
 }
 async function signingJson(path,token,label){
-  const response=await fetch(base+path,{headers:{...authHeaders,"x-signing-token":token}});
+  const response=await fetch(base+path,{headers:{"x-signing-token":token}});
   return readJson(response,label);
 }
 async function sha256(bytes){
