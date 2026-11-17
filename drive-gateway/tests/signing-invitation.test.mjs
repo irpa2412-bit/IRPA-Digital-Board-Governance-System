@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
 import { createEnvelope, getEnvelopeStatus, resendInvitation } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
-import { buildEmailSigningInvitationMessage } from "../src/invitationEmail.mjs";
+import { buildEmailSigningInvitationMessage, sendEmailSigningInvitation } from "../src/invitationEmail.mjs";
 
 async function fixture({failResend=false}={}) {
   const sent=[];
@@ -25,12 +25,26 @@ async function fixture({failResend=false}={}) {
   const created=await createEnvelope(ctx,{uid:"owner-uid",isAdmin:false},{
     documentId,externalReference,title:"Invitation test",classification:"Restricted",
     archives:["board-governance"],signingMode:"Sequential",
-    signers:[{identityType:"email-link",email:"signer@example.test",name:"Assigned Signer",order:1}],
+    signers:[{identityType:"email-link",email:"signer@example.test",name:"Assigned Signer",authorityRole:"Board Secretary",order:1}],
     fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,signerId:"S1",required:true}]
   });
   return{ctx,sent,created,externalReference};
 }
 
+test("signing invitation has the required plain-text and HTML content and sends no document attachment",async()=>{
+  const link="https://irpa.example.test/?emailSignToken=ENV-abc.S1.secret-token";
+  const message=buildEmailSigningInvitationMessage({name:"Amina",link,title:"Board Resolution 2026-04",ownerName:"Daniel Mollel",role:"Board Secretary",action:"Sign",fieldCount:3,expiresAt:"2026-11-23T08:00:00.000Z"});
+  assert.equal(message.subject,"Signature requested: Board Resolution 2026-04");
+  for(const value of ["Dear Amina","Daniel Mollel of IRPA has asked you to review and sign Board Resolution 2026-04.","Your role: Board Secretary","Assigned action: Sign","Fields to complete: 3","2026-11-23T08:00:00.000Z","Review and sign:",link,"This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.","contact the document owner or IRPA Administration","IRPA Administration"])assert.ok(message.text.includes(value),value);
+  for(const value of ["Dear Amina","Board Resolution 2026-04","Board Secretary","Assigned action:</strong> Sign","Fields to complete:</strong> 3","2026-11-23T08:00:00.000Z",">Review and sign</a>",link,"This link is personal. Do not forward it. You will confirm your email with a code. No account is needed.","IRPA Administration"])assert.ok(message.html.includes(value),value);
+  assert.equal(message.text.replace(link,"").includes("secret-token"),false);
+  assert.equal(message.html.split(link).join("").includes("secret-token"),false);
+  assert.doesNotMatch(message.text,/Assigned action: Document Owner/);
+  let delivered;
+  await sendEmailSigningInvitation({email:"signer@example.test",name:"Amina",link,title:"Board Resolution 2026-04",ownerName:"Daniel Mollel",role:"Board Secretary",action:"Sign",fieldCount:3,expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async message=>{delivered=message;return {messageId:"mail-1"};},logger:{error(){}}});
+  assert.equal(delivered.to,"signer@example.test");
+  assert.equal(Object.hasOwn(delivered,"attachments"),false);
+});
 test("Gateway invitation plain-text body uses real line breaks, not escaped newline text",()=>{
   const message=buildEmailSigningInvitationMessage({name:"Assigned Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Invitation test",ownerName:"Document Owner"});
   assert.ok(message.text.includes("\n\n"));
@@ -41,7 +55,10 @@ test("initial Gateway invitation is a single-use email-link and does not use the
   const f=await fixture();
   assert.equal(f.sent.length,1);
   assert.equal(f.sent[0].emailLink,true);
-  assert.equal(f.sent[0].subject,"IRPA secure document-signing invitation");
+  assert.equal(f.sent[0].role,"Board Secretary");
+  assert.equal(f.sent[0].action,"Sign");
+  assert.equal(f.sent[0].fieldCount,1);
+  assert.equal(f.sent[0].subject,"Signature requested: Invitation test");
   assert.doesNotMatch(f.sent[0].text,/create your password|activate your account/i);
   assert.doesNotMatch(f.sent[0].html,/Activate My Account|create your password|activate your account/i);
   const url=new URL(f.sent[0].link);
