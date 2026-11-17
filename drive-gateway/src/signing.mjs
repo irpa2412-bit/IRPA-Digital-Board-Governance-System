@@ -103,7 +103,7 @@ export async function createEnvelope(ctx,user,body){
     const signerId=`S${i+1}`,secret=randomHex(32),emailLink=true,authority=null;
     const profileUid=emailLink&&typeof ctx.resolveEmailLinkProfileUid==="function"?await ctx.resolveEmailLinkProfileUid(email):null;
     if(!uid&&!emailLink&&!ctx.allowLegacyTestSigners)throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
-    const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
+    const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config?.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
     const finalSecret=issued?.token||secret;secrets.push(finalSecret);
     signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,profileUid:profileUid||null,name:validateName(s?.name||email),declaredParticulars:{name:cleanText(s?.name||"",160),title:cleanText(s?.title||"",160)},order:Number.isInteger(s?.routingPosition)&&s.routingPosition>0?s.routingPosition:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,routingPosition:Number.isInteger(s?.routingPosition)&&s.routingPosition>0?s.routingPosition:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:"email-link",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Waiting",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{}}:{})});
   }
@@ -134,7 +134,7 @@ export async function createEnvelope(ctx,user,body){
   for(let i=0;i<signers.length;i++){
     if(Number(signers[i].routingPosition||signers[i].order||1)!==firstPosition)continue;
     const token=id+"."+signers[i].id+"."+secrets[i];
-    if(ctx.sendInvitation){try{const link=ctx.config.appUrl+"/?emailSignToken="+encodeURIComponent(token);await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink:true,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt,role:String(input[i]?.title||input[i]?.role||""),action:signingActionForFields(fields.filter(f=>f.signerId===signers[i].id)),fieldCount:fields.filter(f=>f.signerId===signers[i].id).length});signers[i].invitation="Sent";signers[i].invitedAt=ctx.now().toISOString();}
+    if(ctx.sendInvitation){try{const link=(ctx.config?.appUrl||"https://irpa-digital-board-governance.web.app")+"/?emailSignToken="+encodeURIComponent(token);await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink:true,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt,role:String(input[i]?.title||input[i]?.role||""),action:signingActionForFields(fields.filter(f=>f.signerId===signers[i].id)),fieldCount:fields.filter(f=>f.signerId===signers[i].id).length});signers[i].invitation="Sent";signers[i].invitedAt=ctx.now().toISOString();}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
     else signers[i].invitation="Sent";
   }
@@ -174,16 +174,16 @@ export async function releaseRoutingPosition(ctx,id,position){
   const eligible=envelope.signers.filter(s=>s.status==="Pending"&&Number(s.routingPosition??s.order??1)===Number(position));
   let released=0;
   for(const target of eligible){
-    const now=ctx.now(),secret=randomHex(32),issued=await createEmailSigningToken({envelopeId:id,signerId:target.id,email:target.email,now,ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))});
+    const now=ctx.now(),secret=randomHex(32),issued=await createEmailSigningToken({envelopeId:id,signerId:target.id,email:target.email,now,ttlDays:ctx.config?.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))});
     const committed=await mutate(ctx,id,async current=>{
       const signer=current.signers.find(item=>item.id===target.id);
       if(!signer||signer.status!=="Pending"||!can(current,signer))return{patch:null,result:false};
-      signer.tokenHash=issued.record.tokenHash;signer.emailHash=issued.record.emailHash;signer.invitedAt=now.toISOString();signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=issued.record.expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkOpenedAt=null;signer.invitedAt=null;signer.invitation="Pending";
+      signer.tokenHash=issued.record.tokenHash;signer.emailHash=issued.record.emailHash;signer.invitedAt=now.toISOString();signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=issued.record.expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkOpenedAt=null;signer.invitation="Pending";
       return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.issued",signerId:signer.id,routingPosition:position,emailHash:signer.emailHash,expiresAt:signer.emailLinkExpiresAt,at:now.toISOString()})},result:true};
     });
     if(!committed)continue;
     if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
-    const link=ctx.config.appUrl+"/?emailSignToken="+encodeURIComponent(issued.token);
+    const link=(ctx.config?.appUrl||"https://irpa-digital-board-governance.web.app")+"/?emailSignToken="+encodeURIComponent(issued.token);
     try{
       await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink:true,title:envelope.title,ownerName:envelope.ownerName||"IRPA Document Owner",expiresAt:issued.record.expiresAt,role:String(target.declaredParticulars?.title||target.title||""),action:signingActionForFields((envelope.fields||[]).filter(field=>field.signerId===target.id)),fieldCount:(envelope.fields||[]).filter(field=>field.signerId===target.id).length});
       await mutate(ctx,id,async current=>{const signer=current.signers.find(item=>item.id===target.id);if(!signer)return{patch:null};signer.invitation="Sent";signer.invitedAt=ctx.now().toISOString();return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.delivered",signerId:signer.id,routingPosition:position,at:signer.invitedAt})}};});
@@ -328,7 +328,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   if(target.status==="Signed")throw new HttpError(409,"A signed assignment cannot receive another signing invitation.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
-  const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+(ctx.config.emailLinkTtlDays||7)*86400000).toISOString();
+  const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+(ctx.config?.emailLinkTtlDays||7)*86400000).toISOString();
   await mutate(ctx,id,async current=>{
     const signer=current.signers.find(s=>s.id===signerId);
     if(!signer||signer.status==="Signed")throw new HttpError(409,"This signer assignment can no longer be invited.");
