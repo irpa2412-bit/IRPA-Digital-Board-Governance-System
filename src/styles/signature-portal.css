@@ -80,7 +80,7 @@
 .signature-palette-placement-status{margin:10px 0;padding:10px;border:2px solid #facc15;border-radius:8px;background:#422006;color:#fff7ed;font-size:12px;line-height:1.45;}
 .signature-palette-placement-status button{display:block;min-height:40px;margin-top:7px;padding:7px 12px;border:1px solid #fed7aa;border-radius:7px;background:#7c2d12;color:#fff;font-weight:800;}
 .signature-pdf-placement-active{outline:4px solid #f59e0b;outline-offset:3px;cursor:crosshair!important;touch-action:manipulation;}
-@media (min-width:901px) and (max-width:1100px){
+@media (min-width:901px) and (max-width:1200px){
   .signature-workflow-grid{grid-template-columns:minmax(220px,.85fr) minmax(0,1.65fr)!important;}
   .signature-workflow-grid>aside:last-of-type{grid-column:1/-1;}
 }
