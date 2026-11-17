@@ -152,5 +152,9 @@ test("PDF field geometry respects a non-zero crop box and 90-degree page rotatio
   assert.ok(box.x + box.width <= 1020);
   assert.ok(box.y + box.height <= 830);
   const geometry = getSignatureDrawGeometry(300, 100, box);
-  close(geometry.width / geometry.height, 1 / 3);
+  close(geometry.width / geometry.height, 3);
+  const rotatedBounds = { x: box.x + (box.width - geometry.height) / 2, y: box.y + (box.height - geometry.width) / 2, width: geometry.height, height: geometry.width };
+  assert.ok(rotatedBounds.x >= box.x - 0.01 && rotatedBounds.y >= box.y - 0.01);
+  assert.ok(rotatedBounds.x + rotatedBounds.width <= box.x + box.width + 0.01);
+  assert.ok(rotatedBounds.y + rotatedBounds.height <= box.y + box.height + 0.01);
 });
