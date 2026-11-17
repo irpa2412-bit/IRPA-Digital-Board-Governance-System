@@ -601,7 +601,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     let env=draftEnvelopeId
       ?await finalizeSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled})
       :await createSignatureEnvelope({title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled});
-    const emailLinkRecipients=workflowRecipients.filter(recipient=>recipient.identityType==="email-link");
+    const emailLinkRecipients=workflowRecipients.map(recipient=>({...recipient,identityType:"email-link"}));
     if(emailLinkRecipients.length&&!env.gatewayEnvelopeId){
       setDraftEnvelopeId(env.id);
       setMessage("Creating the isolated Gateway email-link preview and sending invitations…");
