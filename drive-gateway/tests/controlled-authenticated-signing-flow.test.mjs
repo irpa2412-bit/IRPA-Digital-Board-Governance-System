@@ -301,7 +301,7 @@ test("Gateway signing records the signer's optional declared title without regis
   const current=await fixture.ctx.meta.get("envelopes",fixture.envelope.id);
   assert.equal(current.signers[0].signerDeclarations.title,"Independent Consultant");
   assert.equal(current.signers[0].signerDeclarations.title,"Independent Consultant");
-  assert.equal(current.signers[0].authorityVerification,null);
+  assert.equal(current.signers[0].authorityVerification,undefined);
 });
  
 test("signature application without explicit confirmation is rejected", async () => {
