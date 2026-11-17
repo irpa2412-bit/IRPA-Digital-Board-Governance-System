@@ -71,10 +71,13 @@ test("initial Gateway invitation is a single-use email-link and does not use the
 test("owner can resend a failed or missing Gateway invitation with a rotated token",async()=>{
   const f=await fixture();
   const original=new URL(f.sent[0].link).searchParams.get("emailSignToken");
-  const result=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  const result=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1",{role:"Board Secretary"});
   assert.equal(result.deliveryStatus,"Sent");
   assert.equal(f.sent.length,2);
   assert.equal(f.sent[1].emailLink,true);
+  assert.equal(f.sent[1].role,"Board Secretary");
+  assert.equal(f.sent[1].action,"Sign");
+  assert.equal(f.sent[1].fieldCount,1);
   assert.doesNotMatch(f.sent[1].text,/create your password|activate your account/i);
   assert.doesNotMatch(f.sent[1].html,/Activate My Account|create your password|activate your account/i);
   const replacement=new URL(f.sent[1].link);
