@@ -78,15 +78,20 @@ test("email link opens once, changes status to opened and exposes only its contr
   assert.equal(opened.ok,true);
   assert.equal(opened.title,"Email Link Governance Instrument");
   assert.equal(opened.ownerName,"Document Owner");
+  assert.notEqual(opened.sessionToken,f.token,"the one-time invitation token must be replaced by a browser-session token");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(stored.signers[0].emailLinkStatus,"opened");
   assert.equal(stored.signers[0].emailLinkOpenCount,1);
-  const pdf=await getSigningPdf(f.ctx,f.token,null);
+  assert.equal(stored.signers[0].tokenHash,await sha256Hex(opened.sessionToken.split(".")[2]));
+  assert.notEqual(stored.signers[0].tokenHash,await sha256Hex(f.token.split(".")[2]));
+  const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
   assert.equal(pdf.fileName,"email-link.pdf");
-  const resumed=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"),error=>error.message===genericEmailSigningFailure());
+  const resumed=await openEmailSigning(f.ctx,opened.sessionToken,"198.51.100.8");
   assert.equal(resumed.ok,true);
+  assert.equal(resumed.sessionToken,opened.sessionToken);
   const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the redeemed invitation must not redeem it a second time");
+  assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the session must not redeem the invitation a second time");
 });
 
 test("expired, tampered, unknown and revoked links return the same neutral response",async()=>{
@@ -122,7 +127,7 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   assert.equal(opened.signer.identityType,"email-link");
   assert.equal(opened.signer.authenticated,true);
   const signed=await sign(f.ctx,{
-    token:f.token,
+    token:opened.sessionToken,
     signature:{type:"typed",value:"Vendor Signer"},
     declarations:{name:"Vendor Signer",occupation:"External Consultant",capacity:"Contractor"},
     consent:true,
@@ -135,7 +140,7 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   assert.equal(completed.signers[0].signerDeclarations.occupation,"External Consultant");
   assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
   assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
-  const pdf=await getSigningPdf(f.ctx,f.token,null);
+  const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
   assert.equal(pdf.fileName.includes("-signed-"),true);
 });
 
