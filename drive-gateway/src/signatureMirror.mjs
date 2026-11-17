@@ -14,7 +14,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   const signers = (envelope.signers || []).map(s => {
     const prior = priorSigners.find(p => (s.uid && p.uid === s.uid) || (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()));
     return {
-      uid: s.uid || null, signerId:s.id||null, identityType:s.identityType||"account", name: s.name || "", email: s.email || "",
+      uid: s.uid || null, profileUid:s.profileUid||s.uid||null, signerId:s.id||null, identityType:s.identityType||"account", name: s.name || "", email: s.email || "",
       status: s.status || "", signedAt: s.signedAt || null,
       role: s.role || prior?.role || prior?.action || "",
       action: s.action || prior?.action || prior?.role || "",
@@ -46,7 +46,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       recordOrigin:existing.recordOrigin||"PRODUCTION",trialData:existing.trialData===true,
       documentReference:clean(existing.documentReference||existing.envelopeReference||envelope.externalReference),
       documentTitle:clean(existing.title||envelope.title),
-      signerUid:signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
+      signerUid:signer.profileUid||signer.uid||null,signerId:assignedSigner?.id||null,signerIdentityType:assignedSigner?.identityType||"email-link",signerEmail:signer.email||"",signerName:signer.name||"",
       workflowRole:signer.role||signer.action||"",
       signatureAuthority:signer.authorityVerified?signer.authorityRole:"",
       signatureAuthorityVerificationStatus:signer.authorityVerified?"Verified":"NotVerified",
@@ -76,7 +76,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   }
   const ownerUid = clean(envelope.createdBy);
   const ownerCopy = (completion.files || []).find(file => file?.kind === "owner-copy");
-  const ownerAlreadySigner = ownerUid && signers.some(signer => signer.uid === ownerUid && signer.status === "Signed");
+  const ownerAlreadySigner = ownerUid && signers.some(signer => (signer.uid === ownerUid || signer.profileUid === ownerUid) && signer.status === "Signed");
   if (ownerUid && ownerCopy?.id && !ownerAlreadySigner) {
     const ownerArchiveUrl = "https://drive.google.com/file/d/" + encodeURIComponent(ownerCopy.id) + "/view";
     const ownerRecordId = "gateway-" + envelopeId + "-" + ownerUid;
