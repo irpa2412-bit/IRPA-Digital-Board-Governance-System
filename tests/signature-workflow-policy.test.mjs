@@ -222,6 +222,7 @@ test("duplicate participant identities are reused and rapid repeated add actions
   assert.match(addSigner[1], /const duplicate=recipients\.find\(x=>\(registered&&x\.uid===registered\.uid\)\|\|\(registeredEmail&&String\(x\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===registeredEmail\)\)/);
   assert.match(addSigner[1], /The existing signer record has been selected; no duplicate was created/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
+  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
   assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
   assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
 });
