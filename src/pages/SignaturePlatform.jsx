@@ -675,7 +675,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     let env=draftEnvelopeId
       ?await finalizeSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled})
       :await createSignatureEnvelope({title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled});
-    const gatewayRecipients=workflowRecipients.map(recipient=>({...recipient,identityType:recipient.identityType==="email-link"?"email-link":"account"}));
+    const gatewayRecipients=workflowRecipients.map(recipient=>({...recipient,identityType:"email-link"}));
     if(gatewayRecipients.some(recipient=>!String(recipient.email||"").trim()))throw new Error("Each assigned signer, including the document owner when enabled, must have a registered email address for the invitation.");
     if(gatewayRecipients.length&&!env.gatewayEnvelopeId){
       setDraftEnvelopeId(env.id);
@@ -690,7 +690,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     }
     setEnvelopes(prev=>[env,...prev.filter(item=>item.id!==env.id)]);
     setDraftEnvelopeId(null);setTitle("");setDocumentId("");setDocumentUrl("");setRecipients([]);setFields([]);setActiveAssigneeUid("");setSelectedField(null);setOwnerSigningEnabled(false);setTab("Envelopes");
-    setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend.":gatewayRecipients.length?"Envelope created. Account holders sign in and apply their saved Signature Profile; external participants receive single-use email links.":"Envelope created as Draft.");
+    setMessage(env.gatewayEmailLinkStatus==="Failed"?"Envelope created, but one or more email-link invitations failed. Open the envelope to review status and resend.":gatewayRecipients.length?"Envelope created. Every action signer receives a single-use email-link invitation; the invitation opens the controlled signing session.":"Envelope created as Draft.");
   }catch(x){
     console.error("IRPA Signature Portal: Create Draft Envelope failed",{errorType:x?.name||"Error"});
     setMessage((draftEnvelopeId?"Draft saved; email-link setup did not finish: ":"Create Draft Envelope was not completed: ")+(x.message||"Unable to create envelope."));
