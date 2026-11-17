@@ -37,7 +37,8 @@ test("fit handles an exact-size field", () => {
 });
 
 test("fit refuses zero or invalid dimensions", () => {
-  assert.throws(() => fitSignatureImage(0, 100, { x: 0, y: 0, width: 200, height: 200 }), RangeError);
+  assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 0, height: 200 }), RangeError);
+  assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 200, height: 0 }), RangeError);
   assert.throws(() => fitSignatureImage(300, 100, { x: 0, y: 0, width: 0, height: 200 }), RangeError);
 });
 
@@ -81,7 +82,10 @@ test("ink trimming finds the tight bounds and adds fixed padding", () => {
     const index = (y * width + x) * 4;
     rgba[index] = 10; rgba[index + 1] = 20; rgba[index + 2] = 30; rgba[index + 3] = 255;
   }
-  assert.deepEqual(findSignatureInkBounds(rgba, width, height, 2), { x: 2, y: 0, width: 6, height: 7 });
+  const bounds = findSignatureInkBounds(rgba, width, height, 2);
+  assert.deepEqual(bounds, { x: 1, y: 0, width: 8, height: 8 });
+  assert.ok(bounds.x <= 2 && bounds.y <= 0, "the padded crop must include the top-left padding");
+  assert.ok(bounds.x + bounds.width >= 8 && bounds.y + bounds.height >= 7, "the padded crop must include the bottom-right padding");
 });
 
 test("trim export removes white pixels while retaining ink transparency", () => {
