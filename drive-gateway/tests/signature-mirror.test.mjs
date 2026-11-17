@@ -17,8 +17,8 @@ test("completion mirror creates a signer-specific signature register record from
     envelope:{
       id:"ENV-TEST",externalReference:"IRPA-ENV-TEST",documentId:"DOC-TEST",title:"Test governance resolution",
       signers:[
-        {id:"S1",uid:"chair-uid",name:"Chair",email:"chair@example.test",role:"Board Chairperson",status:"Signed",signedAt:"2026-11-15T10:00:00.000Z",authorityVerification:{verified:true,authorityRole:"Board Chairperson"}},
-        {id:"S2",uid:"secretary-uid",name:"Secretary",email:"secretary@example.test",role:"Board Secretary",status:"Signed",signedAt:"2026-11-15T10:01:00.000Z",authorityVerification:{verified:true,authorityRole:"Board Secretary"}}
+        {id:"S1",uid:null,identityType:"email-link",name:"Chair",email:"chair@example.test",role:"Review",signerDeclarations:{name:"Chair",title:"Board Chairperson"},status:"Signed",signedAt:"2026-11-15T10:00:00.000Z"},
+        {id:"S2",uid:null,identityType:"email-link",name:"Secretary",email:"secretary@example.test",role:"Review",signerDeclarations:{name:"Secretary",title:"Board Secretary"},status:"Signed",signedAt:"2026-11-15T10:01:00.000Z"}
       ]
     },
     completion:{
@@ -37,11 +37,15 @@ test("completion mirror creates a signer-specific signature register record from
   assert.equal(chair.recordOrigin,"TRIAL");
   assert.equal(chair.trialData,true);
   assert.equal(chair.signerArchiveFileId,"chair-copy");
-  assert.equal(chair.signatureAuthority,"Board Chairperson");
+  assert.equal(chair.signatureAuthority,"");
+  assert.equal(chair.signatureAuthorityVerificationStatus,"NotRequired");
+  assert.equal(chair.signerDeclarations.title,"Board Chairperson");
   assert.equal(chair.signerArchiveUrl,"https://drive.google.com/file/d/chair-copy/view");
   assert.equal(chair.cryptographicEvidenceStatus,"GatewayAuditOnly","mirror must not claim cryptographic verification without a signer evidence record");
   assert.equal(secretary.signerArchiveFileId,"secretary-copy");
-  assert.equal(secretary.signatureAuthority,"Board Secretary");
+  assert.equal(secretary.signatureAuthority,"");
+  assert.equal(secretary.signatureAuthorityVerificationStatus,"NotRequired");
+  assert.equal(secretary.signerDeclarations.title,"Board Secretary");
   assert.equal(secretary.status,"Signed");
 });
 
@@ -50,9 +54,9 @@ test("email signer mirror includes signer ID, declarations and verified per-sign
   const writes=[];
   const envelope={id:"ENV-EMAIL",externalReference:"IRPA-ENV-EMAIL",documentId:"DOC-EMAIL",signers:[{
     id:"S1",identityType:"email-link",uid:null,email:"external@example.test",name:"External Signer",status:"Signed",signedAt:"2026-11-16T15:10:00.000Z",
-    declaredParticulars:{name:"Owner Name",occupation:"Supplier"},
-    signerDeclarations:{name:"External Name",occupation:"Consultant"},
-    declarationDiscrepancy:{detected:true,fields:["name","occupation"],ownerDeclared:{name:"Owner Name",occupation:"Supplier"},signerDeclared:{name:"External Name",occupation:"Consultant"}}
+    declaredParticulars:{name:"Owner Name",title:"Supplier"},
+    signerDeclarations:{name:"External Name",title:"Consultant"},
+    declarationDiscrepancy:{detected:true,fields:["name","title"],ownerDeclared:{name:"Owner Name",title:"Supplier"},signerDeclared:{name:"External Name",title:"Consultant"}}
   }]};
   await persistCompletedSignatureEnvelope({
     envelope,
@@ -68,9 +72,9 @@ test("email signer mirror includes signer ID, declarations and verified per-sign
   assert.equal(record.signerIdentityType,"email-link");
   assert.equal(record.cryptographicEvidenceStatus,"Verified");
   assert.equal(record.signatureAuthority,"");
-  assert.equal(record.signatureAuthorityVerificationStatus,"NotVerified");
-  assert.deepEqual(record.ownerDeclaredParticulars,{name:"Owner Name",occupation:"Supplier"});
-  assert.deepEqual(record.signerDeclarations,{name:"External Name",occupation:"Consultant"});
+  assert.equal(record.signatureAuthorityVerificationStatus,"NotRequired");
+  assert.deepEqual(record.ownerDeclaredParticulars,{name:"Owner Name",title:"Supplier"});
+  assert.deepEqual(record.signerDeclarations,{name:"External Name",title:"Consultant"});
   assert.equal(record.declarationDiscrepancy.detected,true);
 });
 
