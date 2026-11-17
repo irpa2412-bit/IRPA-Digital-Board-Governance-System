@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { deflateSync } from "node:zlib";
 import { PDFDocument, PDFName, degrees } from "pdf-lib";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
-import { findSignatureInkBounds, requireSignatureInkBounds } from "../../src/utils/signatureImageCanvas.mjs";
+import { findSignatureInkBounds, requireSignatureInkBounds, removeWhitePixels } from "../../src/utils/signatureImageCanvas.mjs";
 import { buildSignedPdf, getPdfFieldBox, getSignatureDrawGeometry } from "../src/pdf.mjs";
 
 function close(actual, expected, epsilon = 0.01) {
@@ -52,6 +52,15 @@ test("ink trimming finds the tight bounds and adds fixed padding", () => {
     rgba[index] = 10; rgba[index + 1] = 20; rgba[index + 2] = 30; rgba[index + 3] = 255;
   }
   assert.deepEqual(findSignatureInkBounds(rgba, width, height, 2), { x: 2, y: 0, width: 6, height: 7 });
+});
+
+test("trim export removes white pixels while retaining ink transparency", () => {
+  const rgba = new Uint8ClampedArray([255,255,255,255, 17,24,39,255, 245,245,245,255, 17,24,39,80]);
+  removeWhitePixels(rgba);
+  assert.equal(rgba[3], 0);
+  assert.equal(rgba[7], 255);
+  assert.equal(rgba[11], 255);
+  assert.equal(rgba[15], 80);
 });
 
 test("ink trimming refuses an empty or white-only pad", () => {
