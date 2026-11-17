@@ -515,7 +515,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
         ...(!emailLink && recipient.uid ? {uid:String(recipient.uid)} : {}),
         email:String(recipient.email || "").trim().toLowerCase(),
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
-        occupation:String(recipient.occupation||recipient.capacity||recipient.role||"").trim(),
+        occupation:String(recipient.occupation||recipient.capacity||"").trim(),
         capacity:String(recipient.capacity||"").trim(),
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
       };
