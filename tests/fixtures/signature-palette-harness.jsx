@@ -29,7 +29,7 @@ function Harness(){
     </button>)}
    </div>
   </section>
-  {active&&<SignatureFieldConfirmationPad field={active} savedSignatureUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/9XcAAAAASUVORK5CYII=" savedInitialsUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/9XcAAAAASUVORK5CYII=" onCancel={()=>setActive(null)} onConfirm={(value,confirmedField)=>apply(confirmedField,value)}/>}
+  {active&&<SignatureFieldConfirmationPad field={active} savedSignatureUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/9XcAAAAASUVORK5CYII=" savedInitialsUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/9XcAAAAASUVORK5CYII=" onCancel={()=>setActive(null)} onConfirm={value=>apply(active,value)}/>}
   <p data-testid="envelope-state">Confirmed fields: {Object.keys(values).length}</p>
  </main>;
 }
