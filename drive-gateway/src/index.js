@@ -529,11 +529,11 @@ export default {
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
-              const safeTitle=String(title||"Completed signed document").replace(/[\\r\\n]+/g," ").slice(0,180);
+              const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA participant").slice(0,160);
               const roles=Array.isArray(recipientRoles)?recipientRoles.join(", "):"Signing participant";
               const subject="Completed signed document: "+safeTitle;
-              const text="Dear "+safeName+",\\n\\nThe signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.\\n\\nDocument: "+safeTitle+"\\nYour role: "+roles+"\\nCompleted: "+String(completedAt||"")+"\\nSHA-256: "+String(finalHash||"")+"\\n\\nKeep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.";
+              const text="Dear "+safeName+",\n\nThe signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.\n\nDocument: "+safeTitle+"\nYour role: "+roles+"\nCompleted: "+String(completedAt||"")+"\nSHA-256: "+String(finalHash||"")+"\n\nKeep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.";
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
@@ -2899,7 +2899,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[]}) {
     await command("RCPT TO:<"+toEmail+">","2");
     await command("DATA","3");
     const mime=buildMailMimeMessage({from:`"IRPA Administration" <${SMTP_FROM}>`,to:toEmail,subject:cleanSubject,text,html,attachments});
-    await writer.write(new TextEncoder().encode(mime+"\\r\\n.\\r\\n"));
+    await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
     let accepted;
     try {
       accepted=await readResponse();
