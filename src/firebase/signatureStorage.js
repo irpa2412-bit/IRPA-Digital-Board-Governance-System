@@ -437,7 +437,15 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error("Only the authenticated document owner can connect this signing workflow to the Gateway.");
   }
   const recipients = Array.isArray(envelope.recipients) ? envelope.recipients : [];
-  const actionRecipients = recipients.filter(r => r?.identityType === "email-link" && String(r?.email||"").trim() && r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly && !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim()));
+  // Include verified email-link recipients and authenticated IRPA account signers.
+  // The document owner is an account signer only when explicitly included in recipients.
+  const actionRecipients = recipients.filter(r => {
+    const emailLink = r?.identityType === "email-link";
+    const accountSigner = Boolean(r?.uid) && !emailLink;
+    return (emailLink || accountSigner) && String(r?.email||"").trim() &&
+      r?.actionRequired !== false && r?.optionalSigning !== true && !r?.accessOnly &&
+      !["View Only","Read Only","Information / FYI","Observer"].includes(String(r?.role || "").trim());
+  });
   if (!actionRecipients.length) throw new Error("At least one authorized action signer is required.");
   const ordered = [...actionRecipients].sort((a,b) => Number(a.routingOrder || 1) - Number(b.routingOrder || 1));
   const signerAssignmentByKey = new Map();
@@ -500,14 +508,18 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     classification,
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
-    signers:ordered.map((recipient,index) => ({
-      identityType:"email-link",
-      email:String(recipient.email || "").trim().toLowerCase(),
-      name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
-      occupation:String(recipient.occupation||recipient.capacity||"").trim(),
-      capacity:String(recipient.capacity||"").trim(),
-      order:envelope.signingMode === "Parallel" ? 1 : index + 1
-    })),
+    signers:ordered.map((recipient,index) => {
+      const emailLink = recipient.identityType === "email-link";
+      return {
+        identityType:emailLink ? "email-link" : "account",
+        ...(!emailLink && recipient.uid ? {uid:String(recipient.uid)} : {}),
+        email:String(recipient.email || "").trim().toLowerCase(),
+        name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
+        occupation:String(recipient.occupation||recipient.capacity||recipient.role||"").trim(),
+        capacity:String(recipient.capacity||"").trim(),
+        order:envelope.signingMode === "Parallel" ? 1 : index + 1
+      };
+    }),
     fields
   };
   const response = await gatewayAuthenticatedRequest("/api/envelopes", {method:"POST",body:JSON.stringify(payload)});
