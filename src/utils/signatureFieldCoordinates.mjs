@@ -10,6 +10,7 @@ export function normalizeSignatureField(field, { warn = null } = {}) {
   if (field.coordinateSpace === SIGNATURE_FIELD_COORDINATE_SPACE) {
     return { ...field, page: Number(field.page || 1), x: Number(field.x), y: Number(field.y), width: Number(field.width), height: Number(field.height), coordinateSpace: SIGNATURE_FIELD_COORDINATE_SPACE };
   }
+  if (field.coordinateSpace != null && field.coordinateSpace !== "") throw new RangeError("The signature field coordinate space is not supported.");
   warn?.("LEGACY_SIGNATURE_FIELD_COORDINATES_CONVERTED", { fieldId: field.fieldId || null, coordinateSpace: "percent-0-100" });
   return {
     ...field,
