@@ -186,7 +186,7 @@ test("signature assignment and signing handlers synchronously reject repeated su
   const sign = portal.match(/async function sign\(\)\{([\s\S]*?)(?=\n\s*(?:async )?function |\n\s*return \()/);
   assert.ok(sign, "the signing handler must exist");
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
-  assert.doesNotMatch(sign[1], /signEnvelope\\(/, "the in-app account signing fallback must remain unreachable");
+  assert.doesNotMatch(sign[1], /signEnvelope\(/, "the in-app account signing fallback must remain unreachable");
   assert.match(sign[1], /This envelope must be signed through its verified email-link invitation/);
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
 });
