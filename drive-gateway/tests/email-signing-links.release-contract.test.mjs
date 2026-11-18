@@ -69,8 +69,8 @@ test("email invitation reuses the existing SMTP retry flow with both text and HT
 });
 
 test("owner resend rotates the link and revoke remains an owner-controlled operation",()=>{
-  assert.ok(router.includes(String.raw`invitations\/(S\d{1,2})\/resend`));
-  assert.ok(router.includes(String.raw`invitations\/(S\d{1,2})\/revoke`));
+  assert.ok(router.includes(String.raw`invitations\/(S\d+)\/resend`));
+  assert.ok(router.includes(String.raw`invitations\/(S\d+)\/revoke`));
   assert.match(signing,/emailLinkTokenHistory/);
   assert.match(signing,/email_link\.resent/);
   assert.match(signing,/email_link\.revoked/);
