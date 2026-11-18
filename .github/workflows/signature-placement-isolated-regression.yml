@@ -42,6 +42,7 @@ jobs:
       - name: Install Gateway dependencies
         working-directory: drive-gateway
         run: npm ci --no-audit --no-fund
+      # Release gate includes root, Gateway, PDF geometry, multi-signer, build and browser checks.
       - name: Run complete repository test suite
         run: npx firebase emulators:exec --only firestore --project demo-irpa-signature "npm run test:all"
       # Run after the full repository suite so signing failures are isolated from unrelated regressions.
