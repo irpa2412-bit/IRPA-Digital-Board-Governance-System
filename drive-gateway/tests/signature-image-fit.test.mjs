@@ -328,15 +328,16 @@ test("signer-count regression: 1, 2, 4, 10 and 20 signers retain independent PDF
   const sourceBytes = await source.save();
   const pngBytes = createPng(300, 100);
   const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
-  for (const count of [1, 2, 4, 10, 20]) {
+  for (const count of [1, 2, 4, 10, 20, 100, 101]) {
     const signers = Array.from({ length: count }, (_, i) => ({ id: `S${i+1}`, uid: "shared-account-uid", name: `Signer ${i+1}`, email: `s${i+1}@example.test`, signedAt: new Date(0).toISOString(), signatureType: "typed", signatureValue: `Signer ${i+1}`, fieldValues: { [`field-${i+1}`]: dataUrl } }));
-    const fields = Array.from({ length: count }, (_, i) => ({ fieldId: `field-${i+1}`, type: "Signature", page: 1, x: 0.08 + (i % 4) * 0.21, y: 0.025 + Math.floor(i / 4) * 0.105, width: 0.14, height: 0.035, coordinateSpace: "visible-page-fraction-v1", signerId: `S${i+1}`, signerUid: "shared-account-uid" }));
+    const fieldCount = Math.min(count, 100);
+    const fields = Array.from({ length: fieldCount }, (_, i) => ({ fieldId: `field-${i+1}`, type: "Signature", page: 1, x: 0.08 + (i % 4) * 0.21, y: 0.025 + Math.floor(i / 4) * 0.038, width: 0.14, height: 0.025, coordinateSpace: "visible-page-fraction-v1", signerId: `S${i+1}`, signerUid: "shared-account-uid" }));
     const orderedFields = [...fields].reverse(), orderedSigners = [...signers].reverse(), draws = [];
     const originalDrawImage = PDFPage.prototype.drawImage;
     PDFPage.prototype.drawImage = function(image, options) { if (image.width === 300 && image.height === 100) draws.push({ ...options }); return originalDrawImage.call(this, image, options); };
     try { await buildSignedPdf(sourceBytes, { envelopeId: `count-${count}`, documentId: "signer-count-regression", title: "Signer count regression", originalHash: "original", chainHead: "chain", completedAt: new Date(0).toISOString(), fields: orderedFields, signers: orderedSigners }); }
     finally { PDFPage.prototype.drawImage = originalDrawImage; }
-    assert.equal(draws.length, count, `${count} signers must produce one stamp per assigned field`);
+    assert.equal(draws.length, fieldCount, `${count} signers must produce one stamp per assigned field (up to the 100-field assignment limit)`);
     const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
     orderedFields.forEach((field, index) => {
       const expected = getPdfFieldBox(sourcePage, field), actual = draws[index];
