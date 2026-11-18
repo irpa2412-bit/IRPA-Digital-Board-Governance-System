@@ -733,6 +733,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   }catch(error){setMessage(error?.message||"Unable to refresh document tracking.");}
   finally{setTrackingBusy(false);}
  }
+ useEffect(()=>{if(tab==="Document Tracking"&&envelopes.length>0&&!trackingBusy)refreshDocumentTracking();},[tab,envelopes.length]);
  async function refreshGatewayEmailStatus(){
   if(!selected?.gatewayEnvelopeId)return;
   setGatewayEmailStatusBusy(true);
