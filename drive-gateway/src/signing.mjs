@@ -42,6 +42,7 @@ export function validateFieldValues(fields,signer,values,signature,fieldApplicat
     if(!field||!["Signature","Initials"].includes(field.type))throw new HttpError(403,"A signature field application is not assigned to this signer.");
     if(applications.has(field.fieldId))throw new HttpError(400,"A signature field may be confirmed only once per submission.");
     if(application.confirmed!==true)throw new HttpError(400,"Signature application requires an explicit Confirm action.");
+    if(application.coordinateSpace!=null&&application.coordinateSpace!==SIGNATURE_FIELD_COORDINATE_SPACE)throw new HttpError(409,"The confirmed signature field coordinate space is not supported.");
     for(const key of ["page","x","y","width","height"]){
       const submitted=Number(application[key]),saved=Number(field[key]??(key==="page"?1:0));
       if(!Number.isFinite(submitted)||submitted!==saved)throw new HttpError(409,"The confirmed signature field page or position differs from the saved assignment.");
