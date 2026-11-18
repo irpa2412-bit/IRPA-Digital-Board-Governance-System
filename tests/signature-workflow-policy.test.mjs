@@ -345,3 +345,19 @@ test("Title is a real signer-assigned PDF field and Document Tracking shows hold
   assert.match(portal,/NEXT EXPECTED ACTION/);
   assert.match(worker,/lastEvent/);
 });
+
+test("email-link signers may confirm only their own active saved profile specimen, with drawing fallback",()=>{
+  const emailPortal=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
+  const confirmationPad=fs.readFileSync(new URL("../src/components/SignatureFieldConfirmationPad.jsx",import.meta.url),"utf8");
+  assert.match(emailPortal,/getMySignatureProfile/);
+  assert.match(emailPortal,/String\(currentUser\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===invitedEmail/);
+  assert.match(emailPortal,/candidate\?\.uid===currentUser\.uid/);
+  assert.match(emailPortal,/candidate\.status==="Active"/);
+  assert.match(emailPortal,/setSignaturePadField\(field\)/);
+  assert.match(emailPortal,/savedSignatureUrl=\{savedProfile\?\.signatureUrl\|\|""\}/);
+  assert.match(emailPortal,/allowTyped=\{false\}/);
+  assert.match(emailPortal,/Your own saved Signature Profile specimen has been confirmed/);
+  assert.match(emailPortal,/Your hand-drawn specimen has been confirmed/);
+  assert.match(confirmationPad,/useState\(hasSavedSpecimen\?"Use my saved signature":"Draw"\)/);
+  assert.match(confirmationPad,/Nothing is stamped until you tap Confirm/);
+});
