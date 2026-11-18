@@ -262,3 +262,62 @@ test("signature and initials assignment defaults fit within a single assignee ro
   assert.match(source, /Initials:\{width:10,height:3\}/);
   assert.doesNotMatch(source, /Signature:\{width:28,height:10\}/);
 });
+
+
+test("PDF finalizer stamps canonical visible-page fractions inside a non-zero CropBox", async () => {
+  const source = await PDFDocument.create();
+  const page = source.addPage([1200, 1000]);
+  page.setCropBox(40, 60, 900, 760);
+  const sourceBytes = await source.save();
+  const pngBytes = createPng(300, 100);
+  const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
+  const field = {
+    fieldId: "canonical-row-four",
+    type: "Signature",
+    page: 1,
+    x: 0.42,
+    y: 0.385,
+    width: 0.125,
+    height: 0.032,
+    coordinateSpace: "visible-page-fraction-v1",
+    signerId: "S1",
+    signerUid: "user-1"
+  };
+  const draws = [];
+  const originalDrawImage = PDFPage.prototype.drawImage;
+  PDFPage.prototype.drawImage = function(image, options) {
+    if (image.width === 300 && image.height === 100) draws.push({ ...options });
+    return originalDrawImage.call(this, image, options);
+  };
+  try {
+    await buildSignedPdf(sourceBytes, {
+      envelopeId: "canonical-envelope",
+      documentId: "canonical-document",
+      title: "Canonical field",
+      originalHash: "original",
+      chainHead: "chain",
+      completedAt: new Date(0).toISOString(),
+      fields: [field],
+      signers: [{
+        id: "S1",
+        uid: "user-1",
+        name: "Signer",
+        signedAt: new Date(0).toISOString(),
+        signatureType: "drawn",
+        signatureValue: dataUrl,
+        fieldValues: { [field.fieldId]: dataUrl }
+      }]
+    });
+  } finally {
+    PDFPage.prototype.drawImage = originalDrawImage;
+  }
+  assert.equal(draws.length, 1);
+  const cropPage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+  const expected = getPdfFieldBox(cropPage, field);
+  const actual = draws[0];
+  assert.ok(actual.x >= expected.x - 0.01 && actual.y >= expected.y - 0.01);
+  assert.ok(actual.x + actual.width <= expected.x + expected.width + 0.01);
+  assert.ok(actual.y + actual.height <= expected.y + expected.height + 0.01);
+  close(expected.x, 40 + 900 * 0.42);
+  close(expected.y, 60 + 760 - 760 * 0.385 - 760 * 0.032);
+});
