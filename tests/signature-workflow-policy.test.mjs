@@ -290,17 +290,19 @@ test("refreshing an envelope reloads signer status and invitation delivery so re
   assert.match(page, /onClick=\{refreshGatewayEmailStatus\}/);
   assert.match(page, /onClick=\{\(\)=>resendEmailLink\(item\.id\)\}/);
 
+});
+
 test("new envelopes remain inactive drafts until Start Workflow sends Gateway email-link invitations", () => {
-  const create = page.match(/async function createEnvelope\(e\)\{([\\s\\S]*?)(?=\\n async function saveAndClosePreparation\()/);
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const storage = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
+  const create = page.match(/async function createEnvelope\(e\)\{([\s\S]*?)(?=\n async function saveAndClosePreparation\()/);
   assert.ok(create, "the envelope creation handler must exist");
   assert.doesNotMatch(create[1], /createGatewaySignatureEnvelope|attachGatewayEmailLinkEnvelope/);
   assert.match(create[1], /Draft envelope saved\. No invitations have been sent/);
-  const start = storage.match(/export async function startSignatureWorkflow\(envelope\)\{([\\s\\S]*?)(?=\\nexport async function)/);
+  const start = storage.match(/export async function startSignatureWorkflow\(envelope\)\{([\s\S]*?)(?=\nexport async function)/);
   assert.ok(start, "the authenticated workflow start handler must exist");
   assert.match(start[1], /createGatewaySignatureEnvelope\(\{envelope,sourceBytes\}\)/);
   assert.doesNotMatch(start[1], /if\(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED\)/);
   assert.match(page, /if\(!selected\.gatewayEnvelopeId\)throw new Error\("This draft has not been sent/);
   assert.match(page, /This envelope must be signed through its verified email-link invitation/);
-});
-
 });
