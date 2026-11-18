@@ -64,4 +64,7 @@ test("signer 101 is accepted, invited and can open its email-link without restar
   const openedBody=await opened.response.json();
   assert.equal(openedBody.signer.id,"S101");
   assert.equal(openedBody.canSign,true);
+  const resent=await route(post("/api/envelopes/"+body.envelopeId+"/invitations/S101/resend",{},"u1"),s.ctx);
+  assert.equal(resent.status,200);
+  assert.equal((await resent.json()).signerId,"S101");
 });
