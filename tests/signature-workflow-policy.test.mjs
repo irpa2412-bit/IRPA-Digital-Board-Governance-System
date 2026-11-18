@@ -352,7 +352,7 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(emailPortal,/getMySignatureProfile/);
   assert.match(emailPortal,/String\(currentUser\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===invitedEmail/);
   assert.match(emailPortal,/candidate\?\.uid===currentUser\.uid/);
-  assert.match(emailPortal,/candidate\.status==="Active"/);
+  assert.match(emailPortal,/candidate\\?\\.status==="Active"/);
   assert.match(emailPortal,/setSignaturePadField\(field\)/);
   assert.match(emailPortal,/savedSignatureUrl=\{savedProfile\?\.signatureUrl\|\|""\}/);
   assert.match(emailPortal,/allowTyped=\{false\}/);
