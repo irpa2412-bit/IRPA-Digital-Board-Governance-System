@@ -720,7 +720,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       try{return [envelope.id,await getGatewaySignatureEnvelopeStatus(envelope.gatewayEnvelopeId)];}
       catch(error){return [envelope.id,{error:error?.message||"Live holder status unavailable"}];}
     }));
-    setTrackingSnapshots(previous=>({...previous,Object.fromEntries(rows)}));
+    setTrackingSnapshots(previous=>({...previous,...Object.fromEntries(rows)}));
     const refreshed=rows.filter(([,status])=>!status.error).length;
     setMessage("Document tracking refreshed: "+refreshed+" of "+visible.length+" live Gateway workflow(s) verified. Drafts remain visible as preparation records.");
   }catch(error){setMessage(error?.message||"Unable to refresh document tracking.");}
