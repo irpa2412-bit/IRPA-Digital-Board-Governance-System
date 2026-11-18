@@ -582,7 +582,7 @@ if(completed){
       signerUid:u.uid,
       originalHash,
       finalHash,
-      workflowRole:recipient.role||"Final Signer",
+      workflowRole:recipient.role||"Final Signer",workflowRoleAssignments:Array.isArray(recipient.roleAssignments)&&recipient.roleAssignments.length?recipient.roleAssignments:[{role:recipient.role||"Final Signer",capacity:recipient.capacity||"",occupation:recipient.occupation||""}],
       documentId:envelope.documentId,
       documentUid:envelope.documentId,
       archiveFolderId:archive.folderId,
