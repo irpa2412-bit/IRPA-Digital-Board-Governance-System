@@ -362,3 +362,22 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(confirmationPad,/useState\(hasSavedSpecimen\?"Use my saved signature":"Draw"\)/);
   assert.match(confirmationPad,/Nothing is stamped until you tap Confirm/);
 });
+
+
+test("envelope refresh keeps signer rows readable and separates invitation delivery from link redemption", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const refresh = page.match(/async function refreshGatewayEmailStatus\\(\\)\\{([\\s\\S]*?)\\n \\}\\n async function resendEmailLink/);
+  assert.ok(refresh, "the envelope delivery refresh handler must exist");
+  assert.match(refresh[1], /getGatewaySignatureEnvelopeStatus\\(selected\\.gatewayEnvelopeId\\)/);
+  assert.doesNotMatch(refresh[1], /getGatewaySignatureEnvelopeDeliveryStatus/);
+  assert.match(refresh[1], /Array\\.isArray\\(status\\.signers\\)/);
+  assert.match(refresh[1], /last readable list has been preserved/);
+  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
+  assert.ok(page.includes('color:"var(--text)",opacity:1'));
+});
+
+test("completed-document distribution retry is admitted by the Gateway e-signature route allowlist", () => {
+  const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("distribution\\/retry"), "the Worker must route distribution retries into the e-signature router");
+});
