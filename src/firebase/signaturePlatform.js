@@ -26,6 +26,19 @@ const writeBatch=(...args)=>wrapSignatureBatch(firestoreWriteBatch(...args),{scr
 const PROFILE_COLLECTION="signatureProfiles";const ENVELOPE_COLLECTION="signatureEnvelopes";const EVENT_COLLECTION="signatureEvents";
 const GATEWAY_URL=getGoogleDriveGatewayUrl();
 const CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED=import.meta.env.VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED==="true";
+async function mutateSignatureEnvelope(envelopeId,action,details={}) {
+  const current=auth.currentUser;
+  if(!current)throw new Error("Authentication is required to update a signing envelope.");
+  if(!envelopeId)throw new Error("A signing envelope is required.");
+  const token=await current.getIdToken();
+  const response=await fetch(`${GATEWAY_URL}/api/signature-workflow/mutate`,{
+    method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+    body:JSON.stringify({envelopeId,action,details}),cache:"no-store"
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||result.ok!==true)throw new Error(result.error||"The authenticated signing-envelope update was rejected.");
+  return result;
+}
 async function sendSignatureMail(envelope,recipient){
   if(!auth.currentUser) throw new Error("Authentication is required. Sign in again before sending the signing invitation.");
   try{
@@ -313,14 +326,7 @@ export async function sendSignatureInvitation(envelope, recipient) {
   if (!(envelope.participantUids || []).includes(recipient.uid)) throw new Error("The selected signer is not a participant in this envelope.");
   const cleanEmail = String(recipient.email).trim().toLowerCase();
   const result = await sendSignatureMail(envelope, recipient);
-  await updateDoc(doc(db, ENVELOPE_COLLECTION, envelope.id), {
-    status: envelope.status === "Draft" ? "Sent" : envelope.status,
-    invitationStatus: result.deliveryStatus || "Sent",
-    invitationSentAt: serverTimestamp(),
-    invitationSentByUid: u.uid,
-    invitationSentByEmail: u.email || "",
-    updatedAt: serverTimestamp()
-  });
+  await mutateSignatureEnvelope(envelope.id,"invitation-sent",{signerUid:recipient.uid,deliveryStatus:result.deliveryStatus||"Sent"});
   await recordEnvelopeEvent(envelope.id, "Signing Invitation Sent", {
     signerUid: recipient.uid, signerEmail: cleanEmail, signerName: recipient.name || "",
     deliveryStatus: result.deliveryStatus || "Sent"
@@ -334,13 +340,7 @@ export async function attachGatewayEmailLinkEnvelope(envelopeId,gatewayResult){
   const reference=doc(db,ENVELOPE_COLLECTION,envelopeId);
   const snapshot=await getDoc(reference);
   if(!snapshot.exists()||snapshot.data()?.ownerUid!==u.uid)throw new Error("Only the original envelope owner may attach the Gateway email-link workflow.");
-  await updateDoc(reference,{
-    gatewayEnvelopeId:gatewayResult.gatewayEnvelopeId,
-    gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent",
-    gatewayEmailLinkSignerCount:Number(gatewayResult.invitations?.length||0),
-    gatewayEmailLinkInvitations:Array.isArray(gatewayResult.invitations)?gatewayResult.invitations:[],
-    gatewayEmailLinkUpdatedAt:serverTimestamp()
-  });
+  await mutateSignatureEnvelope(envelopeId,"attach-gateway",{gatewayEnvelopeId:gatewayResult.gatewayEnvelopeId,gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent",gatewayEmailLinkSignerCount:Number(gatewayResult.invitations?.length||0),gatewayEmailLinkInvitations:Array.isArray(gatewayResult.invitations)?gatewayResult.invitations:[]});
   return {gatewayEnvelopeId:gatewayResult.gatewayEnvelopeId,gatewayEmailLinkStatus:gatewayResult.gatewayInvitationStatus||"Sent"};
 }
 
@@ -385,7 +385,7 @@ export async function startSignatureWorkflow(envelope){
     }:{})
   };
   try{
-    await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),update);
+    await mutateSignatureEnvelope(envelope.id,"start",{status:update.status,workflowStartedByUid:u.uid,gateway:gateway?{gatewayEnvelopeId:gateway.gatewayEnvelopeId,gatewayDocumentId:gateway.gatewayDocumentId||null,gatewayOriginalHash:gateway.gatewayOriginalHash||null,gatewaySigningStatus:gateway.gatewaySigningStatus||"Sent",gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:gateway.gatewayInvitationStatus||"Sent",gatewayInvitationFailures:Number(gateway.gatewayInvitationFailures||0)}:null});
   }catch(error){
     if(gateway?.gatewayEnvelopeId&&!gateway.existing){
       try{await voidGatewaySignatureEnvelope(gateway.gatewayEnvelopeId,"Firebase Signature Portal link could not be committed");}
@@ -405,13 +405,7 @@ export async function startSignatureWorkflow(envelope){
     try{
       const delivery=await sendSignatureMail({...envelope,...update,id:envelope.id},current);
       const deliveryStatus=delivery.deliveryStatus||"Sent";
-      await updateDoc(doc(db,ENVELOPE_COLLECTION,envelope.id),{
-        currentSignerEmail:recipientEmail,
-        currentSignerName:current.name||"",
-        currentSignerInvitationStatus:deliveryStatus,
-        currentSignerInvitationSentAt:serverTimestamp(),
-        updatedAt:serverTimestamp()
-      });
+      await mutateSignatureEnvelope(envelope.id,"initial-invitation-sent",{signerUid:current.uid,deliveryStatus});
       await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Sent",{
         signerUid:current.uid,signerName:current.name||"",maskedAddress,attemptedAt,
         deliveryStatus,providerResponseId:delivery.messageId||delivery.providerResponseId||null,error:null
