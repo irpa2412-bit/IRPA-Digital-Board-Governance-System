@@ -303,8 +303,8 @@ test("PDF finalizer stamps canonical visible-page fractions inside a non-zero Cr
         uid: "user-1",
         name: "Signer",
         signedAt: new Date(0).toISOString(),
-        signatureType: "drawn",
-        signatureValue: dataUrl,
+        signatureType: "typed",
+        signatureValue: "Signer",
         fieldValues: { [field.fieldId]: dataUrl }
       }]
     });
