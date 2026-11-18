@@ -2,6 +2,7 @@ import { getIdToken } from "firebase/auth";
 import { assertGatewaySigningResponse } from "./signatureGatewayResponse.js";
 import { auth } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+import { normalizeSignatureField } from "../utils/signatureFieldCoordinates.mjs";
 
 const GATEWAY_URL = getGoogleDriveGatewayUrl();
 
@@ -497,8 +498,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error(data.error || ("The Gateway could not verify the existing source document (HTTP " + existingResponse.status + ")."));
   }
   const fields = (envelope.fields || []).map(field => ({
-    fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
-    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),roleAssignmentIndex:Number.isInteger(Number(field.roleAssignmentIndex))?Number(field.roleAssignmentIndex):0,required:field.required === true,
+    fieldId:field.fieldId,type:field.type,...normalizeSignatureField(field),signerId:resolveSignerId(field),roleAssignmentIndex:Number.isInteger(Number(field.roleAssignmentIndex))?Number(field.roleAssignmentIndex):0,required:field.required === true,
     placeholder:field.placeholder || ""
   }));
   const ownerSigner=envelope.ownerSigningEnabled===true?ordered.find(recipient=>String(recipient.uid||"")===String(auth.currentUser.uid)):null;

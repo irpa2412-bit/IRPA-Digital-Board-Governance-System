@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 import { HttpError, sha256Hex } from "./util.mjs";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
+import { signatureFieldToPdfBox } from "../../src/utils/signatureFieldCoordinates.mjs";
 
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_PAGES = 500;
@@ -57,25 +58,9 @@ function safeText(font, value, maxLength) {
 }
 
 /** Convert a field rectangle in the visible, rotated crop box into PDF user space. */
-export function getPdfFieldBox(page, field) {
-  const crop = page.getCropBox();
-  const rotation = ((Number(page.getRotation()?.angle || 0) % 360) + 360) % 360;
-  if (![0, 90, 180, 270].includes(rotation)) throw new HttpError(400, "The PDF page rotation is not supported for signature placement.");
-  const swapsAxes = rotation === 90 || rotation === 270;
-  const visibleWidth = swapsAxes ? crop.height : crop.width;
-  const visibleHeight = swapsAxes ? crop.width : crop.height;
-  const left = Number(field.x ?? 0) / 100 * visibleWidth;
-  const top = Number(field.y ?? 0) / 100 * visibleHeight;
-  const width = Number(field.width ?? 24) / 100 * visibleWidth;
-  const height = Number(field.height ?? 8) / 100 * visibleHeight;
-  if (![left, top, width, height].every(Number.isFinite) || width <= 0 || height <= 0 ||
-      left < 0 || top < 0 || left + width > visibleWidth + 0.01 || top + height > visibleHeight + 0.01) {
-    throw new HttpError(400, "The signature field is outside the visible PDF page.");
-  }
-  if (rotation === 0) return { x: crop.x + left, y: crop.y + crop.height - top - height, width, height, rotation };
-  if (rotation === 90) return { x: crop.x + top, y: crop.y + left, width: height, height: width, rotation };
-  if (rotation === 180) return { x: crop.x + crop.width - left - width, y: crop.y + top, width, height, rotation };
-  return { x: crop.x + crop.width - top - height, y: crop.y + crop.height - left - width, width: height, height: width, rotation };
+export function getPdfFieldBox(page, field, options = {}) {
+  try { return signatureFieldToPdfBox(page, field, options); }
+  catch (error) { throw new HttpError(400, error?.message || "The signature field is outside the visible PDF page."); }
 }
 
 export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {

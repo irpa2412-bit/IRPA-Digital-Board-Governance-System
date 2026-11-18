@@ -262,3 +262,89 @@ test("signature and initials assignment defaults fit within a single assignee ro
   assert.match(source, /Initials:\{width:10,height:3\}/);
   assert.doesNotMatch(source, /Signature:\{width:28,height:10\}/);
 });
+
+
+test("PDF finalizer stamps canonical visible-page fractions inside a non-zero CropBox", async () => {
+  const source = await PDFDocument.create();
+  const page = source.addPage([1200, 1000]);
+  page.setCropBox(40, 60, 900, 760);
+  const sourceBytes = await source.save();
+  const pngBytes = createPng(300, 100);
+  const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
+  const field = {
+    fieldId: "canonical-row-four",
+    type: "Signature",
+    page: 1,
+    x: 0.42,
+    y: 0.385,
+    width: 0.125,
+    height: 0.032,
+    coordinateSpace: "visible-page-fraction-v1",
+    signerId: "S1",
+    signerUid: "user-1"
+  };
+  const draws = [];
+  const originalDrawImage = PDFPage.prototype.drawImage;
+  PDFPage.prototype.drawImage = function(image, options) {
+    if (image.width === 300 && image.height === 100) draws.push({ ...options });
+    return originalDrawImage.call(this, image, options);
+  };
+  try {
+    await buildSignedPdf(sourceBytes, {
+      envelopeId: "canonical-envelope",
+      documentId: "canonical-document",
+      title: "Canonical field",
+      originalHash: "original",
+      chainHead: "chain",
+      completedAt: new Date(0).toISOString(),
+      fields: [field],
+      signers: [{
+        id: "S1",
+        uid: "user-1",
+        name: "Signer",
+        signedAt: new Date(0).toISOString(),
+        signatureType: "drawn",
+        signatureValue: dataUrl,
+        fieldValues: { [field.fieldId]: dataUrl }
+      }]
+    });
+  } finally {
+    PDFPage.prototype.drawImage = originalDrawImage;
+  }
+  assert.equal(draws.length, 1);
+  const cropPage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+  const expected = getPdfFieldBox(cropPage, field);
+  const actual = draws[0];
+  assert.ok(actual.x >= expected.x - 0.01 && actual.y >= expected.y - 0.01);
+  assert.ok(actual.x + actual.width <= expected.x + expected.width + 0.01);
+  assert.ok(actual.y + actual.height <= expected.y + expected.height + 0.01);
+  close(expected.x, 40 + 900 * 0.42);
+  close(expected.y, 60 + 760 - 760 * 0.385 - 760 * 0.032);
+});
+
+test("signer-count regression: 1, 2, 4, 10 and 20 signers retain independent PDF field coordinates", async () => {
+  const source = await PDFDocument.create();
+  source.addPage([1200, 2400]);
+  const sourceBytes = await source.save();
+  const pngBytes = createPng(300, 100);
+  const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
+  for (const count of [1, 2, 4, 10, 20]) {
+    const signers = Array.from({ length: count }, (_, i) => ({ id: `S${i+1}`, uid: "shared-account-uid", name: `Signer ${i+1}`, email: `s${i+1}@example.test`, signedAt: new Date(0).toISOString(), signatureType: "typed", signatureValue: `Signer ${i+1}`, fieldValues: { [`field-${i+1}`]: dataUrl } }));
+    const fields = Array.from({ length: count }, (_, i) => ({ fieldId: `field-${i+1}`, type: "Signature", page: 1, x: 0.08 + (i % 4) * 0.21, y: 0.025 + Math.floor(i / 4) * 0.105, width: 0.14, height: 0.035, coordinateSpace: "visible-page-fraction-v1", signerId: `S${i+1}`, signerUid: "shared-account-uid" }));
+    const orderedFields = [...fields].reverse(), orderedSigners = [...signers].reverse(), draws = [];
+    const originalDrawImage = PDFPage.prototype.drawImage;
+    PDFPage.prototype.drawImage = function(image, options) { if (image.width === 300 && image.height === 100) draws.push({ ...options }); return originalDrawImage.call(this, image, options); };
+    try { await buildSignedPdf(sourceBytes, { envelopeId: `count-${count}`, documentId: "signer-count-regression", title: "Signer count regression", originalHash: "original", chainHead: "chain", completedAt: new Date(0).toISOString(), fields: orderedFields, signers: orderedSigners }); }
+    finally { PDFPage.prototype.drawImage = originalDrawImage; }
+    assert.equal(draws.length, count, `${count} signers must produce one stamp per assigned field`);
+    const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+    orderedFields.forEach((field, index) => {
+      const expected = getPdfFieldBox(sourcePage, field), actual = draws[index];
+      assert.ok(actual.x >= expected.x - 0.01 && actual.y >= expected.y - 0.01);
+      assert.ok(actual.x + actual.width <= expected.x + expected.width + 0.01);
+      assert.ok(actual.y + actual.height <= expected.y + expected.height + 0.01);
+      close(actual.x + actual.width / 2, expected.x + expected.width / 2, 0.01);
+      close(actual.y + actual.height / 2, expected.y + expected.height / 2, 0.01);
+    });
+  }
+});
