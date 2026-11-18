@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "playwright/test";
 import { signatureFieldFromPercent, signatureFieldCss } from "../../src/utils/signatureFieldCoordinates.mjs";
 
 test("signature field overlay remains inside its assigned table cell at responsive widths and zoom", async ({ page }) => {
