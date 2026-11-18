@@ -69,6 +69,6 @@ test("email-link possession is not misrepresented as legal identity or instituti
 });
 
 test("Signature Profile explicitly presents the email-link e-signature method",()=>{
-  assert.match(portal,/<span>Signing method<\\/span><strong>Email-link e-signature<\\/strong>/);
-  assert.match(portal,/unique link[\\s\\S]*secure email-link workflow/);
+  assert.ok(portal.includes('<span>Signing method</span><strong>Email-link e-signature</strong>'));
+  assert.ok(portal.includes("unique link")&&portal.includes("secure email-link workflow"));
 });
