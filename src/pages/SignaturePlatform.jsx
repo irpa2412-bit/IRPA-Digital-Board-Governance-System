@@ -675,7 +675,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     let env=draftEnvelopeId
       ?await finalizeSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled})
       :await createSignatureEnvelope({title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,signingMode,recipients:orderedRecipients,fields,ownerSigningEnabled});
-    const gatewayRecipients=workflowRecipients.map(recipient=>({...recipient,identityType:"email-link",uid:null}));
+    const gatewayRecipients=workflowRecipients.map(recipient=>({...recipient,identityType:"email-link"}));
     if(gatewayRecipients.some(recipient=>!String(recipient.email||"").trim()))throw new Error("Each assigned signer, including the document owner when enabled, must have a registered email address for the invitation.");
     if(gatewayRecipients.length&&!env.gatewayEnvelopeId){
       setDraftEnvelopeId(env.id);
