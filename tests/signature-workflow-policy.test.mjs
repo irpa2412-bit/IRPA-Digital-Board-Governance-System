@@ -278,7 +278,7 @@ test("refreshing an envelope reloads signer status and invitation delivery so re
   const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
   const storage = fs.readFileSync(new URL("../src/firebase/signatureStorage.js", import.meta.url), "utf8");
   assert.match(storage, /export async function getGatewaySignatureEnvelopeDeliveryStatus\(envelopeId\)/);
-  assert.match(storage, /gatewayAuthenticatedRequest\("\/api\/envelopes\/"+encodeURIComponent\(envelopeId\)\)/);
+  assert.ok(storage.includes('gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId))'));
   assert.match(page, /getGatewaySignatureEnvelopeStatus,getGatewaySignatureEnvelopeDeliveryStatus/);
   assert.match(page, /const \[status,delivery\]=await Promise\.all\(/);
   assert.match(page, /const deliveryBySigner=new Map\(\(delivery\.signers\|\|\[\]\)\.map\(signer=>\[signer\.id,signer\]\)\)/);
