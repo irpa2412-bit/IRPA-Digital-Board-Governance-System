@@ -305,4 +305,7 @@ test("new envelopes remain inactive drafts until Start Workflow sends Gateway em
   assert.doesNotMatch(start[1], /if\(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED\)/);
   assert.match(page, /if\(!selected\.gatewayEnvelopeId\)throw new Error\("This draft has not been sent/);
   assert.match(page, /This envelope must be signed through its verified email-link invitation/);
+  const signingAction = page.match(/async function sign\(\)\{([\s\S]*?)\n \}/);
+  assert.ok(signingAction, "the Sign Document action must exist");
+  assert.doesNotMatch(signingAction[1], /signEnvelope\(/, "the account-based client signing fallback must not be reachable");
 });
