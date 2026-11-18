@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
-import { createEnvelope, getEnvelopeStatus, resendInvitation } from "../src/signing.mjs";
+import { createEnvelope, getEnvelopeStatus, resendInvitation, openEmailSigning } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 import { buildInvitationMessage } from "../src/invitationEmail.mjs";
 
-async function fixture({failResend=false}={}) {
+async function fixture({failResend=false,emailLink=false}={}) {
   const sent=[];
   let calls=0;
   const ctx=buildEsignContext({
@@ -25,8 +25,8 @@ async function fixture({failResend=false}={}) {
   const created=await createEnvelope(ctx,{uid:"owner-uid",isAdmin:false},{
     documentId,externalReference,title:"Invitation test",classification:"Restricted",
     archives:["board-governance"],signingMode:"Sequential",
-    signers:[{uid:"signer-uid",email:"signer@example.test",name:"Assigned Signer",order:1}],
-    fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,signerUid:"signer-uid",required:true}]
+    signers:[emailLink?{identityType:"email-link",email:"signer@example.test",name:"Assigned Signer",order:1}:{uid:"signer-uid",email:"signer@example.test",name:"Assigned Signer",order:1}],
+    fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,...(emailLink?{signerId:"S1"}:{signerUid:"signer-uid"}),required:true}]
   });
   return{ctx,sent,created,externalReference};
 }
@@ -69,4 +69,32 @@ test("failed Gateway invitation retry remains explicitly Failed and does not rep
 test("another user cannot resend a signer invitation",async()=>{
   const f=await fixture();
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"intruder-uid",isAdmin:false},f.created.envelopeId,"S1"),/Not authorized/);
+});
+
+
+test("email-link signer receives the email-signing URL and redeems the exact one-time token",async()=>{
+  const f=await fixture({emailLink:true});
+  assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].emailLink,true);
+  const url=new URL(f.sent[0].link);
+  assert.equal(url.pathname,"/");
+  const token=url.searchParams.get("emailSignToken");
+  assert.match(token,/^ENV-[0-9a-f]+\\.S1\\.[0-9a-f]{64}$/);
+  assert.equal(url.searchParams.has("gatewayToken"),false);
+  const opened=await openEmailSigning(f.ctx,token,"192.0.2.10");
+  assert.equal(opened.ok,true);
+  assert.equal(opened.signer.email,"signer@example.test");
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
+  assert.equal(status.signers[0].emailLinkStatus,"opened");
+});
+
+test("email-link resend rotates the bearer token and makes the prior invitation unusable",async()=>{
+  const f=await fixture({emailLink:true});
+  const first=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  const second=new URL(f.sent[1].link).searchParams.get("emailSignToken");
+  assert.notEqual(second,first);
+  await assert.rejects(()=>openEmailSigning(f.ctx,first,"192.0.2.11"),/signing link is unavailable/i);
+  const opened=await openEmailSigning(f.ctx,second,"192.0.2.12");
+  assert.equal(opened.ok,true);
 });
