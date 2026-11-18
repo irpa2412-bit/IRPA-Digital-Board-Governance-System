@@ -43,7 +43,7 @@ jobs:
         working-directory: drive-gateway
         run: npm ci --no-audit --no-fund
       - name: Run complete repository test suite
-        run: npm run test:all
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-signature "npm run test:all"
       - name: Run coordinate and multi-signer regression suite
         run: npm run test:signature-coordinate-system
       - name: Run complete Gateway test suite
