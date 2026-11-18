@@ -209,7 +209,7 @@ async function inviteNextPosition(ctx,id){
   for(const order of orders){
     if(!envelope.signers.filter(s=>s.order<order).every(s=>s.status==="Signed"))continue;
     const pending=envelope.signers.filter(s=>s.order===order&&s.status==="Pending"&&s.invitation!=="Sent");
-    if(!pending.length)return;
+    if(!pending.length)continue;
     for(const signer of pending){
       try{await resendInvitation(ctx,{uid:envelope.createdBy,isAdmin:false},id,signer.id);}
       catch(error){ctx.logger?.error?.("SIGNING_NEXT_POSITION_INVITATION_FAILED",{envelopeId:id,signerId:signer.id,errorType:String(error?.name||"Error")});}
