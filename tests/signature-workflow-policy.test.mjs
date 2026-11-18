@@ -368,6 +368,7 @@ test("email-link signers may confirm only their own active saved profile specime
 
 
 test("envelope refresh keeps signer rows readable and separates invitation delivery from link redemption", () => {
+  const css = fs.readFileSync(new URL("../src/styles/signature-portal.css", import.meta.url), "utf8");
   const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
   const refreshStart=page.indexOf(" async function refreshGatewayEmailStatus(){");
   const refreshEnd=page.indexOf(" async function resendEmailLink",refreshStart);
