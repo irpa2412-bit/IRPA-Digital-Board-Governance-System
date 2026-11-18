@@ -526,8 +526,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     throw new Error(result.error || "The authenticated Gateway signing envelope was not created.");
   }
   const invitations=Array.isArray(result.invitations)?result.invitations:[];
-  const invitationFailures=invitations.filter(item=>item.status!=="Sent").length;
-  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":"Sent",gatewayInvitationFailures:invitationFailures,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
+  const invitationFailures=invitations.filter(item=>item.status==="Failed").length;
+  const deferredInvitations=invitations.filter(item=>item.status==="Pending").length;
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":deferredInvitations?"Pending":"Sent",gatewayInvitationFailures:invitationFailures,gatewayPendingInvitations:deferredInvitations,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
 }
 
 export async function getGatewaySignatureEnvelopeStatus(envelopeId) {
