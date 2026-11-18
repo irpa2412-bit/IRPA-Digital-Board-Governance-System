@@ -12,20 +12,18 @@ export async function hashNormalizedEmail(email){
   return sha256Hex(normalized);
 }
 
-export async function createEmailSigningToken({envelopeId,signerId,email,now=new Date(),ttlDays=7,randomBytes}){
+export async function createEmailSigningToken({envelopeId,signerId,email,now=new Date(),randomBytes}){
   const bytes=randomBytes?new Uint8Array(randomBytes):crypto.getRandomValues(new Uint8Array(32));
   if(bytes.byteLength<32)throw new Error("Email signing tokens require at least 32 random bytes.");
   const token=[...bytes].map(value=>value.toString(16).padStart(2,"0")).join("");
   const tokenHash=await sha256Hex(token);
   const createdAt=new Date(now).toISOString();
-  const days=Math.max(1,Math.min(30,Number(ttlDays)||7));
   const record={
     tokenHash,
     envelopeId:String(envelopeId),
     signerId:String(signerId),
     emailHash:await hashNormalizedEmail(email),
     createdAt,
-    expiresAt:new Date(new Date(now).getTime()+days*86400000).toISOString(),
     status:"issued",
     attemptCount:0,
     openCount:0,
@@ -39,7 +37,7 @@ export async function createEmailSigningToken({envelopeId,signerId,email,now=new
 
 export async function inspectEmailSigningToken(token,record,now=new Date()){
   const hash=await sha256Hex(String(token||""));
-  const valid=Boolean(record&&record.status==="issued"&&record.tokenHash&&safeEqual(hash,record.tokenHash)&&Number.isFinite(Date.parse(record.expiresAt))&&new Date(now).getTime()<Date.parse(record.expiresAt));
+  const valid=Boolean(record&&record.status==="issued"&&record.tokenHash&&safeEqual(hash,record.tokenHash));
   return valid?{ok:true,record}:{ok:false,error:genericEmailSigningFailure()};
 }
 
@@ -62,7 +60,7 @@ export async function markEmailSigningTokenOpened(record,{token,now=new Date(),i
 }
 
 export function consumeEmailSigningToken(record,{now=new Date()}={}){
-  if(!record||record.status!=="opened"||Date.parse(record.expiresAt)<=new Date(now).getTime())throw new Error(genericEmailSigningFailure());
+  if(!record||record.status!=="opened")throw new Error(genericEmailSigningFailure());
   return {...record,status:"used",usedAt:new Date(now).toISOString()};
 }
 
