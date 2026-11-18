@@ -115,3 +115,31 @@
   .signature-field-palette button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   .signature-field-palette .signature-field-tool{user-select:none;-webkit-user-select:none;}
 }
+
+
+/* Signature Portal readable-by-default presentation. Never fade the workspace or
+   signer records during refresh; preserve accessible contrast in both themes. */
+.signature-portal-root,
+.signature-portal-root .panel,
+.signature-portal-root .stat-card {
+  color: var(--text, #111827);
+  opacity: 1;
+}
+.signature-portal-root .panel .muted,
+.signature-portal-root .stat-card .muted {
+  color: var(--muted-text, var(--text, #374151));
+  opacity: 1;
+}
+.signature-portal-root [aria-busy="true"] {
+  opacity: 1;
+  filter: none;
+}
+.signature-portal-root .signature-envelope-status,
+.signature-portal-root .signature-envelope-status * {
+  color: var(--text, #111827);
+  opacity: 1;
+}
+.signature-portal-root .signature-envelope-status small {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
