@@ -92,3 +92,24 @@ test("zoom changes rendered pixels but not canonical field location", () => {
     assert.equal(signatureFieldCss(field).left, base.left);
   }
 });
+
+
+test("180-degree rotated CropBox maps the visible top-left rectangle back into PDF user space", () => {
+  const crop = { x: 20, y: 30, width: 600, height: 800 };
+  const field = { fieldId: "rotated-180", coordinateSpace: SIGNATURE_FIELD_COORDINATE_SPACE, page: 1, x: 0.2, y: 0.3, width: 0.1, height: 0.05 };
+  const box = signatureFieldToPdfBox(page(crop, 180), field);
+  close(box.x, crop.x + crop.width - crop.width * 0.2 - crop.width * 0.1);
+  close(box.y, crop.y + crop.height * 0.3);
+  close(box.width, crop.width * 0.1);
+  close(box.height, crop.height * 0.05);
+});
+
+test("270-degree rotated CropBox maps the visible top-left rectangle back into PDF user space", () => {
+  const crop = { x: 20, y: 30, width: 600, height: 800 };
+  const field = { fieldId: "rotated-270", coordinateSpace: SIGNATURE_FIELD_COORDINATE_SPACE, page: 1, x: 0.2, y: 0.3, width: 0.1, height: 0.05 };
+  const box = signatureFieldToPdfBox(page(crop, 270), field);
+  close(box.x, crop.x + crop.width - crop.width * 0.3 - crop.width * 0.05);
+  close(box.y, crop.y + crop.height - crop.height * 0.2 - crop.height * 0.1);
+  close(box.width, crop.width * 0.05);
+  close(box.height, crop.height * 0.1);
+});
