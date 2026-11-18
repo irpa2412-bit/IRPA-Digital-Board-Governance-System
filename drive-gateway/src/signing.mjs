@@ -100,7 +100,7 @@ export async function createEnvelope(ctx,user,body){
   const fields=validateEnvelopeFields(body?.fields,signers);
   for(const signer of signers){
     const assignments=Array.isArray(signer.roleAssignments)&&signer.roleAssignments.length?signer.roleAssignments:[{role:"Signer"}];
-    for(let roleAssignmentIndex=0;roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
+    for(let roleAssignmentIndex=0;assignments.length>1&&roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
       if(!fields.some(field=>field.signerId===signer.id&&field.roleAssignmentIndex===roleAssignmentIndex&&["Signature","Initials"].includes(field.type)))throw new HttpError(400,"Every signer responsibility must have at least one assigned Signature or Initials field.");
     }
   }
