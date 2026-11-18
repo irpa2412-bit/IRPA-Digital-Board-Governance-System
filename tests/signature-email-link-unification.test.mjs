@@ -130,6 +130,7 @@ test("a signer can be assigned separate PDF fields for each role responsibility"
   assert.match(gateway,/Every signer responsibility must have at least one assigned Signature or Initials field/);
   assert.match(gateway,/roleAssignmentEvidence/);
   assert.match(gateway,/signatureFieldHashes\.push/);
+  assert.match(gateway,/signer\.role_assignment\.completed/);
 });
 
 test("email signing advances the document to the next responsibility after the current assignment is complete",()=>{
