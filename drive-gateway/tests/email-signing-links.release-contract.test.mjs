@@ -117,4 +117,12 @@ test("all application PDF.js entry points copy caller-owned bytes before worker 
   assert.ok(portal.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
 });
 
-test("a signer can leave the completed email-link or Gateway document and return to other work without changing signing records",()=>{\n  assert.match(page,/signingClosed&&/);\n  assert.match(page,/Leave document &amp; return to IRPA workspace/);\n  assert.match(page,/window\.location\.assign\(window\.location\.origin\)/);\n  assert.match(gatewayPortal,/setSubmittedByCurrentSigner\(true\)/);\n  assert.match(gatewayPortal,/Leave document &amp; return to my work/);\n  assert.match(gatewayPortal,/removeItem\("irpaGatewaySigningToken"\)/);\n  assert.match(gatewayPortal,/window\.location\.assign\(window\.location\.pathname\)/);\n});\n
+test("a signer can leave the completed email-link or Gateway document and return to other work without changing signing records",()=>{
+  assert.match(page,/signingClosed&&/);
+  assert.match(page,/Leave document &amp; return to IRPA workspace/);
+  assert.match(page,/window\.location\.assign\(window\.location\.origin\)/);
+  assert.match(gatewayPortal,/setSubmittedByCurrentSigner\(true\)/);
+  assert.match(gatewayPortal,/Leave document &amp; return to my work/);
+  assert.match(gatewayPortal,/removeItem\("irpaGatewaySigningToken"\)/);
+  assert.match(gatewayPortal,/window\.location\.assign\(window\.location\.pathname\)/);
+});
