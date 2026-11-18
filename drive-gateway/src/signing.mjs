@@ -155,7 +155,7 @@ export async function createEnvelope(ctx,user,body){
     for(let index=0;index<updatedSigners.length;index++){
       const signer=updatedSigners[index];
       if(signer.invitation==="Pending")continue;
-      events=await chainEvents(events,{type:signer.invitation==="Portal"?"owner.portal_issued":signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,,at});
+      events=await chainEvents(events,{type:signer.invitation==="Portal"?"owner.portal_issued":signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,at});
     }
     return{patch:{signers:updatedSigners,events}};
   });
