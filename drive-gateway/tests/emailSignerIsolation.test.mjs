@@ -176,3 +176,25 @@ test("legacy saved percentage fields are normalized before checking confirmed si
   const confirmed = [{ fieldId: "legacy-signature", page: 1, x: 0.1, y: 0.8, width: 0.24, height: 0.09, coordinateSpace: "visible-page-fraction-v1", confirmed: true, value: mark }];
   assert.deepEqual(validateFieldValues(legacyFields, externalSigner, {}, { type: "typed", value: "Vendor" }, confirmed), { "legacy-signature": mark });
 });
+
+
+test("field confirmation rejects an unsupported coordinate-space marker", () => {
+  const fields = validateEnvelopeFields([
+    { fieldId: "future-space-signature", signerId: "S1", type: "Signature", page: 1, x: 10, y: 80, width: 24, height: 9 }
+  ], [externalSigner]);
+  const confirmed = [{
+    fieldId: "future-space-signature",
+    page: 1,
+    x: 0.1,
+    y: 0.8,
+    width: 0.24,
+    height: 0.09,
+    coordinateSpace: "future-coordinate-v2",
+    confirmed: true,
+    value: "data:image/png;base64," + "A".repeat(100)
+  }];
+  assert.throws(
+    () => validateFieldValues(fields, externalSigner, {}, { type: "typed", value: "Vendor" }, confirmed),
+    /coordinate space is not supported/
+  );
+});
