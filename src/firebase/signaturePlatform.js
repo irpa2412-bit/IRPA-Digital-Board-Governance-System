@@ -10,7 +10,7 @@ import { getCurrentSigningAuthorityRegisterEntries } from "./data";
 import { readWorkflowContext } from "./workflowLinks";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { findManualAuthorityMatch, resolveManualAuthorityLabel } from "../utils/signatureAuthority.mjs";
-import { signatureFieldFromPercent, signatureFieldToPercent, signatureFieldToPdfBox } from "../utils/signatureFieldCoordinates.mjs";
+import { normalizeSignatureField, signatureFieldFromPercent, signatureFieldToPercent, signatureFieldToPdfBox } from "../utils/signatureFieldCoordinates.mjs";
 import { resolveSourceDocumentIntegrity } from "./signatureSourceIntegrity.js";
 const SIGNATURE_SCREEN="Signature workflow";
 const SIGNATURE_USER_TYPE="logged-in owner or signer";
@@ -285,14 +285,14 @@ export async function getSignatureEnvelope(envelopeId){
   if(!envelopeId)throw new Error("Signing envelope ID is required.");
   const body=await fetchServerFilteredSignatureEnvelopes(`/api/signature-workflow/view?envelopeId=${encodeURIComponent(envelopeId)}`);
   const rawEnvelope=body.envelope;
-  const envelope=rawEnvelope?{...rawEnvelope,fields:(rawEnvelope.fields||[]).map(field=>signatureFieldToPercent(field))}:rawEnvelope;
+  const envelope=rawEnvelope?{...rawEnvelope,fields:(rawEnvelope.fields||[]).map(field=>signatureFieldToPercent(field,{warn:(event,details)=>console.warn(event,details)}))}:rawEnvelope;
   if(!envelope||!matchesSignatureEnvironment(envelope))throw new Error("This signing envelope belongs to a different data environment and is unavailable in the current portal session.");
   if(["Cancelled","Declined"].includes(envelope.status))throw new Error("This signing envelope is no longer available.");
   return envelope;
 }
 export async function getSignatureEnvelopes(){
   const body=await fetchServerFilteredSignatureEnvelopes("/api/signature-workflow/list");
-  return (Array.isArray(body.envelopes)?body.envelopes:[]).filter(matchesSignatureEnvironment).map(envelope=>({...envelope,fields:(envelope.fields||[]).map(field=>signatureFieldToPercent(field))})).sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
+  return (Array.isArray(body.envelopes)?body.envelopes:[]).filter(matchesSignatureEnvironment).map(envelope=>({...envelope,fields:(envelope.fields||[]).map(field=>signatureFieldToPercent(field,{warn:(event,details)=>console.warn(event,details)}))})).sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
 }
 export async function getMySignedDocuments(){const u=user();const q=query(collection(db,"signatures"),where("signerUid","==",u.uid));const s=await getDocs(q);const rows=await Promise.all(s.docs.map(async x=>{const data=x.data();if(!matchesSignatureEnvironment(data))return null;if(data.signerArchiveUrl)return{id:x.id,...data};if(!data.envelopeId)return null;try{const envelopeSnap=await getDoc(doc(db,ENVELOPE_COLLECTION,data.envelopeId));if(!envelopeSnap.exists())return null;const envelope={id:envelopeSnap.id,...envelopeSnap.data()};const delivery=envelope.signerArchiveDeliveries?.[u.uid];if(!delivery?.webViewLink)return null;return{id:x.id,...data,signerArchiveUrl:delivery.webViewLink,signerArchiveFolderId:delivery.folderId||null,signerArchiveFolderLink:delivery.folderLink||null,myDocumentsPortal:delivery.myDocumentsPortal||"My Documents",myDocumentsPortalPath:delivery.myDocumentsPortalPath||null,signerArchiveFinalHash:delivery.finalHash||envelope.signerArchiveFinalHash||null,archivePending:false,archiveProtocol:delivery.archiveProtocol||"IRPA-SIGNER-COPY-V2",archiveState:"Final Completed Document"};}catch(error){console.warn("Unable to resolve completed signer archive delivery:",error);return null;}}));return rows.filter(x=>x&&!x.personalCopyDeleted&&((x.status==="Signed")||(x.copyRole==="Owner"&&x.status==="Completed"))&&x.signerArchiveUrl).sort((a,b)=>{const at=a.signedAt?.seconds?Number(a.signedAt.seconds):Date.parse(a.signedAt||0);const bt=b.signedAt?.seconds?Number(b.signedAt.seconds):Date.parse(b.signedAt||0);return bt-at;});}
 async function mySignatureCopyRequest(path,recordId){
@@ -482,7 +482,7 @@ async function signEnvelopeThroughGateway({envelope,profile,fieldValues,manualAu
     throw new Error("The Gateway signing token does not match this Firebase envelope, controlled document, and authenticated signer.");
   }
   if(status.signingMode!==envelope.signingMode)throw new Error("The Gateway signing route differs from the authorized Signature Portal route. Signing has been blocked.");
-  const fieldApplications=signerFields.filter(field=>["Signature","Initials"].includes(field.type)).map(field=>{const value=fieldValues?.[field.fieldId];if(typeof value!=="string"||!value.startsWith("data:image/png;base64,")){if(field.required)throw new Error("Tap the assigned "+field.type.toLowerCase()+" field and confirm it before signing.");return null;}return{fieldId:field.fieldId,confirmed:true,page:Number(field.page||1),x:Number(field.x??0),y:Number(field.y??0),width:Number(field.width??24),height:Number(field.height??9),value};}).filter(Boolean);
+  const fieldApplications=signerFields.filter(field=>["Signature","Initials"].includes(field.type)).map(field=>{const value=fieldValues?.[field.fieldId];if(typeof value!=="string"||!value.startsWith("data:image/png;base64,")){if(field.required)throw new Error("Tap the assigned "+field.type.toLowerCase()+" field and confirm it before signing.");return null;}const canonical=normalizeSignatureField(field);return{fieldId:field.fieldId,confirmed:true,page:Number(canonical.page||1),x:Number(canonical.x),y:Number(canonical.y),width:Number(canonical.width),height:Number(canonical.height),value};}).filter(Boolean);
   if(!fieldApplications.length)throw new Error("Tap your assigned signature field and confirm it before signing.");
   const signatureValue=fieldApplications.find(application=>signerFields.find(field=>field.fieldId===application.fieldId)?.type==="Signature")?.value||fieldApplications[0].value;
   const signature={type:"drawn",value:signatureValue};
