@@ -501,6 +501,12 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),roleAssignmentIndex:Number.isInteger(Number(field.roleAssignmentIndex))?Number(field.roleAssignmentIndex):0,required:field.required === true,
     placeholder:field.placeholder || ""
   }));
+  const ownerSigner=envelope.ownerSigningEnabled===true?ordered.find(recipient=>String(recipient.uid||"")===String(auth.currentUser.uid)):null;
+  if(envelope.ownerSigningEnabled===true){
+    if(!ownerSigner)throw new Error("The authenticated document owner must be included as an action signer for portal-first signing.");
+    const ownerSignerId="S"+String(ordered.indexOf(ownerSigner)+1);
+    if(!fields.some(field=>field.signerId===ownerSignerId&&field.type==="Signature"&&field.required===true))throw new Error("Assign a required Signature field to the document owner before starting the workflow.");
+  }
   for(const [index,recipient] of ordered.entries()){
     const signerId="S"+String(index+1);
     const assignments=Array.isArray(recipient.roleAssignments)&&recipient.roleAssignments.length?recipient.roleAssignments:[{role:recipient.role||"Signer"}];
@@ -517,14 +523,16 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     classification,
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
+    ...(ownerSigner?{ownerPreSignEmail:String(ownerSigner.email||"").trim().toLowerCase()}:{}),
     signers:ordered.map((recipient,index) => {
       return {
         identityType:"email-link",
         email:String(recipient.email || "").trim().toLowerCase(),
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
+        title:String(recipient.title||"").trim().slice(0,160),
         occupation:String(recipient.occupation||recipient.capacity||"").trim(),
         capacity:String(recipient.capacity||"").trim(),
-        roleAssignments:(Array.isArray(recipient.roleAssignments)?recipient.roleAssignments:[{role:recipient.role||"Signer",capacity:String(recipient.capacity||"").trim(),occupation:String(recipient.occupation||"").trim()}]).map(item=>({role:String(item.role||"Signer").trim().slice(0,120),capacity:String(item.capacity||"").trim().slice(0,160),occupation:String(item.occupation||"").trim().slice(0,160)})),
+        roleAssignments:(Array.isArray(recipient.roleAssignments)?recipient.roleAssignments:[{role:recipient.role||"Signer",capacity:String(recipient.capacity||"").trim(),occupation:String(recipient.occupation||"").trim()}]).map(item=>({role:String(item.role||"Signer").trim().slice(0,120),title:String(item.title||recipient.title||"").trim().slice(0,160),capacity:String(item.capacity||"").trim().slice(0,160),occupation:String(item.occupation||"").trim().slice(0,160)})),
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
       };
     }),
@@ -538,7 +546,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   const invitations=Array.isArray(result.invitations)?result.invitations:[];
   const invitationFailures=invitations.filter(item=>item.status==="Failed").length;
   const deferredInvitations=invitations.filter(item=>item.status==="Pending").length;
-  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:invitationFailures?"Failed":deferredInvitations?"Pending":"Sent",gatewayInvitationFailures:invitationFailures,gatewayPendingInvitations:deferredInvitations,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),existing:result.existing === true};
+  return {gatewayEnvelopeId:result.envelopeId,gatewayDocumentId:documentId,gatewayOriginalHash:expectedHash,signingMode:payload.signingMode,gatewaySigningStatus:result.status || "Sent",gatewayInvitationStatus:ownerSigner?"Awaiting Owner Signature":invitationFailures?"Failed":deferredInvitations?"Pending":"Sent",gatewayInvitationFailures:invitationFailures,gatewayPendingInvitations:deferredInvitations,invitations:invitations.map(item=>({signerId:item.signerId,status:item.status})),...(ownerSigner&&result.ownerSigningToken?{ownerSigningToken:result.ownerSigningToken}:{}),existing:result.existing === true};
 }
 
 export async function getGatewaySignatureEnvelopeStatus(envelopeId) {

@@ -5,8 +5,8 @@ export async function chainEvents(events,e){const body={...e,prevHash:events.len
 export async function verifyChain(events){if(!Array.isArray(events))return false;let p="GENESIS";for(const e of events){const {hash,...b}=e;if(b.prevHash!==p||await sha256Hex(canonicalJson(b))!==hash)return false;p=hash}return true}
 async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get("envelopes",id);if(!c)throw new HttpError(404,"Envelope not found.");if(!await verifyChain(c.events))throw new HttpError(409,"Signing audit chain failed verification.");const {patch,result}=await fn(c);if(!patch)return result;try{await ctx.meta.update("envelopes",id,patch,{ifVersion:c._v});return result}catch(e){if(!(e instanceof VersionConflict))throw e}}throw new HttpError(409,"Please retry.")}
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d{1,2}$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
-async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");if(!safeEqual(await sha256Hex(secret),s.tokenHash))throw new HttpError(403,"This signing link is not valid.");if(s.identityType==="email-link"&&(!["issued","opened"].includes(s.emailLinkStatus)||!Number.isFinite(Date.parse(s.emailLinkExpiresAt))||ctx.now().getTime()>=Date.parse(s.emailLinkExpiresAt)))throw new HttpError(401,genericEmailSigningFailure());return{env:e,signer:s}}
-function active(ctx,e){if(["Voided","Declined"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");if(ctx.now()>new Date(e.expiresAt))throw new HttpError(403,"This signing link has expired.")}
+async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");if(!safeEqual(await sha256Hex(secret),s.tokenHash))throw new HttpError(403,"This signing link is not valid.");if(s.identityType==="email-link"&&(!["issued","opened"].includes(s.emailLinkStatus)))throw new HttpError(401,genericEmailSigningFailure());return{env:e,signer:s}}
+function active(ctx,e){if(["Voided","Declined"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");if(!(e.signers||[]).some(s=>s.identityType==="email-link")&&ctx.now()>new Date(e.expiresAt))throw new HttpError(403,"This signing link has expired.")}
 const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
@@ -93,11 +93,21 @@ export async function createEnvelope(ctx,user,body){
     const signerId=`S${i+1}`,secret=randomHex(32),emailLink=s?.identityType==="email-link",authority=null;
     const profileUid=emailLink&&typeof ctx.resolveEmailLinkProfileUid==="function"?await ctx.resolveEmailLinkProfileUid(email):null;
     if(!uid&&!emailLink&&!ctx.allowLegacyTestSigners)throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
-    const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),ttlDays:ctx.config.emailLinkTtlDays||7,randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
+    const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
     const finalSecret=issued?.token||secret;secrets.push(finalSecret);
-    signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,profileUid:profileUid||null,name:validateName(s?.name||email),declaredParticulars:{name:cleanText(s?.name||"",160),occupation:cleanText(s?.occupation||s?.capacity||"",160),capacity:cleanText(s?.capacity||"",160)},roleAssignments:(Array.isArray(s?.roleAssignments)?s.roleAssignments:[{role:s?.role||"Signer",capacity:s?.capacity||"",occupation:s?.occupation||""}]).slice(0,12).map(item=>({role:cleanText(item?.role||"Signer",120),capacity:cleanText(item?.capacity||"",160),occupation:cleanText(item?.occupation||"",160)})),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:emailLink?"email-link":uid?"account":"legacy-token",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{}}:{})});
+    signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,profileUid:profileUid||null,name:validateName(s?.name||email),title:cleanText(s?.title||"",160),declaredParticulars:{name:cleanText(s?.name||"",160),title:cleanText(s?.title||"",160),occupation:cleanText(s?.occupation||s?.capacity||"",160),capacity:cleanText(s?.capacity||"",160)},roleAssignments:(Array.isArray(s?.roleAssignments)?s.roleAssignments:[{role:s?.role||"Signer",title:s?.title||"",capacity:s?.capacity||"",occupation:s?.occupation||""}]).slice(0,12).map(item=>({role:cleanText(item?.role||"Signer",120),title:cleanText(item?.title||s?.title||"",160),capacity:cleanText(item?.capacity||"",160),occupation:cleanText(item?.occupation||"",160)})),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:emailLink?"email-link":uid?"account":"legacy-token",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{}}:{})});
   }
   const fields=validateEnvelopeFields(body?.fields,signers);
+  const ownerPreSignEmail=String(body?.ownerPreSignEmail||"").trim().toLowerCase();
+  let ownerPreSignSigner=null,ownerPreSignIndex=-1;
+  if(ownerPreSignEmail){
+    if(!user?.email||String(user.email).trim().toLowerCase()!==ownerPreSignEmail)throw new HttpError(403,"Only the authenticated document owner's own account may request portal-first signing.");
+    ownerPreSignIndex=signers.findIndex(signer=>signer.email===ownerPreSignEmail);
+    ownerPreSignSigner=signers[ownerPreSignIndex]||null;
+    const firstOrder=Math.min(...signers.map(signer=>signer.order));
+    if(!ownerPreSignSigner||ownerPreSignSigner.order!==firstOrder)throw new HttpError(400,"The document owner must be the first signing participant.");
+    if(!fields.some(field=>field.signerId===ownerPreSignSigner.id&&field.type==="Signature"&&field.required===true))throw new HttpError(400,"The document owner must have a required Signature field before invitations can be deferred.");
+  }
   for(const signer of signers){
     const assignments=Array.isArray(signer.roleAssignments)&&signer.roleAssignments.length?signer.roleAssignments:[{role:"Signer"}];
     for(let roleAssignmentIndex=0;assignments.length>1&&roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
@@ -130,7 +140,11 @@ export async function createEnvelope(ctx,user,body){
   for(let i=0;i<signers.length;i++){
     if(signers[i].order!==firstPosition)continue;
     const token=`${id}.${signers[i].id}.${secrets[i]}`;
-    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
+    if(ownerPreSignEmail){
+      if(signers[i].id===ownerPreSignSigner.id)signers[i].invitation="Portal";
+      continue;
+    }
+    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",...(!emailLink?{expiresAt:e.expiresAt}:{})});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
     else signers[i].invitation="Sent";
   }
@@ -141,12 +155,12 @@ export async function createEnvelope(ctx,user,body){
     for(let index=0;index<updatedSigners.length;index++){
       const signer=updatedSigners[index];
       if(signer.invitation==="Pending")continue;
-      events=await chainEvents(events,{type:signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,expiresAt:signer.emailLinkExpiresAt||null,at});
+      events=await chainEvents(events,{type:signer.invitation==="Portal"?"owner.portal_issued":signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,at});
     }
     return{patch:{signers:updatedSigners,events}};
   });
   const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&signers.every(s=>s.uid===user.uid)):ctx.allowReturnTokens;
-  return{ok:true,envelopeId:id,status:"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
+  return{ok:true,envelopeId:id,status:ownerPreSignEmail?"Awaiting Owner Signature":"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(ownerPreSignSigner?{ownerSigningToken:`${id}.${ownerPreSignSigner.id}.${secrets[ownerPreSignIndex]}`}:{}),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
 }
 async function consumeEmailLinkRateLimit(ctx,key,maxAttempts,now){
   const id=await sha256Hex("email-signing-rate:"+key);
@@ -173,7 +187,7 @@ export async function openEmailSigning(ctx,token,ip=""){
     await consumeEmailLinkRateLimit(ctx,"token:"+tokenHash,8,now);
     await consumeEmailLinkRateLimit(ctx,"ip:"+ipHash,20,now);
     const loaded=await load(ctx,token);
-    if(loaded.signer.identityType!=="email-link"||!["issued","opened"].includes(loaded.signer.emailLinkStatus)||now.getTime()>=Date.parse(loaded.signer.emailLinkExpiresAt))throw new HttpError(401,genericEmailSigningFailure());
+    if(loaded.signer.identityType!=="email-link"||!["issued","opened"].includes(loaded.signer.emailLinkStatus))throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env);
     let sessionToken=token;
     if(loaded.signer.emailLinkStatus==="issued"){
@@ -183,7 +197,7 @@ export async function openEmailSigning(ctx,token,ip=""){
       await mutate(ctx,loaded.env.id,async current=>{
         const signer=current.signers.find(item=>item.id===loaded.signer.id);
         if(!signer||signer.identityType!=="email-link"||signer.emailLinkStatus!=="issued")throw new HttpError(401,genericEmailSigningFailure());
-        const opened=await markEmailSigningTokenOpened({tokenHash:signer.tokenHash,expiresAt:signer.emailLinkExpiresAt,status:signer.emailLinkStatus,attemptCount:signer.emailLinkAttemptCount,openCount:signer.emailLinkOpenCount,ipAttempts:signer.emailLinkIpAttempts},{token:parts[2],now,ipHash,maxAttempts:8});
+        const opened=await markEmailSigningTokenOpened({tokenHash:signer.tokenHash,status:signer.emailLinkStatus,attemptCount:signer.emailLinkAttemptCount,openCount:signer.emailLinkOpenCount,ipAttempts:signer.emailLinkIpAttempts},{token:parts[2],now,ipHash,maxAttempts:8});
         signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"used",usedAt:now.toISOString()}].slice(-10);
         signer.tokenHash=sessionHash;
         signer.emailLinkStatus=opened.status;
@@ -196,13 +210,13 @@ export async function openEmailSigning(ctx,token,ip=""){
       });
     }
     const preview=await openSigning(ctx,sessionToken,null);
-    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:preview.linkExpiresAt,envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars,sessionToken};
+    return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:null,envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars,sessionToken};
   }catch{
     throw new HttpError(401,genericEmailSigningFailure());
   }
 }
 
-export async function openSigning(ctx,token,user=null){const{env,signer}=await load(ctx,token);active(ctx,env);assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,title:env.title,ownerName:env.ownerName||"IRPA Document Owner",linkExpiresAt:signer.emailLinkExpiresAt||env.expiresAt,documentHash:env.documentHash,sha256:env.sha256||env.documentHash,byteLength:env.byteLength??env.documentSize??null,status:env.status,signer:{id:signer.id,identityType:signer.identityType,email:signer.email,name:signer.name,status:signer.status,roleAssignments:signer.roleAssignments||[],emailVerified:signer.identityType==="email-link"&&signer.emailLinkStatus==="opened",authenticated:signer.identityType==="email-link"?signer.emailLinkStatus==="opened":!!signer.uid},signers:env.signers.map(s=>({id:s.id,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),fields:(env.fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),appliedFields:[],canSign:can(env,signer),ownerDeclaredParticulars:signer.declaredParticulars||{}}}
+export async function openSigning(ctx,token,user=null){const{env,signer}=await load(ctx,token);active(ctx,env);assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,title:env.title,ownerName:env.ownerName||"IRPA Document Owner",linkExpiresAt:signer.identityType==="email-link"?null:env.expiresAt,documentHash:env.documentHash,sha256:env.sha256||env.documentHash,byteLength:env.byteLength??env.documentSize??null,status:env.status,signer:{id:signer.id,identityType:signer.identityType,email:signer.email,name:signer.name,status:signer.status,roleAssignments:signer.roleAssignments||[],emailVerified:signer.identityType==="email-link"&&signer.emailLinkStatus==="opened",authenticated:signer.identityType==="email-link"?signer.emailLinkStatus==="opened":!!signer.uid},signers:env.signers.map(s=>({id:s.id,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),fields:(env.fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),appliedFields:[],canSign:can(env,signer),ownerDeclaredParticulars:signer.declaredParticulars||{}}}
 export async function getSigningPdf(ctx,token,user=null){const{env,signer}=await load(ctx,token);if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="opened")throw new HttpError(401,genericEmailSigningFailure());const isOwner=Boolean(user?.uid)&&user.uid===env.createdBy;if(!isOwner)assertSignerAuthentication(signer,user);if(env.status==="Completed"){if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");const b=await ctx.storage.get(env.completion.primaryStorageId);if(!b||await sha256Hex(b)!==env.completion.finalHash)throw new HttpError(500,"Integrity check failed.");return{bytes:b,fileName:env.completion.fileName,hash:env.completion.finalHash}}if(isOwner)throw new HttpError(409,"The completed signed PDF is not available yet.");active(ctx,env);const x=await original(ctx,env);return{bytes:x.bytes,fileName:env.fileName,hash:env.documentHash}}
 async function inviteNextPosition(ctx,id){
   const envelope=await ctx.meta.get("envelopes",id);
@@ -288,13 +302,13 @@ export async function resendInvitation(ctx,user,id,signerId){
   if(envelope.signers.some(s=>s.order<target.order&&s.status!=="Signed"))throw new HttpError(409,"This signer position cannot be invited until every signer in the preceding position has submitted.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
-  const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+(ctx.config.emailLinkTtlDays||7)*86400000).toISOString();
+  const secret=randomHex(32),now=ctx.now();
   await mutate(ctx,id,async current=>{
     const signer=current.signers.find(s=>s.id===signerId);
     if(!signer||signer.status==="Signed")throw new HttpError(409,"This signer assignment can no longer be invited.");
     if(signer.identityType==="email-link"){
       signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:now.toISOString()}].slice(-10);
-      signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkLastIpHash=null;signer.emailLinkOpenedAt=null;
+      signer.emailLinkStatus="issued";delete signer.emailLinkExpiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkLastIpHash=null;signer.emailLinkOpenedAt=null;
       
     }
     signer.tokenHash=await sha256Hex(secret);signer.invitation="Pending";
@@ -302,7 +316,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   });
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
-  try{await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",expiresAt:emailLink?expiresAt:envelope.expiresAt});}
+  try{await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",...(!emailLink?{expiresAt:envelope.expiresAt}:{})});}
   catch(error){
     await mutate(ctx,id,async current=>{const signer=current.signers.find(s=>s.id===signerId);if(signer){signer.invitation="Failed";if(emailLink)signer.emailLinkStatus="revoked";}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,at:ctx.now().toISOString()})}};});
     throw new HttpError(502,"The signing invitation could not be delivered. Check the SMTP provider status and retry.");
@@ -326,7 +340,7 @@ export async function revokeInvitation(ctx,user,id,signerId){
 }
 
 
-export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>({id:s.id,name:s.name,email:s.email,order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation,identityType:s.identityType||"account",emailLinkStatus:s.emailLinkStatus||null,emailLinkExpiresAt:s.emailLinkExpiresAt||null})),completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events),distribution:await getSignatureDistributionSummary(ctx,id)}}
+export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>({id:s.id,name:s.name,email:s.email,order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation,identityType:s.identityType||"account",emailLinkStatus:s.emailLinkStatus||null,emailLinkExpiresAt:s.identityType==="email-link"?null:(s.emailLinkExpiresAt||null)})),completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events),distribution:await getSignatureDistributionSummary(ctx,id)}}
 export async function resyncMirror(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status!=="Completed"||!e.externalReference||!e.completion)throw new HttpError(409,"Only completed linked envelopes can be resynchronized.");if(typeof ctx.persistCompletedSignatureEnvelope!=="function")throw new HttpError(503,"Signature mirror persistence is not configured.");await persistMirrorWithStatus(ctx,e,e.completion);const updated=await ctx.meta.get("envelopes",id);return{ok:true,envelopeId:id,status:updated?.status||"Completed",mirrorStatus:updated?.mirrorStatus||"Pending",mirrorError:updated?.mirrorError||null,mirrorAttempts:Number(updated?.mirrorAttempts||0)}}
 export async function persistMirrorWithStatus(ctx,envelope,completion){const id=envelope.id;const now=ctx.now();const nextAt=Number(new Date(envelope.mirrorNextRetryAt||0));if(envelope.mirrorStatus==="Pending"&&Number.isFinite(nextAt)&&nextAt>now.getTime())return false;const attempts=Number(envelope.mirrorAttempts||0)+1;try{await ctx.persistCompletedSignatureEnvelope({envelope,completion});await ctx.meta.update("envelopes",id,{mirrorStatus:"Completed",mirrorError:null,mirrorAttempts:attempts,mirrorNextRetryAt:null,mirrorUpdatedAt:now.toISOString()});return true}catch(error){const message=String(error?.message||error).slice(0,300);const delayMs=Math.min(60*60*1000,30*1000*Math.pow(2,Math.min(attempts-1,7)));try{const latest=await ctx.meta.get("envelopes",id);if(latest)await ctx.meta.update("envelopes",id,{mirrorStatus:"Pending",mirrorError:message,mirrorAttempts:attempts,mirrorNextRetryAt:new Date(now.getTime()+delayMs).toISOString(),mirrorUpdatedAt:now.toISOString()},{ifVersion:latest._v})}catch(statusError){ctx.logger?.error?.("SIGNATURE_MIRROR_STATUS_PERSIST_FAILED",{envelopeId:id,message:String(statusError?.message||statusError).slice(0,200)})}ctx.logger?.error?.("SIGNATURE_PORTAL_COMPLETION_PERSIST_FAILED",{envelopeId:envelope.externalReference,gatewayEnvelopeId:id,message,attempts});return false}}
 export async function getSigningStatus(ctx,token,user=null){const{env,signer}=await load(ctx,token);const privileged=Boolean(user?.uid)&&(user.uid===env.createdBy||user.isAdmin===true);if(!privileged)assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");const completion=env.completion?{finalHash:env.completion.finalHash,completedAt:env.completion.completedAt,primaryStorageId:env.completion.primaryStorageId,fileName:env.completion.fileName,signedFileReference:env.completion.primaryStorageId,files:(env.completion.files||[]).filter(file=>file?.kind==="archive"||(file?.kind==="signer-copy"&&file.signerId===signer.id)),cryptographicEvidenceIds:env.completion.cryptographicEvidenceIds||[]}:null;return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,status:env.status,signingMode:env.signingMode||"Sequential",signer:{id:signer.id,uid:signer.uid||null,status:signer.status},signers:env.signers.map(s=>({id:s.id,uid:privileged||s.id===signer.id?(s.uid||null):null,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),completion,eventCount:env.events.length,auditChainValid:await verifyChain(env.events)}}
