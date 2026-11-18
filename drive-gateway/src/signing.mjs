@@ -234,7 +234,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   const declared={name:cleanText(declarations?.name||"",160),occupation:cleanText(declarations?.title||declarations?.occupation||"",160),capacity:cleanText(declarations?.capacity||"",160),title:cleanText(declarations?.title||declarations?.occupation||"",160)};
   const roleAssignmentEvidence= (Array.isArray(s0.roleAssignments)&&s0.roleAssignments.length?s0.roleAssignments:[{role:"Signer",capacity:"",occupation:""}]).map((assignment,roleAssignmentIndex)=>{
     const assignedFields=(e0.fields||[]).filter(field=>field.signerId===s0.id&&Number(field.roleAssignmentIndex||0)===roleAssignmentIndex);
-    return {roleAssignmentIndex,role:cleanText(assignment.role||"Signer",120),capacity:cleanText(assignment.capacity||"",160),occupation:cleanText(assignment.occupation||"",160),fieldIds:assignedFields.map(field=>field.fieldId),signatureFieldHashes:assignedFields.filter(field=>["Signature","Initials"].includes(field.type)).map(field=>({fieldId:field.fieldId,type:field.type,hash:checkedFieldValues[field.fieldId]?null:null}))};
+    return {roleAssignmentIndex,role:cleanText(assignment.role||"Signer",120),capacity:cleanText(assignment.capacity||"",160),occupation:cleanText(assignment.occupation||"",160),fieldIds:assignedFields.map(field=>field.fieldId),signatureFieldHashes:[]};
   });
   for(const assignment of roleAssignmentEvidence){
     assignment.signatureFieldHashes=[];
