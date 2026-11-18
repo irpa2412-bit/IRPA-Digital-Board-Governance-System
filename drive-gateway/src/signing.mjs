@@ -1,4 +1,4 @@
-import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {Conflict,VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {MAX_SIGNERS,buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
+import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {Conflict,VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
 import {createEmailSigningToken,markEmailSigningTokenOpened,genericEmailSigningFailure} from "./emailSigningLinks.mjs";
 import {distributeCompletedSignatureDocument,getSignatureDistributionSummary,retryFailedSignatureDistributions} from "./signatureDistribution.mjs";
 export async function chainEvents(events,e){const body={...e,prevHash:events.length?events.at(-1).hash:"GENESIS"};return[...events,{...body,hash:await sha256Hex(canonicalJson(body))}]}
@@ -74,7 +74,7 @@ export async function createEnvelope(ctx,user,body){
   if(!doc||doc.status!=="Stored"||(doc.ownerUid!==user.uid&&!user.isAdmin))throw new HttpError(403,"You are not authorized for this document.");
   const archives=parseArchiveSelection(body.archives),input=body.signers,signingMode=String(body?.signingMode||"Sequential");
   if(!["Sequential","Parallel"].includes(signingMode))throw new HttpError(400,"Unsupported signing mode.");
-  if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
+  if(!Array.isArray(input)||input.length<1)throw new HttpError(400,"Provide at least one signer.");
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
   if(cryptoRequired&&input.some(s=>s?.identityType!=="email-link"||s?.uid))throw new HttpError(400,"Every staging and production signer must use a verified email-link identity.");
   // Email-link possession is transaction-scoped mailbox control, not an authority-register lookup.
