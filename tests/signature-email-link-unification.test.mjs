@@ -28,7 +28,7 @@ test("document owner may be included as an email-link signer when explicitly ena
 test("all workflow recipients become email-link identities and assigned PDF fields reach the Gateway",()=>{
   assert.match(portal,/recipients:orderedRecipients,fields,ownerSigningEnabled/);
   assert.match(storage,/identityType:"email-link"/);
-  assert.match(storage,/signers:ordered\.map\(\(recipient,index\)=>\{/);
+  assert.match(storage,/signers:ordered\.map\(\(recipient,index\)\s*=>\s*\{/);
   assert.match(storage,/recipient\.uid/);
   assert.match(storage,/signerAssignmentByKey/);
   assert.match(storage,/signerId:resolveSignerId\(field\)/);
@@ -53,7 +53,7 @@ test("assigned workflow role is not misrepresented as the signer's occupation or
 });
 
 test("Gateway envelopes cannot be signed through the parallel in-app UID workflow",()=>{
-  assert.match(portal,/if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent[\s\S]*?return\}/);
+  assert.match(portal,/if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent[\s\S]*?return;?\}/);
   assert.match(portal,/This envelope must be signed through its verified email-link invitation/);
 });
 
