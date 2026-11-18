@@ -8,7 +8,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 const NEUTRAL="This signing link is unavailable. Contact the document owner for a new invitation.";
 const inputStyle={width:"100%",boxSizing:"border-box",padding:10,border:"1px solid #9ca3af",borderRadius:7,fontSize:15};
 const buttonStyle={padding:"10px 14px",border:0,borderRadius:7,background:"#174a78",color:"#fff",fontWeight:600,cursor:"pointer"};
-const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
+const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Title:"#1d4ed8",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
 
 export default function EmailSigningReadOnlyPage({token}){
  const [record,setRecord]=useState(null),[signingToken,setSigningToken]=useState(""),[activeRoleAssignmentIndex,setActiveRoleAssignmentIndex]=useState(0);
@@ -40,6 +40,7 @@ export default function EmailSigningReadOnlyPage({token}){
     const fields=Array.isArray(metadata.fields)?metadata.fields:[];
     setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
     setDeclarations({name:metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"",occupation:"",capacity:""});
+    const initialFieldValues={};for(const field of fields){if(field.type==="Name")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"";else if(field.type==="Title")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.title||metadata.signer?.title||"";}setFieldValues(initialFieldValues);
     setActiveRoleAssignmentIndex(0);setSelectedFieldId(fields.find(field=>Number(field.roleAssignmentIndex||0)===0)?.fieldId||fields[0]?.fieldId||"");
     const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
     if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
