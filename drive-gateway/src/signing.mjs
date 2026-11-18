@@ -7,7 +7,7 @@ async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d{1,2}$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
 async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");if(!safeEqual(await sha256Hex(secret),s.tokenHash))throw new HttpError(403,"This signing link is not valid.");if(s.identityType==="email-link"&&(!["issued","opened"].includes(s.emailLinkStatus)||!Number.isFinite(Date.parse(s.emailLinkExpiresAt))||ctx.now().getTime()>=Date.parse(s.emailLinkExpiresAt)))throw new HttpError(401,genericEmailSigningFailure());return{env:e,signer:s}}
 function active(ctx,e){if(["Voided","Declined"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");if(ctx.now()>new Date(e.expiresAt))throw new HttpError(403,"This signing link has expired.")}
-const can=(e,s)=>s.status==="Pending"&&(e.signingMode==="Parallel"||e.signers.every(x=>x.order>=s.order||x.status==="Signed"));
+const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
   if(signer?.identityType==="email-link") return signer.emailLinkStatus==="opened";
@@ -76,11 +76,7 @@ export async function createEnvelope(ctx,user,body){
   if(!["Sequential","Parallel"].includes(signingMode))throw new HttpError(400,"Unsupported signing mode.");
   if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
-  if(cryptoRequired&&input.some(s=>{
-    const emailLink=s?.identityType==="email-link"&&!s?.uid;
-    const account=s?.identityType==="account"&&typeof s?.uid==="string"&&s.uid.trim().length>0;
-    return !emailLink&&!account;
-  }))throw new HttpError(400,"Every staging and production signer must use either a verified email-link identity or an authenticated IRPA account identity.");
+  if(cryptoRequired&&input.some(s=>s?.identityType!=="email-link"||s?.uid))throw new HttpError(400,"Every staging and production signer must use a verified email-link identity.");
   // Email-link possession is transaction-scoped mailbox control, not an authority-register lookup.
   const sourceBytes=await ctx.storage.get(doc.primaryStorageId);
   if(!sourceBytes)throw new HttpError(409,"The stored document failed its integrity check.");
@@ -124,7 +120,9 @@ export async function createEnvelope(ctx,user,body){
   }
   try{await ctx.meta.create("envelopes",id,e);}
   catch(error){if(reservationKey)await ctx.meta.delete("externalReferences",reservationKey).catch(()=>{});throw error;}
+  const firstPosition=Math.min(...signers.map(s=>s.order));
   for(let i=0;i<signers.length;i++){
+    if(signers[i].order!==firstPosition)continue;
     const token=`${id}.${signers[i].id}.${secrets[i]}`;
     if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
@@ -136,12 +134,13 @@ export async function createEnvelope(ctx,user,body){
     let events=cur.events;
     for(let index=0;index<updatedSigners.length;index++){
       const signer=updatedSigners[index];
+      if(signer.invitation==="Pending")continue;
       events=await chainEvents(events,{type:signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,expiresAt:signer.emailLinkExpiresAt||null,at});
     }
     return{patch:{signers:updatedSigners,events}};
   });
   const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&signers.every(s=>s.uid===user.uid)):ctx.allowReturnTokens;
-  return{ok:true,envelopeId:id,status:"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(returnTokens?{tokens:secrets.map((s,i)=>`${id}.S${i+1}.${s}`)}:{})};
+  return{ok:true,envelopeId:id,status:"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
 }
 async function consumeEmailLinkRateLimit(ctx,key,maxAttempts,now){
   const id=await sha256Hex("email-signing-rate:"+key);
@@ -199,6 +198,22 @@ export async function openEmailSigning(ctx,token,ip=""){
 
 export async function openSigning(ctx,token,user=null){const{env,signer}=await load(ctx,token);active(ctx,env);assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,title:env.title,ownerName:env.ownerName||"IRPA Document Owner",linkExpiresAt:signer.emailLinkExpiresAt||env.expiresAt,documentHash:env.documentHash,sha256:env.sha256||env.documentHash,byteLength:env.byteLength??env.documentSize??null,status:env.status,signer:{id:signer.id,identityType:signer.identityType,email:signer.email,name:signer.name,status:signer.status,emailVerified:signer.identityType==="email-link"&&signer.emailLinkStatus==="opened",authenticated:signer.identityType==="email-link"?signer.emailLinkStatus==="opened":!!signer.uid},signers:env.signers.map(s=>({id:s.id,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),fields:(env.fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),appliedFields:[],canSign:can(env,signer),ownerDeclaredParticulars:signer.declaredParticulars||{}}}
 export async function getSigningPdf(ctx,token,user=null){const{env,signer}=await load(ctx,token);if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="opened")throw new HttpError(401,genericEmailSigningFailure());const isOwner=Boolean(user?.uid)&&user.uid===env.createdBy;if(!isOwner)assertSignerAuthentication(signer,user);if(env.status==="Completed"){if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");const b=await ctx.storage.get(env.completion.primaryStorageId);if(!b||await sha256Hex(b)!==env.completion.finalHash)throw new HttpError(500,"Integrity check failed.");return{bytes:b,fileName:env.completion.fileName,hash:env.completion.finalHash}}if(isOwner)throw new HttpError(409,"The completed signed PDF is not available yet.");active(ctx,env);const x=await original(ctx,env);return{bytes:x.bytes,fileName:env.fileName,hash:env.documentHash}}
+async function inviteNextPosition(ctx,id){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||["Completed","Voided","Declined","Completing","Finalizing","CompletionFailed"].includes(envelope.status))return;
+  const orders=[...new Set(envelope.signers.filter(s=>s.status!=="Signed").map(s=>s.order))].sort((a,b)=>a-b);
+  for(const order of orders){
+    if(!envelope.signers.filter(s=>s.order<order).every(s=>s.status==="Signed"))continue;
+    const pending=envelope.signers.filter(s=>s.order===order&&s.status==="Pending"&&s.invitation==="Pending");
+    if(!pending.length)continue;
+    for(const signer of pending){
+      try{await resendInvitation(ctx,{uid:envelope.createdBy,isAdmin:false},id,signer.id);}
+      catch(error){ctx.logger?.error?.("SIGNING_NEXT_POSITION_INVITATION_FAILED",{envelopeId:id,signerId:signer.id,errorType:String(error?.name||"Error")});}
+    }
+    return;
+  }
+}
+
 export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[],signatureConfirmed=false,consent,declarations={},ip,userAgent,user}){
   if(consent!==true)throw new HttpError(400,"Consent to sign electronically is required.");
   if(signatureConfirmed!==true&&Array.isArray(fieldApplications)&&fieldApplications.length>0)throw new HttpError(400,"A signature field cannot be applied without an explicit Confirm action.");
@@ -210,8 +225,8 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   active(ctx,e0);
   if(!can(e0,s0))throw new HttpError(409,"It is not yet your turn to sign.");
   const checkedFieldValues=validateFieldValues(e0.fields,s0,fieldValues,sig,fieldApplications);
-  const declared={name:cleanText(declarations?.name||"",160),occupation:cleanText(declarations?.occupation||"",160),capacity:cleanText(declarations?.capacity||"",160)};
-  if(!declared.name||!declared.occupation)throw new HttpError(400,"Enter your name and occupation/capacity for this document before signing.");
+  const declared={name:cleanText(declarations?.name||"",160),occupation:cleanText(declarations?.title||declarations?.occupation||"",160),capacity:cleanText(declarations?.capacity||"",160),title:cleanText(declarations?.title||declarations?.occupation||"",160)};
+  if(!declared.name)throw new HttpError(400,"Enter your name before signing.");
   const ownerDeclared=s0.declaredParticulars||{};
   const discrepancyFields=["name","occupation","capacity"].filter(key=>String(ownerDeclared[key]||"").trim()!==""&&String(ownerDeclared[key]||"").trim().toLowerCase()!==String(declared[key]||"").trim().toLowerCase());
   await original(ctx,e0);
@@ -233,7 +248,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events:await chainEvents(cur.events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy})},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
-  if(!out.winner)return{ok:true,status:"InProgress",completed:false};
+  if(!out.winner){await inviteNextPosition(ctx,e0.id);return{ok:true,status:"InProgress",completed:false};}
   const done=await finalizeEnvelope(ctx,e0.id);
   return done.completed?{ok:true,status:"Completed",completed:true}:{ok:true,status:"CompletionFailed",completed:false};
 }
@@ -251,6 +266,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   const target=envelope.signers.find(s=>s.id===signerId);
   if(!target)throw new HttpError(404,"Signer assignment not found.");
   if(target.status==="Signed")throw new HttpError(409,"A signed assignment cannot receive another signing invitation.");
+  if(envelope.signers.some(s=>s.order<target.order&&s.status!=="Signed"))throw new HttpError(409,"This signer position cannot be invited until every signer in the preceding position has submitted.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
   const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+(ctx.config.emailLinkTtlDays||7)*86400000).toISOString();

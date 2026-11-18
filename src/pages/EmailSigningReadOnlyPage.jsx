@@ -139,7 +139,7 @@ export default function EmailSigningReadOnlyPage({token}){
   if(!reviewMode){setError("Review the complete document and signature placement before submitting.");return;}
   if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
   if(!record?.canSign){setError("This assignment is not yet available for signing.");return;}
-  if(!declarations.name.trim()||!declarations.occupation.trim()){setError("Enter your name and occupation/capacity for this document.");return;}
+  if(!declarations.name.trim()){setError("Enter your name for this document.");return;}
   if(!consent){setError("Confirm your consent only after reviewing the document and signature placement.");return;}
   if(incomplete.length){setError("Complete all required assigned fields before submitting: "+incomplete.map(field=>field.placeholder||field.type+" · Page "+field.page).join(", ")+".");return;}
   if(!signatureFields.length&&typedSignature.trim().length<2){setError("Enter your typed signature before submitting.");return;}
@@ -217,8 +217,8 @@ export default function EmailSigningReadOnlyPage({token}){
      <p style={{fontSize:13,color:"#4b5563"}}>Opening this link confirms control of the invited email address; it does not independently verify your legal identity or authority to bind an organisation. Your transaction-specific declaration is recorded with the signing evidence, but is not checked against an IRPA authority register. Institutional authority must be established through the relevant organisation’s delegation or approval process.</p>
      <p style={{fontSize:13,background:"#f3f4f6",padding:10,borderRadius:7}}><strong>Owner-recorded particulars for this assignment:</strong> {record.ownerDeclaredParticulars?.name||"Not supplied"} · {record.ownerDeclaredParticulars?.occupation||record.ownerDeclaredParticulars?.capacity||"Occupation/capacity not supplied"}</p>
      <label style={{display:"block",margin:"10px 0"}}>Full name<input style={inputStyle} value={declarations.name} disabled={signingClosed} onChange={e=>setDeclaration("name",e.target.value)} autoComplete="name"/></label>
-     <label style={{display:"block",margin:"10px 0"}}>Occupation / capacity<input style={inputStyle} value={declarations.occupation} disabled={signingClosed} onChange={e=>setDeclaration("occupation",e.target.value)} placeholder="Enter your occupation or capacity"/></label>
-     <label style={{display:"block",margin:"10px 0"}}>Additional capacity (optional)<input style={inputStyle} value={declarations.capacity} disabled={signingClosed} onChange={e=>setDeclaration("capacity",e.target.value)} placeholder="Additional official particulars"/></label>
+     <label style={{display:"block",margin:"10px 0"}}>Title (optional)<input style={inputStyle} value={declarations.occupation} disabled={signingClosed} onChange={e=>setDeclaration("occupation",e.target.value)} placeholder="Enter your title (optional)"/></label>
+     <label style={{display:"block",margin:"10px 0"}}>Additional details (optional)<input style={inputStyle} value={declarations.capacity} disabled={signingClosed} onChange={e=>setDeclaration("capacity",e.target.value)} placeholder="Additional official particulars"/></label>
     </section>
     {!!fields.length&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
      <h2 style={{fontSize:18}}>Your assigned fields</h2>
@@ -236,7 +236,7 @@ export default function EmailSigningReadOnlyPage({token}){
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Changes to assigned fields update this preview. Your signature has not been submitted yet.</p>
      {incomplete.length>0&&<p role="status" style={{fontSize:13,color:"#92400e"}}>{incomplete.length} required field(s) remain incomplete: {incomplete.map(field=>field.placeholder||field.type+" · Page "+field.page).join(", ")}. Submit will be rejected until all are completed. You may still revoke this request.</p>}
-     <button type="button" disabled={submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!declarations.occupation.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
+     <button type="button" disabled={submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!consent||Boolean(pageError)} onClick={submit} style={{...buttonStyle,background:"#166534",opacity:(submitting||!record.canSign||!pageRendered||(!signatureFields.length&&typedSignature.trim().length<2)||!declarations.name.trim()||!consent||Boolean(pageError))?0.5:1}}>{submitting?"Submitting…":"Submit"}</button>
      <button type="button" disabled={revoking||submitting||record.signer?.status!=="Pending"} onClick={revoke} style={{...buttonStyle,background:"#991b1b",marginLeft:8,opacity:(revoking||submitting)?0.5:1}}>{revoking?"Revoking…":"Revoke"}</button>
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}

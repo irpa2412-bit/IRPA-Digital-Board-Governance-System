@@ -8,22 +8,24 @@ const gateway=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.
 const emailPage=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
 const invitation=fs.readFileSync(new URL("../drive-gateway/src/invitationEmail.mjs",import.meta.url),"utf8");
 
-test("registered member and employee assignments retain authenticated account identity",()=>{
+test("registered member and employee assignments are serialized to Gateway as email-link identities",()=>{
   const registered=portal.match(/if\(registered\)\{([\s\S]*?)\}else\{/);
   assert.ok(registered,"registered signer branch must remain explicit");
-  assert.match(registered[1],/identityType:"account"/);
-  assert.match(registered[1],/uid:registered\.uid/);
+  assert.match(registered[1],/email:registeredEmail/);
+  assert.match(storage,/identityType:"email-link"/);
   assert.match(registered[1],/occupation:signerAuthorityRole\.trim\(\)/);
 });
 
-test("document owner is an authenticated account signer only when explicitly enabled",()=>{
+test("document owner may be included as an email-link signer when explicitly enabled",()=>{
   assert.match(portal,/documentOwner=useMemo\(\(\)=>\(\{uid:auth\.currentUser\?\.uid,identityType:"account"/);
+  assert.match(storage,/identityType:"email-link"/);
   assert.match(portal,/ownerSigningEnabled\?\[\{\.\.\.documentOwner,optionalSigning:false,actionRequired:true\}\]:\[\]/);
   assert.match(portal,/if\(ownerSigningEnabled&&!fields\.some/);
 });
 
-test("all workflow recipients preserve account or email-link identity and assigned PDF fields reach the Gateway",()=>{
-  assert.match(portal,/const gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:recipient\.identityType==="email-link"\?"email-link":"account"\}\)\)/);
+test("all workflow recipients become email-link identities and assigned PDF fields reach the Gateway",()=>{
+  assert.match(portal,/const gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:"email-link"\}\)\)/);
+  assert.match(storage,/identityType:"email-link"/);
   assert.match(portal,/recipients:gatewayRecipients,fields\}/);
   assert.match(storage,/recipient\.uid/);
   assert.match(storage,/signerAssignmentByKey/);
@@ -37,10 +39,9 @@ test("Gateway email-link signing is independent of Firebase UID authentication",
   assert.match(invitation,/signer-specific session/);
 });
 
-test("staging and production Gateway envelopes accept only email-link guests without UID or authenticated account signers with UID",()=>{
-  assert.match(gateway,/const emailLink=s\?\.identityType==="email-link"&&!s\?\.uid/);
-  assert.match(gateway,/const account=s\?\.identityType==="account"&&typeof s\?\.uid==="string"&&s\.uid\.trim\(\)\.length>0/);
-  assert.match(gateway,/return !emailLink&&!account/);
+test("staging and production Gateway envelopes reject every non-email-link signer identity",()=>{
+  assert.match(gateway,/input\.some\(s=>s\?\.identityType!=="email-link"\|\|s\?\.uid\)/);
+  assert.match(gateway,/Every staging and production signer must use a verified email-link identity/);
   assert.match(gateway,/else assertSignerAuthentication\(s0,user\)/);
 });
 

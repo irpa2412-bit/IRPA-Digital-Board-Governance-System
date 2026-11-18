@@ -24,6 +24,24 @@ permissions:
   contents: read
 
 jobs:
+  signature-hierarchy-owner-roles:
+    name: Signature hierarchy and owner roles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Gateway dependencies
+        working-directory: drive-gateway
+        run: npm ci --no-audit --no-fund
+      - name: Verify hierarchy, routing, owner authorization, and lifecycle invariants
+        working-directory: drive-gateway
+        run: node --test tests/e2e.test.mjs
+
   signature-security-regression:
     name: Signature security regression
     runs-on: ubuntu-latest

@@ -165,7 +165,7 @@ test("duplicate email signer is refused and login-bound signing remains UID auth
 });
 
 
-test("staging and production accept UID-bound account signers and verified email-link guests only",async()=>{
+test("staging and production require email-link identities for every signer",async()=>{
   const f=await fixture();
   const ctx={...f.ctx,env:{...f.ctx.env,IRPA_ENVIRONMENT:"staging"}};
   const owner={uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false};
@@ -173,18 +173,11 @@ test("staging and production accept UID-bound account signers and verified email
     {email:"member@example.org",uid:"registered-member-uid",name:"Registered Member"},
     {email:"member@example.org",uid:"registered-member-uid",identityType:"email-link",name:"Registered Member"},
     {email:"member@example.org",uid:"registered-member-uid",identityType:"other",name:"Registered Member"},
-    {email:"member@example.org",identityType:"account",name:"Missing UID"}
+    {email:"member@example.org",identityType:"account",name:"Missing UID"},
+    {email:"member@example.org",uid:"registered-member-uid",identityType:"account",name:"Registered Member"}
   ]){
-    await assert.rejects(
-      ()=>createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[signer]}),
-      error=>error?.status===400&&error.message.includes("Every staging and production signer must use either a verified email-link identity or an authenticated IRPA account identity")
-    );
+    await assert.rejects(()=>createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[signer]}),error=>error?.status===400&&error.message==="Every staging and production signer must use a verified email-link identity.");
   }
-  const account=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"member@example.org",uid:"registered-member-uid",identityType:"account",name:"Registered Member"}]});
-  assert.equal(account.status,"Sent");
-  const accountSaved=await ctx.meta.get("envelopes",account.envelopeId);
-  assert.equal(accountSaved.signers[0].uid,"registered-member-uid");
-  assert.equal(accountSaved.signers[0].identityType,"account");
   const guest=await createEnvelope(ctx,owner,{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"guest@example.org",identityType:"email-link",name:"External Guest"}]});
   assert.equal(guest.status,"Sent");
   const guestSaved=await ctx.meta.get("envelopes",guest.envelopeId);
