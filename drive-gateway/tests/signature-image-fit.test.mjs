@@ -258,7 +258,7 @@ test("PDF finalizer binds a field to its exact signer ID when multiple signer re
 test("signature and initials assignment defaults fit within a single assignee row", async () => {
   const fs = await import("node:fs/promises");
   const source = await fs.readFile(new URL("../../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
-  assert.match(source, /Signature:\\{width:18,height:3\\.5\\}/);
-  assert.match(source, /Initials:\\{width:10,height:3\\}/);
-  assert.doesNotMatch(source, /Signature:\\{width:28,height:10\\}/);
+  assert.match(source, /Signature:\{width:18,height:3\.5\}/);
+  assert.match(source, /Initials:\{width:10,height:3\}/);
+  assert.doesNotMatch(source, /Signature:\{width:28,height:10\}/);
 });
