@@ -515,6 +515,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
         occupation:String(recipient.occupation||recipient.capacity||"").trim(),
         capacity:String(recipient.capacity||"").trim(),
+        roleAssignments:(Array.isArray(recipient.roleAssignments)?recipient.roleAssignments:[{role:recipient.role||"Signer",capacity:String(recipient.capacity||"").trim(),occupation:String(recipient.occupation||"").trim()}]).map(item=>({role:String(item.role||"Signer").trim().slice(0,120),capacity:String(item.capacity||"").trim().slice(0,160),occupation:String(item.occupation||"").trim().slice(0,160)})),
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
       };
     }),
