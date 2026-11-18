@@ -2,6 +2,7 @@ import { getIdToken } from "firebase/auth";
 import { assertGatewaySigningResponse } from "./signatureGatewayResponse.js";
 import { auth } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
+import { normalizeSignatureField } from "../utils/signatureFieldCoordinates.mjs";
 
 const GATEWAY_URL = getGoogleDriveGatewayUrl();
 
