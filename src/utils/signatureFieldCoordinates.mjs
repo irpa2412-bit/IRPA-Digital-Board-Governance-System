@@ -24,13 +24,7 @@ export function normalizeSignatureField(field, { warn = null } = {}) {
 
 export function signatureFieldFromPercent(field) {
   const { coordinateSpace: _coordinateSpace, ...percentField } = field || {};
-  return normalizeSignatureField({
-    ...percentField,
-    x: Number(percentField.x ?? 0) * 100,
-    y: Number(percentField.y ?? 0) * 100,
-    width: Number(percentField.width ?? 0) * 100,
-    height: Number(percentField.height ?? 0) * 100
-  });
+  return normalizeSignatureField(percentField);
 }
 
 export function signatureFieldToPercent(field, options) {
