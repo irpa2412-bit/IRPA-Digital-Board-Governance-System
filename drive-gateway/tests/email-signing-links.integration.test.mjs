@@ -4,7 +4,7 @@ import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
-import {genericEmailSigningFailure} from "../src/emailSigningLinks.mjs";
+import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
 import {openSigning,sign,declineSigning} from "../src/signing.mjs";
 
@@ -111,6 +111,21 @@ test("email-link signer is stored with token hash, email hash and issued status 
   assert.equal(f.sent.length,1);
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
+});
+
+test("email signing links do not expire with time and become unusable only after use or revocation",async()=>{
+  const issuedAt=new Date("2026-11-16T08:00:00.000Z");
+  const issued=await createEmailSigningToken({envelopeId:"ENV-LONG-LIVED",signerId:"S1",email:"signer@example.org",now:issuedAt,randomBytes:new Uint8Array(32).fill(7)});
+  assert.equal(issued.record.expiresAt,undefined);
+  const oneYearLater=new Date("2027-11-16T08:00:00.000Z");
+  assert.equal((await inspectEmailSigningToken(issued.token,issued.record,oneYearLater)).ok,true);
+  const opened=await markEmailSigningTokenOpened(issued.record,{token:issued.token,now:oneYearLater,ipHash:"test-ip"});
+  assert.equal(opened.status,"opened");
+  const used=consumeEmailSigningToken(opened,{now:oneYearLater});
+  assert.equal(used.status,"used");
+  assert.equal((await inspectEmailSigningToken(issued.token,used,oneYearLater)).ok,false);
+  const revoked=revokeEmailSigningToken(issued.record,{now:oneYearLater,actorUid:"owner"});
+  assert.equal((await inspectEmailSigningToken(issued.token,revoked,oneYearLater)).ok,false);
 });
 
 test("email link opens once, changes status to opened and exposes only its controlled PDF",async()=>{
