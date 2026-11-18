@@ -79,7 +79,7 @@ test("email-link signer receives the email-signing URL and redeems the exact one
   const url=new URL(f.sent[0].link);
   assert.equal(url.pathname,"/");
   const token=url.searchParams.get("emailSignToken");
-  assert.match(token,/^ENV-[0-9a-f]+\\.S1\\.[0-9a-f]{64}$/);
+  assert.match(token,/^ENV-[0-9a-f]+\.S1\.[0-9a-f]{64}$/);
   assert.equal(url.searchParams.has("gatewayToken"),false);
   const opened=await openEmailSigning(f.ctx,token,"192.0.2.10");
   assert.equal(opened.ok,true);
