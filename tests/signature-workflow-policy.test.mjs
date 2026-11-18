@@ -358,7 +358,7 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(emailPortal,/allowTyped=\{false\}/);
   assert.match(emailPortal,/Your own saved Signature Profile specimen has been confirmed/);
   assert.match(emailPortal,/Your hand-drawn specimen has been confirmed/);
-  assert.match(emailPortal,/setSignaturePadField\(null\);setSelectedFieldId\("")/);
+  assert.ok(emailPortal.includes('setSignaturePadField(null);setSelectedFieldId("");'));
   assert.match(confirmationPad,/useState\(hasSavedSpecimen\?"Use my saved signature":"Draw"\)/);
   assert.match(confirmationPad,/Nothing is stamped until you tap Confirm/);
 });
