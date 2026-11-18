@@ -19,14 +19,14 @@ import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
-  const issued = await createEmailSigningToken({envelopeId:"ENV-TEST01",signerId:"S1",email:"Signer@Example.org",now:NOW,ttlDays:7});
+  const issued = await createEmailSigningToken({envelopeId:"ENV-TEST01",signerId:"S1",email:"Signer@Example.org",now:NOW});
   assert.ok(issued.tokenBytes >= 32);
   assert.equal(issued.record.tokenHash, await sha256Hex(issued.token));
   assert.equal(issued.record.emailHash, await hashNormalizedEmail("signer@example.org"));
   assert.equal(issued.record.envelopeId,"ENV-TEST01");
   assert.equal(issued.record.signerId,"S1");
   assert.equal(issued.record.status,"issued");
-  assert.equal(issued.record.expiresAt,"2026-11-23T08:00:00.000Z");
+  assert.equal(issued.record.expiresAt,undefined,"email-link tokens have no time-based expiry");
   assert.equal(JSON.stringify(issued.record).includes(issued.token),false);
   assert.equal(issued.record.attemptCount,0);
 });
@@ -40,11 +40,11 @@ test("email token opens once and transitions issued to opened", async () => {
   await assert.rejects(()=>markEmailSigningTokenOpened(opened,{token:issued.token,now:NOW}),/unavailable/i);
 });
 
-test("email token expiry is enforced with a neutral failure", async () => {
-  const issued=await createEmailSigningToken({envelopeId:"ENV-TEST03",signerId:"S1",email:"a@example.org",now:NOW,ttlDays:1});
-  const result=await inspectEmailSigningToken(issued.token,issued.record,new Date("2026-11-17T08:00:01.000Z"));
-  assert.equal(result.ok,false);
-  assert.equal(result.error,genericEmailSigningFailure());
+test("email token remains valid after one year and has no time-based expiry", async () => {
+  const issued=await createEmailSigningToken({envelopeId:"ENV-TEST03",signerId:"S1",email:"a@example.org",now:NOW});
+  const result=await inspectEmailSigningToken(issued.token,issued.record,new Date("2027-11-16T08:00:01.000Z"));
+  assert.equal(result.ok,true);
+  assert.equal(result.record,issued.record);
 });
 
 test("revoked token is unusable and resend rotates token while preserving only the new hash", async () => {
