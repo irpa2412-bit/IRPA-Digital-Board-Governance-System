@@ -504,7 +504,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   for(const [index,recipient] of ordered.entries()){
     const signerId="S"+String(index+1);
     const assignments=Array.isArray(recipient.roleAssignments)&&recipient.roleAssignments.length?recipient.roleAssignments:[{role:recipient.role||"Signer"}];
-    for(let roleAssignmentIndex=0;roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
+    for(let roleAssignmentIndex=0;assignments.length>1&&roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
       if(!fields.some(field=>field.signerId===signerId&&field.roleAssignmentIndex===roleAssignmentIndex&&["Signature","Initials"].includes(field.type))){
         throw new Error("Place at least one Signature or Initials field for every responsibility assigned to "+(recipient.name||recipient.email)+". Missing responsibility "+(assignments[roleAssignmentIndex].role||("Assignment "+(roleAssignmentIndex+1)))+".");
       }
