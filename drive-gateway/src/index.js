@@ -376,6 +376,7 @@ export default {
       if (pathname === "/api/signature-workflow/view" && request.method === "GET") return await getSignatureWorkflowViewRoute(request, env);
       if (pathname === "/api/signature-workflow/add-signer-dry-run" && request.method === "POST") return await addSignerDryRunRoute(request, env);
       if (pathname === "/api/signature-workflow/draft" && request.method === "POST") return await saveSignatureWorkflowDraftRoute(request, env);
+      if (pathname === "/api/signature-workflow/mutate" && request.method === "POST") return await mutateSignatureWorkflowEnvelopeRoute(request, env);
       if (pathname === "/api/system/diagnostics" && request.method === "GET") return await systemDiagnosticsRoute(request, env);
       if (pathname === "/api/system/actual-data-access" && (request.method === "GET" || request.method === "POST")) return await actualDataAccessRoute(request, env);
       if (pathname === "/api/members/reconcile-registered-identity-uids" && request.method === "POST") return await reconcileRegisteredIdentityUidsRoute(request, env);
@@ -1302,6 +1303,73 @@ async function saveSignatureWorkflowDraftRoute(request, env) {
     return json({ok:true,envelopeId,draft:envelope,writePath:"authenticated-worker",atomic:true},200,corsHeaders(request));
   } catch (error) { const failedStep=String(error?.diagnosticStep||step); const diagnostics={step:failedStep,firestoreHttpStatus:Number(error?.firestoreHttpStatus)||null,googleStatus:String(error?.googleStatus||"UNKNOWN"),googleMessage:String(error?.googleMessage||error?.message||"No detail").replace(/[\r\n]/g," ").slice(0,240)}; console.error("Signature workflow draft save failed",diagnostics); return json({ok:false,step:failedStep,error:failedStep+" failed: "+String(error?.message||error).replace(/[\r\n]/g," ").slice(0,240),diagnostics},Number(error?.status)||500,corsHeaders(request)); }
 }
+async function mutateSignatureWorkflowEnvelopeRoute(request,env) {
+  let step="Firebase authentication";
+  try {
+    const claims=await authenticateFirebaseRequest(request,env);
+    const uid=String(claims.user_id||"");
+    const body=await request.json().catch(()=>({}));
+    const envelopeId=String(body.envelopeId||"").trim();
+    const action=String(body.action||"");
+    const details=body.details&&typeof body.details==="object"?body.details:{};
+    if(!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId))return json({ok:false,error:"A valid envelope ID is required."},400,corsHeaders(request));
+    if(!["start","attach-gateway","invitation-sent","initial-invitation-sent"].includes(action))return json({ok:false,error:"Unsupported signing-envelope mutation."},400,corsHeaders(request));
+    step="Load envelope and verify owner/participant authority";
+    const token=await getFirestoreAdminAccessToken(env);
+    const record=await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
+    if(!record?.fields)return json({ok:false,error:"Signing envelope not found."},404,corsHeaders(request));
+    const envelope=firestoreDocumentToPlain(record)||{};
+    const ownerUid=String(envelope.ownerUid||envelope.senderUid||"");
+    if(ownerUid!==uid)return json({ok:false,error:"Only the original envelope owner may perform this operation."},403,corsHeaders(request));
+    const now=new Date().toISOString();
+    const patch={updatedAt:now};
+    let eventName="";
+    let eventDetails={actorUid:uid};
+    if(action==="start"){
+      if(String(envelope.status||"")!=="Draft")return json({ok:false,error:"Only a draft envelope can be started."},409,corsHeaders(request));
+      if(String(details.workflowStartedByUid||"")!==uid)return json({ok:false,error:"Workflow starter does not match the authenticated owner."},403,corsHeaders(request));
+      patch.status=String(details.status||"Shared")==="In Progress"?"In Progress":"Shared";
+      patch.workflowStartedAt=now;patch.workflowStartedByUid=uid;
+      if(details.gateway&&typeof details.gateway==="object"){
+        const g=details.gateway;
+        if(!/^[A-Za-z0-9_-]{6,150}$/.test(String(g.gatewayEnvelopeId||"")))return json({ok:false,error:"A valid Gateway envelope reference is required."},400,corsHeaders(request));
+        Object.assign(patch,{gatewayEnvelopeId:String(g.gatewayEnvelopeId),gatewayDocumentId:g.gatewayDocumentId||null,gatewayOriginalHash:g.gatewayOriginalHash||null,gatewaySigningStatus:String(g.gatewaySigningStatus||"Sent"),gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:String(g.gatewayInvitationStatus||"Sent"),gatewayInvitationFailures:Math.max(0,Number(g.gatewayInvitationFailures)||0)});
+      }
+      eventName="Workflow Started";eventDetails={...eventDetails,currentSignerUid:envelope.currentSignerUid||null,gatewayEnvelopeId:patch.gatewayEnvelopeId||null};
+    } else if(action==="attach-gateway"){
+      if(!/^[A-Za-z0-9_-]{6,150}$/.test(String(details.gatewayEnvelopeId||"")))return json({ok:false,error:"A valid Gateway envelope reference is required."},400,corsHeaders(request));
+      patch.gatewayEnvelopeId=String(details.gatewayEnvelopeId);
+      patch.gatewayEmailLinkStatus=String(details.gatewayEmailLinkStatus||"Sent");
+      patch.gatewayEmailLinkSignerCount=Math.max(0,Math.min(100,Number(details.gatewayEmailLinkSignerCount)||0));
+      patch.gatewayEmailLinkInvitations=Array.isArray(details.gatewayEmailLinkInvitations)?details.gatewayEmailLinkInvitations.slice(0,100).map(item=>({signerUid:String(item?.signerUid||item?.uid||""),status:String(item?.status||"Sent")})):[];
+      patch.gatewayEmailLinkUpdatedAt=now;
+      eventName="Gateway Email-link Envelope Attached";
+      eventDetails={...eventDetails,gatewayEnvelopeId:patch.gatewayEnvelopeId,invitationCount:patch.gatewayEmailLinkSignerCount};
+    } else {
+      const signerUid=String(details.signerUid||"");
+      const participants=Array.isArray(envelope.participantUids)?envelope.participantUids.map(String):[];
+      if(!signerUid||!participants.includes(signerUid))return json({ok:false,error:"Invitation recipient is not an assigned envelope participant."},403,corsHeaders(request));
+      const deliveryStatus=String(details.deliveryStatus||"Sent").slice(0,40);
+      if(action==="invitation-sent"){if(String(envelope.status||"")==="Draft")patch.status="Sent";patch.invitationStatus=deliveryStatus;patch.invitationSentAt=now;patch.invitationSentByUid=uid;patch.invitationSentByEmail=String(claims.email||"").trim().toLowerCase();}
+      else {patch.currentSignerEmail=String((envelope.recipients||[]).find(r=>String(r.uid||"")===signerUid)?.email||"").trim().toLowerCase();patch.currentSignerName=String((envelope.recipients||[]).find(r=>String(r.uid||"")===signerUid)?.name||"");patch.currentSignerInvitationStatus=deliveryStatus;patch.currentSignerInvitationSentAt=now;}
+      eventName=action==="invitation-sent"?"Signing Invitation Sent":"Initial Signer Invitation Sent";
+      eventDetails={...eventDetails,signerUid,deliveryStatus};
+    }
+    step="Commit authorized envelope mutation and audit event atomically";
+    const base="projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents";
+    const eventId="signature-mutation-"+Date.now()+"-"+crypto.randomUUID().slice(0,10);
+    const event={envelopeId,event:eventName,actorUid:uid,details:eventDetails,createdAt:now};
+    const fields=Object.fromEntries(Object.entries(patch).map(([key,value])=>[key,signatureDraftFirestoreValue(value,key)]));
+    const writes=[
+      {update:{name:base+"/signatureEnvelopes/"+envelopeId,fields},updateMask:{fieldPaths:Object.keys(fields)},currentDocument:{exists:true}},
+      {update:{name:base+"/signatureEvents/"+eventId,fields:signatureDraftFirestoreValue(event).mapValue.fields},currentDocument:{exists:false}}
+    ];
+    const response=await fetch("https://firestore.googleapis.com/v1/projects/"+getFirebaseProjectId(env)+"/databases/(default)/documents:commit",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({writes})});
+    if(!response.ok){const detail=await response.json().catch(()=>({}));const ge=detail?.error||{};const error=new Error(String(ge.message||"Firestore rejected the authorized envelope update.").replace(/[\\r\\n]/g," ").slice(0,240));error.firestoreHttpStatus=response.status;throw error;}
+    return json({ok:true,envelopeId,action,writePath:"authenticated-gateway",auditRecorded:true,atomic:true},200,corsHeaders(request));
+  }catch(error){console.error("Signature envelope mutation failed",{step,message:String(error?.message||error).slice(0,240),firestoreHttpStatus:error?.firestoreHttpStatus||null});return json({ok:false,error:String(error?.message||"The signing-envelope mutation failed.").slice(0,240),step},Number(error?.status)||500,corsHeaders(request));}
+}
+
 async function reconcileSignatureDocumentIds(request, env) {
   const claims = await authenticateFirebaseRequest(request, env);
   const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
