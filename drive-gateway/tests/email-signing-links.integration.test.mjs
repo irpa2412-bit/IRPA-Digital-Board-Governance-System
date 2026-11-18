@@ -30,6 +30,47 @@ async function fixture({authority=true,failMail=false}={}) {
   return {ctx,sent,created,envelope,token,now:value=>{now=value}};
 }
 
+
+test("owner signs in the portal before any other signer is invited; completing owner signature releases the next signer",async()=>{
+  const sent=[];let now=NOW;
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
+    now:()=>new Date(now),verifyUser:async()=>null,sendInvitation:async message=>sent.push(message),logger:{error(){}}
+  });
+  const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
+  const source=await ctx.storage.put({path:"source/owner-first.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  const documentId="DOC-OWNER-FIRST";
+  await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"owner-first.pdf",title:"Owner First Signing",classification:"Restricted"});
+  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId,externalReference:"IRPA-OWNER-FIRST",archives:["board-governance"],signingMode:"Sequential",ownerPreSignEmail:"owner@example.org",
+    signers:[
+      {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:1,role:"Document Owner"},
+      {identityType:"email-link",email:"signer@example.org",name:"Next Signer",order:2,role:"Signer"}
+    ],
+    fields:[
+      {fieldId:"OWNER-SIGNATURE",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true},
+      {fieldId:"NEXT-SIGNATURE",type:"Signature",signerId:"S2",page:1,x:40,y:10,width:20,height:8,required:true}
+    ]
+  });
+  assert.equal(created.status,"Awaiting Owner Signature");
+  assert.equal(sent.length,0,"no participant invitation is sent before the owner signs");
+  assert.ok(created.ownerSigningToken,"the authenticated owner receives the portal session token");
+  const ownerOpened=await openEmailSigning(ctx,created.ownerSigningToken,"198.51.100.31");
+  assert.equal(ownerOpened.signer.email,"owner@example.org");
+  const result=await sign(ctx,{
+    token:ownerOpened.sessionToken,signature:{type:"drawn",value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="},
+    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:10,y:10,width:20,height:8,value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}],
+    fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Document Owner"}
+  });
+  assert.equal(result.status,"InProgress");
+  assert.equal(sent.length,1,"the next signer is invited only after the owner completes signing");
+  assert.equal(sent[0].to,"signer@example.org");
+  assert.match(sent[0].link,/emailSignToken=/);
+  const stored=await ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(stored.signers[0].status,"Signed");
+  assert.equal(stored.signers[1].invitation,"Sent");
+});
+
 test("invalid token failures are rate-limited by token and IP with one neutral response",async()=>{
   const f=await fixture();
   const repeated="ENV-UNKNOWN.S1."+"a".repeat(64);
