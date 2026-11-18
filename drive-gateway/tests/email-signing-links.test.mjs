@@ -18,6 +18,13 @@ import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
+test("email signing invitation clearly states there is no time-based expiry",()=>{
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
+  assert.match(message.text,/no time-based expiry/i);
+  assert.match(message.text,/becomes unusable after redemption/i);
+  assert.match(message.html,/No time-based expiry/i);
+});
+
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
   const issued = await createEmailSigningToken({envelopeId:"ENV-TEST01",signerId:"S1",email:"Signer@Example.org",now:NOW});
   assert.ok(issued.tokenBytes >= 32);
