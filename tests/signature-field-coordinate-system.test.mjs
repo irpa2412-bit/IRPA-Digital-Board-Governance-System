@@ -113,3 +113,11 @@ test("270-degree rotated CropBox maps the visible top-left rectangle back into P
   close(box.width, crop.width * 0.05);
   close(box.height, crop.height * 0.1);
 });
+
+
+test("unknown coordinate-space markers fail closed instead of being misread as legacy percentages", () => {
+  assert.throws(
+    () => normalizeSignatureField({ fieldId: "unknown-space", page: 1, x: 0.2, y: 0.3, width: 0.1, height: 0.05, coordinateSpace: "future-coordinate-v2" }),
+    /coordinate space is not supported/
+  );
+});
