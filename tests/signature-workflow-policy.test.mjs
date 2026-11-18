@@ -186,8 +186,9 @@ test("signature assignment and signing handlers synchronously reject repeated su
   const sign = portal.match(/async function sign\(\)\{([\s\S]*?)(?=\n\s*(?:async )?function |\n\s*return \()/);
   assert.ok(sign, "the signing handler must exist");
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
-  assert.match(sign[1], /signInFlightRef\.current=true/);
-  assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
+  assert.doesNotMatch(sign[1], /signEnvelope\(/, "the in-app account signing fallback must remain unreachable");
+  assert.match(sign[1], /This envelope must be signed through its verified email-link invitation/);
+  assert.match(sign[1], /if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent[\s\S]*?return;?\}/, "unsent drafts must be blocked before any in-app signing attempt");
 });
 
 
@@ -210,7 +211,7 @@ test("participant creation and field assignment are performed inside the PDF pal
   assert.match(portal, /onAddSigner=\{addSigner\}/);
   assert.match(portal, /onMoveSigner=\{moveSigner\}/);
   assert.match(portal, /onSelectAssignee=\{setActiveAssigneeUid\}/);
-  assert.match(portal, /const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setPendingFieldType\("".*?onSelectAssignee\?\.\(uid\)\}/);
+  assert.match(portal, /const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setSelectedRoleAssignmentIndex\(0\);setPendingFieldType\("".*?onSelectAssignee\?\.\(uid\)\}/);
   assert.match(portal, /onOwnerSigningChange=\{changeOwnerSigning\}/);
   assert.match(portal, /Assign fields to this person/);
   assert.match(portal, /FIELDS ON THIS DOCUMENT/);
@@ -222,7 +223,11 @@ test("duplicate participant identities are reused and rapid repeated add actions
   const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner, "the palette participant handler must exist");
   assert.match(addSigner[1], /const duplicate=recipients\.find\(x=>\(registered&&x\.uid===registered\.uid\)\|\|\(registeredEmail&&String\(x\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===registeredEmail\)\)/);
-  assert.match(addSigner[1], /The existing signer record has been selected; no duplicate was created/);
+  assert.match(addSigner[1], /const existingAssignments=Array\.isArray\(duplicate\.roleAssignments\)/);
+  assert.match(addSigner[1], /const sameAssignment=existingAssignments\.some/);
+  assert.match(addSigner[1], /The existing responsibility was selected; no duplicate was created/);
+  assert.match(addSigner[1], /roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
+  assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(registeredEmail))'));
@@ -285,4 +290,23 @@ test("refreshing an envelope reloads signer status and invitation delivery so re
   assert.match(page, /invitation:deliverySigner\.invitation\?\?signer\.invitation/);
   assert.match(page, /onClick=\{refreshGatewayEmailStatus\}/);
   assert.match(page, /onClick=\{\(\)=>resendEmailLink\(item\.id\)\}/);
+
+});
+
+test("new envelopes remain inactive drafts until Start Workflow sends Gateway email-link invitations", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const storage = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
+  const create = page.match(/async function createEnvelope\(e\)\{([\s\S]*?)(?=\n async function saveAndClosePreparation\()/);
+  assert.ok(create, "the envelope creation handler must exist");
+  assert.doesNotMatch(create[1], /createGatewaySignatureEnvelope|attachGatewayEmailLinkEnvelope/);
+  assert.match(create[1], /Draft envelope saved\. No invitations have been sent/);
+  const start = storage.match(/export async function startSignatureWorkflow\(envelope\)\{([\s\S]*?)(?=\nexport async function)/);
+  assert.ok(start, "the authenticated workflow start handler must exist");
+  assert.match(start[1], /createGatewaySignatureEnvelope\(\{envelope,sourceBytes\}\)/);
+  assert.doesNotMatch(start[1], /if\(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED\)/);
+  assert.match(page, /if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent/);
+  assert.match(page, /This envelope must be signed through its verified email-link invitation/);
+  const signingAction = page.match(/async function sign\(\)\{([\s\S]*?)\n \}/);
+  assert.ok(signingAction, "the Sign Document action must exist");
+  assert.doesNotMatch(signingAction[1], /signEnvelope\(/, "the account-based client signing fallback must not be reachable");
 });

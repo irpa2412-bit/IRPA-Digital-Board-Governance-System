@@ -498,9 +498,18 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
   }
   const fields = (envelope.fields || []).map(field => ({
     fieldId:field.fieldId,type:field.type,page:Number(field.page || 1),x:Number(field.x ?? 10),y:Number(field.y ?? 80),
-    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),required:field.required === true,
+    width:Number(field.width ?? 24),height:Number(field.height ?? 9),signerId:resolveSignerId(field),roleAssignmentIndex:Number.isInteger(Number(field.roleAssignmentIndex))?Number(field.roleAssignmentIndex):0,required:field.required === true,
     placeholder:field.placeholder || ""
   }));
+  for(const [index,recipient] of ordered.entries()){
+    const signerId="S"+String(index+1);
+    const assignments=Array.isArray(recipient.roleAssignments)&&recipient.roleAssignments.length?recipient.roleAssignments:[{role:recipient.role||"Signer"}];
+    for(let roleAssignmentIndex=0;assignments.length>1&&roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
+      if(!fields.some(field=>field.signerId===signerId&&field.roleAssignmentIndex===roleAssignmentIndex&&["Signature","Initials"].includes(field.type))){
+        throw new Error("Place at least one Signature or Initials field for every responsibility assigned to "+(recipient.name||recipient.email)+". Missing responsibility "+(assignments[roleAssignmentIndex].role||("Assignment "+(roleAssignmentIndex+1)))+".");
+      }
+    }
+  }
   const payload = {
     externalReference:envelope.id,
     documentId,
@@ -515,6 +524,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
         occupation:String(recipient.occupation||recipient.capacity||"").trim(),
         capacity:String(recipient.capacity||"").trim(),
+        roleAssignments:(Array.isArray(recipient.roleAssignments)?recipient.roleAssignments:[{role:recipient.role||"Signer",capacity:String(recipient.capacity||"").trim(),occupation:String(recipient.occupation||"").trim()}]).map(item=>({role:String(item.role||"Signer").trim().slice(0,120),capacity:String(item.capacity||"").trim().slice(0,160),occupation:String(item.occupation||"").trim().slice(0,160)})),
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
       };
     }),
