@@ -1,9 +1,10 @@
 import React,{useLayoutEffect,useRef,useState}from"react";
 import{trimSignatureCanvas}from"../utils/signatureImageCanvas.mjs";
 
-export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="",savedInitialsUrl="",onConfirm,onCancel}){
+export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="",savedInitialsUrl="",onConfirm,onCancel,allowTyped=true}){
   const canvasRef=useRef(null),drawing=useRef(false),last=useRef(null),canvasSize=useRef({width:0,height:0}),dirtyRef=useRef(false);
-  const[mode,setMode]=useState("Draw"),[typed,setTyped]=useState(""),[dirty,setDirty]=useState(false),[error,setError]=useState("");
+  const hasSavedSpecimen=Boolean(field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl);
+  const[mode,setMode]=useState(hasSavedSpecimen?"Use my saved signature":"Draw"),[typed,setTyped]=useState(""),[dirty,setDirty]=useState(false),[error,setError]=useState("");
   const label=field?.type==="Initials"?"initials":"signature";
   useLayoutEffect(()=>{
     const canvas=canvasRef.current;
@@ -87,9 +88,9 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
   }
   return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,maxHeight:"70vh",overflowY:"auto",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)",paddingBottom:"env(safe-area-inset-bottom)"}}>
-      <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. Nothing is applied until you tap Confirm.</p>
+      <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. If an active saved specimen is available in your own profile, it is selected for your review. Nothing is applied until you tap Confirm. Nothing is stamped until you tap Confirm.</p>
       <div role="group" aria-label="Signature method" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-        {["Draw","Type","Use my saved signature"].map(item=><button key={item} type="button" className={mode===item?"":"secondary-button"} onClick={()=>setMode(item)}>{item}</button>)}
+        {["Draw",...(allowTyped?["Type"]:[]),"Use my saved signature"].map(item=><button key={item} type="button" className={mode===item?"":"secondary-button"} onClick={()=>setMode(item)}>{item}</button>)}
       </div>
       {mode==="Draw"?<canvas ref={canvasRef} width={900} height={240} aria-label="Draw signature" onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} style={{position:"relative",zIndex:1,width:"100%",height:220,border:"2px solid var(--border)",borderRadius:8,background:"#fff",touchAction:"none",pointerEvents:"auto",userSelect:"none",display:"block"}}/>:mode==="Type"?<label style={{display:"block"}}>Type your signature<input autoComplete="off" value={typed} onChange={e=>setTyped(e.target.value)} placeholder="Type the name you want to sign with" style={{display:"block",width:"100%",marginTop:8}}/><div aria-label="Typed signature preview" style={{fontFamily:"cursive",fontStyle:"italic",fontSize:36,minHeight:64,padding:12}}>{typed||"Signature preview"}</div></label>:<div className="stat-card">{(field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl)?"Your saved specimen is selected. Tap Confirm to apply it.":"No saved specimen is available; choose Draw or Type."}</div>}
       {error&&<p role="alert" className="error-message">{error}</p>}

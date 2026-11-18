@@ -273,7 +273,7 @@ test("document owner can save and close preparation before all fields are assign
 });
 
 test("Sign a Document is available to every active Signature Profile holder, not owner-only",()=>{
-  assert.match(portal,/\["Profile","Sign a Document","Envelopes","My Documents","Signature Pathway Self-Test"\]/);
+  assert.match(portal,/\["Profile","Sign a Document","Envelopes","Document Tracking","My Documents","Signature Pathway Self-Test"\]/);
   assert.match(portal,/An active Signature Profile is required before starting a signing document/);
   assert.doesNotMatch(portal,/documentOwner\.uid===auth\.currentUser\?\.uid[^\n]*Sign a Document/);
 });
@@ -309,4 +309,56 @@ test("new envelopes remain inactive drafts until Start Workflow sends Gateway em
   const signingAction = page.match(/async function sign\(\)\{([\s\S]*?)\n \}/);
   assert.ok(signingAction, "the Sign Document action must exist");
   assert.doesNotMatch(signingAction[1], /signEnvelope\(/, "the account-based client signing fallback must not be reachable");
+});
+
+test("owner-first portal signing survives both direct envelope creation and draft preparation",()=>{
+  const platform=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+  const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+  assert.match(platform,/ownerSigningEnabled:ownerSigningEnabled===true/);
+  assert.match(platform,/ownerSigningEnabled\?u\.uid:/);
+  assert.match(storage,/ownerPreSignEmail:String\(ownerSigner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(storage,/ownerSigningToken/);
+  assert.match(portal,/if\(updated\.ownerSigningToken\)\{window\.location\.assign\("\/\?emailSignToken="/);
+  assert.match(portal,/Owner Sign in Portal & Release Signers/);
+  assert.match(portal,/if\(ownerSigningEnabled\)\{[\s\S]*?startSignatureWorkflow\(env\)[\s\S]*?window\.location\.assign\("\/\?emailSignToken="/);
+  assert.match(portal,/Save & Open Owner Signature Portal/);
+});
+
+test("Title is a real signer-assigned PDF field and Document Tracking shows holder and last action",()=>{
+  const platform=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+  const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+  const signingPortal=fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx",import.meta.url),"utf8");
+  const emailSigningPortal=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
+  assert.match(portal,/Title:"Title"/);
+  assert.match(portal,/TYPES\.slice\(0,6\)/);
+  assert.match(portal,/data-testid="palette-signer-management"/);
+  assert.match(platform,/field\.type==="Title"/);
+  assert.match(worker,/"Name","Title"/);
+  assert.match(worker,/title:signer\.title\|\|""/);
+  assert.match(signingPortal,/field\.type==="Title"\)nextValues\[field\.fieldId\]=result\.signer\?\.title/);
+  assert.match(emailSigningPortal,/field\.type==="Title"\)initialFieldValues\[field\.fieldId\]=metadata\.ownerDeclaredParticulars\?\.title/);
+  assert.match(portal,/Document Tracking Register/);
+  assert.match(portal,/CURRENT HOLDER/);
+  assert.match(portal,/activeHolders=currentNames\.filter/);
+  assert.match(portal,/waitingInvitations=currentNames\.filter/);
+  assert.match(portal,/LAST RECORDED ACTION/);
+  assert.match(portal,/NEXT EXPECTED ACTION/);
+  assert.match(worker,/lastEvent/);
+});
+
+test("email-link signers may confirm only their own active saved profile specimen, with drawing fallback",()=>{
+  const emailPortal=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
+  const confirmationPad=fs.readFileSync(new URL("../src/components/SignatureFieldConfirmationPad.jsx",import.meta.url),"utf8");
+  assert.match(emailPortal,/getMySignatureProfile/);
+  assert.match(emailPortal,/String\(currentUser\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===invitedEmail/);
+  assert.match(emailPortal,/candidate\?\.uid===currentUser\.uid/);
+  assert.match(emailPortal,/candidate\.status==="Active"/);
+  assert.match(emailPortal,/setSignaturePadField\(field\)/);
+  assert.match(emailPortal,/savedSignatureUrl=\{savedProfile\?\.signatureUrl\|\|""\}/);
+  assert.match(emailPortal,/allowTyped=\{false\}/);
+  assert.match(emailPortal,/Your own saved Signature Profile specimen has been confirmed/);
+  assert.match(emailPortal,/Your hand-drawn specimen has been confirmed/);
+  assert.ok(emailPortal.includes('setSignaturePadField(null);setSelectedFieldId("");'));
+  assert.match(confirmationPad,/useState\(hasSavedSpecimen\?"Use my saved signature":"Draw"\)/);
+  assert.match(confirmationPad,/Nothing is stamped until you tap Confirm/);
 });

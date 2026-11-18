@@ -44,6 +44,7 @@ export default function GatewaySigningPortal({token}){
     const nextValues={};
     for(const field of result.fields||[]){
       if(field.type==="Name")nextValues[field.fieldId]=savedProfile?.displayName||result.signer?.name||"";
+      else if(field.type==="Title")nextValues[field.fieldId]=result.signer?.title||"";
       else if(field.type==="Date")nextValues[field.fieldId]="SERVER_TIMESTAMP_PENDING";
       else nextValues[field.fieldId]="";
     }

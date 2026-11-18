@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
-import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation} from "../src/signing.mjs";
+import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,getEnvelopeStatus} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
@@ -263,4 +263,31 @@ test("email-link signer can revoke before submission and the session token is in
   assert.equal(stored.events.at(-1).type,"email_link.revoked_by_signer");
   await assert.rejects(()=>getSigningPdf(f.ctx,opened.sessionToken,null));
   await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Signer"},declarations:{name:"Signer",occupation:"Officer"},consent:true,user:null}));
+});
+
+test("Title assignment is accepted, completed by the signer, and included in live tracking status",async()=>{
+  const sent=[];const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
+    now:()=>new Date(NOW),verifyUser:async()=>null,sendInvitation:async message=>sent.push(message),logger:{error(){}}
+  });
+  const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
+  const source=await ctx.storage.put({path:"source/title-field.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  const documentId="DOC-TITLE-FIELD";
+  await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"title-field.pdf",title:"Title Field Test",classification:"Restricted"});
+  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId,externalReference:"IRPA-TITLE-FIELD",archives:["board-governance"],signingMode:"Sequential",
+    signers:[{identityType:"email-link",email:"signer@example.org",name:"Assigned Signer",title:"Board Secretary",order:1,role:"Board Secretary"}],
+    fields:[{fieldId:"SIGNER-TITLE",type:"Title",signerId:"S1",page:1,x:10,y:20,width:35,height:7,required:true}]
+  });
+  assert.equal(created.status,"Sent");
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(ctx,token,"198.51.100.44");
+  assert.equal(opened.signer.title,"Board Secretary");
+  assert.equal(opened.fields[0].type,"Title");
+  const signed=await sign(ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Assigned Signer"},fieldValues:{"SIGNER-TITLE":"Board Secretary"},consent:true,declarations:{name:"Assigned Signer",occupation:"Officer"},user:null});
+  assert.equal(signed.completed,true);
+  const status=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(status.status,"Completed");
+  assert.equal(status.lastEvent.type,"envelope.completed");
+  assert.equal(status.signers[0].title,"Board Secretary");
 });

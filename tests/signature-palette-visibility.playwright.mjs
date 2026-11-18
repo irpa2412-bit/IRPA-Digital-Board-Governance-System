@@ -76,9 +76,10 @@ async function runViewport(name,viewport){
  await page.getByRole("button",{name:"Confirm Signature"}).click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-sig-page-1");
  console.log("PASS "+name+": Type + explicit Confirm");
- // Draw on the initials field after verifying the canvas is visible and measurable.
+ // Draw on the initials field after explicitly selecting Draw. The fixture intentionally supplies saved signature and initials specimens, so the component correctly defaults to the saved-specimen review mode.
  await page.getByTestId("field-initial-page-1").click();
  await assertDockDoesNotCoverPdf(page,"field-initial-page-1");
+ await page.getByRole("button",{name:"Draw",exact:true}).click();
  const canvas=page.getByLabel("Draw signature");
  await canvas.waitFor({state:"visible"});
  // A visible element can still be below the viewport. Bring the actual canvas
