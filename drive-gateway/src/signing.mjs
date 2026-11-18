@@ -26,11 +26,11 @@ export function validateEnvelopeFields(fields,signers){
   const allowed=new Set(["Signature","Initials","Date","Number","Text","Comment","Remarks","Checkbox","Name"]);
   return fields.map(f=>{
     const fieldId=cleanSegment(f?.fieldId,100),type=String(f?.type||"");
-    const page=Number(f?.page||1),x=Number(f?.x??10),y=Number(f?.y??80),width=Number(f?.width??24),height=Number(f?.height??9),requestedSignerId=String(f?.signerId||""),signerUid=String(f?.signerUid||"");
+    const page=Number(f?.page||1),x=Number(f?.x??10),y=Number(f?.y??80),width=Number(f?.width??24),height=Number(f?.height??9),requestedSignerId=String(f?.signerId||""),signerUid=String(f?.signerUid||""),roleAssignmentIndex=Number.isInteger(Number(f?.roleAssignmentIndex))?Number(f.roleAssignmentIndex):0;
     const assigned=requestedSignerId?byId.get(requestedSignerId):(signerUid?(signers||[]).find(item=>item.uid===signerUid):null);
-    if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||(signerUid&&assigned.uid!==signerUid)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
+    if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||roleAssignmentIndex<0||roleAssignmentIndex>=Math.max(1,Array.isArray(assigned.roleAssignments)?assigned.roleAssignments.length:1)||(signerUid&&assigned.uid!==signerUid)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>100||y+height>100)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
     ids.add(fieldId);
-    return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160)};
+    return{fieldId,type,page,x,y,width,height,signerId:assigned.id,signerUid:assigned.uid||null,roleAssignmentIndex,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160)};
   });
 }
 export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
