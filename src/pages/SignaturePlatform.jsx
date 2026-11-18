@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import"../styles/signature-portal.css";
 import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthorityRegisterEntries,getControlledDocumentsForSigning,getRecords}from"../firebase/data";
-import{createGatewaySignatureEnvelope,voidGatewaySignatureEnvelope,downloadControlledDocumentBytes,downloadSignatureBytes,resendFailedGatewaySignatureInvitations,getGatewaySignatureEnvelopeStatus,retryGatewaySignatureDistribution,resendGatewayEmailInvitation,revokeGatewayEmailInvitation}from"../firebase/signatureStorage";
+import{createGatewaySignatureEnvelope,voidGatewaySignatureEnvelope,downloadControlledDocumentBytes,downloadSignatureBytes,resendFailedGatewaySignatureInvitations,getGatewaySignatureEnvelopeStatus,getGatewaySignatureEnvelopeDeliveryStatus,retryGatewaySignatureDistribution,resendGatewayEmailInvitation,revokeGatewayEmailInvitation}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{resolveExpectedIntegrity,hasIntegrityMismatch,sha256Hex as signatureSha256}from"../utils/documentIntegrity.mjs";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
@@ -711,8 +711,19 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  async function refreshGatewayEmailStatus(){
   if(!selected?.gatewayEnvelopeId)return;
   setGatewayEmailStatusBusy(true);
-  try{const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);setGatewayEmailStatus(status);}
-  catch(error){setMessage(error.message||"Unable to retrieve email-link invitation status.");}
+  try{
+   const [status,delivery]=await Promise.all([
+    getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId),
+    getGatewaySignatureEnvelopeDeliveryStatus(selected.gatewayEnvelopeId)
+   ]);
+   const deliveryBySigner=new Map((delivery.signers||[]).map(signer=>[signer.id,signer]));
+   const signers=(status.signers||[]).map(signer=>{
+    const deliverySigner=deliveryBySigner.get(signer.id)||{};
+    return {...deliverySigner,...signer,invitation:deliverySigner.invitation??signer.invitation};
+   });
+   setGatewayEmailStatus({...status,signers});
+   setMessage("Envelope and invitation delivery status refreshed. Resend options are available for eligible email-link signers.");
+  }catch(error){setMessage(error.message||"Unable to retrieve email-link invitation status.");}
   finally{setGatewayEmailStatusBusy(false);}
  }
  async function resendEmailLink(signerId){
