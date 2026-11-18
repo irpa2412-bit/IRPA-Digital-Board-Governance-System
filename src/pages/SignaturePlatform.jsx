@@ -196,7 +196,7 @@ function PDFDesigner({url,documentId,envelopeId=null,signingStage=false,fields,s
    <div data-testid="palette-signer-management" className="signature-palette-people-list">
     <strong style={{display:"block",fontSize:11,margin:"12px 0 6px"}}>ASSIGNED PEOPLE — SELECT WHOSE FIELDS YOU ARE PLACING</strong>
     {recipients.length===0?<small>No participants added yet. Add a signer above, then select them before placing fields.</small>:recipients.map((r,i)=>{const isOwner=r.uid===ownerSigner?.uid;const signerIndex=signerRecipients.findIndex(item=>item.uid===r.uid);return <div key={r.uid} className="signature-palette-person">
-      <div className="signature-palette-person-details"><strong>{i+1}. {r.name||r.email}</strong><small>{r.email} · {r.role||"Signer"}{isOwner?" · Document owner":""}</small></div>
+      <div className="signature-palette-person-details"><strong>{i+1}. {r.name||r.email}</strong><small>{r.email} · {[...new Set([...(Array.isArray(r.roleAssignments)?r.roleAssignments.map(a=>a.role):[]),r.role||"Signer"])].filter(Boolean).join(" + ")}{isOwner?" · Document owner":""}</small></div>
       <button type="button" className="signature-palette-select-person" aria-pressed={selectedAssigneeUid===r.uid} onClick={()=>selectAssignee(r.uid)}>{selectedAssigneeUid===r.uid?"Selected for fields":"Assign fields to this person"}</button>
       {!isOwner&&<div className="signature-palette-person-actions"><button type="button" onClick={()=>onMoveSigner?.(r.uid,-1)} disabled={signerIndex===0}>Move up</button><button type="button" onClick={()=>onMoveSigner?.(r.uid,1)} disabled={signerIndex===signerRecipients.length-1}>Move down</button><button type="button" data-testid={"palette-remove-signer-"+r.uid} onClick={()=>onRemoveSigner?.(r.uid)}>Remove</button></div>}
      </div>})}
@@ -602,19 +602,28 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     return;
   }
   const duplicate=recipients.find(x=>(registered&&x.uid===registered.uid)||(registeredEmail&&String(x.email||"").trim().toLowerCase()===registeredEmail));
+  const role=signerRole||"Review";
+  const capacity=String(signerCapacity||"").trim();
+  const assignment={role,capacity,occupation:String(signerAuthorityRole||"").trim(),assignedAt:new Date().toISOString()};
   if(duplicate){
-    setActiveAssigneeUid(duplicate.uid);
-    setSelectedSigner("");
-    setSignerEmail("");
-     setSignerName("");
-    setSignerRole(duplicate.role||"Review");
-    setSignerAuthorityRole(duplicate.occupation||"");
-    setSignerCapacity(duplicate.capacity||"");
-    setMessage((duplicate.name||duplicate.email||"This participant")+" is already assigned as "+(duplicate.role||"Review")+". The existing signer record has been selected; no duplicate was created.");
+    const existingAssignments=Array.isArray(duplicate.roleAssignments)&&duplicate.roleAssignments.length?duplicate.roleAssignments:[{role:duplicate.role||"Review",capacity:String(duplicate.capacity||"").trim(),occupation:String(duplicate.occupation||"").trim()}];
+    const sameAssignment=existingAssignments.some(item=>String(item.role||"").trim().toLowerCase()===role.trim().toLowerCase()&&String(item.capacity||"").trim().toLowerCase()===capacity.toLowerCase());
+    if(sameAssignment){
+      setActiveAssigneeUid(duplicate.uid);setSelectedSigner("");setSignerEmail("");setSignerName("");setSignerRole(role);setSignerAuthorityRole(assignment.occupation);setSignerCapacity(capacity);
+      setMessage((duplicate.name||duplicate.email||"This signer")+" already has the "+role+" responsibility"+(capacity?" ("+capacity+")":"")+". The existing responsibility was selected; no duplicate was created.");return;
+    }
+    const updatedRecipient={...duplicate,roleAssignments:[...existingAssignments,assignment]};
+    const updatedRecipients=recipients.map(item=>item.uid===duplicate.uid?updatedRecipient:item);
+    addSignerInFlightRef.current=true;setBusy(true);
+    try{
+      const saved=await saveSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,signingMode,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,recipients:updatedRecipients,fields,ownerSigningEnabled});
+      setDraftEnvelopeId(saved.id);setRecipients(updatedRecipients);setActiveAssigneeUid(duplicate.uid);setSelectedSigner("");setSignerEmail("");setSignerName("");setSignerRole("Review");setSignerAuthorityRole("");setSignerCapacity("");
+      setMessage((duplicate.name||duplicate.email||"This signer")+" now has an additional responsibility: "+role+(capacity?" ("+capacity+")":"")+". One email-link identity and invitation covers the responsibilities; assign the relevant fields to this signer.");
+    }catch(error){setMessage("The additional responsibility was not saved: "+(error?.message||"Unable to update the signer assignment."));}
+    finally{addSignerInFlightRef.current=false;setBusy(false);}
     return;
   }
-  const role=signerRole||"Review";
-  addSignerInFlightRef.current=true;
+    addSignerInFlightRef.current=true;
   setBusy(true);
   setMessage("Adding this participant to the document and saving the signer assignment…");
   try{
