@@ -35,7 +35,7 @@ export function validateEnvelopeFields(fields,signers){
   });
 }
 export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
-  const assigned=(fields||[]).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),out={},byId=new Map(assigned.map(f=>[f.fieldId,f])),applications=new Map();
+  const assigned=(fields||[]).map(field=>normalizeSignatureField(field)).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),out={},byId=new Map(assigned.map(f=>[f.fieldId,f])),applications=new Map();
   if(!Array.isArray(fieldApplications))throw new HttpError(400,"Explicit confirmed signature field applications are required.");
   for(const application of fieldApplications){
     const field=byId.get(String(application?.fieldId||""));
