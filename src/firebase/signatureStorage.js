@@ -539,6 +539,14 @@ export async function getGatewaySignatureEnvelopeStatus(envelopeId) {
   return data;
 }
 
+export async function getGatewaySignatureEnvelopeDeliveryStatus(envelopeId) {
+  if(!envelopeId)throw new Error("A Gateway envelope ID is required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId));
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false)throw new Error(data.error||"Unable to retrieve Gateway invitation delivery status.");
+  return data;
+}
+
 export async function retryGatewaySignatureDistribution(envelopeId) {
   if(!envelopeId)throw new Error("A Gateway envelope ID is required.");
   const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/distribution/retry",{method:"POST",body:JSON.stringify({})});

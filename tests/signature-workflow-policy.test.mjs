@@ -272,3 +272,17 @@ test("Sign a Document is available to every active Signature Profile holder, not
   assert.match(portal,/An active Signature Profile is required before starting a signing document/);
   assert.doesNotMatch(portal,/documentOwner\.uid===auth\.currentUser\?\.uid[^\n]*Sign a Document/);
 });
+
+
+test("refreshing an envelope reloads signer status and invitation delivery so resend controls remain available", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const storage = fs.readFileSync(new URL("../src/firebase/signatureStorage.js", import.meta.url), "utf8");
+  assert.match(storage, /export async function getGatewaySignatureEnvelopeDeliveryStatus\(envelopeId\)/);
+  assert.ok(storage.includes('gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId))'));
+  assert.match(page, /getGatewaySignatureEnvelopeStatus,getGatewaySignatureEnvelopeDeliveryStatus/);
+  assert.match(page, /const \[status,delivery\]=await Promise\.all\(/);
+  assert.match(page, /const deliveryBySigner=new Map\(\(delivery\.signers\|\|\[\]\)\.map\(signer=>\[signer\.id,signer\]\)\)/);
+  assert.match(page, /invitation:deliverySigner\.invitation\?\?signer\.invitation/);
+  assert.match(page, /onClick=\{refreshGatewayEmailStatus\}/);
+  assert.match(page, /onClick=\{\(\)=>resendEmailLink\(item\.id\)\}/);
+});
