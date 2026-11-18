@@ -198,6 +198,8 @@ export default function EmailSigningReadOnlyPage({token}){
   finally{setRevoking(false);}
  }
 
+ function leaveDocument(){window.location.assign(window.location.origin);}
+
  return <main style={{minHeight:"100vh",background:"#f3f4f6",color:"#111827",padding:"20px 12px",boxSizing:"border-box"}}>
   <section style={{maxWidth:1100,margin:"0 auto",background:"#fff",border:"1px solid #d1d5db",borderRadius:12,padding:16}}>
    <h1 style={{fontSize:20,margin:"0 0 10px"}}>IRPA — Secure document signing</h1>
@@ -259,6 +261,7 @@ export default function EmailSigningReadOnlyPage({token}){
     </section>}
     {signingClosed&&!revoked&&<p role="status" style={{marginTop:14}}>This signing action is closed. No further submission is available through this invitation.</p>}
     {revoked&&<p role="status" style={{marginTop:14}}>The invitation is revoked and cannot be used again.</p>}
+    {signingClosed&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16}}><button type="button" onClick={leaveDocument} style={buttonStyle}>Leave document &amp; return to IRPA workspace</button></div>}
    </>}
   </section>
  </main>;
