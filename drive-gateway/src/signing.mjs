@@ -76,11 +76,7 @@ export async function createEnvelope(ctx,user,body){
   if(!["Sequential","Parallel"].includes(signingMode))throw new HttpError(400,"Unsupported signing mode.");
   if(!Array.isArray(input)||input.length<1||input.length>MAX_SIGNERS)throw new HttpError(400,`Provide between 1 and ${MAX_SIGNERS} signers.`);
   const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
-  if(cryptoRequired&&input.some(s=>{
-    const emailLink=s?.identityType==="email-link"&&!s?.uid;
-    const account=s?.identityType==="account"&&typeof s?.uid==="string"&&s.uid.trim().length>0;
-    return !emailLink&&!account;
-  }))throw new HttpError(400,"Every staging and production signer must use either a verified email-link identity or an authenticated IRPA account identity.");
+  if(cryptoRequired&&input.some(s=>s?.identityType!=="email-link"||s?.uid))throw new HttpError(400,"Every staging and production signer must use a verified email-link identity.");
   // Email-link possession is transaction-scoped mailbox control, not an authority-register lookup.
   const sourceBytes=await ctx.storage.get(doc.primaryStorageId);
   if(!sourceBytes)throw new HttpError(409,"The stored document failed its integrity check.");
