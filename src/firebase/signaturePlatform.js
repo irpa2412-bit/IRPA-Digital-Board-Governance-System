@@ -408,7 +408,7 @@ export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
   const recipients=(envelope.recipients||[]).map(recipient=>{
     const signer=gatewaySigners.find(item=>(item.uid&&item.uid===recipient.uid)||(item.email&&recipient.email&&String(item.email).trim().toLowerCase()===String(recipient.email).trim().toLowerCase()));
     if(!signer)return recipient;
-    const status=signer.status==="Signed"?"Signed":signer.status==="Declined"?"Declined":signer.status==="Pending"?(gatewayStatus.signingMode==="Parallel"?"Pending":recipient.uid===gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order)[0]?.uid?"Current":"Pending"):recipient.status;
+    const firstPending=gatewaySigners.filter(item=>item.status==="Pending").sort((a,b)=>a.order-b.order)[0];const isFirstPending=Boolean(firstPending&&((firstPending.uid&&firstPending.uid===recipient.uid)||(firstPending.email&&recipient.email&&String(firstPending.email).trim().toLowerCase()===String(recipient.email).trim().toLowerCase())));const status=signer.status==="Signed"?"Signed":signer.status==="Declined"?"Declined":signer.status==="Pending"?(gatewayStatus.signingMode==="Parallel"?"Pending":isFirstPending?"Current":"Pending"):recipient.status;
     return {...recipient,status,completedAt:signer.signedAt||recipient.completedAt||null};
   });
   const pending=gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order);const currentPending=pending[0];const currentRecipient=currentPending?(envelope.recipients||[]).find(r=>(currentPending.uid&&r.uid===currentPending.uid)||(currentPending.email&&String(r.email||"").trim().toLowerCase()===String(currentPending.email).trim().toLowerCase())):null;
