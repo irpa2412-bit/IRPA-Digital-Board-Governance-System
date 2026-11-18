@@ -67,3 +67,8 @@ test("email-link possession is not misrepresented as legal identity or instituti
   assert.match(emailPage,/does not independently verify your legal identity or authority to bind an organisation/);
   assert.match(emailPage,/delegation or approval process/);
 });
+
+test("Signature Profile explicitly presents the email-link e-signature method",()=>{
+  assert.match(portal,/<span>Signing method<\\/span><strong>Email-link e-signature<\\/strong>/);
+  assert.match(portal,/unique link[\\s\\S]*secure email-link workflow/);
+});
