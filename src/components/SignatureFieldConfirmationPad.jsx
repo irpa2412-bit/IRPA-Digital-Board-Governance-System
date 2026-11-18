@@ -88,7 +88,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
   }
   return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,maxHeight:"70vh",overflowY:"auto",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)",paddingBottom:"env(safe-area-inset-bottom)"}}>
-      <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. If an active saved specimen is available in your own profile, it is selected for your review. Nothing is applied until you tap Confirm.</p>
+      <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. If an active saved specimen is available in your own profile, it is selected for your review. Nothing is stamped until you tap Confirm.</p>
       <div role="group" aria-label="Signature method" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
         {["Draw",...(allowTyped?["Type"]:[]),"Use my saved signature"].map(item=><button key={item} type="button" className={mode===item?"":"secondary-button"} onClick={()=>setMode(item)}>{item}</button>)}
       </div>
