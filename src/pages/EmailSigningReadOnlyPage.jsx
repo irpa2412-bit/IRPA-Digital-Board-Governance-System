@@ -11,7 +11,7 @@ const buttonStyle={padding:"10px 14px",border:0,borderRadius:7,background:"#174a
 const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
 
 export default function EmailSigningReadOnlyPage({token}){
- const [record,setRecord]=useState(null),[signingToken,setSigningToken]=useState("");
+ const [record,setRecord]=useState(null),[signingToken,setSigningToken]=useState(""),[activeRoleAssignmentIndex,setActiveRoleAssignmentIndex]=useState(0);
  const [pdfDocument,setPdfDocument]=useState(null),[pageCount,setPageCount]=useState(0),[pageNum,setPageNum]=useState(1);
  const [pageSize,setPageSize]=useState({width:760,height:980}),[viewerWidth,setViewerWidth]=useState(760),[pageRendered,setPageRendered]=useState(false);
  const [error,setError]=useState(""),[pageError,setPageError]=useState(""),[loading,setLoading]=useState(true);
@@ -40,7 +40,7 @@ export default function EmailSigningReadOnlyPage({token}){
     const fields=Array.isArray(metadata.fields)?metadata.fields:[];
     setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
     setDeclarations({name:metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"",occupation:"",capacity:""});
-    setSelectedFieldId(fields[0]?.fieldId||"");
+    setActiveRoleAssignmentIndex(0);setSelectedFieldId(fields.find(field=>Number(field.roleAssignmentIndex||0)===0)?.fieldId||fields[0]?.fieldId||"");
     const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
     if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
     if(!String(response.headers.get("content-type")||"").toLowerCase().includes("application/pdf"))throw new Error("The signing service did not return a PDF. Signing has been stopped.");
@@ -100,6 +100,8 @@ export default function EmailSigningReadOnlyPage({token}){
 
  const fields=record?.fields||[];
  const selectedField=fields.find(field=>field.fieldId===selectedFieldId)||null;
+ const roleAssignments=Array.isArray(record?.signer?.roleAssignments)&&record.signer.roleAssignments.length?record.signer.roleAssignments:[{role:"Signing responsibility",capacity:"",occupation:""}];
+ const assignmentFields=fields.filter(field=>Number(field.roleAssignmentIndex||0)===activeRoleAssignmentIndex);
  const signatureFields=fields.filter(field=>["Signature","Initials"].includes(field.type));
  const signatureValue=signatureFields.map(field=>fieldApplications.find(item=>item.fieldId===field.fieldId)?.value).find(Boolean)||"";
  const pageFields=fields.filter(field=>Number(field.page||1)===pageNum);
@@ -126,13 +128,17 @@ export default function EmailSigningReadOnlyPage({token}){
    setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,confirmed:true,value}]);
   }else if(fieldValues[selectedField.fieldId]===undefined||String(fieldValues[selectedField.fieldId]).trim()===""){setError("Complete this assigned field before confirming it.");return;}
   setError("");
-  const next=fields.find(field=>field.fieldId!==selectedField.fieldId&&!complete(field));
-  if(next){setSelectedFieldId(next.fieldId);const targetPage=Number(next.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}}
+  const nextInAssignment=assignmentFields.find(field=>field.fieldId!==selectedField.fieldId&&!complete(field));
+  if(nextInAssignment){setSelectedFieldId(nextInAssignment.fieldId);const targetPage=Number(nextInAssignment.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}return;}
+  const nextAssignmentIndex=roleAssignments.findIndex((assignment,index)=>index>activeRoleAssignmentIndex&&fields.some(field=>Number(field.roleAssignmentIndex||0)===index&&!complete(field)));
+  if(nextAssignmentIndex>=0){const nextAssignmentField=fields.find(field=>Number(field.roleAssignmentIndex||0)===nextAssignmentIndex&&!complete(field));setActiveRoleAssignmentIndex(nextAssignmentIndex);setSelectedFieldId(nextAssignmentField.fieldId);const targetPage=Number(nextAssignmentField.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setSuccess("Responsibility completed. Moving to the next signature assignment: "+[roleAssignments[nextAssignmentIndex].role,roleAssignments[nextAssignmentIndex].capacity].filter(Boolean).join(" — ")+".");return;}
+  setSelectedFieldId("");setSuccess("All assigned responsibilities are complete. Review the document and submit the complete set of signatures.");
  }
  function clearPad(){const canvas=signatureCanvasRef.current;if(canvas)canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);setSignatureMarks(current=>{const next={...current};delete next[selectedFieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
  function enterReview(){
   if(!record){setError("The signing assignment is unavailable.");return;}
   if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
+  if(incomplete.length){setError("Complete every responsibility and its assigned fields before final review. "+incomplete.length+" field(s) remain.");return;}
   setError("");setReviewMode(true);if(pageNum!==1){setPageRendered(false);setPageNum(1);}
  }
  async function submit(){
@@ -221,8 +227,8 @@ export default function EmailSigningReadOnlyPage({token}){
      <label style={{display:"block",margin:"10px 0"}}>Additional details (optional)<input style={inputStyle} value={declarations.capacity} disabled={signingClosed} onChange={e=>setDeclaration("capacity",e.target.value)} placeholder="Additional official particulars"/></label>
     </section>
     {!!fields.length&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
-     <h2 style={{fontSize:18}}>Your assigned fields</h2>
-     <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{fields.map(field=><button key={field.fieldId} type="button" disabled={signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);const targetPage=Number(field.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:signingClosed?0.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
+     <h2 style={{fontSize:18}}>Fields for this responsibility</h2>
+     <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{assignmentFields.map(field=><button key={field.fieldId} type="button" disabled={signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);const targetPage=Number(field.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:signingClosed?0.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
      {selectedField&&<div style={{marginTop:14,padding:12,border:"1px solid #9ca3af",borderRadius:8}}>
       <h3 style={{fontSize:16,marginTop:0}}>Complete: {selectedField.placeholder||selectedField.type} · Page {selectedField.page}</h3>
       {["Signature","Initials"].includes(selectedField.type)?<><p style={{fontSize:13}}>Draw your {selectedField.type.toLowerCase()} below. Applying it places the stamp in the highlighted document location.</p><canvas ref={signatureCanvasRef} width={520} height={180} onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={()=>{drawingRef.current=false;}} onPointerCancel={()=>{drawingRef.current=false;}} style={{width:"100%",height:150,border:"1px solid #6b7280",borderRadius:6,touchAction:"none",background:"#fff"}}/><div style={{display:"flex",gap:8,marginTop:8}}><button type="button" disabled={signingClosed} onClick={clearPad} style={{...buttonStyle,background:"#6b7280"}}>Clear mark</button><button type="button" disabled={signingClosed} onClick={confirmField} style={buttonStyle}>Apply stamp to document</button></div></>:<><label style={{display:"block",margin:"8px 0"}}>{selectedField.type}{selectedField.required?" (required)":""}{selectedField.type==="Checkbox"?<input type="checkbox" disabled={signingClosed} checked={fieldValues[selectedField.fieldId]==="true"} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.checked?"true":"false"}))}/>:<input style={inputStyle} disabled={signingClosed} type={selectedField.type==="Date"?"date":"text"} value={fieldValues[selectedField.fieldId]||""} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.value}))} placeholder={selectedField.placeholder||"Enter your response"}/>}</label><button type="button" disabled={signingClosed} onClick={confirmField} style={buttonStyle}>Confirm field value</button></>}
@@ -231,7 +237,7 @@ export default function EmailSigningReadOnlyPage({token}){
     {!signatureFields.length&&<label style={{display:"block",margin:"14px 0"}}>Typed signature<input style={inputStyle} disabled={signingClosed} value={typedSignature} onChange={e=>setTypedSignature(e.target.value)} placeholder="Type your full name as your signature"/></label>}
     <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"18px 0"}}><input type="checkbox" checked={consent} disabled={signingClosed} onChange={e=>setConsent(e.target.checked)}/><span>I have reviewed the complete document, understand its contents and the marked signature location(s), and consent to apply my electronic signature.</span></label>
     {!record.canSign&&<p role="status">Your assignment is waiting for the preceding action. You may review the document, but cannot submit yet.</p>}
-    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError))?0.5:1}}>Review complete document and signature placement</button>}
+    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)||incomplete.length>0} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError)||incomplete.length>0)?0.5:1}}>Review complete document and signature placement</button>}
     {reviewMode&&!signingClosed&&<section style={{marginTop:16,padding:12,border:"2px solid #174a78",borderRadius:8}}>
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Changes to assigned fields update this preview. Your signature has not been submitted yet.</p>
