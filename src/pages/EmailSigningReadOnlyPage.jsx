@@ -39,6 +39,7 @@ export default function EmailSigningReadOnlyPage({token}){
     if(!opened.ok||metadata.ok!==true)throw new Error(NEUTRAL);
     if(cancelled)return;
     const invitedEmail=String(metadata.signer?.email||"").trim().toLowerCase();
+    await auth.authStateReady?.();
     const currentUser=auth.currentUser;
     let matchedProfile=null;
     if(currentUser?.uid&&invitedEmail&&String(currentUser.email||"").trim().toLowerCase()===invitedEmail){
@@ -238,7 +239,7 @@ export default function EmailSigningReadOnlyPage({token}){
      <label style={{display:"block",margin:"10px 0"}}>Additional details (optional)<input style={inputStyle} value={declarations.capacity} disabled={signingClosed} onChange={e=>setDeclaration("capacity",e.target.value)} placeholder="Additional official particulars"/></label>
     </section>
     {!!fields.length&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
-     <h2 style={{fontSize:18}}>Fields for this responsibility</h2>
+     <h2 style={{fontSize:18}}>Fields for this responsibility</h2><p style={{fontSize:13,color:"#4b5563"}}>When you tap your assigned Signature or Initials field, IRPA checks for an active Signature Profile belonging to the same signed-in email address as this invitation. If found, your saved specimen is selected for your review; confirm it to place the stamp. If no matching profile is available, draw your signature in the drawing pane. Your signature is never applied without your confirmation and final submission.</p>
      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{assignmentFields.map(field=><button key={field.fieldId} type="button" disabled={signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);const targetPage=Number(field.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:signingClosed?0.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
      {selectedField&&<div style={{marginTop:14,padding:12,border:"1px solid #9ca3af",borderRadius:8}}>
       <h3 style={{fontSize:16,marginTop:0}}>Complete: {selectedField.placeholder||selectedField.type} · Page {selectedField.page}</h3>
