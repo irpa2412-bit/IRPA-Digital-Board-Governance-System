@@ -259,7 +259,12 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     s.declarationDiscrepancy={detected:discrepancyFields.length>0,fields:discrepancyFields,ownerDeclared:{...ownerDeclared},signerDeclared:{...declared},detectedAt:at};
     s.authorityVerification=null;s.ip=ip||null;s.userAgent=cleanText(userAgent||"",200)||null;
     const last=cur.signers.every(x=>x.status==="Signed");
-    return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events:await chainEvents(cur.events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],roleAssignmentEvidence,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy})},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
+    let events=cur.events;
+    for(const assignment of roleAssignmentEvidence){
+      events=await chainEvents(events,{type:"signer.role_assignment.completed",signerId:s.id,at,roleAssignmentIndex:assignment.roleAssignmentIndex,role:assignment.role,capacity:assignment.capacity,fieldIds:assignment.fieldIds,signatureFieldHashes:assignment.signatureFieldHashes});
+    }
+    events=await chainEvents(events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],roleAssignmentEvidence,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy});
+    return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
   if(!out.winner){await inviteNextPosition(ctx,e0.id);return{ok:true,status:"InProgress",completed:false};}
