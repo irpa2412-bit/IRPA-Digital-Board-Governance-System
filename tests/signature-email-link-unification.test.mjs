@@ -26,9 +26,9 @@ test("document owner may be included as an email-link signer when explicitly ena
 });
 
 test("all workflow recipients become email-link identities and assigned PDF fields reach the Gateway",()=>{
-  assert.match(portal,/const gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:"email-link"\}\)\)/);
+  assert.match(portal,/recipients:orderedRecipients,fields,ownerSigningEnabled/);
   assert.match(storage,/identityType:"email-link"/);
-  assert.match(portal,/recipients:gatewayRecipients,fields\}/);
+  assert.match(storage,/signers:ordered\.map\(\(recipient,index\)=>\{/);
   assert.match(storage,/recipient\.uid/);
   assert.match(storage,/signerAssignmentByKey/);
   assert.match(storage,/signerId:resolveSignerId\(field\)/);
@@ -53,7 +53,8 @@ test("assigned workflow role is not misrepresented as the signer's occupation or
 });
 
 test("Gateway envelopes cannot be signed through the parallel in-app UID workflow",()=>{
-  assert.match(portal,/if\(selected\.gatewayEnvelopeId\)throw new Error\("This envelope must be signed through its email-link invitation/);
+  assert.match(portal,/if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent[\s\S]*?return\}/);
+  assert.match(portal,/This envelope must be signed through its verified email-link invitation/);
 });
 
 test("the invitation bearer token is consumed once and the signer session survives a page refresh",()=>{
@@ -72,6 +73,7 @@ test("email-link possession is not misrepresented as legal identity or instituti
 
 test("Signature Profile explicitly presents the email-link e-signature method",()=>{
   assert.ok(portal.includes('<span>Signing method</span><strong>Email-link e-signature</strong>'));
+  assert.ok(portal.includes('<h1>{signerOnly?"Signing Invitation":"Email-link E-signature Portal"}</h1>'),"the main Signature Portal heading must identify the email-link signing method");
   assert.ok(portal.includes("unique link")&&portal.includes("secure email-link workflow"));
 });
 
