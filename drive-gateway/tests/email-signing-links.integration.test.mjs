@@ -150,13 +150,21 @@ test("email link opens once, changes status to opened and exposes only its contr
   assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the session must not redeem the invitation a second time");
 });
 
-test("expired, tampered, unknown and revoked links return the same neutral response",async()=>{
+test("tampered and unknown links return the same neutral response",async()=>{
   const f=await fixture();
   const wrong=f.token.slice(0,-1)+(f.token.endsWith("0")?"1":"0");
   await assert.rejects(()=>openEmailSigning(f.ctx,wrong,"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
   await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+"a".repeat(64),"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
-  f.now(new Date("2026-11-23T08:00:01.000Z"));
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
+});
+
+test("an unused email signing link remains redeemable one year after issuance",async()=>{
+  const f=await fixture();
+  f.now(new Date("2027-11-16T08:00:00.000Z"));
+  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.19");
+  assert.equal(opened.ok,true);
+  const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(stored.signers[0].emailLinkStatus,"opened");
+  assert.equal(stored.signers[0].emailLinkExpiresAt,undefined);
 });
 
 test("owner revoke invalidates a guest link; resend rotates token and revokes the previous hash",async()=>{
