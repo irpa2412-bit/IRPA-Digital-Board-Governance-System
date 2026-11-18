@@ -529,9 +529,10 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
         identityType:"email-link",
         email:String(recipient.email || "").trim().toLowerCase(),
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
+        title:String(recipient.title||"").trim().slice(0,160),
         occupation:String(recipient.occupation||recipient.capacity||"").trim(),
         capacity:String(recipient.capacity||"").trim(),
-        roleAssignments:(Array.isArray(recipient.roleAssignments)?recipient.roleAssignments:[{role:recipient.role||"Signer",capacity:String(recipient.capacity||"").trim(),occupation:String(recipient.occupation||"").trim()}]).map(item=>({role:String(item.role||"Signer").trim().slice(0,120),capacity:String(item.capacity||"").trim().slice(0,160),occupation:String(item.occupation||"").trim().slice(0,160)})),
+        roleAssignments:(Array.isArray(recipient.roleAssignments)?recipient.roleAssignments:[{role:recipient.role||"Signer",capacity:String(recipient.capacity||"").trim(),occupation:String(recipient.occupation||"").trim()}]).map(item=>({role:String(item.role||"Signer").trim().slice(0,120),title:String(item.title||recipient.title||"").trim().slice(0,160),capacity:String(item.capacity||"").trim().slice(0,160),occupation:String(item.occupation||"").trim().slice(0,160)})),
         order:envelope.signingMode === "Parallel" ? 1 : index + 1
       };
     }),
