@@ -188,7 +188,7 @@ test("signature assignment and signing handlers synchronously reject repeated su
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
   assert.doesNotMatch(sign[1], /signEnvelope\(/, "the in-app account signing fallback must remain unreachable");
   assert.match(sign[1], /This envelope must be signed through its verified email-link invitation/);
-  assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
+  assert.match(sign[1], /if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent[\s\S]*?return;?\}/, "unsent drafts must be blocked before any in-app signing attempt");
 });
 
 
