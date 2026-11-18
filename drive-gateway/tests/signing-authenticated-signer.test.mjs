@@ -72,7 +72,7 @@ test("staging signing does not require IRPA register authority but retains signe
       consent:true,
       user:{uid:"staging-user",email:"staging@example.invalid",token:"staging-id-token"}
     }),
-    error=>error?.status===400&&error.message==="Enter your name and occupation/capacity for this document before signing."
+    error=>error?.status===400&&error.message==="Enter your name before signing."
   );
 });
 
