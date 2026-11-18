@@ -284,7 +284,8 @@ export async function getSignatureEnvelope(envelopeId){
   user();
   if(!envelopeId)throw new Error("Signing envelope ID is required.");
   const body=await fetchServerFilteredSignatureEnvelopes(`/api/signature-workflow/view?envelopeId=${encodeURIComponent(envelopeId)}`);
-  const rawEnvelope=body.envelope;\n  const envelope=rawEnvelope?{...rawEnvelope,fields:(rawEnvelope.fields||[]).map(field=>signatureFieldToPercent(field))}:rawEnvelope;
+  const rawEnvelope=body.envelope;
+  const envelope=rawEnvelope?{...rawEnvelope,fields:(rawEnvelope.fields||[]).map(field=>signatureFieldToPercent(field))}:rawEnvelope;
   if(!envelope||!matchesSignatureEnvironment(envelope))throw new Error("This signing envelope belongs to a different data environment and is unavailable in the current portal session.");
   if(["Cancelled","Declined"].includes(envelope.status))throw new Error("This signing envelope is no longer available.");
   return envelope;
