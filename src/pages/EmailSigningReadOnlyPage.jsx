@@ -190,7 +190,7 @@ export default function EmailSigningReadOnlyPage({token}){
   const parts=String(token||"").split(".");
   try{if(parts.length===3)window.sessionStorage.removeItem("irpaEmailSigningSession:"+parts[0]+"."+parts[1]);for(const key of Object.keys(window.sessionStorage)){if(/emailSigningSession|emailSignToken|gatewaySigningToken|signature.*(token|application|field)|signing.*token/i.test(key))window.sessionStorage.removeItem(key);}}catch{}
   try{const url=new URL(window.location.href);url.searchParams.delete("emailSignToken");url.searchParams.delete("signingToken");url.searchParams.set("signingComplete","1");window.history.replaceState({}, "", url.pathname+url.search);}catch{}
-  setSigningToken("");setFieldApplications([]);setFieldValues({});setSignatureMarks({});setDeclarations({name:"",occupation:"",capacity:""});setSignaturePadField(null);setSelectedFieldId("");setSavedProfile(null);setTypedSignature("");setConsent(false);setRecord(null);
+  setSigningToken("");setFieldApplications([]);setFieldValues({});setSignatureMarks({});setDeclarations({name:"",occupation:"",capacity:""});setSignaturePadField(null);setSelectedFieldId("");setSavedProfile(null);setTypedSignature("");setConsent(false);setRecord(null);setPdfDocument(current=>{current?.destroy?.().catch?.(()=>{});return null;});setPageCount(0);setPageRendered(false);
   if(auth.currentUser?.uid){window.location.replace("/");return;}
   setLeftSession(true);
  }
