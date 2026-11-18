@@ -35,7 +35,8 @@ export function signatureFieldFromPercent(field) {
 
 export function signatureFieldToPercent(field, options) {
   const canonical = normalizeSignatureField(field, options);
-  return { ...canonical, x: canonical.x * 100, y: canonical.y * 100, width: canonical.width * 100, height: canonical.height * 100 };
+  const { coordinateSpace: _coordinateSpace, ...percentField } = canonical;
+  return { ...percentField, x: canonical.x * 100, y: canonical.y * 100, width: canonical.width * 100, height: canonical.height * 100 };
 }
 
 export function signatureFieldFromPointer(clientX, clientY, pageRect) {
