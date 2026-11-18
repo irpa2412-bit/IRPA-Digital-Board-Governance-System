@@ -98,5 +98,23 @@ test("matching registered signer records are offered for selection without creat
   assert.match(portal,/aria-label="Matching existing IRPA records"/);
   assert.match(portal,/setSelectedSigner\(member\.uid\)/);
   assert.match(portal,/const duplicate=recipients\.find/);
-  assert.match(portal,/The existing signer record has been selected; no duplicate was created/);
+  assert.match(portal,/roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
+  assert.match(portal,/sameAssignment=currentAssignments\.some/);
+  assert.match(portal,/One email-link identity and invitation covers the responsibilities/);
+  assert.match(storage,/roleAssignments:\(Array\.isArray\(recipient\.roleAssignments\)/);
+  assert.match(gateway,/roleAssignments:\(Array\.isArray\(s\?\.roleAssignments\)/);
+  assert.match(gateway,/roleAssignments:signer\.roleAssignments\|\|\[\]/);
+  assert.match(gateway,/roleAssignments:s\.roleAssignments\|\|\[\]/);
+  assert.match(platform,/workflowRoleAssignments:Array\.isArray\(recipient\.roleAssignments\)/);
+  assert.match(emailPage,/Your assigned responsibilities:/);
+});
+
+
+test("one email-link signer can hold distinct roles or capacities on the same document",()=>{
+  assert.match(portal,/const updatedRecipient=\{\.\.\.duplicate,roleAssignments:\[\.\.\.existingAssignments,assignment\]\}/);
+  assert.match(portal,/sameAssignment=currentAssignments\.some/);
+  assert.match(portal,/setRecipients\(updatedRecipients\)/);
+  assert.match(storage,/roleAssignments:/);
+  assert.match(gateway,/roleAssignments:/);
+  assert.match(emailPage,/record\.signer\?\.roleAssignments/);
 });
