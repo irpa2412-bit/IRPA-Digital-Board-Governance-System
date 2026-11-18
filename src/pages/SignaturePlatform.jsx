@@ -594,6 +594,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setActiveAssigneeUid(documentOwner.uid);
     setSelectedSigner("");
     setSignerEmail("");
+     setSignerName("");
     setSignerRole("Review");
     setSignerAuthorityRole("");
     setSignerCapacity("");
@@ -605,6 +606,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setActiveAssigneeUid(duplicate.uid);
     setSelectedSigner("");
     setSignerEmail("");
+     setSignerName("");
     setSignerRole(duplicate.role||"Review");
     setSignerAuthorityRole(duplicate.occupation||"");
     setSignerCapacity(duplicate.capacity||"");
@@ -635,6 +637,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setActiveAssigneeUid(next.uid);
     setSelectedSigner("");
     setSignerEmail("");
+     setSignerName("");
     setSignerRole("Review");
     setSignerAuthorityRole("");
     setSignerCapacity("");
