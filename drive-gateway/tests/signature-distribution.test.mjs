@@ -71,6 +71,7 @@ test("failed completed-document email is retryable without resending already del
     ]
   };
   const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"board-resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
+  await ctx.meta.create("envelopes",envelope.id,envelope);
   const initial=await distributeCompletedSignatureDocument(ctx,envelope,completion);
   assert.equal(initial.failed,1);
   const retried=await retryFailedSignatureDistributions(ctx,{uid:"owner-uid",isAdmin:false},envelope.id);
