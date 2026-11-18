@@ -126,7 +126,7 @@ test("a signer can be assigned separate PDF fields for each role responsibility"
   assert.match(portal,/Responsibility for new fields/);
   assert.match(portal,/Signature responsibility assignment/);
   assert.match(storage,/roleAssignmentIndex:Number\.isInteger\(Number\(field\.roleAssignmentIndex\)\)/);
-  assert.match(gateway,/roleAssignmentIndex=Number\.isInteger\(Number\(f\?\.roleAssignmentIndex\)\)/);
+  assert.match(gateway,/roleAssignmentIndex=f\?\.roleAssignmentIndex==null\?0:Number\(f\.roleAssignmentIndex\)/);
   assert.match(gateway,/Every signer responsibility must have at least one assigned Signature or Initials field/);
   assert.match(gateway,/roleAssignmentEvidence/);
   assert.match(gateway,/signatureFieldHashes\.push/);
