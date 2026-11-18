@@ -138,7 +138,7 @@ export default function EmailSigningReadOnlyPage({token}){
    let value="";try{value=trimSignatureCanvas(signatureCanvasRef.current,{padding:4}).dataUrl;}catch(e){setError(e?.message||"Draw your mark before applying it.");return;}
    if(!value||value.length<100){setError("Draw your mark before applying it.");return;}
    setSignatureMarks(current=>({...current,[selectedField.fieldId]:value}));
-   setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,confirmed:true,value}]);
+   setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,coordinateSpace:selectedField.coordinateSpace,confirmed:true,value}]);
   }else if(fieldValues[selectedField.fieldId]===undefined||String(fieldValues[selectedField.fieldId]).trim()===""){setError("Complete this assigned field before confirming it.");return;}
   setError("");
   const nextInAssignment=assignmentFields.find(field=>field.fieldId!==selectedField.fieldId&&!complete(field));
