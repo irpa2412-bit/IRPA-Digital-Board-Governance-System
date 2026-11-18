@@ -320,6 +320,8 @@ test("owner-first portal signing survives both direct envelope creation and draf
   assert.match(storage,/ownerSigningToken/);
   assert.match(portal,/if\(updated\.ownerSigningToken\)\{window\.location\.assign\("\/\?emailSignToken="/);
   assert.match(portal,/Owner Sign in Portal & Release Signers/);
+  assert.match(portal,/if\(ownerSigningEnabled\)\{[\s\S]*?startSignatureWorkflow\(env\)[\s\S]*?window\.location\.assign\("\/\?emailSignToken="/);
+  assert.match(portal,/Save & Open Owner Signature Portal/);
 });
 
 test("Title is a real signer-assigned PDF field and Document Tracking shows holder and last action",()=>{
