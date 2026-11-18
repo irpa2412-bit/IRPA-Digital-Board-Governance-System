@@ -77,8 +77,8 @@ test("rotated visible CropBox uses the same top-left visible-page coordinate sys
   const crop = { x: 20, y: 30, width: 600, height: 800 };
   const field = { fieldId: "rotated", coordinateSpace: SIGNATURE_FIELD_COORDINATE_SPACE, page: 1, x: 0.2, y: 0.3, width: 0.1, height: 0.05 };
   const box = signatureFieldToPdfBox(page(crop, 90), field);
-  close(box.x, crop.x + crop.height * 0.3);
-  close(box.y, crop.y + crop.width * 0.2);
+  close(box.x, crop.x + crop.width * 0.3);
+  close(box.y, crop.y + crop.height * 0.2);
   close(box.width, crop.width * 0.05);
   close(box.height, crop.height * 0.1);
 });
