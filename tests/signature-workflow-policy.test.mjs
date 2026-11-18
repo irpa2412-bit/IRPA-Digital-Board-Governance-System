@@ -310,3 +310,32 @@ test("new envelopes remain inactive drafts until Start Workflow sends Gateway em
   assert.ok(signingAction, "the Sign Document action must exist");
   assert.doesNotMatch(signingAction[1], /signEnvelope\(/, "the account-based client signing fallback must not be reachable");
 });
+
+test("owner-first portal signing survives both direct envelope creation and draft preparation",()=>{
+  const platform=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+  const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+  assert.match(platform,/ownerSigningEnabled:ownerSigningEnabled===true/);
+  assert.match(platform,/ownerSigningEnabled\?u\.uid:/);
+  assert.match(storage,/ownerPreSignEmail:String\(ownerSigner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(storage,/ownerSigningToken/);
+  assert.match(portal,/if\(updated\.ownerSigningToken\)\{window\.location\.assign\("\/\?emailSignToken="/);
+  assert.match(portal,/Owner Sign in Portal & Release Signers/);
+});
+
+test("Title is a real signer-assigned PDF field and Document Tracking shows holder and last action",()=>{
+  const platform=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+  const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+  const signingPortal=fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx",import.meta.url),"utf8");
+  assert.match(portal,/Title:"Title \/ Position"/);
+  assert.match(portal,/TYPES\.slice\(0,6\)/);
+  assert.match(portal,/data-testid="palette-signer-management"/);
+  assert.match(platform,/field\.type==="Title"/);
+  assert.match(worker,/"Name","Title"/);
+  assert.match(worker,/title:signer\.title\|\|""/);
+  assert.match(signingPortal,/field\.type==="Title"\)nextValues\[field\.fieldId\]=result\.signer\?\.title/);
+  assert.match(portal,/Document Tracking Register/);
+  assert.match(portal,/CURRENT HOLDER/);
+  assert.match(portal,/LAST RECORDED ACTION/);
+  assert.match(portal,/NEXT EXPECTED ACTION/);
+  assert.match(worker,/lastEvent/);
+});
