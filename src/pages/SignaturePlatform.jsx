@@ -747,7 +747,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    if(status.signers.length===0&&previous.length>0)throw new Error("Gateway returned no signer assignments; the last readable list has been preserved.");
    const previousById=new Map(previous.map(signer=>[signer.id,signer]));
    const signers=status.signers.map(signer=>({...previousById.get(signer.id),...signer}));
-   setGatewayEmailStatus({...status,signers});
+   setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId,signers});
    setMessage("Envelope and invitation delivery status refreshed. Invitation delivery and link-use status are shown separately.");
   }catch(error){setMessage(error.message||"Unable to retrieve email-link invitation status. The previous signer list remains visible.");}
   finally{setGatewayEmailStatusBusy(false);}
@@ -755,14 +755,14 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
  async function resendEmailLink(signerId){
   if(!selected?.gatewayEnvelopeId)return;
   setGatewayEmailStatusBusy(true);
-  try{await resendGatewayEmailInvitation(selected.gatewayEnvelopeId,signerId);const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);setGatewayEmailStatus(status);setMessage("A new email-link invitation was sent. The previous link has been revoked.");}
+  try{await resendGatewayEmailInvitation(selected.gatewayEnvelopeId,signerId);const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});setMessage("A new email-link invitation was sent. The previous link has been revoked.");}
   catch(error){setMessage(error.message||"Unable to resend the email-link invitation.");}
   finally{setGatewayEmailStatusBusy(false);}
  }
  async function revokeEmailLink(signerId){
   if(!selected?.gatewayEnvelopeId)return;
   setGatewayEmailStatusBusy(true);
-  try{await revokeGatewayEmailInvitation(selected.gatewayEnvelopeId,signerId);const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);setGatewayEmailStatus(status);setMessage("The email signing link has been revoked.");}
+  try{await revokeGatewayEmailInvitation(selected.gatewayEnvelopeId,signerId);const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});setMessage("The email signing link has been revoked.");}
   catch(error){setMessage(error.message||"Unable to revoke the email-link invitation.");}
   finally{setGatewayEmailStatusBusy(false);}
  }
@@ -772,7 +772,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   try{
     const result=await retryGatewaySignatureDistribution(selected.gatewayEnvelopeId);
     const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);
-    setGatewayEmailStatus(status);
+    setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});
     const delivery=result.distribution||status.distribution||{};
     setMessage(delivery.failed?("Retry finished. "+delivery.sent+" recipient email(s) delivered; "+delivery.failed+" remain failed."):("Completed-document distribution retry finished. "+delivery.sent+" recipient email(s) are recorded as delivered."));
   }catch(error){setMessage(error.message||"Unable to retry completed-document email delivery.");}
