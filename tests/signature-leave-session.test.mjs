@@ -26,7 +26,7 @@ test("email-link Leave clears the invitation session and removes the signing for
   assert.match(emailPortal, /function leaveSigningSession\(\)/);
   assert.match(emailPortal, /irpaEmailSigningSession:/);
   assert.match(emailPortal, /url\.searchParams\.delete\("emailSignToken"\)/);
-  assert.match(emailPortal, /setSigningToken\("\"\)/);
+  assert.ok(emailPortal.includes("setSigningToken(\"\")"));
   assert.match(emailPortal, /setFieldApplications\(\[\]\)/);
   assert.match(emailPortal, /setFieldValues\(\{\}\)/);
   assert.match(emailPortal, /if\(leftSession\)return/);
