@@ -98,6 +98,12 @@ export async function createEnvelope(ctx,user,body){
     signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,profileUid:profileUid||null,name:validateName(s?.name||email),declaredParticulars:{name:cleanText(s?.name||"",160),occupation:cleanText(s?.occupation||s?.capacity||"",160),capacity:cleanText(s?.capacity||"",160)},roleAssignments:(Array.isArray(s?.roleAssignments)?s.roleAssignments:[{role:s?.role||"Signer",capacity:s?.capacity||"",occupation:s?.occupation||""}]).slice(0,12).map(item=>({role:cleanText(item?.role||"Signer",120),capacity:cleanText(item?.capacity||"",160),occupation:cleanText(item?.occupation||"",160)})),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:emailLink?"email-link":uid?"account":"legacy-token",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{}}:{})});
   }
   const fields=validateEnvelopeFields(body?.fields,signers);
+  for(const signer of signers){
+    const assignments=Array.isArray(signer.roleAssignments)&&signer.roleAssignments.length?signer.roleAssignments:[{role:"Signer"}];
+    for(let roleAssignmentIndex=0;roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
+      if(!fields.some(field=>field.signerId===signer.id&&field.roleAssignmentIndex===roleAssignmentIndex&&["Signature","Initials"].includes(field.type)))throw new HttpError(400,"Every signer responsibility must have at least one assigned Signature or Initials field.");
+    }
+  }
   const sourceHash=doc.sha256||doc.hash||await sha256Hex(sourceBytes),sourceSize=doc.fileSize??doc.byteLength??doc.size??sourceBytes.byteLength;
   const e={id,externalReference:externalReference||null,documentId:doc.id,documentHash:sourceHash,sha256:sourceHash,byteLength:sourceSize,documentSize:sourceSize,title:doc.title,fileName:doc.fileName,classification:doc.classification,ownerName:String(user.name||user.email||"IRPA Document Owner"),ownerEmail:String(user.email||"").trim().toLowerCase(),createdByEmail:String(user.email||"").trim().toLowerCase(),createdBy:user.uid,status:"Sent",signingMode,signers,fields,archiveTargets:archives,createdAt:ctx.now().toISOString(),expiresAt:new Date(ctx.now().getTime()+ctx.config.ttlDays*86400000).toISOString(),events:[],completion:null};
   e.events=await chainEvents([],{type:"envelope.created",at:e.createdAt,actor:user.uid,documentHash:sourceHash,signerCount:signers.length});
@@ -226,6 +232,14 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   if(!can(e0,s0))throw new HttpError(409,"It is not yet your turn to sign.");
   const checkedFieldValues=validateFieldValues(e0.fields,s0,fieldValues,sig,fieldApplications);
   const declared={name:cleanText(declarations?.name||"",160),occupation:cleanText(declarations?.title||declarations?.occupation||"",160),capacity:cleanText(declarations?.capacity||"",160),title:cleanText(declarations?.title||declarations?.occupation||"",160)};
+  const roleAssignmentEvidence= (Array.isArray(s0.roleAssignments)&&s0.roleAssignments.length?s0.roleAssignments:[{role:"Signer",capacity:"",occupation:""}]).map((assignment,roleAssignmentIndex)=>{
+    const assignedFields=(e0.fields||[]).filter(field=>field.signerId===s0.id&&Number(field.roleAssignmentIndex||0)===roleAssignmentIndex);
+    return {roleAssignmentIndex,role:cleanText(assignment.role||"Signer",120),capacity:cleanText(assignment.capacity||"",160),occupation:cleanText(assignment.occupation||"",160),fieldIds:assignedFields.map(field=>field.fieldId),signatureFieldHashes:assignedFields.filter(field=>["Signature","Initials"].includes(field.type)).map(field=>({fieldId:field.fieldId,type:field.type,hash:checkedFieldValues[field.fieldId]?null:null}))};
+  });
+  for(const assignment of roleAssignmentEvidence){
+    assignment.signatureFieldHashes=[];
+    for(const fieldId of assignment.fieldIds){const field=(e0.fields||[]).find(item=>item.fieldId===fieldId);if(field&&["Signature","Initials"].includes(field.type))assignment.signatureFieldHashes.push({fieldId,type:field.type,hash:await sha256Hex(checkedFieldValues[fieldId])});}
+  }
   if(!declared.name)throw new HttpError(400,"Enter your name before signing.");
   const ownerDeclared=s0.declaredParticulars||{};
   const discrepancyFields=["name","occupation","capacity"].filter(key=>String(ownerDeclared[key]||"").trim()!==""&&String(ownerDeclared[key]||"").trim().toLowerCase()!==String(declared[key]||"").trim().toLowerCase());
@@ -241,11 +255,11 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
       if(assignedToSigner&&field.type==="Date")signedFieldValues[field.fieldId]=at;
     }
     s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=signedFieldValues;
-    s.signerDeclarations=declared;
+    s.signerDeclarations=declared;s.roleAssignmentEvidence=roleAssignmentEvidence;
     s.declarationDiscrepancy={detected:discrepancyFields.length>0,fields:discrepancyFields,ownerDeclared:{...ownerDeclared},signerDeclared:{...declared},detectedAt:at};
     s.authorityVerification=null;s.ip=ip||null;s.userAgent=cleanText(userAgent||"",200)||null;
     const last=cur.signers.every(x=>x.status==="Signed");
-    return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events:await chainEvents(cur.events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy})},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
+    return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events:await chainEvents(cur.events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],roleAssignmentEvidence,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy})},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
   if(!out.winner){await inviteNextPosition(ctx,e0.id);return{ok:true,status:"InProgress",completed:false};}
