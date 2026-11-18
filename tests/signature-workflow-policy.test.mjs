@@ -186,7 +186,8 @@ test("signature assignment and signing handlers synchronously reject repeated su
   const sign = portal.match(/async function sign\(\)\{([\s\S]*?)(?=\n\s*(?:async )?function |\n\s*return \()/);
   assert.ok(sign, "the signing handler must exist");
   assert.match(sign[1], /if\(signInFlightRef\.current\|\|busy\)return/);
-  assert.match(sign[1], /signInFlightRef\.current=true/);
+  assert.doesNotMatch(sign[1], /signEnvelope\\(/, "the in-app account signing fallback must remain unreachable");
+  assert.match(sign[1], /This envelope must be signed through its verified email-link invitation/);
   assert.match(sign[1], /finally\s*\{\s*signInFlightRef\.current=false;\s*setBusy\(false\);?\s*\}/);
 });
 
@@ -210,7 +211,7 @@ test("participant creation and field assignment are performed inside the PDF pal
   assert.match(portal, /onAddSigner=\{addSigner\}/);
   assert.match(portal, /onMoveSigner=\{moveSigner\}/);
   assert.match(portal, /onSelectAssignee=\{setActiveAssigneeUid\}/);
-  assert.match(portal, /const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setPendingFieldType\("".*?onSelectAssignee\?\.\(uid\)\}/);
+  assert.match(portal, /const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setSelectedRoleAssignmentIndex\(0\);setPendingFieldType\("".*?onSelectAssignee\?\.\(uid\)\}/);
   assert.match(portal, /onOwnerSigningChange=\{changeOwnerSigning\}/);
   assert.match(portal, /Assign fields to this person/);
   assert.match(portal, /FIELDS ON THIS DOCUMENT/);
@@ -303,7 +304,7 @@ test("new envelopes remain inactive drafts until Start Workflow sends Gateway em
   assert.ok(start, "the authenticated workflow start handler must exist");
   assert.match(start[1], /createGatewaySignatureEnvelope\(\{envelope,sourceBytes\}\)/);
   assert.doesNotMatch(start[1], /if\(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED\)/);
-  assert.match(page, /if\(!selected\.gatewayEnvelopeId\)throw new Error\("This draft has not been sent/);
+  assert.match(page, /if\(!selected\.gatewayEnvelopeId\)\{setMessage\("This draft has not been sent/);
   assert.match(page, /This envelope must be signed through its verified email-link invitation/);
   const signingAction = page.match(/async function sign\(\)\{([\s\S]*?)\n \}/);
   assert.ok(signingAction, "the Sign Document action must exist");
