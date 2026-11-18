@@ -377,7 +377,7 @@ test("confirmed signature is rendered on the saved third-page field position", a
   fixture.envelope.archiveTargets=["completed-signed"];
   const result=await sign(fixture.ctx,{declarations:{name:"Institutional Signer",occupation:"Test Occupation"},
     token:fixture.token,signature:{type:"drawn",value:SIGNATURE_PNG},
-    fieldValues:{},fieldApplications:[{...field,confirmed:true,value:SIGNATURE_PNG}],
+    fieldValues:{},fieldApplications:[{...field,x:0.2,y:0.3,width:0.35,height:0.1,coordinateSpace:"visible-page-fraction-v1",confirmed:true,value:SIGNATURE_PNG}],
     signatureConfirmed:true,consent:true,
     user:{uid:"member-uid",email:"member@example.org"}
   });

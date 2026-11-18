@@ -40,7 +40,8 @@ test("tapping an assigned signature field opens Draw, Type and saved-signature c
 });
 
 test("each signature application carries the saved page and coordinates and the Worker verifies them", () => {
-  assert.match(service, /page:Number\(field\.page\|\|1\),x:Number\(field\.x\?\?0\),y:Number\(field\.y\?\?0\),width:Number\(field\.width\?\?24\),height:Number\(field\.height\?\?9\)/);
+  assert.ok(service.includes('signatureFieldFromPercent({...field,page:Number(field?.page||1),x:Number(field?.x??10),y:Number(field?.y??12),width:Number(field?.width??24),height:Number(field?.height??9)}),coordinateSpace:"visible-page-fraction-v1"'));
+  assert.match(gatewayPortal, /coordinateSpace:field\.coordinateSpace/);
   assert.match(worker, /application\.confirmed!==true/);
   assert.match(worker, /submitted!==saved/);
   assert.match(pdf, /pages\[Number\(field\.page\s*\|\|\s*1\)\s*-\s*1\]/);
@@ -55,7 +56,7 @@ test("the Worker refuses unconfirmed and non-assigned signature field applicatio
 });
 
 test("the signing view keeps server-side visibility filtering for later signers", () => {
-  assert.match(worker, /fields:\(env\.fields\|\|\[\]\)\.filter\(f=>f\.signerId===signer\.id\|\|\(!f\.signerId&&signer\.uid&&f\.signerUid===signer\.uid\)\)/);
+  assert.ok(worker.includes("fields:readEnvelopeFields(ctx,env.fields).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid))"));
   assert.match(gatewayPortal, /const fields=opened\.fields\|\|\[\]/);
 });
 

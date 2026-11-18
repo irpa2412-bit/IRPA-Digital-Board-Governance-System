@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 
 mkdirSync("test-results",{recursive:true});
+const controlledMinutesFixture="test-results/irpa-three-page-controlled-minutes.pdf";
+if(!existsSync(controlledMinutesFixture)){
+ const generated=spawnSync("python",["scripts/create-signature-realistic-fixtures.py"],{encoding:"utf8"});
+ assert.equal(generated.status,0,"three-page controlled-minutes fixture must be regenerated if a prior test cleaned test-results: "+(generated.stderr||generated.stdout||"fixture generator failed"));
+ assert.ok(existsSync(controlledMinutesFixture),"three-page controlled-minutes PDF fixture must exist before the browser regression");
+}
 const component=readFileSync("src/pages/SignaturePlatform.jsx","utf8");
 const platform=readFileSync("src/firebase/signaturePlatform.js","utf8");
 const addSigner=component.slice(component.indexOf("async function addSigner"),component.indexOf("function removeSigner"));
@@ -46,7 +52,7 @@ try{
  await page.goto("http://127.0.0.1:4175/tests/fixtures/signature-envelope-content-harness.html");
  await page.getByTestId("authenticated-user").waitFor();
  assert.match(await page.getByTestId("authenticated-user").textContent(),/fixture-authenticated-signer/);
- const pdfBytes=readFileSync("test-results/irpa-three-page-controlled-minutes.pdf"),sourceHash=hash(pdfBytes);
+ const pdfBytes=readFileSync(controlledMinutesFixture),sourceHash=hash(pdfBytes);
  await page.getByTestId("controlled-pdf-upload").setInputFiles({name:"IRPA-controlled-three-page.pdf",mimeType:"application/pdf",buffer:pdfBytes});
  await waitForStage(page,"CONTROLLED PDF UPLOADED");
  assert.equal(await page.getByTestId("source-hash").textContent(),sourceHash,"uploaded source hash must match original PDF bytes");
