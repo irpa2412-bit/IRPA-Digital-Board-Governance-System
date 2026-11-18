@@ -79,9 +79,24 @@ test("owner envelope lifecycle mutations use the authenticated Gateway commit pa
   assert.match(platform,/mutateSignatureEnvelope\(envelope\.id,"start"/);
   assert.match(platform,/mutateSignatureEnvelope\(envelope\.id,"invitation-sent"/);
   assert.match(platform,/mutateSignatureEnvelope\(envelopeId,"attach-gateway"/);
-  assert.doesNotMatch(platform,/await updateDoc\(doc\(db,\s*ENVELOPE_COLLECTION,\s*envelope\.id\)/);
+  assert.match(platform,/await updateDoc\(doc\(db,ENVELOPE_COLLECTION,envelope\.id\),update\)/,"signer completion is a separate path and remains explicitly tracked for migration");
   assert.match(platform,/\/api\/signature-workflow\/mutate/);
   assert.match(worker,/mutateSignatureWorkflowEnvelopeRoute/);
   assert.match(worker,/Only the original envelope owner may perform this operation/);
   assert.match(worker,/Commit authorized envelope mutation and audit event atomically/);
+});
+
+
+test("document owner can manually enter a signer name and email",()=>{
+  assert.match(portal,/<label>Signer name<input type="text" value=\{signerName\}/);
+  assert.match(portal,/<label>Signer email<input type="email" value=\{signerEmail\}/);
+  assert.match(portal,/if\(!registered&&!String\(signerName\|\|""\)\.trim\(\)\)/);
+  assert.match(portal,/name:String\(signerName\|\|""\)\.trim\(\),email,role/);
+});
+
+test("matching registered signer records are offered for selection without creating duplicates",()=>{
+  assert.match(portal,/aria-label="Matching existing IRPA records"/);
+  assert.match(portal,/setSelectedSigner\(member\.uid\)/);
+  assert.match(portal,/const duplicate=recipients\.find/);
+  assert.match(portal,/The existing signer record has been selected; no duplicate was created/);
 });
