@@ -129,7 +129,7 @@ test("confirmed signature specimens support the bounded aggregate request budget
     {fieldId:"sig-a",signerId:"S1",type:"Signature",required:true,page:1},
     {fieldId:"sig-b",signerId:"S1",type:"Initials",required:true,page:2},
   ],[externalSigner]);
-  const app=(fieldId,value)=>({fieldId,page:fieldId==="sig-a"?1:2,x:10,y:80,width:24,height:9,confirmed:true,value});
+  const app=(fieldId,value)=>({fieldId,page:fieldId==="sig-a"?1:2,x:0.1,y:0.8,width:0.24,height:0.09,coordinateSpace:"visible-page-fraction-v1",confirmed:true,value});
   const markA="data:image/png;base64,"+"A".repeat(110000);
   const markB="data:image/png;base64,"+"B".repeat(110000);
   const values=validateFieldValues(fields,externalSigner,{}, {type:"typed",value:"Vendor"},[app("sig-a",markA),app("sig-b",markB)]);
@@ -157,7 +157,7 @@ test("required checkbox fields accept only an explicit checked value and signatu
     {fieldId:"sig-b",signerId:"S1",type:"Signature",required:true,page:1},
     {fieldId:"initials",signerId:"S1",type:"Initials",required:true,page:1},
   ],[externalSigner]);
-  const app=(fieldId,value)=>({fieldId,page:1,x:10,y:80,width:24,height:9,confirmed:true,value});
+  const app=(fieldId,value)=>({fieldId,page:1,x:0.1,y:0.8,width:0.24,height:0.09,coordinateSpace:"visible-page-fraction-v1",confirmed:true,value});
   const markA="data:image/png;base64,"+"A".repeat(100);
   const markB="data:image/png;base64,"+"B".repeat(100);
   const markI="data:image/png;base64,"+"C".repeat(100);
@@ -167,4 +167,12 @@ test("required checkbox fields accept only an explicit checked value and signatu
   assert.equal(values["sig-a"],markA);
   assert.equal(values["sig-b"],markB);
   assert.equal(values.initials,markI);
+});
+
+
+test("legacy saved percentage fields are normalized before checking confirmed signature placement", () => {
+  const legacyFields = [{ fieldId: "legacy-signature", signerId: "S1", type: "Signature", page: 1, x: 10, y: 80, width: 24, height: 9 }];
+  const mark = "data:image/png;base64," + "A".repeat(100);
+  const confirmed = [{ fieldId: "legacy-signature", page: 1, x: 0.1, y: 0.8, width: 0.24, height: 0.09, coordinateSpace: "visible-page-fraction-v1", confirmed: true, value: mark }];
+  assert.deepEqual(validateFieldValues(legacyFields, externalSigner, {}, { type: "typed", value: "Vendor" }, confirmed), { "legacy-signature": mark });
 });
