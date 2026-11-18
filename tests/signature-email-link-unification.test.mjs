@@ -24,7 +24,7 @@ test("document owner may be included as an email-link signer when explicitly ena
 });
 
 test("all workflow recipients become email-link identities and assigned PDF fields reach the Gateway",()=>{
-  assert.match(portal,/const gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:recipient\.identityType==="email-link"\?"email-link":"account"\}\)\)/);
+  assert.match(portal,/const gatewayRecipients=workflowRecipients\.map\(recipient=>\(\{\.\.\.recipient,identityType:"email-link"\}\)\)/);
   assert.match(storage,/identityType:"email-link"/);
   assert.match(portal,/recipients:gatewayRecipients,fields\}/);
   assert.match(storage,/recipient\.uid/);
