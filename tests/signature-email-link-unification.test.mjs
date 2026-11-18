@@ -72,3 +72,14 @@ test("Signature Profile explicitly presents the email-link e-signature method",(
   assert.ok(portal.includes('<span>Signing method</span><strong>Email-link e-signature</strong>'));
   assert.ok(portal.includes("unique link")&&portal.includes("secure email-link workflow"));
 });
+
+test("owner envelope lifecycle mutations use the authenticated Gateway commit path",()=>{
+  assert.match(platform,/mutateSignatureEnvelope\(envelope\.id,"start"/);
+  assert.match(platform,/mutateSignatureEnvelope\(envelope\.id,"invitation-sent"/);
+  assert.match(platform,/mutateSignatureEnvelope\(envelopeId,"attach-gateway"/);
+  assert.doesNotMatch(platform,/await updateDoc\(doc\(db,\s*ENVELOPE_COLLECTION,\s*envelope\.id\)/);
+  assert.match(gateway,/\/api\/signature-workflow\/mutate/);
+  assert.match(gateway,/mutateSignatureWorkflowEnvelopeRoute/);
+  assert.match(gateway,/Only the original envelope owner may perform this operation/);
+  assert.match(gateway,/Commit authorized envelope mutation and audit event atomically/);
+});
