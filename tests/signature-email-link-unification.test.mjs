@@ -118,3 +118,26 @@ test("one email-link signer can hold distinct roles or capacities on the same do
   assert.match(gateway,/roleAssignments:/);
   assert.match(emailPage,/record\.signer\?\.roleAssignments/);
 });
+
+
+test("a signer can be assigned separate PDF fields for each role responsibility",()=>{
+  assert.match(portal,/selectedRoleAssignmentIndex/);
+  assert.match(portal,/roleAssignmentIndex=selectedRoleAssignmentIndex/);
+  assert.match(portal,/Responsibility for new fields/);
+  assert.match(portal,/Signature responsibility assignment/);
+  assert.match(storage,/roleAssignmentIndex:Number\.isInteger\(Number\(field\.roleAssignmentIndex\)\)/);
+  assert.match(gateway,/roleAssignmentIndex=Number\.isInteger\(Number\(f\?\.roleAssignmentIndex\)\)/);
+  assert.match(gateway,/Every signer responsibility must have at least one assigned Signature or Initials field/);
+  assert.match(gateway,/roleAssignmentEvidence/);
+  assert.match(gateway,/signatureFieldHashes\.push/);
+});
+
+test("email signing advances the document to the next responsibility after the current assignment is complete",()=>{
+  assert.match(emailPage,/activeRoleAssignmentIndex/);
+  assert.match(emailPage,/assignmentFields=fields\.filter/);
+  assert.match(emailPage,/nextInAssignment/);
+  assert.match(emailPage,/nextAssignmentIndex/);
+  assert.match(emailPage,/setActiveRoleAssignmentIndex\(nextAssignmentIndex\)/);
+  assert.match(emailPage,/Moving to the next signature assignment/);
+  assert.match(emailPage,/All assigned responsibilities are complete/);
+});
