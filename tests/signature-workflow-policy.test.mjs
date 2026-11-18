@@ -327,7 +327,7 @@ test("Title is a real signer-assigned PDF field and Document Tracking shows hold
   const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
   const signingPortal=fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx",import.meta.url),"utf8");
   const emailSigningPortal=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
-  assert.match(portal,/Title:"Title \/ Position"/);
+  assert.match(portal,/Title:"Title"/);
   assert.match(portal,/TYPES\.slice\(0,6\)/);
   assert.match(portal,/data-testid="palette-signer-management"/);
   assert.match(platform,/field\.type==="Title"/);
@@ -337,6 +337,8 @@ test("Title is a real signer-assigned PDF field and Document Tracking shows hold
   assert.match(emailSigningPortal,/field\.type==="Title"\)initialFieldValues\[field\.fieldId\]=metadata\.ownerDeclaredParticulars\?\.title/);
   assert.match(portal,/Document Tracking Register/);
   assert.match(portal,/CURRENT HOLDER/);
+  assert.match(portal,/activeHolders=currentNames\.filter/);
+  assert.match(portal,/waitingInvitations=currentNames\.filter/);
   assert.match(portal,/LAST RECORDED ACTION/);
   assert.match(portal,/NEXT EXPECTED ACTION/);
   assert.match(worker,/lastEvent/);
