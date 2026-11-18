@@ -99,7 +99,7 @@ test("matching registered signer records are offered for selection without creat
   assert.match(portal,/setSelectedSigner\(member\.uid\)/);
   assert.match(portal,/const duplicate=recipients\.find/);
   assert.match(portal,/roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
-  assert.match(portal,/sameAssignment=currentAssignments\.some/);
+  assert.match(portal,/sameAssignment=existingAssignments\.some/);
   assert.match(portal,/One email-link identity and invitation covers the responsibilities/);
   assert.match(storage,/roleAssignments:\(Array\.isArray\(recipient\.roleAssignments\)/);
   assert.match(gateway,/roleAssignments:\(Array\.isArray\(s\?\.roleAssignments\)/);
@@ -112,7 +112,7 @@ test("matching registered signer records are offered for selection without creat
 
 test("one email-link signer can hold distinct roles or capacities on the same document",()=>{
   assert.match(portal,/const updatedRecipient=\{\.\.\.duplicate,roleAssignments:\[\.\.\.existingAssignments,assignment\]\}/);
-  assert.match(portal,/sameAssignment=currentAssignments\.some/);
+  assert.match(portal,/sameAssignment=existingAssignments\.some/);
   assert.match(portal,/setRecipients\(updatedRecipients\)/);
   assert.match(storage,/roleAssignments:/);
   assert.match(gateway,/roleAssignments:/);
