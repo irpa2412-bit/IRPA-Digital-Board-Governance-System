@@ -595,7 +595,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setActiveAssigneeUid(documentOwner.uid);
     setSelectedSigner("");
     setSignerEmail("");
-     setSignerName("");
+     setSignerName("");setSignerTitle("");
     setSignerRole("Review");
     setSignerAuthorityRole("");
     setSignerCapacity("");
@@ -610,7 +610,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     const existingAssignments=Array.isArray(duplicate.roleAssignments)&&duplicate.roleAssignments.length?duplicate.roleAssignments:[{role:duplicate.role||"Review",capacity:String(duplicate.capacity||"").trim(),occupation:String(duplicate.occupation||"").trim()}];
     const sameAssignment=existingAssignments.some(item=>String(item.role||"").trim().toLowerCase()===role.trim().toLowerCase()&&String(item.title||"").trim().toLowerCase()===String(signerTitle||"").trim().toLowerCase()&&String(item.capacity||"").trim().toLowerCase()===capacity.toLowerCase());
     if(sameAssignment){
-      setActiveAssigneeUid(duplicate.uid);setSelectedSigner("");setSignerEmail("");setSignerName("");setSignerRole(role);setSignerAuthorityRole(assignment.occupation);setSignerCapacity(capacity);
+      setActiveAssigneeUid(duplicate.uid);setSelectedSigner("");setSignerEmail("");setSignerName("");setSignerTitle("");setSignerRole(role);setSignerAuthorityRole(assignment.occupation);setSignerCapacity(capacity);
       setMessage((duplicate.name||duplicate.email||"This signer")+" already has the "+role+" responsibility"+(capacity?" ("+capacity+")":"")+". The existing responsibility was selected; no duplicate was created.");return;
     }
     const updatedRecipient={...duplicate,roleAssignments:[...existingAssignments,assignment]};
@@ -618,7 +618,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     addSignerInFlightRef.current=true;setBusy(true);
     try{
       const saved=await saveSignatureWorkflowDraft({envelopeId:draftEnvelopeId,title,documentId,documentReference:selectedDoc?.reference||selectedDoc?.title||documentId,documentUrl,signingMode,documentClassification:selectedDoc?.classification||selectedDoc?.accessLevel||"Public",documentArchiveCategory:selectedDoc?.archiveCategory||"Administrative Documents",documentType:selectedDoc?.documentType||"Governance Document",documentUploadedAt:selectedDoc?.uploadedAt||selectedDoc?.documentTypeSelectedAt||null,recipients:updatedRecipients,fields,ownerSigningEnabled});
-      setDraftEnvelopeId(saved.id);setRecipients(updatedRecipients);setActiveAssigneeUid(duplicate.uid);setSelectedSigner("");setSignerEmail("");setSignerName("");setSignerRole("Review");setSignerAuthorityRole("");setSignerCapacity("");
+      setDraftEnvelopeId(saved.id);setRecipients(updatedRecipients);setActiveAssigneeUid(duplicate.uid);setSelectedSigner("");setSignerEmail("");setSignerName("");setSignerTitle("");setSignerRole("Review");setSignerAuthorityRole("");setSignerCapacity("");
       setMessage((duplicate.name||duplicate.email||"This signer")+" now has an additional responsibility: "+role+(capacity?" ("+capacity+")":"")+". One email-link identity and invitation covers the responsibilities; assign the relevant fields to this signer.");
     }catch(error){setMessage("The additional responsibility was not saved: "+(error?.message||"Unable to update the signer assignment."));}
     finally{addSignerInFlightRef.current=false;setBusy(false);}
@@ -647,7 +647,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setActiveAssigneeUid(next.uid);
     setSelectedSigner("");
     setSignerEmail("");
-     setSignerName("");
+     setSignerName("");setSignerTitle("");
     setSignerRole("Review");
     setSignerAuthorityRole("");
     setSignerCapacity("");
