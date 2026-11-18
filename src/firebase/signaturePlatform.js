@@ -357,16 +357,12 @@ export async function startSignatureWorkflow(envelope){
   if(!envelope?.id)throw new Error("A valid workflow envelope is required.");
   if(envelope.senderUid!==u.uid&&envelope.ownerUid!==u.uid)throw new Error("Only the document owner can start this workflow.");
   if(envelope.status!=="Draft")return envelope;
-  const actionRecipients=(envelope.recipients||[]).filter(isActionRecipient);
-  const current=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid)||actionRecipients[0]||null;
   let gateway=null;
-  if(CRYPTOGRAPHIC_GATEWAY_BRIDGE_ENABLED){
-    if(envelope.gatewayEnvelopeId){
-      gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",existing:true};
-    }else{
-      const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
-      gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
-    }
+  if(envelope.gatewayEnvelopeId){
+    gateway={gatewayEnvelopeId:envelope.gatewayEnvelopeId,gatewayDocumentId:envelope.gatewayDocumentId||null,gatewayOriginalHash:envelope.gatewayOriginalHash||null,gatewaySigningStatus:envelope.gatewaySigningStatus||"Sent",existing:true};
+  }else{
+    const sourceBytes=await fetchBytes(envelope.documentUrl,envelope.documentId,envelope.id);
+    gateway=await createGatewaySignatureEnvelope({envelope,sourceBytes});
   }
   const update={
     status:envelope.currentSignerUid?"In Progress":"Shared",
@@ -393,40 +389,6 @@ export async function startSignatureWorkflow(envelope){
     }
     throw error;
   }
-  if(!gateway&&current){
-    const recipientEmail=String(current.email||"").trim().toLowerCase();
-    const maskedAddress=maskSignatureEmail(recipientEmail);
-    const attemptedAt=new Date().toISOString();
-    if(!recipientEmail){
-      const deliveryError=new Error("The first signer has no registered email address. The workflow status was updated, but no invitation could be sent.");
-      await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Failed",{signerUid:current.uid,signerName:current.name||"",maskedAddress:"unavailable",attemptedAt,deliveryStatus:"Failed",providerResponseId:null,error:deliveryError.message});
-      throw deliveryError;
-    }
-    try{
-      const delivery=await sendSignatureMail({...envelope,...update,id:envelope.id},current);
-      const deliveryStatus=delivery.deliveryStatus||"Sent";
-      await mutateSignatureEnvelope(envelope.id,"initial-invitation-sent",{signerUid:current.uid,deliveryStatus});
-      await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Sent",{
-        signerUid:current.uid,signerName:current.name||"",maskedAddress,attemptedAt,
-        deliveryStatus,providerResponseId:delivery.messageId||delivery.providerResponseId||null,error:null
-      });
-    }catch(error){
-      const message=error?.message||"The invitation provider rejected the signing email.";
-      try{
-        await recordEnvelopeEvent(envelope.id,"Initial Signer Invitation Failed",{
-          signerUid:current.uid,signerName:current.name||"",maskedAddress,attemptedAt,
-          deliveryStatus:"Failed",providerResponseId:null,error:message
-        });
-      }catch(auditError){
-        throw new Error(`The signing invitation to ${maskedAddress} failed: ${message}. The delivery failure audit also failed: ${auditError?.message||"unknown audit error"}.`);
-      }
-      throw new Error(`The workflow was started, but the signing invitation to ${maskedAddress} failed: ${message}`);
-    }
-  }
-  if(!gateway)await recordEnvelopeEvent(envelope.id,"Workflow Started",{
-    ownerUid:u.uid,currentSignerUid:envelope.currentSignerUid||null,currentSignerName:current?.name||"",
-    requiredActionCount:actionRecipients.length,gatewayEnvelopeId:null,gatewayBridgeStatus:"Not Enabled"
-  });
   return{...envelope,...update,...(gateway||{})};
 }
 
