@@ -98,6 +98,16 @@ export async function createEnvelope(ctx,user,body){
     signers.push({id:signerId,email,emailHash:issued?.record.emailHash||null,profileUid:profileUid||null,name:validateName(s?.name||email),declaredParticulars:{name:cleanText(s?.name||"",160),occupation:cleanText(s?.occupation||s?.capacity||"",160),capacity:cleanText(s?.capacity||"",160)},roleAssignments:(Array.isArray(s?.roleAssignments)?s.roleAssignments:[{role:s?.role||"Signer",capacity:s?.capacity||"",occupation:s?.occupation||""}]).slice(0,12).map(item=>({role:cleanText(item?.role||"Signer",120),capacity:cleanText(item?.capacity||"",160),occupation:cleanText(item?.occupation||"",160)})),order:Number.isInteger(s?.order)&&s.order>0?s.order:i+1,uid,status:"Pending",identityType:emailLink?"email-link":uid?"account":"legacy-token",tokenHash:issued?.record.tokenHash||await sha256Hex(secret),invitation:"Pending",...(issued?{emailLinkStatus:"issued",emailLinkExpiresAt:issued.record.expiresAt,emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{}}:{})});
   }
   const fields=validateEnvelopeFields(body?.fields,signers);
+  const ownerPreSignEmail=String(body?.ownerPreSignEmail||"").trim().toLowerCase();
+  let ownerPreSignSigner=null,ownerPreSignIndex=-1;
+  if(ownerPreSignEmail){
+    if(!user?.email||String(user.email).trim().toLowerCase()!==ownerPreSignEmail)throw new HttpError(403,"Only the authenticated document owner's own account may request portal-first signing.");
+    ownerPreSignIndex=signers.findIndex(signer=>signer.email===ownerPreSignEmail);
+    ownerPreSignSigner=signers[ownerPreSignIndex]||null;
+    const firstOrder=Math.min(...signers.map(signer=>signer.order));
+    if(!ownerPreSignSigner||ownerPreSignSigner.order!==firstOrder)throw new HttpError(400,"The document owner must be the first signing participant.");
+    if(!fields.some(field=>field.signerId===ownerPreSignSigner.id&&field.type==="Signature"&&field.required===true))throw new HttpError(400,"The document owner must have a required Signature field before invitations can be deferred.");
+  }
   for(const signer of signers){
     const assignments=Array.isArray(signer.roleAssignments)&&signer.roleAssignments.length?signer.roleAssignments:[{role:"Signer"}];
     for(let roleAssignmentIndex=0;assignments.length>1&&roleAssignmentIndex<assignments.length;roleAssignmentIndex++){
@@ -130,6 +140,10 @@ export async function createEnvelope(ctx,user,body){
   for(let i=0;i<signers.length;i++){
     if(signers[i].order!==firstPosition)continue;
     const token=`${id}.${signers[i].id}.${secrets[i]}`;
+    if(ownerPreSignEmail){
+      if(signers[i].id===ownerPreSignSigner.id)signers[i].invitation="Portal";
+      continue;
+    }
     if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",expiresAt:signers[i].emailLinkExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";ctx.logger.error("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,errorType:String(err?.name||"Error")});}}
     else signers[i].invitation="Sent";
@@ -141,12 +155,12 @@ export async function createEnvelope(ctx,user,body){
     for(let index=0;index<updatedSigners.length;index++){
       const signer=updatedSigners[index];
       if(signer.invitation==="Pending")continue;
-      events=await chainEvents(events,{type:signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,expiresAt:signer.emailLinkExpiresAt||null,at});
+      events=await chainEvents(events,{type:signer.invitation==="Portal"?"owner.portal_issued":signer.identityType==="email-link"?"email_link.issued":"invitation.issued",signerId:signer.id,emailHash:signer.emailHash||null,deliveryStatus:signer.invitation,expiresAt:signer.emailLinkExpiresAt||null,at});
     }
     return{patch:{signers:updatedSigners,events}};
   });
   const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&signers.every(s=>s.uid===user.uid)):ctx.allowReturnTokens;
-  return{ok:true,envelopeId:id,status:"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
+  return{ok:true,envelopeId:id,status:ownerPreSignEmail?"Awaiting Owner Signature":"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation})),...(ownerPreSignSigner?{ownerSigningToken:`${id}.${ownerPreSignSigner.id}.${secrets[ownerPreSignIndex]}`}:{}),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
 }
 async function consumeEmailLinkRateLimit(ctx,key,maxAttempts,now){
   const id=await sha256Hex("email-signing-rate:"+key);
