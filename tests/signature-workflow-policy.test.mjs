@@ -279,18 +279,21 @@ test("Sign a Document is available to every active Signature Profile holder, not
 });
 
 
-test("refreshing an envelope reloads signer status and invitation delivery so resend controls remain available", () => {
+test("refreshing an envelope uses one authoritative status read and keeps signer delivery controls visible", () => {
   const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
   const storage = fs.readFileSync(new URL("../src/firebase/signatureStorage.js", import.meta.url), "utf8");
-  assert.match(storage, /export async function getGatewaySignatureEnvelopeDeliveryStatus\(envelopeId\)/);
-  assert.ok(storage.includes('gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId))'));
-  assert.match(page, /getGatewaySignatureEnvelopeStatus,getGatewaySignatureEnvelopeDeliveryStatus/);
-  assert.match(page, /const \[status,delivery\]=await Promise\.all\(/);
-  assert.match(page, /const deliveryBySigner=new Map\(\(delivery\.signers\|\|\[\]\)\.map\(signer=>\[signer\.id,signer\]\)\)/);
-  assert.match(page, /invitation:deliverySigner\.invitation\?\?signer\.invitation/);
-  assert.match(page, /onClick=\{refreshGatewayEmailStatus\}/);
-  assert.match(page, /onClick=\{\(\)=>resendEmailLink\(item\.id\)\}/);
-
+  const refreshStart=page.indexOf(" async function refreshGatewayEmailStatus(){");
+  const refreshEnd=page.indexOf(" async function resendEmailLink",refreshStart);
+  assert.ok(refreshStart>=0&&refreshEnd>refreshStart);
+  const refresh=page.slice(refreshStart,refreshEnd);
+  assert.ok(refresh.includes("getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId)"));
+  assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
+  assert.equal(page.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
+  assert.doesNotMatch(storage,/export async function getGatewaySignatureEnvelopeDeliveryStatus/);
+  assert.ok(page.includes("onClick={refreshGatewayEmailStatus}"));
+  assert.ok(page.includes("onClick={()=>resendEmailLink(item.id)}"));
+  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
 
 test("new envelopes remain inactive drafts until Start Workflow sends Gateway email-link invitations", () => {
@@ -361,4 +364,25 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.ok(emailPortal.includes('setSignaturePadField(null);setSelectedFieldId("");'));
   assert.match(confirmationPad,/useState\(hasSavedSpecimen\?"Use my saved signature":"Draw"\)/);
   assert.match(confirmationPad,/Nothing is stamped until you tap Confirm/);
+});
+
+
+test("envelope refresh keeps signer rows readable and separates invitation delivery from link redemption", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const refreshStart=page.indexOf(" async function refreshGatewayEmailStatus(){");
+  const refreshEnd=page.indexOf(" async function resendEmailLink",refreshStart);
+  assert.ok(refreshStart>=0&&refreshEnd>refreshStart,"the envelope delivery refresh handler must exist");
+  const refresh=page.slice(refreshStart,refreshEnd);
+  assert.ok(refresh.includes("getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId)"));
+  assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
+  assert.ok(refresh.includes("Array.isArray(status.signers)"));
+  assert.ok(refresh.includes("last readable list has been preserved"));
+  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
+  assert.ok(page.includes('color:"var(--text)",opacity:1'));
+});
+
+test("completed-document distribution retry is admitted by the Gateway e-signature route allowlist", () => {
+  const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("distribution\\/retry"), "the Worker must route distribution retries into the e-signature router");
 });

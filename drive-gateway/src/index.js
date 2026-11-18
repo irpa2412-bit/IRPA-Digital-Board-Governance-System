@@ -495,7 +495,7 @@ export default {
         const isEsignPath =
           pathname === "/api/documents/next-reference" ||
           /^\/api\/documents(?:\/.*)?$/.test(pathname) ||
-          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void)|\/invitations\/S\d+\/(?:resend|revoke))?)?$/.test(pathname) ||
+          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void|distribution\/retry)|\/invitations\/S\d+\/(?:resend|revoke))?)?$/.test(pathname) ||
           /^\/api\/sign\/.*$/.test(pathname) ||
           /^\/api\/document-lifecycle\/.*$/.test(pathname) ||
           /^\/api\/auth\/.*$/.test(pathname);
