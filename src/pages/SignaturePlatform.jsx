@@ -21,7 +21,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 
 const TYPES=["Signature","Initials","Date","Name","Title","Text","Number","Comment","Remarks","Checkbox"];const TYPE_LABELS={Signature:"Signature",Initials:"Initials",Date:"Date & Time",Name:"Name",Title:"Title",Text:"Text",Number:"Number",Comment:"Comment",Remarks:"Remarks",Checkbox:"Checkbox"};
 const COLORS={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Title:"#1d4ed8",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
-const DEFAULTS={Signature:{width:28,height:10},Initials:{width:16,height:8},Date:{width:18,height:6},Name:{width:24,height:6},Title:{width:30,height:7},Text:{width:30,height:7},Number:{width:20,height:6},Comment:{width:34,height:10},Remarks:{width:34,height:10},Checkbox:{width:7,height:7}};
+const DEFAULTS={Signature:{width:18,height:3.5},Initials:{width:10,height:3},Date:{width:18,height:6},Name:{width:24,height:6},Title:{width:30,height:7},Text:{width:30,height:7},Number:{width:20,height:6},Comment:{width:34,height:10},Remarks:{width:34,height:10},Checkbox:{width:7,height:7}};
 
 function makeField(type,i,uid,page=1){const d=DEFAULTS[type]||DEFAULTS.Text;return{fieldId:`FIELD-${Date.now()}-${i}`,type,page,x:8,y:12,width:d.width,height:d.height,required:type!=="Checkbox",signerUid:uid,responsibility:type==="Signature"?"Signature":type==="Initials"?"Initial":type==="Date"?"Date":type==="Title"?"Title / Position":type==="Comment"?"Comment":type==="Remarks"?"Remarks":type==="Number"?"Number Entry":type==="Checkbox"?"Approval":"Review",placeholder:type==="Comment"?"Enter comment":type==="Remarks"?"Enter remarks":type==="Number"?"Enter number":""};}
 

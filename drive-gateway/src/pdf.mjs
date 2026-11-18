@@ -113,7 +113,9 @@ export async function buildSignedPdf(originalBytes, info) {
   const pages = document.getPages();
 
   for (const field of info.fields || []) {
-    const signer = (info.signers || []).find(item => (field.signerId && item.id === field.signerId) || (item.uid && item.uid === field.signerUid));
+    const signer = field.signerId
+      ? (info.signers || []).find(item => item.id === field.signerId)
+      : (info.signers || []).find(item => item.uid && item.uid === field.signerUid);
     if (!signer) continue;
     const serverDateTime = signer.signedAt && Number.isFinite(Date.parse(signer.signedAt))
       ? new Date(signer.signedAt).toISOString().replace("T", " ").replace(/\\.\\d{3}Z$/, " UTC")
