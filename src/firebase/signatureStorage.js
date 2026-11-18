@@ -509,10 +509,9 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => {
-      const emailLink = recipient.identityType === "email-link";
+      const emailLink = true;
       return {
-        identityType:emailLink ? "email-link" : "account",
-        ...(!emailLink && recipient.uid ? {uid:String(recipient.uid)} : {}),
+        identityType:"email-link",
         email:String(recipient.email || "").trim().toLowerCase(),
         name:String(recipient.name || recipient.displayName || recipient.email || "IRPA Signer").trim(),
         occupation:String(recipient.occupation||recipient.capacity||"").trim(),
