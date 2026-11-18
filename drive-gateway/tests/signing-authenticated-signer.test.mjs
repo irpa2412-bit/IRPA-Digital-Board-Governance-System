@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {canAuthenticatedSignerAccess} from "../src/signing.mjs";
+import {canAuthenticatedSignerAccess,validateEnvelopeFields} from "../src/signing.mjs";
 
 test("unbound legacy signers are rejected; email-link identity requires redeemed invitation",()=>{
   assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"legacy-token"},null),false);
@@ -120,4 +120,20 @@ test("signed PDF Date fields are rendered from the server UTC signing timestamp"
   assert.match(pdfSource,/field\.type === "Date" && serverDateTime/);
   assert.match(pdfSource,/new Date\(signer\.signedAt\)\.toISOString\(\)/);
   assert.match(pdfSource,/UTC/);
+});
+
+
+test("Gateway preserves distinct signature-field responsibility indexes for one email-link signer",()=>{
+  const signers=[{id:"S1",identityType:"email-link",roleAssignments:[{role:"Attendance"},{role:"Chairperson"}]}];
+  const fields=validateEnvelopeFields([
+    {fieldId:"F-ATTENDANCE",type:"Signature",signerId:"S1",roleAssignmentIndex:0,page:1,x:10,y:10,width:20,height:8},
+    {fieldId:"F-CHAIR",type:"Signature",signerId:"S1",roleAssignmentIndex:1,page:2,x:10,y:10,width:20,height:8}
+  ],signers);
+  assert.deepEqual(fields.map(field=>field.roleAssignmentIndex),[0,1]);
+  assert.throws(()=>validateEnvelopeFields([
+    {fieldId:"F-INVALID",type:"Signature",signerId:"S1",roleAssignmentIndex:2,page:1,x:10,y:10,width:20,height:8}
+  ],signers),/invalid or assigned/i);
+  assert.throws(()=>validateEnvelopeFields([
+    {fieldId:"F-MALFORMED",type:"Signature",signerId:"S1",roleAssignmentIndex:"second",page:1,x:10,y:10,width:20,height:8}
+  ],signers),/invalid or assigned/i);
 });
