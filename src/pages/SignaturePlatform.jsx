@@ -19,7 +19,7 @@ import pdfWorker from"pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 
-const TYPES=["Signature","Initials","Date","Name","Title","Text","Number","Comment","Remarks","Checkbox"];const TYPE_LABELS={Signature:"Signature",Initials:"Initials",Date:"Date & Time",Name:"Name",Title:"Title / Position",Text:"Text",Number:"Number",Comment:"Comment",Remarks:"Remarks",Checkbox:"Checkbox"};
+const TYPES=["Signature","Initials","Date","Name","Title","Text","Number","Comment","Remarks","Checkbox"];const TYPE_LABELS={Signature:"Signature",Initials:"Initials",Date:"Date & Time",Name:"Name",Title:"Title",Text:"Text",Number:"Number",Comment:"Comment",Remarks:"Remarks",Checkbox:"Checkbox"};
 const COLORS={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Title:"#1d4ed8",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
 const DEFAULTS={Signature:{width:28,height:10},Initials:{width:16,height:8},Date:{width:18,height:6},Name:{width:24,height:6},Title:{width:30,height:7},Text:{width:30,height:7},Number:{width:20,height:6},Comment:{width:34,height:10},Remarks:{width:34,height:10},Checkbox:{width:7,height:7}};
 
