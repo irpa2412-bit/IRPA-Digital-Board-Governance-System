@@ -366,12 +366,14 @@ test("email-link signers may confirm only their own active saved profile specime
 
 test("envelope refresh keeps signer rows readable and separates invitation delivery from link redemption", () => {
   const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
-  const refresh = page.match(/async function refreshGatewayEmailStatus\\(\\)\\{([\\s\\S]*?)\\n \\}\\n async function resendEmailLink/);
-  assert.ok(refresh, "the envelope delivery refresh handler must exist");
-  assert.match(refresh[1], /getGatewaySignatureEnvelopeStatus\\(selected\\.gatewayEnvelopeId\\)/);
-  assert.doesNotMatch(refresh[1], /getGatewaySignatureEnvelopeDeliveryStatus/);
-  assert.match(refresh[1], /Array\\.isArray\\(status\\.signers\\)/);
-  assert.match(refresh[1], /last readable list has been preserved/);
+  const refreshStart=page.indexOf(" async function refreshGatewayEmailStatus(){");
+  const refreshEnd=page.indexOf(" async function resendEmailLink",refreshStart);
+  assert.ok(refreshStart>=0&&refreshEnd>refreshStart,"the envelope delivery refresh handler must exist");
+  const refresh=page.slice(refreshStart,refreshEnd);
+  assert.ok(refresh.includes("getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId)"));
+  assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
+  assert.ok(refresh.includes("Array.isArray(status.signers)"));
+  assert.ok(refresh.includes("last readable list has been preserved"));
   assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.emailLinkStatus||"—"}'));
   assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
