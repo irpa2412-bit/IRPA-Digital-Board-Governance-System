@@ -204,7 +204,7 @@ async function inviteNextPosition(ctx,id){
   const orders=[...new Set(envelope.signers.filter(s=>s.status!=="Signed").map(s=>s.order))].sort((a,b)=>a-b);
   for(const order of orders){
     if(!envelope.signers.filter(s=>s.order<order).every(s=>s.status==="Signed"))continue;
-    const pending=envelope.signers.filter(s=>s.order===order&&s.status==="Pending"&&s.invitation!=="Sent");
+    const pending=envelope.signers.filter(s=>s.order===order&&s.status==="Pending"&&s.invitation==="Pending");
     if(!pending.length)continue;
     for(const signer of pending){
       try{await resendInvitation(ctx,{uid:envelope.createdBy,isAdmin:false},id,signer.id);}
