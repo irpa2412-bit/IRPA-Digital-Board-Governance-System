@@ -47,3 +47,21 @@ test("28 stale externalReference reservation can be reclaimed after its lease ex
 test("29 same-position signers receive invitations together and the next position waits for all of them",async()=>{const s=setup();await up(s);const created=await route(post("/api/envelopes",{documentId:"DOC-001",signingMode:"Parallel",signers:[{name:"A",email:"a@example.org",order:1,identityType:"email-link"},{name:"B",email:"b@example.org",order:1,identityType:"email-link"},{name:"C",email:"c@example.org",order:2,identityType:"email-link"}],archives:["legal-contracts"]},"u1"),s.ctx);assert.equal(created.status,201);assert.deepEqual(s.invites.map(i=>i.to).sort(),["a@example.org","b@example.org"]);const a=await openSession(s,s.tokenFor("a@example.org"));assert.equal((await route(sig(a.sessionToken,"A signer"),s.ctx)).status,200);assert.equal(s.invites.some(i=>i.to==="c@example.org"),false);const b=await openSession(s,s.tokenFor("b@example.org"));assert.equal((await route(sig(b.sessionToken,"B signer"),s.ctx)).status,200);assert.equal(s.invites.some(i=>i.to==="c@example.org"),true)});
 
 test("30 non-hierarchical parallel signing invites everyone together and accepts any signing order",async()=>{const s=setup();await up(s);const created=await route(post("/api/envelopes",{documentId:"DOC-001",signingMode:"Parallel",signers:[{name:"A",email:"a@example.org",order:1,identityType:"email-link"},{name:"B",email:"b@example.org",order:1,identityType:"email-link"},{name:"C",email:"c@example.org",order:1,identityType:"email-link"}],archives:["legal-contracts"]},"u1"),s.ctx);assert.equal(created.status,201);const body=await created.json();const envelope=await s.meta.get("envelopes",body.envelopeId);assert.equal(envelope.signingMode,"Parallel");assert.deepEqual(envelope.signers.map(x=>x.order),[1,1,1]);assert.deepEqual(s.invites.map(i=>i.to).sort(),["a@example.org","b@example.org","c@example.org"]);for(const [email,name] of [["b@example.org","B signer"],["a@example.org","A signer"],["c@example.org","C signer"]]){const opened=await openSession(s,s.tokenFor(email));assert.equal(opened.response.status,200);const response=await route(sig(opened.sessionToken,name),s.ctx);assert.equal(response.status,200);if(email==="c@example.org")assert.equal((await response.json()).completed,true);}const completed=await s.meta.get("envelopes",body.envelopeId);assert.equal(completed.status,"Completed");});
+
+test("signer 101 is accepted, invited and can open its email-link without restarting the envelope",async()=>{
+  const s=setup();
+  await up(s);
+  const signers=Array.from({length:101},(_,index)=>({name:"Meeting Participant "+(index+1),email:"participant-"+(index+1)+"@example.org",order:1,identityType:"email-link"}));
+  const created=await route(post("/api/envelopes",{documentId:"DOC-001",signingMode:"Parallel",signers,archives:["legal-contracts"]},"u1"),s.ctx);
+  assert.equal(created.status,201);
+  const body=await created.json();
+  const envelope=await s.meta.get("envelopes",body.envelopeId);
+  assert.equal(envelope.signers.length,101);
+  assert.equal(envelope.signers[100].id,"S101");
+  assert.equal(s.invites.length,101);
+  const opened=await openSession(s,s.tokenFor("participant-101@example.org"));
+  assert.equal(opened.response.status,200);
+  const openedBody=await opened.response.json();
+  assert.equal(openedBody.signer.id,"S101");
+  assert.equal(openedBody.canSign,true);
+});
