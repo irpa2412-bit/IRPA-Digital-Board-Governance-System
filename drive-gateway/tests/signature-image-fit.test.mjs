@@ -221,3 +221,36 @@ test("PDF field geometry respects a non-zero crop box and 90-degree page rotatio
   assert.ok(rotatedBounds.x + rotatedBounds.width <= box.x + box.width + 0.01);
   assert.ok(rotatedBounds.y + rotatedBounds.height <= box.y + box.height + 0.01);
 });
+
+test("PDF finalizer binds a field to its exact signer ID when multiple signer records share the owner's UID", async () => {
+  const source = await PDFDocument.create();
+  source.addPage([1200, 1000]);
+  const sourceBytes = await source.save();
+  const pngBytes = createPng(300, 100);
+  const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
+  const field = { ...makeField("owner-signature", "Signature", 10, 20, 30, 10), signerId: "S4", signerUid: "owner-uid" };
+  const draws = [];
+  const originalDrawImage = PDFPage.prototype.drawImage;
+  PDFPage.prototype.drawImage = function(image, options) {
+    if (image.width === 300 && image.height === 100) draws.push({ ...options });
+    return originalDrawImage.call(this, image, options);
+  };
+  try {
+    await buildSignedPdf(sourceBytes, {
+      envelopeId: "envelope-owner-duplicate", documentId: "document-owner-duplicate", title: "Owner signer mapping",
+      originalHash: "original", chainHead: "chain", completedAt: new Date(0).toISOString(),
+      fields: [field],
+      signers: [
+        { id: "S7", uid: "owner-uid", name: "Owner duplicate role", email: "owner@example.test", signedAt: new Date(0).toISOString(), signatureType: "typed", signatureValue: "OTHER ROLE", fieldValues: {} },
+        { id: "S4", uid: "owner-uid", name: "Daniel Estomihi Mollel", email: "owner@example.test", signedAt: new Date(0).toISOString(), signatureType: "typed", signatureValue: "DANIEL", fieldValues: { "owner-signature": dataUrl } }
+      ]
+    });
+  } finally {
+    PDFPage.prototype.drawImage = originalDrawImage;
+  }
+  assert.equal(draws.length, 1, "the assigned signer S4 must stamp the field even when another signer record with the same UID appears first");
+  const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+  const expected = getPdfFieldBox(sourcePage, field);
+  close(draws[0].x + draws[0].width / 2, expected.x + expected.width / 2);
+  close(draws[0].y + draws[0].height / 2, expected.y + expected.height / 2);
+});
