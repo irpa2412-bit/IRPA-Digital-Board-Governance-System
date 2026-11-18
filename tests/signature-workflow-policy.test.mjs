@@ -273,7 +273,7 @@ test("document owner can save and close preparation before all fields are assign
 });
 
 test("Sign a Document is available to every active Signature Profile holder, not owner-only",()=>{
-  assert.match(portal,/\["Profile","Sign a Document","Envelopes","My Documents","Signature Pathway Self-Test"\]/);
+  assert.match(portal,/\["Profile","Sign a Document","Envelopes","Document Tracking","My Documents","Signature Pathway Self-Test"\]/);
   assert.match(portal,/An active Signature Profile is required before starting a signing document/);
   assert.doesNotMatch(portal,/documentOwner\.uid===auth\.currentUser\?\.uid[^\n]*Sign a Document/);
 });
@@ -326,6 +326,7 @@ test("Title is a real signer-assigned PDF field and Document Tracking shows hold
   const platform=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
   const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
   const signingPortal=fs.readFileSync(new URL("../src/pages/GatewaySigningPortal.jsx",import.meta.url),"utf8");
+  const emailSigningPortal=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
   assert.match(portal,/Title:"Title \/ Position"/);
   assert.match(portal,/TYPES\.slice\(0,6\)/);
   assert.match(portal,/data-testid="palette-signer-management"/);
@@ -333,6 +334,7 @@ test("Title is a real signer-assigned PDF field and Document Tracking shows hold
   assert.match(worker,/"Name","Title"/);
   assert.match(worker,/title:signer\.title\|\|""/);
   assert.match(signingPortal,/field\.type==="Title"\)nextValues\[field\.fieldId\]=result\.signer\?\.title/);
+  assert.match(emailSigningPortal,/field\.type==="Title"\)initialFieldValues\[field\.fieldId\]=metadata\.ownerDeclaredParticulars\?\.title/);
   assert.match(portal,/Document Tracking Register/);
   assert.match(portal,/CURRENT HOLDER/);
   assert.match(portal,/LAST RECORDED ACTION/);
