@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const portal=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+const platform=fs.readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
+const worker=fs.readFileSync(new URL("../drive-gateway/src/index.js",import.meta.url),"utf8");
 const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
 const gateway=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
 const emailPage=fs.readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
@@ -78,8 +80,8 @@ test("owner envelope lifecycle mutations use the authenticated Gateway commit pa
   assert.match(platform,/mutateSignatureEnvelope\(envelope\.id,"invitation-sent"/);
   assert.match(platform,/mutateSignatureEnvelope\(envelopeId,"attach-gateway"/);
   assert.doesNotMatch(platform,/await updateDoc\(doc\(db,\s*ENVELOPE_COLLECTION,\s*envelope\.id\)/);
-  assert.match(gateway,/\/api\/signature-workflow\/mutate/);
-  assert.match(gateway,/mutateSignatureWorkflowEnvelopeRoute/);
-  assert.match(gateway,/Only the original envelope owner may perform this operation/);
-  assert.match(gateway,/Commit authorized envelope mutation and audit event atomically/);
+  assert.match(platform,/\/api\/signature-workflow\/mutate/);
+  assert.match(worker,/mutateSignatureWorkflowEnvelopeRoute/);
+  assert.match(worker,/Only the original envelope owner may perform this operation/);
+  assert.match(worker,/Commit authorized envelope mutation and audit event atomically/);
 });
