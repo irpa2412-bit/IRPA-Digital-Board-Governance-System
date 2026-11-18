@@ -4,7 +4,6 @@ import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
 
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_PAGES = 500;
-export const MAX_SIGNERS = 8;
 const ascii = (bytes, start, end) => String.fromCharCode(...bytes.subarray(start, end));
 
 export async function validatePdf(bytes) {

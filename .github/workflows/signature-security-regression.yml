@@ -13,6 +13,7 @@ on:
     branches:
       - "fix/signature-hardening-phase1-20261102"
       - "fix/signature-stamp-aspect-ratio-20261117"
+      - "fix/unlimited-signers-resume-20261118"
     paths:
       - "drive-gateway/**"
       - "src/firebase/signaturePlatform.js"

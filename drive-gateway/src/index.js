@@ -495,7 +495,7 @@ export default {
         const isEsignPath =
           pathname === "/api/documents/next-reference" ||
           /^\/api\/documents(?:\/.*)?$/.test(pathname) ||
-          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void)|\/invitations\/S\d{1,2}\/(?:resend|revoke))?)?$/.test(pathname) ||
+          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void)|\/invitations\/S\d+\/(?:resend|revoke))?)?$/.test(pathname) ||
           /^\/api\/sign\/.*$/.test(pathname) ||
           /^\/api\/document-lifecycle\/.*$/.test(pathname) ||
           /^\/api\/auth\/.*$/.test(pathname);
@@ -1340,8 +1340,8 @@ async function mutateSignatureWorkflowEnvelopeRoute(request,env) {
       if(!/^[A-Za-z0-9_-]{6,150}$/.test(String(details.gatewayEnvelopeId||"")))return json({ok:false,error:"A valid Gateway envelope reference is required."},400,corsHeaders(request));
       patch.gatewayEnvelopeId=String(details.gatewayEnvelopeId);
       patch.gatewayEmailLinkStatus=String(details.gatewayEmailLinkStatus||"Sent");
-      patch.gatewayEmailLinkSignerCount=Math.max(0,Math.min(100,Number(details.gatewayEmailLinkSignerCount)||0));
-      patch.gatewayEmailLinkInvitations=Array.isArray(details.gatewayEmailLinkInvitations)?details.gatewayEmailLinkInvitations.slice(0,100).map(item=>({signerUid:String(item?.signerUid||item?.uid||""),status:String(item?.status||"Sent")})):[];
+      patch.gatewayEmailLinkSignerCount=Math.max(0,Number(details.gatewayEmailLinkSignerCount)||0);
+      patch.gatewayEmailLinkInvitations=Array.isArray(details.gatewayEmailLinkInvitations)?details.gatewayEmailLinkInvitations.map(item=>({signerUid:String(item?.signerUid||item?.uid||""),status:String(item?.status||"Sent")})):[];
       patch.gatewayEmailLinkUpdatedAt=now;
       eventName="Gateway Email-link Envelope Attached";
       eventDetails={...eventDetails,gatewayEnvelopeId:patch.gatewayEnvelopeId,invitationCount:patch.gatewayEmailLinkSignerCount};
