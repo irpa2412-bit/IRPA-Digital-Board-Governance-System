@@ -94,20 +94,20 @@ test("signer-list mutations retain Firestore-style compare-and-set and UID dupli
   assert.match(source,/if\(seenEmails\.has\(email\)\)throw new HttpError\(400,"Duplicate signer email\."/);
 });
 
-test("email-link signer is stored with token hash, email hash, expiry and issued status; mail is sent once",async()=>{
+test("email-link signer is stored with token hash, email hash and issued status without a time expiry; mail is sent once",async()=>{
   const f=await fixture();
   const signer=f.envelope.signers[0];
   assert.equal(signer.identityType,"email-link");
   assert.equal(signer.emailLinkStatus,"issued");
   assert.equal(signer.emailLinkAttemptCount,0);
   assert.equal(signer.emailLinkOpenCount,0);
-  assert.equal(signer.emailLinkExpiresAt,"2026-11-23T08:00:00.000Z");
+  assert.equal(signer.emailLinkExpiresAt,undefined,"unused email links have no time-based expiry");
   assert.equal(signer.tokenHash,await sha256Hex(f.token.split(".")[2]));
   assert.equal(signer.emailHash,await sha256Hex("board.secretary@example.org"));
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
   assert.equal(signer.authorityVerification,undefined);
   assert.equal(signer.name,"Client supplied name");
-  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",occupation:"",capacity:""});
+  assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",title:"",occupation:"",capacity:""});
   assert.equal(f.sent.length,1);
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
