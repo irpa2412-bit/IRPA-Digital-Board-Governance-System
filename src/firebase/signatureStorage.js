@@ -509,7 +509,6 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
     signers:ordered.map((recipient,index) => {
-      const emailLink = true;
       return {
         identityType:"email-link",
         email:String(recipient.email || "").trim().toLowerCase(),
