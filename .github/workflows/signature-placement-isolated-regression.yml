@@ -52,7 +52,7 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-irpa-signature "DRIVE_MOCK=true npm --prefix drive-gateway test"
       - name: Build production application
         run: npm run build
-      - name: Install Chromium for browser regression
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright and Chromium for browser regression
+        run: npm install --no-save --no-audit --no-fund @playwright/test && npx playwright install --with-deps chromium
       - name: Run browser placement regression
         run: npm run test:signature-coordinate-browser
