@@ -222,7 +222,11 @@ test("duplicate participant identities are reused and rapid repeated add actions
   const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner, "the palette participant handler must exist");
   assert.match(addSigner[1], /const duplicate=recipients\.find\(x=>\(registered&&x\.uid===registered\.uid\)\|\|\(registeredEmail&&String\(x\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===registeredEmail\)\)/);
-  assert.match(addSigner[1], /The existing signer record has been selected; no duplicate was created/);
+  assert.match(addSigner[1], /const existingAssignments=Array\.isArray\(duplicate\.roleAssignments\)/);
+  assert.match(addSigner[1], /const sameAssignment=existingAssignments\.some/);
+  assert.match(addSigner[1], /The existing responsibility was selected; no duplicate was created/);
+  assert.match(addSigner[1], /roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
+  assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(registeredEmail))'));
