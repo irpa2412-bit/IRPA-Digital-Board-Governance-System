@@ -5,7 +5,7 @@ import{collection,doc,onSnapshot,query,where}from"firebase/firestore";
 import{getFunctions,httpsCallable}from"firebase/functions";
 import{translateMeetingPhrase}from"../firebase/liveInterpreter";
 import{MAA_DICTIONARY,MAA_DICTIONARY_SOURCES,searchMaaDictionary}from"../data/maaDictionary";
-import{COLLECTIONS,createRecord,getAccessibleMeetingRecords,getAdminProfile,getCurrentMemberProfile,getRecord,getRecords,openVotingIssue,updateRecord}from"../firebase/data";
+import{COLLECTIONS,createRecord,getAccessibleMeetingRecords,getAdminProfile,getCurrentMemberProfile,getRecord,getRecords,openVotingIssue}from"../firebase/data";
 import{withWorkflowLinks,navigateWorkflow}from"../firebase/workflowLinks";
 import{normalizeMeetingForV3,meetingCapabilities}from"../firebase/meetingPolicy";
 import{captureMeetingRecord,listMeetingRecords,retrieveMeetingRecord,updateMeetingRecordProtection,disposeMeetingRecord,saveLiveMeetingProceedings,listMeetingWorkingDocuments,registerMeetingWorkingDocument,submitMeetingDocumentReview,signMeetingAttendance,markMeetingAttendance,getMeetingAttendanceRegister}from"../firebase/meetingRecords";
