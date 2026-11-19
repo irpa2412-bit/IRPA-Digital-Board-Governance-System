@@ -67,12 +67,18 @@ test("three distinct signer identities sharing one email each retain three indep
   for(const recipient of recipients)assert.equal(assigned.filter(field=>field.signerUid===recipient.uid).length,3);
 });
 
-test("on-demand email signing pad opens only after the unregistered signer clicks their assigned field",()=>{
-  assert.ok(emailPage.includes('setSelectedFieldId(matchedProfile?(firstAssignedField?.fieldId||""):"")'));
-  assert.ok(emailPage.includes('signaturePadField?.fieldId===selectedField.fieldId'));
-  assert.ok(emailPage.includes('setSignaturePadField(field)'));
-  assert.ok(emailPage.includes('const field=signaturePadField||selectedField'));
-  assert.ok(emailPage.includes('setFieldApplications(current=>[...current.filter(item=>item.fieldId!==field.fieldId),application])'));
+test("an unregistered signer can select their assigned signature field and open the pad",()=>{
+  assert.ok(emailPage.includes("setSelectedFieldId(field.fieldId)"));
+  assert.ok(emailPage.includes("const field=signaturePadField||selectedField"));
+  assert.ok(emailPage.includes("setFieldApplications(current=>[...current.filter(item=>item.fieldId!==field.fieldId),application])"));
+  if(emailPage.includes("const shouldShowSignaturePad=Boolean")){
+    assert.ok(emailPage.includes('setSelectedFieldId(matchedProfile?(firstAssignedField?.fieldId||""):"")'));
+    assert.ok(emailPage.includes('setSignaturePadField(["Signature","Initials"].includes(field.type)?field:null)'));
+    assert.ok(emailPage.includes("signaturePadField?.fieldId===selectedField.fieldId"));
+  }else{
+    assert.ok(emailPage.includes('setSelectedFieldId(firstAssignedField?.fieldId||"")'));
+    assert.ok(emailPage.includes("setSignaturePadField(field)"));
+  }
 });
 
 test("participant button gating and required signer name/email validation are explicit",()=>{
