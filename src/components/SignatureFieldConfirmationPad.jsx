@@ -102,7 +102,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       <footer className="signature-confirmation-actions" style={{position:"sticky",bottom:0,zIndex:2,flex:"0 0 auto",display:"flex",justifyContent:"flex-end",alignItems:"center",gap:8,flexWrap:"wrap",padding:"10px 16px calc(10px + env(safe-area-inset-bottom, 0px))",borderTop:"1px solid #d1d5db",background:"#fff",boxShadow:"0 -3px 10px rgba(0,0,0,.08)"}}>
         <button type="button" className="secondary-button" onClick={clear} style={{minHeight:44}}>Clear and redo</button>
         <button type="button" className="secondary-button" onClick={onCancel} style={{minHeight:44}}>Cancel</button>
-        <button type="button" onClick={confirm} style={{minHeight:44,padding:"10px 18px"}}>{mode==="Use my saved signature"?"Use this signature":mode==="Type"?"Use typed signature":"Confirm signature"}</button>
+        <button type="button" onClick={confirm} style={{minHeight:44,padding:"10px 18px"}}>{mode==="Use my saved signature"?"Use this signature":mode==="Type"?"Confirm "+(field?.type||"Signature"):"Confirm "+(field?.type||"Signature")}</button>
       </footer>
   </section>;
 }
