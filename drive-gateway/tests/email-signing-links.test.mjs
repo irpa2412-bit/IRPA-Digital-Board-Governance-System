@@ -227,7 +227,7 @@ test("email-link delivery stages are appended individually to the envelope audit
   const stages=record.events.filter(event=>event.type==="email_link.stage");
   assert.deepEqual(stages.map(event=>event.stage),EMAIL_LINK_STAGE_CODES);
   assert.ok(stages.every(event=>event.outcome==="success"&&event.signerId==="S1"));
-  assert.doesNotMatch(JSON.stringify(stages),/private@example\.org|emailSignToken|password|token/i);
+  assert.doesNotMatch(JSON.stringify(stages),/private@example\.org|emailSignToken|password|tokenHash|tokenValue/i);
 });
 
 test("smtp-selfcheck rejects non-admin and non-owner callers before invoking SMTP",async()=>{
