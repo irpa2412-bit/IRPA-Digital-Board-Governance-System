@@ -76,8 +76,8 @@ if(!source)return fail(ctx,request,"The controlled document was not found.",404)
 if(clean(source.meetingId)!==meetingId)return fail(ctx,request,"The controlled document must be explicitly linked to this meeting before registration.",409);
 const workingDocumentId=await hash(meetingId+":"+documentId).then(v=>v.slice(0,40));
 const prior=await getDoc(ctx,env,token,"meetingWorkingDocuments",workingDocumentId),now=new Date();
-const record={meetingId,documentId,title:clean(source.title||source.fileName||"Meeting document"),reference:clean(source.reference||source.documentReference),fileName:clean(source.fileName),webViewLink:clean(source.webViewLink||source.archiveFileWebViewLink),classification:clean(source.classification||"INTERNAL"),status:"ACTIVE",registeredByUid:c.uid,registeredByEmail:c.email||null,registeredAt:prior?.registeredAt||now,updatedAt:now};
-if(prior)await patchDoc(ctx,env,token,"meetingWorkingDocuments",workingDocumentId,record);else await writeDoc(ctx,env,token,"meetingWorkingDocuments",workingDocumentId,record,false);
+const record={meetingId,documentId,title:clean(source.title||source.fileName||"Meeting document"),reference:clean(source.reference||source.documentReference),fileName:clean(source.fileName),webViewLink:clean(source.webViewLink||source.archiveFileWebViewLink),classification:clean(source.classification||"INTERNAL"),status:"ACTIVE",registeredByUid:c.uid,registeredByEmail:c.email||null,updatedAt:now};
+if(prior)await patchDoc(ctx,env,token,"meetingWorkingDocuments",workingDocumentId,record);else await writeDoc(ctx,env,token,"meetingWorkingDocuments",workingDocumentId,{...record,registeredAt:now},false);
 await audit(ctx,env,token,claims,"MEETING_WORKING_DOCUMENT_REGISTERED",c.meeting,workingDocumentId,{documentId,documentReference:record.reference});
 return response(ctx,request,{ok:true,workingDocumentId});
 }
