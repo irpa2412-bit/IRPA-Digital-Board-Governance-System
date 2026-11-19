@@ -7,6 +7,7 @@ The existing `irpa-google-drive-gateway` Worker is the server-side meeting opera
 ### Worker routes
 
 - Meeting access: `POST /api/meeting-access/issue`, `/api/meeting-access/revoke`, `/api/meeting-access/authorize`
+- Meeting invitation delivery: `POST /api/meeting-invitations/dispatch` (validates the issued meeting pass and sends through the existing Worker SMTP sender; invitation delivery metadata is written to the meeting participant record, not the general `invitations` collection).
 - Meeting register: `POST /api/meeting-register/create`, `/api/meeting-register/update`, `/api/meeting-register/delete`
 - Meeting voting control: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`
 - Meeting-linked decisions: `POST /api/meeting-decisions/create`
@@ -49,7 +50,7 @@ The existing Firebase callable definitions are retained temporarily for rollback
 
 Transcript translation uses Google Cloud Translation through the existing server-side Google access token. Confirm the Translation API is enabled, billing is active if required, and the Worker service identity has the necessary Google Cloud Translation permissions.
 
-Keep the existing mail route unchanged: Worker → `mail.irpa.or.tz:465`, sender `info@irpa.or.tz`. Report email delivery must be verified with a controlled recipient before any live success claim.
+Meeting invitation delivery calls the existing `smtpSend` implementation in the same Cloudflare Worker. It reuses the configured SMTP host, port, sender and secret bindings (`mail.irpa.or.tz:465`, `info@irpa.or.tz`) without introducing a second mail service or storing SMTP credentials in the Meeting Portal. The general `/api/invitations/send` activation workflow remains reserved for member/personnel onboarding and is not a meeting-invitation dependency. SMTP acceptance is not proof of inbox delivery; verify with a controlled recipient before any live success claim.
 
 ## Release verification
 
@@ -57,5 +58,5 @@ Keep the existing mail route unchanged: Worker → `mail.irpa.or.tz:465`, sender
 2. Test with a non-confidential test meeting and test participants first.
 3. Verify create/update meeting, issue/revoke/authorize pass, attendance/quorum, open/close vote, duplicate vote rejection, decision creation, transcript auto-save, record hash verification, retention/legal hold, report dispatch, and LiveKit token/recording status.
 4. Confirm unauthorized roles cannot read or modify records outside their meeting.
-5. Verify SMTP delivery and the invitee tally against the attendance register.
+5. Verify the dedicated Meeting Worker SMTP route with a controlled recipient, confirm the participant record dispatch state, and reconcile the invitee tally against attendance and quorum. Confirm the general Invitation Portal is not invoked by meeting registration, dispatch or resend.
 6. Deploy only through the approved Worker workflow after required checks pass. This source migration by itself does not prove the production Worker has been deployed or that LiveKit/translation/mail credentials are configured.
