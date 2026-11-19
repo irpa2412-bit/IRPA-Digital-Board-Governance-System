@@ -130,7 +130,7 @@ export default function OperationalGatewaysParticipants(){
   }catch(x){
    if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
    const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation resend failed.";
-   try{await updateRecord(COLLECTIONS.participants,i.id,{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"})}catch(persistError){console.error("Unable to persist meeting dispatch failure",persistError?.code||"")}
+   try{await callMeetingService("/api/meeting-participants/update",{participantId:i.id,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"}})}catch(persistError){console.error("Unable to persist meeting dispatch failure",persistError?.code||"")}
    setErr("Meeting invitation resend failed: "+failure);
    await load();
   }finally{resendInFlight.current.delete(i.id);setResendingInvitationIds(current=>current.filter(id=>id!==i.id));if(!fromBulk)setBusy(false)}
@@ -164,9 +164,8 @@ export default function OperationalGatewaysParticipants(){
  }catch(x){setErr(x.message||"Unable to save participant.")}finally{setBusy(false)}}
  async function remove(r){if(!window.confirm("Remove this participant record and revoke its meeting access pass?"))return;setBusy(true);try{await callMeetingService("/api/meeting-participants/delete",{participantId:r.id});setMsg("Participant removed and meeting access revoked.");await load()}catch(x){setErr(x.message||"Unable to remove participant.")}finally{setBusy(false)}}
  const metrics=useMemo(()=>({total:rows.length,present:rows.filter(x=>x.attendanceStatus==="Present").length,invited:rows.filter(x=>x.attendanceStatus==="Invited").length,absent:rows.filter(x=>x.attendanceStatus==="Absent").length}),[rows]);
- // The invitation register is the source of truth for dispatched meeting links and token releases.
- // Only metadata/reference IDs are retained here; the bearer token itself is delivered by email
- // and is deliberately not persisted in the broadly readable invitation register.
+ // The meeting participant register is authoritative for meeting-specific dispatch status.
+ // Only access-pass reference metadata is retained; bearer tokens are delivered by SMTP and never stored in participant records.
  const meetingInvitationRows=useMemo(()=>rows.filter(x=>Boolean(String(x.meetingId||"").trim())&&(x.meetingAccessDispatchStatus||x.invitationStatus)).map(x=>({...x,participantId:x.id,email:x.participantEmail,name:x.participantName,role:x.participantRole,deliveryStatus:x.meetingAccessDeliveryStatus||x.meetingAccessDispatchStatus,status:x.invitationStatus,deliveryError:x.meetingAccessDispatchError})).sort((a,b)=>String(b.meetingAccessDispatchedAt||b.createdAt||"").localeCompare(String(a.meetingAccessDispatchedAt||a.createdAt||""))),[rows]);
  const isInvitationError=(x)=>{const status=[x?.meetingAccessDispatchStatus,x?.deliveryStatus,x?.status].map(v=>String(v||"").trim().toLowerCase());if(status.some(v=>["cancelled","canceled","cancelled invitation","canceled invitation"].includes(v)))return false;return x?.meetingAccessDispatched===false||Boolean(String(x?.deliveryError||x?.meetingAccessDispatchError||"").trim())||status.some(v=>["failed","error","dispatch error","delivery error","undelivered","invitation dispatch failed","smtp error"].includes(v)||v.includes("error")||v.includes("undelivered"));};
  const invitationMetrics=useMemo(()=>({
