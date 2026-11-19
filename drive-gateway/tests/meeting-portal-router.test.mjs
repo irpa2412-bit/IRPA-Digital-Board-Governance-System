@@ -50,7 +50,7 @@ const post = (router, path, body = {}) => router(new Request(`https://worker.tes
   method: "POST",
   headers: { "content-type": "application/json", authorization: "Bearer test-id-token" },
   body: JSON.stringify(body)
-}), { FIREBASE_PROJECT_ID: "test-project" }, path);
+}), { FIREBASE_PROJECT_ID: "test-project", IRPA_APP_URL: "https://app.example.test" }, path);
 test("meeting invitation dispatch uses the injected SMTP worker and writes only meeting participant delivery metadata", async () => {
   const accessToken = "test-meeting-access-token-0123456789";
   const meetingPassword = "ABCD1234WXYZ";
