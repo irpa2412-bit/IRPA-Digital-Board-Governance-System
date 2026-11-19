@@ -364,10 +364,10 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
       if (rotation) page.setRotation(degrees(rotation));
       const sourceBytes = await source.save();
       const fields = [
-        { ...makeField("sig", "Signature", 8, 8, 24, 10), coordinateSpace: "visible-page-fraction-v1" },
-        { ...makeField("name", "Name", 8, 23, 84, 6), coordinateSpace: "visible-page-fraction-v1" },
-        { ...makeField("role", "Title", 8, 31, 20, 10), coordinateSpace: "visible-page-fraction-v1" },
-        { ...makeField("date", "Date", 8, 42, 84, 6), coordinateSpace: "visible-page-fraction-v1" }
+        { ...makeField("sig", "Signature", 0.08, 0.08, 0.24, 0.10), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("name", "Name", 0.08, 0.23, 0.84, 0.06), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("role", "Title", 0.08, 0.31, 0.20, 0.10), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("date", "Date", 0.08, 0.42, 0.84, 0.06), coordinateSpace: "visible-page-fraction-v1" }
       ];
       const textDraws = [], imageDraws = [];
       const originalDrawText = PDFPage.prototype.drawText;
