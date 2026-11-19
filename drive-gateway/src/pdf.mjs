@@ -316,7 +316,7 @@ function getEffectivePdfFieldBox(page, field, contentMatrix) {
     if (Math.abs(Math.atan2(visibleMatrix[1], visibleMatrix[0]) * 180 / Math.PI - angle) > 0.5) {
       throw new RangeError("The PDF page content is not aligned to a supported right angle.");
     }
-    return { x, y, width: right - x, height: bottom - y, rotation: angle };
+    return { x, y, width: right - x, height: bottom - y, rotation: angle, visibleToPdfMatrix: inverse, visibleLeft: left, visibleTop: top };
   } catch (error) {
     throw new HttpError(400, error?.message || "The signature field is outside the visible PDF page.");
   }
@@ -379,15 +379,21 @@ function drawTextInField(page, value, font, fieldBox, options = {}) {
   const color = options.color || rgb(0.05, 0.05, 0.08);
   layout.lines.forEach((line, index) => {
     let x, y;
-    if (rotation === 90) {
-      x = fieldBox.x + padding + index * layout.lineHeight;
-      y = fieldBox.y + fieldBox.height - padding;
+    if (fieldBox.visibleToPdfMatrix) {
+      const visibleX = fieldBox.visibleLeft + padding;
+      const visibleY = fieldBox.visibleTop + padding + layout.size + index * layout.lineHeight;
+      const origin = transformPdfPoint(fieldBox.visibleToPdfMatrix, visibleX, visibleY);
+      x = origin.x;
+      y = origin.y;
+    } else if (rotation === 90) {
+      x = fieldBox.x + fieldBox.width - layout.size - padding - index * layout.lineHeight;
+      y = fieldBox.y + padding;
     } else if (rotation === 180) {
       x = fieldBox.x + fieldBox.width - padding;
       y = fieldBox.y + fieldBox.height - padding - index * layout.lineHeight;
     } else if (rotation === 270) {
-      x = fieldBox.x + fieldBox.width - padding - index * layout.lineHeight;
-      y = fieldBox.y + padding;
+      x = fieldBox.x + padding + layout.size + index * layout.lineHeight;
+      y = fieldBox.y + fieldBox.height - padding;
     } else {
       x = fieldBox.x + padding;
       y = fieldBox.y + padding + (layout.lines.length - 1 - index) * layout.lineHeight;
