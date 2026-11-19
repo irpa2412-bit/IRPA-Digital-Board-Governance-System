@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 
-const media=fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const media=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
 const gateway=fs.readFileSync("functions/meetingGateway.js","utf8");
 const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const meetingsCentre=fs.readFileSync("src/pages/Meetings.jsx","utf8");
@@ -16,9 +16,9 @@ const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
 const meetingWorker=fs.readFileSync("drive-gateway/src/meetingPortal.mjs","utf8");
 const meetingApi=fs.readFileSync("src/firebase/meetingGatewayApi.js","utf8");
 const meetingServices=fs.readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
-const meetingAccessControl=fs.readFileSync("src/components/MeetingAccessControl.jsx","utf8");
+const meetingAccessControl=fs.readFileSync("src/meeting/MeetingAccessControl.jsx","utf8");
 const attendanceClient=fs.readFileSync("src/firebase/meetingRecords.js","utf8");
-const mediaClient=fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const mediaClient=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
 const participantApi=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
@@ -30,7 +30,7 @@ const checks=[
  ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
  ["Firestore create retains registrar, initiator and meeting-category validation",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
- ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
+ ["Meeting media client exists",fs.existsSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is dispatched through the independent Meeting Worker API",participantPage.includes("dispatchMeetingInvitation")&&meetingApi.includes("/api/meeting-invitations/dispatch")],
  ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
@@ -53,7 +53,7 @@ const checks=[
  ["Responsive media columns stack on mobile",media.includes('className="irpa-live-media-columns"')&&styles.includes("@media (max-width:760px)")&&styles.includes("grid-template-columns:minmax(0,1fr)")],
  ["Camera and microphone preflight checks real capture permission",media.includes("async function checkDevices()")&&media.includes("getUserMedia")&&media.includes("width:{ideal:1280}")],
  ["Meeting entry gateway exists",fs.existsSync("src/pages/MeetingEntryGateway.jsx")],
- ["Meeting access control exists",fs.existsSync("src/components/MeetingAccessControl.jsx")],
+ ["Meeting access control exists",fs.existsSync("src/meeting/MeetingAccessControl.jsx")],
  ["Live meeting token gateway exists",fs.existsSync("functions/liveMeeting.js")],
  ["Meeting access gateway exists",fs.existsSync("functions/meetingGateway.js")],
  ["Meeting gateway registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingGateway")')],
