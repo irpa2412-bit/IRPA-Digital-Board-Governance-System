@@ -22,6 +22,13 @@ export function escapeHtml(s) {
 export const MAX_INVITATION_MAIL_ATTEMPTS = 3;
 export const MAX_INVITATION_RETRY_DELAY_MS = 2000;
 
+// A queued delivery is considered in-flight only for a short bounded lease.
+// Missing or stale timestamps are recoverable and must not block a resend forever.
+export function isInvitationQueueActive(queuedAt, now = Date.now(), leaseMs = 5 * 60 * 1000) {
+  const queuedAtMs = Date.parse(String(queuedAt || ""));
+  return Number.isFinite(queuedAtMs) && queuedAtMs <= now + 30_000 && now - queuedAtMs < leaseMs;
+}
+
 export function isRetryableMailError(error) {
   const message = String(error?.message || error || "");
   const smtp = message.match(/IRPA SMTP error (\d{3})/i);
