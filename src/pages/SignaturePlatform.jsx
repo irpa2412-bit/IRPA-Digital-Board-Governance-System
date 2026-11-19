@@ -185,11 +185,11 @@ function PDFDesigner({url,documentId,envelopeId=null,signingStage=false,fields,s
    <label className="signature-owner-toggle"><input type="checkbox" checked={ownerSigningEnabled} onChange={e=>onOwnerSigningChange?.(e.target.checked)}/> <span>Require the document owner to sign</span></label>
    <div className="signature-palette-add-person">
     <strong style={{display:"block",fontSize:11,margin:"12px 0 7px"}}>ADD A PARTICIPANT</strong>
-    <label>Registered IRPA officer<select value={selectedSigner} onChange={e=>{setSelectedSigner(e.target.value);const member=members.find(x=>x.uid===e.target.value);setSignerEmail(member?.email||"");setSignerTitle(member?.jobTitle||member?.boardPosition||member?.role||"");}}><option value="">Choose a registered officer</option>{members.filter(member=>String(member.email||"").trim()&&member.uid!==auth.currentUser?.uid&&!(auth.currentUser?.email&&String(member.email||"").trim().toLowerCase()===String(auth.currentUser.email||"").trim().toLowerCase())&&!recipients.some(r=>r.uid===member.uid||(member.email&&String(r.email||"").trim().toLowerCase()===String(member.email||"").trim().toLowerCase()))).map(member=><option key={member.uid} value={member.uid}>{member.name||member.email} · {member.boardPosition||member.role||member.jobTitle||"Registered officer"} · {member.email}</option>)}</select></label>
+    <label>Optional IRPA record lookup — not required<select value={selectedSigner} onChange={e=>{setSelectedSigner(e.target.value);const member=members.find(x=>x.uid===e.target.value);setSignerEmail(member?.email||"");setSignerTitle(member?.jobTitle||member?.boardPosition||member?.role||"");}}><option value="">Choose an existing record (optional)</option>{members.filter(member=>String(member.email||"").trim()&&member.uid!==auth.currentUser?.uid&&!recipients.some(r=>r.uid===member.uid)).map(member=><option key={member.uid} value={member.uid}>{member.name||member.email} · {member.boardPosition||member.role||member.jobTitle||"Registered officer"} · {member.email}</option>)}</select></label><small className="field-help">This lookup only prefills details. You may enter any person manually below; an IRPA register entry is not required to be a signatory.</small>
     <label>Signer name<input type="text" value={signerName} onChange={e=>{setSignerName(e.target.value);setSelectedSigner("");}} placeholder="Full name" autoComplete="name"/></label>
     <label>Signer title / position (optional)<input type="text" value={signerTitle} onChange={e=>setSignerTitle(e.target.value)} placeholder="e.g. Executive Director, Board Chairperson"/></label>
     <label>Signer email<input type="email" value={signerEmail} onChange={e=>{setSignerEmail(e.target.value);setSelectedSigner("");}} placeholder="name@example.org" autoComplete="email"/></label>
-    {(signerName.trim()||signerEmail.trim())&&members.filter(member=>member.uid!==auth.currentUser?.uid&&String(member.email||"").trim()&&!(auth.currentUser?.email&&String(member.email||"").trim().toLowerCase()===String(auth.currentUser.email||"").trim().toLowerCase())&&((!!signerName.trim()&&String(member.name||"").toLowerCase().includes(signerName.trim().toLowerCase()))||(!!signerEmail.trim()&&String(member.email||"").toLowerCase().includes(signerEmail.trim().toLowerCase())))).slice(0,6).length>0&&<div role="listbox" aria-label="Matching existing IRPA records" className="signature-signer-match-list"><strong>Matching existing IRPA records</strong>{members.filter(member=>member.uid!==auth.currentUser?.uid&&String(member.email||"").trim()&&!(auth.currentUser?.email&&String(member.email||"").trim().toLowerCase()===String(auth.currentUser.email||"").trim().toLowerCase())&&((!!signerName.trim()&&String(member.name||"").toLowerCase().includes(signerName.trim().toLowerCase()))||(!!signerEmail.trim()&&String(member.email||"").toLowerCase().includes(signerEmail.trim().toLowerCase())))).slice(0,6).map(member=><button type="button" role="option" aria-selected={selectedSigner===member.uid} key={member.uid} onClick={()=>{setSelectedSigner(member.uid);setSignerName(member.name||"");setSignerEmail(member.email||"");setSignerTitle(member.jobTitle||member.boardPosition||member.role||"");}} >{member.name||"Unnamed officer"} · {member.email} <small>{member.boardPosition||member.role||member.jobTitle||"Registered IRPA officer"}</small></button>)}</div>}
+    {(signerName.trim()||signerEmail.trim())&&members.filter(member=>member.uid!==auth.currentUser?.uid&&!recipients.some(r=>r.uid===member.uid)&&String(member.email||"").trim()&&((!!signerName.trim()&&String(member.name||"").toLowerCase().includes(signerName.trim().toLowerCase()))||(!!signerEmail.trim()&&String(member.email||"").toLowerCase().includes(signerEmail.trim().toLowerCase())))).slice(0,6).length>0&&<div role="listbox" aria-label="Matching existing IRPA records" className="signature-signer-match-list"><strong>Matching existing IRPA records</strong>{members.filter(member=>member.uid!==auth.currentUser?.uid&&!recipients.some(r=>r.uid===member.uid)&&String(member.email||"").trim()&&((!!signerName.trim()&&String(member.name||"").toLowerCase().includes(signerName.trim().toLowerCase()))||(!!signerEmail.trim()&&String(member.email||"").toLowerCase().includes(signerEmail.trim().toLowerCase())))).slice(0,6).map(member=><button type="button" role="option" aria-selected={selectedSigner===member.uid} key={member.uid} onClick={()=>{setSelectedSigner(member.uid);setSignerName(member.name||"");setSignerEmail(member.email||"");setSignerTitle(member.jobTitle||member.boardPosition||member.role||"");}} >{member.name||"Unnamed officer"} · {member.email} <small>{member.boardPosition||member.role||member.jobTitle||"Registered IRPA officer"}</small></button>)}</div>}
     <label>Participant role / action<select value={signerRole} onChange={e=>setSignerRole(e.target.value)}><option>Review</option><option>Authorization</option><option>Approval</option><option>Verification</option><option>Recommendation</option><option>Comment</option><option>Signature</option><option>Final Authorization</option><option>Board Chairperson</option><option>Board Vice Chairperson</option><option>Board Secretary</option><option>Board Treasurer</option><option>Board Member</option><option>Other</option></select></label>
     <label>Occupation (optional)<input type="text" value={signerAuthorityRole} onChange={e=>setSignerAuthorityRole(e.target.value)} placeholder="e.g. Director or Consultant"/></label>
     <label>Additional capacity (optional)<input type="text" value={signerCapacity} onChange={e=>setSignerCapacity(e.target.value)} placeholder="e.g. Board Secretary or Technical Adviser"/></label>
@@ -596,8 +596,8 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   if(!documentId||!documentUrl){setMessage("Select a controlled PDF before adding a signer.");return;}
   const registeredEmail=String(registered?.email||email).trim().toLowerCase();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registeredEmail)){setMessage("The selected participant must have a valid email address before they can be assigned.");return;}if(!registered&&!String(signerName||"").trim()){setMessage("Enter the signer’s full name as well as their email address.");return;}
-  const ownerEmail=String(documentOwner.email||"").trim().toLowerCase();
-  const isOwnerDuplicate=!!(registered&&registered.uid===documentOwner.uid)||(!!registeredEmail&&!!ownerEmail&&registeredEmail===ownerEmail);
+  // Mailbox addresses are delivery channels, not signer identities.
+  const isOwnerDuplicate=!!(registered&&registered.uid===documentOwner.uid);
   if(isOwnerDuplicate){
     setOwnerSigningEnabled(true);
     setActiveAssigneeUid(documentOwner.uid);
@@ -610,7 +610,8 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     setMessage("This address belongs to the document owner. The owner has been selected once; no separate signer record was created. Assign the owner's field using the palette.");
     return;
   }
-  const duplicate=recipients.find(x=>(registered&&x.uid===registered.uid)||(registeredEmail&&String(x.email||"").trim().toLowerCase()===registeredEmail));
+  // Only collapse the same registered UID. Separate email-link people may share a mailbox.
+  const duplicate=registered?recipients.find(x=>x.uid===registered.uid):null;
   const role=signerRole||"Review";
   const capacity=String(signerCapacity||"").trim();
   const assignment={role,title:String(signerTitle||"").trim(),capacity,occupation:String(signerAuthorityRole||"").trim(),assignedAt:new Date().toISOString()};
@@ -641,9 +642,10 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
       next={uid:registered.uid,identityType:"account",name:registered.name||registered.email,email:registeredEmail,role,institutionalRole:registered.boardPosition||registered.role||"",title:String(signerTitle||registered.jobTitle||registered.boardPosition||"").trim(),occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
     }else{
       if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error("Enter a valid email address for the external participant.");
-      const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(email));
-      const emailHash=Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,"0")).join("");
-      next={uid:"email-link-"+emailHash.slice(0,24),identityType:"email-link",name:String(signerName||"").trim(),email,role,institutionalRole:"",title:String(signerTitle||"").trim(),occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending",emailLinkStatus:"Not issued"};
+      // Random per-participant key: never derive identity from a shared mailbox.
+      const identityBytes=crypto.getRandomValues(new Uint8Array(16));
+      const identityKey=Array.from(identityBytes,value=>value.toString(16).padStart(2,"0")).join("");
+      next={uid:"email-link-"+identityKey,identityType:"email-link",name:String(signerName||"").trim(),email,role,institutionalRole:"",title:String(signerTitle||"").trim(),occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending",emailLinkStatus:"Not issued"};
     }
     const nextRecipients=[...recipients,next];
     const nextFields=[...fields];
@@ -677,22 +679,25 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     if(ownerSigningEnabled&&!fields.some(f=>f?.type==="Signature"&&f.required!==false&&f.signerUid===documentOwner.uid))throw new Error("Explicitly assign a required Signature field to the document owner before creating the envelope.");
     const orderedRecipients=recipients.filter(r=>r.uid!==documentOwner.uid).map((r,i)=>({...r,routingOrder:signingMode==="Sequential"?i+(ownerSigningEnabled?2:1):r.routingOrder||1}));
     const seenSignerUids=new Set([documentOwner.uid]);
-    const ownerEmailKey=String(documentOwner.email||"").trim().toLowerCase();
-    const seenSignerEmails=new Set(ownerEmailKey?[ownerEmailKey]:[]);
     const duplicateRecipients=[];
     for(const recipient of orderedRecipients){
       const uid=String(recipient.uid||"").trim();
-      const emailKey=String(recipient.email||"").trim().toLowerCase();
       if(!uid)throw new Error("Every participant must have a unique signer identity before the envelope can be created.");
-      if(seenSignerUids.has(uid)||(emailKey&&seenSignerEmails.has(emailKey))){duplicateRecipients.push(recipient);continue;}
+      if(seenSignerUids.has(uid)){duplicateRecipients.push(recipient);continue;}
       seenSignerUids.add(uid);
-      if(emailKey)seenSignerEmails.add(emailKey);
     }
-    if(duplicateRecipients.length)throw new Error("Duplicate participants were detected by signer identity or email: "+duplicateRecipients.map(recipient=>recipient.name||recipient.email).join(", ")+". Remove duplicate people in the palette and reassign their fields before creating the envelope.");
+    if(duplicateRecipients.length)throw new Error("Duplicate signer identities were detected: "+duplicateRecipients.map(recipient=>recipient.name||recipient.email).join(", ")+". Each distinct participant must have a separate signer identity.");
     const signerUids=new Set([...orderedRecipients.map(r=>r.uid),...(ownerSigningEnabled?[documentOwner.uid]:[])]);
     if(!orderedRecipients.length&&!ownerSigningEnabled)throw new Error("Add at least one participant in the PDF palette before creating the envelope.");
-    const recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>field.signerUid===recipient.uid));
-    if(recipientsWithoutFields.length)throw new Error("Assign at least one field to each participant in the palette before creating the envelope: "+recipientsWithoutFields.map(recipient=>recipient.name||recipient.email).join(", ")+".");
+    const recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>String(field.signerUid||"")===String(recipient.uid||"")));
+    if(recipientsWithoutFields.length){
+      const assignmentReport=recipientsWithoutFields.map(recipient=>{
+        const identity=String(recipient.uid||"");
+        const matching=fields.filter(field=>String(field.signerUid||"")===identity).length;
+        return (recipient.name||recipient.email||"Participant")+" [identity "+identity.slice(0,18)+"…; matching fields: "+matching+"]";
+      });
+      throw new Error("Each participant needs at least one PDF field assigned to their own signer identity. No matching field was found for: "+assignmentReport.join("; ")+". Select each person separately in the palette and place their field on the PDF. Shared email addresses do not combine participants.");
+    }
     if(fields.some(f=>!f.signerUid||!signerUids.has(f.signerUid)))throw new Error("Assign every field to the document owner or an assigned signer before creating the envelope.");
     setMessage("All checks passed. Saving the draft envelope and its field assignments…");
     let env=draftEnvelopeId

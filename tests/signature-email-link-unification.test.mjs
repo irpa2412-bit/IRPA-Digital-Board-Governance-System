@@ -98,8 +98,12 @@ test("document owner can manually enter a signer name and email",()=>{
 
 test("matching registered signer records are offered for selection without creating duplicates",()=>{
   assert.match(portal,/aria-label="Matching existing IRPA records"/);
+  assert.match(portal,/Optional IRPA record lookup — not required/);
+  assert.match(portal,/an IRPA register entry is not required to be a signatory/);
   assert.match(portal,/setSelectedSigner\(member\.uid\)/);
-  assert.match(portal,/const duplicate=recipients\.find/);
+  assert.match(portal,/const duplicate=registered\?recipients\.find\(x=>x\.uid===registered\.uid\):null/);
+  assert.match(portal,/members\.filter\(member=>String\(member\.email\|\|""\)\.trim\(\)&&member\.uid!==auth\.currentUser\?\.uid&&!recipients\.some\(r=>r\.uid===member\.uid\)/);
+  assert.doesNotMatch(portal,/r\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===String\(member\.email/);
   assert.match(portal,/roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
   assert.match(portal,/sameAssignment=existingAssignments\.some/);
   assert.match(portal,/One email-link identity and invitation covers the responsibilities/);

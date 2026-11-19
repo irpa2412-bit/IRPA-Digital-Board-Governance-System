@@ -10,11 +10,11 @@ import { assertGatewaySigningResponse } from "../../src/firebase/signatureGatewa
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
 
-test("Gateway envelope creation rejects duplicate UIDs and duplicate emails and validates signing mode", async () => {
+test("Gateway envelope creation permits shared delivery emails but rejects duplicate UIDs", async () => {
   const source = await read("../src/signing.mjs");
   assert.match(source, /if\(!\["Sequential","Parallel"\]\.includes\(signingMode\)\)/);
   assert.match(source, /email=validateEmail\(s\?\.email\)\.trim\(\)\.toLowerCase\(\)/);
-  assert.match(source, /if\(seenEmails\.has\(email\)\)throw new HttpError\(400,"Duplicate signer email\."/);
+  assert.doesNotMatch(source, /Duplicate signer email/);
   assert.match(source, /if\(uid&&seenUids\.has\(uid\)\)throw new HttpError\(400,"Duplicate signer UID\."/);
   assert.match(source, /meta\.create\("externalReferences",reservationKey/);
 });
@@ -50,7 +50,7 @@ test("signature draft ownership and recipient policy have positive and negative 
   assert.equal(signatureDraftOwnershipAllowed({ownerUid:"u2"},"u1",false), false);
   assert.equal(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u2",email:"two@example.org"}],"Sequential"), null);
   assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u1",email:"two@example.org"}],"Sequential"), /Duplicate signer UID/);
-  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u2",email:"ONE@example.org"}],"Sequential"), /Duplicate signer email/);
+  assert.equal(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"},{uid:"u2",email:"ONE@example.org"}],"Sequential"), null);
   assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"one@example.org"}],"Invalid"), /Signing mode/);
   const source = await read("../src/index.js");
   assert.match(source, /status:"Draft",signingMode,recipients/);

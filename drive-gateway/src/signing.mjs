@@ -85,15 +85,14 @@ export async function createEnvelope(ctx,user,body){
   await verifySourceDocumentIntegrity(sourceBytes,{},doc);
   const externalReference=String(body?.externalReference||"").trim();
   if(externalReference&&!ID_RE.test(externalReference))throw new HttpError(400,"Invalid external envelope reference.");
-  const id=`ENV-${randomHex(8)}`,seenEmails=new Set(),seenUids=new Set(),signers=[],secrets=[];
+  const id=`ENV-${randomHex(8)}`,seenUids=new Set(),signers=[],secrets=[];
   for(let i=0;i<input.length;i++){
     const s=input[i],email=validateEmail(s?.email).trim().toLowerCase(),uid=s?.uid?cleanSegment(s.uid,128):null;
-    if(seenEmails.has(email))throw new HttpError(400,"Duplicate signer email.");
-    seenEmails.add(email);
+    // Delivery email may be shared. Signers remain isolated by signerId and token hash.
     if(uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
     if(uid)seenUids.add(uid);
     const signerId=`S${i+1}`,secret=randomHex(32),emailLink=s?.identityType==="email-link",authority=null;
-    const profileUid=emailLink&&typeof ctx.resolveEmailLinkProfileUid==="function"?await ctx.resolveEmailLinkProfileUid(email):null;
+    const profileUid=emailLink&&typeof ctx.resolveEmailLinkProfileUid==="function"?await ctx.resolveEmailLinkProfileUid(email,s?.name):null;
     if(!uid&&!emailLink&&!ctx.allowLegacyTestSigners)throw new HttpError(403,"Unregistered email-only signers must use the verified email-link path.");
     const issued=emailLink?await createEmailSigningToken({envelopeId:id,signerId,email,now:ctx.now(),randomBytes:Uint8Array.from(secret.match(/.{2}/g).map(value=>parseInt(value,16)))}):null;
     const finalSecret=issued?.token||secret;secrets.push(finalSecret);
@@ -101,11 +100,19 @@ export async function createEnvelope(ctx,user,body){
   }
   const fields=validateEnvelopeFields(body?.fields,signers);
   const ownerPreSignEmail=String(body?.ownerPreSignEmail||"").trim().toLowerCase();
+  const ownerPreSignSignerId=String(body?.ownerPreSignSignerId||"").trim();
   let ownerPreSignSigner=null,ownerPreSignIndex=-1;
-  if(ownerPreSignEmail){
+  if(ownerPreSignEmail||ownerPreSignSignerId){
     if(!user?.email||String(user.email).trim().toLowerCase()!==ownerPreSignEmail)throw new HttpError(403,"Only the authenticated document owner's own account may request portal-first signing.");
-    ownerPreSignIndex=signers.findIndex(signer=>signer.email===ownerPreSignEmail);
-    ownerPreSignSigner=signers[ownerPreSignIndex]||null;
+    if(ownerPreSignSignerId){
+      ownerPreSignIndex=signers.findIndex(signer=>signer.id===ownerPreSignSignerId);
+      ownerPreSignSigner=signers[ownerPreSignIndex]||null;
+      if(ownerPreSignSigner&&ownerPreSignSigner.email!==ownerPreSignEmail)throw new HttpError(403,"The portal-first signer identity does not match the authenticated document owner.");
+    }else{
+      const matches=signers.map((signer,index)=>({signer,index})).filter(item=>item.signer.email===ownerPreSignEmail);
+      if(matches.length!==1)throw new HttpError(400,"The owner-first participant is ambiguous because the delivery email is shared. Retry with an identity-bound owner assignment.");
+      ownerPreSignSigner=matches[0].signer;ownerPreSignIndex=matches[0].index;
+    }
     const firstOrder=Math.min(...signers.map(signer=>signer.order));
     if(!ownerPreSignSigner||ownerPreSignSigner.order!==firstOrder)throw new HttpError(400,"The document owner must be the first signing participant.");
     if(!fields.some(field=>field.signerId===ownerPreSignSigner.id&&field.type==="Signature"&&field.required===true))throw new HttpError(400,"The document owner must have a required Signature field before invitations can be deferred.");

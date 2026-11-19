@@ -3,7 +3,7 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [main, fix/workflow-main-push-validation-20261114, feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015]
+    branches: [main, fix/workflow-main-push-validation-20261114, feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015, fix/signature-email-link-identity-isolation-20261119]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
@@ -11,6 +11,16 @@ on:
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
       - "tests/meeting-isolation-guard.test.mjs"
+      - "drive-gateway/src/index.js"
+      - "drive-gateway/src/signatureDraftPolicy.mjs"
+      - "drive-gateway/src/signing.mjs"
+      - "drive-gateway/tests/email-signing-links.integration.test.mjs"
+      - "drive-gateway/tests/email-signing-links.test.mjs"
+      - "drive-gateway/tests/signature-hardening-phase1.test.mjs"
+      - "src/firebase/signatureStorage.js"
+      - "src/pages/SignaturePlatform.jsx"
+      - "tests/signature-email-link-unification.test.mjs"
+      - "tests/signature-workflow-policy.test.mjs"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
@@ -377,6 +387,28 @@ jobs:
             changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
           const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
             changed.includes("tests/meeting-category-policy.test.mjs");
+          // Shared-email signer identity repair is a narrowly scoped Signature Portal/Gateway
+          // integration. Keep the browser fixture guard active and require its paired source/tests.
+          const signatureEmailLinkIdentityPaths = new Set([
+            "drive-gateway/src/index.js",
+            "drive-gateway/src/signatureDraftPolicy.mjs",
+            "drive-gateway/src/signing.mjs",
+            "drive-gateway/tests/email-signing-links.integration.test.mjs",
+            "drive-gateway/tests/email-signing-links.test.mjs",
+            "drive-gateway/tests/signature-hardening-phase1.test.mjs",
+            "src/firebase/signatureStorage.js",
+            "src/pages/SignaturePlatform.jsx",
+            "tests/signature-email-link-unification.test.mjs",
+            "tests/signature-workflow-policy.test.mjs",
+          ]);
+          const signatureEmailLinkIdentityRepair =
+            changed.includes("src/firebase/signatureStorage.js") &&
+            changed.includes("src/pages/SignaturePlatform.jsx") &&
+            changed.includes("drive-gateway/src/signing.mjs") &&
+            changed.includes("drive-gateway/src/signatureDraftPolicy.mjs") &&
+            changed.includes("tests/signature-email-link-unification.test.mjs") &&
+            changed.every(path => signatureEmailLinkIdentityPaths.has(path) ||
+              path === ".github/workflows/meeting-portal-fixture-browser.yml");
           const invitationMailResendIntegration = changed.includes("public/administrator.html") &&
             changed.includes("src/firebase/auth.js") &&
             changed.includes("src/pages/Invitations.jsx") &&
@@ -448,7 +480,7 @@ jobs:
               !changed.includes("src/pages/Meetings.jsx") &&
               !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
               !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+              !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
             throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
           }
           console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
