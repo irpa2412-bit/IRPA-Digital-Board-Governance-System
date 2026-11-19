@@ -2,7 +2,7 @@ import { auth, db } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { addDoc, collection, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 
-export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType, meetingAccess = null, options = {}) {
+export async function sendMemberInvitationEmail(_email, invitationId, _role, _memberType, options = {}) {
   const cleanId = String(invitationId || "").trim();
   if (!cleanId) throw new Error("The invitation ID is required.");
   if (!auth.currentUser) throw new Error("Administrator authentication is required.");
@@ -12,7 +12,7 @@ export async function sendMemberInvitationEmail(_email, invitationId, _role, _me
     const response = await fetch(`${gateway}/api/invitations/send`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ invitationId: cleanId, ...(meetingAccess ? { meetingAccess } : {}), ...(options.forceResend === true ? { forceResend: true } : {}) })
+      body: JSON.stringify({ invitationId: cleanId, ...(options.forceResend === true ? { forceResend: true } : {}) })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) throw new Error(data.error || "The IRPA mail server could not send the invitation.");
