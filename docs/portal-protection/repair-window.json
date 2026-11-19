@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "status": "closed",
+  "closedAt": "2026-11-19T00:00:00Z",
+  "reason": "No repair window is currently open. Open one with a new declaration before protected changes.",
+  "inactivityCloseHours": 24,
+  "activityLog": []
+}
