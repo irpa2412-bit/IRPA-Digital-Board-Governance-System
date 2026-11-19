@@ -59,7 +59,8 @@ test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
   assert.match(signing,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
   assert.match(signing,/signer\.emailLinkStatus=opened\.status/);
   assert.match(signing,/emailLinkStatus="revoked"/);
-  assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^\n]*token\b/i);
+  assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^
+]*token\b/i);
 });
 
 test("email invitation reuses the existing SMTP retry flow with both text and HTML bodies",()=>{
@@ -117,4 +118,14 @@ test("all application PDF.js entry points copy caller-owned bytes before worker 
   assert.ok(portal.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
 });
 
-\ntest("email-link signer must review every rendered PDF page before the explicit TO SIGN CLICK HERE action unlocks the signature pad",()=>{\n  assert.match(page,/reviewedPages/);\n  assert.match(page,/setReviewedPages/);\n  assert.match(page,/reviewedPages.length!==pageCount/);\n  assert.match(page,/TO SIGN CLICK HERE/);\n  assert.match(page,/setSigningUnlocked\\(true\\)/);\n  assert.match(page,/selectedField&&signingUnlocked&&/);\n  assert.match(page,/disabled=\\{signingClosed\\|\\|!signingUnlocked\\}/);\n  assert.match(page,/Review the complete document and signature placement before submitting/);\n});\n
+
+test("email-link signer must review every rendered PDF page before the explicit TO SIGN CLICK HERE action unlocks the signature pad",()=>{
+  assert.match(page,/reviewedPages/);
+  assert.match(page,/setReviewedPages/);
+  assert.match(page,/reviewedPages.length!==pageCount/);
+  assert.match(page,/TO SIGN CLICK HERE/);
+  assert.match(page,/setSigningUnlocked\\(true\\)/);
+  assert.match(page,/selectedField&&signingUnlocked&&/);
+  assert.match(page,/disabled=\\{signingClosed\\|\\|!signingUnlocked\\}/);
+  assert.match(page,/Review the complete document and signature placement before submitting/);
+});
