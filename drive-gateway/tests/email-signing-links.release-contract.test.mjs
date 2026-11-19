@@ -59,8 +59,7 @@ test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
   assert.match(signing,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
   assert.match(signing,/signer\.emailLinkStatus=opened\.status/);
   assert.match(signing,/emailLinkStatus="revoked"/);
-  assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^
-]*token\b/i);
+  assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^\n]*token\b/i);
 });
 
 test("email invitation reuses the existing SMTP retry flow with both text and HTML bodies",()=>{
