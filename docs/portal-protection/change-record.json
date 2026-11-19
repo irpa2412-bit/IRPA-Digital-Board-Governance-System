@@ -42,8 +42,7 @@
       "Invitation redemption tests": "PASS",
       "Meeting invitation resend/quorum tests": "PASS",
       "Gateway full regression suite": "PASS",
-      "Governance application build": "PASS",
-      "Portal protection policy timestamp regression test": "PASS"
+      "Governance application build": "PASS"
     },
     "fullRegression": "PASS",
     "behaviourDifferences": [
