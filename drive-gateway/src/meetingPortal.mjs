@@ -58,6 +58,25 @@ async function firestoreRequest(ctx, env, token, path, init = {}) {
   }
   return body;
 }
+async function listByField(ctx, env, token, collection, fieldPath, value, limit = 200) {
+  const url = `https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: collection }],
+      where: { fieldFilter: { field: { fieldPath }, op: "EQUAL", value: { stringValue: String(value) } } },
+      limit
+    } })
+  });
+  const body = await response.json().catch(() => []);
+  if (!response.ok) {
+    const error = new Error(`Firestore query failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  return (Array.isArray(body) ? body : []).filter(row => row.document).map(row => docToPlain(row.document));
+}
 async function getDoc(ctx, env, token, collection, id) {
   try { return await firestoreRequest(ctx, env, token, `${collection}/${encodeURIComponent(id)}`); }
   catch (error) { if (error.status === 404) return null; throw error; }
@@ -139,8 +158,8 @@ export function createMeetingPortalRouter(ctx) {
         const initiator = clean(meeting.initiatorUid) === uid;
         logStage("AUTHORIZATION_EVALUATED", "SUCCESS", ids, { isAdmin: admin, chair, secretary, initiator });
         if (!admin && !chair && !secretary && !initiator) return errorResponse(ctx, request, "Only the authorised meeting initiator, administrator, chairperson or secretary may issue meeting access.", 403);
-        const priorAccessId = clean(participant.meetingAccessId);
-        const priorPass = priorAccessId ? await getDoc(ctx, env, adminToken, "meetingAccessTokens", priorAccessId) : null;
+        const priorPasses = await listByField(ctx, env, adminToken, "meetingAccessTokens", "participantId", ids.participantId);
+        const activePriorPasses = priorPasses.filter(pass => pass.status === "Active");
         const raw = randomToken(32);
         const password = gatePassword();
         const accessId = crypto.randomUUID();
@@ -183,8 +202,8 @@ export function createMeetingPortalRouter(ctx) {
             { update: { name: tokenDocName, fields: passFields }, currentDocument: { exists: false } },
             { update: { name: meetingDocName, fields: fieldsToFirestore(patch) }, updateMask: { fieldPaths: Object.keys(patch) }, currentDocument: { updateTime: meetingDoc.updateTime } }
           ];
-          if (priorPass?.fields?.status?.stringValue === "Active") {
-            writes.push({ update: { name: priorPass.name, fields: fieldsToFirestore({ status: "Revoked", revokedByUid: uid, revokedAt: new Date(), revocationReason: "Superseded by a newly issued meeting access pass" }) }, updateMask: { fieldPaths: ["status", "revokedByUid", "revokedAt", "revocationReason"] }, currentDocument: { updateTime: priorPass.updateTime } });
+          for (const priorPass of activePriorPasses) {
+            writes.push({ update: { name: `projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/meetingAccessTokens/${priorPass.id}`, fields: fieldsToFirestore({ status: "Revoked", revokedByUid: uid, revokedAt: new Date(), revocationReason: "Superseded by a newly issued meeting access pass" }) }, updateMask: { fieldPaths: ["status", "revokedByUid", "revokedAt", "revocationReason"] }, currentDocument: { updateTime: priorPass.updateTime } });
           }
           await commitWrites(ctx, env, adminToken, writes);
         } catch (error) {
