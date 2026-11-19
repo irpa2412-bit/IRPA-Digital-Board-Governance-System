@@ -8,7 +8,7 @@ test("required SMTP stage codes are present and every stage emits a sanitized fa
     assert.ok(EMAIL_LINK_STAGE_CODES.includes(stage));
     let emitted;
     await assert.rejects(runEmailStage(stage,async()=>{throw new Error("temporary transport failure")},(code,outcome,category)=>{emitted={code,outcome,category};}));
-    assert.deepEqual(emitted,{code:stage,outcome:"failure",category:"UNKNOWN"});
+    assert.deepEqual(emitted,{code:stage,outcome:"failure",category:stage==="SMTP_AUTH"?"AUTH_FAILED":"UNKNOWN"});
   }
   assert.deepEqual(SMTP_SELF_CHECK_STAGES,["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"]);
 });
