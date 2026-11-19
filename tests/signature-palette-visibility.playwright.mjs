@@ -189,7 +189,7 @@ async function assertConfirmationFooterMatrix(){
  ];
  for(const item of cases){
   for(const zoom of [1,1.25,1.5]){
-   const context=await browser.newContext({viewport:{width:item.width,height:item.height}});
+   const zoomedViewport={width:Math.max(320,Math.floor(item.width/zoom)),height:Math.max(300,Math.floor(item.height/zoom))};\n   const context=await browser.newContext({viewport:zoomedViewport});
    const page=await context.newPage();
    await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
    await page.evaluate(value=>{document.documentElement.style.zoom=String(value)},zoom);
@@ -199,7 +199,7 @@ async function assertConfirmationFooterMatrix(){
     if(mode==="type"){
      await page.getByRole("button",{name:"Type",exact:true}).click();
      await page.getByLabel("Type your signature").fill("A very long signer name used to check wrapping at narrow widths");
-     await page.setViewportSize({width:item.width,height:Math.max(300,item.height-260)});
+     await page.setViewportSize({width:zoomedViewport.width,height:Math.max(260,zoomedViewport.height-260)});
     }
     const measured=await page.evaluate(()=>{
      const dialog=document.querySelector('[role="dialog"]'),footer=dialog?.querySelector(".signature-confirmation-actions"),action=footer?.querySelector("button:last-child");
@@ -211,7 +211,7 @@ async function assertConfirmationFooterMatrix(){
     assert.ok(measured.action.height>=44,"confirmation action must retain a 44px touch target: "+JSON.stringify({item,zoom,mode,measured}));
     assert.equal(measured.footerPosition,"sticky","confirmation footer must remain sticky");
     assert.equal(measured.contentOverflow,"auto","signature choices must scroll independently above the footer");
-    if(mode==="type")await page.setViewportSize({width:item.width,height:item.height});
+    if(mode==="type")await page.setViewportSize(zoomedViewport);
     await page.getByRole("button",{name:"Cancel",exact:true}).click();
    }
    await context.close();
