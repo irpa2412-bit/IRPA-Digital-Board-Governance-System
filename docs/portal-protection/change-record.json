@@ -10,7 +10,9 @@
       "src/pages/Invitations.jsx",
       "drive-gateway/src/index.js",
       "drive-gateway/src/invitationEmail.mjs",
-      "drive-gateway/tests/mail-invitation.unit.mjs"
+      "drive-gateway/tests/mail-invitation.unit.mjs",
+      "scripts/portal-protection-check.mjs",
+      "tests/portal-protection-policy.test.mjs"
     ],
     "expectedEffect": "A queued delivery is considered in-flight for at most five minutes. Stale or timestamp-less queued records can be retried; recent requests remain protected from duplicate token rotation. The portal displays Queued until SMTP delivery is confirmed and records sentAt only after Sent.",
     "prohibitedChanges": [
@@ -23,7 +25,7 @@
   },
   "repairWindow": {
     "openedAt": "2026-11-19T21:08:00Z",
-    "lastActivityAt": "2026-11-19T21:12:10Z",
+    "lastActivityAt": "2026-11-19T21:14:00Z",
     "emergency": false
   },
   "baseline": {
@@ -40,13 +42,15 @@
       "Invitation redemption tests": "PASS",
       "Meeting invitation resend/quorum tests": "PASS",
       "Gateway full regression suite": "PASS",
-      "Governance application build": "PASS"
+      "Governance application build": "PASS",
+      "Portal protection policy timestamp regression test": "PASS"
     },
     "fullRegression": "PASS",
     "behaviourDifferences": [
       "A stale or timestamp-less Queued invitation can recover after the five-minute processing lease instead of remaining permanently blocked.",
       "An actively queued request returns HTTP 202 and is no longer represented as a confirmed email send.",
-      "The Invitation Register records sentAt only after the Gateway confirms SMTP acceptance."
+      "The Invitation Register records sentAt only after the Gateway confirms SMTP acceptance.",
+      "The protected-portal policy checker now parses each Git activity timestamp independently; its existing 24-hour inactivity closure remains unchanged."
     ],
     "evidence": [
       "The protected portal register documents baseline commit b766e7727722161f4f779bbd86d8ef21830eefa8 as verified by production frontend deployment and live-build verification.",
