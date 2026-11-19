@@ -55,7 +55,7 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   const meetingPassword = "ABCD1234WXYZ";
   const digest = async value => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(b => b.toString(16).padStart(2, "0")).join("");
   const { ctx, calls } = ctxFor({
-    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled" } },
+    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled", platformAccessUrl: "https://meet.example.org/board", platformMeetingId: "ROOM-123", platformPasscode: "ROOM-PASS", agenda: "Approve minutes" } },
     participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } },
     pass: { id: "access-1", data: {
       meetingId: "meeting-1", participantId: "participant-1", participantEmail: "participant@example.org",
@@ -72,6 +72,9 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   assert.equal(ctx.sentEmail.to, "participant@example.org");
   assert.match(ctx.sentEmail.subject, /IRPA Meeting Invitation/);
   assert.match(ctx.sentEmail.text, /Gate password: ABCD1234WXYZ/);
+  assert.match(ctx.sentEmail.text, /Online meeting link: https:\/\/meet\.example\.org\/board/);
+  assert.match(ctx.sentEmail.html, /Join online meeting/);
+  assert.match(ctx.sentEmail.text, /Agenda: Approve minutes/);
   assert.match(ctx.sentEmail.text, /meetingToken=/);
   assert.ok(calls.some(call => call.url.pathname.includes("/documents/participants/participant-1")));
   assert.ok(calls.some(call => call.url.pathname.endsWith("/documents/audit")));
