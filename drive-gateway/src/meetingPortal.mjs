@@ -239,6 +239,12 @@ export function createMeetingPortalRouter(ctx) {
         const time = [clean(meeting.startTime), clean(meeting.endTime)].filter(Boolean).join(" – ");
         const venue = clean(meeting.venue || meeting.meetingVenue);
         const platform = clean(meeting.meetingPlatform || "As specified by the meeting organiser");
+        const rawPlatformUrl = clean(meeting.platformAccessUrl || meeting.meetingUrl || meeting.onlineMeetingUrl || meeting.joinUrl);
+        let platformUrl = "";
+        try { const parsedPlatformUrl = new URL(rawPlatformUrl); if (["https:", "http:"].includes(parsedPlatformUrl.protocol)) platformUrl = parsedPlatformUrl.toString(); } catch {}
+        const platformMeetingId = clean(meeting.platformMeetingId || meeting.externalMeetingId);
+        const platformPasscode = clean(meeting.platformPasscode || meeting.externalMeetingPasscode);
+        const agenda = clean(meeting.agenda || meeting.meetingAgenda);
         const subject = "IRPA Meeting Invitation — " + reference;
         const text = "Dear " + participantName + ",\n\nYou are invited to " + meetingTitle + ".\nMeeting reference: " + reference + "\nDate: " + (date || "See meeting notice") + "\nTime: " + (time || "See meeting notice") + "\nVenue: " + (venue || platform) + "\n\nOpen your independent IRPA Meeting Portal access link:\n" + gateUrl.toString() + "\n\nMeeting ID: " + pass.meetingId + "\nGate password: " + password + "\n\nThis link and password are for this meeting only. Do not forward them.\n\nIRPA Administration";
         const html = "<!doctype html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6;color:#1f2937\"><h2>IRPA Meeting Invitation</h2><p>Dear " + escapeHtml(participantName) + ",</p><p>You are invited to <strong>" + escapeHtml(meetingTitle) + "</strong>.</p><p><strong>Meeting reference:</strong> " + escapeHtml(reference) + "<br><strong>Date:</strong> " + escapeHtml(date || "See meeting notice") + "<br><strong>Time:</strong> " + escapeHtml(time || "See meeting notice") + "<br><strong>Venue / platform:</strong> " + escapeHtml(venue || platform) + "</p><p><a href=\"" + escapeHtml(gateUrl.toString()) + "\">Open the IRPA Meeting Portal</a></p><p><strong>Meeting ID:</strong> " + escapeHtml(pass.meetingId) + "<br><strong>Gate password:</strong> " + escapeHtml(password) + "</p><p>This access link and password are valid for this meeting only. Do not forward them.</p><p>IRPA Administration</p></body></html>";
