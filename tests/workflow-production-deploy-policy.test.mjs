@@ -123,8 +123,8 @@ test("production Gateway deployment requires SMTP_PASSWORD secret and configures
   const source=readWorkflow(".github/workflows/cloudflare-gateway-deploy.yml");
   assert.match(source,/smtpPasswordBindings = bindings\.filter\(b => b\.name === "SMTP_PASSWORD"\)/);
   assert.match(source,/smtpPasswordBindings\.length !== 1 \|\| smtpPasswordBindings\[0\]\?\.type !== "secret_text"/);
-  assert.match(source,/SMTP_HOST: "mail\\.irpa\\.or\\.tz"/);
+  assert.match(source,/SMTP_HOST: "mail\.irpa\.or\.tz"/);
   assert.match(source,/SMTP_PORT: "465"/);
-  assert.match(source,/SMTP_FROM: "info@irpa\\.or\\.tz"/);
+  assert.match(source,/SMTP_FROM: "info@irpa\.or\.tz"/);
   assert.match(source,/deploy --keep-vars/);
 });
