@@ -425,7 +425,7 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
       for (const draw of textDraws) {
         const text = draw.text;
         const field = text === name ? fields[1]
-          : text === date ? fields[3]
+          : text.includes(date) ? fields[3]
           : fields[2];
         const box = getPdfFieldBox(sourcePage, field);
         const width = draw.options.font.widthOfTextAtSize(text, draw.options.size);
