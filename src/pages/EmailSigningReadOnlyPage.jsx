@@ -53,7 +53,7 @@ export default function EmailSigningReadOnlyPage({token}){
     setSavedProfile(matchedProfile);setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
     setDeclarations({name:metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"",occupation:"",capacity:""});
     const initialFieldValues={};for(const field of fields){if(field.type==="Name")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"";else if(field.type==="Title")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.title||metadata.signer?.title||"";}setFieldValues(initialFieldValues);
-    const firstAssignedField=fields.find(field=>["Signature","Initials"].includes(field.type))||fields.find(field=>Number(field.roleAssignmentIndex||0)===0)||fields[0];setActiveRoleAssignmentIndex(Number(firstAssignedField?.roleAssignmentIndex||0));setSelectedFieldId(firstAssignedField?.fieldId||"");
+    const firstAssignedField=fields.find(field=>["Signature","Initials"].includes(field.type))||fields.find(field=>Number(field.roleAssignmentIndex||0)===0)||fields[0];setActiveRoleAssignmentIndex(Number(firstAssignedField?.roleAssignmentIndex||0));setSelectedFieldId(matchedProfile?(firstAssignedField?.fieldId||""):"");
     const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
     if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
     if(!String(response.headers.get("content-type")||"").toLowerCase().includes("application/pdf"))throw new Error("The signing service did not return a PDF. Signing has been stopped.");
@@ -62,7 +62,7 @@ export default function EmailSigningReadOnlyPage({token}){
     if(bytes.length<5||String.fromCharCode(...bytes.subarray(0,5))!=="%PDF-")throw new Error("The controlled document response is not a valid PDF.");
     loadedPdf=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
     if(cancelled){await loadedPdf.destroy();return;}
-    setPdfDocument(loadedPdf);setPageCount(loadedPdf.numPages);setPageNum(Number(firstAssignedField?.page||1));
+    setPdfDocument(loadedPdf);setPageCount(loadedPdf.numPages);setPageNum(matchedProfile?Number(firstAssignedField?.page||1):1);
    }catch(e){if(!cancelled)setError(e?.message||NEUTRAL);}
    finally{if(!cancelled)setLoading(false);}
   })();
