@@ -10,6 +10,7 @@ The existing `irpa-google-drive-gateway` Worker is the server-side meeting opera
 - Participant registration: `POST /api/meeting-participants/create`, `/api/meeting-participants/update`, `/api/meeting-participants/delete`
 - Gate queue: `POST /api/meeting-entry-requests/list`, `/api/meeting-entry-requests/resolve`
 - Meeting room state/activity: `POST /api/meeting-register/update`, `/api/meeting-room/event`
+- Voting, decisions and actions: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`, `/api/meeting-decisions/create`, `/api/meeting-actions/create`
 - Attendance operations: `POST /api/meeting-attendance/sign`, `/api/meeting-attendance/mark`, `/api/meeting-attendance/register`
 - Working documents: `POST /api/meeting-working-documents/register`, `/api/meeting-working-documents/list`, `/api/meeting-working-documents/review`
 - Attendance signature/register: `POST /api/meeting-attendance/sign`, `/api/meeting-attendance/register`
