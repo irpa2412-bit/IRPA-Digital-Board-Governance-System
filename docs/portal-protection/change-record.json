@@ -42,7 +42,8 @@
       "Invitation redemption tests": "PASS",
       "Meeting invitation resend/quorum tests": "PASS",
       "Gateway full regression suite": "PASS",
-      "Governance application build": "PASS"
+      "Governance application build": "PASS",
+      "Portal protection policy timestamp regression test": "PASS"
     },
     "fullRegression": "PASS",
     "behaviourDifferences": [
@@ -55,7 +56,8 @@
       "The protected portal register documents baseline commit b766e7727722161f4f779bbd86d8ef21830eefa8 as verified by production frontend deployment and live-build verification.",
       "Production Promotion Gate candidate-proof completed successfully for commit 4726a1d2d7a7443d6aa17582716bac34adc29c15; Gateway regression suite and governance application build passed.",
       "Mail Invitation Tests passed syntax, mocked SMTP invitation and invitation redemption tests.",
-      "Meeting Invitation Flow CI passed Gateway/meeting tests, meeting entry policy and invitation resend/quorum tests."
+      "Meeting Invitation Flow CI passed Gateway/meeting tests, meeting entry policy and invitation resend/quorum tests.",
+      "Protected portal repair policy check passed on the exact PR revision; all five registered Invitation Portal tests and all nine portal-protection policy tests passed."
     ]
   },
   "closure": {
