@@ -26,6 +26,7 @@ test("merge duplicate participant keeps the identity with most fields and moves 
  assert.equal(result.recipients.some(p=>p.uid==="gloria-b"),false);
  assert.equal(result.recipients.find(p=>p.uid==="gloria-a").roleAssignments.length,2);
  assert.equal(result.fields.find(f=>f.fieldId==="secretary-signature").signerUid,"gloria-a");
+ assert.equal(result.fields.find(f=>f.fieldId==="secretary-signature").roleAssignmentIndex,1);
  assert.equal(result.fields.find(f=>f.fieldId==="attendance-1").signerUid,"gloria-a");
  assert.equal(result.merged.length,1);
 });
