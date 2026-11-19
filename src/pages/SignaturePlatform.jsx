@@ -684,13 +684,13 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   finally{setBusy(false);}
  }
  async function mergeDuplicateParticipantGroup(group){
-  try{const merged=mergeDuplicateParticipants(recipients,fields);if(!merged.merged.length)throw new Error("No exact name-and-email duplicate was found.");await persistAssignmentRepair(merged,"Merged "+merged.merged.length+" duplicate participant entr"+(merged.merged.length===1?"y":"ies")+" and moved every linked field to the retained identity.");}
+  try{const merged=mergeDuplicateParticipants(recipients,fields,group);if(!merged.merged.length)throw new Error("No exact name-and-email duplicate was found.");await persistAssignmentRepair(merged,"Merged "+merged.merged.length+" duplicate participant entr"+(merged.merged.length===1?"y":"ies")+" and moved every linked field to the retained identity.");}
   catch(error){setMessage(error?.message||"Duplicate participants could not be merged.");}
  }
  async function repairDraftNow(){
   const repaired=repairDraftAssignmentState({recipients,fields,ownerUid:documentOwner.uid,ownerSigningEnabled});
   const details=[];if(repaired.merged.length)details.push("merged "+repaired.merged.length+" duplicate entr"+(repaired.merged.length===1?"y":"ies"));if(repaired.relinked)details.push("re-linked "+repaired.relinked+" orphaned field"+(repaired.relinked===1?"":"s"));
-  if(!details.length){setMessage("No unambiguous automatic repair was possible. Review the listed orphaned fields and assign them manually.");return;}
+  if(!details.length){setMessage("Repair draft found "+repaired.unresolvedOrphans.length+" orphaned field(s) and "+repaired.recipientsWithoutFields.length+" participant(s) with zero matching fields. They remain listed below for owner assignment; no identity was guessed.");return;}
   await persistAssignmentRepair(repaired,"Repair draft: "+details.join("; ")+". "+repaired.unresolvedOrphans.length+" orphaned field(s) remain for owner assignment.");
  }
  async function relinkOrphanFieldNow(fieldId,signerUid){
