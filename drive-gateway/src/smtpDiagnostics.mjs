@@ -1,4 +1,4 @@
-import { classifySmtpReplyCategory, EMAIL_LINK_STAGE_CODES, runEmailStage } from "./invitationEmail.mjs";
+import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 
 const REQUIRED_STAGES = Object.freeze(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"]);
 const REPLY_CATEGORIES = Object.freeze(["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"]);
@@ -43,11 +43,3 @@ export function createSmtpSelfcheckRoute({authenticateFirebaseRequest,getFiresto
 }
 
 export { REQUIRED_STAGES as SMTP_SELF_CHECK_STAGES, REPLY_CATEGORIES as SMTP_REPLY_CATEGORIES };
-export function classifyStageFailure(stageCode,error) {
-  if(!REQUIRED_STAGES.includes(stageCode))throw new Error("Unsupported SMTP stage.");
-  return classifySmtpReplyCategory(error,stageCode);
-}
-export async function runStageForTest(stageCode,action,onStage) {
-  if(!REQUIRED_STAGES.includes(stageCode))throw new Error("Unsupported SMTP stage.");
-  return runEmailStage(stageCode,action,onStage);
-}
