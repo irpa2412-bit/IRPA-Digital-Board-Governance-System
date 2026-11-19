@@ -22,6 +22,14 @@ test("duplicate participant is detected by exact normalized name and email, not 
  assert.equal(findDuplicateParticipantGroups([{uid:"a",name:"A",email:"same@example.org"},{uid:"b",name:"B",email:"same@example.org"}]).length,0);
 });
 
+test("duplicate entry with zero fields is merged into the identity that owns the placed fields",()=>{
+ const placed=fields.filter(field=>field.signerUid==="gloria-a");
+ const result=mergeDuplicateParticipants(participants,placed);
+ assert.equal(result.recipients.some(person=>person.uid==="gloria-b"),false);
+ assert.equal(result.recipients.find(person=>person.uid==="gloria-a").roleAssignments.length,2);
+ assert.equal(result.fields.length,2);
+ assert.ok(result.fields.every(field=>field.signerUid==="gloria-a"));
+});
 test("merge duplicate participant keeps the identity with most fields and moves all fields to it",()=>{
  const result=mergeDuplicateParticipants(participants,fields);
  assert.equal(result.recipients.some(p=>p.uid==="gloria-b"),false);
