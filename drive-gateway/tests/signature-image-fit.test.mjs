@@ -656,3 +656,51 @@ test("rendered signed particulars and signature images follow the visible source
     }
   }
 });
+
+
+test("certificate signature image uses the same fitted dimensions as the placed document signature on all page rotations", async () => {
+  const png = createPng(64, 24);
+  const dataUrl = "data:image/png;base64," + png.toString("base64");
+  for (const rotation of [0, 90, 180, 270]) {
+    const source = await PDFDocument.create();
+    const page = source.addPage([600, 800]);
+    if (rotation) page.setRotation(degrees(rotation));
+    const sourceBytes = await source.save();
+    const field = {
+      ...makeField("same-size-signature", "Signature", 0.08, 0.12, 0.28, 0.12),
+      coordinateSpace: "visible-page-fraction-v1"
+    };
+    const documentDraws = [], certificateDraws = [];
+    const originalDrawImage = PDFPage.prototype.drawImage;
+    PDFPage.prototype.drawImage = function(image, options) {
+      if (image.width === 64 && image.height === 24) {
+        const draw = { width: options.width, height: options.height };
+        if (Math.abs(this.getWidth() - 600) < 0.1 && Math.abs(this.getHeight() - 800) < 0.1) documentDraws.push(draw);
+        else certificateDraws.push(draw);
+      }
+      return originalDrawImage.call(this, image, options);
+    };
+    try {
+      await buildSignedPdf(sourceBytes, {
+        envelopeId: "same-size-" + rotation,
+        documentId: "same-size-" + rotation,
+        title: "Certificate signature size parity",
+        originalHash: "original",
+        chainHead: "chain",
+        completedAt: "2026-11-19T12:25:00.000Z",
+        fields: [field],
+        signers: [{
+          id: "S1", uid: null, name: "Shared Mailbox Signer", email: "shared@example.test",
+          signedAt: "2026-11-19T12:25:00.000Z", signatureType: "drawn",
+          signatureValue: dataUrl, fieldValues: { [field.fieldId]: dataUrl }
+        }]
+      });
+    } finally {
+      PDFPage.prototype.drawImage = originalDrawImage;
+    }
+    assert.equal(documentDraws.length, 1, "/Rotate " + rotation + " must draw one assigned document signature");
+    assert.equal(certificateDraws.length, 1, "/Rotate " + rotation + " must draw one certificate signature");
+    close(certificateDraws[0].width, documentDraws[0].width, 0.01);
+    close(certificateDraws[0].height, documentDraws[0].height, 0.01);
+  }
+});
