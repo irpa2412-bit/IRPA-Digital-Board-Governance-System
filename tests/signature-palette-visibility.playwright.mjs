@@ -156,7 +156,7 @@ async function runViewport(name,viewport){
  assert.equal(await page.getByTestId("page-number").innerText(),"2");
  await page.getByTestId("field-sig-page-2").click();
  await page.getByRole("button",{name:"Use my saved signature"}).click();
- await page.getByRole("button",{name:"Confirm Signature"}).click();
+ await page.getByRole("button",{name:"Use this signature",exact:true}).click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-sig-page-2");
  console.log("PASS "+name+": Saved specimen + explicit Confirm");
  // Page 1's two fields remain confirmed after page changes.
@@ -177,11 +177,54 @@ async function runViewport(name,viewport){
  await page.screenshot({path:"test-results/signature-palette-"+name+".png",fullPage:true});
  await context.close();
 }
+async function assertConfirmationFooterMatrix(){
+ const cases=[
+  {name:"android-360x640",width:360,height:640},
+  {name:"android-390x480",width:390,height:480},
+  {name:"android-412x480",width:412,height:480},
+  {name:"tablet-768x640",width:768,height:640},
+  {name:"laptop-1280x480",width:1280,height:480},
+  {name:"desktop-1280x600",width:1280,height:600},
+  {name:"desktop-1920x900",width:1920,height:900}
+ ];
+ for(const item of cases){
+  for(const zoom of [1,1.25,1.5]){
+   const zoomedViewport={width:Math.max(320,Math.floor(item.width/zoom)),height:Math.max(300,Math.floor(item.height/zoom))};
+   const context=await browser.newContext({viewport:zoomedViewport});
+   const page=await context.newPage();
+   await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
+   for(const mode of ["saved","draw","type"]){
+    await page.getByTestId("field-sig-page-1").click();
+    if(mode==="draw")await page.getByRole("button",{name:"Draw",exact:true}).click();
+    if(mode==="type"){
+     await page.getByRole("button",{name:"Type",exact:true}).click();
+     await page.getByLabel("Type your signature").fill("A very long signer name used to check wrapping at narrow widths");
+     await page.setViewportSize({width:zoomedViewport.width,height:Math.max(260,zoomedViewport.height-260)});
+    }
+    const measured=await page.evaluate(()=>{
+     const dialog=document.querySelector('[role="dialog"]'),footer=dialog?.querySelector(".signature-confirmation-actions"),action=footer?.querySelector("button:last-child");
+     const d=dialog?.getBoundingClientRect(),f=footer?.getBoundingClientRect(),a=action?.getBoundingClientRect();
+     return {viewport:{width:window.innerWidth,height:window.innerHeight},dialog:d&&{top:d.top,bottom:d.bottom,height:d.height},footer:f&&{top:f.top,bottom:f.bottom,height:f.height},action:a&&{top:a.top,bottom:a.bottom,height:a.height},footerPosition:footer&&getComputedStyle(footer).position,contentOverflow:dialog&&getComputedStyle(dialog.querySelector(".signature-confirmation-content")).overflowY};
+    });
+    assert.ok(measured.action,"confirmation action must render for "+item.name+" "+zoom+" "+mode);
+    assert.ok(measured.action.top>=0&&measured.action.bottom<=measured.viewport.height+1,"confirmation action must stay inside the visible viewport: "+JSON.stringify({item,zoom,mode,measured}));
+    assert.ok(measured.action.height>=44,"confirmation action must retain a 44px touch target: "+JSON.stringify({item,zoom,mode,measured}));
+    assert.equal(measured.footerPosition,"sticky","confirmation footer must remain sticky");
+    assert.equal(measured.contentOverflow,"auto","signature choices must scroll independently above the footer");
+    if(mode==="type")await page.setViewportSize(zoomedViewport);
+    await page.getByRole("button",{name:"Cancel",exact:true}).click();
+   }
+   await context.close();
+   console.log("PASS confirmation footer viewport matrix: "+item.name+" at "+Math.round(zoom*100)+"% zoom");
+  }
+ }
+}
 try{
  await waitForServer();
  browser=await chromium.launch({headless:true});
  await runViewport("desktop",{width:1440,height:1000});
  await runViewport("mobile",{width:390,height:844});
+ await assertConfirmationFooterMatrix();
  console.log("PASS desktop: Draw, Type, saved signature, explicit Confirm, multi-page, multi-field, zoom, reload, no palette overlap");
  console.log("PASS mobile: Draw, Type, saved signature, explicit Confirm, multi-page, multi-field, zoom, reload, no palette overlap");
 }catch(error){
