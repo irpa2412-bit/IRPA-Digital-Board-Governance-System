@@ -46,3 +46,9 @@ test("each PDF field can be assigned both a signer and that signer's specific du
   assert.match(worker, /roleAssignmentIndex=f\?\.roleAssignmentIndex==null\?0:Number\(f\.roleAssignmentIndex\)/);
   assert.match(worker, /roleAssignmentIndex>=Math\.max\(1,Array\.isArray\(assigned\.roleAssignments\)\?assigned\.roleAssignments\.length:1\)/);
 });
+
+test("PDF placement handler imports its canonical pointer-coordinate helper", () => {
+  assert.match(portal, /import\{signatureFieldFromPointer\}from"\.\.\/utils\/signatureFieldCoordinates\.mjs";/);
+  assert.match(portal, /const placePendingField=e=>\{[\s\S]*?signatureFieldFromPointer\(e\.clientX,e\.clientY,rect\)/);
+  assert.match(portal, /const addAt=\(type,x=50,y=20\)=>\{/);
+});
