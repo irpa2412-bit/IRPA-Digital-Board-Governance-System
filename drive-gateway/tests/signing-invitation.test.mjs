@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
-import { createEnvelope, getEnvelopeStatus, resendInvitation, openEmailSigning } from "../src/signing.mjs";
+import { createEnvelope, getEnvelopeStatus, resendInvitation, revokeInvitation, openEmailSigning, openSigning } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
+import { route as esignRoute } from "../src/router.mjs";
 import { buildInvitationMessage } from "../src/invitationEmail.mjs";
 
 async function fixture({failResend=false,emailLink=false}={}) {
@@ -101,7 +102,7 @@ test("email-link resend rotates the bearer token and makes the prior invitation 
   await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   const second=new URL(f.sent[1].link).searchParams.get("emailSignToken");
   assert.notEqual(second,first);
-  await assert.rejects(()=>openEmailSigning(f.ctx,first,"192.0.2.11"),/signing link is unavailable/i);
+  await assert.rejects(()=>openEmailSigning(f.ctx,first,"192.0.2.11"),/This link was replaced\. Please use the newest email\./);
   const opened=await openEmailSigning(f.ctx,second,"192.0.2.12");
   assert.equal(opened.ok,true);
 });
@@ -114,4 +115,95 @@ test("failed email-link resend keeps the previously delivered bearer link usable
   const opened=await openEmailSigning(f.ctx,first,"192.0.2.22");
   assert.equal(opened.ok,true);
   assert.equal(opened.signer.id,"S1");
+});
+
+test("owner can replace invited, opened, expired, revoked, failed and interrupted unsigned email links",async()=>{
+  const states=["invited","opened","expired","revoked","send-failed","interrupted"];
+  for(const state of states){
+    const f=await fixture({emailLink:true});
+    const oldLink=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+    if(state==="opened"||state==="interrupted")await openEmailSigning(f.ctx,oldLink,"192.0.2.31");
+    if(state==="expired"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);const signer={...current.signers[0],tokenExpiresAt:"2000-01-01T00:00:00.000Z",emailLinkExpiresAt:"2000-01-01T00:00:00.000Z"};await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[signer]},{ifVersion:current._v});}
+    if(state==="revoked")await revokeInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+    if(state==="send-failed"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[{...current.signers[0],invitation:"Failed",deliveryStageCode:"SMTP_AUTH"}]},{ifVersion:current._v});}
+    if(state==="interrupted"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(current.signers[0].status,"Pending");assert.equal(current.signers[0].emailLinkStatus,"opened");assert.equal(current.signers[0].partialSignature,undefined);}
+    const sent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+    assert.equal(sent.deliveryStatus,"Sent",state);assert.ok(Date.parse(sent.expiresAt)>Date.now(),state);
+    const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+    assert.equal(current.signers[0].emailLinkStatus,"issued",state);assert.equal(current.signers[0].status,"Pending",state);
+    assert.equal(current.signers[0].tokenExpiresAt,sent.expiresAt,state);
+    await assert.rejects(()=>openEmailSigning(f.ctx,oldLink,"192.0.2.32"),/This link was replaced\. Please use the newest email\./,state);
+    const newLink=new URL(f.sent[1].link).searchParams.get("emailSignToken");
+    const opened=await openEmailSigning(f.ctx,newLink,"192.0.2.33");assert.equal(opened.ok,true,state);
+  }
+});
+
+test("owner can resend an expired account signer link with a fresh expiry",async()=>{
+  const f=await fixture();
+  const oldLink=new URL(f.sent[0].link).searchParams.get("gatewayToken");
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{expiresAt:"2000-01-01T00:00:00.000Z",signers:[{...current.signers[0],tokenExpiresAt:"2000-01-01T00:00:00.000Z"}]},{ifVersion:current._v});
+  const sent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  const newLink=new URL(f.sent[1].link).searchParams.get("gatewayToken");
+  assert.notEqual(newLink,oldLink);assert.ok(Date.parse(sent.expiresAt)>Date.now());
+  await assert.rejects(()=>openSigning(f.ctx,oldLink,{uid:"signer-uid"}),/This link was replaced\. Please use the newest email\./);
+  const opened=await openSigning(f.ctx,newLink,{uid:"signer-uid"});assert.equal(opened.signer.id,"S1");
+});
+
+test("resend is restricted to the current sequence position and permits it once predecessors have signed",async()=>{
+  const f=await fixture();
+  const env=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const second={...env.signers[0],id:"S2",order:2,uid:"signer-two",name:"Second Signer",email:"second@example.test",tokenHash:await sha256Hex("second-token"),tokenExpiresAt:env.expiresAt};
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[...env.signers,second]},{ifVersion:env._v});
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S2"),/not yet at the current signing position/i);
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:current.signers.map(s=>s.id==="S1"?{...s,status:"Signed",signedAt:"2026-11-19T12:00:00.000Z"}:s)},{ifVersion:current._v});
+  const result=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S2");
+  assert.equal(result.signerId,"S2");assert.match(new URL(f.sent.at(-1).link).searchParams.get("gatewayToken"),new RegExp("^"+f.created.envelopeId+"\\.S2\\."));
+});
+
+test("same email in separate signer positions keeps independent signer IDs and tokens",async()=>{
+  const f=await fixture();
+  const env=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const originalS1=env.signers[0].tokenHash;
+  const second={...env.signers[0],id:"S2",order:1,uid:"another-identity",name:"Same Email, Different Role",tokenHash:await sha256Hex("second-token"),tokenExpiresAt:env.expiresAt};
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[...env.signers,second]},{ifVersion:env._v});
+  await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S2");
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(current.signers.find(s=>s.id==="S1").tokenHash,originalS1);
+  assert.match(new URL(f.sent.at(-1).link).searchParams.get("gatewayToken"),new RegExp("^"+f.created.envelopeId+"\\.S2\\."));
+});
+
+test("a signed signer or completed/cancelled envelope cannot receive a replacement link",async()=>{
+  const f=await fixture();
+  const env=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[{...env.signers[0],status:"Signed"}]},{ifVersion:env._v});
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),/completed signing/);
+  for(const status of ["Completed","Cancelled"]){
+    const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+    await f.ctx.meta.update("envelopes",f.created.envelopeId,{status,signers:[{...current.signers[0],status:"Pending"}]},{ifVersion:current._v});
+    await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),/completed or cancelled/i);
+  }
+});
+
+test("failed replacement reports the SMTP stage and preserves the prior link",async()=>{
+  const f=await fixture({emailLink:true});
+  const original=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const originalTokenHash=current.signers[0].tokenHash;
+  const originalSend=f.ctx.sendInvitation;
+  f.ctx.sendInvitation=async invitation=>{if(invitation.signerId==="S1")throw Object.assign(new Error("SMTP authentication failed"),{stageCode:"SMTP_AUTH"});return originalSend(invitation)};
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),error=>error.code==="SMTP_AUTH");
+  const afterFailure=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(afterFailure.signers[0].tokenHash,originalTokenHash);
+  const opened=await openEmailSigning(f.ctx,original,"192.0.2.44");assert.equal(opened.ok,true);
+});
+
+test("replaced email signing links show the explicit replacement notice through the public open route",async()=>{
+  const f=await fixture({emailLink:true});
+  const oldLink=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  const response=await esignRoute(new Request("https://irpa.example.test/api/sign/email/open",{headers:{"x-signing-token":oldLink}}),f.ctx);
+  assert.equal(response.status,410);
+  const body=await response.json();
+  assert.equal(body.error,"This link was replaced. Please use the newest email.");
 });

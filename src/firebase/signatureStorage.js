@@ -576,7 +576,7 @@ export async function resendGatewayEmailInvitation(envelopeId,signerId) {
   if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
   const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/resend",{method:"POST",body:JSON.stringify({})});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok||data.ok===false)throw new Error(data.error||"Unable to resend the email signing invitation.");
+  if(!response.ok||data.ok===false){const error=new Error(data.error||"Unable to resend the signing invitation.");if(data.code)error.code=String(data.code);throw error;}
   return data;
 }
 
