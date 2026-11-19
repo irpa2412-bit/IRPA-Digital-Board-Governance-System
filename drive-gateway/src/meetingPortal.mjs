@@ -251,7 +251,12 @@ export function createMeetingPortalRouter(ctx) {
         if (!isActiveMeeting(meeting.status)) return errorResponse(ctx, request, "This meeting is closed and cannot issue invitations.", 409);
         const recipient = lower(participant.participantEmail || participant.email);
         if (!recipient || (pass.participantEmail && lower(pass.participantEmail) !== recipient)) return errorResponse(ctx, request, "The participant email does not match the issued access pass.", 409);
-        const appUrl = clean(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/, "");
+        const configuredAppUrl = clean(env.IRPA_APP_URL);
+        if (!configuredAppUrl) return errorResponse(ctx, request, "Meeting invitation dispatch is not configured for this Worker environment.", 503);
+        let parsedAppUrl;
+        try { parsedAppUrl = new URL(configuredAppUrl); } catch { return errorResponse(ctx, request, "Meeting invitation application URL is invalid for this Worker environment.", 503); }
+        if (parsedAppUrl.protocol !== "https:") return errorResponse(ctx, request, "Meeting invitation application URL must use HTTPS.", 503);
+        const appUrl = parsedAppUrl.toString().replace(/\/$/, "");
         const gateUrl = new URL(appUrl + "/");
         gateUrl.searchParams.set("meetingToken", accessToken);
         gateUrl.searchParams.set("meetingId", pass.meetingId);
