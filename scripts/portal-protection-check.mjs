@@ -5,7 +5,7 @@ const HOURS_24 = 24 * 60 * 60 * 1000;
 const isWithin = (file, path) => file === path || (path.endsWith("/") && file.startsWith(path));
 const readJson = (path) => JSON.parse(fs.readFileSync(path, "utf8"));
 
-export function evaluatePolicy({ changedFiles, registry, windowState, record, now = Date.now(), latestActivityAt = null }) {
+export function evaluatePolicy({ changedFiles, registry, windowState, record, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
   const affected = new Set();
   const protectedFiles = [];
   for (const file of changedFiles) {
@@ -26,10 +26,16 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   const fail = (reason) => ({ ok: false, affected: [...affected].sort(), protectedFiles, reason });
   if (!record || record.status !== "complete") return fail("A completed Change Record is required.");
   if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.");
-  if (!latestActivityAt) return fail("Repair activity timestamp could not be established from Git history.");
-  const activityTime = Date.parse(latestActivityAt);
-  if (!Number.isFinite(activityTime) || now - activityTime >= HOURS_24) return fail("Repair window automatically closed after 24 consecutive hours without activity.");
-  if (Date.parse(windowState.openedAt) > activityTime) return fail("Repair activity predates the current repair-window declaration.");
+  const openedAt = Date.parse(windowState.openedAt);
+  const activities = [...new Set([...(activityTimestamps ?? []), ...(latestActivityAt ? [latestActivityAt] : [])])]
+    .map(Date.parse).filter((time) => Number.isFinite(time) && time >= openedAt).sort((a, b) => a - b);
+  if (!Number.isFinite(openedAt) || !activities.length) return fail("No repair activity is recorded after the current window declaration.");
+  let previousActivity = openedAt;
+  for (const activityTime of activities) {
+    if (activityTime - previousActivity >= HOURS_24) return fail("Repair window automatically closed after a 24-hour inactivity gap; a new declaration is required.");
+    previousActivity = activityTime;
+  }
+  if (now - previousActivity >= HOURS_24) return fail("Repair window automatically closed after 24 consecutive hours without activity.");
   const scope = windowState.scope ?? [];
   const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
   if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
@@ -63,8 +69,14 @@ function main() {
   const windowState = readJson("docs/portal-protection/repair-window.json");
   const recordPath = "docs/portal-protection/change-record.json";
   const record = fs.existsSync(recordPath) ? readJson(recordPath) : null;
-  const latestActivityAt = execFileSync("git", ["log", "-1", "--format=%cI"], { encoding: "utf8" }).trim();
-  const result = evaluatePolicy({ changedFiles, registry, windowState, record, latestActivityAt });
+  const initial = evaluatePolicy({ changedFiles, registry, windowState, record });
+  if (!initial.protectedFiles.length) {
+    console.log(JSON.stringify(initial, null, 2));
+    return;
+  }
+  const history = execFileSync("git", ["log", "--format=%cI", "--", ...initial.protectedFiles], { encoding: "utf8" }).trim();
+  const activityTimestamps = history ? history.split("\\n").filter(Boolean) : [];
+  const result = evaluatePolicy({ changedFiles, registry, windowState, record, activityTimestamps });
   console.log(JSON.stringify(result, null, 2));
   if (!result.ok) process.exitCode = 1;
   if (result.ok && result.protectedFiles.length) {
