@@ -157,7 +157,7 @@ export async function createEnvelope(ctx,user,body){
   }
   const sourceHash=doc.sha256||doc.hash||await sha256Hex(sourceBytes),sourceSize=doc.fileSize??doc.byteLength??doc.size??sourceBytes.byteLength;
   const e={id,externalReference:externalReference||null,documentId:doc.id,documentHash:sourceHash,sha256:sourceHash,byteLength:sourceSize,documentSize:sourceSize,title:doc.title,fileName:doc.fileName,classification:doc.classification,ownerName:String(user.name||user.email||"IRPA Document Owner"),ownerEmail:String(user.email||"").trim().toLowerCase(),createdByEmail:String(user.email||"").trim().toLowerCase(),createdBy:user.uid,status:"Sent",signingMode,signers,fields,archiveTargets:archives,createdAt:ctx.now().toISOString(),expiresAt:new Date(ctx.now().getTime()+ctx.config.ttlDays*86400000).toISOString(),events:[],completion:null};
-  for(const signer of e.signers){signer.tokenExpiresAt=e.expiresAt;if(signer.identityType==="email-link")signer.emailLinkExpiresAt=e.expiresAt;}
+  for(const signer of e.signers){const ttlDays=signer.identityType==="email-link"?(ctx.config.emailLinkTtlDays||7):(ctx.config.ttlDays||14);signer.tokenExpiresAt=new Date(ctx.now().getTime()+ttlDays*86400000).toISOString();if(signer.identityType==="email-link")signer.emailLinkExpiresAt=signer.tokenExpiresAt;}
   e.events=await chainEvents([],{type:"envelope.created",at:e.createdAt,actor:user.uid,documentHash:sourceHash,signerCount:signers.length});
   let reservationKey=null;
   if(externalReference){
@@ -186,7 +186,7 @@ export async function createEnvelope(ctx,user,body){
       if(signers[i].id===ownerPreSignSigner.id)signers[i].invitation="Portal";
       continue;
     }
-    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signers[i].id,stage,outcome,category)}:{}),expiresAt:e.expiresAt});signers[i].invitation="Sent";}
+    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signers[i].id,stage,outcome,category)}:{}),expiresAt:signers[i].tokenExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";signers[i].deliveryStageCode=EMAIL_STAGE_SET.has(err?.stageCode)?err.stageCode:null;ctx.logger?.error?.("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,...invitationFailureDiagnostics(err),...(signers[i].deliveryStageCode?{stageCode:signers[i].deliveryStageCode}:{})});}}
     else signers[i].invitation="Sent";
   }
@@ -357,14 +357,14 @@ export async function resendInvitation(ctx,user,id,signerId){
   if(envelope.signers.some(s=>s.order<target.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position. Later signers cannot be emailed early.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
-  const secret=randomHex(32),now=ctx.now(),expiresAt=new Date(now.getTime()+ctx.config.ttlDays*86400000).toISOString();
+  const secret=randomHex(32),now=ctx.now(),ttlDays=Math.max(1,Math.min(30,Number(emailLink?ctx.config?.emailLinkTtlDays:ctx.config?.ttlDays)||(emailLink?7:14))),expiresAt=new Date(now.getTime()+ttlDays*86400000).toISOString();
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
   try{
     await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,expiresAt,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signerId,stage,outcome,category)}:{})});
   }catch(error){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
-    await mutate(ctx,id,async current=>({patch:{events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:ctx.now().toISOString()})}}));
+    await mutate(ctx,id,async current=>({patch:{events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:now.toISOString()})}}));
     const failure=new HttpError(502,"The signing invitation could not be delivered. The previous link remains valid; retry after resolving the delivery error.");failure.code=EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT";throw failure;
   }
   await mutate(ctx,id,async current=>{
