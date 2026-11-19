@@ -36,7 +36,8 @@
     "test:signature-firestore-diagnostics": "node --test tests/signature-firestore-diagnostics.test.mjs",
     "test:signature-coordinate-system": "node --test tests/signature-field-coordinate-system.test.mjs drive-gateway/tests/signature-image-fit.test.mjs",
     "test:signature-coordinate-browser": "npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/signature-coordinate-leave.spec.mjs",
-    "test:signature-field-assignment": "node --test tests/signature-field-assignment-setup.test.mjs drive-gateway/tests/signature-field-assignment-regression.test.mjs"
+    "test:signature-field-assignment": "node --test tests/signature-field-assignment-setup.test.mjs drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+    "test:protected-portals": "node scripts/portal-protection-smoke.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
