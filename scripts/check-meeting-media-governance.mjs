@@ -13,6 +13,7 @@ const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants
 const entryGateway=fs.readFileSync("src/pages/MeetingEntryGateway.jsx","utf8");
 const invitationEmail=fs.readFileSync("drive-gateway/src/invitationEmail.mjs","utf8");
 const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
+const memberInvitationClient=fs.readFileSync("src/firebase/employeeRegistrationEmail.js","utf8");
 const meetingWorker=fs.readFileSync("drive-gateway/src/meetingPortal.mjs","utf8");
 const meetingApi=fs.readFileSync("src/firebase/meetingGatewayApi.js","utf8");
 const meetingServices=fs.readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
@@ -38,6 +39,8 @@ const checks=[
  ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
  ["Meeting Worker verifies access pass, participant, meeting and organiser before SMTP dispatch",meetingWorker.includes('["/api/meeting-invitations/dispatch", "dispatch"]')&&meetingWorker.includes("pass.participantId")&&meetingWorker.includes("participant.meetingId !== pass.meetingId")&&meetingWorker.includes("Only an authorised meeting organiser")],
  ["Meeting Worker uses the existing SMTP sender and existing Worker secrets",invitationWorker.includes("sendEmail: (env, message) => smtpSend(env, message)")&&meetingWorker.includes("ctx.sendEmail(env, { to: recipient, subject, text, html })")],
+ ["General member Invitation Portal rejects meeting-access payloads and remains member-only",!invitationWorker.includes("data.meetingAccess")&&!invitationWorker.includes("meetingAccessSent")&&!memberInvitationClient.includes("meetingAccess")],
+ ["Meeting Worker has no dependency on the general invitations collection",!meetingServices.includes('"invitations"')&&!meetingServices.includes("/api/meeting-invitations/update")],
  ["Meeting invitation records are stored on meeting participant records, not Invitation Portal",participantPage.includes("meetingInvitationRows=useMemo(()=>rows.filter")&&!participantPage.includes("COLLECTIONS.invitations")&&!participantPage.includes("sendMemberInvitationEmail")],
  ["Meeting Worker email includes meeting-specific gate link and password",meetingWorker.includes("meetingToken")&&meetingWorker.includes("Gate password: ")&&meetingWorker.includes("IRPA Meeting Invitation")],
  ["Meeting register create update delete and voting use Worker routes",["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open"].every(route=>meetingsPage.includes(route))&&!/\b(createRecord|updateRecord|deleteRecord|openVotingIssue)\(/.test(meetingsPage)],
