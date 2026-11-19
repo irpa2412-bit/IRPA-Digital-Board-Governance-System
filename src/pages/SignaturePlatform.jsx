@@ -717,14 +717,11 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     if(duplicateRecipients.length)throw new Error("Duplicate signer identities were detected: "+duplicateRecipients.map(recipient=>recipient.name||recipient.email).join(", ")+". Each distinct participant must have a separate signer identity.");
     const signerUids=new Set([...orderedRecipients.map(r=>r.uid),...(ownerSigningEnabled?[documentOwner.uid]:[])]);
     if(!orderedRecipients.length&&!ownerSigningEnabled)throw new Error("Add at least one participant in the PDF palette before creating the envelope.");
-    const recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>String(field.signerUid||"")===String(recipient.uid||"")));
-    if(recipientsWithoutFields.length){
-      const assignmentReport=recipientsWithoutFields.map(recipient=>{
-        const identity=String(recipient.uid||"");
-        const matching=fields.filter(field=>String(field.signerUid||"")===identity).length;
-        return (recipient.name||recipient.email||"Participant")+" [identity "+identity.slice(0,18)+"…; matching fields: "+matching+"]";
-      });
-      throw new Error("Each participant needs at least one PDF field assigned to their own signer identity. No matching field was found for: "+assignmentReport.join("; ")+". Select each person separately in the palette and place their field on the PDF. Shared email addresses do not combine participants.");
+    const assignmentCheck=analyzeFieldAssignments({recipients:[...(ownerSigningEnabled?[documentOwner]:[]),...orderedRecipients],fields,ownerUid:documentOwner.uid,ownerSigningEnabled});
+    if(assignmentCheck.fieldIssues.length||assignmentCheck.recipientsWithoutFields.length){
+      const fieldReport=assignmentCheck.fieldIssues.map(issue=>"Page "+issue.page+", field "+issue.fieldNumber+": "+issue.reason);
+      const participantReport=assignmentCheck.recipientsWithoutFields.map(person=>(person.name||person.email||"Participant")+": no signer fields assigned (0 matching fields)");
+      throw new Error("Signing field assignment needs repair: "+[...fieldReport,...participantReport].join("; ")+". Use the field list to jump to each affected page, re-link orphaned fields, merge exact duplicate participants, or place a missing field before creating the envelope.");
     }
     if(fields.some(f=>!f.signerUid||!signerUids.has(f.signerUid)))throw new Error("Assign every field to the document owner or an assigned signer before creating the envelope.");
     setMessage("All checks passed. Saving the draft envelope and its field assignments…");
