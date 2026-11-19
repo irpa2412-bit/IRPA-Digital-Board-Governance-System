@@ -390,7 +390,7 @@ test("completed-document distribution retry is admitted by the Gateway e-signatu
 
 test("saved signature drafts return canonical persisted fields in preparation-editor percentage coordinates", () => {
   const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
-  const save = platform.slice(platform.indexOf("export async function saveSignatureWorkflowDraft("), platform.indexOf("\\nexport async function finalizeSignatureWorkflowDraft"));
+  const save = platform.slice(platform.indexOf("export async function saveSignatureWorkflowDraft("), platform.indexOf("\nexport async function finalizeSignatureWorkflowDraft"));
   assert.match(platform, /signatureFieldsToPercent/);
-  assert.match(save, /const savedDraft=result\\.draft\\|\\|workerDraft;return\\{id,\\.\\.\\.savedDraft,fields:signatureFieldsToPercent\\(savedDraft\\.fields/);
+  assert.match(save, /const savedDraft=result\.draft\|\|workerDraft;return\{id,\.\.\.savedDraft,fields:signatureFieldsToPercent\(savedDraft\.fields/);
 });
