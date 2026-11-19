@@ -222,7 +222,9 @@ test("participant creation and field assignment are performed inside the PDF pal
 test("duplicate participant identities are reused and rapid repeated add actions are locked before asynchronous work", () => {
   const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner, "the palette participant handler must exist");
-  assert.match(addSigner[1], /const duplicate=recipients\.find\(x=>\(registered&&x\.uid===registered\.uid\)\|\|\(registeredEmail&&String\(x\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===registeredEmail\)\)/);
+  assert.match(addSigner[1], /const duplicate=registered\?recipients\.find\(x=>x\.uid===registered\.uid\):null/);
+  assert.match(addSigner[1], /Random per-participant key/);
+  assert.doesNotMatch(addSigner[1], /emailHash\.slice\(0,24\)/);
   assert.match(addSigner[1], /const existingAssignments=Array\.isArray\(duplicate\.roleAssignments\)/);
   assert.match(addSigner[1], /const sameAssignment=existingAssignments\.some/);
   assert.match(addSigner[1], /The existing responsibility was selected; no duplicate was created/);
@@ -239,16 +241,17 @@ test("duplicate participant identities are reused and rapid repeated add actions
 
 test("envelope creation requires every participant to have at least one explicitly assigned field", () => {
   assert.match(portal, /if\(!orderedRecipients\.length&&!ownerSigningEnabled\)/);
-  assert.match(portal, /const recipientsWithoutFields=orderedRecipients\.filter\(recipient=>!fields\.some\(field=>field\.signerUid===recipient\.uid\)\)/);
-  assert.match(portal, /Assign at least one field to each participant in the palette before creating the envelope/);
+  assert.match(portal, /const recipientsWithoutFields=orderedRecipients\.filter\(recipient=>!fields\.some\(field=>String\(field\.signerUid\|\|""\)===String\(recipient\.uid\|\|"\")\)\)/);
+  assert.match(portal, /Each participant needs at least one PDF field assigned to their own signer identity/);
+  assert.match(portal, /matching fields:/);
 });
 
 
 test("owner identity is never added as a duplicate signer and reorder controls exclude the owner row", () => {
   const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner);
-  assert.match(addSigner[1], /const ownerEmail=String\(documentOwner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
-  assert.match(addSigner[1], /const isOwnerDuplicate=/);
+  assert.match(addSigner[1], /const isOwnerDuplicate=!!\(registered&&registered\.uid===documentOwner\.uid\)/);
+  assert.doesNotMatch(addSigner[1], /ownerEmail/);
   assert.match(addSigner[1], /setOwnerSigningEnabled\(true\)/);
   assert.match(portal, /const signerRecipients=recipients\.filter\(r=>r\.uid!==ownerSigner\?\.uid\)/);
   assert.match(portal, /disabled=\{signerIndex===0\}/);
@@ -256,12 +259,11 @@ test("owner identity is never added as a duplicate signer and reorder controls e
 });
 
 
-test("envelope creation blocks duplicate participant UIDs and case-insensitive emails, including the owner", () => {
+test("envelope creation blocks duplicate participant UIDs but permits shared delivery emails", () => {
   assert.match(portal, /const seenSignerUids=new Set\(\[documentOwner\.uid\]\)/);
-  assert.match(portal, /const ownerEmailKey=String\(documentOwner\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)/);
-  assert.match(portal, /const seenSignerEmails=new Set\(ownerEmailKey\?\[ownerEmailKey\]:\[\]\)/);
-  assert.match(portal, /if\(seenSignerUids\.has\(uid\)\|\|\(emailKey&&seenSignerEmails\.has\(emailKey\)\)\)/);
-  assert.match(portal, /Duplicate participants were detected by signer identity or email/);
+  assert.doesNotMatch(portal, /seenSignerEmails/);
+  assert.match(portal, /if\(seenSignerUids\.has\(uid\)\)/);
+  assert.match(portal, /Duplicate signer identities were detected/);
 });
 
 test("document owner can save and close preparation before all fields are assigned, then resume the draft",()=>{
