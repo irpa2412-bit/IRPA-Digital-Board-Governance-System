@@ -2,7 +2,7 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{createRecord,getRecords,getMeetingScopedRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
 
-import{createMeetingAccessInvitation,dispatchMeetingInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
+import{callMeetingService,createMeetingAccessInvitation,dispatchMeetingInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
 const AUTHORITATIVE_ROLES=["Board Member","Board Committee Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"];
 const empty={participantName:"",participantUid:"",participantEmail:"",participantRole:"Invited Guest",participantType:"External Invitee",sourceType:"Manual Invitee",sourceRecordId:"",employeeId:"",boardMemberId:"",memberType:"Technical Advisor",meetingId:"",meetingReference:"",attendanceStatus:"Invited",notes:""};
@@ -140,9 +140,9 @@ export default function OperationalGatewaysParticipants(){
   const m=meetings.find(x=>x.id===form.meetingId);if(!m)throw new Error("Select a meeting first.");if(!form.participantEmail.trim())throw new Error("An email address is required for the meeting-specific invitation.");const inviteeEmail=form.participantEmail.trim().toLowerCase();const duplicate=rows.find(r=>r.meetingId===m.id&&r.id!==edit?.id&&String(r.participantEmail||r.email||"").trim().toLowerCase()===inviteeEmail&&!["cancelled","removed"].includes(String(r.status||"").toLowerCase()));if(duplicate)throw new Error("This email address is already registered for the selected meeting. Reuse the existing participant record so invitee and quorum counts are not duplicated.");
   if(sourceMode==="manual"&&(AUTHORITATIVE_ROLES.includes(form.participantRole)||form.boardMemberId||form.employeeId||form.memberId))throw new Error("A provisional manual invitee must use an external participant role. Select the person from the Board Members, Members or Employees Register for an authoritative IRPA identity.");
   const payload={...form,participantEmail:inviteeEmail,meetingIdentity:m.meetingIdentity||`IRPA-MEET-${String(m.id||"").toUpperCase()}`,meetingReference:m.meetingReference||`IRPA-MTG-${String(m.date||new Date().getFullYear()).slice(0,4)}-${String(m.id||"").slice(0,8).toUpperCase()}`,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",attendanceStatus:form.attendanceStatus||"Invited",invitationStatus:edit?.invitationStatus||"Not Sent"};
-  if(edit){await updateRecord(COLLECTIONS.participants,edit.id,payload);setMsg("Participant record updated.");}
+  if(edit){await callMeetingService("/api/meeting-participants/update",{participantId:edit.id,data:payload});setMsg("Participant record updated.");}
   else{
-   const participantId=await createRecord(COLLECTIONS.participants,{...payload,meetingAccessDispatched:false,meetingAccessDispatchStatus:"Pending"});
+   const created=await callMeetingService("/api/meeting-participants/create",{data:payload});const participantId=created.participantId;
    let issuedAccess=null,dispatchStage="issue-meeting-access";
    try{
     const issued=await createMeetingAccessInvitation({meetingId:payload.meetingId,participantId});
@@ -156,13 +156,13 @@ export default function OperationalGatewaysParticipants(){
     console.error("IRPA meeting invitation dispatch failed",{stage:dispatchStage,errorCode:String(x?.code||""),errorMessage:String(x?.message||x).slice(0,240),meetingId:payload.meetingId,participantId});
     if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
     const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation dispatch failed.";
-    await updateRecord(COLLECTIONS.participants,participantId,{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:dispatchStage});
+    await callMeetingService("/api/meeting-participants/update",{participantId,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:dispatchStage}});
     throw new Error("Participant was registered, but the meeting invitation failed at "+dispatchStage+": "+failure);
    }
   }
   reset();await load()
  }catch(x){setErr(x.message||"Unable to save participant.")}finally{setBusy(false)}}
- async function remove(r){if(!window.confirm("Remove this participant record?"))return;setBusy(true);try{await deleteRecord(COLLECTIONS.participants,r.id);setMsg("Participant record removed.");await load()}catch(x){setErr(x.message||"Unable to remove participant.")}finally{setBusy(false)}}
+ async function remove(r){if(!window.confirm("Remove this participant record and revoke its meeting access pass?"))return;setBusy(true);try{await callMeetingService("/api/meeting-participants/delete",{participantId:r.id});setMsg("Participant removed and meeting access revoked.");await load()}catch(x){setErr(x.message||"Unable to remove participant.")}finally{setBusy(false)}}
  const metrics=useMemo(()=>({total:rows.length,present:rows.filter(x=>x.attendanceStatus==="Present").length,invited:rows.filter(x=>x.attendanceStatus==="Invited").length,absent:rows.filter(x=>x.attendanceStatus==="Absent").length}),[rows]);
  // The invitation register is the source of truth for dispatched meeting links and token releases.
  // Only metadata/reference IDs are retained here; the bearer token itself is delivered by email
