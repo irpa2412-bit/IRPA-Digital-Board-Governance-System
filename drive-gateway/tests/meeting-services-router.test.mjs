@@ -48,11 +48,16 @@ test("meeting register, decision, and voting control routes require authenticate
     "/api/meeting-decisions/create",
     "/api/meeting-voting/open",
     "/api/meeting-voting/close",
+    "/api/meeting-participants/create",
     "/api/meeting-participants/update",
     "/api/meeting-participants/delete",
     "/api/meeting-invitations/update",
     "/api/meeting-room/activity",
-    "/api/meeting-subscriptions/mine"
+    "/api/meeting-subscriptions/mine",
+    "/api/meeting-entry-requests/list",
+    "/api/meeting-entry-requests/resolve",
+    "/api/meeting-attendance/sign",
+    "/api/meeting-attendance/register"
   ]) {
     const response = await post(router, path, { meetingId: "test-meeting" });
     assert.equal(response.status, 401, path);
