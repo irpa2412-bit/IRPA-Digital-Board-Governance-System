@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "commit": "b766e7727722161f4f779bbd86d8ef21830eefa8",
+    "source": "main commit verified by successful production deployment and live frontend verification workflow"
+  },
+  "portals": {
+    "Invitation Portal": {
+      "paths": [
+        "src/pages/Invitations.jsx",
+        "src/pages/InvitationActivation.jsx",
+        "src/firebase/invitationWorkflow.js"
+      ],
+      "tests": [
+        "tests/meeting-invitation-resend-quorum.test.mjs"
+      ]
+    },
+    "Grants Intelligence and Funding Opportunities Portal": {
+      "paths": [
+        "src/pages/GrantIntelligencePortal.jsx",
+        "src/pages/grant-fundraising/",
+        "src/grantPipeline/"
+      ],
+      "tests": [
+        "tests/fundraising-source-registry.test.mjs"
+      ]
+    },
+    "Signature Portal": {
+      "paths": [
+        "src/pages/SignaturePlatform.jsx",
+        "src/pages/SignaturePlatformWithUpload.jsx",
+        "src/pages/GatewaySigningPortal.jsx",
+        "src/styles/signature-portal.css",
+        "src/components/SignatureFieldConfirmationPad.jsx",
+        "src/components/SignatureImagePreview.jsx",
+        "src/components/SignaturePathwaySelfTest.jsx",
+        "src/firebase/signature/",
+        "src/utils/signature/"
+      ],
+      "tests": [
+        "tests/signature-field-assignment-setup.test.mjs",
+        "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+        "tests/signature-firestore-diagnostics.test.mjs"
+      ]
+    },
+    "Board Members Portal": {
+      "paths": [
+        "src/pages/BoardMembers.jsx"
+      ],
+      "tests": [
+        "tests/org-structure-portal-alignment.test.mjs",
+        "tests/signature-authority-matrix.test.mjs"
+      ]
+    },
+    "Members and Employees Portal": {
+      "paths": [
+        "src/pages/Members.jsx",
+        "src/pages/Employees.jsx",
+        "src/pages/EmployeePayments.jsx",
+        "src/firebase/employee/"
+      ],
+      "tests": [
+        "tests/org-structure-authority.test.mjs",
+        "tests/job-description-intranet-workflow.test.mjs"
+      ]
+    },
+    "Communication and Media Portal": {
+      "paths": [
+        "src/pages/CommunicationMediaPortal.jsx",
+        "src/pages/CommunicationMediaOperations.jsx",
+        "src/pages/CommunicationMediaStudio.jsx",
+        "src/pages/Communications/",
+        "src/pages/SocialMediaAccounts.jsx"
+      ],
+      "tests": [
+        "tests/communication-media-policy.test.mjs",
+        "tests/social-studio-policy.test.mjs"
+      ]
+    }
+  },
+  "shared": [
+    {
+      "path": "src/App.jsx",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal"
+      ]
+    },
+    {
+      "path": "src/main.jsx",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/auth.js",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal"
+      ]
+    },
+    {
+      "path": "src/components/",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal"
+      ]
+    },
+    {
+      "path": "src/styles/",
+      "portals": [
+        "Invitation Portal",
+        "Grants Intelligence and Funding Opportunities Portal",
+        "Signature Portal",
+        "Board Members Portal",
+        "Members and Employees Portal",
+        "Communication and Media Portal"
+      ]
+    }
+  ],
+  "exclusions": [
+    "functions/**",
+    "firestore.rules",
+    "firestore.indexes.json",
+    "storage.rules",
+    "secrets",
+    "SMTP configuration",
+    "certificate logic",
+    "hash logic",
+    "archive logic",
+    "Cloudflare Worker source and deployment configuration"
+  ]
+}
