@@ -373,11 +373,11 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
       const originalDrawText = PDFPage.prototype.drawText;
       const originalDrawImage = PDFPage.prototype.drawImage;
       PDFPage.prototype.drawText = function(text, options) {
-        if (this === page) textDraws.push({ text: String(text), options: { ...options } });
+        if (this.getWidth() === dimensions[0] && this.getHeight() === dimensions[1]) textDraws.push({ text: String(text), options: { ...options } });
         return originalDrawText.call(this, text, options);
       };
       PDFPage.prototype.drawImage = function(image, options) {
-        if (this === page && image.width === 64 && image.height === 24) imageDraws.push({ ...options });
+        if (this.getWidth() === dimensions[0] && this.getHeight() === dimensions[1] && image.width === 64 && image.height === 24) imageDraws.push({ ...options });
         return originalDrawImage.call(this, image, options);
       };
       try {
