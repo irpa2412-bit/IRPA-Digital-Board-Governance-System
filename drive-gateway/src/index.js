@@ -549,7 +549,7 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
-            smtpSelfCheck: async () => { const result=await smtpSend(env,{to:SMTP_FROM,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
+            smtpSelfCheck: async () => { const result=await smtpSend(env,{to:resolveSmtpConfiguration(env).from,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
             resolveEmailLinkProfileUid: async (email, signerName) => {
               const normalized=String(email||"").trim().toLowerCase();
               const normalizedName=String(signerName||"").trim().toLowerCase();
