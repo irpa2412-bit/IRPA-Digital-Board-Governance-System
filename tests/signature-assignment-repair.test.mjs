@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { analyzeFieldAssignments, findDuplicateParticipantGroups, mergeDuplicateParticipants, repairDraftAssignments, relinkOrphanedField } from "../src/utils/signatureAssignmentRepair.mjs";
+import { signatureFieldToPdfBox } from "../src/utils/signatureFieldCoordinates.mjs";
 
 const participants=[
  {uid:"gloria-a",name:"Gloria Labarani",email:"gloria@example.org",role:"Attendance",roleAssignments:[{role:"Attendance"}]},
@@ -75,6 +76,8 @@ test("merge and repair preserve coordinates and page references on 0, 90, 180 an
  for(const rotation of rotations){
   const before=rotated.find(f=>f.pageRotation===rotation),after=result.fields.find(f=>f.pageRotation===rotation);
   assert.equal(after.page,before.page);assert.equal(after.x,before.x);assert.equal(after.y,before.y);assert.equal(after.width,before.width);assert.equal(after.height,before.height);assert.equal(after.pageRotation,rotation);assert.equal(after.signerUid,"gloria-a");
+  const page={getCropBox:()=>({x:0,y:0,width:612,height:792}),getRotation:()=>({angle:rotation})};
+  assert.deepEqual(signatureFieldToPdfBox(page,after),signatureFieldToPdfBox(page,before));
  }
 });
 
