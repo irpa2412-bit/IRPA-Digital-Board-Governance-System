@@ -11,14 +11,15 @@ test("failed meeting invitations expose a guarded resend action and valid gatewa
   assert.match(participants,/Resend Invitation/);
   assert.match(participants,/Resend All Failed\/Error Invitations/);
   assert.match(participants,/createMeetingAccessInvitation/);
-  assert.match(participants,/link:meetingGateUrl\.toString\(\)/);
-  assert.match(participants,/searchParams\.set\("meetingToken",issued\.accessToken\)/);
-  assert.match(participants,/sendMemberInvitationEmail\(i\.email\|\|participant\.participantEmail/);
+  assert.match(participants,/dispatchMeetingInvitation\(\{accessId:issued\.accessId,accessToken:issued\.accessToken,meetingPassword:issued\.meetingPassword\}\)/);
+  assert.doesNotMatch(participants,/COLLECTIONS\.invitations/);
+  assert.doesNotMatch(participants,/sendMemberInvitationEmail/);
   assert.match(participants,/resendInFlight\.current\.has\(i\.id\)/);
 });
 
 test("resend persists confirmed dispatch or marks failure and revokes the newly issued pass",()=>{
   assert.match(participants,/meetingAccessDispatchStatus:"Confirmed"/);
+  assert.match(participants,/\/api\/meeting-invitations\/dispatch/);
   assert.match(participants,/meetingAccessDispatched:true/);
   assert.match(participants,/meetingAccessDispatchStatus:"Failed"/);
   assert.match(participants,/revokeMeetingAccessInvitation/);
@@ -45,7 +46,7 @@ test("bulk resend targets only explicit failed or error-reported invitation reco
 
 test("resend action gives immediate per-invitation feedback and is not blocked by unrelated busy state",()=>{
   assert.match(participants,/\[resendingInvitationIds,setResendingInvitationIds\]=useState\(\[\]\)/);
-  assert.match(participants,/setMsg\("Resending the meeting invitation to "/);
+  assert.match(participants,/setMsg\("Preparing a fresh meeting-only access pass for "/);
   assert.match(participants,/disabled=\{resendingInvitationIds\.includes\(i\.id\)\|\|\(busy&&resendInFlight\.current\.has\("__bulk__"\)\)\}/);
   assert.match(participants,/setResendingInvitationIds\(current=>current\.filter\(id=>id!==i\.id\)\)/);
 });
