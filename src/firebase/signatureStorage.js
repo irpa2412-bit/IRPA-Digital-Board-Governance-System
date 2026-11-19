@@ -497,10 +497,17 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     const data = await existingResponse.json().catch(() => ({}));
     throw new Error(data.error || ("The Gateway could not verify the existing source document (HTTP " + existingResponse.status + ")."));
   }
-  const fields = (envelope.fields || []).map(field => ({
-    fieldId:field.fieldId,type:field.type,...normalizeSignatureField(field),signerId:resolveSignerId(field),roleAssignmentIndex:Number.isInteger(Number(field.roleAssignmentIndex))?Number(field.roleAssignmentIndex):0,required:field.required === true,
-    placeholder:field.placeholder || ""
-  }));
+  const fields = (envelope.fields || []).map(field => {
+    const normalizedField=normalizeSignatureField(field);
+    // Gateway email-link signers are identified by their envelope-scoped signerId.
+    // The Firebase-side draft UID is only a local mapping key and must not be sent
+    // as a Gateway account UID (email-link signers intentionally have no account UID).
+    delete normalizedField.signerUid;
+    return {
+      fieldId:field.fieldId,type:field.type,...normalizedField,signerId:resolveSignerId(field),roleAssignmentIndex:Number.isInteger(Number(field.roleAssignmentIndex))?Number(field.roleAssignmentIndex):0,required:field.required === true,
+      placeholder:field.placeholder || ""
+    };
+  });
   const ownerSigner=envelope.ownerSigningEnabled===true?ordered.find(recipient=>String(recipient.uid||"")===String(auth.currentUser.uid)):null;
   if(envelope.ownerSigningEnabled===true){
     if(!ownerSigner)throw new Error("The authenticated document owner must be included as an action signer for portal-first signing.");
