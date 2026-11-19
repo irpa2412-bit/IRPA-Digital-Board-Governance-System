@@ -425,7 +425,7 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
       for (const draw of textDraws) {
         const text = draw.text;
         const field = text === name ? fields[1]
-          : text === date ? fields[3]
+          : text.includes(date) ? fields[3]
           : fields[2];
         const box = getPdfFieldBox(sourcePage, field);
         const width = draw.options.font.widthOfTextAtSize(text, draw.options.size);
@@ -447,3 +447,50 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
   }
 });
 
+
+
+test("PDF Date stamp uses the exact server signing instant formatted as EAT and ignores typed device values", async () => {
+  const source = await PDFDocument.create();
+  const page = source.addPage([600, 800]);
+  const sourceBytes = await source.save();
+  const field = {
+    fieldId: "server-date",
+    type: "Date",
+    page: 1,
+    x: 0.1,
+    y: 0.1,
+    width: 0.8,
+    height: 0.08,
+    coordinateSpace: "visible-page-fraction-v1",
+    signerId: "S1"
+  };
+  const draws = [];
+  const originalDrawText = PDFPage.prototype.drawText;
+  PDFPage.prototype.drawText = function(value, options) {
+    if (this.getWidth() === 600 && this.getHeight() === 800) draws.push(String(value));
+    return originalDrawText.call(this, value, options);
+  };
+  try {
+    await buildSignedPdf(sourceBytes, {
+      envelopeId: "eat-date-test",
+      documentId: "eat-date-test",
+      title: "EAT date test",
+      originalHash: "original",
+      chainHead: "audit-chain",
+      completedAt: "2026-11-19T12:25:00.000Z",
+      fields: [field],
+      signers: [{
+        id: "S1",
+        name: "Test Signer",
+        signedAt: "2026-11-19T12:25:00.000Z",
+        signatureType: "typed",
+        signatureValue: "Test Signer",
+        fieldValues: { "server-date": "2099-01-01 00:00 WRONG DEVICE TIME" }
+      }]
+    });
+  } finally {
+    PDFPage.prototype.drawText = originalDrawText;
+  }
+  assert.ok(draws.includes("2026-11-19 15:25 EAT"), "the server timestamp must be displayed in EAT");
+  assert.ok(!draws.some(value => value.includes("WRONG DEVICE TIME")), "user-entered date/time must never be stamped");
+});

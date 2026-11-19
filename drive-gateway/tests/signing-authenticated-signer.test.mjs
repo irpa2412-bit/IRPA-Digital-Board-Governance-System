@@ -117,9 +117,10 @@ test("assigned Date field is persisted from the Gateway signedAt timestamp, not 
 test("signed PDF Date fields are rendered from the server UTC signing timestamp",()=>{
   assert.match(signingSource,/if\(assignedToSigner&&field\.type==="Date"\)signedFieldValues\[field\.fieldId\]=at/);
   assert.match(signingSource,/s\.fieldValues=signedFieldValues/);
-  assert.match(pdfSource,/field\.type === "Date" && serverDateTime/);
-  assert.match(pdfSource,/new Date\(signer\.signedAt\)\.toISOString\(\)\.slice\(0, 10\)/);
-  assert.doesNotMatch(pdfSource,/UTC/);
+  assert.ok(pdfSource.includes("formatSigningTimestampEAT(signer.signedAt)"));
+  assert.ok(pdfSource.includes('const value = field.type === "Date"'));
+  assert.ok(pdfSource.includes('const value = field.type === "Date"'));
+  assert.ok(pdfSource.includes(" EAT"));
 });
 
 

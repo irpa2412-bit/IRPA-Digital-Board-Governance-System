@@ -169,6 +169,14 @@ function drawTextInField(page, value, font, fieldBox, options = {}) {
   return layout;
 }
 
+function formatSigningTimestampEAT(value) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  const eat = new Date(timestamp + 3 * 60 * 60 * 1000);
+  const pad = part => String(part).padStart(2, "0");
+  return `${eat.getUTCFullYear()}-${pad(eat.getUTCMonth() + 1)}-${pad(eat.getUTCDate())} ${pad(eat.getUTCHours())}:${pad(eat.getUTCMinutes())} EAT`;
+}
+
 export async function buildSignedPdf(originalBytes, info) {
   const document = await PDFDocument.load(originalBytes);
   const regular = await document.embedFont(StandardFonts.Helvetica);
@@ -181,10 +189,8 @@ export async function buildSignedPdf(originalBytes, info) {
       ? (info.signers || []).find(item => item.id === field.signerId)
       : (info.signers || []).find(item => item.uid && item.uid === field.signerUid);
     if (!signer) continue;
-    const serverDateTime = signer.signedAt && Number.isFinite(Date.parse(signer.signedAt))
-      ? new Date(signer.signedAt).toISOString().slice(0, 10)
-      : null;
-    const value = field.type === "Date" && serverDateTime
+    const serverDateTime = formatSigningTimestampEAT(signer.signedAt);
+    const value = field.type === "Date"
       ? serverDateTime
       : signer.fieldValues?.[field.fieldId];
     if (value == null || value === "") continue;
