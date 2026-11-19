@@ -18,6 +18,7 @@ test("SMTP reply categories classify rate limits, authentication, connection, ma
   assert.equal(classifySmtpReplyCategory(new Error("IRPA SMTP error 535"),"SMTP_AUTH"),"AUTH_FAILED");
   assert.equal(classifySmtpReplyCategory(Object.assign(new Error("connect failed"),{code:"ECONNREFUSED"}),"SMTP_CONNECT"),"CONNECTION_REFUSED");
   assert.equal(classifySmtpReplyCategory(new Error("IRPA SMTP error 552 5.2.2 mailbox full"),"SUBMIT"),"MAILBOX_FULL");
+  assert.equal(classifySmtpReplyCategory(new Error("452 4.2.2 mailbox full"),"SUBMIT"),"MAILBOX_FULL");
   assert.equal(classifySmtpReplyCategory(new Error("IRPA SMTP error 550 5.1.1 recipient rejected"),"RCPT_ACCEPTED"),"RECIPIENT_REJECTED");
   assert.equal(classifySmtpReplyCategory(new Error("unclassified provider response"),"SUBMIT"),"UNKNOWN");
   assert.deepEqual(SMTP_REPLY_CATEGORIES,["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"]);
