@@ -15,8 +15,10 @@ import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mj
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
 import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../src/invitationEmail.mjs";
-import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope} from "../src/signing.mjs";
+import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
+import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
+import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
@@ -201,4 +203,46 @@ test("failed resend preserves the previous active email-link token",async()=>{
   assert.equal(record.signers[0].tokenHash,originalHash);
   assert.equal(record.signers[0].emailLinkStatus,"issued");
   assert.deepEqual(record.signers[0].emailLinkTokenHistory,[]);
+});
+
+
+test("every SMTP and email-link failure stage returns only its sanitized stage code",async()=>{
+  for(const stage of EMAIL_LINK_STAGE_CODES){
+    const events=[];
+    await assert.rejects(()=>runEmailStage(stage,async()=>{throw new Error("IRPA SMTP error 535 recipient private@example.org password=do-not-log")},async(code,outcome)=>events.push({code,outcome})),error=>{
+      assert.equal(error.stageCode,stage);
+      assert.doesNotMatch(error.message,/private@example\.org|password=|do-not-log/i);
+      return true;
+    });
+    assert.deepEqual(events,[{code:stage,outcome:"failure"}]);
+  }
+});
+
+test("email-link delivery stages are appended individually to the envelope audit chain without email or token data",async()=>{
+  const ctx=buildEsignContext({env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test"},verifyUser:async()=>null,sendInvitation:async()=>{},logger:{error(){}}});
+  const events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
+  await ctx.meta.create("envelopes","ENV-STAGE01",{id:"ENV-STAGE01",createdBy:"owner",status:"Active",signers:[{id:"S1",identityType:"email-link"}],events});
+  for(const stage of EMAIL_LINK_STAGE_CODES)await recordEmailLinkStage(ctx,"ENV-STAGE01","S1",stage,"success");
+  const record=await ctx.meta.get("envelopes","ENV-STAGE01");
+  const stages=record.events.filter(event=>event.type==="email_link.stage");
+  assert.deepEqual(stages.map(event=>event.stage),EMAIL_LINK_STAGE_CODES);
+  assert.ok(stages.every(event=>event.outcome==="success"&&event.signerId==="S1"));
+  assert.doesNotMatch(JSON.stringify(stages),/private@example\.org|emailSignToken|password|token/i);
+});
+
+test("smtp-selfcheck rejects non-admin and non-owner callers before invoking SMTP",async()=>{
+  let sends=0;
+  const ctx=makeContext({verifyUser:async()=>({uid:"ordinary-user",isAdmin:false,isOwner:false}),smtpSelfCheck:async()=>{sends++;return{ok:true}}});
+  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST"}),ctx);
+  assert.equal(response.status,403);
+  assert.equal(sends,0);
+});
+
+test("smtp-selfcheck permits an authenticated system owner and invokes exactly one send",async()=>{
+  let sends=0;
+  const ctx=makeContext({verifyUser:async()=>({uid:"system-owner",isAdmin:false,isOwner:true}),smtpSelfCheck:async()=>{sends++;return{ok:true,stageCode:"SUBMIT"}}});
+  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST"}),ctx);
+  assert.equal(response.status,200);
+  assert.equal(sends,1);
+  assert.deepEqual(await response.json(),{ok:true,stageCode:"SUBMIT"});
 });
