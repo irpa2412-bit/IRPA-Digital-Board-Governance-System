@@ -17,11 +17,14 @@ export function findDuplicateParticipantGroups(recipients=[]){
 export function analyzeFieldAssignments({recipients=[],fields=[],ownerUid="",ownerSigningEnabled=false}={}){
  const ids=new Set(recipients.map(item=>String(item?.uid||"")).filter(Boolean));
  if(ownerSigningEnabled&&ownerUid)ids.add(String(ownerUid));
+ const pageCounts=new Map();
  const fieldIssues=(fields||[]).flatMap((field,index)=>{
+  const page=Number(field?.page)||1;
+  const fieldNumber=(pageCounts.get(page)||0)+1;pageCounts.set(page,fieldNumber);
   const uid=String(field?.signerUid||"").trim();
-  if(!uid)return [{kind:"unassigned-field",reason:"no signer",fieldId:field?.fieldId||"",fieldNumber:index+1,page:Number(field?.page)||1,index}];
-  if(uid===String(ownerUid)&&!ownerSigningEnabled)return [{kind:"unassigned-field",reason:"owner signing is off",fieldId:field?.fieldId||"",fieldNumber:index+1,page:Number(field?.page)||1,index}];
-  if(!ids.has(uid))return [{kind:"orphaned-field",reason:"signer not in list",fieldId:field?.fieldId||"",fieldNumber:index+1,page:Number(field?.page)||1,index,signerUid:uid}];
+  if(!uid)return [{kind:"unassigned-field",reason:"no signer",fieldId:field?.fieldId||"",fieldNumber,page,index}];
+  if(uid===String(ownerUid)&&!ownerSigningEnabled)return [{kind:"unassigned-field",reason:"owner signing is off",fieldId:field?.fieldId||"",fieldNumber,page,index}];
+  if(!ids.has(uid))return [{kind:"orphaned-field",reason:"signer not in list",fieldId:field?.fieldId||"",fieldNumber,page,index,signerUid:uid}];
   return [];
  });
  const recipientsWithoutFields=(recipients||[]).filter(person=>person?.uid&&!(fields||[]).some(field=>String(field?.signerUid||"")===String(person.uid))).map(person=>({uid:String(person.uid),name:person.name||person.email||"Participant",email:person.email||"",reason:"no signer fields assigned",fieldCount:0}));
