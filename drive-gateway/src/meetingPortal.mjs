@@ -139,6 +139,8 @@ export function createMeetingPortalRouter(ctx) {
         const initiator = clean(meeting.initiatorUid) === uid;
         logStage("AUTHORIZATION_EVALUATED", "SUCCESS", ids, { isAdmin: admin, chair, secretary, initiator });
         if (!admin && !chair && !secretary && !initiator) return errorResponse(ctx, request, "Only the authorised meeting initiator, administrator, chairperson or secretary may issue meeting access.", 403);
+        const priorAccessId = clean(participant.meetingAccessId);
+        const priorPass = priorAccessId ? await getDoc(ctx, env, adminToken, "meetingAccessTokens", priorAccessId) : null;
         const raw = randomToken(32);
         const password = gatePassword();
         const accessId = crypto.randomUUID();
@@ -177,10 +179,14 @@ export function createMeetingPortalRouter(ctx) {
         });
         try {
           logStage("CREATE_ACCESS_PASS_AND_UPDATE_INVITEE_TALLY", "START", ids);
-          await commitWrites(ctx, env, adminToken, [
+          const writes = [
             { update: { name: tokenDocName, fields: passFields }, currentDocument: { exists: false } },
             { update: { name: meetingDocName, fields: fieldsToFirestore(patch) }, updateMask: { fieldPaths: Object.keys(patch) }, currentDocument: { updateTime: meetingDoc.updateTime } }
-          ]);
+          ];
+          if (priorPass?.fields?.status?.stringValue === "Active") {
+            writes.push({ update: { name: priorPass.name, fields: fieldsToFirestore({ status: "Revoked", revokedByUid: uid, revokedAt: new Date(), revocationReason: "Superseded by a newly issued meeting access pass" }) }, updateMask: { fieldPaths: ["status", "revokedByUid", "revokedAt", "revocationReason"] }, currentDocument: { updateTime: priorPass.updateTime } });
+          }
+          await commitWrites(ctx, env, adminToken, writes);
         } catch (error) {
           console.error("MEETING_ACCESS_INVITATION_COMMIT_FAILED", { stage: "CREATE_ACCESS_PASS_AND_UPDATE_INVITEE_TALLY", ...ids, code: error.status || null, message: String(error?.message || error).slice(0, 180) });
           return errorResponse(ctx, request, "The meeting invitation could not be issued. Refresh the meeting register and retry.", 409);
