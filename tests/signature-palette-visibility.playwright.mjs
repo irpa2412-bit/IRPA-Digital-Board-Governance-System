@@ -204,7 +204,7 @@ async function assertConfirmationFooterMatrix(){
     const measured=await page.evaluate(()=>{
      const dialog=document.querySelector('[role="dialog"]'),footer=dialog?.querySelector(".signature-confirmation-actions"),action=footer?.querySelector("button:last-child");
      const d=dialog?.getBoundingClientRect(),f=footer?.getBoundingClientRect(),a=action?.getBoundingClientRect();
-     return {viewport:{width:innerWidth,height:innerHeight},dialog:d&&{top:d.top,bottom:d.bottom,height:d.height},footer:f&&{top:f.top,bottom:f.bottom,height:f.height},action:a&&{top:a.top,bottom:a.bottom,height:a.height},footerPosition:footer&&getComputedStyle(footer).position,contentOverflow:dialog&&getComputedStyle(dialog.querySelector(".signature-confirmation-content")).overflowY};
+     return {viewport:{width:window.innerWidth,height:window.innerHeight},dialog:d&&{top:d.top,bottom:d.bottom,height:d.height},footer:f&&{top:f.top,bottom:f.bottom,height:f.height},action:a&&{top:a.top,bottom:a.bottom,height:a.height},footerPosition:footer&&getComputedStyle(footer).position,contentOverflow:dialog&&getComputedStyle(dialog.querySelector(".signature-confirmation-content")).overflowY};
     });
     assert.ok(measured.action,"confirmation action must render for "+item.name+" "+zoom+" "+mode);
     assert.ok(measured.action.top>=0&&measured.action.bottom<=measured.viewport.height+1,"confirmation action must stay inside the visible viewport: "+JSON.stringify({item,zoom,mode,measured}));
