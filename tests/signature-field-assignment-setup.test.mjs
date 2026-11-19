@@ -113,7 +113,7 @@ test("owner-signing mode requires a required Signature field assigned to the own
 test("failed drafts reopen for owner repair and assignment diagnostics expose merge, orphan and field-jump actions",()=>{
   assert.ok(ui.includes('(e.status==="Draft"||e.status==="Failed")'));
   assert.ok(ui.includes("Continue Preparation"));
-  assert.ok(ui.includes("data-testid=\\"signature-assignment-diagnostics\\""));
+  assert.ok(ui.includes('data-testid="signature-assignment-diagnostics"'));
   assert.ok(ui.includes("Merge duplicate entries"));
   assert.ok(ui.includes("ORPHANED"));
   assert.ok(ui.includes("Jump to field"));
