@@ -19,6 +19,7 @@ const meetingServices=fs.readFileSync("drive-gateway/src/meetingServices.mjs","u
 const meetingAccessControl=fs.readFileSync("src/meeting/MeetingAccessControl.jsx","utf8");
 const attendanceClient=fs.readFileSync("src/firebase/meetingRecords.js","utf8");
 const mediaClient=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const meetingRoom=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const participantApi=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
@@ -39,6 +40,8 @@ const checks=[
  ["Meeting invitation records are stored on meeting participant records, not Invitation Portal",participantPage.includes("meetingInvitationRows=useMemo(()=>rows.filter")&&!participantPage.includes("COLLECTIONS.invitations")&&!participantPage.includes("sendMemberInvitationEmail")],
  ["Meeting Worker email includes meeting-specific gate link and password",meetingWorker.includes("meetingToken")&&meetingWorker.includes("Gate password: ")&&meetingWorker.includes("IRPA Meeting Invitation")],
  ["Meeting participant create update and removal use Worker endpoints",meetingServices.includes("/api/meeting-participants/create")&&meetingServices.includes("/api/meeting-participants/update")&&meetingServices.includes("/api/meeting-participants/delete")&&participantApi.includes("/api/meeting-participants/create")&&participantApi.includes("/api/meeting-participants/update")&&participantApi.includes("/api/meeting-participants/delete")&&!participantApi.includes("COLLECTIONS.invitations")],
+ ["Meeting room status and activity events use Worker routes",meetingServices.includes("/api/meeting-room/event")&&meetingRoom.includes("/api/meeting-register/update")&&meetingRoom.includes("/api/meeting-room/event")],
+ ["Self and host attendance marking use Worker route",meetingServices.includes("/api/meeting-attendance/mark")&&attendanceClient.includes("/api/meeting-attendance/mark")&&meetingRoom.includes("markMeetingAttendance")],
  ["Meeting gate queue and host admission decisions use Cloudflare Worker routes",meetingServices.includes("/api/meeting-entry-requests/list")&&meetingServices.includes("/api/meeting-entry-requests/resolve")&&meetingAccessControl.includes("/api/meeting-entry-requests/list")&&meetingAccessControl.includes("/api/meeting-entry-requests/resolve")&&!meetingAccessControl.includes("httpsCallable")],
  ["Migrated meeting records client no longer invokes Firebase callables",!attendanceClient.includes("httpsCallable")&&!attendanceClient.includes("getFunctions")],
  ["Meeting working-document registration listing and review use Worker routes",meetingServices.includes("/api/meeting-working-documents/register")&&meetingServices.includes("/api/meeting-working-documents/list")&&meetingServices.includes("/api/meeting-working-documents/review")&&attendanceClient.includes("/api/meeting-working-documents/register")&&attendanceClient.includes("/api/meeting-working-documents/list")&&attendanceClient.includes("/api/meeting-working-documents/review")],
