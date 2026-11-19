@@ -209,12 +209,12 @@ test("failed resend preserves the previous active email-link token",async()=>{
 test("every SMTP and email-link failure stage returns only its sanitized stage code",async()=>{
   for(const stage of EMAIL_LINK_STAGE_CODES){
     const events=[];
-    await assert.rejects(()=>runEmailStage(stage,async()=>{throw new Error("IRPA SMTP error 535 recipient private@example.org password=do-not-log")},async(code,outcome)=>events.push({code,outcome})),error=>{
+    await assert.rejects(()=>runEmailStage(stage,async()=>{throw new Error("IRPA SMTP error 535 recipient private@example.org password=do-not-log")},async(code,outcome,category)=>events.push({code,outcome,category})),error=>{
       assert.equal(error.stageCode,stage);
       assert.doesNotMatch(error.message,/private@example\.org|password=|do-not-log/i);
       return true;
     });
-    assert.deepEqual(events,[{code:stage,outcome:"failure"}]);
+    assert.deepEqual(events,[{code:stage,outcome:"failure",category:stage==="SMTP_AUTH"?"AUTH_FAILED":"UNKNOWN"}]);
   }
 });
 
@@ -222,11 +222,12 @@ test("email-link delivery stages are appended individually to the envelope audit
   const ctx=buildEsignContext({env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test"},verifyUser:async()=>null,sendInvitation:async()=>{},logger:{error(){}}});
   const events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
   await ctx.meta.create("envelopes","ENV-STAGE01",{id:"ENV-STAGE01",createdBy:"owner",status:"Active",signers:[{id:"S1",identityType:"email-link"}],events});
-  for(const stage of EMAIL_LINK_STAGE_CODES)await recordEmailLinkStage(ctx,"ENV-STAGE01","S1",stage,"success");
+  for(const stage of EMAIL_LINK_STAGE_CODES)await recordEmailLinkStage(ctx,"ENV-STAGE01","S1",stage,"success",stage==="SMTP_AUTH"?"AUTH_FAILED":"UNKNOWN");
   const record=await ctx.meta.get("envelopes","ENV-STAGE01");
   const stages=record.events.filter(event=>event.type==="email_link.stage");
   assert.deepEqual(stages.map(event=>event.stage),EMAIL_LINK_STAGE_CODES);
   assert.ok(stages.every(event=>event.outcome==="success"&&event.signerId==="S1"));
+  assert.equal(stages.find(event=>event.stage==="SMTP_AUTH").smtpReplyCategory,"AUTH_FAILED");
   assert.doesNotMatch(JSON.stringify(stages),/private@example\.org|emailSignToken|password|tokenHash|tokenValue/i);
 });
 
