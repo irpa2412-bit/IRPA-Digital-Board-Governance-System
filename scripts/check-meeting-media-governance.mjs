@@ -13,6 +13,8 @@ const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants
 const entryGateway=fs.readFileSync("src/pages/MeetingEntryGateway.jsx","utf8");
 const invitationEmail=fs.readFileSync("drive-gateway/src/invitationEmail.mjs","utf8");
 const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
+const meetingWorker=fs.readFileSync("drive-gateway/src/meetingPortal.mjs","utf8");
+const meetingApi=fs.readFileSync("src/firebase/meetingGatewayApi.js","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
 const livekitConfig=fs.readFileSync("infra/livekit/livekit.yaml.template","utf8");
@@ -25,10 +27,12 @@ const checks=[
  ["Firestore create retains registrar, initiator and meeting-category validation",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
  ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
- ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
+ ["Meeting access pass is dispatched through the independent Meeting Worker API",participantPage.includes("dispatchMeetingInvitation")&&meetingApi.includes("/api/meeting-invitations/dispatch")],
  ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
- ["Mail gateway verifies meeting and participant link before dispatch",invitationWorker.includes("fields.participantId?.stringValue")&&invitationWorker.includes("linkedMeeting!==meetingId||participantEmail!==email")],
- ["Meeting email template includes gate link and password only when supplied",invitationEmail.includes("meetingAccess")&&invitationEmail.includes("Meeting gate password")],
+ ["Meeting Worker verifies access pass, participant, meeting and organiser before SMTP dispatch",meetingWorker.includes('["/api/meeting-invitations/dispatch", "dispatch"]')&&meetingWorker.includes("pass.participantId")&&meetingWorker.includes("participant.meetingId !== pass.meetingId")&&meetingWorker.includes("Only an authorised meeting organiser")],
+ ["Meeting Worker uses the existing SMTP sender and existing Worker secrets",invitationWorker.includes("sendEmail: (env, message) => smtpSend(env, message)")&&meetingWorker.includes("ctx.sendEmail(env, { to: recipient, subject, text, html })")],
+ ["Meeting invitation records are stored on meeting participant records, not Invitation Portal",participantPage.includes("meetingInvitationRows=useMemo(()=>rows.filter")&&!participantPage.includes("COLLECTIONS.invitations")&&!participantPage.includes("sendMemberInvitationEmail")],
+ ["Meeting Worker email includes meeting-specific gate link and password",meetingWorker.includes("meetingToken")&&meetingWorker.includes("Gate password: ")&&meetingWorker.includes("IRPA Meeting Invitation")],
  ["Meeting entry asks for gate password separately from URL",entryGateway.includes('state==="password"')&&entryGateway.includes('type="password"')&&entryGateway.includes("Verify Password & Continue")],
  ["Meeting Room selects the meeting from the invitation gate context",room.includes("entryContext?.meetingId")&&room.includes("setSelectedId(invitedMeeting.id)")],
  ["Verified invitee context enables the media join control",room.includes("entryContext?.participantId")&&room.includes("entryContext?.meetingId===selected?.id")],
