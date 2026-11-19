@@ -34,6 +34,11 @@ export function signatureFieldToPercent(field, options) {
   return { ...percentField, x: canonical.x * 100, y: canonical.y * 100, width: canonical.width * 100, height: canonical.height * 100 };
 }
 
+/** Convert canonical persisted fields to the percentage geometry used by the preparation editor. */
+export function signatureFieldsToPercent(fields, options) {
+  return Array.isArray(fields) ? fields.map(field => signatureFieldToPercent(field, options)) : [];
+}
+
 export function signatureFieldFromPointer(clientX, clientY, pageRect) {
   if (!pageRect || !(pageRect.width > 0) || !(pageRect.height > 0)) throw new RangeError("A measurable PDF page container is required.");
   return {

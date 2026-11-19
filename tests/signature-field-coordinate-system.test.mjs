@@ -5,6 +5,7 @@ import {
   normalizeSignatureField,
   signatureFieldFromPercent,
   signatureFieldToPercent,
+  signatureFieldsToPercent,
   signatureFieldFromPointer,
   signatureFieldToPdfBox,
   signatureFieldCss
@@ -120,4 +121,30 @@ test("unknown coordinate-space markers fail closed instead of being misread as l
     () => normalizeSignatureField({ fieldId: "unknown-space", page: 1, x: 0.2, y: 0.3, width: 0.1, height: 0.05, coordinateSpace: "future-coordinate-v2" }),
     /coordinate space is not supported/
   );
+});
+
+
+test("saved draft fields round-trip to editor percentages without losing signer or responsibility metadata", () => {
+  const persisted = [{
+    fieldId: "draft-field-1", type: "Signature", page: 3,
+    x: 0.4225, y: 0.385, width: 0.125, height: 0.032,
+    coordinateSpace: SIGNATURE_FIELD_COORDINATE_SPACE,
+    signerUid: "assigned-signer-uid", responsibility: "Signature",
+    roleAssignmentIndex: 1, required: true
+  }];
+  const restored = signatureFieldsToPercent(persisted);
+  assert.equal(restored.length, 1);
+  assert.deepEqual(
+    { fieldId: restored[0].fieldId, type: restored[0].type, page: restored[0].page,
+      signerUid: restored[0].signerUid, responsibility: restored[0].responsibility,
+      roleAssignmentIndex: restored[0].roleAssignmentIndex, required: restored[0].required },
+    { fieldId: "draft-field-1", type: "Signature", page: 3,
+      signerUid: "assigned-signer-uid", responsibility: "Signature",
+      roleAssignmentIndex: 1, required: true }
+  );
+  close(restored[0].x, 42.25);
+  close(restored[0].y, 38.5);
+  close(restored[0].width, 12.5);
+  close(restored[0].height, 3.2);
+  assert.equal("coordinateSpace" in restored[0], false);
 });
