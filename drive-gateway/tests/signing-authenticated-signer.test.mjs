@@ -119,7 +119,7 @@ test("signed PDF Date fields are rendered from the server UTC signing timestamp"
   assert.match(signingSource,/s\.fieldValues=signedFieldValues/);
   assert.match(pdfSource,/field\.type === "Date" && serverDateTime/);
   assert.match(pdfSource,/new Date\(signer\.signedAt\)\.toISOString\(\)\.slice\(0, 10\)/);
-  assert.match(pdfSource,/2026-11-19/);
+  assert.doesNotMatch(pdfSource,/UTC/);
 });
 
 
