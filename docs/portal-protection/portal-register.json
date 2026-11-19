@@ -34,9 +34,8 @@
         "src/components/SignatureFieldConfirmationPad.jsx",
         "src/components/SignatureImagePreview.jsx",
         "src/components/SignaturePathwaySelfTest.jsx",
-        "src/firebase/signature",
-        "src/utils/signature",
-        "drive-gateway/src/"
+        "src/firebase/signature/",
+        "src/utils/signature/"
       ],
       "tests": [
         "tests/signature-field-assignment-setup.test.mjs",
@@ -58,7 +57,7 @@
         "src/pages/Members.jsx",
         "src/pages/Employees.jsx",
         "src/pages/EmployeePayments.jsx",
-        "src/firebase/employee"
+        "src/firebase/employee/"
       ],
       "tests": [
         "tests/org-structure-authority.test.mjs",
@@ -70,7 +69,7 @@
         "src/pages/CommunicationMediaPortal.jsx",
         "src/pages/CommunicationMediaOperations.jsx",
         "src/pages/CommunicationMediaStudio.jsx",
-        "src/pages/Communications",
+        "src/pages/Communications/",
         "src/pages/SocialMediaAccounts.jsx"
       ],
       "tests": [
