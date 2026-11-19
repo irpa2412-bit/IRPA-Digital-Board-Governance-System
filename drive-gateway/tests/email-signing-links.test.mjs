@@ -15,6 +15,7 @@ import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mj
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
 import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../src/invitationEmail.mjs";
+import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents} from "../src/signing.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
@@ -128,4 +129,54 @@ test("mail delivery is delegated once to the existing Worker invitation sender",
   const source = fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   assert.match(source,/sendWithRetry\s*\(/);
   assert.match(source,/smtpSend\(env,\{to:email,subject,text,html:htmlBody\}\)/);
+});
+
+
+test("optional Signature Profile lookup failures and timeouts do not block email-link invitation preparation",async()=>{
+  assert.equal(await resolveOptionalEmailLinkProfileUid(async()=>{throw new Error("profile service unavailable")},"unregistered@example.org","Unregistered Signer"),null);
+  assert.equal(await resolveOptionalEmailLinkProfileUid(()=>new Promise(()=>{}),"unregistered@example.org","Unregistered Signer",3000),null);
+});
+
+test("three positions sharing one mailbox retain separate signer IDs, token hashes, and invitation deliveries",async()=>{
+  const mailbox="shared@example.org",deliveries=[];
+  const signers=[];
+  for(let index=1;index<=3;index++){
+    const signerId=`S${index}`;
+    const issued=await createEmailSigningToken({envelopeId:"ENV-SHARED01",signerId,email:mailbox,now:NOW});
+    signers.push({id:signerId,token:issued.token,tokenHash:issued.record.tokenHash});
+    deliveries.push({to:mailbox,signerId,token:issued.token});
+  }
+  assert.deepEqual(signers.map(x=>x.id),["S1","S2","S3"]);
+  assert.equal(new Set(signers.map(x=>x.token)).size,3);
+  assert.equal(new Set(signers.map(x=>x.tokenHash)).size,3);
+  assert.equal(deliveries.length,3);
+  assert.deepEqual(deliveries.map(x=>x.signerId),["S1","S2","S3"]);
+  assert.ok(deliveries.every(x=>x.to===mailbox));
+});
+
+test("email signing token rejects a different signer ID and an incorrect token",async()=>{
+  const issued=await createEmailSigningToken({envelopeId:"ENV-IDENTITY01",signerId:"S1",email:"a@example.org",now:NOW});
+  const wrongSigner=`ENV-IDENTITY01.S2.${issued.token.split(".")[2]}`;
+  const wrongToken=`ENV-IDENTITY01.S1.${"0".repeat(64)}`;
+  assert.equal((await inspectEmailSigningToken(wrongSigner,issued.record,NOW)).ok,false);
+  assert.equal((await inspectEmailSigningToken(wrongToken,issued.record,NOW)).ok,false);
+});
+
+test("failed resend preserves the previous active email-link token",async()=>{
+  const originalHash="a".repeat(64),events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
+  let record={_v:1,id:"ENV-RESEND01",createdBy:"owner",status:"Active",title:"Test",ownerName:"Owner",signers:[{id:"S1",email:"signer@example.org",name:"Signer",order:1,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:originalHash,emailLinkTokenHistory:[],invitation:"Sent"}],events};
+  const ctx={
+    meta:{
+      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
+      update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
+    },
+    now:()=>NOW,
+    config:{appUrl:"https://irpa.example.org"},
+    sendInvitation:async()=>{throw new Error("SMTP unavailable")},
+    logger:{error(){}}
+  };
+  await assert.rejects(()=>resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S1"),/could not be delivered/i);
+  assert.equal(record.signers[0].tokenHash,originalHash);
+  assert.equal(record.signers[0].emailLinkStatus,"issued");
+  assert.deepEqual(record.signers[0].emailLinkTokenHistory,[]);
 });
