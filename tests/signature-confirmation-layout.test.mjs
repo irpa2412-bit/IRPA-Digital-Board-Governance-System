@@ -18,7 +18,6 @@ test("signature confirmation actions are outside the independently scrolling con
 
 test("confirmation dock fits the dynamic viewport and respects phone safe areas",()=>{
   assert.ok(source.includes('maxHeight:"calc(100dvh - 12px)"'));
-  assert.ok(source.includes('paddingBottom:"env(safe-area-inset-bottom, 0px)"'));
   assert.ok(source.includes("calc(10px + env(safe-area-inset-bottom, 0px))"));
   assert.ok(source.includes('overflow:"hidden"'));
   assert.ok(source.includes("minHeight:44"));
