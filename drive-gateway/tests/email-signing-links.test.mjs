@@ -104,9 +104,9 @@ test("email hashing normalizes whitespace and case", async () => {
   assert.equal(await hashNormalizedEmail("  Person@Example.org "),await hashNormalizedEmail("person@example.org"));
 });
 
-test("duplicate signer and compare-and-set policy remain enforced", () => {
-  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"a@example.org"},{email:" A@example.org "}],"Sequential"),/Duplicate signer email/);
-  assert.match(validateSignatureDraftRecipients([{uid:"u1",email:"a@example.org"},{uid:"u1",email:"b@example.org"}],"Sequential"),/Duplicate signer UID/);
+test("shared delivery email is allowed while duplicate signer identity remains blocked", () => {
+  assert.equal(validateSignatureDraftRecipients([{uid:"person-1",email:"shared@example.org"},{uid:"person-2",email:" SHARED@example.org "}],"Sequential"),null);
+  assert.match(validateSignatureDraftRecipients([{uid:"person-1",email:"a@example.org"},{uid:"person-1",email:"b@example.org"}],"Sequential"),/Duplicate signer UID/);
 });
 
 test("registered login-based signing access remains UID-bound", () => {
