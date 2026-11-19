@@ -242,9 +242,13 @@ test("email-link invitations do not require register, authority-matrix or Fireba
   assert.equal(f.envelope.signers[0].authorityVerification,undefined);
 });
 
-test("duplicate email signer is refused and login-bound signing remains UID authenticated",async()=>{
+test("shared email signers remain distinct and login-bound signing remains UID authenticated",async()=>{
   const f=await fixture();
-  await assert.rejects(()=>createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org"},{documentId:f.envelope.documentId,archives:["board-governance"],signingMode:"Sequential",signers:[{email:"same@example.org",order:1},{email:"SAME@example.org",order:2}]}),/Duplicate signer email/);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org"},{documentId:f.envelope.documentId,externalReference:"IRPA-SHARED-LOGIN-"+Math.random().toString(16).slice(2,10),archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",email:"same@example.org",name:"Chairperson",order:1},{identityType:"email-link",email:"SAME@example.org",name:"Secretary",order:2}]});
+  const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(stored.signers.length,2);
+  assert.notEqual(stored.signers[0].id,stored.signers[1].id);
+  assert.notEqual(stored.signers[0].tokenHash,stored.signers[1].tokenHash);
   const {canAuthenticatedSignerAccess}=await import("../src/signing.mjs");
   assert.equal(canAuthenticatedSignerAccess({uid:"registered-uid"},{uid:"registered-uid"}),true);
   assert.equal(canAuthenticatedSignerAccess({uid:"registered-uid"},{uid:"guest"}),false);
