@@ -2768,6 +2768,7 @@ async function sendMemberInvitation(request, env) {
   const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
   await enforceMailRateLimit(env, claims.user_id);
   const data = await request.json();
+  if (Object.prototype.hasOwnProperty.call(data, "meetingAccess")) return json({ok:false,error:"Meeting invitations must use the dedicated Meeting Portal Worker."},400,corsHeaders(request));
   const invitationId = cleanId(data.invitationId || "");
   if (!invitationId) return json({ok:false,error:"Invitation ID is required."},400,corsHeaders(request));
   const invitation = await getFirestoreDocument(env, `invitations/${invitationId}`, claims.token);
