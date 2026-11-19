@@ -93,6 +93,7 @@ const meetingPortalRouter = createMeetingPortalRouter({
   getFirebaseProjectId: env => getFirebaseProjectId(env),
   getFirestoreAdminAccessToken: env => getFirestoreAdminAccessToken(env),
   authenticateFirebaseRequest,
+  sendEmail: (env, message) => smtpSend(env, message),
   json,
   corsHeaders
 });
