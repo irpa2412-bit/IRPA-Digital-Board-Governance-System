@@ -8,9 +8,9 @@ export function resolveSmtpConfiguration(env = {}) {
   const from = String(env.SMTP_FROM || DEFAULTS.from).trim();
   const username = String(env.SMTP_USERNAME || from).trim();
   const password = String(env.SMTP_PASSWORD || "");
-  if (!host || /[\r\n]/.test(host)) throw new Error("IRPA SMTP host configuration is invalid.");
+  if (!host || host.includes("\r") || host.includes("\n")) throw new Error("IRPA SMTP host configuration is invalid.");
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("IRPA SMTP port configuration is invalid.");
-  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(from) || /[\r\n]/.test(from)) throw new Error("IRPA SMTP sender configuration is invalid.");
-  if (!username || /[\r\n<>]/.test(username)) throw new Error("IRPA SMTP username configuration is invalid.");
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(from) || from.includes("\r") || from.includes("\n")) throw new Error("IRPA SMTP sender configuration is invalid.");
+  if (!username || username.includes("\r") || username.includes("\n") || username.includes("<") || username.includes(">")) throw new Error("IRPA SMTP username configuration is invalid.");
   return { host, port, from, username, password };
 }
