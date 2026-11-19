@@ -67,11 +67,11 @@ test("field diagnostics identify no signer, signer not in list, and owner signin
 
 test("merge and repair preserve coordinates and page references on 0, 90, 180 and 270 degree pages",()=>{
  const rotations=[0,90,180,270];
- const rotated=rotations.map((rotation,index)=>({fieldId:"rot-"+rotation,type:"Signature",page:index+1,x:11+index,y:21+index,width:19,height:7,rotation,signerUid:index%2?"gloria-b":"gloria-a"}));
+ const rotated=rotations.map((rotation,index)=>({fieldId:"rot-"+rotation,type:"Signature",page:index+1,x:11+index,y:21+index,width:19,height:7,pageRotation:rotation,signerUid:index%2?"gloria-b":"gloria-a"}));
  const result=mergeDuplicateParticipants(participants,rotated);
  for(const rotation of rotations){
-  const before=rotated.find(f=>f.rotation===rotation),after=result.fields.find(f=>f.rotation===rotation);
-  assert.equal(after.page,before.page);assert.equal(after.x,before.x);assert.equal(after.y,before.y);assert.equal(after.width,before.width);assert.equal(after.height,before.height);assert.equal(after.rotation,rotation);assert.equal(after.signerUid,"gloria-a");
+  const before=rotated.find(f=>f.pageRotation===rotation),after=result.fields.find(f=>f.rotation===rotation);
+  assert.equal(after.page,before.page);assert.equal(after.x,before.x);assert.equal(after.y,before.y);assert.equal(after.width,before.width);assert.equal(after.height,before.height);assert.equal(after.pageRotation,rotation);assert.equal(after.signerUid,"gloria-a");
  }
 });
 
