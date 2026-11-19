@@ -261,17 +261,28 @@ export function createMeetingPortalRouter(ctx) {
           meetingInvitationLinkStatus: "Released by IRPA Meeting Worker",
           meetingTokenStatus: "Released by IRPA Meeting Worker"
         };
-        await firestoreRequest(ctx, env, adminToken, "participants/" + encodeURIComponent(pass.participantId) + "?updateMask.fieldPaths=" + Object.keys(participantPatch).map(encodeURIComponent).join("&updateMask.fieldPaths="), {
-          method: "PATCH", body: JSON.stringify({ fields: fieldsToFirestore(participantPatch) })
-        });
-        await firestoreRequest(ctx, env, adminToken, "audit", {
-          method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
-            action: "MEETING_INVITATION_DISPATCHED", collection: "participants", recordId: pass.participantId,
-            details: { meetingId: pass.meetingId, accessId, recipientDomain: recipient.split("@").pop(), provider: "IRPA SMTP Worker", messageId: String(messageId || "") },
-            actorUid: uid, actorEmail: email || null, createdAt: dispatchedAt
-          }) })
-        });
-        return ctx.json({ ok: true, meetingAccessSent: true, deliveryStatus: "Accepted by IRPA SMTP gateway", accessId, expiresAt: pass.expiresAt, messageId: String(messageId || "") }, 200, ctx.corsHeaders(request));
+        let participantStatusPersisted = true, auditPersisted = true;
+        try {
+          await firestoreRequest(ctx, env, adminToken, "participants/" + encodeURIComponent(pass.participantId) + "?updateMask.fieldPaths=" + Object.keys(participantPatch).map(encodeURIComponent).join("&updateMask.fieldPaths="), {
+            method: "PATCH", body: JSON.stringify({ fields: fieldsToFirestore(participantPatch) })
+          });
+        } catch (persistError) {
+          participantStatusPersisted = false;
+          console.error("MEETING_INVITATION_SMTP_ACCEPTED_PARTICIPANT_STATUS_PENDING", { meetingId: pass.meetingId, participantId: pass.participantId, accessId, status: persistError.status || null });
+        }
+        try {
+          await firestoreRequest(ctx, env, adminToken, "audit", {
+            method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
+              action: "MEETING_INVITATION_DISPATCHED", collection: "participants", recordId: pass.participantId,
+              details: { meetingId: pass.meetingId, accessId, recipientDomain: recipient.split("@").pop(), provider: "IRPA SMTP Worker", messageId: String(messageId || ""), participantStatusPersisted },
+              actorUid: uid, actorEmail: email || null, createdAt: dispatchedAt
+            }) })
+          });
+        } catch (auditError) {
+          auditPersisted = false;
+          console.error("MEETING_INVITATION_SMTP_ACCEPTED_AUDIT_PENDING", { meetingId: pass.meetingId, participantId: pass.participantId, accessId, status: auditError.status || null });
+        }
+        return ctx.json({ ok: true, meetingAccessSent: true, deliveryStatus: "Accepted by IRPA SMTP gateway", participantStatusPersisted, auditPersisted, accessId, expiresAt: pass.expiresAt, messageId: String(messageId || "") }, 200, ctx.corsHeaders(request));
       }
 
       if (action === "revoke") {
