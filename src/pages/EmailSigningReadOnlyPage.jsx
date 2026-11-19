@@ -17,7 +17,8 @@ const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#
 export default function EmailSigningReadOnlyPage({token}){
  const [record,setRecord]=useState(null),[signingToken,setSigningToken]=useState(""),[activeRoleAssignmentIndex,setActiveRoleAssignmentIndex]=useState(0);
  const [pdfDocument,setPdfDocument]=useState(null),[pageCount,setPageCount]=useState(0),[pageNum,setPageNum]=useState(1);
- const [pageSize,setPageSize]=useState({width:760,height:980}),[viewerWidth,setViewerWidth]=useState(760),[pageRendered,setPageRendered]=useState(false);\n const [reviewedPages,setReviewedPages]=useState([]),[signingUnlocked,setSigningUnlocked]=useState(false);
+ const [pageSize,setPageSize]=useState({width:760,height:980}),[viewerWidth,setViewerWidth]=useState(760),[pageRendered,setPageRendered]=useState(false);
+ const [reviewedPages,setReviewedPages]=useState([]),[signingUnlocked,setSigningUnlocked]=useState(false);
  const [error,setError]=useState(""),[pageError,setPageError]=useState(""),[loading,setLoading]=useState(true);
  const [submitting,setSubmitting]=useState(false),[revoking,setRevoking]=useState(false),[success,setSuccess]=useState("");
  const [declarations,setDeclarations]=useState({name:"",occupation:"",capacity:""}),[fieldValues,setFieldValues]=useState({});
@@ -94,7 +95,11 @@ export default function EmailSigningReadOnlyPage({token}){
    }catch(e){if(!cancelled&&e?.name!=="RenderingCancelledException")setPageError(e?.message||"The PDF page could not be rendered.");}
   })();
   return()=>{cancelled=true;try{task?.cancel();}catch{}};
- },[pdfDocument,pageNum,viewerWidth]);\n\n useEffect(()=>{\n  if(pageRendered&&!pageError&&pdfDocument&&pageCount>0)setReviewedPages(current=>current.includes(pageNum)?current:[...current,pageNum]);\n },[pageRendered,pageError,pdfDocument,pageCount,pageNum]);
+ },[pdfDocument,pageNum,viewerWidth]);
+
+ useEffect(()=>{
+  if(pageRendered&&!pageError&&pdfDocument&&pageCount>0)setReviewedPages(current=>current.includes(pageNum)?current:[...current,pageNum]);
+ },[pageRendered,pageError,pdfDocument,pageCount,pageNum]);
 
  useEffect(()=>{
   if(!pageRendered||!selectedFieldId)return;
@@ -237,7 +242,11 @@ export default function EmailSigningReadOnlyPage({token}){
        })}
       </div>
      </div>
-     {pageError&&<p role="alert" style={{color:"#991b1b",background:"#fee2e2",padding:10,borderRadius:6}}>This page could not be rendered: {pageError}. Do not submit until it is visible.</p>}\n     <div style={{marginTop:14,padding:12,border:"2px solid #174a78",borderRadius:8,textAlign:"center"}}>\n      <p style={{margin:"0 0 8px",fontWeight:700}}>PDF review progress: {reviewedPages.length} of {pageCount||0} pages rendered and viewed.</p>\n      {!signingUnlocked?<button type="button" disabled={!pdfDocument||Boolean(pageError)||pageCount===0||reviewedPages.length!==pageCount||signingClosed} onClick={()=>{const first=assignmentFields.find(field=>["Signature","Initials"].includes(field.type));setSigningUnlocked(true);setError("");if(first){setActiveRoleAssignmentIndex(Number(first.roleAssignmentIndex||0));setSelectedFieldId(first.fieldId);setSignaturePadField(first);const targetPage=Number(first.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}}}} style={{...buttonStyle,background:"#166534",opacity:(!pdfDocument||Boolean(pageError)||pageCount===0||reviewedPages.length!==pageCount||signingClosed)?0.5:1}}>TO SIGN CLICK HERE</button>:<p role="status" style={{margin:0,color:"#166534",fontWeight:700}}>Signing pad unlocked after complete PDF review. Select each assigned Signature or Initials field to confirm it.</p>}\n     </div>
+     {pageError&&<p role="alert" style={{color:"#991b1b",background:"#fee2e2",padding:10,borderRadius:6}}>This page could not be rendered: {pageError}. Do not submit until it is visible.</p>}
+     <div style={{marginTop:14,padding:12,border:"2px solid #174a78",borderRadius:8,textAlign:"center"}}>
+      <p style={{margin:"0 0 8px",fontWeight:700}}>PDF review progress: {reviewedPages.length} of {pageCount||0} pages rendered and viewed.</p>
+      {!signingUnlocked?<button type="button" disabled={!pdfDocument||Boolean(pageError)||pageCount===0||reviewedPages.length!==pageCount||signingClosed} onClick={()=>{const first=assignmentFields.find(field=>["Signature","Initials"].includes(field.type));setSigningUnlocked(true);setError("");if(first){setActiveRoleAssignmentIndex(Number(first.roleAssignmentIndex||0));setSelectedFieldId(first.fieldId);setSignaturePadField(first);const targetPage=Number(first.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}}}} style={{...buttonStyle,background:"#166534",opacity:(!pdfDocument||Boolean(pageError)||pageCount===0||reviewedPages.length!==pageCount||signingClosed)?0.5:1}}>TO SIGN CLICK HERE</button>:<p role="status" style={{margin:0,color:"#166534",fontWeight:700}}>Signing pad unlocked after complete PDF review. Select each assigned Signature or Initials field to confirm it.</p>}
+     </div>
      {!pdfDocument&&!loading&&<p role="alert">The complete document is not available for review. Signing is disabled.</p>}
      <p style={{fontSize:12,color:"#4b5563",margin:"10px 0 0"}}>The PDF is delivered through the invited signer’s controlled Gateway session and is not published as a public file. The final signed PDF appends an IRPA signature-evidence certificate after the source document.</p>
     </section>
