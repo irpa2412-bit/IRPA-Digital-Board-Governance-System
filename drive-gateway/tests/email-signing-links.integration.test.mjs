@@ -59,7 +59,7 @@ test("owner signs in the portal before any other signer is invited; completing o
   assert.equal(ownerOpened.signer.email,"owner@example.org");
   const result=await sign(ctx,{
     token:ownerOpened.sessionToken,signature:{type:"drawn",value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="},
-    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:10,y:10,width:20,height:8,value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}],
+    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}],
     fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Document Owner"}
   });
   assert.equal(result.status,"InProgress");
