@@ -241,9 +241,10 @@ test("duplicate participant identities are reused and rapid repeated add actions
 
 test("envelope creation requires every participant to have at least one explicitly assigned field", () => {
   assert.match(portal, /if\(!orderedRecipients\.length&&!ownerSigningEnabled\)/);
-  assert.ok(portal.includes("const recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>String(field.signerUid"));
-  assert.match(portal, /Each participant needs at least one PDF field assigned to their own signer identity/);
-  assert.match(portal, /matching fields:/);
+  assert.ok(portal.includes("const assignmentCheck=analyzeFieldAssignments("));
+  assert.match(portal, /Page \"\+issue\.page\+\", field \"\+issue\.fieldNumber\+\": \"\+issue\.reason/);
+  assert.match(portal, /Signing field assignment needs repair/);
+  assert.match(portal, /no signer fields assigned/);
 });
 
 

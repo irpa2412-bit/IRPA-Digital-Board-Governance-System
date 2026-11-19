@@ -100,8 +100,9 @@ test("envelope validation rejects duplicate or missing signer UIDs but permits s
 });
 
 test("each signer needs an assigned field and fields cannot reference unknown signer identities",()=>{
-  assert.ok(createValidation.includes('recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>String(field.signerUid||"")===String(recipient.uid||"")))'));
-  assert.ok(createValidation.includes("if(recipientsWithoutFields.length)"));
+  assert.ok(createValidation.includes("const assignmentCheck=analyzeFieldAssignments("));
+  assert.ok(createValidation.includes('const fieldReport=assignmentCheck.fieldIssues.map(issue=>"Page "+issue.page+", field "+issue.fieldNumber+": "+issue.reason)'));
+  assert.ok(createValidation.includes("assignmentCheck.recipientsWithoutFields"));
   assert.ok(createValidation.includes("if(fields.some(f=>!f.signerUid||!signerUids.has(f.signerUid)))"));
 });
 
@@ -109,6 +110,15 @@ test("owner-signing mode requires a required Signature field assigned to the own
   assert.ok(createValidation.includes('ownerSigningEnabled&&!fields.some(f=>f?.type==="Signature"&&f.required!==false&&f.signerUid===documentOwner.uid)'));
 });
 
+test("failed drafts reopen for owner repair and assignment diagnostics expose merge, orphan and field-jump actions",()=>{
+  assert.ok(ui.includes('(e.status==="Draft"||e.status==="Failed")'));
+  assert.ok(ui.includes("Continue Preparation"));
+  assert.ok(ui.includes('data-testid="signature-assignment-diagnostics"'));
+  assert.ok(ui.includes("Merge duplicate entries"));
+  assert.ok(ui.includes("ORPHANED"));
+  assert.ok(ui.includes("Jump to field"));
+  assert.ok(ui.includes("Repair draft"));
+});
 test("four visible-page rotations preserve non-zero field geometry and all signer metadata through save/reload",()=>{
   for(const rotation of [0,90,180,270]){
     const original={fieldId:`rotation-${rotation}`,type:"Signature",page:rotation/90+1,x:42.25,y:38.5,width:12.5,height:3.2,signerUid:"email-link-person-b",roleAssignmentIndex:0};
