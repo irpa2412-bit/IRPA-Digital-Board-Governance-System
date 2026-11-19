@@ -294,7 +294,8 @@ test("refreshing an envelope uses one authoritative status read and keeps signer
   assert.doesNotMatch(storage,/export async function getGatewaySignatureEnvelopeDeliveryStatus/);
   assert.ok(page.includes("onClick={refreshGatewayEmailStatus}"));
   assert.ok(page.includes("onClick={()=>resendEmailLink(item.id)}"));
-  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
 
@@ -379,7 +380,8 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
   assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
   assert.ok(refresh.includes("Array.isArray(status.signers)"));
   assert.ok(refresh.includes("last readable list has been preserved"));
-  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
