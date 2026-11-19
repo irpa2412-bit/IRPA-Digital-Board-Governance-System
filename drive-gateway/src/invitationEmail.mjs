@@ -125,7 +125,7 @@ export function classifySmtpReplyCategory(error, stage = "") {
   const message = String(error?.message || error || "").toLowerCase();
   const code = Number(error?.smtpResponseCode || (message.match(/(?:smtp error |^)(\d{3})/i) || [])[1] || 0);
   const transportCode = String(error?.code || "").toUpperCase();
-  if (stage === "SMTP_AUTH" || /authentication|auth failed|credentials invalid|not authorized/.test(message) || [530,534,535,538].includes(code)) return "AUTH_FAILED";
+  if (stage === "SMTP_AUTH" || /authentication failed|auth failed|invalid credentials|credentials rejected|not authorized/.test(message)) return "AUTH_FAILED";
   if (transportCode === "ECONNREFUSED" || /connection refused/.test(message)) return "CONNECTION_REFUSED";
   if (/mailbox full|mailbox is full|quota exceeded|over quota|insufficient storage/.test(message) || code === 552 || code === 452 && /4\.2\.2/.test(message)) return "MAILBOX_FULL";
   if (/rate.?limit|too many messages|throttl|sending limit|try again later/.test(message) || [421,450,451,452,454].includes(code)) return "RATE_LIMITED";
