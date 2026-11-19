@@ -358,7 +358,15 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(emailPortal,/String\(currentUser\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===invitedEmail/);
   assert.match(emailPortal,/candidate\?\.uid===currentUser\.uid/);
   assert.match(emailPortal,/candidate\.status==="Active"/);
-  assert.match(emailPortal,/setSignaturePadField\(field\)/);
+  assert.match(emailPortal,/setSelectedFieldId\(matchedProfile\?\(firstAssignedField\?\.fieldId\|\|""\):""\)/);
+  assert.match(emailPortal,/setPageNum\(matchedProfile\?Number\(firstAssignedField\?\.page\|\|1\):1\)/);
+  assert.match(emailPortal,/shouldShowSignaturePad=Boolean\(selectedField&&\["Signature","Initials"\]\.includes\(selectedField\.type\)&&\(savedProfile\|\|signaturePadField\?\.fieldId===selectedField\.fieldId\)\)/);
+  assert.match(emailPortal,/CLICK HERE TO SIGN/);
+  assert.match(emailPortal,/onClick=\{\(\)=>\{if\(!signingClosed\)\{setActiveRoleAssignmentIndex\(Number\(field\.roleAssignmentIndex\|\|0\)\);setSelectedFieldId\(field\.fieldId\);setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\);\}\}\}/);
+  assert.match(emailPortal,/onKeyDown=\{event=>\{if\(!signingClosed&&\(event\.key==="Enter"\|\|event\.key===" "\)\).*setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\)/s);
+  assert.match(emailPortal,/selectedField&&\(!\["Signature","Initials"\]\.includes\(selectedField\.type\)\|\|shouldShowSignaturePad\)/);
+  assert.match(emailPortal,/setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\)/);
+  assert.ok(emailPortal.includes("setSignaturePadField(null);const targetPage=Number(field.page||1);"),"field-list selection must not open the non-profile drawing pad");
   assert.match(emailPortal,/savedSignatureUrl=\{savedProfile\?\.signatureUrl\|\|""\}/);
   assert.match(emailPortal,/allowTyped=\{false\}/);
   assert.match(emailPortal,/Your own saved Signature Profile specimen has been confirmed/);
