@@ -15,8 +15,7 @@ export function createSmtpSelfcheckRoute({authenticateFirebaseRequest,getFiresto
     try { profile=await getFirestoreDocument(env,"adminProfiles/"+uid,claims.token); }
     catch { return json({ok:false,error:"Administrator authorization could not be verified."},403,corsHeaders(request)); }
     const activeAdmin=profile?.fields?.active?.booleanValue===true && profile?.fields?.role?.stringValue==="Administrator";
-    const primaryAdmin=String(claims?.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
-    if(!activeAdmin&&!primaryAdmin) return json({ok:false,error:"Administrator authorization is required."},403,corsHeaders(request));
+    if(!activeAdmin) return json({ok:false,error:"Administrator authorization is required."},403,corsHeaders(request));
 
     const stages=[];
     const onStage=async(stageCode,outcome,smtpReplyCategory="UNKNOWN")=>{
