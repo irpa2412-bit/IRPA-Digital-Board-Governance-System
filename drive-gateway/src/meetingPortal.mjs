@@ -160,6 +160,8 @@ export function createMeetingPortalRouter(ctx) {
         if (!admin && !chair && !secretary && !initiator) return errorResponse(ctx, request, "Only the authorised meeting initiator, administrator, chairperson or secretary may issue meeting access.", 403);
         const priorPasses = await listByField(ctx, env, adminToken, "meetingAccessTokens", "participantId", ids.participantId);
         const activePriorPasses = priorPasses.filter(pass => pass.status === "Active");
+        const priorEntryRequests = await listByField(ctx, env, adminToken, "meetingEntryRequests", "participantId", ids.participantId);
+        const pendingPriorEntryRequests = priorEntryRequests.filter(entry => entry.status === "PENDING" && activePriorPasses.some(pass => pass.id === entry.accessId));
         const raw = randomToken(32);
         const password = gatePassword();
         const accessId = crypto.randomUUID();
@@ -204,6 +206,9 @@ export function createMeetingPortalRouter(ctx) {
           ];
           for (const priorPass of activePriorPasses) {
             writes.push({ update: { name: `projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/meetingAccessTokens/${priorPass.id}`, fields: fieldsToFirestore({ status: "Revoked", revokedByUid: uid, revokedAt: new Date(), revocationReason: "Superseded by a newly issued meeting access pass" }) }, updateMask: { fieldPaths: ["status", "revokedByUid", "revokedAt", "revocationReason"] }, currentDocument: { updateTime: priorPass.updateTime } });
+          }
+          for (const entry of pendingPriorEntryRequests) {
+            writes.push({ update: { name: `projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/meetingEntryRequests/${entry.id}`, fields: fieldsToFirestore({ status: "DENIED", resolvedByUid: uid, resolvedAt: new Date(), resolutionReason: "Superseded by a newly issued meeting access pass" }) }, updateMask: { fieldPaths: ["status", "resolvedByUid", "resolvedAt", "resolutionReason"] }, currentDocument: { updateTime: entry.updateTime } });
           }
           await commitWrites(ctx, env, adminToken, writes);
         } catch (error) {
