@@ -405,7 +405,7 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
         orientation + " /Rotate " + rotation + " must retain the complete wrapped role");
       assert.ok(combinedText.includes(date), orientation + " /Rotate " + rotation + " must retain the full ISO date");
       assert.ok(textDraws.length >= 3, "name, wrapped role and date must be drawn on the signed page");
-      const expectedAngle = rotation;
+      const expectedAngle = rotation ? (360 - rotation) % 360 : 0;
       for (const draw of textDraws) {
         const angle = Number(draw.options.rotate?.angle ?? 0);
         assert.equal(angle, expectedAngle, orientation + " /Rotate " + rotation + " text must counter-rotate upright");
@@ -522,7 +522,7 @@ function directionalPng(width, height) {
 }
 
 function inversePageRotationAroundCenter(width, height, rotation) {
-  const radians = rotation * Math.PI / 180;
+  const radians = -rotation * Math.PI / 180;
   const a = Math.cos(radians), b = Math.sin(radians);
   const c = -Math.sin(radians), d = Math.cos(radians);
   const cx = width / 2, cy = height / 2;
@@ -594,7 +594,7 @@ test("rendered signed particulars and signature images follow the visible source
           page.drawText("ORIGINAL TABLE ROW", originalTextOptions);
           page.pushOperators(popGraphicsState());
         } else {
-          page.drawText("ORIGINAL TABLE ROW", { ...originalTextOptions, rotate: degrees(rotation) });
+          page.drawText("ORIGINAL TABLE ROW", { ...originalTextOptions, rotate: degrees((360 - rotation) % 360) });
         }
         const sourceBytes = await source.save();
         const fields = [
