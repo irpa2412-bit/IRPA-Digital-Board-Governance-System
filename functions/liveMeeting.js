@@ -128,7 +128,7 @@ exports.issueLiveMeetingToken = onCall({
   if (memberSnap.exists) records.push(memberSnap.data() || {});
   if (employeeSnap.exists) records.push(employeeSnap.data() || {});
 
-  // When a participant arrives through the Invitation Portal gate, validate
+  // When a participant arrives through the Meeting Entry Gateway, validate
   // the server-side participant record again before issuing a media token.
   // The browser-provided ID is only a lookup key; meeting and identity binding
   // are re-verified here and never trusted from client state alone.
@@ -137,11 +137,11 @@ exports.issueLiveMeetingToken = onCall({
   if (participantId) {
     const participantSnap = await db.collection("participants").doc(participantId).get();
     if (!participantSnap.exists) {
-      throw new HttpsError("permission-denied", "The invitation participant record could not be verified.");
+      throw new HttpsError("permission-denied", "The meeting participant record could not be verified.");
     }
     const candidate = { id: participantSnap.id, ...participantSnap.data() };
     if (text(candidate.meetingId) !== meetingId) {
-      throw new HttpsError("permission-denied", "The invited participant is not linked to this meeting.");
+      throw new HttpsError("permission-denied", "The registered meeting participant is not linked to this meeting.");
     }
     const boundUid = text(candidate.participantUid || candidate.uid || candidate.userId);
     const boundEmail = text(candidate.participantEmail || candidate.email).toLowerCase();
