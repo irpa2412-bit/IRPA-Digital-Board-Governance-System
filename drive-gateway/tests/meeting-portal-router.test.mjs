@@ -23,7 +23,8 @@ const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "
     getFirestoreAdminAccessToken: async () => "test-admin-token",
     json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
     corsHeaders: () => ({ "content-type": "application/json" }),
-    sendEmail: async (env, message) => { ctx.sentEmail = message; return "250 accepted"; }
+    sendEmail: async (env, message) => { ctx.sentEmail = message; return "250 accepted"; },
+    enforceMailRateLimit: async (env, uid) => { ctx.rateLimitedUid = uid; }
   };
   globalThis.fetch = async (url, init = {}) => {
     const target = new URL(url);
@@ -70,6 +71,7 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   const body = await response.json();
   assert.equal(body.meetingAccessSent, true);
   assert.equal(ctx.sentEmail.to, "participant@example.org");
+  assert.equal(ctx.rateLimitedUid, "organizer-1");
   assert.match(ctx.sentEmail.subject, /IRPA Meeting Invitation/);
   assert.match(ctx.sentEmail.text, /Gate password: ABCD1234WXYZ/);
   assert.match(ctx.sentEmail.text, /Online meeting link: https:\/\/meet\.example\.org\/board/);
