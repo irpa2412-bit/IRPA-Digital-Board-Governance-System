@@ -15,7 +15,8 @@ import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mj
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
 import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../src/invitationEmail.mjs";
-import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents} from "../src/signing.mjs";
+import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope} from "../src/signing.mjs";
+import {buildEsignContext} from "../src/esignContext.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
@@ -132,9 +133,30 @@ test("mail delivery is delegated once to the existing Worker invitation sender",
 });
 
 
-test("optional Signature Profile lookup failures and timeouts do not block email-link invitation preparation",async()=>{
-  assert.equal(await resolveOptionalEmailLinkProfileUid(async()=>{throw new Error("profile service unavailable")},"unregistered@example.org","Unregistered Signer"),null);
-  assert.equal(await resolveOptionalEmailLinkProfileUid(()=>new Promise(()=>{}),"unregistered@example.org","Unregistered Signer",3000),null);
+test("profile lookup errors and a 3-second timeout never block an unregistered signer invitation",async()=>{
+  async function attempt(resolveEmailLinkProfileUid,suffix){
+    const sent=[];
+    const ctx=buildEsignContext({
+      env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
+      verifyUser:async()=>null,
+      sendInvitation:async invitation=>sent.push(invitation),
+      logger:{error(){}}
+    });
+    ctx.resolveEmailLinkProfileUid=resolveEmailLinkProfileUid;
+    const bytes=new TextEncoder().encode("%PDF-1.7\\nIRPA optional profile test");
+    const source=await ctx.storage.put({path:`source/${suffix}.pdf`,bytes,contentType:"application/pdf",metadata:{}});
+    const documentId=`DOC-OPT-${suffix}`;
+    await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"test.pdf",title:"Profile lookup test",classification:"Restricted"});
+    const created=await createEnvelope(ctx,{uid:"owner",isAdmin:false},{documentId,title:"Profile lookup test",archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",email:"unregistered@example.org",name:"Unregistered Signer",order:1}],fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,signerId:"S1",required:true}]});
+    assert.equal(sent.length,1);
+    assert.equal(sent[0].to,"unregistered@example.org");
+    assert.equal(sent[0].name,"Unregistered Signer");
+    assert.match(sent[0].link,/emailSignToken=/);
+    const status=await (await import("../src/signing.mjs")).getEnvelopeStatus(ctx,{uid:"owner",isAdmin:false},created.envelopeId);
+    assert.equal(status.signers[0].profileUid,null);
+  }
+  await attempt(async()=>{throw new Error("profile service unavailable")},"THROW");
+  await attempt(()=>new Promise(()=>{}),"TIMEOUT");
 });
 
 test("three positions sharing one mailbox retain separate signer IDs, token hashes, and invitation deliveries",async()=>{
