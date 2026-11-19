@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "status": "complete",
+  "declaration": {
+    "affectedPortals": [
+      "Invitation Portal"
+    ],
+    "reason": "Recover invitations stranded in Queued, report delivery only after SMTP acceptance, and make Gateway SMTP sender/transport configuration match production deployment bindings.",
+    "files": [
+      "src/pages/Invitations.jsx",
+      "drive-gateway/src/index.js",
+      "drive-gateway/src/invitationEmail.mjs",
+      "drive-gateway/tests/mail-invitation.unit.mjs",
+      "scripts/portal-protection-check.mjs",
+      "tests/portal-protection-policy.test.mjs",
+      "drive-gateway/src/smtpConfig.mjs",
+      ".github/workflows/cloudflare-gateway-deploy.yml",
+      "tests/workflow-production-deploy-policy.test.mjs"
+    ],
+    "expectedEffect": "A queued delivery is considered in-flight for at most five minutes. Stale or timestamp-less queued records can be retried; recent requests remain protected from duplicate token rotation. The portal displays Queued until SMTP delivery is confirmed and records sentAt only after Sent. The Gateway now uses the configured SMTP host, port, sender and optional login username; production deployment refuses to proceed unless exactly one SMTP_PASSWORD secret binding is present.",
+    "prohibitedChanges": [
+      "Do not change Firestore security rules or indexes.",
+      "Do not reveal, print, rotate, or replace SMTP credential values; require the existing SMTP_PASSWORD secret binding and fail closed if absent.",
+      "Do not weaken administrator authorization, invitation token validation, account activation or audit controls.",
+      "Do not bypass branch protection or the protected production deployment environment.",
+      "Do not modify unrelated portals or production data."
+    ]
+  },
+  "repairWindow": {
+    "openedAt": "2026-11-19T21:08:00Z",
+    "lastActivityAt": "2026-11-19T21:20:36Z",
+    "emergency": false
+  },
+  "baseline": {
+    "commit": "b766e7727722161f4f779bbd86d8ef21830eefa8",
+    "rollbackCommit": "32dfb60353c012342aadb96849688aef1ff00470"
+  },
+  "validation": {
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Invitation Portal": "PASS"
+    },
+    "dependentSmoke": {
+      "Gateway mocked SMTP invitation tests": "PASS",
+      "Invitation redemption tests": "PASS",
+      "Meeting invitation resend/quorum tests": "PASS",
+      "Gateway full regression suite": "PASS",
+      "Governance application build": "PASS",
+      "Portal protection policy timestamp regression test": "PASS",
+      "SMTP configuration unit tests": "PENDING",
+      "Production SMTP secret-binding policy test": "PENDING"
+    },
+    "fullRegression": "PASS",
+    "behaviourDifferences": [
+      "A stale or timestamp-less Queued invitation can recover after the five-minute processing lease instead of remaining permanently blocked.",
+      "An actively queued request returns HTTP 202 and is no longer represented as a confirmed email send.",
+      "The Invitation Register records sentAt only after the Gateway confirms SMTP acceptance.",
+      "The protected-portal policy checker now parses each Git activity timestamp independently; its existing 24-hour inactivity closure remains unchanged.",
+      "Queued invitations now use neutral pending feedback and do not display a success banner before SMTP delivery confirmation.",
+      "Gateway SMTP host, port, sender and optional login username are now resolved from Worker bindings with validated defaults; production deploy preflight requires exactly one SMTP_PASSWORD secret binding of type secret_text."
+    ],
+    "evidence": [
+      "The protected portal register documents baseline commit b766e7727722161f4f779bbd86d8ef21830eefa8 as verified by production frontend deployment and live-build verification.",
+      "Production Promotion Gate candidate-proof completed successfully for commit 4726a1d2d7a7443d6aa17582716bac34adc29c15; Gateway regression suite and governance application build passed.",
+      "Mail Invitation Tests passed syntax, mocked SMTP invitation and invitation redemption tests.",
+      "Meeting Invitation Flow CI passed Gateway/meeting tests, meeting entry policy and invitation resend/quorum tests.",
+      "Protected portal repair policy check passed on the exact PR revision; all five registered Invitation Portal tests and all nine portal-protection policy tests passed.",
+      "Queued-state portal feedback was tightened so the UI does not display success styling while delivery remains unconfirmed.",
+      "Gateway SMTP configuration and deployment binding changes added; exact-head workflow validation is pending."
+    ]
+  },
+  "closure": {
+    "closedAt": "",
+    "updatedBaselineCommit": ""
+  }
+}

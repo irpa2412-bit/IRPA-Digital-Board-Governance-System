@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/portal-register.json", import.meta.url), "utf8"));
 
@@ -36,4 +36,9 @@ test("a fresh declaration reopens after an earlier closure", () => {
   const reopened = { ...windowState, openedAt: "2026-11-20T18:00:00Z" };
   const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState: reopened, activityTimestamps: ["2026-11-19T19:00:00Z", "2026-11-20T18:30:00Z"], now: Date.parse("2026-11-20T18:31:00Z") });
   assert.equal(result.ok, true);
+});
+
+
+test("Git activity history is parsed into individual timestamps", () => {
+  assert.deepEqual(parseActivityTimestamps("2026-11-19T21:10:19Z\n2026-11-19T21:11:00Z\n"), ["2026-11-19T21:10:19Z","2026-11-19T21:11:00Z"]);
 });

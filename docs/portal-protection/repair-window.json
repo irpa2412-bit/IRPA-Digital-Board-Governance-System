@@ -1,8 +1,50 @@
 {
   "schemaVersion": 1,
-  "status": "closed",
-  "closedAt": "2026-11-19T00:00:00Z",
-  "reason": "No repair window is currently open. Open one with a new declaration before protected changes.",
+  "status": "open",
+  "openedAt": "2026-11-19T21:08:00Z",
+  "lastActivityAt": "2026-11-19T21:20:36Z",
+  "reason": "Repair Invitation Portal delivery recovery, Gateway SMTP sender/transport configuration, and production SMTP secret-binding validation.",
+  "scope": [
+    "src/pages/Invitations.jsx",
+    "drive-gateway/src/index.js",
+    "drive-gateway/src/invitationEmail.mjs",
+    "drive-gateway/tests/mail-invitation.unit.mjs",
+    "drive-gateway/src/smtpConfig.mjs",
+    ".github/workflows/cloudflare-gateway-deploy.yml",
+    "tests/workflow-production-deploy-policy.test.mjs"
+  ],
   "inactivityCloseHours": 24,
-  "activityLog": []
+  "emergency": false,
+  "activityLog": [
+    {
+      "at": "2026-11-19T21:08:00Z",
+      "action": "opened",
+      "description": "Opened a scoped Invitation Portal repair window before protected changes."
+    },
+    {
+      "at": "2026-11-19T21:10:19Z",
+      "action": "repair",
+      "description": "Inspected and repaired stale queued invitation recovery and delivery-status reporting."
+    },
+    {
+      "at": "2026-11-19T21:12:10Z",
+      "action": "validation",
+      "description": "Gateway regression suite, mocked SMTP invitation tests, invitation redemption tests and meeting invitation resend tests passed; application build validation in progress."
+    },
+    {
+      "at": "2026-11-19T21:14:00Z",
+      "action": "policy-repair",
+      "description": "Corrected Git activity history parsing in the protected portal validator and added a regression test; 24-hour inactivity closure logic unchanged."
+    },
+    {
+      "at": "2026-11-19T21:17:45Z",
+      "action": "repair",
+      "description": "Changed queued invitation feedback to a neutral pending state and removed the success banner until SMTP delivery is confirmed."
+    },
+    {
+      "at": "2026-11-19T21:20:36Z",
+      "action": "gateway-mail-configuration",
+      "description": "Aligned Gateway SMTP host, port, sender and login with deployment bindings; added fail-closed production preflight requiring SMTP_PASSWORD secret binding and tests. Secret values were not read or changed."
+    }
+  ]
 }

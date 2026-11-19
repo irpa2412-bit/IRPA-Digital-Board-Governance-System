@@ -117,3 +117,16 @@ test("draft pull requests cannot create production-promotion proof tags", () => 
   assert.match(source, /gate-proof:\s*\n\s+if: github\.event\.pull_request\.draft == false/);
   assert.match(source, /git push origin "refs\/tags\/\$TAG_NAME"/);
 });
+
+
+test("production Gateway deployment requires SMTP_PASSWORD secret and configures the IRPA sender",()=>{
+  const source=readWorkflow(".github/workflows/cloudflare-gateway-deploy.yml");
+  assert.match(source,/smtpPasswordBindings = bindings\.filter\(b => b\.name === "SMTP_PASSWORD"\)/);
+  assert.match(source,/smtpPasswordBindings\.length !== 1 \|\| smtpPasswordBindings\[0\]\?\.type !== "secret_text"/);
+  assert.match(source,/inviteServiceKeyBindings = bindings\.filter\(b => b\.name === "INVITE_SERVICE_KEY"\)/);
+  assert.match(source,/inviteServiceKeyBindings\.length !== 1 \|\| inviteServiceKeyBindings\[0\]\?\.type !== "secret_text"/);
+  assert.match(source,/SMTP_HOST: "mail\.irpa\.or\.tz"/);
+  assert.match(source,/SMTP_PORT: "465"/);
+  assert.match(source,/SMTP_FROM: "info@irpa\.or\.tz"/);
+  assert.match(source,/deploy --keep-vars/);
+});

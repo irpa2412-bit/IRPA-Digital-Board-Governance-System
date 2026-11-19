@@ -5,6 +5,10 @@ const HOURS_24 = 24 * 60 * 60 * 1000;
 const isWithin = (file, path) => file === path || (path.endsWith("/") && file.startsWith(path));
 const readJson = (path) => JSON.parse(fs.readFileSync(path, "utf8"));
 
+export function parseActivityTimestamps(history) {
+  return String(history || "").split(/\r?\n/).filter(Boolean);
+}
+
 export function evaluatePolicy({ changedFiles, registry, windowState, record, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
   const affected = new Set();
   const protectedFiles = [];
@@ -75,7 +79,7 @@ function main() {
     return;
   }
   const history = execFileSync("git", ["log", "--format=%cI", "--", ...initial.protectedFiles], { encoding: "utf8" }).trim();
-  const activityTimestamps = history ? history.split("\\n").filter(Boolean) : [];
+  const activityTimestamps = parseActivityTimestamps(history);
   const result = evaluatePolicy({ changedFiles, registry, windowState, record, activityTimestamps });
   console.log(JSON.stringify(result, null, 2));
   if (!result.ok) process.exitCode = 1;
