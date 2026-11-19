@@ -80,9 +80,9 @@ const ids=[participant.uid,participant.userId,participant.participantUid,partici
 const emails=[participant.email,participant.participantEmail,participant.invitedEmail,participant.subscriberEmail].map(lower);
 if(!ids.includes(uid)&&!(email&&emails.includes(email)))return fail(ctx,request,"You may sign only your own registered participant record.",403);
 const expected=clean(participant.name||participant.participantName||participant.fullName||participant.displayName);
-const normalized=value=>clean(value).normalize("NFKC").replace(/\\s+/g," ").toLowerCase();
+const normalized=value=>clean(value).normalize("NFKC").replace(/\s+/g," ").toLowerCase();
 if(!expected||normalized(typedName)!==normalized(expected))return fail(ctx,request,"The typed signature must match the name in your meeting registration.",409);
-const signatureId=await hash(meetingId+"\\0"+participantId);
+const signatureId=await hash(meetingId+"\0"+participantId);
 const existing=await getDoc(ctx,env,token,"meetingAttendanceSignatures",signatureId);
 if(existing)return response(ctx,request,{ok:true,signed:true,alreadySigned:true,signatureId,participantId,signedAt:iso(existing.signedAt)});
 const now=new Date(),signature={
