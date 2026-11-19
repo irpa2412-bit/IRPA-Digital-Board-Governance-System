@@ -19,6 +19,7 @@ const meetingServices=fs.readFileSync("drive-gateway/src/meetingServices.mjs","u
 const meetingAccessControl=fs.readFileSync("src/components/MeetingAccessControl.jsx","utf8");
 const attendanceClient=fs.readFileSync("src/firebase/meetingRecords.js","utf8");
 const mediaClient=fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const participantApi=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
 const livekitConfig=fs.readFileSync("infra/livekit/livekit.yaml.template","utf8");
@@ -37,6 +38,7 @@ const checks=[
  ["Meeting Worker uses the existing SMTP sender and existing Worker secrets",invitationWorker.includes("sendEmail: (env, message) => smtpSend(env, message)")&&meetingWorker.includes("ctx.sendEmail(env, { to: recipient, subject, text, html })")],
  ["Meeting invitation records are stored on meeting participant records, not Invitation Portal",participantPage.includes("meetingInvitationRows=useMemo(()=>rows.filter")&&!participantPage.includes("COLLECTIONS.invitations")&&!participantPage.includes("sendMemberInvitationEmail")],
  ["Meeting Worker email includes meeting-specific gate link and password",meetingWorker.includes("meetingToken")&&meetingWorker.includes("Gate password: ")&&meetingWorker.includes("IRPA Meeting Invitation")],
+ ["Meeting participant create update and removal use Worker endpoints",meetingServices.includes("/api/meeting-participants/create")&&meetingServices.includes("/api/meeting-participants/update")&&meetingServices.includes("/api/meeting-participants/delete")&&participantApi.includes("/api/meeting-participants/create")&&participantApi.includes("/api/meeting-participants/update")&&participantApi.includes("/api/meeting-participants/delete")&&!participantApi.includes("COLLECTIONS.invitations")],
  ["Meeting gate queue and host admission decisions use Cloudflare Worker routes",meetingServices.includes("/api/meeting-entry-requests/list")&&meetingServices.includes("/api/meeting-entry-requests/resolve")&&meetingAccessControl.includes("/api/meeting-entry-requests/list")&&meetingAccessControl.includes("/api/meeting-entry-requests/resolve")&&!meetingAccessControl.includes("httpsCallable")],
  ["Meeting attendance signing and register use Cloudflare Worker routes",meetingServices.includes("/api/meeting-attendance/sign")&&meetingServices.includes("/api/meeting-attendance/register")&&attendanceClient.includes("/api/meeting-attendance/sign")&&attendanceClient.includes("/api/meeting-attendance/register")],
  ["Live media token issuance uses the shared Meeting Worker gateway",mediaClient.includes("issueLiveMeetingToken")&&!mediaClient.includes("VITE_LIVEKIT_TOKEN_WORKER_URL")&&!mediaClient.includes("httpsCallable")],
