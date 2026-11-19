@@ -157,9 +157,9 @@ test("two signers with three fields each and three distinct signers sharing one 
       const page = index + 1;
       const x = 0.08 + index * 0.04;
       return [
-        { fieldId: signer.id + "-signature", type: "Signature", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.12, width: 0.24, height: 0.08 },
-        { fieldId: signer.id + "-name", type: "Name", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.28, width: 0.32, height: 0.06 },
-        { fieldId: signer.id + "-date", type: "Date", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.40, width: 0.32, height: 0.06 }
+        { fieldId: signer.id + "-signature", type: "Signature", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.12, width: 0.24, height: 0.08, coordinateSpace: "visible-page-fraction-v1" },
+        { fieldId: signer.id + "-name", type: "Name", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.28, width: 0.32, height: 0.06, coordinateSpace: "visible-page-fraction-v1" },
+        { fieldId: signer.id + "-date", type: "Date", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.40, width: 0.32, height: 0.06, coordinateSpace: "visible-page-fraction-v1" }
       ];
     });
     const savedFields = validateEnvelopeFields(sourceFields, signers);
