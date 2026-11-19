@@ -362,6 +362,8 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(emailPortal,/setPageNum\(matchedProfile\?Number\(firstAssignedField\?\.page\|\|1\):1\)/);
   assert.match(emailPortal,/shouldShowSignaturePad=Boolean\(selectedField&&\["Signature","Initials"\]\.includes\(selectedField\.type\)&&\(savedProfile\|\|signaturePadField\?\.fieldId===selectedField\.fieldId\)\)/);
   assert.match(emailPortal,/CLICK HERE TO SIGN/);
+  assert.match(emailPortal,/onClick=\{\(\)=>\{if\(!signingClosed\)\{setActiveRoleAssignmentIndex\(Number\(field\.roleAssignmentIndex\|\|0\)\);setSelectedFieldId\(field\.fieldId\);setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\);\}\}\}/);
+  assert.match(emailPortal,/onKeyDown=\{event=>\{if\(!signingClosed&&\(event\.key==="Enter"\|\|event\.key===" "\)\).*setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\)/s);
   assert.match(emailPortal,/selectedField&&\(!\["Signature","Initials"\]\.includes\(selectedField\.type\)\|\|shouldShowSignaturePad\)/);
   assert.match(emailPortal,/setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\)/);
   assert.ok(emailPortal.includes("setSignaturePadField(null);const targetPage=Number(field.page||1);"),"field-list selection must not open the non-profile drawing pad");
