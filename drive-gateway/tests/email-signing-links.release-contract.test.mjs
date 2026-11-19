@@ -123,8 +123,8 @@ test("email-link signer must review every rendered PDF page before the explicit 
   assert.match(page,/setReviewedPages/);
   assert.match(page,/reviewedPages.length!==pageCount/);
   assert.match(page,/TO SIGN CLICK HERE/);
-  assert.match(page,/setSigningUnlocked\\(true\\)/);
+  assert.ok(page.includes("setSigningUnlocked(true)"));
   assert.match(page,/selectedField&&signingUnlocked&&/);
-  assert.match(page,/disabled=\\{signingClosed\\|\\|!signingUnlocked\\}/);
+  assert.ok(page.includes("disabled={signingClosed||!signingUnlocked}"));
   assert.match(page,/Review the complete document and signature placement before submitting/);
 });
