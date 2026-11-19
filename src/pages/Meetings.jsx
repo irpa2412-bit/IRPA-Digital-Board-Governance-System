@@ -175,7 +175,7 @@ const created=await callMeetingService("/api/meeting-register/create",{data:payl
     addSavedAssistantRecord(saved,title);
     if(admin){
       const next=normalizeMeetingForV3({...selected,transcript,proceedingsStatus:"Transcript Saved"});
-      await updateRecord(COLLECTIONS.meetings,selected.id,next);setSelected(next);setForm(next);await load();
+      await callMeetingService("/api/meeting-register/update",{meetingId:selected.id,data:{transcript,proceedingsStatus:"Transcript Saved"}});setSelected(next);setForm(next);await load();
     }
     setMessage("Transcript saved as a meeting-linked draft record. It is not an approved or final transcript.");
   }catch(e){setError(e?.message||"Unable to save the transcript draft.")}finally{setBusy(false)}
@@ -207,7 +207,7 @@ const created=await callMeetingService("/api/meeting-register/create",{data:payl
     setSelected(current=>current?.id===selected.id?{...current,...draft,transcript,proceedingsStatus:"Draft Minutes"}:current);
     if(admin){
       const next=normalizeMeetingForV3({...selected,...draft,transcript,proceedingsStatus:"Draft Minutes"});
-      await updateRecord(COLLECTIONS.meetings,selected.id,next);setSelected(next);setForm(next);await load();
+      await callMeetingService("/api/meeting-register/update",{meetingId:selected.id,data:{...draft,transcript,proceedingsStatus:"Draft Minutes"}});setSelected(next);setForm(next);await load();
     }
     setMessage("Draft minutes saved to the meeting record lifecycle. They remain unapproved pending review by the authorised secretary.");
   }catch(e){setError(e?.message||"Unable to save draft minutes.")}finally{setBusy(false)}
