@@ -532,7 +532,7 @@ export default {
               const member = await getFirestoreDocument(env, `members/${claims.user_id}`, adminToken);
               const employee = await getFirestoreDocument(env, `employees/${claims.user_id}`, adminToken);
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
-              const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"};
+              const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"||ownerProfile.isOwner===true||String(ownerProfile.role||"").trim().toLowerCase()==="owner"};
             },
             sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt,envelopeId,signerId,onStage}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
@@ -2995,7 +2995,9 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
     const accepted=await runEmailStage("SUBMIT",async()=>{
       await command("DATA","3");
       await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
-      return await readResponse();
+      const response=await readResponse();
+      if(!response.startsWith("2"))throw new Error("SMTP message was not accepted.");
+      return response;
     },onStage);
     try{await command("QUIT","2")}catch{}
     return accepted;
