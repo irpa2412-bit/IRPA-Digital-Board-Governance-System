@@ -14,6 +14,7 @@ import SignatureImagePreview from"../components/SignatureImagePreview.jsx";
 import SignaturePathwaySelfTest from"../components/SignaturePathwaySelfTest";
 import{readWorkflowContext}from"../firebase/workflowLinks";
 import{renderPdfPageToCanvas,describePdfPageError}from"../utils/pdfPageRendering.mjs";
+import{signatureFieldFromPointer}from"../utils/signatureFieldCoordinates.mjs";
 import*as pdfjsLib from"pdfjs-dist";
 import pdfWorker from"pdfjs-dist/build/pdf.worker.min.mjs?url";
 
