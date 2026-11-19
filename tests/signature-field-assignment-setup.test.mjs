@@ -10,6 +10,7 @@ import {
 
 const ui=readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
 const storage=readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+const emailPage=readFileSync(new URL("../src/pages/EmailSigningReadOnlyPage.jsx",import.meta.url),"utf8");
 const platform=readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
 const designer=ui.slice(ui.indexOf("function PDFDesigner"),ui.indexOf("export default function SignaturePlatform"));
 const addSigner=ui.slice(ui.indexOf("async function addSigner"),ui.indexOf("function removeSigner"));
@@ -64,6 +65,14 @@ test("three distinct signer identities sharing one email each retain three indep
   assert.equal(new Set(recipients.map(r=>r.email)).size,1);
   assert.equal(assigned.length,9);
   for(const recipient of recipients)assert.equal(assigned.filter(field=>field.signerUid===recipient.uid).length,3);
+});
+
+test("on-demand email signing pad opens only after the unregistered signer clicks their assigned field",()=>{
+  assert.ok(emailPage.includes('setSelectedFieldId(matchedProfile?(firstAssignedField?.fieldId||""):"")'));
+  assert.ok(emailPage.includes('signaturePadField?.fieldId===selectedField.fieldId'));
+  assert.ok(emailPage.includes('setSignaturePadField(field)'));
+  assert.ok(emailPage.includes('const field=signaturePadField||selectedField'));
+  assert.ok(emailPage.includes('setFieldApplications(current=>[...current.filter(item=>item.fieldId!==field.fieldId),application])'));
 });
 
 test("participant button gating and required signer name/email validation are explicit",()=>{
