@@ -125,7 +125,7 @@ export default function OperationalGatewaysParticipants(){
    if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The Meeting Worker did not return a complete access pass.");
    const result=await dispatchMeetingInvitation({accessId:issued.accessId,accessToken:issued.accessToken,meetingPassword:issued.meetingPassword});
    if(result.meetingAccessSent!==true)throw new Error("The IRPA SMTP Worker did not confirm meeting invitation dispatch.");
-   setMsg("Meeting invitation accepted by the IRPA SMTP gateway for "+participant.participantEmail+".");
+   setMsg(result.participantStatusPersisted===false?"SMTP accepted the meeting invitation, but the participant delivery status needs reconciliation. The access pass remains active.":"Meeting invitation accepted by the IRPA SMTP gateway for "+participant.participantEmail+".");
    await load();
   }catch(x){
    if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
@@ -151,7 +151,7 @@ export default function OperationalGatewaysParticipants(){
     dispatchStage="smtp-dispatch";
     const result=await dispatchMeetingInvitation({accessId:issued.accessId,accessToken:issued.accessToken,meetingPassword:issued.meetingPassword});
     if(result.meetingAccessSent!==true)throw new Error("The IRPA SMTP Worker did not confirm meeting invitation dispatch.");
-    setMsg("Participant registered and meeting invitation accepted by the IRPA SMTP gateway. The invitation is recorded on the meeting participant record only.");
+    setMsg(result.participantStatusPersisted===false?"Participant registered and SMTP accepted the meeting invitation, but the participant delivery status needs reconciliation. The access pass remains active.":"Participant registered and meeting invitation accepted by the IRPA SMTP gateway. The invitation is recorded on the meeting participant record only.");
    }catch(x){
     console.error("IRPA meeting invitation dispatch failed",{stage:dispatchStage,errorCode:String(x?.code||""),errorMessage:String(x?.message||x).slice(0,240),meetingId:payload.meetingId,participantId});
     if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
