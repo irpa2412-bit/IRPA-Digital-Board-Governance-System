@@ -41,9 +41,10 @@ function mergePair(recipients,fields,keepUid,removeUid){
  return {recipients:recipients.filter(item=>String(item.uid)!==String(removeUid)).map(item=>String(item.uid)===String(keepUid)?merged:item),fields:movedFields};
 }
 
-export function mergeDuplicateParticipants(recipients=[],fields=[]){
+export function mergeDuplicateParticipants(recipients=[],fields=[],targetGroup=null){
  let nextRecipients=[...recipients],nextFields=[...fields],merged=[];
- for(const group of findDuplicateParticipantGroups(nextRecipients)){
+ const groups=targetGroup?[targetGroup]:findDuplicateParticipantGroups(nextRecipients);
+ for(const group of groups){
   const live=group.filter(person=>nextRecipients.some(item=>String(item.uid)===String(person.uid)));
   if(live.length<2)continue;
   const ranked=[...live].sort((a,b)=>nextFields.filter(f=>String(f?.signerUid||"")===String(b.uid)).length-nextFields.filter(f=>String(f?.signerUid||"")===String(a.uid)).length);
