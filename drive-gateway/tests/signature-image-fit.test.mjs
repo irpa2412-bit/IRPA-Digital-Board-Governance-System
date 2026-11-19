@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deflateSync } from "node:zlib";
-import { PDFDocument, PDFName, PDFPage, degrees } from "pdf-lib";
+import { PDFDocument, PDFName, PDFPage, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix } from "pdf-lib";
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import { createCanvas } from "@napi-rs/canvas";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
 import { findSignatureInkBounds, requireSignatureInkBounds, removeWhitePixels } from "../../src/utils/signatureImageCanvas.mjs";
 import { buildSignedPdf, getPdfFieldBox, getSignatureDrawGeometry } from "../src/pdf.mjs";
@@ -403,7 +405,7 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
         orientation + " /Rotate " + rotation + " must retain the complete wrapped role");
       assert.ok(combinedText.includes(date), orientation + " /Rotate " + rotation + " must retain the full ISO date");
       assert.ok(textDraws.length >= 3, "name, wrapped role and date must be drawn on the signed page");
-      const expectedAngle = rotation ? (360 - rotation) % 360 : 0;
+      const expectedAngle = rotation;
       for (const draw of textDraws) {
         const angle = Number(draw.options.rotate?.angle ?? 0);
         assert.equal(angle, expectedAngle, orientation + " /Rotate " + rotation + " text must counter-rotate upright");
@@ -493,4 +495,160 @@ test("PDF Date stamp uses the exact server signing instant formatted as EAT and 
   }
   assert.ok(draws.includes("2026-11-19 15:25 EAT"), "the server timestamp must be displayed in EAT");
   assert.ok(!draws.some(value => value.includes("WRONG DEVICE TIME")), "user-entered date/time must never be stamped");
+});
+
+
+function directionalPng(width, height) {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
+  header[8] = 8; header[9] = 6;
+  const rows = Buffer.alloc(height * (1 + width * 4));
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (1 + width * 4);
+    rows[row] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const offset = row + 1 + x * 4;
+      let rgba = [0, 0, 0, 0];
+      if (x < 13 && y < 13) rgba = [230, 25, 25, 255];
+      else if (x >= width - 13 && y >= height - 13) rgba = [20, 55, 230, 255];
+      else if (x >= 24 && x < 40 && y >= 4 && y < 8) rgba = [20, 160, 60, 255];
+      rows[offset] = rgba[0]; rows[offset + 1] = rgba[1]; rows[offset + 2] = rgba[2]; rows[offset + 3] = rgba[3];
+    }
+  }
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header), pngChunk("IDAT", deflateSync(rows)), pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
+function inversePageRotationAroundCenter(width, height, rotation) {
+  const radians = rotation * Math.PI / 180;
+  const a = Math.cos(radians), b = Math.sin(radians);
+  const c = -Math.sin(radians), d = Math.cos(radians);
+  const cx = width / 2, cy = height / 2;
+  return [a, b, c, d, cx - a * cx - c * cy, cy - b * cx - d * cy];
+}
+
+function visibleTextBaseline(item, viewport) {
+  const t = item.transform, v = viewport.transform;
+  const x = v[0] * t[0] + v[2] * t[1];
+  const y = v[1] * t[0] + v[3] * t[1];
+  return { x, y, angle: Math.atan2(y, x) * 180 / Math.PI };
+}
+
+async function renderFirstPage(pdfBytes) {
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(pdfBytes),
+    useSystemFonts: true,
+    isEvalSupported: false,
+    useWorkerFetch: false
+  });
+  const loaded = await loadingTask.promise;
+  const page = await loaded.getPage(1);
+  const viewport = page.getViewport({ scale: 1 });
+  const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+  const context = canvas.getContext("2d");
+  await page.render({ canvasContext: context, viewport }).promise;
+  const text = await page.getTextContent();
+  return { loaded, page, viewport, canvas, context, items: text.items.filter(item => typeof item.str === "string" && item.str.trim()) };
+}
+
+function coloredPixelCentroid(context, bounds, color) {
+  const x = Math.max(0, Math.floor(bounds.x)), y = Math.max(0, Math.floor(bounds.y));
+  const width = Math.max(1, Math.ceil(bounds.width)), height = Math.max(1, Math.ceil(bounds.height));
+  const pixels = context.getImageData(x, y, width, height).data;
+  let count = 0, sumX = 0, sumY = 0;
+  for (let py = 0; py < height; py += 1) for (let px = 0; px < width; px += 1) {
+    const i = (py * width + px) * 4;
+    const match = color === "red"
+      ? pixels[i] > 160 && pixels[i + 1] < 90 && pixels[i + 2] < 90 && pixels[i + 3] > 100
+      : pixels[i + 2] > 150 && pixels[i] < 90 && pixels[i + 1] < 120 && pixels[i + 3] > 100;
+    if (match) { count += 1; sumX += x + px; sumY += y + py; }
+  }
+  return count ? { x: sumX / count, y: sumY / count, count } : null;
+}
+
+test("rendered signed particulars and signature images follow the visible source content for /Rotate and pre-rotated pages", async () => {
+  const name = "Daniel Estomihi Mollel";
+  const role = "Executive Director, Board Secretary";
+  const date = "2026-11-19";
+  const pngBytes = directionalPng(64, 48);
+  const dataUrl = "data:image/png;base64," + pngBytes.toString("base64");
+
+  for (const [orientation, dimensions] of [["portrait", [600, 800]], ["landscape", [800, 600]]]) {
+    for (const rotation of [0, 90, 180, 270]) {
+      for (const contentMode of ["page-rotation", "pre-rotated-content"]) {
+        const source = await PDFDocument.create();
+        const page = source.addPage(dimensions);
+        const regular = await source.embedFont("Helvetica");
+        if (rotation) page.setRotation(degrees(rotation));
+        const originalTextOptions = {
+          x: dimensions[0] * 0.30,
+          y: dimensions[1] * 0.50,
+          size: 16,
+          font: regular
+        };
+        if (contentMode === "pre-rotated-content") {
+          const matrix = inversePageRotationAroundCenter(dimensions[0], dimensions[1], rotation);
+          page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...matrix));
+          page.drawText("ORIGINAL TABLE ROW", originalTextOptions);
+          page.pushOperators(popGraphicsState());
+        } else {
+          page.drawText("ORIGINAL TABLE ROW", { ...originalTextOptions, rotate: degrees(rotation) });
+        }
+        const sourceBytes = await source.save();
+        const fields = [
+          { ...makeField("sig", "Signature", 0.08, 0.12, 0.28, 0.12), coordinateSpace: "visible-page-fraction-v1" },
+          { ...makeField("name", "Name", 0.08, 0.32, 0.84, 0.06), coordinateSpace: "visible-page-fraction-v1" },
+          { ...makeField("role", "Title", 0.08, 0.42, 0.84, 0.10), coordinateSpace: "visible-page-fraction-v1" },
+          { ...makeField("date", "Date", 0.08, 0.56, 0.84, 0.06), coordinateSpace: "visible-page-fraction-v1" }
+        ];
+        const signedBytes = await buildSignedPdf(sourceBytes, {
+          envelopeId: "visible-orientation", documentId: "visible-orientation",
+          title: orientation + " " + contentMode, originalHash: "original", chainHead: "chain",
+          completedAt: date, fields,
+          signers: [{
+            id: "S1", uid: "user-1", name, email: "signer@example.test",
+            signedAt: "2026-11-19T08:30:00.000Z", signatureType: "drawn",
+            signatureValue: dataUrl, fieldValues: { sig: dataUrl, name, role, date }
+          }]
+        });
+        const rendered = await renderFirstPage(signedBytes);
+        try {
+          const baseline = rendered.items.find(item => item.str.includes("ORIGINAL TABLE ROW"));
+          assert.ok(baseline, orientation + " /Rotate " + rotation + " " + contentMode + " must retain original table text");
+          const baselineAngle = visibleTextBaseline(baseline, rendered.viewport);
+          assert.ok(Math.abs(baselineAngle.angle) < 1 && baselineAngle.x > 0,
+            orientation + " /Rotate " + rotation + " " + contentMode + " original table text must render left-to-right and upright");
+
+          const signerItems = rendered.items.filter(item =>
+            item.str.includes(name) || item.str.includes("Executive") || item.str.includes("Director") ||
+            item.str.includes("Board") || item.str.includes("Secretary") || item.str.includes(date)
+          );
+          assert.ok(signerItems.some(item => item.str.includes(name)), "full signer name must be visible in rendered PDF text");
+          assert.ok(signerItems.some(item => item.str.includes(date)), "full signing date must be visible in rendered PDF text");
+          for (const item of signerItems) {
+            const baselineAngle = visibleTextBaseline(item, rendered.viewport);
+            assert.ok(Math.abs(baselineAngle.angle) < 1 && baselineAngle.x > 0,
+              orientation + " /Rotate " + rotation + " " + contentMode + " stamped text must render left-to-right and upright: " + item.str);
+          }
+
+          const signatureRegion = {
+            x: rendered.viewport.width * fields[0].x,
+            y: rendered.viewport.height * fields[0].y,
+            width: rendered.viewport.width * fields[0].width,
+            height: rendered.viewport.height * fields[0].height
+          };
+          const red = coloredPixelCentroid(rendered.context, signatureRegion, "red");
+          const blue = coloredPixelCentroid(rendered.context, signatureRegion, "blue");
+          assert.ok(red && blue && red.count > 5 && blue.count > 5,
+            orientation + " /Rotate " + rotation + " " + contentMode + " rendered signature image must retain both orientation markers");
+          assert.ok(red.x < blue.x && red.y < blue.y,
+            orientation + " /Rotate " + rotation + " " + contentMode + " signature image must remain upright (red top-left before blue bottom-right)");
+        } finally {
+          await rendered.loaded.destroy();
+        }
+      }
+    }
+  }
 });
