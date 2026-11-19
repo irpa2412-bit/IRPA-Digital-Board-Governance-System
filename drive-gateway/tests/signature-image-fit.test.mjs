@@ -704,3 +704,120 @@ test("certificate signature image uses the same fitted dimensions as the placed 
     close(certificateDraws[0].height, documentDraws[0].height, 0.01);
   }
 });
+
+
+test("two signers with three assigned fields each and three same-email positions retain signer, placement, rotation, timestamp and certificate size", async () => {
+  const pngs = [createPng(64, 24), createPng(48, 24), createPng(40, 20)];
+  const dataUrls = pngs.map(png => "data:image/png;base64," + png.toString("base64"));
+  const scenarios = [
+    [
+      { id: "S1", name: "Signer One", email: "one@example.test" },
+      { id: "S2", name: "Signer Two", email: "two@example.test" }
+    ],
+    [
+      { id: "S1", name: "Shared Signer One", email: "shared@example.test" },
+      { id: "S2", name: "Shared Signer Two", email: "shared@example.test" },
+      { id: "S3", name: "Shared Signer Three", email: "shared@example.test" }
+    ]
+  ];
+  for (const rotation of [0, 90, 180, 270]) {
+    for (const signersInput of scenarios) {
+      const source = await PDFDocument.create();
+      const page = source.addPage([600, 800]);
+      if (rotation) page.setRotation(degrees(rotation));
+      const sourceBytes = await source.save();
+      const signers = signersInput.map((signer, index) => ({
+        ...signer,
+        uid: null,
+        signedAt: "2026-11-19T12:25:00.000Z",
+        signatureType: "drawn",
+        signatureValue: dataUrls[index],
+        fieldValues: {
+          [signer.id + "-signature"]: dataUrls[index],
+          [signer.id + "-name"]: signer.name,
+          [signer.id + "-date"]: "WRONG DEVICE DATE"
+        }
+      }));
+      const fields = signers.flatMap((signer, index) => {
+        const x = signers.length === 2 ? (index === 0 ? 0.08 : 0.55) : 0.04 + index * 0.32;
+        const width = signers.length === 2 ? 0.35 : 0.26;
+        return [
+          { fieldId: signer.id + "-signature", type: "Signature", signerId: signer.id, page: 1, x, y: 0.12, width, height: 0.09, coordinateSpace: "visible-page-fraction-v1" },
+          { fieldId: signer.id + "-name", type: "Name", signerId: signer.id, page: 1, x, y: 0.29, width, height: 0.07, coordinateSpace: "visible-page-fraction-v1" },
+          { fieldId: signer.id + "-date", type: "Date", signerId: signer.id, page: 1, x, y: 0.42, width, height: 0.07, coordinateSpace: "visible-page-fraction-v1" }
+        ];
+      });
+      const documentDraws = [], certificateDraws = [], documentTextDraws = [];
+      const originalDrawImage = PDFPage.prototype.drawImage;
+      const originalDrawText = PDFPage.prototype.drawText;
+      PDFPage.prototype.drawImage = function(image, options) {
+        if (pngs.some(png => png.length > 0) && signers.some(signer => {
+          const index = signers.findIndex(item => item.id === signer.id);
+          return image.width === pngs[index].readUInt32BE(16) && image.height === pngs[index].readUInt32BE(20);
+        })) {
+          const draw = { imageWidth: image.width, imageHeight: image.height, ...options };
+          if (Math.abs(this.getWidth() - 600) < 0.1 && Math.abs(this.getHeight() - 800) < 0.1) documentDraws.push(draw);
+          else certificateDraws.push(draw);
+        }
+        return originalDrawImage.call(this, image, options);
+      };
+      PDFPage.prototype.drawText = function(text, options) {
+        if (Math.abs(this.getWidth() - 600) < 0.1 && Math.abs(this.getHeight() - 800) < 0.1) {
+          documentTextDraws.push({ text: String(text), options: { ...options } });
+        }
+        return originalDrawText.call(this, text, options);
+      };
+      try {
+        await buildSignedPdf(sourceBytes, {
+          envelopeId: "assignment-rotation-" + rotation,
+          documentId: "assignment-rotation-" + rotation,
+          title: "Signer assignment rotation regression",
+          originalHash: "original",
+          chainHead: "chain",
+          completedAt: "2026-11-19T12:25:00.000Z",
+          fields,
+          signers
+        });
+      } finally {
+        PDFPage.prototype.drawImage = originalDrawImage;
+        PDFPage.prototype.drawText = originalDrawText;
+      }
+      assert.equal(documentDraws.length, signers.length, "/Rotate " + rotation + " must stamp exactly one assigned signature per signer");
+      assert.equal(certificateDraws.length, signers.length, "/Rotate " + rotation + " must include one matching certificate signature per signer");
+      for (const [index, signer] of signers.entries()) {
+        const signatureField = fields.find(field => field.fieldId === signer.id + "-signature");
+        const imageWidth = pngs[index].readUInt32BE(16), imageHeight = pngs[index].readUInt32BE(20);
+        const documentDraw = documentDraws.find(draw => draw.imageWidth === imageWidth && draw.imageHeight === imageHeight);
+        const certificateDraw = certificateDraws.find(draw => draw.imageWidth === imageWidth && draw.imageHeight === imageHeight);
+        assert.ok(documentDraw, signer.id + " must receive its own image, not another signer's specimen");
+        assert.ok(certificateDraw, signer.id + " must retain its own certificate specimen");
+        close(certificateDraw.width, documentDraw.width, 0.01);
+        close(certificateDraw.height, documentDraw.height, 0.01);
+        const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+        const box = getPdfFieldBox(sourcePage, signatureField);
+        const angle = Number(documentDraw.rotate?.angle ?? 0);
+        const imageBounds = angle === 90
+          ? { x: documentDraw.x - documentDraw.height, y: documentDraw.y, width: documentDraw.height, height: documentDraw.width }
+          : angle === 180
+            ? { x: documentDraw.x - documentDraw.width, y: documentDraw.y - documentDraw.height, width: documentDraw.width, height: documentDraw.height }
+            : angle === 270
+              ? { x: documentDraw.x, y: documentDraw.y - documentDraw.width, width: documentDraw.height, height: documentDraw.width }
+              : { x: documentDraw.x, y: documentDraw.y, width: documentDraw.width, height: documentDraw.height };
+        assert.ok(imageBounds.x >= box.x - 0.1 && imageBounds.y >= box.y - 0.1 &&
+          imageBounds.x + imageBounds.width <= box.x + box.width + 0.1 &&
+          imageBounds.y + imageBounds.height <= box.y + box.height + 0.1,
+          signer.id + " signature must stay inside its assigned field at /Rotate " + rotation);
+        assert.ok(documentTextDraws.some(draw => draw.text.includes(signer.name)),
+          signer.id + " name must be stamped in the document");
+      }
+      const dateDraws = documentTextDraws.filter(draw => draw.text.includes("2026-11-19 15:25 EAT"));
+      assert.ok(dateDraws.length >= signers.length, "/Rotate " + rotation + " must stamp each server signing date with full EAT time");
+      assert.ok(!documentTextDraws.some(draw => draw.text.includes("WRONG DEVICE DATE")),
+        "/Rotate " + rotation + " must not stamp the device-supplied date");
+      for (const draw of documentTextDraws.filter(item => signers.some(signer => item.text.includes(signer.name)) || item.text.includes("2026-11-19 15:25 EAT"))) {
+        assert.equal(Number(draw.options.rotate?.angle ?? 0), rotation,
+          "/Rotate " + rotation + " assigned signer text must use the effective upright orientation");
+      }
+    }
+  }
+});
