@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {canAuthenticatedSignerAccess,validateEnvelopeFields} from "../src/signing.mjs";
+import {canAuthenticatedSignerAccess,validateEnvelopeFields,validateFieldValues} from "../src/signing.mjs";
 
 test("unbound legacy signers are rejected; email-link identity requires redeemed invitation",()=>{
   assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"legacy-token"},null),false);
@@ -137,4 +137,69 @@ test("Gateway preserves distinct signature-field responsibility indexes for one 
   assert.throws(()=>validateEnvelopeFields([
     {fieldId:"F-MALFORMED",type:"Signature",signerId:"S1",roleAssignmentIndex:"second",page:1,x:10,y:10,width:20,height:8}
   ],signers),/invalid or assigned/i);
+});
+
+
+test("two signers with three fields each and three distinct signers sharing one email retain exact field ownership and geometry", () => {
+  const scenarios = [
+    [
+      { id: "S1", identityType: "email-link", email: "first@example.test", roleAssignments: [{ role: "Chair" }] },
+      { id: "S2", identityType: "email-link", email: "second@example.test", roleAssignments: [{ role: "Secretary" }] }
+    ],
+    [
+      { id: "S1", identityType: "email-link", email: "shared@example.test", roleAssignments: [{ role: "Chair" }] },
+      { id: "S2", identityType: "email-link", email: "shared@example.test", roleAssignments: [{ role: "Secretary" }] },
+      { id: "S3", identityType: "email-link", email: "shared@example.test", roleAssignments: [{ role: "Treasurer" }] }
+    ]
+  ];
+  for (const signers of scenarios) {
+    const sourceFields = signers.flatMap((signer, index) => {
+      const page = index + 1;
+      const x = 0.08 + index * 0.04;
+      return [
+        { fieldId: signer.id + "-signature", type: "Signature", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.12, width: 0.24, height: 0.08 },
+        { fieldId: signer.id + "-name", type: "Name", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.28, width: 0.32, height: 0.06 },
+        { fieldId: signer.id + "-date", type: "Date", signerId: signer.id, roleAssignmentIndex: 0, page, x, y: 0.40, width: 0.32, height: 0.06 }
+      ];
+    });
+    const savedFields = validateEnvelopeFields(sourceFields, signers);
+    assert.equal(savedFields.length, signers.length * 3);
+    for (let index = 0; index < sourceFields.length; index += 1) {
+      for (const key of ["fieldId", "signerId", "page", "x", "y", "width", "height"]) {
+        assert.equal(savedFields[index][key], sourceFields[index][key], key + " must remain attached to the original signer field");
+      }
+    }
+    for (const signer of signers) {
+      const ownFields = savedFields.filter(field => field.signerId === signer.id);
+      assert.equal(ownFields.length, 3, signer.id + " must retain all three assigned fields");
+      const signatureField = ownFields.find(field => field.type === "Signature");
+      const application = {
+        fieldId: signatureField.fieldId,
+        page: signatureField.page,
+        x: signatureField.x,
+        y: signatureField.y,
+        width: signatureField.width,
+        height: signatureField.height,
+        confirmed: true,
+        value: "data:image/png;base64,AAAA"
+      };
+      const values = {
+        [signer.id + "-name"]: signer.id + " Name",
+        [signer.id + "-date"]: "device date must be replaced by server time"
+      };
+      const completed = validateFieldValues(savedFields, signer, values, null, [application]);
+      assert.deepEqual(Object.keys(completed).sort(), ownFields.map(field => field.fieldId).sort());
+      const foreign = savedFields.find(field => field.signerId !== signer.id && field.type === "Signature");
+      if (foreign) {
+        assert.throws(
+          () => validateFieldValues(savedFields, signer, values, null, [{
+            fieldId: foreign.fieldId, page: foreign.page, x: foreign.x, y: foreign.y,
+            width: foreign.width, height: foreign.height, confirmed: true,
+            value: "data:image/png;base64,AAAA"
+          }]),
+          error => error?.status === 403 && error.message === "A signature field application is not assigned to this signer."
+        );
+      }
+    }
+  }
 });
