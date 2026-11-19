@@ -11,7 +11,7 @@ import {
 const ui=readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
 const storage=readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
 const platform=readFileSync(new URL("../src/firebase/signaturePlatform.js",import.meta.url),"utf8");
-const designer=ui.slice(ui.indexOf("function PDFDesigner"),ui.indexOf("function EmailSigningReadOnlyPage"));
+const designer=ui.slice(ui.indexOf("function PDFDesigner"),ui.indexOf("export default function SignaturePlatform"));
 const addSigner=ui.slice(ui.indexOf("async function addSigner"),ui.indexOf("function removeSigner"));
 const palette=designer.slice(designer.indexOf("PEOPLE & FIELD ASSIGNMENT"),designer.indexOf("FIELDS ON THIS DOCUMENT")+10000);
 const savedDraft=platform.slice(platform.indexOf("export async function saveSignatureWorkflowDraft"),platform.indexOf("export async function finalizeSignatureWorkflowDraft"));
@@ -52,7 +52,7 @@ test("save, reload and Gateway mapping preserve unique signer IDs and stored geo
   assert.match(gatewayMapper,/signerAssignmentByKey\.get\(key\)/);
 });
 
-test("two signers plus three people sharing one email retain six independent assignments",()=>{
+test("three distinct signer identities sharing one email each retain three independent field assignments",()=>{
   const sharedEmail="shared@example.test";
   const recipients=["email-link-person-a","email-link-person-b","email-link-person-c"].map((uid,index)=>({uid,email:sharedEmail,identityType:"email-link",routingOrder:index+1}));
   const fields=recipients.flatMap((recipient,index)=>Array.from({length:3},(_,n)=>({
