@@ -60,6 +60,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install
+      - name: Email-link signing review-before-pad release contract
+        run: node --test drive-gateway/tests/email-signing-links.release-contract.test.mjs
       - name: PWA install/offline contract tests
         run: node --test tests/pwa-install-offline.test.mjs
       - name: Upload runtime regression test
