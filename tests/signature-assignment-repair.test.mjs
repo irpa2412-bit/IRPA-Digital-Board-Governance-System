@@ -80,9 +80,9 @@ test("field diagnostics identify no signer, signer not in list, and owner signin
  const result=analyzeFieldAssignments({
   ownerUid:"owner",ownerSigningEnabled:false,
   recipients:[{uid:"signer",name:"Signer",email:"signer@example.org"}],
-  fields:[{fieldId:"f1",page:1,signerUid:""},{fieldId:"f2",page:2,signerUid:"missing"},{fieldId:"f3",page:4,signerUid:"owner"},{fieldId:"f4",page:3,signerUid:"signer"}]
+  fields:[{fieldId:"f1",page:1,signerUid:""},{fieldId:"f2",page:2,signerUid:"missing"},{fieldId:"f2b",page:2,signerUid:"missing-again"},{fieldId:"f3",page:4,signerUid:"owner"},{fieldId:"f4",page:3,signerUid:"signer"}]
  });
- assert.deepEqual(result.fieldIssues.map(x=>[x.page,x.fieldNumber,x.reason]),[[1,1,"no signer"],[2,2,"signer not in list"],[4,3,"owner signing is off"]]);
+ assert.deepEqual(result.fieldIssues.map(x=>[x.page,x.fieldNumber,x.reason]),[[1,1,"no signer"],[2,1,"signer not in list"],[2,2,"signer not in list"],[4,1,"owner signing is off"]]);
 });
 
 test("merge and repair preserve coordinates and page references on 0, 90, 180 and 270 degree pages",()=>{
