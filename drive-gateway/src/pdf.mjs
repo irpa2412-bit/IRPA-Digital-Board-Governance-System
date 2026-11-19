@@ -524,7 +524,7 @@ export async function buildSignedPdf(originalBytes, info) {
     if (signer.signatureType === "drawn" && typeof signer.signatureValue === "string" && signer.signatureValue.startsWith("data:image/png;base64,")) {
       const png = await document.embedPng(decodePngDataUrl(signer.signatureValue));
       const documentSignatureSize = certificateSignatureGeometry.get(signer.id) || { width: 170, height: 50 };
-      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: documentSignatureSize.width, height: documentSignatureSize.height });
+      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: documentSignatureSize.width, height: documentSignatureSize.height }, { allowUpscale: true, maxScale: 3 });
       certificatePage.drawImage(png, { x: fit.x, y: fit.y, width: fit.width, height: fit.height });
     } else {
       certificatePage.drawText(safeText(italic, signer.signatureValue, 28), { x: 340, y: top - 40, size: 18, font: italic });
