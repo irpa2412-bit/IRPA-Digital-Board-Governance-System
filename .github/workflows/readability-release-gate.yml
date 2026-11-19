@@ -33,6 +33,10 @@ jobs:
         run: npm ci
       - name: Syntax-check checker and verifier
         run: node --check scripts/check-production-readability.mjs && node --check scripts/verify-production-readability.mjs
+      - name: Enforce protected portal repair policy
+        run: node scripts/portal-protection-check.mjs
+      - name: Test protected portal policy scenarios
+        run: node --test tests/portal-protection-policy.test.mjs
       - name: Test shared portal readability standard
         run: node --test tests/portal-readability-standard.test.mjs
       - name: Run mandatory full-source readability and contrast audit
