@@ -22,11 +22,11 @@ import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
-test("email signing invitation clearly states there is no time-based expiry",()=>{
+test("email signing invitation clearly states its EAT expiry",()=>{
   const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
-  assert.match(message.text,/no time-based expiry/i);
-  assert.match(message.text,/becomes unusable after redemption/i);
-  assert.match(message.html,/No time-based expiry/i);
+  assert.match(message.text,/Link expiry:/i);
+  assert.match(message.text,/after expiry or replacement/i);
+  assert.match(message.html,/Link expiry:/i);
 });
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
@@ -37,7 +37,7 @@ test("email token has at least 32 random bytes and only its SHA-256 hash is pers
   assert.equal(issued.record.envelopeId,"ENV-TEST01");
   assert.equal(issued.record.signerId,"S1");
   assert.equal(issued.record.status,"issued");
-  assert.equal(issued.record.expiresAt,undefined,"email-link tokens have no time-based expiry");
+  assert.equal(issued.record.expiresAt,undefined,"the standalone token primitive does not own envelope expiry");
   assert.equal(JSON.stringify(issued.record).includes(issued.token),false);
   assert.equal(issued.record.attemptCount,0);
 });
@@ -51,7 +51,7 @@ test("email token opens once and transitions issued to opened", async () => {
   await assert.rejects(()=>markEmailSigningTokenOpened(opened,{token:issued.token,now:NOW}),/unavailable/i);
 });
 
-test("email token remains valid after one year and has no time-based expiry", async () => {
+test("standalone email token inspection remains separate from envelope expiry policy", async () => {
   const issued=await createEmailSigningToken({envelopeId:"ENV-TEST03",signerId:"S1",email:"a@example.org",now:NOW});
   const result=await inspectEmailSigningToken(issued.token,issued.record,new Date("2027-11-16T08:00:01.000Z"));
   assert.equal(result.ok,true);
@@ -195,7 +195,7 @@ test("failed resend preserves the previous active email-link token",async()=>{
       update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
     },
     now:()=>NOW,
-    config:{appUrl:"https://irpa.example.org"},
+    config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7},
     sendInvitation:async()=>{throw new Error("SMTP unavailable")},
     logger:{error(){}}
   };
