@@ -23,10 +23,10 @@ import {route as esignRoute,makeContext} from "../src/router.mjs";
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
 test("email signing invitation clearly states its EAT expiry",()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
-  assert.match(message.text,/Link expiry:/i);
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
+  assert.match(message.text,/Link expiry:.*EAT/i);
   assert.match(message.text,/after expiry or replacement/i);
-  assert.match(message.html,/Link expiry:/i);
+  assert.match(message.html,/Link expiry:.*EAT/i);
 });
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
