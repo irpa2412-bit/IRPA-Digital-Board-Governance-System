@@ -2,13 +2,16 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-19T21:08:00Z",
-  "lastActivityAt": "2026-11-19T21:17:45Z",
-  "reason": "Repair the IRPA-DBGS Invitation Portal stale-queue delivery fault and correct unconfirmed email status reporting.",
+  "lastActivityAt": "2026-11-19T21:20:36Z",
+  "reason": "Repair Invitation Portal delivery recovery, Gateway SMTP sender/transport configuration, and production SMTP secret-binding validation.",
   "scope": [
     "src/pages/Invitations.jsx",
     "drive-gateway/src/index.js",
     "drive-gateway/src/invitationEmail.mjs",
-    "drive-gateway/tests/mail-invitation.unit.mjs"
+    "drive-gateway/tests/mail-invitation.unit.mjs",
+    "drive-gateway/src/smtpConfig.mjs",
+    ".github/workflows/cloudflare-gateway-deploy.yml",
+    "tests/workflow-production-deploy-policy.test.mjs"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
@@ -37,6 +40,11 @@
       "at": "2026-11-19T21:17:45Z",
       "action": "repair",
       "description": "Changed queued invitation feedback to a neutral pending state and removed the success banner until SMTP delivery is confirmed."
+    },
+    {
+      "at": "2026-11-19T21:20:36Z",
+      "action": "gateway-mail-configuration",
+      "description": "Aligned Gateway SMTP host, port, sender and login with deployment bindings; added fail-closed production preflight requiring SMTP_PASSWORD secret binding and tests. Secret values were not read or changed."
     }
   ]
 }
