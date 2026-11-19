@@ -16,6 +16,7 @@ const SMTP_FROM = "info@irpa.or.tz";
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
+import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
@@ -143,6 +144,10 @@ const bootstrapPrimaryAdministratorRoute = createBootstrapPrimaryAdministratorRo
   corsHeaders
 });
 
+const smtpSelfcheckRoute = createSmtpSelfcheckRoute({
+  authenticateFirebaseRequest, getFirestoreDocument, smtpSend,
+  writeAudit: writeSmtpSelfcheckAudit, json, corsHeaders
+});
 const passwordRecoveryRouter = createPasswordRecoveryRouter({
   authenticateFirebaseRequest,
   getFirebaseAuthAdminAccessToken,
@@ -309,6 +314,7 @@ export default {
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
+      if (pathname === "/api/system/smtp-selfcheck" && request.method === "POST") return await smtpSelfcheckRoute(request, env);
       if (pathname === "/api/auth/password-reset/prepare" || pathname === "/api/auth/password-reset/clear") return await passwordRecoveryRouter(request, env, pathname);
       if (pathname === "/api/auth/bootstrap-primary-administrator") return await bootstrapPrimaryAdministratorRoute(request, env);
       if (pathname === "/api/auth/login-context") return await loginContextRoute(request, env);
@@ -2940,6 +2946,23 @@ async function enforceMailRateLimit(env, uid) {
 }
 
 
+async function writeSmtpSelfcheckAudit(env, claims, event) {
+  const token = await getFirestoreAdminAccessToken(env);
+  const auditId = "smtp-selfcheck-" + Date.now() + "-" + crypto.randomUUID();
+  const fields = {
+    action:{stringValue:"SMTP_SELF_CHECK_STAGE"},
+    actorUid:{stringValue:String(claims?.user_id || "")},
+    stageCode:{stringValue:String(event.stageCode || "UNKNOWN")},
+    outcome:{stringValue:String(event.outcome || "failure")},
+    smtpReplyCategory:{stringValue:String(event.smtpReplyCategory || "UNKNOWN")},
+    createdAt:{timestampValue:new Date().toISOString()}
+  };
+  const response = await fetch("https://firestore.googleapis.com/v1/projects/" + getFirebaseProjectId(env) + "/databases/(default)/documents/audit?documentId=" + encodeURIComponent(auditId), {
+    method:"POST", headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"}, body:JSON.stringify({fields})
+  });
+  if (!response.ok) throw new Error("Unable to persist SMTP self-check audit event.");
+  return {auditId};
+}
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
   const toEmail=normalizeRecipientEmail(to);
   const cleanSubject=validateMailHeader(subject,"Subject");
