@@ -85,11 +85,10 @@ export async function createEnvelope(ctx,user,body){
   await verifySourceDocumentIntegrity(sourceBytes,{},doc);
   const externalReference=String(body?.externalReference||"").trim();
   if(externalReference&&!ID_RE.test(externalReference))throw new HttpError(400,"Invalid external envelope reference.");
-  const id=`ENV-${randomHex(8)}`,seenEmails=new Set(),seenUids=new Set(),signers=[],secrets=[];
+  const id=`ENV-${randomHex(8)}`,seenUids=new Set(),signers=[],secrets=[];
   for(let i=0;i<input.length;i++){
     const s=input[i],email=validateEmail(s?.email).trim().toLowerCase(),uid=s?.uid?cleanSegment(s.uid,128):null;
-    if(seenEmails.has(email))throw new HttpError(400,"Duplicate signer email.");
-    seenEmails.add(email);
+    // Delivery email may be shared. Signers remain isolated by signerId and token hash.
     if(uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
     if(uid)seenUids.add(uid);
     const signerId=`S${i+1}`,secret=randomHex(32),emailLink=s?.identityType==="email-link",authority=null;
