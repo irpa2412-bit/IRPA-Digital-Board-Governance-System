@@ -2791,76 +2791,23 @@ async function sendMemberInvitation(request, env) {
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
   const role=String(fields.role?.stringValue||"IRPA Member").trim();
-  let meetingOrganizer=false;
-  if(data.meetingAccess){const meetingId=cleanId(data.meetingAccess.meetingId||"");if(meetingId){const meetingDoc=await getFirestoreDocument(env,`meetings/${meetingId}`,claims.token);const mf=meetingDoc?.fields||{};const actorEmail=String(claims.email||"").trim().toLowerCase();meetingOrganizer=String(mf.initiatorUid?.stringValue||"")===claims.user_id||String(mf.chairpersonUid?.stringValue||"")===claims.user_id||String(mf.secretaryUid?.stringValue||"")===claims.user_id||Boolean(actorEmail&&[mf.initiatorEmail?.stringValue,mf.chairpersonEmail?.stringValue,mf.secretaryEmail?.stringValue].some(v=>String(v||"").trim().toLowerCase()===actorEmail));}}
-  if(!admin?.fields?.active?.booleanValue&&!meetingOrganizer)return json({ok:false,error:"Administrator or authorised meeting organiser access is required to send this invitation."},403,corsHeaders(request));
+  if(!admin?.fields?.active?.booleanValue)return json({ok:false,error:"Administrator access is required to send this member invitation."},403,corsHeaders(request));
   const appUrl=String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,"");
   const invitationSecret=randomBase64Url(32);
   const invitationTokenHash=await sha256Hex(invitationSecret);
   const invitationExpiresAt=new Date(Date.now()+72*60*60*1000).toISOString();
   const link=`${appUrl}/?invitationToken=${encodeURIComponent(invitationId+"."+invitationSecret)}`;
-  let meetingAccess=null;
-  if(data.meetingAccess){
-    const supplied=data.meetingAccess||{};
-    const meetingId=cleanId(supplied.meetingId||"");
-    const participantId=cleanId(supplied.participantId||"");
-    const accessToken=String(supplied.accessToken||"").trim();
-    const password=String(supplied.password||"").trim();
-    if(!meetingId||!participantId||! /^[A-Za-z0-9_-]{32,128}$/.test(accessToken)||! /^[A-Z0-9]{8,20}$/.test(password)){
-      return json({ok:false,error:"Invalid meeting access payload."},400,corsHeaders(request));
-    }
-    if(String(fields.meetingId?.stringValue||"")!==meetingId||String(fields.participantId?.stringValue||"")!==participantId){
-      return json({ok:false,error:"The meeting access pass does not match the selected invitation record."},409,corsHeaders(request));
-    }
-    const [meetingDoc,participantDoc]=await Promise.all([
-      getFirestoreDocument(env,`meetings/${meetingId}`,claims.token),
-      getFirestoreDocument(env,`participants/${participantId}`,claims.token)
-    ]);
-    if(!meetingDoc||!participantDoc)return json({ok:false,error:"The meeting or participant record could not be verified."},404,corsHeaders(request));
-    const meetingFields=meetingDoc.fields||{},participantFields=participantDoc.fields||{};
-    const linkedMeeting=String(participantFields.meetingId?.stringValue||"");
-    const participantEmail=String(participantFields.participantEmail?.stringValue||participantFields.email?.stringValue||"").trim().toLowerCase();
-    if(linkedMeeting!==meetingId||participantEmail!==email){
-      return json({ok:false,error:"The participant email and meeting relationship do not match this invitation."},403,corsHeaders(request));
-    }
-    const meetingStatus=String(meetingFields.status?.stringValue||"Scheduled").trim().toLowerCase();
-    if(["closed","completed","cancelled","canceled","archived"].includes(meetingStatus)){
-      return json({ok:false,error:"This meeting is closed and cannot issue a new access invitation."},409,corsHeaders(request));
-    }
-    const meetingReference=String(meetingFields.meetingReference?.stringValue||meetingFields.reference?.stringValue||meetingFields.title?.stringValue||"IRPA Meeting").trim();
-    const meetingIdentity=String(meetingFields.meetingIdentity?.stringValue||`IRPA-MEET-${meetingId.toUpperCase()}`).trim();
-    // Invitation particulars are sourced from the authoritative meeting document,
-    // not client-supplied display fields, so the invitation cites the saved register.
-    meetingAccess={
-      link:`${appUrl}/?meetingToken=${encodeURIComponent(accessToken)}&meetingId=${encodeURIComponent(meetingId)}`,
-      meetingIdentity,
-      meetingReference,
-      meetingTitle:String(meetingFields.title?.stringValue||meetingReference).trim(),
-      meetingDate:String(meetingFields.date?.stringValue||""),
-      meetingStartTime:String(meetingFields.startTime?.stringValue||""),
-      meetingEndTime:String(meetingFields.endTime?.stringValue||""),
-      meetingPlatform:String(meetingFields.meetingPlatform?.stringValue||"Platform not recorded"),
-      platformAccessUrl:String(meetingFields.platformAccessUrl?.stringValue||""),
-      platformMeetingId:String(meetingFields.platformMeetingId?.stringValue||""),
-      platformPasscode:String(meetingFields.platformPasscode?.stringValue||""),
-      meetingVenue:String(meetingFields.venue?.stringValue||""),
-      meetingChairperson:String(meetingFields.chairperson?.stringValue||""),
-      meetingAgenda:String(meetingFields.agenda?.stringValue||""),
-      password,
-      expiresAt:String(supplied.expiresAt||"")
-    };
-  }
   await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{
     invitationTokenHash:{stringValue:invitationTokenHash},invitationTokenVersion:{stringValue:"2"},invitationExpiresAt:{timestampValue:invitationExpiresAt},invitationRedeemedAt:{nullValue:null},invitationRedeemedUid:{nullValue:null},
     deliveryStatus:{stringValue:"Queued"},deliveryQueuedAt:{timestampValue:new Date().toISOString()},deliveryError:{stringValue:""},deliveryProvider:{stringValue:"IRPA Mail Server via Cloudflare Worker"}
   },["invitationTokenHash","invitationTokenVersion","invitationExpiresAt","invitationRedeemedAt","invitationRedeemedUid","deliveryStatus","deliveryQueuedAt","deliveryError","deliveryProvider"]);
-  const message=buildInvitationMessage({name:name||"Member",link,meetingAccess,username:email});
+  const message=buildInvitationMessage({name:name||"Member",link,username:email});
   try{
-    const result=await sendInvitationEmail({email,name:name||"Member",link,meetingAccess,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
+    const result=await sendInvitationEmail({email,name:name||"Member",link,smtpSend:async ({to,subject,text,html})=>smtpSend(env,{to,subject,text,html}),logger:{error:(label,meta)=>console.error(label,{recipientDomain:recipientDomain(email),attempt:meta?.attempt})}});
     const sentAt=new Date().toISOString();
     const messageId=result?.messageId||result;
     await updateFirestoreDocument(env,`invitations/${invitationId}`,claims.token,{status:{stringValue:"Sent"},deliveryStatus:{stringValue:"Sent"},deliverySentAt:{timestampValue:sentAt},deliveryError:{stringValue:""},deliveryMessageId:{stringValue:String(messageId||"")} },["status","deliveryStatus","deliverySentAt","deliveryError","deliveryMessageId"]);
-    return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message:meetingAccess?{subject:message.subject,text:"Meeting access details were included in the invitation email."}:message,meetingAccessSent:Boolean(meetingAccess)},200,corsHeaders(request));
+    return json({ok:true,email,deliveryStatus:"Sent",sentAt,messageId,message},200,corsHeaders(request));
   }catch(error){
     const failedAt=new Date().toISOString(), safeError=safeMailError(error);
     // Preserve the provider failure even if Firestore refuses the status write.
