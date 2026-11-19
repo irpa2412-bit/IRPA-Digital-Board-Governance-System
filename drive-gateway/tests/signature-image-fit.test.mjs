@@ -349,3 +349,92 @@ test("signer-count regression: 1, 2, 4, 10 and 20 signers retain independent PDF
     });
   }
 });
+
+test("PDF finalizer keeps signer name, long role and full date upright and inside rotated portrait/landscape pages", async () => {
+  const role = "Executive Director, Board Secretary";
+  const name = "Daniel Estomihi Mollel";
+  const date = "2026-11-19";
+  const png = createPng(64, 24);
+  const dataUrl = "data:image/png;base64," + png.toString("base64");
+
+  for (const [orientation, dimensions] of [["portrait", [600, 800]], ["landscape", [800, 600]]]) {
+    for (const rotation of [0, 90, 180, 270]) {
+      const source = await PDFDocument.create();
+      const page = source.addPage(dimensions);
+      if (rotation) page.setRotation(degrees(rotation));
+      const sourceBytes = await source.save();
+      const fields = [
+        { ...makeField("sig", "Signature", 8, 8, 24, 10), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("name", "Name", 8, 23, 84, 6), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("role", "Title", 8, 31, 84, 8), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("date", "Date", 8, 42, 84, 6), coordinateSpace: "visible-page-fraction-v1" }
+      ];
+      const textDraws = [], imageDraws = [];
+      const originalDrawText = PDFPage.prototype.drawText;
+      const originalDrawImage = PDFPage.prototype.drawImage;
+      PDFPage.prototype.drawText = function(text, options) {
+        if (this === page) textDraws.push({ text: String(text), options: { ...options } });
+        return originalDrawText.call(this, text, options);
+      };
+      PDFPage.prototype.drawImage = function(image, options) {
+        if (this === page && image.width === 64 && image.height === 24) imageDraws.push({ ...options });
+        return originalDrawImage.call(this, image, options);
+      };
+      try {
+        await buildSignedPdf(sourceBytes, {
+          envelopeId: "rotation-test", documentId: "rotation-test", title: orientation,
+          originalHash: "original", chainHead: "chain", completedAt: date,
+          fields,
+          signers: [{
+            id: "S1", uid: "user-1", name, email: "signer@example.test",
+            signedAt: "2026-11-19T08:30:00.000Z", signatureType: "drawn",
+            signatureValue: dataUrl,
+            fieldValues: { name, role, sig: dataUrl }
+          }]
+        });
+      } finally {
+        PDFPage.prototype.drawText = originalDrawText;
+        PDFPage.prototype.drawImage = originalDrawImage;
+      }
+
+      const combinedText = textDraws.map(item => item.text).join(" ");
+      assert.ok(combinedText.includes(name), orientation + " /Rotate " + rotation + " must retain the full signer name");
+      assert.ok(combinedText.includes("Executive") && combinedText.includes("Director") && combinedText.includes("Board") && combinedText.includes("Secretary"),
+        orientation + " /Rotate " + rotation + " must retain the complete wrapped role");
+      assert.ok(combinedText.includes(date), orientation + " /Rotate " + rotation + " must retain the full ISO date");
+      assert.ok(textDraws.length >= 3, "name, wrapped role and date must be drawn on the signed page");
+      const expectedAngle = rotation ? (360 - rotation) % 360 : 0;
+      for (const draw of textDraws) {
+        const angle = Number(draw.options.rotate?.angle ?? 0);
+        assert.equal(angle, expectedAngle, orientation + " /Rotate " + rotation + " text must counter-rotate upright");
+      }
+      assert.equal(imageDraws.length, 1, "the signature image must be stamped on the signed page");
+      assert.ok(Math.max(imageDraws[0].width, imageDraws[0].height) >= 30,
+        orientation + " /Rotate " + rotation + " signature image must render at a readable page-relative size");
+
+      const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+      for (const draw of textDraws) {
+        const text = draw.text;
+        const field = text === name ? fields[1]
+          : text === date ? fields[3]
+          : fields[2];
+        const box = getPdfFieldBox(sourcePage, field);
+        const width = draw.options.font.widthOfTextAtSize(text, draw.options.size);
+        const height = draw.options.size;
+        const angle = Number(draw.options.rotate?.angle ?? 0) * Math.PI / 180;
+        const corners = [[0,0],[width,0],[0,height],[width,height]].map(([dx,dy]) => ({
+          x: draw.options.x + dx * Math.cos(angle) - dy * Math.sin(angle),
+          y: draw.options.y + dx * Math.sin(angle) + dy * Math.cos(angle)
+        }));
+        const minX = Math.min(...corners.map(point => point.x));
+        const maxX = Math.max(...corners.map(point => point.x));
+        const minY = Math.min(...corners.map(point => point.y));
+        const maxY = Math.max(...corners.map(point => point.y));
+        assert.ok(minX >= box.x - 0.1 && minY >= box.y - 0.1 &&
+          maxX <= box.x + box.width + 0.1 && maxY <= box.y + box.height + 0.1,
+        orientation + " /Rotate " + rotation + " text must stay within its assigned page field");
+      }
+    }
+  }
+});
+

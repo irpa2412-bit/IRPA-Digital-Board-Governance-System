@@ -70,7 +70,7 @@ export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {
     y: 0,
     width: rotated ? fieldBox.height : fieldBox.width,
     height: rotated ? fieldBox.width : fieldBox.height
-  });
+  }, { allowUpscale: true, maxScale: 3 });
   const width = fit.width;
   const height = fit.height;
   return {
@@ -90,6 +90,85 @@ function drawFittedSignature(page, image, fieldBox) {
   return geometry;
 }
 
+function wrapPdfText(font, value, size, maxWidth) {
+  const lines = [];
+  let line = "";
+  const words = String(value ?? "").trim().split(/\\s+/).filter(Boolean);
+  for (const word of words) {
+    const candidate = line ? line + " " + word : word;
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+      line = candidate;
+      continue;
+    }
+    if (line) {
+      lines.push(line);
+      line = "";
+    }
+    if (font.widthOfTextAtSize(word, size) <= maxWidth) {
+      line = word;
+      continue;
+    }
+    let chunk = "";
+    for (const character of word) {
+      const next = chunk + character;
+      if (font.widthOfTextAtSize(next, size) <= maxWidth) chunk = next;
+      else {
+        if (!chunk) throw new RangeError("A signer particular cannot fit inside its PDF field.");
+        lines.push(chunk);
+        chunk = character;
+      }
+    }
+    line = chunk;
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
+function drawTextInField(page, value, font, fieldBox, options = {}) {
+  const rotation = fieldBox.rotation || 0;
+  const rotated = rotation === 90 || rotation === 270;
+  const textWidth = Math.max(1, rotated ? fieldBox.height : fieldBox.width);
+  const textHeight = Math.max(1, rotated ? fieldBox.width : fieldBox.height);
+  const padding = Math.min(2, Math.max(0.5, Math.min(textWidth, textHeight) * 0.05));
+  const maxWidth = Math.max(1, textWidth - padding * 2);
+  const maxHeight = Math.max(1, textHeight - padding * 2);
+  const safeValue = safeText(font, String(value ?? ""), 2000);
+  let layout = null;
+  for (let size = Math.min(12, Math.max(4, maxHeight * 0.55)); size >= 4; size -= 0.25) {
+    const lines = wrapPdfText(font, safeValue, size, maxWidth);
+    const lineHeight = size * 1.16;
+    if (lines.length * lineHeight <= maxHeight + 0.01) {
+      layout = { lines, size, lineHeight };
+      break;
+    }
+  }
+  if (!layout) throw new HttpError(400, "Signer name, role or date does not fit inside its assigned PDF field. Enlarge the field and retry.");
+  const rotate = rotation ? degrees((360 - rotation) % 360) : undefined;
+  const color = options.color || rgb(0.05, 0.05, 0.08);
+  layout.lines.forEach((line, index) => {
+    let x, y;
+    if (rotation === 90) {
+      x = fieldBox.x + padding + index * layout.lineHeight;
+      y = fieldBox.y + fieldBox.height - padding;
+    } else if (rotation === 180) {
+      x = fieldBox.x + fieldBox.width - padding;
+      y = fieldBox.y + fieldBox.height - padding - index * layout.lineHeight;
+    } else if (rotation === 270) {
+      x = fieldBox.x + fieldBox.width - padding - index * layout.lineHeight;
+      y = fieldBox.y + padding;
+    } else {
+      x = fieldBox.x + padding;
+      y = fieldBox.y + padding + (layout.lines.length - 1 - index) * layout.lineHeight;
+    }
+    page.drawText(line, {
+      x, y, size: layout.size, font, color,
+      ...(rotate ? { rotate } : {}),
+      maxWidth
+    });
+  });
+  return layout;
+}
+
 export async function buildSignedPdf(originalBytes, info) {
   const document = await PDFDocument.load(originalBytes);
   const regular = await document.embedFont(StandardFonts.Helvetica);
@@ -103,7 +182,7 @@ export async function buildSignedPdf(originalBytes, info) {
       : (info.signers || []).find(item => item.uid && item.uid === field.signerUid);
     if (!signer) continue;
     const serverDateTime = signer.signedAt && Number.isFinite(Date.parse(signer.signedAt))
-      ? new Date(signer.signedAt).toISOString().replace("T", " ").replace(/\\.\\d{3}Z$/, " UTC")
+      ? new Date(signer.signedAt).toISOString().slice(0, 10)
       : null;
     const value = field.type === "Date" && serverDateTime
       ? serverDateTime
@@ -129,11 +208,7 @@ export async function buildSignedPdf(originalBytes, info) {
       page.drawRectangle({ x, y, width: Math.min(width, height), height: Math.min(width, height), borderWidth: 1, borderColor: rgb(0.1, 0.1, 0.1) });
       if (value === "true") page.drawText("X", { x: x + 2, y: y + 1, size: Math.max(7, Math.min(12, height * 0.6)), font: regular, color: rgb(0, 0, 0) });
     } else {
-      page.drawText(safeText(regular, String(value), Math.max(1, Math.floor(width / 4))), {
-        x, y: y + Math.min(height * 0.2, 3),
-        size: Math.max(7, Math.min(16, height * 0.6)),
-        font: regular, color: rgb(0.05, 0.05, 0.08), maxWidth: width
-      });
+      drawTextInField(page, value, regular, fieldBox);
     }
   }
 
