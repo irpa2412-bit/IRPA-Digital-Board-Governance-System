@@ -29,5 +29,5 @@ test("saved, drawn and typed signature methods share the always-visible action f
   assert.ok(source.includes('"Use my saved signature"'));
   assert.ok(source.includes('"Type"'));
   assert.ok(source.includes('mode==="Use my saved signature"?"Use this signature"'));
-  assert.ok(source.includes('mode==="Type"?"Use typed signature":"Confirm signature"'));
+  assert.ok(source.includes('mode==="Type"?"Confirm "+(field?.type||"Signature")'));
 });
