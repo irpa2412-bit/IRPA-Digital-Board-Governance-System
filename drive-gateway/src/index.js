@@ -14,6 +14,7 @@ const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
@@ -2983,7 +2984,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
       for(const line of lines){
         if(/^\d{3} /.test(line)){
           const code=Number(line.slice(0,3));
-          if(code>=400)throw new Error("IRPA SMTP error "+code);
+          if(code>=400){const failure=new Error("IRPA SMTP error "+code);failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));throw failure;}
           return line;
         }
       }
