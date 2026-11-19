@@ -358,6 +358,8 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(emailPortal,/String\(currentUser\.email\|\|""\)\.trim\(\)\.toLowerCase\(\)===invitedEmail/);
   assert.match(emailPortal,/candidate\?\.uid===currentUser\.uid/);
   assert.match(emailPortal,/candidate\.status==="Active"/);
+  assert.match(emailPortal,/setSelectedFieldId\(matchedProfile\?\(firstAssignedField\?\.fieldId\|\|""\):""\)/);
+  assert.match(emailPortal,/setPageNum\(matchedProfile\?Number\(firstAssignedField\?\.page\|\|1\):1\)/);
   assert.match(emailPortal,/shouldShowSignaturePad=Boolean\(selectedField&&\["Signature","Initials"\]\.includes\(selectedField\.type\)&&\(savedProfile\|\|signaturePadField\?\.fieldId===selectedField\.fieldId\)\)/);
   assert.match(emailPortal,/CLICK HERE TO SIGN/);
   assert.match(emailPortal,/selectedField&&\(!\["Signature","Initials"\]\.includes\(selectedField\.type\)\|\|shouldShowSignaturePad\)/);
