@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const participants=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
 const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
+const meetingApi=fs.readFileSync("src/firebase/meetingGatewayApi.js","utf8");
 
 test("failed meeting invitations expose a guarded resend action and valid gateway link",()=>{
   assert.match(participants,/async function resendInvitation\(i,fromBulk=false\)/);
@@ -19,7 +20,7 @@ test("failed meeting invitations expose a guarded resend action and valid gatewa
 
 test("resend persists confirmed dispatch or marks failure and revokes the newly issued pass",()=>{
   assert.match(participants,/meetingAccessDispatchStatus:"Confirmed"/);
-  assert.match(participants,/\/api\/meeting-invitations\/dispatch/);
+  assert.match(meetingApi,/\/api\/meeting-invitations\/dispatch/);
   assert.match(participants,/meetingAccessDispatched:true/);
   assert.match(participants,/meetingAccessDispatchStatus:"Failed"/);
   assert.match(participants,/revokeMeetingAccessInvitation/);
