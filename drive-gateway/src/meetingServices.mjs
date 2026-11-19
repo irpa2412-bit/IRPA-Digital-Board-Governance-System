@@ -138,7 +138,7 @@ if(pathname==="/api/meeting-entry-requests/resolve"){
 const requestId=clean(data.requestId),decision=clean(data.decision).toUpperCase();
 if(!requestId||!["ADMIT","DENY"].includes(decision))return fail(ctx,request,"An entry request ID and ADMIT or DENY decision are required.",400);
 const entry=await getDoc(ctx,env,token,"meetingEntryRequests",requestId);if(!entry)return fail(ctx,request,"Entry request was not found.",404);
-const meeting=await getDoc(ctx,env,token,"meetings",clean(entry.meetingId));if(!meeting)return fail(ctx,request,"Meeting was not found.",404);
+const meeting=await getDoc(ctx,env,token,"meetings",clean(entry.meetingId));if(!meeting)return fail(ctx,request,"Meeting was not found.",404);if(terminal.has(lower(meeting.status)))return fail(ctx,request,"Closed meetings cannot admit or decline new entry requests.",409);
 const uid=clean(claims.user_id),email=lower(claims.email),adminProfile=await getDoc(ctx,env,token,"adminProfiles",uid);
 const authorised=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true||clean(meeting.initiatorUid)===uid||clean(meeting.chairpersonUid)===uid||clean(meeting.secretaryUid)===uid||email&&[meeting.chairpersonEmail,meeting.secretaryEmail].some(v=>lower(v)===email);
 if(!authorised)return fail(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may resolve entry requests.",403);
