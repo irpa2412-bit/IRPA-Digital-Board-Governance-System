@@ -475,7 +475,7 @@ function directionalPng(width, height) {
 }
 
 function inversePageRotationAroundCenter(width, height, rotation) {
-  const radians = -rotation * Math.PI / 180;
+  const radians = rotation * Math.PI / 180;
   const a = Math.cos(radians), b = Math.sin(radians);
   const c = -Math.sin(radians), d = Math.cos(radians);
   const cx = width / 2, cy = height / 2;
