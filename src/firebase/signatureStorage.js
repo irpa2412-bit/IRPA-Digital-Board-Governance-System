@@ -523,7 +523,7 @@ export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) 
     classification,
     archives:[archiveKey],
     signingMode:envelope.signingMode === "Parallel" ? "Parallel" : "Sequential",
-    ...(ownerSigner?{ownerPreSignEmail:String(ownerSigner.email||"").trim().toLowerCase()}:{}),
+    ...(ownerSigner?{ownerPreSignEmail:String(ownerSigner.email||"").trim().toLowerCase(),ownerPreSignSignerId:"S"+String(ordered.indexOf(ownerSigner)+1)}:{}),
     signers:ordered.map((recipient,index) => {
       return {
         identityType:"email-link",
