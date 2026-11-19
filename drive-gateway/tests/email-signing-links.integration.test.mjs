@@ -121,7 +121,7 @@ test("two distinct participants may share one delivery email and retain isolated
   assert.equal(f.sent.length,2,"sequential routing sends the first invitation and keeps the second signer pending");
 });
 
-test("email-link signer is stored with token hash, email hash and issued status without a time expiry; mail is sent once",async()=>{
+test("email-link signer is stored with token hash, email hash and configured expiry; mail is sent once",async()=>{
   const f=await fixture();
   const signer=f.envelope.signers[0];
   assert.equal(signer.identityType,"email-link");
@@ -193,7 +193,7 @@ test("an unused email signing link is no longer redeemable after its configured 
   assert.ok(Date.parse(stored.signers[0].emailLinkExpiresAt)<f.ctx.now().getTime());
 });
 
-test("owner revoke invalidates a guest link; resend rotates token and revokes the previous hash",async()=>{
+test("owner revoke invalidates a guest link; resend rotates token and marks the previous hash replaced",async()=>{
   const f=await fixture();
   const oldToken=f.token;
   const opened=await openEmailSigning(f.ctx,oldToken,"198.51.100.10");
