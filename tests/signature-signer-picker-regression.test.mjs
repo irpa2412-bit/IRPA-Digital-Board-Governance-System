@@ -35,3 +35,14 @@ test("participant selection and addition are performed directly in the PDF palet
   assert.match(portal, /addSignerInFlightRef\.current=true/);
   assert.match(portal, /window\.matchMedia\("\(pointer:fine\)"\)/);
 });
+
+
+test("each PDF field can be assigned both a signer and that signer's specific duty without changing signing protocols", () => {
+  assert.match(portal, /Assigned signer<select aria-label=\{"Assign "\+field\.type\+" field "\+\(index\+1\)\}/);
+  assert.match(portal, /Assigned duty \/ responsibility<select aria-label=\{"Duty for "\+field\.type\+" field "\+\(index\+1\)\}/);
+  assert.match(portal, /roleAssignmentIndex:nextIndex,responsibility:assignment\?\.role\|\|"Review"/);
+  assert.match(portal, /const assignments=assignedRecipient\?\(Array\.isArray\(assignedRecipient\.roleAssignments\)/);
+  const worker = fs.readFileSync("drive-gateway/src/signing.mjs", "utf8");
+  assert.match(worker, /roleAssignmentIndex=f\?\.roleAssignmentIndex==null\?0:Number\(f\.roleAssignmentIndex\)/);
+  assert.match(worker, /roleAssignmentIndex>=Math\.max\(1,Array\.isArray\(assigned\.roleAssignments\)\?assigned\.roleAssignments\.length:1\)/);
+});
