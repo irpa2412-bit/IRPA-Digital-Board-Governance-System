@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluatePolicy } from "../scripts/portal-protection-check.mjs";
-import registry from "../docs/portal-protection/portal-register.json" with { type: "json" };
+import fs from "node:fs";
+const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/portal-register.json", import.meta.url), "utf8"));
 
 const portal = "Signature Portal";
 const now = Date.parse("2026-11-19T20:00:00Z");
