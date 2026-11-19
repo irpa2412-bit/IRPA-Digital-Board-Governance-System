@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
-import { createEnvelope, getEnvelopeStatus, resendInvitation, revokeInvitation, openEmailSigning } from "../src/signing.mjs";
+import { createEnvelope, getEnvelopeStatus, resendInvitation, revokeInvitation, openEmailSigning, openSigning } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 import { buildInvitationMessage } from "../src/invitationEmail.mjs";
 
@@ -101,7 +101,7 @@ test("email-link resend rotates the bearer token and makes the prior invitation 
   await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   const second=new URL(f.sent[1].link).searchParams.get("emailSignToken");
   assert.notEqual(second,first);
-  await assert.rejects(()=>openEmailSigning(f.ctx,first,"192.0.2.11"),/signing link is unavailable/i);
+  await assert.rejects(()=>openEmailSigning(f.ctx,first,"192.0.2.11"),/This link was replaced\. Please use the newest email\./);
   const opened=await openEmailSigning(f.ctx,second,"192.0.2.12");
   assert.equal(opened.ok,true);
 });
@@ -189,10 +189,10 @@ test("failed replacement reports the SMTP stage and preserves the prior link",as
   const f=await fixture({emailLink:true});
   const original=new URL(f.sent[0].link).searchParams.get("emailSignToken");
   const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  const signer=current.signers[0];
+  const originalTokenHash=current.signers[0].tokenHash;
   const originalSend=f.ctx.sendInvitation;
   f.ctx.sendInvitation=async invitation=>{if(invitation.signerId==="S1")throw Object.assign(new Error("SMTP authentication failed"),{stageCode:"SMTP_AUTH"});return originalSend(invitation)};
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),error=>error.code==="SMTP_AUTH");
+  const afterFailure=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(afterFailure.signers[0].tokenHash,originalTokenHash);
   const opened=await openEmailSigning(f.ctx,original,"192.0.2.44");assert.equal(opened.ok,true);
-  const after=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(after.signers[0].tokenHash,signer.tokenHash);
 });
