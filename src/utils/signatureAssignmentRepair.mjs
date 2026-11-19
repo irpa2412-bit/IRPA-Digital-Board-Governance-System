@@ -33,10 +33,12 @@ function mergePair(recipients,fields,keepUid,removeUid){
  const remove=recipients.find(item=>String(item.uid)===String(removeUid));
  if(!keep||!remove)throw new Error("Both participant entries must exist before merging.");
  if(norm(keep.name)!==norm(remove.name)||email(keep.email)!==email(remove.email)||!email(keep.email))throw new Error("Only participants with the same name and email can be merged.");
- const assignments=[...rolesFor(keep),...rolesFor(remove)];
+ const keepRoles=rolesFor(keep),removeRoles=rolesFor(remove);
+ const assignments=[...keepRoles,...removeRoles];
  const unique=[...new Map(assignments.map(item=>[roleKey(item),item])).values()];
  const merged={...keep,roleAssignments:unique,role:keep.role||remove.role,title:keep.title||remove.title,capacity:keep.capacity||remove.capacity};
- return {recipients:recipients.filter(item=>String(item.uid)!==String(removeUid)).map(item=>String(item.uid)===String(keepUid)?merged:item),fields:fields.map(field=>String(field?.signerUid||"")===String(removeUid)?{...field,signerUid:String(keepUid)}:field)};
+ const movedFields=fields.map(field=>{if(String(field?.signerUid||"")!==String(removeUid))return field;const oldRole=removeRoles[Math.max(0,Math.min(Number(field.roleAssignmentIndex||0),removeRoles.length-1))];const roleAssignmentIndex=Math.max(0,unique.findIndex(item=>roleKey(item)===roleKey(oldRole)));return {...field,signerUid:String(keepUid),roleAssignmentIndex};});
+ return {recipients:recipients.filter(item=>String(item.uid)!==String(removeUid)).map(item=>String(item.uid)===String(keepUid)?merged:item),fields:movedFields};
 }
 
 export function mergeDuplicateParticipants(recipients=[],fields=[]){
