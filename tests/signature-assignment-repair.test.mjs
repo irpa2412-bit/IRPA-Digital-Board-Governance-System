@@ -78,6 +78,20 @@ test("merge and repair preserve coordinates and page references on 0, 90, 180 an
  }
 });
 
+test("ten attendance participants plus owner and last-page Abednego and Gloria signatures remain assigned across several pages",()=>{
+ const people=Array.from({length:10},(_,index)=>({uid:"participant-"+index,name:"Participant "+(index+1),email:"person"+index+"@example.org"}));
+ const owner={uid:"owner",name:"Document Owner",email:"owner@example.org"};
+ const attendance=people.map((person,index)=>({fieldId:"attendance-"+index,type:"Name",page:index<5?1:2,x:8+(index%5)*18,y:20,width:14,height:5,signerUid:person.uid}));
+ const signatureFields=[
+  {fieldId:"owner-signature",type:"Signature",page:3,x:12,y:72,width:18,height:7,signerUid:"owner"},
+  {fieldId:"abednego-signature",type:"Signature",page:4,x:32,y:72,width:18,height:7,signerUid:"participant-0"},
+  {fieldId:"gloria-signature",type:"Signature",page:4,x:56,y:72,width:18,height:7,signerUid:"participant-1"}
+ ];
+ const result=analyzeFieldAssignments({recipients:[owner,...people],fields:[...attendance,...signatureFields],ownerUid:"owner",ownerSigningEnabled:true});
+ assert.equal(result.fieldIssues.length,0);
+ assert.equal(result.recipientsWithoutFields.length,0);
+ assert.equal(attendance.length,10);
+});
 test("participant with no fields is listed for owner repair rather than silently discarded",()=>{
  const result=analyzeFieldAssignments({recipients:[{uid:"empty",name:"Ndang...",email:"n@example.org"}],fields:[]});
  assert.deepEqual(result.recipientsWithoutFields.map(x=>[x.name,x.fieldCount]),[["Ndang...",0]]);
