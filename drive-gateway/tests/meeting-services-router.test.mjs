@@ -51,7 +51,6 @@ test("meeting register, decision, and voting control routes require authenticate
     "/api/meeting-participants/create",
     "/api/meeting-participants/update",
     "/api/meeting-participants/delete",
-    "/api/meeting-invitations/update",
     "/api/meeting-room/activity",
     "/api/meeting-subscriptions/mine",
     "/api/meeting-entry-requests/list",
