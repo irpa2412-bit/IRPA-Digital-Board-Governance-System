@@ -246,3 +246,26 @@ test("smtp-selfcheck permits an authenticated system owner and invokes exactly o
   assert.equal(sends,1);
   assert.deepEqual(await response.json(),{ok:true,stageCode:"SUBMIT"});
 });
+
+
+test("createEnvelope sends three distinct email-link invitations to three signer positions sharing one mailbox",async()=>{
+  const sent=[];
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
+    verifyUser:async()=>null,
+    sendInvitation:async invitation=>sent.push(invitation),
+    logger:{error(){}}
+  });
+  const bytes=new TextEncoder().encode("%PDF-1.7\\nIRPA shared mailbox positions");
+  const source=await ctx.storage.put({path:"source/shared-mailbox.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  await ctx.meta.create("documents","DOC-SHARED-THREE",{id:"DOC-SHARED-THREE",status:"Stored",ownerUid:"owner",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"shared.pdf",title:"Shared mailbox test",classification:"Restricted"});
+  const signers=[1,2,3].map(index=>({identityType:"email-link",email:"shared@example.org",name:`Signer ${index}`,order:1}));
+  const fields=[1,2,3].map(index=>({fieldId:`SIGN-${index}`,type:"Signature",page:1,x:10,y:10,width:25,height:10,signerId:`S${index}`,required:true}));
+  const created=await createEnvelope(ctx,{uid:"owner",isAdmin:false},{documentId:"DOC-SHARED-THREE",title:"Shared mailbox test",archives:["board-governance"],signingMode:"Parallel",signers,fields});
+  assert.equal(created.invitations.length,3);
+  assert.equal(sent.length,3);
+  const tokens=sent.map(invitation=>new URL(invitation.link).searchParams.get("emailSignToken"));
+  assert.deepEqual(tokens.map(token=>token.split(".")[1]),["S1","S2","S3"]);
+  assert.equal(new Set(tokens).size,3);
+  assert.ok(sent.every(invitation=>invitation.to==="shared@example.org"&&invitation.emailLink===true));
+});
