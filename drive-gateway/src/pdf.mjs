@@ -93,7 +93,7 @@ function drawFittedSignature(page, image, fieldBox) {
 function wrapPdfText(font, value, size, maxWidth) {
   const lines = [];
   let line = "";
-  const words = String(value ?? "").trim().split(/\\s+/).filter(Boolean);
+  const words = String(value ?? "").trim().split(/\s+/).filter(Boolean);
   for (const word of words) {
     const candidate = line ? line + " " + word : word;
     if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {

@@ -366,7 +366,7 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
       const fields = [
         { ...makeField("sig", "Signature", 8, 8, 24, 10), coordinateSpace: "visible-page-fraction-v1" },
         { ...makeField("name", "Name", 8, 23, 84, 6), coordinateSpace: "visible-page-fraction-v1" },
-        { ...makeField("role", "Title", 8, 31, 84, 8), coordinateSpace: "visible-page-fraction-v1" },
+        { ...makeField("role", "Title", 8, 31, 20, 10), coordinateSpace: "visible-page-fraction-v1" },
         { ...makeField("date", "Date", 8, 42, 84, 6), coordinateSpace: "visible-page-fraction-v1" }
       ];
       const textDraws = [], imageDraws = [];
