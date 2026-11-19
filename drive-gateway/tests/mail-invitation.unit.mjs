@@ -177,8 +177,8 @@ test("SMTP configuration uses the declared Gateway sender, TLS endpoint and opti
 });
 
 test("SMTP configuration rejects malformed host, port, sender and username without exposing credentials",()=>{
-  assert.throws(()=>resolveSmtpConfiguration({SMTP_HOST:"mail.irpa.or.tz\\r\\nX"}),/host configuration is invalid/);
+  assert.throws(()=>resolveSmtpConfiguration({SMTP_HOST:"mail.irpa.or.tz\r\nX"}),/host configuration is invalid/);
   assert.throws(()=>resolveSmtpConfiguration({SMTP_PORT:"70000"}),/port configuration is invalid/);
   assert.throws(()=>resolveSmtpConfiguration({SMTP_FROM:"not-an-email"}),/sender configuration is invalid/);
-  assert.throws(()=>resolveSmtpConfiguration({SMTP_USERNAME:"smtp-user\\r\\nAUTH LOGIN"}),/username configuration is invalid/);
+  assert.throws(()=>resolveSmtpConfiguration({SMTP_USERNAME:"smtp-user\r\nAUTH LOGIN"}),/username configuration is invalid/);
 });
