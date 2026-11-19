@@ -230,7 +230,7 @@ test("duplicate participant identities are reused and rapid repeated add actions
   assert.match(addSigner[1], /The existing responsibility was selected; no duplicate was created/);
   assert.match(addSigner[1], /roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
   assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
-  assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("await crypto.subtle.digest"));
+  assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("crypto.getRandomValues"));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(registeredEmail))'));
   assert.ok(addSigner[1].includes("email:registeredEmail,role,"));
