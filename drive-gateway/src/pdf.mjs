@@ -85,9 +85,10 @@ export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {
 
 function drawFittedSignature(page, image, fieldBox) {
   const geometry = getSignatureDrawGeometry(image.width, image.height, fieldBox);
+  const counterRotation = fieldBox.rotation ? (360 - fieldBox.rotation) % 360 : 0;
   page.drawImage(image, {
     ...geometry,
-    ...(fieldBox.rotation ? { rotate: degrees(fieldBox.rotation) } : {})
+    ...(counterRotation ? { rotate: degrees(counterRotation) } : {})
   });
   return geometry;
 }
@@ -312,11 +313,15 @@ function getEffectivePdfFieldBox(page, field, contentMatrix) {
     const y = Math.min(...points.map(point => point.y));
     const right = Math.max(...points.map(point => point.x));
     const bottom = Math.max(...points.map(point => point.y));
-    const angle = ((Math.round(Math.atan2(visibleMatrix[1], visibleMatrix[0]) * 180 / Math.PI / 90) * 90) % 360 + 360) % 360;
-    if (Math.abs(Math.atan2(visibleMatrix[1], visibleMatrix[0]) * 180 / Math.PI - angle) > 0.5) {
+    const rawAngle = Math.atan2(visibleMatrix[1], visibleMatrix[0]) * 180 / Math.PI;
+    const nearestAngle = Math.round(rawAngle / 90) * 90;
+    const angularError = Math.abs(((rawAngle - nearestAngle + 540) % 360) - 180);
+    if (angularError > 0.5) {
       throw new RangeError("The PDF page content is not aligned to a supported right angle.");
     }
-    return { x, y, width: right - x, height: bottom - y, rotation: angle, visibleToPdfMatrix: inverse, visibleLeft: left, visibleTop: top };
+    const visibleAngle = ((nearestAngle % 360) + 360) % 360;
+    const counterRotation = (360 - visibleAngle) % 360;
+    return { x, y, width: right - x, height: bottom - y, rotation: visibleAngle, counterRotation, visibleToPdfMatrix: inverse, visibleLeft: left, visibleTop: top };
   } catch (error) {
     throw new HttpError(400, error?.message || "The signature field is outside the visible PDF page.");
   }
@@ -375,7 +380,7 @@ function drawTextInField(page, value, font, fieldBox, options = {}) {
     }
   }
   if (!layout) throw new HttpError(400, "Signer name, role or date does not fit inside its assigned PDF field. Enlarge the field and retry.");
-  const rotate = rotation ? degrees(rotation) : undefined;
+  const rotate = fieldBox.counterRotation ? degrees(fieldBox.counterRotation) : (rotation ? degrees((360 - rotation) % 360) : undefined);
   const color = options.color || rgb(0.05, 0.05, 0.08);
   layout.lines.forEach((line, index) => {
     let x, y;
