@@ -437,6 +437,7 @@ export async function buildSignedPdf(originalBytes, info) {
   const italic = await document.embedFont(StandardFonts.HelveticaOblique);
   const pages = document.getPages();
   const pageContentTransforms = new Map();
+  const certificateSignatureGeometry = new Map();
 
   for (const field of info.fields || []) {
     const signer = field.signerId
@@ -472,7 +473,10 @@ export async function buildSignedPdf(originalBytes, info) {
     if (field.type === "Signature" || field.type === "Initials") {
       if (typeof value === "string" && value.startsWith("data:image/png;base64,")) {
         const png = await document.embedPng(decodePngDataUrl(value));
-        drawFittedSignature(page, png, fieldBox);
+        const geometry = drawFittedSignature(page, png, fieldBox);
+        if (field.type === "Signature" && !certificateSignatureGeometry.has(signer.id)) {
+          certificateSignatureGeometry.set(signer.id, { width: geometry.width, height: geometry.height });
+        }
       } else {
         drawTextInField(page, safeText(italic, value, 100), italic, fieldBox);
       }
@@ -519,7 +523,8 @@ export async function buildSignedPdf(originalBytes, info) {
     certificatePage.drawText(safeText(bold, signer.declarationDiscrepancy?.detected ? `DISCREPANCY NOTED: ${(signer.declarationDiscrepancy.fields || []).join(", ")}` : "Declaration comparison: no discrepancy recorded", 90), { x: 56, y: top - 94, size: 6.5, font: bold, color: signer.declarationDiscrepancy?.detected ? rgb(0.65, 0.2, 0.1) : rgb(0.12, 0.12, 0.12) });
     if (signer.signatureType === "drawn" && typeof signer.signatureValue === "string" && signer.signatureValue.startsWith("data:image/png;base64,")) {
       const png = await document.embedPng(decodePngDataUrl(signer.signatureValue));
-      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: 170, height: 50 });
+      const documentSignatureSize = certificateSignatureGeometry.get(signer.id) || { width: 170, height: 50 };
+      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: documentSignatureSize.width, height: documentSignatureSize.height });
       certificatePage.drawImage(png, { x: fit.x, y: fit.y, width: fit.width, height: fit.height });
     } else {
       certificatePage.drawText(safeText(italic, signer.signatureValue, 28), { x: 340, y: top - 40, size: 18, font: italic });
