@@ -364,7 +364,7 @@ test("email-link signers may confirm only their own active saved profile specime
   assert.match(emailPortal,/CLICK HERE TO SIGN/);
   assert.match(emailPortal,/selectedField&&\(!\["Signature","Initials"\]\.includes\(selectedField\.type\)\|\|shouldShowSignaturePad\)/);
   assert.match(emailPortal,/setSignaturePadField\(\["Signature","Initials"\]\.includes\(field\.type\)\?field:null\)/);
-  assert.match(emailPortal,/setSignaturePadField\(field\)/);
+  assert.ok(emailPortal.includes("setSignaturePadField(null);const targetPage=Number(field.page||1);"),"field-list selection must not open the non-profile drawing pad");
   assert.match(emailPortal,/savedSignatureUrl=\{savedProfile\?\.signatureUrl\|\|""\}/);
   assert.match(emailPortal,/allowTyped=\{false\}/);
   assert.match(emailPortal,/Your own saved Signature Profile specimen has been confirmed/);
