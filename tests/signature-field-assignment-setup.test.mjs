@@ -37,7 +37,7 @@ test("adding unregistered people creates independent identities even when their 
 });
 
 test("field selection, explicit reassignment and placement preserve the selected signer UID",()=>{
-  assert.match(designer,/const selectAssignee=uid=>\{setSelectedAssigneeUid\(uid\);setSelectedRoleAssignmentIndex\(0\);setPendingFieldType\("");onSelectAssignee\?\.\(uid\)\}/);
+  assert.ok(designer.includes("const selectAssignee=uid=>{setSelectedAssigneeUid(uid);setSelectedRoleAssignmentIndex(0);setPendingFieldType(\"\");onSelectAssignee?.(uid)}"));
   assert.match(designer,/const addAt=\(type,x=50,y=20\)=>/);
   assert.match(designer,/makeField\(type,fields\.length,selectedAssigneeUid,pageNum\)/);
   assert.match(palette,/update\(field\.fieldId,\{signerUid:uid,roleAssignmentIndex:0,responsibility:/);
