@@ -66,6 +66,34 @@ test("three distinct signer identities sharing one email each retain three indep
   for(const recipient of recipients)assert.equal(assigned.filter(field=>field.signerUid===recipient.uid).length,3);
 });
 
+test("participant button gating and required signer name/email validation are explicit",()=>{
+  assert.ok(designer.includes('disabled={busy||(!selectedSigner&&!String(signerEmail||"").trim())}'));
+  assert.ok(addSigner.includes('if(!registered&&!email){setMessage("Select a registered officer or enter a signer name and email address.'));
+  assert.ok(addSigner.includes('Enter the signer’s full name as well as their email address.'));
+  assert.ok(addSigner.includes("valid email address"));
+});
+
+const createStart=ui.indexOf("async function createEnvelope(e)");
+const createValidation=ui.slice(createStart,ui.indexOf("let env=draftEnvelopeId",createStart));
+
+test("envelope validation rejects duplicate or missing signer UIDs but permits shared email addresses",()=>{
+  assert.ok(createValidation.includes('Every participant must have a unique signer identity before the envelope can be created.'));
+  assert.ok(createValidation.includes('if(seenSignerUids.has(uid)){duplicateRecipients.push(recipient);continue;}'));
+  assert.ok(createValidation.includes('const seenSignerUids=new Set([documentOwner.uid])'));
+  assert.ok(!createValidation.includes("seenSignerEmails"));
+  assert.ok(!createValidation.includes("Duplicate participants were detected by signer identity or email"));
+});
+
+test("each signer needs an assigned field and fields cannot reference unknown signer identities",()=>{
+  assert.ok(createValidation.includes('recipientsWithoutFields=orderedRecipients.filter(recipient=>!fields.some(field=>String(field.signerUid||"")===String(recipient.uid||"")))'));
+  assert.ok(createValidation.includes("if(recipientsWithoutFields.length)"));
+  assert.ok(createValidation.includes("if(fields.some(f=>!f.signerUid||!signerUids.has(f.signerUid)))"));
+});
+
+test("owner-signing mode requires a required Signature field assigned to the owner",()=>{
+  assert.ok(createValidation.includes('ownerSigningEnabled&&!fields.some(f=>f?.type==="Signature"&&f.required!==false&&f.signerUid===documentOwner.uid)'));
+});
+
 test("four visible-page rotations preserve non-zero field geometry and all signer metadata through save/reload",()=>{
   for(const rotation of [0,90,180,270]){
     const original={fieldId:`rotation-${rotation}`,type:"Signature",page:rotation/90+1,x:42.25,y:38.5,width:12.5,height:3.2,signerUid:"email-link-person-b",roleAssignmentIndex:0};
