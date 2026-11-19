@@ -67,7 +67,7 @@ function resolveFieldParticipant(field,recipients){
  return null;
 }
 
-export function repairDraftAssignments({recipients=[],fields=[],ownerUid="",ownerSigningEnabled=false}={}){
+export function repairDraftAssignments({recipients=[],fields=[],ownerUid="",ownerSigningEnabled=false,ownerSigner=null}={}){
  const merged=mergeDuplicateParticipants(recipients,fields);
  const ids=new Set(merged.recipients.map(item=>String(item.uid||"")).filter(Boolean));
  if(ownerSigningEnabled&&ownerUid)ids.add(String(ownerUid));
@@ -75,7 +75,7 @@ export function repairDraftAssignments({recipients=[],fields=[],ownerUid="",owne
  const nextFields=merged.fields.map(field=>{
   const uid=String(field?.signerUid||"").trim();
   if(!uid||ids.has(uid))return field;
-  const match=resolveFieldParticipant(field,merged.recipients);
+  const match=resolveFieldParticipant(field,ownerSigningEnabled&&ownerSigner?.uid?[ownerSigner,...merged.recipients]:merged.recipients);
   if(!match)return field;
   relinked++;return {...field,signerUid:String(match.uid),signerName:match.name||"",signerEmail:match.email||""};
  });
