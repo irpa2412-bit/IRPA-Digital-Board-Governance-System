@@ -20,6 +20,7 @@ const meetingAccessControl=fs.readFileSync("src/meeting/MeetingAccessControl.jsx
 const attendanceClient=fs.readFileSync("src/firebase/meetingRecords.js","utf8");
 const mediaClient=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
 const meetingRoom=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
+const meetingsPage=fs.readFileSync("src/pages/Meetings.jsx","utf8");
 const participantApi=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
@@ -39,6 +40,7 @@ const checks=[
  ["Meeting Worker uses the existing SMTP sender and existing Worker secrets",invitationWorker.includes("sendEmail: (env, message) => smtpSend(env, message)")&&meetingWorker.includes("ctx.sendEmail(env, { to: recipient, subject, text, html })")],
  ["Meeting invitation records are stored on meeting participant records, not Invitation Portal",participantPage.includes("meetingInvitationRows=useMemo(()=>rows.filter")&&!participantPage.includes("COLLECTIONS.invitations")&&!participantPage.includes("sendMemberInvitationEmail")],
  ["Meeting Worker email includes meeting-specific gate link and password",meetingWorker.includes("meetingToken")&&meetingWorker.includes("Gate password: ")&&meetingWorker.includes("IRPA Meeting Invitation")],
+ ["Meeting register create update delete and voting use Worker routes",["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open"].every(route=>meetingsPage.includes(route))&&!/\b(createRecord|updateRecord|deleteRecord|openVotingIssue)\(/.test(meetingsPage)],
  ["Meeting participant create update and removal use Worker endpoints",meetingServices.includes("/api/meeting-participants/create")&&meetingServices.includes("/api/meeting-participants/update")&&meetingServices.includes("/api/meeting-participants/delete")&&participantApi.includes("/api/meeting-participants/create")&&participantApi.includes("/api/meeting-participants/update")&&participantApi.includes("/api/meeting-participants/delete")&&!participantApi.includes("COLLECTIONS.invitations")],
  ["Meeting voting decisions and actions use Worker routes",meetingServices.includes("/api/meeting-voting/open")&&meetingServices.includes("/api/meeting-decisions/create")&&meetingServices.includes("/api/meeting-actions/create")&&meetingRoom.includes("/api/meeting-voting/open")&&meetingRoom.includes("/api/meeting-decisions/create")&&meetingRoom.includes("/api/meeting-actions/create")],
  ["Meeting room status and activity events use Worker routes",meetingServices.includes("/api/meeting-room/event")&&meetingRoom.includes("/api/meeting-register/update")&&meetingRoom.includes("/api/meeting-room/event")],
