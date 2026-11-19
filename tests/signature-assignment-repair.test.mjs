@@ -49,6 +49,14 @@ test("missing signer links are diagnosed and unambiguous name/email snapshots ar
  assert.equal(repaired.unresolvedOrphans.length,0);
 });
 
+test("orphaned owner field is automatically re-linked to the enabled owner when name and email match uniquely",()=>{
+ const owner={uid:"owner",name:"Document Owner",email:"owner@example.org"};
+ const field={fieldId:"owner-orphan",type:"Signature",page:3,signerUid:"old-owner-id",signerName:"Document Owner",signerEmail:"owner@example.org"};
+ const result=repairDraftAssignments({recipients:[participants[0]],fields:[field],ownerUid:"owner",ownerSigningEnabled:true,ownerSigner:owner});
+ assert.equal(result.relinked,1);
+ assert.equal(result.fields[0].signerUid,"owner");
+ assert.equal(result.unresolvedOrphans.length,0);
+});
 test("orphaned field remains explicitly orphaned when there is no safe identity match and can be re-linked",()=>{
  const orphan={fieldId:"orphan",type:"Signature",page:3,x:10,y:20,width:18,height:6,signerUid:"deleted-id"};
  const diagnosed=analyzeFieldAssignments({recipients:[participants[0]],fields:[orphan]});
