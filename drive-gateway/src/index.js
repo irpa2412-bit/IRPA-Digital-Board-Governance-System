@@ -14,7 +14,7 @@ const SMTP_HOST = "mail.irpa.or.tz";
 const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
@@ -532,9 +532,9 @@ export default {
               const member = await getFirestoreDocument(env, `members/${claims.user_id}`, adminToken);
               const employee = await getFirestoreDocument(env, `employees/${claims.user_id}`, adminToken);
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
-              return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue)};
+              const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"};
             },
-            sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt,envelopeId,signerId,onStage}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA participant").slice(0,160);
@@ -544,6 +544,7 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
+            smtpSelfCheck: async () => { const result=await smtpSend(env,{to:SMTP_FROM,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
             resolveEmailLinkProfileUid: async (email, signerName) => {
               const normalized=String(email||"").trim().toLowerCase();
               const normalizedName=String(signerName||"").trim().toLowerCase();
@@ -2939,73 +2940,69 @@ async function enforceMailRateLimit(env, uid) {
 }
 
 
-async function smtpSend(env,{to,subject,text,html,attachments=[]}) {
-  const toEmail = normalizeRecipientEmail(to);
-  const cleanSubject = validateMailHeader(subject, "Subject");
-  if (env.SMTP_MOCK === "success") return "250 MOCK ACCEPTED";
-  if (env.SMTP_MOCK === "fail") throw new Error("Mock SMTP provider failure.");
-  if (!env.SMTP_PASSWORD) throw new Error("IRPA SMTP password is not configured in the deployment environment.");
-  const { connect } = await import("cloudflare:sockets");
-  const socket = connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
-  const reader = socket.readable.getReader();
-  const writer = socket.writable.getWriter();
-  let buffer = "";
-  async function readResponse() {
-    while (true) {
+async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
+  const toEmail=normalizeRecipientEmail(to);
+  const cleanSubject=validateMailHeader(subject,"Subject");
+  const mime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:`"IRPA Administration" <${SMTP_FROM}>`,to:toEmail,subject:cleanSubject,text,html,attachments}),onStage);
+  if(env.SMTP_MOCK==="success"){
+    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success")}catch{}
+    return "250 MOCK ACCEPTED";
+  }
+  if(env.SMTP_MOCK==="fail")return runEmailStage("SMTP_CONNECT",async()=>{throw new Error("SMTP provider unavailable.")},onStage);
+  if(!env.SMTP_PASSWORD)return runEmailStage("SMTP_AUTH",async()=>{throw new Error("SMTP authentication is unavailable.")},onStage);
+  let socket,reader,writer,buffer="";
+  async function readResponse(){
+    while(true){
       const {value,done}=await reader.read();
-      if (done) throw new Error("SMTP server closed the connection.");
-      buffer += new TextDecoder().decode(value);
-      const lines=buffer.split("\r\n"); buffer=lines.pop() || "";
-      for (const line of lines) {
-        if (/^\d{3} /.test(line)) {
+      if(done)throw new Error("SMTP server closed the connection.");
+      buffer+=new TextDecoder().decode(value);
+      const lines=buffer.split("\r\n");buffer=lines.pop()||"";
+      for(const line of lines){
+        if(/^\d{3} /.test(line)){
           const code=Number(line.slice(0,3));
-          if (code>=400) throw new Error("IRPA SMTP error " + code + ": " + line.slice(4));
+          if(code>=400)throw new Error("IRPA SMTP error "+code);
           return line;
         }
       }
     }
   }
-  async function command(value, expectedClass) {
+  async function command(value,expectedClass){
     await writer.write(new TextEncoder().encode(value+"\r\n"));
     const line=await readResponse();
-    if (expectedClass && !line.startsWith(String(expectedClass))) throw new Error("Unexpected SMTP response.");
+    if(expectedClass&&!line.startsWith(String(expectedClass)))throw new Error("Unexpected SMTP response.");
     return line;
   }
-  try {
-    await readResponse();
-    await command("EHLO irpa-digital-board-governance","2");
-    await authenticateSmtpPlain({
+  try{
+    await runEmailStage("SMTP_CONNECT",async()=>{
+      const {connect}=await import("cloudflare:sockets");
+      socket=connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
+      reader=socket.readable.getReader();
+      writer=socket.writable.getWriter();
+      await readResponse();
+      await command("EHLO irpa-digital-board-governance","2");
+    },onStage);
+    await runEmailStage("SMTP_AUTH",()=>authenticateSmtpPlain({
       username:env.SMTP_USERNAME||SMTP_FROM,
       password:env.SMTP_PASSWORD,
       writeLine:async line=>writer.write(new TextEncoder().encode(line+"\r\n")),
       readResponse,
       command
-    });
-    await command("MAIL FROM:<"+SMTP_FROM+">","2");
-    await command("RCPT TO:<"+toEmail+">","2");
-    await command("DATA","3");
-    const mime=buildMailMimeMessage({from:`"IRPA Administration" <${SMTP_FROM}>`,to:toEmail,subject:cleanSubject,text,html,attachments});
-    await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
-    let accepted;
-    try {
-      accepted=await readResponse();
-    } catch (error) {
-      // Once DATA has been written, a transport failure before the final SMTP
-      // response is ambiguous: the provider may already have accepted the mail.
-      // Do not retry this case automatically and risk duplicate invitations.
-      if (!/^IRPA SMTP error \d{3}/i.test(String(error?.message||""))) {
-        error.deliveryOutcome="unknown";
-        error.retryable=false;
-      }
-      throw error;
-    }
-    if (!accepted.startsWith("2")) throw new Error("SMTP message was not accepted.");
-    await command("QUIT","2");
+    }),onStage);
+    await runEmailStage("RCPT_ACCEPTED",async()=>{
+      await command("MAIL FROM:<"+SMTP_FROM+">","2");
+      await command("RCPT TO:<"+toEmail+">","2");
+    },onStage);
+    const accepted=await runEmailStage("SUBMIT",async()=>{
+      await command("DATA","3");
+      await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
+      return await readResponse();
+    },onStage);
+    try{await command("QUIT","2")}catch{}
     return accepted;
-  } finally {
-    try { reader.releaseLock(); } catch {}
-    try { writer.releaseLock(); } catch {}
-    try { socket.close(); } catch {}
+  }finally{
+    try{reader?.releaseLock()}catch{}
+    try{writer?.releaseLock()}catch{}
+    try{socket?.close()}catch{}
   }
 }
 
