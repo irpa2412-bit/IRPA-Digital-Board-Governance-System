@@ -1,4 +1,6 @@
-import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix } from "pdf-lib";
+import { decodePDFRawStream } from "pdf-lib/cjs/core/streams/decode.js";
+import { normalizeSignatureField } from "../../src/utils/signatureFieldCoordinates.mjs";
 import { HttpError, sha256Hex } from "./util.mjs";
 import { fitSignatureImage } from "../../src/utils/signatureImageFit.mjs";
 import { signatureFieldToPdfBox } from "../../src/utils/signatureFieldCoordinates.mjs";
@@ -73,21 +75,266 @@ export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {
   }, { allowUpscale: true, maxScale: 3 });
   const width = fit.width;
   const height = fit.height;
-  return {
-    x: fieldBox.x + (fieldBox.width - width) / 2,
-    y: fieldBox.y + (fieldBox.height - height) / 2,
-    width,
-    height
-  };
+  const rotation = ((Number(fieldBox.rotation || 0) % 360) + 360) % 360;
+  let x = fieldBox.x + (fieldBox.width - width) / 2;
+  let y = fieldBox.y + (fieldBox.height - height) / 2;
+  // pdf-lib rotates image XObjects around their lower-left origin. Offset the
+  // origin so the rotated image's visible bounds remain centred in the field.
+  if (rotation === 90) {
+    x = fieldBox.x + (fieldBox.width + height) / 2;
+    y = fieldBox.y + (fieldBox.height - width) / 2;
+  } else if (rotation === 180) {
+    x = fieldBox.x + (fieldBox.width + width) / 2;
+    y = fieldBox.y + (fieldBox.height + height) / 2;
+  } else if (rotation === 270) {
+    x = fieldBox.x + (fieldBox.width - height) / 2;
+    y = fieldBox.y + (fieldBox.height + width) / 2;
+  }
+  return { x, y, width, height };
 }
 
 function drawFittedSignature(page, image, fieldBox) {
   const geometry = getSignatureDrawGeometry(image.width, image.height, fieldBox);
+  const counterRotation = fieldBox.rotation || 0;
   page.drawImage(image, {
     ...geometry,
-    ...(fieldBox.rotation ? { rotate: degrees(360 - fieldBox.rotation) } : {})
+    ...(counterRotation ? { rotate: degrees(counterRotation) } : {})
   });
   return geometry;
+}
+
+const IDENTITY_PDF_MATRIX = [1, 0, 0, 1, 0, 0];
+const PDF_NUMBER_TOKEN = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[Ee][+-]?\d+)?$/;
+
+function multiplyPdfMatrices(left, right) {
+  const [a, b, c, d, e, f] = left;
+  const [g, h, i, j, k, l] = right;
+  return [
+    a * g + c * h,
+    b * g + d * h,
+    a * i + c * j,
+    b * i + d * j,
+    a * k + c * l + e,
+    b * k + d * l + f
+  ];
+}
+
+function invertPdfMatrix(matrix) {
+  const [a, b, c, d, e, f] = matrix;
+  const determinant = a * d - b * c;
+  if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-10) {
+    throw new HttpError(400, "The PDF page content transform is not invertible; signer fields cannot be placed safely.");
+  }
+  return [
+    d / determinant, -b / determinant, -c / determinant, a / determinant,
+    (c * f - d * e) / determinant,
+    (b * e - a * f) / determinant
+  ];
+}
+
+function transformPdfPoint(matrix, x, y) {
+  return {
+    x: matrix[0] * x + matrix[2] * y + matrix[4],
+    y: matrix[1] * x + matrix[3] * y + matrix[5]
+  };
+}
+
+function skipPdfLiteralString(source, index) {
+  let depth = 1;
+  for (let i = index + 1; i < source.length; i += 1) {
+    const character = source[i];
+    if (character === "\\") { i += 1; continue; }
+    if (character === "(") depth += 1;
+    else if (character === ")" && --depth === 0) return i + 1;
+  }
+  return source.length;
+}
+
+function skipPdfComposite(source, index, open, close) {
+  let depth = 1;
+  for (let i = index + 1; i < source.length; i += 1) {
+    const character = source[i];
+    if (character === "(") { i = skipPdfLiteralString(source, i) - 1; continue; }
+    if (character === "<" && source[i + 1] === "<") { i = skipPdfComposite(source, i + 1, "<", ">") - 1; continue; }
+    if (character === "[" && open !== "[") { i = skipPdfComposite(source, i, "[", "]") - 1; continue; }
+    if (character === open) depth += 1;
+    else if (character === close && --depth === 0) return i + 1;
+  }
+  return source.length;
+}
+
+function skipPdfInlineImage(source, index) {
+  let i = index;
+  while (i < source.length) {
+    while (i < source.length && /\s/.test(source[i])) i += 1;
+    const start = i;
+    while (i < source.length && !/[\s()[\]<>/%]/.test(source[i])) i += 1;
+    const token = source.slice(start, i);
+    if (token === "ID") {
+      for (let j = i; j < source.length - 2; j += 1) {
+        if (/\s/.test(source[j]) && source[j + 1] === "E" && source[j + 2] === "I" &&
+          (j + 3 === source.length || /[\s()[\]<>/%]/.test(source[j + 3]))) return j + 3;
+      }
+      return source.length;
+    }
+    if (!token) i += 1;
+  }
+  return source.length;
+}
+
+function parsePdfContentStream(bytes, state) {
+  const source = new TextDecoder("latin1").decode(bytes);
+  const operands = [];
+  let i = 0;
+  while (i < source.length) {
+    const character = source[i];
+    if (/\s/.test(character)) { i += 1; continue; }
+    if (character === "%") {
+      while (i < source.length && source[i] !== "\n" && source[i] !== "\r") i += 1;
+      continue;
+    }
+    if (character === "(") { i = skipPdfLiteralString(source, i); continue; }
+    if (character === "<") {
+      if (source[i + 1] === "<") i = skipPdfComposite(source, i + 1, "<", ">");
+      else {
+        i += 1;
+        while (i < source.length && source[i] !== ">") i += 1;
+        i += 1;
+      }
+      continue;
+    }
+    if (character === "[") { i = skipPdfComposite(source, i, "[", "]"); continue; }
+    if (character === "/") {
+      i += 1;
+      while (i < source.length && !/[\s()[\]<>/%]/.test(source[i])) i += 1;
+      continue;
+    }
+    const start = i;
+    while (i < source.length && !/[\s()[\]<>/%]/.test(source[i])) i += 1;
+    const token = source.slice(start, i);
+    if (!token) { i += 1; continue; }
+    if (PDF_NUMBER_TOKEN.test(token)) {
+      operands.push(Number(token));
+      if (operands.length > 12) operands.splice(0, operands.length - 12);
+      continue;
+    }
+    if (token === "BI") {
+      operands.length = 0;
+      i = skipPdfInlineImage(source, i);
+      continue;
+    }
+    if (token === "q") {
+      state.stack.push([...state.matrix]);
+    } else if (token === "Q") {
+      if (state.stack.length) state.matrix = state.stack.pop();
+    } else if (token === "cm" && operands.length >= 6) {
+      state.matrix = multiplyPdfMatrices(state.matrix, operands.slice(-6));
+    } else if (token === "BT") {
+      state.textMatrices.push([...state.matrix]);
+    }
+    operands.length = 0;
+  }
+}
+
+function medianNumber(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
+}
+
+function validatePageContentMatrix(matrix) {
+  const [a, b, c, d] = matrix;
+  const scaleX = Math.hypot(a, b);
+  const scaleY = Math.hypot(c, d);
+  const dot = a * c + b * d;
+  const determinant = a * d - b * c;
+  const tolerance = Math.max(scaleX, scaleY, 1) * 1e-4;
+  if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX < 1e-6 || scaleY < 1e-6 ||
+      determinant <= 0 || Math.abs(dot) > scaleX * scaleY * 1e-4 ||
+      Math.abs(scaleX - scaleY) > tolerance) {
+    throw new HttpError(400, "The PDF page has a skewed, mirrored or non-uniform content transform; signer particulars cannot be oriented safely.");
+  }
+  return matrix;
+}
+
+async function getPageContentTransform(page) {
+  const state = { matrix: [...IDENTITY_PDF_MATRIX], stack: [], textMatrices: [] };
+  const contents = page.node.Contents();
+  if (contents) {
+    const streams = typeof contents.size === "function" && typeof contents.lookup === "function"
+      ? Array.from({ length: contents.size() }, (_, index) => contents.lookup(index))
+      : [contents];
+    for (const stream of streams) {
+      if (!stream) continue;
+      const bytes = typeof stream.getUnencodedContents === "function"
+        ? stream.getUnencodedContents()
+        : decodePDFRawStream(stream).decode();
+      parsePdfContentStream(bytes, state);
+    }
+  }
+  const candidates = state.textMatrices.length ? state.textMatrices : [state.matrix];
+  const buckets = new Map();
+  for (const candidate of candidates) {
+    const key = candidate.slice(0, 4).map(value => Math.round(value * 10000) / 10000).join(",");
+    const bucket = buckets.get(key) || [];
+    bucket.push(candidate);
+    buckets.set(key, bucket);
+  }
+  const dominant = [...buckets.values()].sort((a, b) => b.length - a.length)[0] || [state.matrix];
+  const matrix = [
+    ...dominant[0].slice(0, 4),
+    medianNumber(dominant.map(item => item[4])),
+    medianNumber(dominant.map(item => item[5]))
+  ];
+  return validatePageContentMatrix(matrix);
+}
+
+function pageToVisibleMatrix(crop, rotation) {
+  if (rotation === 0) return [1, 0, 0, -1, -crop.x, crop.y + crop.height];
+  if (rotation === 90) return [0, 1, 1, 0, -crop.y, -crop.x];
+  if (rotation === 180) return [-1, 0, 0, 1, crop.x + crop.width, -crop.y];
+  return [0, -1, -1, 0, crop.y + crop.height, crop.x + crop.width];
+}
+
+function getEffectivePdfFieldBox(page, field, contentMatrix) {
+  try {
+    const canonical = normalizeSignatureField(field);
+    const crop = page.getCropBox();
+    const pageRotation = ((Number(page.getRotation?.()?.angle || 0) % 360) + 360) % 360;
+    if (![0, 90, 180, 270].includes(pageRotation)) throw new RangeError("The PDF page rotation is not supported.");
+    const visibleWidth = pageRotation === 90 || pageRotation === 270 ? crop.height : crop.width;
+    const visibleHeight = pageRotation === 90 || pageRotation === 270 ? crop.width : crop.height;
+    const left = canonical.x * visibleWidth;
+    const top = canonical.y * visibleHeight;
+    const width = canonical.width * visibleWidth;
+    const height = canonical.height * visibleHeight;
+    if (![left, top, width, height].every(Number.isFinite) || left < 0 || top < 0 || width <= 0 || height <= 0 ||
+        left + width > visibleWidth + 0.01 || top + height > visibleHeight + 0.01) {
+      throw new RangeError("The signature field is outside the visible PDF page.");
+    }
+    const visibleMatrix = multiplyPdfMatrices(pageToVisibleMatrix(crop, pageRotation), contentMatrix);
+    const inverse = invertPdfMatrix(visibleMatrix);
+    const points = [
+      transformPdfPoint(inverse, left, top),
+      transformPdfPoint(inverse, left + width, top),
+      transformPdfPoint(inverse, left, top + height),
+      transformPdfPoint(inverse, left + width, top + height)
+    ];
+    const x = Math.min(...points.map(point => point.x));
+    const y = Math.min(...points.map(point => point.y));
+    const right = Math.max(...points.map(point => point.x));
+    const bottom = Math.max(...points.map(point => point.y));
+    const rawAngle = Math.atan2(visibleMatrix[1], visibleMatrix[0]) * 180 / Math.PI;
+    const nearestAngle = Math.round(rawAngle / 90) * 90;
+    const angularError = Math.abs(((rawAngle - nearestAngle + 540) % 360) - 180);
+    if (angularError > 0.5) {
+      throw new RangeError("The PDF page content is not aligned to a supported right angle.");
+    }
+    const visibleAngle = ((nearestAngle % 360) + 360) % 360;
+    const counterRotation = visibleAngle;
+    return { x, y, width: right - x, height: bottom - y, rotation: visibleAngle, counterRotation, visibleToPdfMatrix: inverse, visibleLeft: left, visibleTop: top };
+  } catch (error) {
+    throw new HttpError(400, error?.message || "The signature field is outside the visible PDF page.");
+  }
 }
 
 function wrapPdfText(font, value, size, maxWidth) {
@@ -143,19 +390,25 @@ function drawTextInField(page, value, font, fieldBox, options = {}) {
     }
   }
   if (!layout) throw new HttpError(400, "Signer name, role or date does not fit inside its assigned PDF field. Enlarge the field and retry.");
-  const rotate = rotation ? degrees((360 - rotation) % 360) : undefined;
+  const rotate = fieldBox.counterRotation ? degrees(fieldBox.counterRotation) : (rotation ? degrees(rotation) : undefined);
   const color = options.color || rgb(0.05, 0.05, 0.08);
   layout.lines.forEach((line, index) => {
     let x, y;
-    if (rotation === 90) {
-      x = fieldBox.x + padding + index * layout.lineHeight;
-      y = fieldBox.y + fieldBox.height - padding;
+    if (fieldBox.visibleToPdfMatrix) {
+      const visibleX = fieldBox.visibleLeft + padding;
+      const visibleY = fieldBox.visibleTop + padding + layout.size + index * layout.lineHeight;
+      const origin = transformPdfPoint(fieldBox.visibleToPdfMatrix, visibleX, visibleY);
+      x = origin.x;
+      y = origin.y;
+    } else if (rotation === 90) {
+      x = fieldBox.x + fieldBox.width - layout.size - padding - index * layout.lineHeight;
+      y = fieldBox.y + padding;
     } else if (rotation === 180) {
       x = fieldBox.x + fieldBox.width - padding;
       y = fieldBox.y + fieldBox.height - padding - index * layout.lineHeight;
     } else if (rotation === 270) {
-      x = fieldBox.x + fieldBox.width - padding - index * layout.lineHeight;
-      y = fieldBox.y + padding;
+      x = fieldBox.x + padding + layout.size + index * layout.lineHeight;
+      y = fieldBox.y + fieldBox.height - padding;
     } else {
       x = fieldBox.x + padding;
       y = fieldBox.y + padding + (layout.lines.length - 1 - index) * layout.lineHeight;
@@ -183,6 +436,8 @@ export async function buildSignedPdf(originalBytes, info) {
   const bold = await document.embedFont(StandardFonts.HelveticaBold);
   const italic = await document.embedFont(StandardFonts.HelveticaOblique);
   const pages = document.getPages();
+  const pageContentTransforms = new Map();
+  const certificateSignatureGeometry = new Map();
 
   for (const field of info.fields || []) {
     const signer = field.signerId
@@ -196,25 +451,43 @@ export async function buildSignedPdf(originalBytes, info) {
     if (value == null || value === "") continue;
     const page = pages[Number(field.page || 1) - 1];
     if (!page) throw new HttpError(400, "A signing field references a missing PDF page.");
-    const fieldBox = getPdfFieldBox(page, field);
+    const orientationSensitive = ["Signature", "Initials", "Name", "Title", "Role", "Date"].includes(field.type);
+    let fieldBox;
+    if (orientationSensitive) {
+      let contentMatrix = pageContentTransforms.get(page);
+      if (!contentMatrix) {
+        contentMatrix = await getPageContentTransform(page);
+        page.node.normalize();
+        pageContentTransforms.set(page, contentMatrix);
+      }
+      fieldBox = getEffectivePdfFieldBox(page, field, contentMatrix);
+      if (contentMatrix.some((value, index) => Math.abs(value - IDENTITY_PDF_MATRIX[index]) > 1e-8)) {
+        page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...contentMatrix));
+        // The matching Q is emitted immediately after this field's stamp below.
+      }
+    } else {
+      fieldBox = getPdfFieldBox(page, field);
+    }
     const { x, y, width, height } = fieldBox;
 
     if (field.type === "Signature" || field.type === "Initials") {
       if (typeof value === "string" && value.startsWith("data:image/png;base64,")) {
         const png = await document.embedPng(decodePngDataUrl(value));
-        drawFittedSignature(page, png, fieldBox);
+        const geometry = drawFittedSignature(page, png, fieldBox);
+        if (field.type === "Signature" && !certificateSignatureGeometry.has(signer.id)) {
+          certificateSignatureGeometry.set(signer.id, { width: geometry.width, height: geometry.height });
+        }
       } else {
-        page.drawText(safeText(italic, value, 100), {
-          x, y: y + Math.min(height * 0.25, 4),
-          size: Math.max(7, Math.min(16, height * 0.6)),
-          font: italic, maxWidth: width
-        });
+        drawTextInField(page, safeText(italic, value, 100), italic, fieldBox);
       }
     } else if (field.type === "Checkbox") {
       page.drawRectangle({ x, y, width: Math.min(width, height), height: Math.min(width, height), borderWidth: 1, borderColor: rgb(0.1, 0.1, 0.1) });
       if (value === "true") page.drawText("X", { x: x + 2, y: y + 1, size: Math.max(7, Math.min(12, height * 0.6)), font: regular, color: rgb(0, 0, 0) });
     } else {
       drawTextInField(page, value, regular, fieldBox);
+    }
+    if (orientationSensitive && pageContentTransforms.get(page)?.some((item, index) => Math.abs(item - IDENTITY_PDF_MATRIX[index]) > 1e-8)) {
+      page.pushOperators(popGraphicsState());
     }
   }
 
@@ -250,7 +523,8 @@ export async function buildSignedPdf(originalBytes, info) {
     certificatePage.drawText(safeText(bold, signer.declarationDiscrepancy?.detected ? `DISCREPANCY NOTED: ${(signer.declarationDiscrepancy.fields || []).join(", ")}` : "Declaration comparison: no discrepancy recorded", 90), { x: 56, y: top - 94, size: 6.5, font: bold, color: signer.declarationDiscrepancy?.detected ? rgb(0.65, 0.2, 0.1) : rgb(0.12, 0.12, 0.12) });
     if (signer.signatureType === "drawn" && typeof signer.signatureValue === "string" && signer.signatureValue.startsWith("data:image/png;base64,")) {
       const png = await document.embedPng(decodePngDataUrl(signer.signatureValue));
-      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: 170, height: 50 });
+      const documentSignatureSize = certificateSignatureGeometry.get(signer.id) || { width: 170, height: 50 };
+      const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: documentSignatureSize.width, height: documentSignatureSize.height }, { allowUpscale: true, maxScale: 3 });
       certificatePage.drawImage(png, { x: fit.x, y: fit.y, width: fit.width, height: fit.height });
     } else {
       certificatePage.drawText(safeText(italic, signer.signatureValue, 28), { x: 340, y: top - 40, size: 18, font: italic });
