@@ -15,7 +15,7 @@ const SMTP_PORT = 465;
 const SMTP_FROM = "info@irpa.or.tz";
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
 import { route as esignRoute } from "./router.mjs";
@@ -2781,9 +2781,12 @@ async function sendMemberInvitation(request, env) {
   if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="sent"){
     return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Sent",alreadySent:true},200,corsHeaders(request));
   }
-  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="queued"){
-    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Queued",alreadyProcessing:true},200,corsHeaders(request));
+  if(priorTokenHash&&!forceResend&&priorDeliveryStatus==="queued"&&isInvitationQueueActive(fields.deliveryQueuedAt?.timestampValue)){
+    return json({ok:true,email:fields.email?.stringValue||"",deliveryStatus:"Queued",alreadyProcessing:true,message:"Invitation delivery is still processing; email delivery is not yet confirmed."},202,corsHeaders(request));
   }
+  // A worker interruption can leave a record permanently Queued. After the
+  // bounded lease expires (or when legacy records have no queue timestamp),
+  // allow this request to issue a fresh token and retry SMTP delivery.
   const email=validateRecipient(fields.email?.stringValue||"");
   if(!email) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
   const name=String(fields.name?.stringValue||"").trim();
