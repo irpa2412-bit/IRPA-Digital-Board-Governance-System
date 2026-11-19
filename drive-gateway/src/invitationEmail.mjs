@@ -128,7 +128,7 @@ export async function runEmailStage(stage,action,onStage){
     try{await onStage?.(stage,"success")}catch{}
     return result;
   }catch(error){
-    const response=String(error?.message||"").match(/IRPA SMTP error (\\d{3})/i);
+    const response=String(error?.message||"").match(/IRPA SMTP error (\d{3})/i);
     const safe=new Error(response?`IRPA SMTP error ${response[1]}`:`Email delivery failed at ${stage}.`);
     safe.name=String(error?.name||"Error").slice(0,40);
     safe.stageCode=stage;
