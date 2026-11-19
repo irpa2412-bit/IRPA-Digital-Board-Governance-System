@@ -10,13 +10,11 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
-const SMTP_HOST = "mail.irpa.or.tz";
-const SMTP_PORT = 465;
-const SMTP_FROM = "info@irpa.or.tz";
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
+import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
 import { route as esignRoute } from "./router.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
@@ -2968,15 +2966,16 @@ async function writeSmtpSelfcheckAudit(env, claims, event) {
   return {auditId};
 }
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
+  const smtpConfig=resolveSmtpConfiguration(env);
   const toEmail=normalizeRecipientEmail(to);
   const cleanSubject=validateMailHeader(subject,"Subject");
-  const mime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:`"IRPA Administration" <${SMTP_FROM}>`,to:toEmail,subject:cleanSubject,text,html,attachments}),onStage);
+  const mime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:`"IRPA Administration" <${smtpConfig.from}>`,to:toEmail,subject:cleanSubject,text,html,attachments}),onStage);
   if(env.SMTP_MOCK==="success"){
     for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success")}catch{}
     return "250 MOCK ACCEPTED";
   }
   if(env.SMTP_MOCK==="fail")return runEmailStage("SMTP_CONNECT",async()=>{throw new Error("SMTP provider unavailable.")},onStage);
-  if(!env.SMTP_PASSWORD)return runEmailStage("SMTP_AUTH",async()=>{throw new Error("SMTP authentication is unavailable.")},onStage);
+  if(!smtpConfig.password)return runEmailStage("SMTP_AUTH",async()=>{throw new Error("SMTP authentication is unavailable.")},onStage);
   let socket,reader,writer,buffer="";
   async function readResponse(){
     while(true){
@@ -3002,21 +3001,21 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
   try{
     await runEmailStage("SMTP_CONNECT",async()=>{
       const {connect}=await import("cloudflare:sockets");
-      socket=connect({hostname:SMTP_HOST,port:SMTP_PORT},{secureTransport:"on"});
+      socket=connect({hostname:smtpConfig.host,port:smtpConfig.port},{secureTransport:"on"});
       reader=socket.readable.getReader();
       writer=socket.writable.getWriter();
       await readResponse();
       await command("EHLO irpa-digital-board-governance","2");
     },onStage);
     await runEmailStage("SMTP_AUTH",()=>authenticateSmtpPlain({
-      username:env.SMTP_USERNAME||SMTP_FROM,
-      password:env.SMTP_PASSWORD,
+      username:smtpConfig.username,
+      password:smtpConfig.password,
       writeLine:async line=>writer.write(new TextEncoder().encode(line+"\r\n")),
       readResponse,
       command
     }),onStage);
     await runEmailStage("RCPT_ACCEPTED",async()=>{
-      await command("MAIL FROM:<"+SMTP_FROM+">","2");
+      await command("MAIL FROM:<"+smtpConfig.from+">","2");
       await command("RCPT TO:<"+toEmail+">","2");
     },onStage);
     const accepted=await runEmailStage("SUBMIT",async()=>{
