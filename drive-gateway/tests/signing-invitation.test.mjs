@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildEsignContext } from "../src/esignContext.mjs";
 import { createEnvelope, getEnvelopeStatus, resendInvitation, revokeInvitation, openEmailSigning, openSigning } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
+import { route as esignRoute } from "../src/router.mjs";
 import { buildInvitationMessage } from "../src/invitationEmail.mjs";
 
 async function fixture({failResend=false,emailLink=false}={}) {
@@ -195,4 +196,14 @@ test("failed replacement reports the SMTP stage and preserves the prior link",as
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),error=>error.code==="SMTP_AUTH");
   const afterFailure=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(afterFailure.signers[0].tokenHash,originalTokenHash);
   const opened=await openEmailSigning(f.ctx,original,"192.0.2.44");assert.equal(opened.ok,true);
+});
+
+test("replaced email signing links show the explicit replacement notice through the public open route",async()=>{
+  const f=await fixture({emailLink:true});
+  const oldLink=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  const response=await esignRoute(new Request("https://irpa.example.test/api/sign/email/open",{headers:{"x-signing-token":oldLink}}),f.ctx);
+  assert.equal(response.status,410);
+  const body=await response.json();
+  assert.equal(body.error,"This link was replaced. Please use the newest email.");
 });
