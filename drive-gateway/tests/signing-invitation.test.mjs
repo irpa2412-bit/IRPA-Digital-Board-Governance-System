@@ -7,12 +7,13 @@ import { buildInvitationMessage } from "../src/invitationEmail.mjs";
 
 async function fixture({failResend=false,emailLink=false}={}) {
   const sent=[];
+  const logs=[];
   let calls=0;
   const ctx=buildEsignContext({
     env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
     verifyUser:async()=>null,
-    sendInvitation:async invitation=>{calls++;if(failResend&&calls>1)throw new Error("SMTP unavailable");sent.push(invitation);},
-    logger:{error(){}}
+    sendInvitation:async invitation=>{calls++;if(failResend&&calls>1)throw Object.assign(new Error("IRPA SMTP error 535: authentication failed"),{code:"EAUTH"});sent.push(invitation);},
+    logger:{error:(event,details)=>logs.push({event,details})}
   });
   const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA test PDF");
   const source=await ctx.storage.put({path:"source/test.pdf",bytes,contentType:"application/pdf",metadata:{}});
@@ -28,7 +29,7 @@ async function fixture({failResend=false,emailLink=false}={}) {
     signers:[emailLink?{identityType:"email-link",email:"signer@example.test",name:"Assigned Signer",order:1}:{uid:"signer-uid",email:"signer@example.test",name:"Assigned Signer",order:1}],
     fields:[{fieldId:"SIGN-1",type:"Signature",page:1,x:10,y:10,width:25,height:10,...(emailLink?{signerId:"S1"}:{signerUid:"signer-uid"}),required:true}]
   });
-  return{ctx,sent,created,externalReference};
+  return{ctx,sent,created,externalReference,logs};
 }
 
 test("Gateway invitation plain-text body uses real line breaks, not escaped newline text",()=>{
@@ -64,6 +65,12 @@ test("failed Gateway invitation retry remains explicitly Failed and does not rep
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),/could not be delivered/);
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
   assert.equal(status.signers[0].invitation,"Failed");
+  const diagnostic=f.logs.find(item=>item.event==="SIGNING_INVITATION_DELIVERY_FAILED");
+  assert.ok(diagnostic,"SMTP failure must be recorded in Gateway logs");
+  assert.equal(diagnostic.details.smtpResponseCode,535);
+  assert.equal(diagnostic.details.failureClass,"permanent-provider-rejection");
+  assert.equal(diagnostic.details.retryable,false);
+  assert.equal(JSON.stringify(diagnostic).includes("signer@example.test"),false);
 });
 
 test("another user cannot resend a signer invitation",async()=>{
