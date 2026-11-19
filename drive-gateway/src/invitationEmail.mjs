@@ -119,11 +119,44 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
   return {subject,text,html};
 }
 
-export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,smtpSend,logger=console,sleep}) {
+export const EMAIL_LINK_STAGE_CODES=Object.freeze(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT","TOKEN_LOOKUP","SESSION_CREATE"]);
+
+export async function runEmailStage(stage,action,onStage){
+  if(!EMAIL_LINK_STAGE_CODES.includes(stage))throw new Error("Unsupported email stage.");
+  try{
+    const result=await action();
+    try{await onStage?.(stage,"success")}catch{}
+    return result;
+  }catch(error){
+    const response=String(error?.message||"").match(/IRPA SMTP error (\d{3})/i);
+    const safe=new Error(response?`IRPA SMTP error ${response[1]}`:`Email delivery failed at ${stage}.`);
+    safe.name=String(error?.name||"Error").slice(0,40);
+    safe.stageCode=stage;
+    if(response)safe.smtpResponseCode=Number(response[1]);
+    if(/^[A-Z0-9_-]{1,40}$/i.test(String(error?.code||"")))safe.code=String(error.code);
+    if(error?.deliveryOutcome==="unknown")safe.deliveryOutcome="unknown";
+    if(error?.retryable===false)safe.retryable=false;
+    try{await onStage?.(stage,"failure")}catch{}
+    throw safe;
+  }
+}
+
+export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,smtpSend,logger=console,sleep,onStage}) {
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
-  const message=buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt});
-  return sendWithRetry(()=>smtpSend({to,...message}),{logger,sleep});
+  const outcomes=new Map();
+  const capture=async(stage,outcome)=>outcomes.set(stage,outcome);
+  let result,error;
+  try{
+    const message=await runEmailStage("BUILD_MESSAGE",()=>buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}),capture);
+    result=await sendWithRetry(()=>smtpSend({to,...message,onStage:capture}),{logger,sleep});
+  }catch(err){
+    error=err;
+    if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,"failure");
+  }
+  for(const [stage,outcome] of outcomes){try{await onStage?.(stage,outcome)}catch{}}
+  if(error)throw error;
+  return result;
 }
 
 export async function handleSendInvitationEmail(request, env, deps = {}) {
