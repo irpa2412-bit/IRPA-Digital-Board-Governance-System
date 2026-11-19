@@ -91,7 +91,7 @@ test("signer-list mutations retain Firestore-style compare-and-set and UID dupli
   const source=fs.readFileSync(new URL("../src/signing.mjs",import.meta.url),"utf8");
   assert.match(source,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
   assert.match(source,/if\(uid&&seenUids\.has\(uid\)\)throw new HttpError\(400,"Duplicate signer UID\."/);
-  assert.match(source,/if\(seenEmails\.has\(email\)\)throw new HttpError\(400,"Duplicate signer email\."/);
+  assert.doesNotMatch(source,/Duplicate signer email/);
 });
 
 test("email-link signer is stored with token hash, email hash and issued status without a time expiry; mail is sent once",async()=>{
