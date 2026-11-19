@@ -25,15 +25,15 @@ test("Gateway envelope creation and openSigning retain three shared-email identi
   };
   const recipients=[
     {identityType:"email-link",email:"shared@example.test",name:"Person A",roleAssignments:[{role:"Chair"}],order:1},
-    {identityType:"email-link",email:"shared@example.test",name:"Person B",roleAssignments:[{role:"Secretary"}],order:2},
-    {identityType:"email-link",email:"shared@example.test",name:"Person C",roleAssignments:[{role:"Treasurer"}],order:3}
+    {identityType:"email-link",email:"shared@example.test",name:"Person B",roleAssignments:[{role:"Secretary"}],order:1},
+    {identityType:"email-link",email:"shared@example.test",name:"Person C",roleAssignments:[{role:"Treasurer"}],order:1}
   ];
   const fields=recipients.flatMap((recipient,index)=>Array.from({length:3},(_,n)=>({
     fieldId:`S${index+1}-F${n+1}`,type:"Signature",signerId:`S${index+1}`,
-    page:index*3+n+1,x:0.4225,y:0.385,width:0.125,height:0.032,
+    page:[1,2,3,4][(index+n)%4],x:0.4225,y:0.385,width:0.125,height:0.032,
     coordinateSpace:"visible-page-fraction-v1",required:true
   })));
-  const result=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.test",name:"Owner"},{documentId:document.id,archives:["board-governance"],signingMode:"Sequential",signers:recipients,fields});
+  const result=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.test",name:"Owner"},{documentId:document.id,archives:["board-governance"],signingMode:"Parallel",signers:recipients,fields});
   assert.equal(result.ok,true);
   const envelope=store[result.envelopeId];
   assert.equal(envelope.signers.length,3);
@@ -55,7 +55,7 @@ test("Gateway envelope creation and openSigning retain three shared-email identi
     assert.ok(opened.fields.every(field=>field.signerId===signer.id));
     for(const field of opened.fields){
       assert.ok(field.width>0&&field.height>0);
-      assert.equal(field.page, i*3 + Number(field.fieldId.slice(-1)));
+      assert.equal(field.page,[1,2,3,4][(i+Number(field.fieldId.slice(-1))-1)%4]);
       close(field.x,0.4225);close(field.y,0.385);close(field.width,0.125);close(field.height,0.032);
     }
   }
