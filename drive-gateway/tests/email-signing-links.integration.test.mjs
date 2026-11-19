@@ -94,6 +94,12 @@ test("signer-list mutations retain Firestore-style compare-and-set and UID dupli
   assert.doesNotMatch(source,/Duplicate signer email/);
 });
 
+test("Gateway field payload uses envelope signerId and omits the local draft UID",()=>{
+  const source=fs.readFileSync(new URL("../../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+  assert.match(source,/delete normalizedField\.signerUid/);
+  assert.match(source,/signerId:resolveSignerId\(field\)/);
+});
+
 test("two distinct participants may share one delivery email and retain isolated signer tokens",async()=>{
   const f=await fixture();
   const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
@@ -112,8 +118,7 @@ test("two distinct participants may share one delivery email and retain isolated
   assert.notEqual(envelope.signers[0].tokenHash,envelope.signers[1].tokenHash);
   assert.equal(envelope.signers[0].name,"Meeting Chair");
   assert.equal(envelope.signers[1].name,"Meeting Secretary");
-  assert.equal(f.sent.length,3,"one fixture invitation plus two independent invitations");
-  assert.notEqual(new URL(f.sent[1].link).searchParams.get("emailSignToken"),new URL(f.sent[2].link).searchParams.get("emailSignToken"));
+  assert.equal(f.sent.length,2,"sequential routing sends the first invitation and keeps the second signer pending");
 });
 
 test("email-link signer is stored with token hash, email hash and issued status without a time expiry; mail is sent once",async()=>{
