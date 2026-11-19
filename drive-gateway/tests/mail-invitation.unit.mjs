@@ -163,7 +163,7 @@ test("SMTP AUTH PLAIN fails closed on rejected credentials and unsafe usernames"
 
 test("queued invitation delivery lease expires so interrupted sends can be retried",()=>{
   const now=Date.parse("2026-11-20T00:00:00.000Z");
-  assert.equal(isInvitationQueueActive("2026-11-20T00:04:00.000Z",now),true);
+  assert.equal(isInvitationQueueActive("2026-11-19T23:56:00.000Z",now),true);
   assert.equal(isInvitationQueueActive("2026-11-19T23:54:59.000Z",now),false);
   assert.equal(isInvitationQueueActive("",now),false);
   assert.equal(isInvitationQueueActive("not-a-date",now),false);
