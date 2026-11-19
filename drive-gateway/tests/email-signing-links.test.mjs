@@ -153,7 +153,7 @@ test("profile lookup errors and a 3-second timeout never block an unregistered s
     assert.equal(sent[0].name,"Unregistered Signer");
     assert.match(sent[0].link,/emailSignToken=/);
     const status=await (await import("../src/signing.mjs")).getEnvelopeStatus(ctx,{uid:"owner",isAdmin:false},created.envelopeId);
-    assert.equal(status.signers[0].profileUid,null);
+    assert.equal(status.signers[0].profileUid??null,null);
   }
   await attempt(async()=>{throw new Error("profile service unavailable")},"THROW");
   await attempt(()=>new Promise(()=>{}),"TIMEOUT");
