@@ -15,14 +15,15 @@ const document = (collection, id, data, updateTime = "2026-10-10T00:00:00.000Z")
   updateTime,
   fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, field(v)]))
 });
-const ctxFor = ({ meeting, participant, admin = false, user = { user_id: "organizer-1", email: "organizer@example.org" }, onCommit = () => {} } = {}) => {
+const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "organizer-1", email: "organizer@example.org" }, onCommit = () => {} } = {}) => {
   const calls = [];
   const ctx = {
     authenticateFirebaseRequest: async () => user,
     getFirebaseProjectId: () => "test-project",
     getFirestoreAdminAccessToken: async () => "test-admin-token",
     json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
-    corsHeaders: () => ({ "content-type": "application/json" })
+    corsHeaders: () => ({ "content-type": "application/json" }),
+    sendEmail: async (env, message) => { ctx.sentEmail = message; return "250 accepted"; }
   };
   globalThis.fetch = async (url, init = {}) => {
     const target = new URL(url);
@@ -36,6 +37,7 @@ const ctxFor = ({ meeting, participant, admin = false, user = { user_id: "organi
       const [, collection, id] = match;
       if (collection === "meetings" && meeting && id === meeting.id) return new Response(JSON.stringify(document(collection, id, meeting.data, meeting.updateTime)), { status: 200 });
       if (collection === "participants" && participant && id === participant.id) return new Response(JSON.stringify(document(collection, id, participant.data)), { status: 200 });
+      if (collection === "meetingAccessTokens" && pass && id === pass.id) return new Response(JSON.stringify(document(collection, id, pass.data)), { status: 200 });
       if (collection === "adminProfiles" && admin && id === user.user_id) return new Response(JSON.stringify(document(collection, id, { active: true })), { status: 200 });
       return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 });
     }
@@ -48,6 +50,33 @@ const post = (router, path, body = {}) => router(new Request(`https://worker.tes
   headers: { "content-type": "application/json", authorization: "Bearer test-id-token" },
   body: JSON.stringify(body)
 }), { FIREBASE_PROJECT_ID: "test-project" }, path);
+test("meeting invitation dispatch uses the injected SMTP worker and writes only meeting participant delivery metadata", async () => {
+  const accessToken = "test-meeting-access-token-0123456789";
+  const meetingPassword = "ABCD1234WXYZ";
+  const digest = async value => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(b => b.toString(16).padStart(2, "0")).join("");
+  const { ctx, calls } = ctxFor({
+    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled" } },
+    participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } },
+    pass: { id: "access-1", data: {
+      meetingId: "meeting-1", participantId: "participant-1", participantEmail: "participant@example.org",
+      tokenHash: await digest(accessToken), passwordHash: await digest(meetingPassword), status: "Active",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    } }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-invitations/dispatch", {
+    accessId: "access-1", accessToken, meetingPassword
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.meetingAccessSent, true);
+  assert.equal(ctx.sentEmail.to, "participant@example.org");
+  assert.match(ctx.sentEmail.subject, /IRPA Meeting Invitation/);
+  assert.match(ctx.sentEmail.text, /Gate password: ABCD1234WXYZ/);
+  assert.match(ctx.sentEmail.text, /meetingToken=/);
+  assert.ok(calls.some(call => call.url.pathname.includes("/documents/participants/participant-1")));
+  assert.ok(calls.some(call => call.url.pathname.endsWith("/documents/audit")));
+});
+
 
 test("meeting portal router ignores unrelated paths", async () => {
   const { ctx } = ctxFor();
