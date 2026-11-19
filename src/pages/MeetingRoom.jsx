@@ -8,9 +8,9 @@ import{COLLECTIONS,createRecord,getAccessibleMeetingRecords,getAdminProfile,getC
 import{withWorkflowLinks,navigateWorkflow}from"../firebase/workflowLinks";
 import{normalizeMeetingForV3,meetingCapabilities}from"../firebase/meetingPolicy";
 import{captureMeetingRecord,listMeetingRecords,retrieveMeetingRecord,updateMeetingRecordProtection,disposeMeetingRecord,saveLiveMeetingProceedings,listMeetingWorkingDocuments,registerMeetingWorkingDocument,submitMeetingDocumentReview,signMeetingAttendance,getMeetingAttendanceRegister}from"../firebase/meetingRecords";
-import IRPADGBSMeetingRoomMedia from"../components/IRPADGBSMeetingRoomMedia";
+import IRPADGBSMeetingRoomMedia from"../meeting/IRPADGBSMeetingRoomMedia";
 import ControlledDocumentUpload from"../components/ControlledDocumentUpload";
-import GovernanceFieldPalette from"../components/GovernanceFieldPalette";import MeetingAccessControl from"../components/MeetingAccessControl";
+import GovernanceFieldPalette from"../components/GovernanceFieldPalette";import MeetingAccessControl from"../meeting/MeetingAccessControl";
 const PROCEEDINGS=["Not Started","In Progress","Transcript Saved","Draft Minutes","Reviewed","Approved","Final"],ATTENDANCE=["Present","Absent","Excused"],ITEM_STATUS=["Pending","In Discussion","Motion Recorded","Voting","Decision Recorded","Deferred","Completed"];
 const emptyMotion={text:"",movedBy:"",secondedBy:""},emptyAction={description:"",responsiblePerson:"",deadline:""};
 function MeetingFacilities({meeting,onNavigate,onRegister,registered}){
