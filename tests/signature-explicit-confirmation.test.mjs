@@ -64,8 +64,8 @@ test("signature confirmation palette is a fixed bottom sheet and closes only aft
   assert.match(pad, /position:"fixed"/);
   assert.match(pad, /bottom:0/);
   assert.match(pad, /zIndex:1000/);
-  assert.match(pad, /maxHeight:"70vh"/);
-  assert.match(pad, /overflowY:"auto"/);
+  assert.match(pad, /maxHeight:"calc\(100dvh - 12px\)"/);
+  assert.match(pad, /overflow:"hidden"/);\n  assert.match(pad, /className="signature-confirmation-content"[\\s\\S]*?overflowY:"auto"/);\n  assert.match(pad, /className="signature-confirmation-actions"[\\s\\S]*?position:"sticky"[\\s\\S]*?bottom:0/);
   assert.match(pad, /paddingBottom:"env\(safe-area-inset-bottom\)"/);
   assert.match(pad, /aria-modal="false"/);
   assert.match(pad, /Nothing is applied until you tap Confirm/);
@@ -133,4 +133,16 @@ test("Date fields are presented as server-stamped date and time, not client cale
   assert.match(platform, /Gateway server date and time when you submit your signature/);
   assert.match(gatewayPortal, /SERVER_TIMESTAMP_PENDING/);
   assert.match(gatewayPortal, /Gateway server date and time will be recorded on submission/);
+});
+
+test("saved, drawn and typed signature confirmation controls remain visible in a sticky viewport-bounded footer", () => {
+  assert.match(pad, /maxHeight:"calc\\(100dvh - 12px\\)"/);
+  assert.match(pad, /className="signature-confirmation-content"[\\s\\S]*?overflowY:"auto"/);
+  assert.match(pad, /className="signature-confirmation-actions"[\\s\\S]*?position:"sticky"[\\s\\S]*?bottom:0/);
+  assert.match(pad, /safe-area-inset-bottom/);
+  assert.match(pad, /minHeight:44/);
+  assert.match(pad, /mode==="Use my saved signature"\?"Use this signature"/);
+  assert.match(pad, /"Use my saved signature"/);
+  assert.match(pad, /"Draw"/);
+  assert.match(pad, /"Type"/);
 });
