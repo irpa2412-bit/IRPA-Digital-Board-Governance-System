@@ -92,6 +92,10 @@ jobs:
           if (smtpPasswordBindings.length !== 1 || smtpPasswordBindings[0]?.type !== "secret_text") {
             throw new Error("Safety stop: production Gateway requires exactly one SMTP_PASSWORD secret binding; the secret value is never read or printed.");
           }
+          const inviteServiceKeyBindings = bindings.filter(b => b.name === "INVITE_SERVICE_KEY");
+          if (inviteServiceKeyBindings.length !== 1 || inviteServiceKeyBindings[0]?.type !== "secret_text") {
+            throw new Error("Safety stop: production Gateway requires exactly one INVITE_SERVICE_KEY secret binding for service-authenticated invitee delivery; the secret value is never read or printed.");
+          }
           const smtpUsernameBindings = bindings.filter(b => b.name === "SMTP_USERNAME");
           if (smtpUsernameBindings.length > 1 || smtpUsernameBindings.some(b => !variableTypes.has(String(b?.type || "")))) {
             throw new Error("Safety stop: production SMTP_USERNAME binding is duplicated or has an unsupported type.");
