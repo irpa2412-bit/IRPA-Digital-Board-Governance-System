@@ -37,7 +37,7 @@ function mergePair(recipients,fields,keepUid,removeUid){
  const assignments=[...keepRoles,...removeRoles];
  const unique=[...new Map(assignments.map(item=>[roleKey(item),item])).values()];
  const merged={...keep,roleAssignments:unique,role:keep.role||remove.role,title:keep.title||remove.title,capacity:keep.capacity||remove.capacity};
- const movedFields=fields.map(field=>{if(String(field?.signerUid||"")!==String(removeUid))return field;const oldRole=removeRoles[Math.max(0,Math.min(Number(field.roleAssignmentIndex||0),removeRoles.length-1))];const roleAssignmentIndex=Math.max(0,unique.findIndex(item=>roleKey(item)===roleKey(oldRole)));return {...field,signerUid:String(keepUid),roleAssignmentIndex};});
+ const movedFields=fields.map(field=>{if(String(field?.signerUid||"")!==String(removeUid))return field;const oldRole=removeRoles[Math.max(0,Math.min(Number(field.roleAssignmentIndex||0),removeRoles.length-1))];const roleAssignmentIndex=Math.max(0,unique.findIndex(item=>roleKey(item)===roleKey(oldRole)));return {...field,signerUid:String(keepUid),signerName:keep.name||"",signerEmail:keep.email||"",roleAssignmentIndex};});
  return {recipients:recipients.filter(item=>String(item.uid)!==String(removeUid)).map(item=>String(item.uid)===String(keepUid)?merged:item),fields:movedFields};
 }
 
@@ -77,7 +77,7 @@ export function repairDraftAssignments({recipients=[],fields=[],ownerUid="",owne
   if(!uid||ids.has(uid))return field;
   const match=resolveFieldParticipant(field,merged.recipients);
   if(!match)return field;
-  relinked++;return {...field,signerUid:String(match.uid)};
+  relinked++;return {...field,signerUid:String(match.uid),signerName:match.name||"",signerEmail:match.email||""};
  });
  const diagnostics=analyzeFieldAssignments({recipients:merged.recipients,fields:nextFields,ownerUid,ownerSigningEnabled});
  return {recipients:merged.recipients,fields:nextFields,merged:merged.merged,relinked,unresolvedOrphans:diagnostics.orphanedFields,recipientsWithoutFields:diagnostics.recipientsWithoutFields,fieldIssues:diagnostics.fieldIssues};
@@ -86,7 +86,7 @@ export function repairDraftAssignments({recipients=[],fields=[],ownerUid="",owne
 export function relinkOrphanedField(fields=[],fieldId,signerUid,recipients=[]){
  if(!recipients.some(person=>String(person?.uid||"")===String(signerUid)))throw new Error("Choose a current participant before re-linking this field.");
  let found=false;
- const next=(fields||[]).map(field=>{if(String(field?.fieldId||"")!==String(fieldId))return field;found=true;return {...field,signerUid:String(signerUid)};});
+ const next=(fields||[]).map(field=>{if(String(field?.fieldId||"")!==String(fieldId))return field;found=true;const target=recipients.find(person=>String(person?.uid||"")===String(signerUid));return {...field,signerUid:String(signerUid),signerName:target?.name||"",signerEmail:target?.email||""};});
  if(!found)throw new Error("The orphaned field could not be found in this draft.");
  return next;
 }
