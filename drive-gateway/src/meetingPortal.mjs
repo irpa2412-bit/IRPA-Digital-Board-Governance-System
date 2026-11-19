@@ -90,7 +90,8 @@ export function createMeetingPortalRouter(ctx) {
     const routes = new Map([
       ["/api/meeting-access/issue", "issue"],
       ["/api/meeting-access/revoke", "revoke"],
-      ["/api/meeting-access/authorize", "authorize"]
+      ["/api/meeting-access/authorize", "authorize"],
+      ["/api/meeting-invitations/dispatch", "dispatch"]
     ]);
     const action = routes.get(pathname);
     if (!action || request.method !== "POST") return null;
@@ -192,6 +193,78 @@ export function createMeetingPortalRouter(ctx) {
           meetingCategory: clean(meeting.meetingCategory || meeting.category || meeting.meetingType || "General Meeting"),
           reusable: true, reusePolicy: "Reusable for 30 days, or until revoked or the meeting is closed.", expiresAt: expiresAt.toISOString()
         }, 200, ctx.corsHeaders(request));
+      }
+
+      if (action === "dispatch") {
+        const accessId = clean(data.accessId);
+        const accessToken = clean(data.accessToken);
+        const password = clean(data.meetingPassword);
+        if (!accessId || !accessToken || !password) return errorResponse(ctx, request, "A complete meeting access pass is required for dispatch.", 400);
+        const passDoc = await getDoc(ctx, env, adminToken, "meetingAccessTokens", accessId);
+        if (!passDoc) return errorResponse(ctx, request, "Meeting access pass was not found.", 404);
+        const pass = docToPlain(passDoc);
+        if (pass.status !== "Active" || !pass.expiresAt || new Date(pass.expiresAt).getTime() < Date.now()) return errorResponse(ctx, request, "The meeting access pass is no longer active.", 409);
+        if (await sha256(accessToken) !== pass.tokenHash || await sha256(password) !== pass.passwordHash) return errorResponse(ctx, request, "The meeting access pass could not be verified.", 403);
+        const [meetingDoc, participantDoc] = await Promise.all([
+          getDoc(ctx, env, adminToken, "meetings", clean(pass.meetingId)),
+          getDoc(ctx, env, adminToken, "participants", clean(pass.participantId))
+        ]);
+        if (!meetingDoc || !participantDoc) return errorResponse(ctx, request, "The linked meeting or participant record was not found.", 404);
+        const meeting = docToPlain(meetingDoc), participant = docToPlain(participantDoc);
+        if (participant.meetingId !== pass.meetingId) return errorResponse(ctx, request, "The participant is not linked to this meeting.", 409);
+        const [admin, chair, secretary] = await Promise.all([
+          isAdmin(ctx, env, adminToken, uid, claims),
+          Promise.resolve(lower(meeting.chairpersonEmail) === email || clean(meeting.chairpersonUid) === uid),
+          Promise.resolve(lower(meeting.secretaryEmail) === email || clean(meeting.secretaryUid) === uid)
+        ]);
+        if (!admin && !chair && !secretary && clean(meeting.initiatorUid) !== uid && clean(meeting.createdByUid) !== uid) return errorResponse(ctx, request, "Only an authorised meeting organiser may dispatch meeting access.", 403);
+        if (!isActiveMeeting(meeting.status)) return errorResponse(ctx, request, "This meeting is closed and cannot issue invitations.", 409);
+        const recipient = lower(participant.participantEmail || participant.email);
+        if (!recipient || (pass.participantEmail && lower(pass.participantEmail) !== recipient)) return errorResponse(ctx, request, "The participant email does not match the issued access pass.", 409);
+        const appUrl = clean(env.IRPA_APP_URL || "https://irpa-digital-board-governance.web.app").replace(/\/$/, "");
+        const gateUrl = new URL(appUrl + "/");
+        gateUrl.searchParams.set("meetingToken", accessToken);
+        gateUrl.searchParams.set("meetingId", pass.meetingId);
+        const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+        const meetingTitle = clean(meeting.title || meeting.reference || "IRPA Meeting");
+        const participantName = clean(participant.participantName || participant.name || recipient);
+        const reference = clean(meeting.reference || meeting.meetingReference || meetingTitle);
+        const date = clean(meeting.date || meeting.meetingDate);
+        const time = [clean(meeting.startTime), clean(meeting.endTime)].filter(Boolean).join(" – ");
+        const venue = clean(meeting.venue || meeting.meetingVenue);
+        const platform = clean(meeting.meetingPlatform || "As specified by the meeting organiser");
+        const subject = "IRPA Meeting Invitation — " + reference;
+        const text = "Dear " + participantName + ",\n\nYou are invited to " + meetingTitle + ".\nMeeting reference: " + reference + "\nDate: " + (date || "See meeting notice") + "\nTime: " + (time || "See meeting notice") + "\nVenue: " + (venue || platform) + "\n\nOpen your independent IRPA Meeting Portal access link:\n" + gateUrl.toString() + "\n\nMeeting ID: " + pass.meetingId + "\nGate password: " + password + "\n\nThis link and password are for this meeting only. Do not forward them.\n\nIRPA Administration";
+        const html = "<!doctype html><html><body style=\"font-family:Arial,sans-serif;line-height:1.6;color:#1f2937\"><h2>IRPA Meeting Invitation</h2><p>Dear " + escapeHtml(participantName) + ",</p><p>You are invited to <strong>" + escapeHtml(meetingTitle) + "</strong>.</p><p><strong>Meeting reference:</strong> " + escapeHtml(reference) + "<br><strong>Date:</strong> " + escapeHtml(date || "See meeting notice") + "<br><strong>Time:</strong> " + escapeHtml(time || "See meeting notice") + "<br><strong>Venue / platform:</strong> " + escapeHtml(venue || platform) + "</p><p><a href=\"" + escapeHtml(gateUrl.toString()) + "\">Open the IRPA Meeting Portal</a></p><p><strong>Meeting ID:</strong> " + escapeHtml(pass.meetingId) + "<br><strong>Gate password:</strong> " + escapeHtml(password) + "</p><p>This access link and password are valid for this meeting only. Do not forward them.</p><p>IRPA Administration</p></body></html>";
+        if (typeof ctx.sendEmail !== "function") return errorResponse(ctx, request, "The meeting mail service is not available in this Worker environment.", 503);
+        const messageId = await ctx.sendEmail(env, { to: recipient, subject, text, html });
+        const dispatchedAt = new Date();
+        const participantPatch = {
+          invitationStatus: "Invitation Requested",
+          meetingAccessDispatched: true,
+          meetingAccessDispatchStatus: "Confirmed",
+          meetingAccessId: accessId,
+          meetingAccessTokenReference: accessId,
+          meetingAccessExpiresAt: pass.expiresAt,
+          meetingAccessDispatchedAt: dispatchedAt,
+          meetingAccessDeliveryStatus: "Accepted by IRPA SMTP gateway",
+          meetingAccessDispatchError: "",
+          meetingAccessDispatchFailedAt: null,
+          meetingAccessDispatchStage: "",
+          meetingInvitationLinkStatus: "Released by IRPA Meeting Worker",
+          meetingTokenStatus: "Released by IRPA Meeting Worker"
+        };
+        await firestoreRequest(ctx, env, adminToken, "participants/" + encodeURIComponent(pass.participantId) + "?updateMask.fieldPaths=" + Object.keys(participantPatch).map(encodeURIComponent).join("&updateMask.fieldPaths="), {
+          method: "PATCH", body: JSON.stringify({ fields: fieldsToFirestore(participantPatch) })
+        });
+        await firestoreRequest(ctx, env, adminToken, "audit", {
+          method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
+            action: "MEETING_INVITATION_DISPATCHED", collection: "participants", recordId: pass.participantId,
+            details: { meetingId: pass.meetingId, accessId, recipientDomain: recipient.split("@").pop(), provider: "IRPA SMTP Worker", messageId: String(messageId || "") },
+            actorUid: uid, actorEmail: email || null, createdAt: dispatchedAt
+          }) })
+        });
+        return ctx.json({ ok: true, meetingAccessSent: true, deliveryStatus: "Accepted by IRPA SMTP gateway", accessId, expiresAt: pass.expiresAt, messageId: String(messageId || "") }, 200, ctx.corsHeaders(request));
       }
 
       if (action === "revoke") {
