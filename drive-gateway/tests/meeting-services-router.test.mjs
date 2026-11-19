@@ -52,11 +52,13 @@ test("meeting register, decision, and voting control routes require authenticate
     "/api/meeting-participants/update",
     "/api/meeting-participants/delete",
     "/api/meeting-room/activity",
+    "/api/meeting-room/event",
     "/api/meeting-subscriptions/mine",
     "/api/meeting-entry-requests/list",
     "/api/meeting-entry-requests/resolve",
     "/api/meeting-attendance/sign",
     "/api/meeting-attendance/register",
+    "/api/meeting-attendance/mark",
     "/api/meeting-working-documents/register",
     "/api/meeting-working-documents/list",
     "/api/meeting-working-documents/review"
