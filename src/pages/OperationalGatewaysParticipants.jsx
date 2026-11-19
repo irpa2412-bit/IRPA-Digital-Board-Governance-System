@@ -1,6 +1,6 @@
 // V3.0 participant/invitation integration: system records + controlled external invitees.
 import React,{useEffect,useMemo,useRef,useState}from"react";
-import{createRecord,getRecords,getMeetingScopedRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
+import{getMeetingScopedRecords,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
 
 import{callMeetingService,createMeetingAccessInvitation,dispatchMeetingInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
