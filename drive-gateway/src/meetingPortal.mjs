@@ -322,17 +322,63 @@ export function createMeetingPortalRouter(ctx) {
       const boundEmail = lower(pass.participantEmail), boundUid = clean(pass.participantUid);
       if ((boundUid && boundUid !== uid) || (!boundUid && boundEmail && boundEmail !== email)) return errorResponse(ctx, request, "This meeting link is assigned to a different participant identity.", 403);
       if (!isActiveMeeting(meeting.status)) return errorResponse(ctx, request, "This meeting is closed and cannot be entered.", 409);
-      const auditId = crypto.randomUUID();
-      await firestoreRequest(ctx, env, adminToken, "audit", {
-        method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
-          action: "MEETING_ENTRY_AUTHORIZED", collection: "meetingAccessTokens", recordId: pass.id,
-          details: { meetingId: pass.meetingId, participantId: pass.participantId, gateway: "IRPA Meeting Entry Gateway" },
-          actorUid: uid, actorEmail: email, createdAt: new Date()
-        }) })
-      });
-      return ctx.json({
-        ok: true, meetingId: pass.meetingId, participantId: pass.participantId,
+      const entryMode = lower(meeting.meetingEntryMode || "HOST_APPROVAL") === "DIRECT" ? "DIRECT" : "HOST_APPROVAL";
+      const entryRequestId = await sha256("meeting-entry:" + pass.id + ":" + uid);
+      let entryRequest = await getDoc(ctx, env, adminToken, "meetingEntryRequests", entryRequestId);
+      if (entryRequest?.status === "DENIED") return errorResponse(ctx, request, "The meeting host declined this entry request. Contact the meeting initiator for assistance.", 403);
+      if (entryMode === "DIRECT" || entryRequest?.status === "ADMITTED") {
+        if (entryRequest && entryRequest.status !== "ADMITTED") {
+          await firestoreRequest(ctx, env, adminToken, "meetingEntryRequests/" + encodeURIComponent(entryRequestId) + "?updateMask.fieldPaths=status&updateMask.fieldPaths=resolvedAt&updateMask.fieldPaths=resolvedBy", {
+            method: "PATCH", body: JSON.stringify({ fields: fieldsToFirestore({ status: "ADMITTED", resolvedAt: new Date(), resolvedBy: "DIRECT_ENTRY_POLICY" }) })
+          });
+        }
+        await firestoreRequest(ctx, env, adminToken, "audit", {
+          method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
+            action: "MEETING_ENTRY_AUTHORIZED", collection: "meetingAccessTokens", recordId: pass.id,
+            details: { meetingId: pass.meetingId, participantId: pass.participantId, entryMode, gateway: "IRPA Meeting Entry Gateway" },
+            actorUid: uid, actorEmail: email, createdAt: new Date()
+          }) })
+        });
+        return ctx.json({
+          ok: true, entryState: "AUTHORIZED", entryMode, meetingId: pass.meetingId, participantId: pass.participantId,
+          meetingReference: pass.meetingReference || meeting.reference || meeting.title,
+          meetingCategory: clean(meeting.meetingCategory || meeting.category || meeting.meetingType || "General Meeting"),
+          meetingStatus: meeting.status || "Scheduled", participantName: clean(participant.participantName || participant.name || email)
+        }, 200, ctx.corsHeaders(request));
+      }
+      if (!entryRequest) {
+        const requestData = {
+          meetingId: pass.meetingId, meetingReference: pass.meetingReference || meeting.reference || meeting.title || "",
+          participantId: pass.participantId, participantName: clean(participant.participantName || participant.name) || email,
+          participantUid: uid, participantEmail: email, accessId: pass.id, status: "PENDING",
+          entryMode, requestedAt: new Date(), expiresAt: pass.expiresAt
+        };
+        try {
+          await firestoreRequest(ctx, env, adminToken, "meetingEntryRequests?documentId=" + encodeURIComponent(entryRequestId), {
+            method: "POST", body: JSON.stringify({ fields: fieldsToFirestore(requestData) })
+          });
+          entryRequest = { id: entryRequestId, ...requestData };
+          await firestoreRequest(ctx, env, adminToken, "audit", {
+            method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
+              action: "MEETING_ENTRY_REQUESTED", collection: "meetingEntryRequests", recordId: entryRequestId,
+              details: { meetingId: pass.meetingId, participantId: pass.participantId, entryMode },
+              actorUid: uid, actorEmail: email, createdAt: new Date()
+            }) })
+          });
+        } catch (createError) {
+          if (createError.status !== 409) throw createError;
+          entryRequest = await getDoc(ctx, env, adminToken, "meetingEntryRequests", entryRequestId);
+        }
+      }
+      if (entryRequest?.status === "DENIED") return errorResponse(ctx, request, "The meeting host declined this entry request. Contact the meeting initiator for assistance.", 403);
+      if (entryRequest?.status === "ADMITTED") return ctx.json({
+        ok: true, entryState: "AUTHORIZED", entryMode, meetingId: pass.meetingId, participantId: pass.participantId,
         meetingReference: pass.meetingReference || meeting.reference || meeting.title,
+        meetingCategory: clean(meeting.meetingCategory || meeting.category || meeting.meetingType || "General Meeting"),
+        meetingStatus: meeting.status || "Scheduled", participantName: clean(participant.participantName || participant.name || email)
+      }, 200, ctx.corsHeaders(request));
+      return ctx.json({ ok: true, entryState: "WAITING_FOR_HOST", entryMode, entryRequestId, meetingId: pass.meetingId,
+        participantId: pass.participantId, meetingReference: pass.meetingReference || meeting.reference || meeting.title,
         meetingCategory: clean(meeting.meetingCategory || meeting.category || meeting.meetingType || "General Meeting"),
         meetingStatus: meeting.status || "Scheduled", participantName: clean(participant.participantName || participant.name || email)
       }, 200, ctx.corsHeaders(request));
