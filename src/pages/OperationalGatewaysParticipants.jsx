@@ -130,7 +130,7 @@ export default function OperationalGatewaysParticipants(){
   }catch(x){
    if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
    const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation resend failed.";
-   try{await callMeetingService("/api/meeting-participants/update",{participantId:i.id,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"}})}catch(persistError){console.error("Unable to persist meeting dispatch failure",persistError?.code||"")}
+   try{await callMeetingService("/api/meeting-participants/update",{participantId:i.id,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"}})}catch(persistError){console.error("Unable to persist meeting dispatch failure",persistError?.code||"")}
    setErr("Meeting invitation resend failed: "+failure);
    await load();
   }finally{resendInFlight.current.delete(i.id);setResendingInvitationIds(current=>current.filter(id=>id!==i.id));if(!fromBulk)setBusy(false)}
