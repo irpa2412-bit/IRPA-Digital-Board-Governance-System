@@ -65,7 +65,38 @@ export function createR2RecordingOutput(env, filepath, meeting = {}) {
   };
 }
 async function liveKitRequest(env,endpoint,body,method="POST"){const host=clean(env.LIVEKIT_URL).replace(/^wss:/i,"https:").replace(/^ws:/i,"http:").replace(/\/$/,""),key=clean(env.LIVEKIT_API_KEY),secret=clean(env.LIVEKIT_API_SECRET);if(!host||!key||!secret)throw Object.assign(new Error("Live meeting infrastructure is not configured in Cloudflare secrets."),{status:503});const now=Math.floor(Date.now()/1000),auth=await signedJwt(key,secret,{iss:key,sub:key,nbf:now-5,exp:now+60,video:{roomRecord:true,roomAdmin:true,roomCreate:true}});const r=await fetch(host+endpoint,{method,headers:{Authorization:"Bearer "+auth,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});const result=await r.json().catch(()=>({}));if(!r.ok){const e=new Error("LiveKit request failed ("+r.status+").");e.status=r.status;throw e;}return result;}
-export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-invitations/update","/api/meeting-room/activity","/api/meeting-subscriptions/mine","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-invitations/update","/api/meeting-room/activity","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+if(pathname==="/api/meeting-entry-requests/list"){
+const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
+const meeting=await getDoc(ctx,env,token,"meetings",meetingId);if(!meeting)return fail(ctx,request,"Meeting was not found.",404);
+const uid=clean(claims.user_id),email=lower(claims.email),adminProfile=await getDoc(ctx,env,token,"adminProfiles",uid);
+const authorised=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true||clean(meeting.initiatorUid)===uid||clean(meeting.chairpersonUid)===uid||clean(meeting.secretaryUid)===uid||email&&[meeting.chairpersonEmail,meeting.secretaryEmail].some(v=>lower(v)===email);
+if(!authorised)return fail(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.",403);
+if(terminal.has(lower(meeting.status)))return fail(ctx,request,"Closed meetings cannot load pending entry requests.",409);
+const rows=await listByField(ctx,env,token,"meetingEntryRequests","meetingId",meetingId);
+const requests=rows.filter(row=>row.status==="PENDING"&&new Date(row.expiresAt||0).getTime()>Date.now()).map(row=>({id:row.id,participantId:clean(row.participantId),participantName:clean(row.participantName||row.participantEmail),participantEmail:clean(row.participantEmail),requestedAt:iso(row.requestedAt)}));
+return response(ctx,request,{ok:true,requests});
+}
+if(pathname==="/api/meeting-entry-requests/resolve"){
+const requestId=clean(data.requestId),decision=clean(data.decision).toUpperCase();
+if(!requestId||!["ADMIT","DENY"].includes(decision))return fail(ctx,request,"An entry request ID and ADMIT or DENY decision are required.",400);
+const entry=await getDoc(ctx,env,token,"meetingEntryRequests",requestId);if(!entry)return fail(ctx,request,"Entry request was not found.",404);
+const meeting=await getDoc(ctx,env,token,"meetings",clean(entry.meetingId));if(!meeting)return fail(ctx,request,"Meeting was not found.",404);
+const uid=clean(claims.user_id),email=lower(claims.email),adminProfile=await getDoc(ctx,env,token,"adminProfiles",uid);
+const authorised=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true||clean(meeting.initiatorUid)===uid||clean(meeting.chairpersonUid)===uid||clean(meeting.secretaryUid)===uid||email&&[meeting.chairpersonEmail,meeting.secretaryEmail].some(v=>lower(v)===email);
+if(!authorised)return fail(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may resolve entry requests.",403);
+if(entry.status!=="PENDING")return fail(ctx,request,"This entry request has already been resolved.",409);
+const access=await getDoc(ctx,env,token,"meetingAccessTokens",clean(entry.accessId));
+if(!access||access.status!=="Active"||new Date(access.expiresAt||0).getTime()<=Date.now())return fail(ctx,request,"The invitation pass is expired, revoked or no longer active.",409);
+const next=decision==="ADMIT"?"ADMITTED":"DENIED",now=new Date(),patch={status:next,resolvedByUid:uid,resolvedByEmail:email||null,resolvedAt:now};
+const project=ctx.getFirebaseProjectId(env),base="projects/"+project+"/databases/(default)/documents/";
+const auditId=crypto.randomUUID();
+await commitWrites(ctx,env,token,[
+ {update:{name:base+"meetingEntryRequests/"+requestId,fields:fields(patch)},updateMask:{fieldPaths:Object.keys(patch)},currentDocument:{updateTime:entry.updateTime}},
+ {update:{name:base+"audit/"+auditId,fields:fields({action:decision==="ADMIT"?"MEETING_ENTRY_ADMITTED":"MEETING_ENTRY_DENIED",collection:"meetingEntryRequests",recordId:requestId,details:{meetingId:entry.meetingId,participantId:entry.participantId,accessId:entry.accessId},actorUid:uid,actorEmail:email||null,createdAt:now})},currentDocument:{exists:false}}
+]);
+return response(ctx,request,{ok:true,requestId,status:next});
+}
 if(pathname==="/api/meeting-register/create"){
 const incoming=data.data&&typeof data.data==="object"?data.data:{};
 const uid=clean(claims.user_id),email=lower(claims.email);
