@@ -60,11 +60,11 @@ test("owner can resend a failed or missing Gateway invitation with a rotated tok
   assert.equal(status.signers[0].invitation,"Sent");
 });
 
-test("failed Gateway invitation retry remains explicitly Failed and does not report delivery success",async()=>{
+test("failed Gateway invitation retry preserves the previous delivery state and does not report delivery success",async()=>{
   const f=await fixture({failResend:true});
   await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),/could not be delivered/);
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
-  assert.equal(status.signers[0].invitation,"Failed");
+  assert.equal(status.signers[0].invitation,"Sent","a failed replacement must not overwrite the previous accepted delivery state");
   const diagnostic=f.logs.find(item=>item.event==="SIGNING_INVITATION_DELIVERY_FAILED");
   assert.ok(diagnostic,"SMTP failure must be recorded in Gateway logs");
   assert.equal(diagnostic.details.smtpResponseCode,535);
@@ -104,4 +104,14 @@ test("email-link resend rotates the bearer token and makes the prior invitation 
   await assert.rejects(()=>openEmailSigning(f.ctx,first,"192.0.2.11"),/signing link is unavailable/i);
   const opened=await openEmailSigning(f.ctx,second,"192.0.2.12");
   assert.equal(opened.ok,true);
+});
+
+
+test("failed email-link resend keeps the previously delivered bearer link usable",async()=>{
+  const f=await fixture({failResend:true,emailLink:true});
+  const first=new URL(f.sent[0].link).searchParams.get("emailSignToken");
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),/could not be delivered/i);
+  const opened=await openEmailSigning(f.ctx,first,"192.0.2.22");
+  assert.equal(opened.ok,true);
+  assert.equal(opened.signer.id,"S1");
 });
