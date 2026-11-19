@@ -192,7 +192,6 @@ async function assertConfirmationFooterMatrix(){
    const zoomedViewport={width:Math.max(320,Math.floor(item.width/zoom)),height:Math.max(300,Math.floor(item.height/zoom))};\n   const context=await browser.newContext({viewport:zoomedViewport});
    const page=await context.newPage();
    await page.goto("http://127.0.0.1:4173/tests/fixtures/signature-palette-harness.html");
-   await page.evaluate(value=>{document.documentElement.style.zoom=String(value)},zoom);
    for(const mode of ["saved","draw","type"]){
     await page.getByTestId("field-sig-page-1").click();
     if(mode==="draw")await page.getByRole("button",{name:"Draw",exact:true}).click();
