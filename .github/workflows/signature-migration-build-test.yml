@@ -61,7 +61,7 @@ jobs:
           npm test
 
       - name: Run Signature Portal routing and pathway contract tests
-        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs tests/signature-email-link-unification.test.mjs
+        run: node --test tests/signature-workflow-policy.test.mjs tests/signature-pathway-contract.test.mjs tests/signature-email-link-unification.test.mjs tests/signature-assignment-repair.test.mjs tests/signature-field-assignment-setup.test.mjs
 
       - name: Build web application
         env:
