@@ -62,7 +62,7 @@ test("SMTP self-check returns sanitized failing stage and category",async()=>{
   const audits=[];
   const route=createSmtpSelfcheckRoute({
     authenticateFirebaseRequest:async()=>({user_id:"admin-1",email:"irpa2412@gmail.com",token:"test"}),
-    getFirestoreDocument:async()=>null,
+    getFirestoreDocument:async()=>({fields:{active:{booleanValue:true},role:{stringValue:"Administrator"}}}),
     smtpSend:async(_env,message)=>{const error=new Error("IRPA SMTP error 550 5.1.1 recipient rejected at person@example.org");error.stageCode="RCPT_ACCEPTED";error.smtpReplyCategory="RECIPIENT_REJECTED";await message.onStage(error.stageCode,"failure",error.smtpReplyCategory);throw error;},
     writeAudit:async(_env,_claims,event)=>audits.push(event),
     json:(body,status)=>new Response(JSON.stringify(body),{status}),corsHeaders:()=>({})
