@@ -39,7 +39,7 @@ function docToPlain(document) {
     if ("mapValue" in field) return Object.fromEntries(Object.entries(field.mapValue.fields || {}).map(([k, v]) => [k, convert(v)]));
     return null;
   };
-  return { id: String(document.name || "").split("/").pop(), ...Object.fromEntries(Object.entries(document.fields).map(([k, v]) => [k, convert(v)])) };
+  return { id: String(document.name || "").split("/").pop(), updateTime: document.updateTime || null, ...Object.fromEntries(Object.entries(document.fields).map(([k, v]) => [k, convert(v)])) };
 }
 function errorResponse(ctx, request, message, status = 400) {
   return ctx.json({ ok: false, error: message }, status, ctx.corsHeaders(request));
