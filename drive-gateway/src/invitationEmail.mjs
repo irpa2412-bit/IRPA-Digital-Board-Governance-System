@@ -121,22 +121,34 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
 
 export const EMAIL_LINK_STAGE_CODES=Object.freeze(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT","TOKEN_LOOKUP","SESSION_CREATE"]);
 
+export function classifySmtpReplyCategory(error, stage = "") {
+  const message = String(error?.message || error || "").toLowerCase();
+  const code = Number(error?.smtpResponseCode || (message.match(/(?:smtp error |^)(\d{3})/i) || [])[1] || 0);
+  const transportCode = String(error?.code || "").toUpperCase();
+  if (stage === "SMTP_AUTH" || /authentication|auth failed|credentials invalid|not authorized/.test(message) || [530,534,535,538].includes(code)) return "AUTH_FAILED";
+  if (transportCode === "ECONNREFUSED" || /connection refused/.test(message)) return "CONNECTION_REFUSED";
+  if (/mailbox full|mailbox is full|quota exceeded|over quota|insufficient storage/.test(message) || code === 552 || code === 452 && /4\.2\.2/.test(message)) return "MAILBOX_FULL";
+  if (/rate.?limit|too many messages|throttl|sending limit|try again later/.test(message) || [421,450,451,452,454].includes(code)) return "RATE_LIMITED";
+  if (/recipient.*reject|unknown recipient|user unknown|no such user|address rejected/.test(message) || [550,551,553].includes(code) || /5\.1\.[0-9]/.test(message)) return "RECIPIENT_REJECTED";
+  return "UNKNOWN";
+}
 export async function runEmailStage(stage,action,onStage){
   if(!EMAIL_LINK_STAGE_CODES.includes(stage))throw new Error("Unsupported email stage.");
   try{
     const result=await action();
-    try{await onStage?.(stage,"success")}catch{}
+    try{await onStage?.(stage,"success","UNKNOWN")}catch{}
     return result;
   }catch(error){
     const response=String(error?.message||"").match(/IRPA SMTP error (\d{3})/i);
     const safe=new Error(response?`IRPA SMTP error ${response[1]}`:`Email delivery failed at ${stage}.`);
     safe.name=String(error?.name||"Error").slice(0,40);
     safe.stageCode=stage;
+    safe.smtpReplyCategory=classifySmtpReplyCategory(error,stage);
     if(response)safe.smtpResponseCode=Number(response[1]);
     if(/^[A-Z0-9_-]{1,40}$/i.test(String(error?.code||"")))safe.code=String(error.code);
     if(error?.deliveryOutcome==="unknown")safe.deliveryOutcome="unknown";
     if(error?.retryable===false)safe.retryable=false;
-    try{await onStage?.(stage,"failure")}catch{}
+    try{await onStage?.(stage,"failure",safe.smtpReplyCategory)}catch{}
     throw safe;
   }
 }
@@ -145,7 +157,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
   const outcomes=new Map();
-  const capture=async(stage,outcome)=>outcomes.set(stage,outcome);
+  const capture=async(stage,outcome,smtpReplyCategory)=>outcomes.set(stage,{outcome,smtpReplyCategory});
   let result,error;
   try{
     const message=await runEmailStage("BUILD_MESSAGE",()=>buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}),capture);
@@ -154,7 +166,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
     error=err;
     if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,"failure");
   }
-  for(const [stage,outcome] of outcomes){try{await onStage?.(stage,outcome)}catch{}}
+  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory)}catch{}}
   if(error)throw error;
   return result;
 }
