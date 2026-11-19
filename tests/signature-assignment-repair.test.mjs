@@ -27,6 +27,7 @@ test("merge duplicate participant keeps the identity with most fields and moves 
  assert.equal(result.recipients.find(p=>p.uid==="gloria-a").roleAssignments.length,2);
  assert.equal(result.fields.find(f=>f.fieldId==="secretary-signature").signerUid,"gloria-a");
  assert.equal(result.fields.find(f=>f.fieldId==="secretary-signature").roleAssignmentIndex,1);
+ assert.equal(result.fields.find(f=>f.fieldId==="secretary-signature").signerEmail,"gloria@example.org");
  assert.equal(result.fields.find(f=>f.fieldId==="attendance-1").signerUid,"gloria-a");
  assert.equal(result.merged.length,1);
 });
@@ -54,6 +55,8 @@ test("orphaned field remains explicitly orphaned when there is no safe identity 
  assert.equal(diagnosed.orphanedFields[0].reason,"signer not in list");
  const linked=relinkOrphanedField([orphan],"orphan","gloria-a",[participants[0]]);
  assert.equal(linked[0].signerUid,"gloria-a");
+ assert.equal(linked[0].signerName,"Gloria Labarani");
+ assert.equal(linked[0].signerEmail,"gloria@example.org");
 });
 
 test("field diagnostics identify no signer, signer not in list, and owner signing off with page and field numbers",()=>{
@@ -70,7 +73,7 @@ test("merge and repair preserve coordinates and page references on 0, 90, 180 an
  const rotated=rotations.map((rotation,index)=>({fieldId:"rot-"+rotation,type:"Signature",page:index+1,x:11+index,y:21+index,width:19,height:7,pageRotation:rotation,signerUid:index%2?"gloria-b":"gloria-a"}));
  const result=mergeDuplicateParticipants(participants,rotated);
  for(const rotation of rotations){
-  const before=rotated.find(f=>f.pageRotation===rotation),after=result.fields.find(f=>f.rotation===rotation);
+  const before=rotated.find(f=>f.pageRotation===rotation),after=result.fields.find(f=>f.pageRotation===rotation);
   assert.equal(after.page,before.page);assert.equal(after.x,before.x);assert.equal(after.y,before.y);assert.equal(after.width,before.width);assert.equal(after.height,before.height);assert.equal(after.pageRotation,rotation);assert.equal(after.signerUid,"gloria-a");
  }
 });
