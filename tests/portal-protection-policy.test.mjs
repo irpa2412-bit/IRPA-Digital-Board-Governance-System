@@ -27,3 +27,13 @@ test("shared dependency fans out to every dependent portal", () => {
   assert.equal(result.ok, true);
 });
 test("unrelated change passes without a repair window", () => assert.equal(run(["README.md"], null, null).ok, true));
+
+test("a new commit cannot silently reopen a window after a 24-hour gap", () => {
+  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState, activityTimestamps: ["2026-11-19T18:30:00Z", "2026-11-20T19:00:00Z"], now: Date.parse("2026-11-20T19:01:00Z") });
+  assert.equal(result.ok, false);
+});
+test("a fresh declaration reopens after an earlier closure", () => {
+  const reopened = { ...windowState, openedAt: "2026-11-20T18:00:00Z" };
+  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState: reopened, activityTimestamps: ["2026-11-19T19:00:00Z", "2026-11-20T18:30:00Z"], now: Date.parse("2026-11-20T18:31:00Z") });
+  assert.equal(result.ok, true);
+});
