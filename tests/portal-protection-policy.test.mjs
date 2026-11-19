@@ -40,5 +40,5 @@ test("a fresh declaration reopens after an earlier closure", () => {
 
 
 test("Git activity history is parsed into individual timestamps", () => {
-  assert.deepEqual(parseActivityTimestamps("2026-11-19T21:10:19Z\\n2026-11-19T21:11:00Z\\n"), ["2026-11-19T21:10:19Z","2026-11-19T21:11:00Z"]);
+  assert.deepEqual(parseActivityTimestamps("2026-11-19T21:10:19Z\n2026-11-19T21:11:00Z\n"), ["2026-11-19T21:10:19Z","2026-11-19T21:11:00Z"]);
 });
