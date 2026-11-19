@@ -386,3 +386,11 @@ test("completed-document distribution retry is admitted by the Gateway e-signatu
   const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
   assert.ok(worker.includes("distribution\\/retry"), "the Worker must route distribution retries into the e-signature router");
 });
+
+
+test("saved signature drafts return canonical persisted fields in preparation-editor percentage coordinates", () => {
+  const platform = fs.readFileSync(new URL("../src/firebase/signaturePlatform.js", import.meta.url), "utf8");
+  const save = platform.slice(platform.indexOf("export async function saveSignatureWorkflowDraft("), platform.indexOf("\\nexport async function finalizeSignatureWorkflowDraft"));
+  assert.match(platform, /signatureFieldsToPercent/);
+  assert.match(save, /const savedDraft=result\\.draft\\|\\|workerDraft;return\\{id,\\.\\.\\.savedDraft,fields:signatureFieldsToPercent\\(savedDraft\\.fields/);
+});
