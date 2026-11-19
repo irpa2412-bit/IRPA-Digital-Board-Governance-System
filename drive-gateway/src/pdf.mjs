@@ -75,12 +75,22 @@ export function getSignatureDrawGeometry(imageWidth, imageHeight, fieldBox) {
   }, { allowUpscale: true, maxScale: 3 });
   const width = fit.width;
   const height = fit.height;
-  return {
-    x: fieldBox.x + (fieldBox.width - width) / 2,
-    y: fieldBox.y + (fieldBox.height - height) / 2,
-    width,
-    height
-  };
+  const rotation = ((Number(fieldBox.rotation || 0) % 360) + 360) % 360;
+  let x = fieldBox.x + (fieldBox.width - width) / 2;
+  let y = fieldBox.y + (fieldBox.height - height) / 2;
+  // pdf-lib rotates image XObjects around their lower-left origin. Offset the
+  // origin so the rotated image's visible bounds remain centred in the field.
+  if (rotation === 90) {
+    x = fieldBox.x + (fieldBox.width + height) / 2;
+    y = fieldBox.y + (fieldBox.height - width) / 2;
+  } else if (rotation === 180) {
+    x = fieldBox.x + (fieldBox.width + width) / 2;
+    y = fieldBox.y + (fieldBox.height + height) / 2;
+  } else if (rotation === 270) {
+    x = fieldBox.x + (fieldBox.width - height) / 2;
+    y = fieldBox.y + (fieldBox.height + width) / 2;
+  }
+  return { x, y, width, height };
 }
 
 function drawFittedSignature(page, image, fieldBox) {
