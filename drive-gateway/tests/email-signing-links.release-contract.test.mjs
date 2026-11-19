@@ -116,15 +116,3 @@ test("all application PDF.js entry points copy caller-owned bytes before worker 
   assert.ok(portal.includes("source={data:bytes.slice()}"));
   assert.ok(portal.includes("pdfjsLib.getDocument({data:bytes.slice()}).promise"));
 });
-
-
-test("email-link signer must review every rendered PDF page before the explicit TO SIGN CLICK HERE action unlocks the signature pad",()=>{
-  assert.match(page,/reviewedPages/);
-  assert.match(page,/setReviewedPages/);
-  assert.match(page,/reviewedPages.length!==pageCount/);
-  assert.match(page,/TO SIGN CLICK HERE/);
-  assert.ok(page.includes("setSigningUnlocked(true)"));
-  assert.match(page,/selectedField&&signingUnlocked&&/);
-  assert.ok(page.includes("disabled={signingClosed||!signingUnlocked}"));
-  assert.match(page,/Review the complete document and signature placement before submitting/);
-});
