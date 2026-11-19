@@ -90,7 +90,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
   return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,display:"flex",flexDirection:"column",maxHeight:"calc(100dvh - 12px)",height:"auto",minHeight:0,overflow:"hidden",boxSizing:"border-box",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)"}}>
       <header style={{flex:"0 0 auto",padding:"12px 16px 0"}}>
         <h2 style={{margin:"0 0 8px"}}>Confirm {field?.type||"Signature"}</h2>
-        <p className="muted" style={{margin:"0 0 12px"}}>Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. If an active saved specimen is available in your own profile, it is selected for your review. Nothing is applied until you confirm.</p>
+        <p className="muted" style={{margin:"0 0 12px"}}>Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. If an active saved specimen is available in your own profile, it is selected for your review. Nothing is applied until you tap Confirm. Nothing is stamped until you tap Confirm.</p>
         <div role="group" aria-label="Signature method" style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
           {["Draw",...(allowTyped?["Type"]:[]),"Use my saved signature"].map(item=><button key={item} type="button" className={mode===item?"":"secondary-button"} onClick={()=>setMode(item)} style={{minHeight:44}}>{item}</button>)}
         </div>
