@@ -413,6 +413,15 @@ test("PDF finalizer keeps signer name, long role and full date upright and insid
         orientation + " /Rotate " + rotation + " signature image must render at a readable page-relative size");
 
       const sourcePage = (await PDFDocument.load(sourceBytes)).getPages()[0];
+      const signatureBox = getPdfFieldBox(sourcePage, fields[0]);
+      const image = imageDraws[0];
+      const imageBounds = rotation === 90 || rotation === 270
+        ? { x: image.x + (image.width - image.height) / 2, y: image.y + (image.height - image.width) / 2, width: image.height, height: image.width }
+        : { x: image.x, y: image.y, width: image.width, height: image.height };
+      assert.ok(imageBounds.x >= signatureBox.x - 0.1 && imageBounds.y >= signatureBox.y - 0.1 &&
+        imageBounds.x + imageBounds.width <= signatureBox.x + signatureBox.width + 0.1 &&
+        imageBounds.y + imageBounds.height <= signatureBox.y + signatureBox.height + 0.1,
+      orientation + " /Rotate " + rotation + " signature image must remain inside its page field");
       for (const draw of textDraws) {
         const text = draw.text;
         const field = text === name ? fields[1]
