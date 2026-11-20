@@ -798,7 +798,32 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   setMessage("This envelope must be signed through its verified email-link invitation. Open the unique link sent to your assigned email address.");
  }
  async function certificate(){setBusy(true);try{const url=await createCompletionCertificate(selected);const updated={...selected,certificateUrl:url};setSelected(updated);setEnvelopes(envelopes.map(e=>e.id===updated.id?updated:e));setMessage("Certificate of Completion generated.")}catch(x){setMessage(x.message||"Unable to generate certificate.")}finally{setBusy(false)}}
- return <div className="page signature-portal-root"><section className="welcome-panel"><div><span className="eyebrow">IRPA SIGNATURE PORTAL</span><h1>{signerOnly?"Signing Invitation":"Email-link E-signature Portal"}</h1><p>{signerOnly?"Review the invited controlled document and complete only the signature fields assigned to you.":"Prepare, route and track controlled documents. All signer actions are completed through verified email-link invitations."}</p></div><div className="identity-card"><span>Signature status</span><strong>{profile?.status||"Not configured"}</strong>{profile?.driveSignatureFolderId&&<a href={`https://drive.google.com/drive/folders/${encodeURIComponent(profile.driveSignatureFolderId)}`} target="_blank" rel="noopener noreferrer" className="text-button" style={{display:"inline-block",marginTop:8,textDecoration:"none"}}>Open My Signature Folder</a>}</div></section>
+ return <div className="page signature-portal-root"><style>{`
+.signature-portal-root,
+.signature-portal-root .panel,
+.signature-portal-root .stat-card {
+  color: var(--text, #111827);
+  opacity: 1;
+}
+.signature-portal-root .panel .muted,
+.signature-portal-root .stat-card .muted {
+  color: var(--muted-text, var(--text, #374151));
+  opacity: 1;
+}
+.signature-portal-root [aria-busy="true"] {
+  opacity: 1;
+  filter: none;
+}
+.signature-portal-root .signature-envelope-status,
+.signature-portal-root .signature-envelope-status * {
+  color: var(--text, #111827);
+  opacity: 1;
+}
+.signature-portal-root .signature-envelope-status small {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+`}</style><section className="welcome-panel"><div><span className="eyebrow">IRPA SIGNATURE PORTAL</span><h1>{signerOnly?"Signing Invitation":"Email-link E-signature Portal"}</h1><p>{signerOnly?"Review the invited controlled document and complete only the signature fields assigned to you.":"Prepare, route and track controlled documents. All signer actions are completed through verified email-link invitations."}</p></div><div className="identity-card"><span>Signature status</span><strong>{profile?.status||"Not configured"}</strong>{profile?.driveSignatureFolderId&&<a href={`https://drive.google.com/drive/folders/${encodeURIComponent(profile.driveSignatureFolderId)}`} target="_blank" rel="noopener noreferrer" className="text-button" style={{display:"inline-block",marginTop:8,textDecoration:"none"}}>Open My Signature Folder</a>}</div></section>
  {!signerOnly&&<div className="dashboard-grid" style={{marginBottom:18}}>{[["Signature Profile",profile?"Active":"Required"],["Envelopes",envelopes.length],["Controlled Documents",docs.length],["Pending Signing",envelopes.filter(e=>e.status!=="Completed").length]].map(([a,b])=><div className="stat-card" key={a}><span>{a}</span><strong>{b}</strong><small>Signature Portal</small></div>)}</div>}
  {!signerOnly&&<div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}><div className="signature-portal-nav">{["Profile","Sign a Document","Envelopes","Document Tracking","My Documents","Signature Pathway Self-Test"].map(x=><button type="button" key={x} className={tab===x?"signature-nav-button active":"signature-nav-button"} onClick={()=>{if(x==="Sign a Document"){if(profile?.status!=="Active"){setTab(x);setMessage("An active Signature Profile is required before starting a signing document.");return;}setTab(x);setSignDocumentPickerMode("source");setSignDocumentPickerOpen(true);setMessage("Document picker opened. Select a system document or choose a PDF/file from this device.");}else setTab(x)}}>{x}</button>)}</div></div>}{message&&<div className="auth-message" role="alert" aria-live="assertive" style={{marginBottom:16}}>{message}</div>}
  {signDocumentPickerOpen&&<div role="dialog" aria-modal="true" aria-label="Sign a Document picker" style={{position:"fixed",inset:0,zIndex:1000,background:"var(--surface)",display:"flex",alignItems:"center",justifyContent:"center",padding:18}}>
