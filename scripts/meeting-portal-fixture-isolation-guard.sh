@@ -302,6 +302,7 @@ if (changed.includes("docs/portal-protection/repair-window.json") ||
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
+  !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/"))) &&
   !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
   !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
   !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
@@ -357,6 +358,20 @@ const signatureEmailLinkIdentityPaths = new Set([
   "tests/signature-email-link-unification.test.mjs",
   "tests/signature-workflow-policy.test.mjs",
 ]);
+const emailSigningRebuildPaths = new Set([
+  "drive-gateway/src/emailSigningLinks.mjs", "drive-gateway/src/signing.mjs", "drive-gateway/src/index.js",
+  "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
+  "drive-gateway/tests/email-signing-contract.test.mjs", "drive-gateway/tests/email-signing-links.test.mjs",
+  "drive-gateway/tests/email-signing-links.integration.test.mjs", "tests/email-signing-contract.test.mjs",
+  ".github/workflows/email-signing-contract.yml"
+]);
+const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signing.mjs") &&
+  changed.includes("drive-gateway/src/emailSigningLinks.mjs") &&
+  changed.includes("src/pages/EmailSigningReadOnlyPage.jsx") &&
+  changed.includes("src/pages/SignaturePlatform.jsx") &&
+  changed.includes("drive-gateway/tests/email-signing-contract.test.mjs") &&
+  changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")) &&
+  changed.every(path => emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/"));
 const signatureEmailLinkIdentityRepair =
   changed.includes("src/firebase/signatureStorage.js") &&
   changed.includes("src/pages/SignaturePlatform.jsx") &&
@@ -436,7 +451,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !emailSigningRebuildIntegration && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
