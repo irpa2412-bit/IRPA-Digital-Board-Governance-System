@@ -866,6 +866,17 @@ export function createAdministratorCleanupRouter(deps) {
         } catch (executionError) {
           plan.status = plan.backupDriveFileId ? "PAUSED" : "AWAITING_REVIEW";
           plan.lastError = String(executionError?.message||executionError).slice(0,500);
+          try {
+            const auditRef = await writeAuditEvent(env,auth.token,{eventType:plan.backupDriveFileId?"EXECUTION_PAUSED":"BACKUP_OR_PREFLIGHT_FAILED",
+              planId:plan.planId,inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,
+              backupDriveFileId:plan.backupDriveFileId||null,error:plan.lastError,occurredAt:new Date().toISOString()});
+            plan.auditRefs = [...(plan.auditRefs||[]),auditRef];
+            if (plan.backupArchive) {
+              plan.backupArchive.auditRefs = plan.auditRefs;
+              plan.backupArchive.operationOutcomes = plan.operationOutcomes||[];
+              await updateBackup(env,plan,driveToken);
+            }
+          } catch {}
           await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
           return json({ok:false,code:"CLEANUP_EXECUTION_BLOCKED",error:plan.lastError,planId,backupUrl:plan.backupUrl||null},Number(executionError?.status||502),corsHeaders(request));
         }
