@@ -89,7 +89,7 @@ export default function AdministratorCleanupControl() {
     </div></div>
     <div className="form-actions">
       <button type="button" onClick={takeInventory} disabled={busy}>{busy ? "Working…" : "Take Fresh Inventory"}</button>
-      {inventory && <button type="button" className="secondary" onClick={() => { setDecisions(Object.fromEntries(rows.map(row => [row.key, "STAYS"]))); setPlan(null); }} disabled={busy}>Mark All STAYS</button>}
+      {inventory && <button type="button" className="secondary" onClick={() => { setDecisions(Object.fromEntries(rows.map(row => [row.key, "STAYS"]))); setPlan(null); setExecution(null); setConfirmation(""); }} disabled={busy}>Mark All STAYS</button>}
     </div>
     {inventory && <>
       <div className="detail-grid" style={{marginTop:16}}>
