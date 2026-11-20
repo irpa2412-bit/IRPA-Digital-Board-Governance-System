@@ -395,7 +395,9 @@ const emailSigningRebuildPaths = new Set([
   "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
   "drive-gateway/tests/email-signing-contract.test.mjs", "drive-gateway/tests/email-signing-links.test.mjs",
   "drive-gateway/tests/email-signing-links.integration.test.mjs", "tests/email-signing-contract.test.mjs",
-  ".github/workflows/email-signing-contract.yml"
+  ".github/workflows/email-signing-contract.yml",
+  "docs/portal-protection/change-record.json", "docs/portal-protection/repair-window.json",
+  "scripts/meeting-portal-fixture-isolation-guard.sh"
 ]);
 const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signing.mjs") &&
   changed.includes("drive-gateway/src/emailSigningLinks.mjs") &&
