@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T12:08:00Z",
+  "lastActivityAt": "2026-11-20T12:09:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -179,6 +179,11 @@
       "at": "2026-11-20T12:08:00Z",
       "action": "repair",
       "description": "The outsider fixture now remounts Meeting Room under an outsider actor and verifies the server-scoped mock returns no meetings, no meeting details, and no governance or attendance-signing controls."
+    },
+    {
+      "at": "2026-11-20T12:09:00Z",
+      "action": "repair",
+      "description": "Raised the isolated fixture banner's mobile font size from 11px to the repository's 12px readability floor after candidate-proof reported the single violation."
     }
   ],
   "durationHours": 48,
