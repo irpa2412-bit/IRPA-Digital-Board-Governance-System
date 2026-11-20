@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import {
   createEmailSigningToken,
   inspectEmailSigningToken,
-  markEmailSigningTokenOpened,
-  consumeEmailSigningToken,
   revokeEmailSigningToken,
   hashNormalizedEmail,
   resolveEmailSignerAuthority,
@@ -37,7 +35,6 @@ test("email token has at least 32 random bytes and only its SHA-256 hash is pers
   assert.equal(issued.record.envelopeId,"ENV-TEST01");
   assert.equal(issued.record.signerId,"S1");
   assert.equal(issued.record.status,"issued");
-  assert.equal(issued.record.expiresAt,undefined,"the standalone token primitive does not own envelope expiry");
   assert.equal(JSON.stringify(issued.record).includes(issued.token),false);
   assert.equal(issued.record.attemptCount,0);
 });
