@@ -81,7 +81,7 @@ try {
       await page.getByRole("button", { name: "Meeting Room", exact: true }).click();
       await page.getByRole("heading", { name: "Meeting Room" }).waitFor();
 
-      const meetingPicker = page.locator(".form-field").filter({ hasText: /^Meeting$/ }).locator("select");
+      const meetingPicker = page.locator("select").first();
       await meetingPicker.selectOption(created.id);
       await page.getByText("TEST Guest — Position 1", { exact: true }).waitFor();
       await page.getByText("TEST Guest — Position 2", { exact: true }).waitFor();
