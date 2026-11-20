@@ -17,6 +17,10 @@ function preservesChangeRecordHistory(baselineChangeRecord,currentChangeRecord,a
     JSON.stringify(currentAffected)===JSON.stringify(["Signature Portal","Meeting Portal"])&&
     JSON.stringify(declaredAffected)===JSON.stringify(["Meeting Portal","Signature Portal"]);
   if(allowedSharedDependencyExtension)baseline.declaration.affectedPortals=currentAffected;
+  if(amendment?.validation){
+    if(JSON.stringify(current.validation)!==JSON.stringify(amendment.validation))return false;
+    baseline.validation=current.validation;
+  }
   return JSON.stringify(baseline)===JSON.stringify(current);
 }
 
