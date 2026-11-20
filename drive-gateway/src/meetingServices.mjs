@@ -58,7 +58,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  const dailyByParticipant=new Map(dailyRows.filter(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate).map(r=>[clean(r.participantId),r]));
  const dailyDispatch=dispatchRows.find(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate);
  let dailyGatewayStatus=null;
- if(dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.gatewayEnvelopeId&&dailyDispatch?.ownerUid===clean(claims?.user_id)&&typeof ctx.getGatewayEnvelopeStatus==="function")dailyGatewayStatus=await ctx.getGatewayEnvelopeStatus(claims,env,clean(dailyDispatch.gatewayEnvelopeId)).catch(()=>null);
+ if(dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.gatewayEnvelopeId&&dailyDispatch?.ownerUid&&typeof ctx.getGatewayEnvelopeStatus==="function")dailyGatewayStatus=await ctx.getGatewayEnvelopeStatus(clean(dailyDispatch.ownerUid),env,clean(dailyDispatch.gatewayEnvelopeId)).catch(()=>null);
  const gatewaySignersById=new Map((Array.isArray(dailyGatewayStatus?.signers)?dailyGatewayStatus.signers:[]).map(s=>[clean(s.id),s]));
  const dailySignerByUid=new Map((Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([uid,signer])=>uid&&signer?.status==="Signed"));
  const queueByParticipant=new Map();
@@ -308,6 +308,10 @@ for(const member of memberRecords){
  rows.push({participantId:null,participantUid:memberUid,name:clean(member.name||member.fullName||member.memberName||member.displayName)||"Board Member",email:lower(member.email||member.emailAddress||member.contactEmail),role:clean(member.boardPosition)||"Board Member",registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false,dailyAttendanceStatus:"N/A",attendanceStatus:"N/A",dailyAttendanceRecordedAt:null,signed:false,registrationNote:"Not registered for this meeting"});
 }
 const dispatch=dispatchRows.find(r=>clean(r.attendanceDate)===date)||null;
+let gatewayStatus=null;if(dispatch?.status==="DISPATCHED"&&dispatch?.gatewayEnvelopeId&&dispatch?.ownerUid&&typeof ctx.getGatewayEnvelopeStatus==="function")gatewayStatus=await ctx.getGatewayEnvelopeStatus(clean(dispatch.ownerUid),env,clean(dispatch.gatewayEnvelopeId)).catch(()=>null);
+const gatewaySignersById=new Map((Array.isArray(gatewayStatus?.signers)?gatewayStatus.signers:[]).map(signer=>[clean(signer.id),signer]));
+const signedByUid=new Map((Array.isArray(dispatch?.gatewaySignerMap)?dispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantUid,signer])=>participantUid&&signer?.status==="Signed"));
+for(const row of rows){const signer=signedByUid.get(clean(row.participantUid));if(signer){row.signed=true;row.signedAt=iso(signer.signedAt);}}
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
 return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null,gatewayEnvelopeId:dispatch.gatewayEnvelopeId||null,gatewaySignerMap:Array.isArray(dispatch.gatewaySignerMap)?dispatch.gatewaySignerMap:[]}:null});
 }
