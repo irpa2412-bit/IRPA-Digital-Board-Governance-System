@@ -1,9 +1,9 @@
 # Administrator-Controlled Data Cleanup — Implementation Contract
 
-Status: inventory gate and read-only plan API implemented on `feat/admin-controlled-cleanup-20261120`; destructive executor and Settings interface remain incomplete. Not merged or deployed. The legacy reset executor is disabled on this feature branch and is not approved for reuse.
+Status: administrator inventory and review interface, expanded inventory coverage and read-only plan API are implemented on `feat/admin-controlled-cleanup-20261120`; destructive executor, durable backup and staging acceptance remain incomplete. Not merged or deployed. The legacy reset executor is disabled on this feature branch and is not approved for reuse.
 
 ## Objective
-Replace the broad System Reset / trial-reset pathway with a dedicated Cloudflare Gateway service and Settings interface. The browser may inventory, select, review and confirm records; only the authenticated Worker may authorise and execute mutations.
+Replace the broad System Reset / trial-reset pathway with a dedicated Cloudflare Gateway service and Settings interface. The browser may inventory, select and review records; only the authenticated Worker may authorise and execute mutations. The Settings page is now connected to the inventory and plan endpoints.
 
 ## Authorisation
 - Require a valid Firebase ID token and an active `adminProfiles/{uid}` record.
@@ -12,7 +12,7 @@ Replace the broad System Reset / trial-reset pathway with a dedicated Cloudflare
 - Reject all other users with HTTP 403. Do not permit deletion of the executing administrator, Executive Director, Board Chairperson or Board Secretary.
 
 ## Inventory and selection
-Inventory must span member and employee registers, identity/signature profiles, Firebase Auth users, invitations, meetings, meeting participants, attendance, subscriptions, documents, signature envelopes, signer assignments and related portal records.
+Inventory currently reads the registered member, employee, governance, finance, procurement, research, meeting, document, communication and signature collections, plus Firebase Auth account presence. The current collection sweep must be checked against production schemas and completeness before it can authorise execution.
 Every eligible record defaults to STAYS. GOES is an explicit per-record administrator decision. Provide full name, email, role, register category, creation date, status, record identifier, linked-record impact, search/filter, Mark all STAYS and live STAYS/GOES counters.
 External signing invitees must not be treated as registered portal users unless a real member/profile record establishes that relationship.
 
