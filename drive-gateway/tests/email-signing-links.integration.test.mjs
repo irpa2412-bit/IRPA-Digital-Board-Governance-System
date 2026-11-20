@@ -121,14 +121,15 @@ test("two distinct participants may share one delivery email and retain isolated
   assert.equal(f.sent.length,2,"sequential routing sends the first invitation and keeps the second signer pending");
 });
 
-test("email-link signer is stored with token hash, email hash and configured expiry; mail is sent once",async()=>{
+test("email-link signer is stored without time-based expiry; mail is sent once",async()=>{
   const f=await fixture();
   const signer=f.envelope.signers[0];
   assert.equal(signer.identityType,"email-link");
   assert.equal(signer.emailLinkStatus,"issued");
   assert.equal(signer.emailLinkAttemptCount,0);
   assert.equal(signer.emailLinkOpenCount,0);
-  assert.equal(signer.emailLinkExpiresAt,new Date(NOW.getTime()+7*86400000).toISOString(),"email-link expiry follows the configured seven-day lifetime");
+  assert.equal(signer.emailLinkExpiresAt,undefined,"email-link invitations must not expire with time");
+  assert.equal(signer.tokenExpiresAt,undefined,"email-link token must not inherit the envelope expiry");
   assert.equal(signer.tokenHash,await sha256Hex(f.token.split(".")[2]));
   assert.equal(signer.emailHash,await sha256Hex("board.secretary@example.org"));
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
@@ -184,13 +185,14 @@ test("tampered and unknown links return the same neutral response",async()=>{
   await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+"a".repeat(64),"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
-test("an unused email signing link is no longer redeemable after its configured expiry",async()=>{
+test("an unused email signing link remains valid indefinitely until its one-time redemption",async()=>{
   const f=await fixture();
-  f.now(new Date("2026-11-24T08:00:00.000Z"));
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.message===genericEmailSigningFailure());
+  f.now(new Date("2027-11-24T08:00:00.000Z"));
+  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.19");
+  assert.equal(opened.ok,true,"the invitation remains valid more than one year after issue");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(stored.signers[0].emailLinkStatus,"issued");
-  assert.ok(Date.parse(stored.signers[0].emailLinkExpiresAt)<f.ctx.now().getTime());
+  assert.equal(stored.signers[0].emailLinkStatus,"opened");
+  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.message===genericEmailSigningFailure());
 });
 
 test("owner revoke invalidates a guest link; resend rotates token and marks the previous hash replaced",async()=>{
