@@ -196,8 +196,8 @@ export function createAdministratorCleanupRouter(deps) {
           registerType: collection === "members" ? "Member Register" : collection === "employees" ? "Employee Register" :
             collection === "auditorProfiles" ? "External Profile" : collection === "signatureProfiles" ? "Signature Profile" : collection,
           role, createdAt: data.createdAt || data.createdDate || data.timestamp || doc.createTime || null,
-          status: trialData ? "Trial/test" : clean(data.status || data.registrationStatus || data.employmentStatus) ||
-            (authUser ? (authUser.disabled ? "Disabled" : "Active") : collection === "invitations" ? "Invited" : ""),
+          status: trialData ? "Trial/test" : collection === "invitations" ? "Invited" : clean(data.status || data.registrationStatus || data.employmentStatus) ||
+            (authUser ? (authUser.disabled ? "Disabled" : "Active") : ""),
           sourceStatus: clean(data.status || data.registrationStatus || data.employmentStatus) || null,
           authAccountPresent: Boolean(authUser),
           authCreatedAt: authUser?.createdAt || null,
