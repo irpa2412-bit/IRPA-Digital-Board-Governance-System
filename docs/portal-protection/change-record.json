@@ -3,8 +3,7 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal",
-      "Meeting Portal"
+      "Signature Portal"
     ],
     "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
     "files": [
@@ -30,30 +29,28 @@
   },
   "validation": {
     "baselineSmoke": "PASS",
-    "fullRegression": "PENDING",
     "portalSmoke": {
-      "Signature Portal": "PENDING",
-      "Meeting Portal": "PENDING"
+      "Signature Portal": "PASS"
     },
+    "dependentSmoke": {
+      "Signature envelope refresh and delivery regression": "PASS",
+      "Readability CI and token contrast": "PASS",
+      "Production application build": "PASS",
+      "Complete root test suite": "PASS"
+    },
+    "fullRegression": "PASS",
     "behaviourDifferences": [
-      "The email-link invitation/open/PDF/signing lifecycle is restored to the verified pre-cutoff route implementation.",
-      "Email-link invitations have no time-based expiry, including after first open; the same email URL remains usable when the signer leaves without signing and returns later.",
-      "Opening does not rotate or consume the invitation token; legacy opened-but-unsigned invitation hashes remain accepted unless replaced, revoked, signed, or cancelled.",
-      "A successful replacement email delivery, authorised revocation, signer completion, or envelope cancellation controls when signing access changes.",
-      "Existing signing records, tokens, completed PDFs and audit trails are not rewritten."
+      "Signer status responses are now associated with the selected Gateway envelope ID locally for refresh, resend, revoke, and completed-distribution retry.",
+      "The Signature Portal root and signer status panel retain full opacity and readable text during aria-busy refresh state.",
+      "Signer metadata wraps on narrow screens to avoid clipping."
     ],
     "evidence": [
-      "Production Gateway deployment run 44690520757 confirmed commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd live at 09:49:57 EAT.",
-      "Signature files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
-      "Owner clarified that an opened-but-unsigned invitation must remain valid and reusable; implementation and regression tests now cover reopening the same email URL after more than one year.",
-      "Full regression and both affected-portal smoke checks are pending on the amended exact PR head; no production deployment has occurred."
-    ],
-    "dependentSmoke": {
-      "Signature envelope refresh and delivery regression": "PENDING",
-      "Readability CI and token contrast": "PENDING",
-      "Production application build": "PENDING",
-      "Complete root test suite": "PENDING"
-    }
+      "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
+      "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
+      "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
+      "IRPA Release Build completed successfully on the exact PR head before scope correction.",
+      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
+    ]
   },
   "closure": {
     "closedAt": "",
@@ -89,7 +86,8 @@
       "tests/signature-email-link-unification.test.mjs",
       "tests/signature-workflow-policy.test.mjs",
       "drive-gateway/src/invitationEmail.mjs",
-      "drive-gateway/tests/e2e.test.mjs"
+      "drive-gateway/tests/e2e.test.mjs",
+      "scripts/portal-protection-check.mjs"
     ],
     "repairWindow": {
       "openedAt": "2026-11-20T17:08:47Z",
@@ -99,14 +97,16 @@
       "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified."
     },
     "prohibitedChanges": [
-      "Do not change existing Firestore signing envelopes, invitation tokens, signer profiles, audit trails, completed PDFs or recipient copies.",
+      "Do not change existing Firestore signing envelopes, signer assignments, invitation tokens, audit trails, completed PDFs or recipient copies except for normal signing lifecycle updates.",
       "Do not change SMTP configuration, credentials, secrets, Worker bindings or mail transport.",
       "Do not change Firestore rules, indexes, document hashing, PDF stamping, certificates or archive logic.",
       "Do not roll back Meeting Portal attendance registration, attendance-sheet preparation, ordinary meeting invitations or other portal functionality.",
       "Do not deploy a whole-application or whole-Gateway historical rollback.",
-      "Do not add time-based expiry to email-link invitations or signer sessions; do not invalidate unused invitations by envelope TTL. Preserve one-time redemption, owner revocation and envelope cancellation."
+      "Do not add time-based expiry to email-link invitations or signer sessions; do not invalidate unused invitations by envelope TTL.",
+      "Do not consume or rotate an email invitation on opening, closing, refreshing or leaving the signing page without signing.",
+      "Consume the invitation only after successful signature submission; preserve authorised revocation, successful replacement delivery and envelope cancellation."
     ],
-    "ownerInstruction": "Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links. The email-link invitation must have no time-based expiry: it remains valid until redeemed once, revoked, or the envelope is cancelled. After redemption, the invitation bearer token is consumed and cannot be reused; the signer session remains usable without time expiry.",
+    "ownerInstruction": "Restore only the Email-link E-signature code paths to their verified pre-11:00 EAT state. Every dispatched email-link invitation has no time-based expiry, before or after opening. Opening, closing, refreshing or reopening the same email URL without signing does not consume or rotate it. The same link remains usable until successful signature submission, authorised owner revocation, successful replacement delivery, or envelope cancellation. Preserve existing signing records, tokens, audit events, completed PDFs, recipient copies, SMTP configuration and unrelated portal functionality.",
     "supersededAmendment": {
       "status": "open",
       "affectedPortals": [
