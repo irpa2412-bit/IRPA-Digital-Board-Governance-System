@@ -24,7 +24,7 @@ const NOW = new Date("2026-11-16T08:00:00.000Z");
 
 test("email signing invitation clearly states the reusable no-time-expiry rule",()=>{
   const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
-  assert.match(message.text,/does not expire with time/i);
+  assert.match(message.text,/no time-based expiry/i);
   assert.match(message.text,/remains valid after opening/i);
   assert.match(message.text,/does not consume the invitation/i);
   assert.match(message.html,/No time-based expiry/i);
