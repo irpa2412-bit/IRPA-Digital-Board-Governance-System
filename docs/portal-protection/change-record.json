@@ -87,7 +87,9 @@
       "tests/signature-workflow-policy.test.mjs",
       "drive-gateway/src/invitationEmail.mjs",
       "drive-gateway/tests/e2e.test.mjs",
-      "scripts/portal-protection-check.mjs"
+      "scripts/portal-protection-check.mjs",
+      "docs/portal-protection/change-record.json",
+      "docs/portal-protection/repair-window.json"
     ],
     "repairWindow": {
       "openedAt": "2026-11-20T17:08:47Z",
