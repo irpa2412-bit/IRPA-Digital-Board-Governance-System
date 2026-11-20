@@ -54,6 +54,9 @@ const allowed = new Set([
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
   "src/firebase/meetingAttendanceSigning.js",
+  "src/utils/dailyAttendanceSigners.mjs",
+  "docs/portal-protection/portal-register.json",
+  "drive-gateway/tests/email-signing-links.integration.test.mjs",
   "src/firebase/meetingAttendanceSignerIdentity.js",
   "tests/meeting-daily-attendance-email-signing.test.mjs",
   "tests/meeting-attendance-guest-identity.test.mjs",
@@ -313,6 +316,19 @@ const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-brows
   changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
 const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
   changed.includes("tests/meeting-category-policy.test.mjs");
+// The daily attendance signer repair is an explicitly paired Meeting Portal
+// source/Worker/test change. It does not exempt any other portal source.
+const dailyAttendanceSignerRepair =
+  changed.includes("src/firebase/meetingAttendanceSigning.js") &&
+  changed.includes("src/utils/dailyAttendanceSigners.mjs") &&
+  changed.includes("drive-gateway/src/meetingServices.mjs") &&
+  changed.includes("tests/meeting-attendance-guest-identity.test.mjs") &&
+  changed.includes("drive-gateway/tests/email-signing-links.integration.test.mjs") &&
+  changed.every(path => allowed.has(path) || [
+    "src/utils/dailyAttendanceSigners.mjs",
+    "drive-gateway/tests/email-signing-links.integration.test.mjs",
+    "docs/portal-protection/portal-register.json"
+  ].includes(path));
 // Shared-email signer identity repair is a narrowly scoped Signature Portal/Gateway
 // integration. Keep the browser fixture guard active and require its paired source/tests.
 const signatureEmailLinkIdentityPaths = new Set([
@@ -406,7 +422,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !dailyAttendanceSignerRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
