@@ -220,6 +220,8 @@ import {
   evaluateSignatureWindowRepair,
   evaluateSignatureWindowClosure,
   evaluateSignatureWindowReopen,
+  evaluateMeetingWindowAmendment,
+  MEETING_WINDOW_CHANGE_PATHS,
   SIGNATURE_WINDOW_AMENDMENT_PATHS
 } from "../scripts/portal-repair-window-guard-policy.mjs";
 
@@ -516,4 +518,82 @@ test("isolation guard blocks reopening if another portal's Change Record history
   const fixture=reopenFixture();
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
+});
+
+
+const meetingWindowFixture = () => {
+  const baselineChangeRecord = {
+    schemaVersion: 1,
+    status: "complete",
+    declaration: { affectedPortals: ["Signature Portal"], reason: "Previous Signature Portal change.", files: ["src/pages/SignaturePlatform.jsx"], expectedEffect: "Preserve signature behaviour.", prohibitedChanges: ["SMTP"] },
+    repairWindow: { openedAt: "2026-11-20T09:18:00Z", lastActivityAt: "2026-11-20T09:23:00Z" },
+    baseline: { commit: "8bfa67b2a8757519befb2f6be1074c0f34457c99", rollbackCommit: "8bfa67b2a8757519befb2f6be1074c0f34457c99" },
+    validation: { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { "Signature Portal": "PASS" }, behaviourDifferences: [] },
+    closure: { closedAt: "", updatedBaselineCommit: "" },
+    activeAmendment: { status: "open", files: ["drive-gateway/src/signing.mjs"], repairWindow: { rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8" } }
+  };
+  const currentChangeRecord = structuredClone(baselineChangeRecord);
+  currentChangeRecord.previousTopLevelRecord = {
+    declaration: baselineChangeRecord.declaration,
+    baseline: baselineChangeRecord.baseline,
+    validation: baselineChangeRecord.validation,
+    repairWindow: baselineChangeRecord.repairWindow,
+    closure: baselineChangeRecord.closure
+  };
+  currentChangeRecord.declaration = {
+    affectedPortals: ["Meeting Portal"],
+    reason: "Temporarily disconnect attendance-driven signing after the Meeting Portal integration caused the signing invitation failure.",
+    files: ["src/pages/MeetingRoom.jsx", "drive-gateway/src/meetingServices.mjs"],
+    expectedEffect: "Meeting attendance remains operational while new attendance-driven signing dispatch is blocked and standalone Signature Portal signing remains independent.",
+    prohibitedChanges: ["Do not change existing signing links or records.", "Do not change SMTP settings or secrets.", "Do not change Firestore rules or signing transport."]
+  };
+  currentChangeRecord.repairWindow = { openedAt: "2026-11-20T11:08:48Z", lastActivityAt: "2026-11-20T19:43:21Z" };
+  currentChangeRecord.baseline = { commit: "d8b52fd652942e7bcbb206fa52d44abeb2c1382d", rollbackCommit: "d8b52fd652942e7bcbb206fa52d44abeb2c1382d" };
+  currentChangeRecord.validation = { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { "Meeting Portal": "PASS" }, behaviourDifferences: ["New attendance-driven signing dispatch returns HTTP 410.", "New standalone Signature Portal requests are not linked to Meeting Portal quorum."] };
+  const repairWindow = {
+    status: "open",
+    openedAt: "2026-11-20T11:08:48Z",
+    lastActivityAt: "2026-11-20T19:43:21Z",
+    inactivityCloseHours: 24,
+    scope: ["src/pages/MeetingRoom.jsx", "drive-gateway/src/meetingServices.mjs"]
+  };
+  const changedPaths = [...MEETING_WINDOW_CHANGE_PATHS];
+  const protectedFiles = ["src/pages/MeetingRoom.jsx", "drive-gateway/src/meetingServices.mjs"];
+  return {
+    changedPaths, repairWindow,
+    baselineRepairWindow: { status: "open", parallelWindows: [{ portal: "Signature Portal", status: "open" }] },
+    currentRepairWindow: { status: "open", parallelWindows: [{ portal: "Signature Portal", status: "open" }] },
+    baselineChangeRecord, currentChangeRecord, protectedFiles,
+    baselineCommit: "d8b52fd652942e7bcbb206fa52d44abeb2c1382d",
+    now: new Date("2026-11-20T19:50:00Z")
+  };
+};
+
+test("Meeting Portal Change Record amendment is permitted only for declared in-window files and preserves Signature Portal history", () => {
+  const fixture = meetingWindowFixture();
+  assert.equal(evaluateMeetingWindowAmendment(fixture).pass, true);
+});
+
+test("Meeting Portal Change Record amendment blocks changes to the parallel Signature Portal record", () => {
+  const fixture = meetingWindowFixture();
+  fixture.currentChangeRecord.activeAmendment.files.push("src/pages/SignaturePlatform.jsx");
+  assert.equal(evaluateMeetingWindowAmendment(fixture).pass, false);
+});
+
+test("Meeting Portal Change Record amendment blocks protected files omitted from the declaration", () => {
+  const fixture = meetingWindowFixture();
+  fixture.currentChangeRecord.declaration.files = ["src/pages/MeetingRoom.jsx"];
+  assert.equal(evaluateMeetingWindowAmendment(fixture).pass, false);
+});
+
+test("Meeting Portal Change Record amendment blocks source files outside the declared window scope", () => {
+  const fixture = meetingWindowFixture();
+  fixture.changedPaths.push("src/pages/SignaturePlatform.jsx");
+  assert.equal(evaluateMeetingWindowAmendment(fixture).pass, false);
+});
+
+test("Meeting Portal Change Record amendment blocks an expired or inactive repair window", () => {
+  const fixture = meetingWindowFixture();
+  fixture.now = new Date("2026-11-22T12:00:00Z");
+  assert.equal(evaluateMeetingWindowAmendment(fixture).pass, false);
 });
