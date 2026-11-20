@@ -60,9 +60,10 @@
     "status": "open",
     "operation": "restore-pre-11-eat-baseline",
     "affectedPortals": [
-      "Signature Portal"
+      "Signature Portal",
+      "Meeting Portal"
     ],
-    "reason": "Restore the Email-link E-signature source and routing to the exact state deployed before 11:00 EAT on 20 Nov 2026. The verified production Gateway deployment at 09:49:57 EAT used commit eb04405; the immediately preceding source snapshot 8bfa67 is byte-identical for all restored signature files.",
+    "reason": "Restore the Email-link E-signature source and routing to the exact state deployed before 11:00 EAT on 20 Nov 2026. The verified production Gateway deployment at 09:49:57 EAT used commit eb04405; the immediately preceding source snapshot 8bfa67 is byte-identical for all restored signature files. The shared SignaturePlatform page and Gateway router/index are protected dependencies of the Meeting Portal; Meeting Portal attendance, attendance-sheet and ordinary invitation behaviour must remain unchanged and receive separate regression verification.",
     "cutoffEAT": "2026-11-20T11:00:00+03:00",
     "targetProductionWorkerCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
     "targetSourceSnapshot": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
@@ -82,7 +83,9 @@
       "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
       "drive-gateway/tests/signing-invitation.test.mjs",
       "tests/signature-email-link-unification.test.mjs",
-      "tests/signature-workflow-policy.test.mjs"
+      "tests/signature-workflow-policy.test.mjs",
+      "drive-gateway/src/invitationEmail.mjs",
+      "drive-gateway/tests/e2e.test.mjs"
     ],
     "repairWindow": {
       "openedAt": "2026-11-20T17:08:47Z",
@@ -96,9 +99,10 @@
       "Do not change SMTP configuration, credentials, secrets, Worker bindings or mail transport.",
       "Do not change Firestore rules, indexes, document hashing, PDF stamping, certificates or archive logic.",
       "Do not roll back Meeting Portal attendance registration, attendance-sheet preparation, ordinary meeting invitations or other portal functionality.",
-      "Do not deploy a whole-application or whole-Gateway historical rollback."
+      "Do not deploy a whole-application or whole-Gateway historical rollback.",
+      "Do not add time-based expiry to email-link invitations or signer sessions; do not invalidate unused invitations by envelope TTL. Preserve one-time redemption, owner revocation and envelope cancellation."
     ],
-    "ownerInstruction": "Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links.",
+    "ownerInstruction": "Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links. The email-link invitation must have no time-based expiry: it remains valid until redeemed once, revoked, or the envelope is cancelled. After redemption, the invitation bearer token is consumed and cannot be reused; the signer session remains usable without time expiry.",
     "supersededAmendment": {
       "status": "open",
       "affectedPortals": [
