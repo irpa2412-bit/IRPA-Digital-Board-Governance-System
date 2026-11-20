@@ -335,7 +335,7 @@ export function createAdministratorCleanupRouter(deps) {
     const operationIds = new Set();
     const blockers = [];
     const add = operation => {
-      const id = operation.type + ":" + (operation.type === "update-signers" ? (operation.key + ":" + (operation.uid || operation.email || "")) : (operation.key || operation.uid || operation.fileId || ""));
+      const id = operation.type + ":" + (operation.type === "update-signers" ? (operation.key + ":" + (operation.uid || operation.email || "")) : operation.type === "auth-delete" ? (operation.uid || operation.email || operation.key) : (operation.key || operation.uid || operation.fileId || ""));
       if (operationIds.has(id)) return;
       operationIds.add(id);
       operations.push({operationId:id,...operation});
@@ -353,6 +353,17 @@ export function createAdministratorCleanupRouter(deps) {
         continue;
       }
       if (row.collection === "members" || row.collection === "employees") {
+        const uid = clean(row.uid);
+        const email = clean(row.email).toLowerCase();
+        const otherRegisters = [...byKey.values()].filter(candidate =>
+          ["members","employees"].includes(candidate.collection) && candidate.key !== row.key &&
+          ((uid && clean(candidate.uid) === uid) || (email && clean(candidate.email).toLowerCase() === email)));
+        const retainedRegisters = otherRegisters.filter(candidate => candidate.decision !== "GOES");
+        if (row.authAccountPresent && retainedRegisters.length) {
+          blockers.push(row.key + ": the Firebase Auth account is shared with retained register record(s): " +
+            retainedRegisters.map(candidate=>candidate.key).join(", ") + ". Select all linked member/employee register rows GOES or retain this row.");
+          continue;
+        }
         add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected register record"});
         const uid = clean(row.uid);
         const email = clean(row.email).toLowerCase();
