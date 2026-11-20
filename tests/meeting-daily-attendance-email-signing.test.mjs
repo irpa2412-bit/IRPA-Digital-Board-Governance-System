@@ -37,6 +37,8 @@ test("daily PDF places signature fields in the final column only for Present par
  assert.match(helper,/signerUid:uid/);
  assert.match(helper,/gatewaySignerMap/);
  assert.match(service,/gatewaySignerMap/);
+ assert.match(service,/mappingValid/);
+ assert.match(service,/gatewayAuditChainValid:true/);
  assert.match(helper,/attendanceStatus/);
 });
 
