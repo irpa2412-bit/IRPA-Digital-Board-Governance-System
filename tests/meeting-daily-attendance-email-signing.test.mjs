@@ -10,50 +10,50 @@ const signatureWorker=readFileSync("drive-gateway/src/signing.mjs","utf8");
 const signaturePage=readFileSync("src/pages/SignaturePlatform.jsx","utf8");
 
 test("Meeting Portal retains daily categorical attendance, date selection and exports",()=>{
- assert.match(room,/getDailyMeetingAttendance/);
- assert.match(room,/dailyAttendanceDate/);
- assert.match(room,/N\\/A — Not Attended/);
- assert.match(room,/BOARD_MEMBERS/);
- assert.match(room,/EMPLOYEES_AND_MANAGEMENT/);
- assert.match(service,/attendanceStatus:"N\\/A"/);
- assert.match(service,/registrationCategory:"BOARD_MEMBER"/);
- assert.match(service,/UNMATCHED_BOARD_REGISTRATION/);
- assert.match(room,/Download Consolidated CSV/);
- assert.match(room,/Print Daily Sheet/);
+ assert.ok(room.includes("getDailyMeetingAttendance"));
+ assert.ok(room.includes("dailyAttendanceDate"));
+ assert.ok(room.includes("N/A — Not Attended"));
+ assert.ok(room.includes("BOARD_MEMBERS"));
+ assert.ok(room.includes("EMPLOYEES_AND_MANAGEMENT"));
+ assert.ok(service.includes('attendanceStatus:"N/A"'));
+ assert.ok(service.includes('registrationCategory:"BOARD_MEMBER"'));
+ assert.ok(service.includes("UNMATCHED_BOARD_REGISTRATION"));
+ assert.ok(room.includes("Download Consolidated CSV"));
+ assert.ok(room.includes("Print Daily Sheet"));
 });
 
 test("daily attendance records remain independently readable and markable",()=>{
- assert.match(service,/\/api\/meeting-attendance\/daily\/register/);
- assert.match(service,/\/api\/meeting-attendance\/daily\/mark/);
- assert.match(records,/getDailyMeetingAttendance/);
- assert.match(records,/markDailyMeetingAttendance/);
- assert.match(service,/meetingDailyAttendance/);
+ assert.ok(service.includes("/api/meeting-attendance/daily/register"));
+ assert.ok(service.includes("/api/meeting-attendance/daily/mark"));
+ assert.ok(records.includes("getDailyMeetingAttendance"));
+ assert.ok(records.includes("markDailyMeetingAttendance"));
+ assert.ok(service.includes("meetingDailyAttendance"));
 });
 
 test("Meeting Portal no longer invokes or resumes automatic Email-link signing",()=>{
- assert.doesNotMatch(room,/meetingAttendanceSigning/);
- assert.doesNotMatch(room,/dispatchDailyAttendanceSigning/);
- assert.doesNotMatch(room,/resumeDailyAttendanceSigning/);
- assert.doesNotMatch(room,/Dispatch Signing Requests/);
- assert.match(room,/Automatic attendance-sheet signing is temporarily disconnected/);
- assert.match(room,/Open Signature Portal/);
- assert.match(room,/nav\("Signature Platform"\)/);
+ assert.ok(!room.includes("meetingAttendanceSigning"));
+ assert.ok(!room.includes("dispatchDailyAttendanceSigning"));
+ assert.ok(!room.includes("resumeDailyAttendanceSigning"));
+ assert.ok(!room.includes("Dispatch Signing Requests"));
+ assert.ok(room.includes("Automatic attendance-sheet signing is temporarily disconnected"));
+ assert.ok(room.includes("Open Signature Portal"));
+ assert.ok(room.includes('nav("Signature Platform")'));
 });
 
 test("standalone Signature Portal email-link workflow remains present and unchanged in its service contract",()=>{
- assert.match(signaturePlatform,/export async function createSignatureEnvelope/);
- assert.match(signaturePlatform,/export async function startSignatureWorkflow/);
- assert.match(signaturePage,/Signature Platform/);
- assert.match(signatureWorker,/sendSignatureInvitation/);
- assert.match(signatureWorker,/SMTP_CONNECT/);
+ assert.ok(signaturePlatform.includes("export async function createSignatureEnvelope"));
+ assert.ok(signaturePlatform.includes("export async function startSignatureWorkflow"));
+ assert.ok(signaturePage.includes("Signature Platform"));
+ assert.ok(signatureWorker.includes("sendSignatureInvitation"));
+ assert.ok(signatureWorker.includes("SMTP_CONNECT"));
 });
 
 test("legacy attendance dispatch records and signed quorum reconciliation remain available for existing records",()=>{
- assert.match(service,/meetingAttendanceDispatches/);
- assert.match(service,/getGatewayEnvelopeStatus/);
- assert.match(service,/auditChainValid===true/);
- assert.match(service,/dailySignerByUid/);
- assert.match(service,/Math\\.ceil\\(denominator\\/3\\)/);
- assert.match(records,/\/api\/meeting-attendance\/daily\/dispatch/);
- assert.doesNotMatch(service,/\/api\/meeting-attendance\/sign/);
+ assert.ok(service.includes("meetingAttendanceDispatches"));
+ assert.ok(service.includes("getGatewayEnvelopeStatus"));
+ assert.ok(service.includes("auditChainValid===true"));
+ assert.ok(service.includes("dailySignerByUid"));
+ assert.ok(service.includes("Math.ceil(denominator/3)"));
+ assert.ok(records.includes("/api/meeting-attendance/daily/dispatch"));
+ assert.ok(!service.includes("/api/meeting-attendance/sign"));
 });
