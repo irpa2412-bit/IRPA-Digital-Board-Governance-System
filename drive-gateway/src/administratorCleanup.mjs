@@ -52,7 +52,7 @@ const COLLECTIONS = Object.freeze([
   "invitations",
   "registrationRequests",
   "inductionRecords",
-  "adminProfiles",
+  "adminProfiles","adminCleanupAudit",
   "auditorProfiles",
   "systemSettings",
   "mail",
@@ -158,8 +158,12 @@ export function createAdministratorCleanupRouter(deps) {
         const trialData = isTrialRecord(data);
         const isSignedTrial = collection === "signatureEnvelopes" && trialData &&
           ["completed","signed"].includes(clean(data.status).toLowerCase());
-        const immutableHistory = collection === "audit" || collection === "signatureEvents";
-        const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory;
+        const immutableHistory = collection === "audit" || collection === "signatureEvents" || collection === "adminCleanupAudit";
+        const envelopeStatus = clean(data.status).toLowerCase();
+        const signedEnvelope = collection === "signatureEnvelopes" && ["signed","completed"].includes(envelopeStatus);
+        const signedProductionEnvelope = signedEnvelope && !trialData;
+        const missingTrialPdf = isSignedTrial && !clean(data.signedPdfReference || data.signedFileId || data.driveFileId);
+        const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory || signedProductionEnvelope || missingTrialPdf;
         records.push({
           key: collection + "/" + id, collection, id, version: clean(doc.updateTime || doc.createTime), uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
@@ -173,7 +177,7 @@ export function createAdministratorCleanupRouter(deps) {
           signedTrialDocument: isSignedTrial,
           signedPdfReference: isSignedTrial ? clean(data.signedPdfReference || data.signedFileId || data.driveFileId) || null : null,
           relationshipRefs: [...new Set([
-            data.meetingId, data.documentId, data.envelopeId, data.signatureEnvelopeId, data.invitationId,
+            data.meetingId, data.documentId, data.envelopeId, data.gatewayEnvelopeId, data.signatureEnvelopeId, data.invitationId,
             data.memberUid, data.employeeUid, data.participantUid, data.subscriberUid, data.ownerUid,
             data.uid, data.userId, data.memberId, data.employeeId, data.participantId, data.signerUid,
             data.email, data.ownerEmail, data.signerEmail,
@@ -188,8 +192,10 @@ export function createAdministratorCleanupRouter(deps) {
           protectionReason: isAdmin ? "Signed-in administrator cannot be removed." :
             protectedRole ? "Protected governance or administrator role." :
             signerInProtectedEnvelope ? "Signer on a signed or in-progress envelope." :
-            immutableHistory ? "Immutable audit/signature history must be retained." : "",
-          decision: "STAYS"
+            immutableHistory ? "Immutable audit/signature history must be retained." :
+            signedProductionEnvelope ? "Completed production signing envelopes must be retained." :
+            missingTrialPdf ? "Signed trial PDF reference is missing; safe deletion cannot be verified." : "",
+          decision: "STAYS", sourceDocument: doc
         });
       }
     }
