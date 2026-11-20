@@ -54,7 +54,7 @@ export async function verifyHostAssets({ baseUrl, manifest, fetchImpl = fetch, r
   const actualHash = sha256(moduleBytes);
   if (actualHash !== manifest.files[moduleName].sha256) fail("a", `DocumentLifecycleModule SHA-256 mismatch for ${moduleName}: expected ${manifest.files[moduleName].sha256}, received ${actualHash}`);
   const moduleSource = new TextDecoder().decode(moduleBytes);
-  const imports = [...moduleSource.matchAll(/(?:from\\s*|import\\s*\\()["']([^"']+\\.js(?:\\?[^"']*)?)["']/g)].map(m => m[1]);
+  const imports = [...moduleSource.matchAll(/(?:from\\s*|import\\s*(?:\\(\\s*)?)["']([^"']+)["']/g)].map(m => m[1]);
   for (const specifier of imports) {
     if (/^(https?:|data:)/i.test(specifier)) continue;
     const resolved = new URL(specifier, new URL("/" + moduleName, base));
