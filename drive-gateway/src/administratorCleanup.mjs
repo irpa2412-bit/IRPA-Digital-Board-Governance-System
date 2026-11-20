@@ -104,7 +104,10 @@ const isTrialRecord = data => data?.trialData === true || data?.isTrial === true
 export function createAdministratorCleanupRouter(deps) {
   const { authenticateFirebaseRequest, getFirestoreAdminAccessToken, getFirestoreDocument,
     getFirestoreCollectionDocuments, firestoreDocumentToPlain, getFirebaseAuthAdminAccessToken,
-    listFirebaseAuthUsers, json, corsHeaders } = deps;
+    listFirebaseAuthUsers, getFirebaseProjectId, getDriveAccessToken, findOrCreateFolder, driveFetch,
+    json, corsHeaders } = deps;
+  const fetchImpl = deps.fetch || fetch;
+  const projectIdFor = env => getFirebaseProjectId ? getFirebaseProjectId(env) : String(env.FIREBASE_PROJECT_ID || "");
 
   async function authorize(request, env) {
     const claims = await authenticateFirebaseRequest(request, env);
@@ -222,6 +225,251 @@ export function createAdministratorCleanupRouter(deps) {
       const { relationshipRefs, ...safeRow } = row;
       return { ...safeRow, linkedRecordKeys: [...linked].sort(), dependencyCount: linked.size };
     });
+  }
+
+ 
+  function dataOf(row) { return firestoreDocumentToPlain(row?.sourceDocument) || {}; }
+  function firestorePath(collection, id) { return collection + "/" + id; }
+  function pendingInvitation(row) {
+    const data = dataOf(row);
+    const status = clean(data.status || data.invitationStatus || data.state).toLowerCase();
+    const redemption = clean(data.invitationRedemptionState || data.redemptionState).toUpperCase();
+    return ["pending","invited","sent","queued","created","awaiting activation","awaiting_activation"].includes(status) &&
+      redemption !== "ACTIVATED" && data.accountActivated !== true;
+  }
+  function signedState(value) { return ["signed","completed"].includes(clean(value).toLowerCase()); }
+  function unsentEnvelope(value) { return !["signed","completed","in progress","inprogress","signing"].includes(clean(value).toLowerCase()); }
+  function scrubBackup(value, key = "") {
+    if (/password|secret|token|credential|private.?key|api.?key|authorization|refresh.?token/i.test(key)) return "[REDACTED]";
+    if (Array.isArray(value)) return value.map(item => scrubBackup(item));
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, scrubBackup(v,k)]));
+    return value;
+  }
+  function firestoreValue(value) {
+    if (value === null || value === undefined) return {nullValue:null};
+    if (typeof value === "string") return {stringValue:value};
+    if (typeof value === "boolean") return {booleanValue:value};
+    if (typeof value === "number") return Number.isInteger(value) ? {integerValue:String(value)} : {doubleValue:value};
+    if (Array.isArray(value)) return {arrayValue:{values:value.map(firestoreValue)}};
+    return {mapValue:{fields:Object.fromEntries(Object.entries(value).map(([k,v])=>[k,firestoreValue(v)]))}};
+  }
+  function buildOperations(inventory, requested) {
+    const byKey = new Map(inventory.records.map(row => [row.key, {...row, decision:"STAYS", decisionSource:"DEFAULT"}]));
+    const selection = new Map(requested.map(item => [clean(item.key), clean(item.decision).toUpperCase()]));
+    for (const [key, decision] of selection) {
+      const row = byKey.get(key);
+      if (row && decision === "GOES" && !row.protected) { row.decision = "GOES"; row.decisionSource = "ADMIN_SELECTION"; }
+    }
+    const operations = [];
+    const operationIds = new Set();
+    const blockers = [];
+    const add = operation => {
+      const id = operation.type + ":" + (operation.key || operation.uid || operation.fileId || "");
+      if (operationIds.has(id)) return;
+      operationIds.add(id);
+      operations.push({operationId:id,...operation});
+    };
+    const cascadeDelete = row => {
+      if (!row || row.protected) return;
+      row.decision = "GOES";
+      row.decisionSource = "APPROVED_CASCADE";
+      add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Approved related-record cleanup"});
+    };
+    for (const row of [...byKey.values()].filter(item => item.decision === "GOES" && item.decisionSource === "ADMIN_SELECTION")) {
+      const data = dataOf(row);
+      if (row.collection === "members" || row.collection === "employees") {
+        add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected register record"});
+        const uid = clean(row.uid);
+        const email = clean(row.email).toLowerCase();
+        for (const invitation of byKey.values()) {
+          if (invitation.collection !== "invitations" || !pendingInvitation(invitation)) continue;
+          const invite = dataOf(invitation);
+          const inviteUid = clean(invite.uid || invite.userId || invite.memberUid);
+          const inviteEmail = clean(invite.email || invite.recipientEmail).toLowerCase();
+          if ((uid && inviteUid === uid) || (email && inviteEmail === email)) cascadeDelete(invitation);
+        }
+        if (row.authAccountPresent && uid) add({type:"auth-delete",key:row.key,uid,email,reason:"Approved member-account cascade"});
+        for (const envelope of byKey.values()) {
+          if (envelope.collection !== "signatureEnvelopes") continue;
+          const envelopeData = dataOf(envelope);
+          if (!unsentEnvelope(envelopeData.status)) continue;
+          const signers = Array.isArray(envelopeData.signers) ? envelopeData.signers : [];
+          const hasUnsentAssignment = signers.some(signer => {
+            const matches = (uid && clean(signer.uid || signer.profileUid) === uid) ||
+              (email && clean(signer.email).toLowerCase() === email);
+            return matches && clean(signer.status).toLowerCase() !== "signed";
+          });
+          if (hasUnsentAssignment) add({type:"update-signers",key:envelope.key,path:firestorePath(envelope.collection,envelope.id),
+            version:envelope.version,uid,email,reason:"Remove unsent signing assignment for deleted member"});
+        }
+        continue;
+      }
+      if (row.collection === "signatureEnvelopes" && row.signedTrialDocument) {
+        const fileId = clean(row.signedPdfReference);
+        if (!fileId) { blockers.push(row.key + ": signed trial PDF reference is missing"); continue; }
+        const portalRows = (row.linkedRecordKeys || []).map(key => byKey.get(key)).filter(candidate =>
+          candidate && ["signatures","documents","controlledDocuments"].includes(candidate.collection) &&
+          (candidate.trialData || isTrialRecord(dataOf(candidate))));
+        if (!portalRows.length) { blockers.push(row.key + ": associated trial-document portal record was not found"); continue; }
+        add({type:"drive-delete",key:row.key,fileId,reason:"Delete explicitly selected signed trial PDF"});
+        add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Delete explicitly selected signed trial envelope"});
+        for (const portalRow of portalRows) cascadeDelete(portalRow);
+        continue;
+      }
+      add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected record"});
+    }
+    return {records:[...byKey.values()].map(({sourceDocument,...row})=>row),operations,blockers};
+  }
+  async function writeAuditEvent(env, token, event) {
+    const id = clean(event.planId) + "-" + clean(event.eventType).toLowerCase() + "-" + crypto.randomUUID();
+    const fields = Object.fromEntries(Object.entries(event).map(([key,value])=>[key,firestoreValue(value)]));
+    const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectIdFor(env)) +
+      "/databases/(default)/documents/adminCleanupAudit?documentId=" + encodeURIComponent(id);
+    const response = await fetchImpl(url,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({fields})});
+    if (!response.ok) throw new Error("Cleanup audit event could not be persisted (HTTP " + response.status + ").");
+    return "adminCleanupAudit/" + id;
+  }
+  async function listSubcollections(env, token, path) {
+    const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectIdFor(env)) +
+      "/databases/(default)/documents/" + path.split("/").map(encodeURIComponent).join("/") + ":listCollectionIds";
+    const response = await fetchImpl(url,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({pageSize:100})});
+    if (!response.ok) throw new Error("Unable to verify nested Firestore records for " + path + " (HTTP " + response.status + ").");
+    const body = await response.json().catch(()=>({}));
+    return Array.isArray(body.collectionIds) ? body.collectionIds : [];
+  }
+  async function firestoreGet(env, token, path) {
+    const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectIdFor(env)) +
+      "/databases/(default)/documents/" + path.split("/").map(encodeURIComponent).join("/");
+    const response = await fetchImpl(url,{headers:{Authorization:"Bearer "+token}});
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error("Firestore revalidation failed for " + path + " (HTTP " + response.status + ").");
+    return response.json();
+  }
+  async function firestoreDelete(env, token, path, expectedVersion) {
+    const current = await firestoreGet(env,token,path);
+    if (!current) return "ALREADY_DELETED";
+    if (expectedVersion && clean(current.updateTime) !== expectedVersion) throw new Error("Record changed after inventory: " + path);
+    const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectIdFor(env)) +
+      "/databases/(default)/documents/" + path.split("/").map(encodeURIComponent).join("/");
+    const response = await fetchImpl(url,{method:"DELETE",headers:{Authorization:"Bearer "+token}});
+    if (response.status === 404) return "ALREADY_DELETED";
+    if (!response.ok) throw new Error("Firestore delete failed for " + path + " (HTTP " + response.status + ").");
+    return "DELETED";
+  }
+  async function uploadBackup(env, plan, inventory, auth, driveToken) {
+    const folderId = await findOrCreateFolder(env,driveToken,"IRPA Governance System - Cleanup Backups",null,{irpaGovernanceBackup:true,kind:"administrator-cleanup"});
+    const driveFileCopies = [];
+    const fileIds = new Set();
+    for (const row of plan.records.filter(item=>item.decision==="GOES")) {
+      const data = dataOf(inventory.records.find(item=>item.key===row.key));
+      for (const value of [row.signedPdfReference,data.fileId,data.driveFileId,data.signedFileId,data.storageFileId,data.fileReference]) {
+        const id = clean(value);
+        if (id && /^[A-Za-z0-9_-]{10,}$/.test(id)) fileIds.add(id);
+      }
+    }
+    for (const fileId of fileIds) {
+      const copied = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"/copy?fields=id,name,webViewLink",{
+        method:"POST",body:JSON.stringify({name:"IRPA-Cleanup-Backup-"+plan.planId+"-"+fileId,parents:[folderId]})
+      });
+      if (!copied.id) throw new Error("Drive backup copy did not return a file ID; no records were deleted.");
+      driveFileCopies.push({originalFileId:fileId,backupFileId:copied.id,name:copied.name || "",webViewLink:copied.webViewLink || ""});
+    }
+    const archive = {
+      schemaVersion:1,createdAt:new Date().toISOString(),planId:plan.planId,inventoryId:plan.inventoryId,
+      administrator:{uid:auth.uid,email:auth.email},scope:{collections:COLLECTIONS,selected:plan.records.filter(row=>row.decision==="GOES").map(row=>row.key)},
+      records:inventory.records.map(row=>({key:row.key,collection:row.collection,id:row.id,version:row.version,
+        decision:plan.records.find(item=>item.key===row.key)?.decision || "STAYS",
+        decisionSource:plan.records.find(item=>item.key===row.key)?.decisionSource || "DEFAULT",
+        protected:row.protected,protectionReason:row.protectionReason,linkedRecordKeys:row.linkedRecordKeys,
+        document:scrubBackup(row.sourceDocument)})),
+      operations:plan.executionOperations,operationOutcomes:plan.operationOutcomes || [],
+      auditRefs:inventory.records.filter(row=>["audit","signatureEvents","adminCleanupAudit"].includes(row.collection)).map(row=>row.key),
+      driveFileCopies
+    };
+    const archiveText = JSON.stringify(archive);
+    const metadata = {name:"IRPA-DBGS-Cleanup-"+plan.planId+".json",mimeType:"application/json",parents:[folderId],description:"Administrator-controlled cleanup backup; includes full inventory, record snapshots, decisions, dependency references and operation state."};
+    const form = new FormData();
+    form.append("metadata",new Blob([JSON.stringify(metadata)],{type:"application/json"}));
+    form.append("file",new Blob([archiveText],{type:"application/json"}));
+    const response = await fetchImpl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",{
+      method:"POST",headers:{Authorization:"Bearer "+driveToken},body:form
+    });
+    const result = await response.json().catch(()=>({}));
+    if (!response.ok || !result.id) throw new Error("Durable Drive backup creation failed (HTTP " + response.status + "). No records were deleted.");
+    return {fileId:result.id,url:result.webViewLink || "https://drive.google.com/file/d/"+result.id+"/view",folderId,driveFileCopies,archive};
+  }
+  async function updateBackup(env, plan, driveToken) {
+    const archive = JSON.stringify(plan.backupArchive);
+    const response = await fetchImpl("https://www.googleapis.com/upload/drive/v3/files/"+encodeURIComponent(plan.backupDriveFileId)+"?uploadType=media",{
+      method:"PATCH",headers:{Authorization:"Bearer "+driveToken,"Content-Type":"application/json"},body:archive
+    });
+    if (!response.ok) throw new Error("Cleanup backup outcome update failed (HTTP " + response.status + ").");
+  }
+  async function revalidatePlan(env, auth, plan, inventory) {
+    const freshRecords = await loadInventory(env,auth);
+    const freshByKey = new Map(freshRecords.map(row=>[row.key,row]));
+    for (const row of plan.records.filter(item=>item.decision==="GOES")) {
+      const fresh = freshByKey.get(row.key);
+      if (!fresh || !row.version || fresh.version !== row.version) throw Object.assign(new Error("Inventory is stale for " + row.key + ". Take a fresh inventory and review the plan again."),{status:409});
+      if (fresh.protected) throw Object.assign(new Error("Protection state changed for " + row.key + ". Cleanup was stopped."),{status:409});
+      if (JSON.stringify([...(fresh.linkedRecordKeys||[])].sort()) !== JSON.stringify([...(row.linkedRecordKeys||[])].sort())) {
+        throw Object.assign(new Error("Record dependencies changed for " + row.key + ". Take a fresh inventory and review the plan again."),{status:409});
+      }
+    }
+    for (const operation of plan.executionOperations.filter(item=>["firestore-delete","update-signers"].includes(item.type))) {
+      const fresh = freshByKey.get(operation.key);
+      if (!fresh || !operation.version || fresh.version !== operation.version) throw Object.assign(new Error("A related record changed after inventory: " + operation.key),{status:409});
+      if (operation.type === "update-signers" && !unsentEnvelope(dataOf(fresh).status)) throw Object.assign(new Error("A signing assignment became active or completed; cleanup was stopped."),{status:409});
+    }
+    const checked = new Set();
+    for (const operation of plan.executionOperations.filter(item=>item.type==="firestore-delete")) {
+      if (checked.has(operation.path)) continue;
+      checked.add(operation.path);
+      const nested = await listSubcollections(env,auth.token,operation.path);
+      if (nested.length) throw Object.assign(new Error("Nested Firestore collections exist under " + operation.path + "; deleting this record would orphan related data. Cleanup was stopped."),{status:409});
+    }
+  }
+  async function executeOperation(env, auth, operation, driveToken, authToken) {
+    if (operation.type === "firestore-delete") return firestoreDelete(env,auth.token,operation.path,operation.version);
+    if (operation.type === "drive-delete") {
+      const response = await fetchImpl("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(operation.fileId),{
+        method:"DELETE",headers:{Authorization:"Bearer "+driveToken}
+      });
+      if (response.status === 404) return "ALREADY_DELETED";
+      if (!response.ok) throw new Error("Drive file deletion failed (HTTP " + response.status + ").");
+      return "DELETED";
+    }
+    if (operation.type === "auth-delete") {
+      const url = "https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/accounts:delete";
+      const response = await fetchImpl(url,{method:"POST",headers:{Authorization:"Bearer "+authToken,"Content-Type":"application/json"},body:JSON.stringify({localId:operation.uid})});
+      const result = await response.json().catch(()=>({}));
+      if (response.status === 404 || /USER_NOT_FOUND|NOT_FOUND/i.test(String(result.error?.message||""))) return "ALREADY_DELETED";
+      if (!response.ok) throw new Error("Firebase Auth account deletion failed (HTTP " + response.status + ").");
+      return "DELETED";
+    }
+    if (operation.type === "update-signers") {
+      const current = await firestoreGet(env,auth.token,operation.path);
+      if (!current) return "ALREADY_DELETED";
+      if (operation.version && clean(current.updateTime) !== operation.version) throw new Error("Signing assignment record changed after inventory: " + operation.path);
+      const signers = firestoreDocumentToPlain({fields:{signers:current.fields?.signers}})?.signers || [];
+      const retained = signers.filter(signer => {
+        const matches = (operation.uid && clean(signer.uid || signer.profileUid) === operation.uid) ||
+          (operation.email && clean(signer.email).toLowerCase() === operation.email);
+        return !(matches && clean(signer.status).toLowerCase() !== "signed");
+      });
+      if (retained.length === signers.length) return "ALREADY_REMOVED";
+      const values = (current.fields?.signers?.arrayValue?.values || []).filter(value => {
+        const signer = firestoreDocumentToPlain({fields:{signer:value}})?.signer || {};
+        const matches = (operation.uid && clean(signer.uid || signer.profileUid) === operation.uid) ||
+          (operation.email && clean(signer.email).toLowerCase() === operation.email);
+        return !(matches && clean(signer.status).toLowerCase() !== "signed");
+      });
+      const url = "https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/databases/(default)/documents/"+operation.path.split("/").map(encodeURIComponent).join("/")+"?updateMask.fieldPaths=signers";
+      const response = await fetchImpl(url,{method:"PATCH",headers:{Authorization:"Bearer "+auth.token,"Content-Type":"application/json"},body:JSON.stringify({fields:{signers:{arrayValue:{values}}}})});
+      if (!response.ok) throw new Error("Unsent signer assignment removal failed (HTTP " + response.status + ").");
+      return "UPDATED";
+    }
+    throw new Error("Unknown cleanup operation type: " + operation.type);
   }
 
   return async function administratorCleanupRouter(request, env, pathname) {
