@@ -131,11 +131,14 @@ try {
         "minutes signing navigation must retain the canonical meeting reference");
 
       await page.getByRole("button", { name: "TEST: switch to outsider" }).click();
-      await page.getByRole("button", { name: "Record Action" }).waitFor();
-      assert.equal(await page.getByRole("button", { name: "Record Action" }).isDisabled(), true,
-        "outsider must not be able to record meeting actions");
-      assert.equal(await page.getByRole("button", { name: "Dispatch Signing Requests" }).isDisabled(), true,
-        "outsider must not be able to dispatch attendance signing");
+      await page.getByRole("heading", { name: "Meeting Room" }).waitFor();
+      await page.getByText(createdTitle, { exact: true }).waitFor({ state: "detached" });
+      const outsiderMeetingOptions = await page.locator("select").first().locator("option").allTextContents();
+      assert.deepEqual(outsiderMeetingOptions, ["Select meeting"], "outsider must not receive any meeting records");
+      assert.equal(await page.getByRole("button", { name: "Record Action" }).count(), 0,
+        "outsider must not see meeting governance controls");
+      assert.equal(await page.getByRole("button", { name: "Dispatch Signing Requests" }).count(), 0,
+        "outsider must not see attendance signing controls");
 
       const layout = await page.evaluate(() => ({
         viewportWidth: window.innerWidth,
