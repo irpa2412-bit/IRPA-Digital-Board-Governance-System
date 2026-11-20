@@ -313,7 +313,8 @@ const unexpected = changed.filter(path =>
   !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
   !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
   !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
-  !(signatureEmailLinkSessionRepair && changed.includes(path))
+  !(signatureEmailLinkSessionRepair && changed.includes(path)) &&
+  !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/")))
 );
 if (unexpected.length) {
   console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
@@ -374,6 +375,21 @@ const signatureEmailLinkIdentityRepair =
   changed.includes("tests/signature-email-link-unification.test.mjs") &&
   changed.every(path => signatureEmailLinkIdentityPaths.has(path) ||
     path === ".github/workflows/meeting-portal-fixture-browser.yml");
+const emailSigningRebuildPaths = new Set([
+  "drive-gateway/src/emailSigningLinks.mjs", "drive-gateway/src/signing.mjs", "drive-gateway/src/index.js",
+  "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
+  "drive-gateway/tests/email-signing-contract.test.mjs", "drive-gateway/tests/email-signing-links.test.mjs",
+  "drive-gateway/tests/email-signing-links.integration.test.mjs", "tests/email-signing-contract.test.mjs",
+  ".github/workflows/email-signing-contract.yml"
+]);
+const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signing.mjs") &&
+  changed.includes("drive-gateway/src/emailSigningLinks.mjs") &&
+  changed.includes("drive-gateway/src/index.js") &&
+  changed.includes("src/pages/EmailSigningReadOnlyPage.jsx") &&
+  changed.includes("src/pages/SignaturePlatform.jsx") &&
+  changed.includes("drive-gateway/tests/email-signing-contract.test.mjs") &&
+  changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")) &&
+  changed.every(path => emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/"));
 const invitationMailResendIntegration = changed.includes("public/administrator.html") &&
   changed.includes("src/firebase/auth.js") &&
   changed.includes("src/pages/Invitations.jsx") &&
@@ -445,7 +461,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
