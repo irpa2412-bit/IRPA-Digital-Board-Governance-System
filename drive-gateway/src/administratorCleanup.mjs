@@ -52,7 +52,7 @@ const COLLECTIONS = Object.freeze([
   "invitations",
   "registrationRequests",
   "inductionRecords",
-  "adminProfiles","adminCleanupAudit",
+  "adminProfiles","adminCleanupAudit","adminInvitations","authSecurity",
   "auditorProfiles",
   "systemSettings",
   "systemResetPlans",
@@ -60,7 +60,7 @@ const COLLECTIONS = Object.freeze([
   "financialReferenceCounters",
   "mail",
   "donorFunders",
-  "grantReportingObligations",
+  "grantReportingObligations","grantOpportunities","grantAssistantDocuments","grantCrawlerRuns","grantCrawlerStatus",
   "researchStudies",
   "researchDatasets",
   "researchObservations",
@@ -75,7 +75,7 @@ const COLLECTIONS = Object.freeze([
   "researchUpdates",
   "researchToolPermissions",
   "researchPortalAlerts",
-  "institutionalDepartments",
+  "institutionalDepartments","jobDescriptionWorkflows",
   "departmentArchives",
   "signatureProfiles",
   "signerIdentities",
@@ -92,7 +92,7 @@ const COLLECTIONS = Object.freeze([
   "communicationMediaAssets",
   "communicationMediaItems",
   "communicationSocialPosts",
-  "communicationOperations",
+  "communicationOperations","communicationOperationsAudit",
   "portalDefinitions",
   "systemResetRequests",
   "dataResetRequests"
@@ -177,9 +177,9 @@ export function createAdministratorCleanupRouter(deps) {
         const trialData = isTrialRecord(data);
         const isSignedTrial = collection === "signatureEnvelopes" && trialData &&
           ["completed","signed"].includes(clean(data.status).toLowerCase());
-        const immutableHistory = collection === "audit" || collection === "signatureEvents" || collection === "adminCleanupAudit";
+        const immutableHistory = ["audit","signatureEvents","adminCleanupAudit","communicationOperationsAudit","grantCrawlerRuns"].includes(collection);
         const protectedSystemCollection = ["adminProfiles","systemSettings","systemResetPlans","memberCounters","employeeCounters",
-          "financialReferenceCounters","portalDefinitions","systemResetRequests","dataResetRequests"].includes(collection);
+          "financialReferenceCounters","portalDefinitions","systemResetRequests","dataResetRequests","authSecurity","grantCrawlerStatus"].includes(collection);
         const envelopeStatus = clean(data.status).toLowerCase();
         const signedEnvelope = collection === "signatureEnvelopes" && ["signed","completed"].includes(envelopeStatus);
         const signedProductionEnvelope = signedEnvelope && !trialData;
@@ -306,7 +306,7 @@ export function createAdministratorCleanupRouter(deps) {
   function signedState(value) { return ["signed","completed"].includes(clean(value).toLowerCase()); }
   function unsentEnvelope(value) { return !["signed","completed","in progress","inprogress","signing"].includes(clean(value).toLowerCase()); }
   function scrubBackup(value, key = "") {
-    if (/password|secret|token|credential|private.?key|api.?key|authorization|refresh.?token/i.test(key)) return "[REDACTED]";
+    if (/password|secret|token|credential|private.?key|api.?key|authorization|refresh.?token|hash|salt|mfa|otp|challenge/i.test(key)) return "[REDACTED]";
     if (Array.isArray(value)) return value.map(item => scrubBackup(item));
     if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, scrubBackup(v,k)]));
     return value;
