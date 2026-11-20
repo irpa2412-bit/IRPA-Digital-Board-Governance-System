@@ -82,7 +82,8 @@
       "scripts/meeting-portal-fixture-isolation-guard.sh",
       "scripts/portal-repair-window-guard-policy.mjs",
       "tests/meeting-isolation-guard.test.mjs",
-      "docs/portal-protection/change-record.json"
+      "docs/portal-protection/change-record.json",
+      "docs/portal-protection/repair-window.json"
     ],
     "repairWindow": {
       "openedAt": "2026-11-20T17:08:47Z",
