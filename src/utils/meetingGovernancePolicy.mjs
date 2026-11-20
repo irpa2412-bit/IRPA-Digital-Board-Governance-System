@@ -11,7 +11,7 @@ export function normalizeMeetingGovernancePolicy(input={}){
   version:1,
   status:configured&&thresholdConfigured&&["votes_cast","eligible_present","total_eligible"].includes(votingDenominator)&&Boolean(sourceReference)&&Boolean(effectiveDate)?"CONFIGURED":"UNCONFIGURED",
   quorum:{basis,fixedCount:Number.isFinite(fixedCount)?fixedCount:null,numerator:Number.isFinite(numerator)?numerator:null,denominator:Number.isFinite(denominator)?denominator:null,denominatorSource:"active_eligible_members"},
-  voting:{thresholdType,numerator:Number.isFinite(thresholdNumerator)?thresholdNumerator:null,denominator:Number.isFinite(thresholdDenominator)?thresholdDenominator:null,denominatorBasis:votingDenominator,abstentionTreatment:voting.abstentionTreatment==="count_as_against"?"count_as_against":"exclude",tiePolicy:["rejected","pending","chair_decides"].includes(voting.tiePolicy)?voting.tiePolicy:"pending",requireQuorumAtVoteOpen:voting.requireQuorumAtVoteOpen!==false,requireQuorumAtVoteClose:voting.requireQuorumAtVoteClose!==false,eligibleVoterGroup:String(voting.eligibleVoterGroup||"board_members"),secondingRequired:voting.secondingRequired===true},
+  voting:{thresholdType,numerator:Number.isFinite(thresholdNumerator)?thresholdNumerator:null,denominator:Number.isFinite(thresholdDenominator)?thresholdDenominator:null,denominatorBasis:votingDenominator,abstentionTreatment:voting.abstentionTreatment==="count_as_against"?"count_as_against":"exclude",tiePolicy:["rejected","pending","chair_decides"].includes(voting.tiePolicy)?voting.tiePolicy:"pending",requireQuorumAtVoteOpen:voting.requireQuorumAtVoteOpen!==false,requireQuorumAtVoteClose:voting.requireQuorumAtVoteClose!==false,eligibleVoterGroup:String(voting.eligibleVoterGroup||"board_members"),secondingRequired:voting.secondingRequired===true,recusalTreatment:"exclude_from_denominator",proxyPolicy:"not_permitted",vacantSeatTreatment:"exclude_inactive_and_vacant_seats"},
   source:{reference:sourceReference,effectiveDate}
  };
 }
@@ -36,6 +36,7 @@ export function calculateVotingOutcome({forCount=0,againstCount=0,abstainCount=0
  const requiredFor=v.thresholdType==="simple_majority"?Math.floor(denominator/2)+1:Math.ceil(denominator*numerator/denom);
  if(v.requireQuorumAtVoteClose&&quorumMet!==true)return {result:"INVALID_QUORUM",denominator,requiredFor,forCount:forVotes,againstCount:against,abstainCount:abstain,policyVersion:policy.version};
  if(denominator===0)return {result:"NO_VALID_DENOMINATOR",denominator,requiredFor,forCount:forVotes,againstCount:against,abstainCount:abstain,policyVersion:policy.version};
+ if(forVotes+against+abstain===0)return {result:"NO_BALLOTS",denominator,requiredFor,forCount:forVotes,againstCount:against,abstainCount:abstain,policyVersion:policy.version};
  const tied=forVotes===against;
  const result=tied?(v.tiePolicy==="rejected"?"Rejected":v.tiePolicy==="chair_decides"?"CHAIR_DECISION_REQUIRED":"Pending"):(forVotes>=requiredFor?"Passed":"Rejected");
  return {result,denominator,requiredFor,forCount:forVotes,againstCount:against,abstainCount:abstain,policyVersion:policy.version};
