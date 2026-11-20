@@ -11,7 +11,7 @@ export function createManifest(root) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.isFile()) {
+      else if (entry.isFile() && entry.name !== "deploy-manifest.json") {
         const rel = path.relative(root, full).split(path.sep).join("/");
         files[rel] = { sha256: sha256(fs.readFileSync(full)), size: fs.statSync(full).size };
       }
@@ -71,12 +71,17 @@ export async function verifyHostAssets({ baseUrl, manifest, fetchImpl = fetch, r
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-  const baseUrl = process.argv[2];
-  const manifestPath = process.argv[3];
-  if (!baseUrl || !manifestPath) throw new Error("Usage: node scripts/verify-document-lifecycle-host.mjs <host-url> <manifest.json>");
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  verifyHostAssets({ baseUrl, manifest }).then(result => console.log(JSON.stringify(result, null, 2))).catch(error => {
-    console.error(JSON.stringify({ check: error.check || "unknown", error: error.message }));
-    process.exit(1);
-  });
+  if (process.argv[2] === "--write-manifest") {
+    const root = path.resolve(process.argv[3] || "dist");
+    fs.writeFileSync(path.join(root, "deploy-manifest.json"), JSON.stringify(createManifest(root), null, 2) + "\\n");
+  } else {
+    const baseUrl = process.argv[2];
+    const manifestPath = process.argv[3];
+    if (!baseUrl || !manifestPath) throw new Error("Usage: node scripts/verify-document-lifecycle-host.mjs <host-url> <manifest.json>");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    verifyHostAssets({ baseUrl, manifest }).then(result => console.log(JSON.stringify(result, null, 2))).catch(error => {
+      console.error(JSON.stringify({ check: error.check || "unknown", error: error.message }));
+      process.exit(1);
+    });
+  }
 }
