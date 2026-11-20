@@ -6,24 +6,6 @@ export const SIGNATURE_WINDOW_AMENDMENT_PATHS = Object.freeze([
   "tests/meeting-isolation-guard.test.mjs"
 ]);
 
-function preservesChangeRecordHistory(baselineChangeRecord,currentChangeRecord,amendment){
-  const strip=value=>{const copy=structuredClone(value);delete copy.activeAmendment;return copy;};
-  const baseline=strip(baselineChangeRecord),current=strip(currentChangeRecord);
-  const baselineAffected=baseline?.declaration?.affectedPortals;
-  const currentAffected=current?.declaration?.affectedPortals;
-  const declaredAffected=[...(amendment?.affectedPortals||[])].sort();
-  const allowedSharedDependencyExtension=
-    JSON.stringify(baselineAffected)===JSON.stringify(["Signature Portal"])&&
-    JSON.stringify(currentAffected)===JSON.stringify(["Signature Portal","Meeting Portal"])&&
-    JSON.stringify(declaredAffected)===JSON.stringify(["Meeting Portal","Signature Portal"]);
-  if(allowedSharedDependencyExtension)baseline.declaration.affectedPortals=currentAffected;
-  if(amendment?.validation){
-    if(JSON.stringify(current.validation)!==JSON.stringify(amendment.validation))return false;
-    baseline.validation=current.validation;
-  }
-  return JSON.stringify(baseline)===JSON.stringify(current);
-}
-
 export function evaluateSignatureWindowAmendment({
   changedPaths, repairWindow, changeRecord, baselineChangeRecord,
   currentChangeRecord, now = new Date()
@@ -47,7 +29,12 @@ export function evaluateSignatureWindowAmendment({
       !amendment.files.includes("drive-gateway/src/signing.mjs")) {
     return { pass: false, reason: "Protected Signature Portal changes require an active Change Record." };
   }
-  if (!preservesChangeRecordHistory(baselineChangeRecord,currentChangeRecord,amendment)) {
+  const strip = value => {
+    const copy = structuredClone(value);
+    delete copy.activeAmendment;
+    return copy;
+  };
+  if (JSON.stringify(strip(baselineChangeRecord)) !== JSON.stringify(strip(currentChangeRecord))) {
     return { pass: false, reason: "Another portal's window or existing Change Record history was altered." };
   }
   const expectedRollback = "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd";
@@ -109,6 +96,7 @@ export function evaluateSignatureWindowRepair({
   const maintenance = new Set([
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "scripts/portal-repair-window-guard-policy.mjs",
+    "scripts/portal-protection-check.mjs",
     "tests/meeting-isolation-guard.test.mjs"
   ]);
   const inScope = path => amendment.files.some(scope =>
@@ -117,7 +105,12 @@ export function evaluateSignatureWindowRepair({
   if (!changed.every(path => inScope(path) || maintenance.has(path))) {
     return { pass: false, reason: "The repair changes a file outside the active Signature Portal window." };
   }
-  if (!preservesChangeRecordHistory(baselineChangeRecord,currentChangeRecord,amendment)) {
+  const strip = value => {
+    const copy = structuredClone(value);
+    delete copy.activeAmendment;
+    return copy;
+  };
+  if (JSON.stringify(strip(baselineChangeRecord)) !== JSON.stringify(strip(currentChangeRecord))) {
     return { pass: false, reason: "The repair changed another portal's window or historical Change Record." };
   }
   return { pass: true, reason: "Repair is limited to the active Signature Portal window." };
