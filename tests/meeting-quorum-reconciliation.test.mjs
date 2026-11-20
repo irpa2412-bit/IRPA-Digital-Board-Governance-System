@@ -6,6 +6,7 @@ import { isBoardMeeting, meetingCapabilities } from "../src/firebase/meetingPoli
 const service=readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
 const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const api=readFileSync("src/firebase/meetingGatewayApi.js","utf8");
+const meetings=readFileSync("src/pages/Meetings.jsx","utf8");
 
 test("only explicit Board and Board Meeting types require the one-third quorum",()=>{
   for(const meetingType of ["Board","Board Meeting"]){
@@ -44,6 +45,8 @@ test("Cloudflare Worker prevents a Board meeting from starting without quorum",(
   assert.match(service,/lower\(changed\.status\)==="in progress"&&isBoardMeeting\(current\)/);
   assert.match(service,/if\(!assessment\.quorumMet\)return fail/);
   assert.match(service,/A Board meeting cannot start without quorum/);
+  assert.match(service,/quorumAssessmentStatus/);
+  assert.match(meetings,/p\.id==="GOVERNANCE"\?"Board Meeting"/);
 });
 
 test("Meeting Room presents dispatch, queue and signed-attendance reconciliation",()=>{
