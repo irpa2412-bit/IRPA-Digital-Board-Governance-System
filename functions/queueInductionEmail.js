@@ -26,7 +26,10 @@ async function queueInductionEmail(inputOrEmail, subjectOrOptions, text, html, o
   try {
     const result=await retry(async()=>{
       const payload={to,name:input.recipientName||recipientName||"Member",subject:input.subject||"",text:input.text||"",html:input.html||"",invitationId:input.invitationId||null};
-      const gateway=String(env.GATEWAY_URL||env.INVITATION_GATEWAY_URL||"").replace(/\\/$/,"");\n      if(!gateway) throw new Error("Invitation email gateway is not configured.");\n      const serviceToken=await getServiceIdToken({env,fetchFn});\n      const res=await fetchFn(gateway+"/api/send-invitation-email",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+serviceToken},body:JSON.stringify(payload)});
+      const gateway=String(env.GATEWAY_URL||env.INVITATION_GATEWAY_URL||"").replace(/\\/$/,"");
+      if(!gateway) throw new Error("Invitation email gateway is not configured.");
+      const serviceToken=await getServiceIdToken({env,fetchFn});
+      const res=await fetchFn(gateway+"/api/send-invitation-email",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+serviceToken},body:JSON.stringify(payload)});
       if(!res.ok){const err=new Error("Gateway responded "+res.status);err.status=res.status;throw err;} return res.json();
     },{logger,sleep,shouldRetry:(e)=>!(e?.status>=400&&e?.status<500)});
     await queueRef.update({status:"Sent",sentAt:new Date().toISOString(),messageId:result?.messageId||null});
