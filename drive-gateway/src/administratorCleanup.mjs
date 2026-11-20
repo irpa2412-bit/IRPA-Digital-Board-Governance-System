@@ -720,6 +720,12 @@ export function createAdministratorCleanupRouter(deps) {
         if (!archive || archive.planId !== planId || !Array.isArray(archive.records) || !Array.isArray(archive.operationOutcomes)) {
           return json({ok:false,error:"The Drive backup archive failed its integrity checks."},502,corsHeaders(request));
         }
+        const archivedDecisions = new Map(archive.records.map(row=>[row.key,row.decision]));
+        const decisionsMatch = plan.records.every(row=>archivedDecisions.get(row.key)===row.decision);
+        const outcomesMatch = archive.operationOutcomes.length === (plan.operationOutcomes||[]).length &&
+          archive.operationOutcomes.every((item,index)=>item.operationId===(plan.operationOutcomes||[])[index]?.operationId &&
+            item.status===(plan.operationOutcomes||[])[index]?.status);
+        if (!decisionsMatch || !outcomesMatch) return json({ok:false,error:"The Drive backup does not match the reviewed selections or recorded operation outcomes."},502,corsHeaders(request));
         return json({ok:true,backupVerified:true,planId,backupDriveFileId:plan.backupDriveFileId,backupUrl:plan.backupUrl,
           schemaVersion:archive.schemaVersion,recordCount:archive.records.length,
           staysCount:archive.records.filter(row=>row.decision==="STAYS").length,
