@@ -1074,24 +1074,38 @@ async function actualDataAccessRoute(request, env) {
   let step = 'Firebase authentication';
   try {
     const claims = await authenticateFirebaseRequest(request, env);
-    step = 'Administrator profile lookup';
     step = "token creation";
     let adminToken;
     try { adminToken = await getFirestoreAdminAccessToken(env); }
     catch (error) { error.diagnosticStep = String(error?.message || "").includes("obtain an access token") ? "token exchange" : "token creation"; throw error; }
-    const profile = await getFirestoreDocument(env, 'adminProfiles/' + claims.user_id, adminToken);
-    const email = String(claims.email || '').trim().toLowerCase();
-    const adminAllowed = email === 'irpa2412@gmail.com' || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === 'Administrator');
-    if (!adminAllowed) return json({ok:false,step,error:'Only an active IRPA Administrator may change actual-data access.'},403,corsHeaders(request));
+
+    // The gate state is a read-only, non-sensitive operational setting. Every authenticated
+    // member/employee must be able to read it so the portal entry gate can honour the
+    // administrator's global OPEN/CLOSED decision. Only the administrator may mutate it.
     step = 'Read actual-data setting';
     const path = 'systemSettings/actualDataAccess';
     const previous = await getFirestoreDocument(env, path, adminToken);
     const fields = previous?.fields || {};
-    if (request.method === 'GET') return json({ok:true,enabled:fields.enabled?.booleanValue===true,status:fields.status?.stringValue || 'CLOSED',finalTestsAttested:fields.finalTestsAttested?.booleanValue===true,changedAt:fields.changedAt?.timestampValue||null,changedByEmail:fields.changedByEmail?.stringValue||null},200,corsHeaders(request));
+    if (request.method === 'GET') {
+      return json({
+        ok:true,
+        enabled:fields.enabled?.booleanValue===true,
+        status:fields.status?.stringValue || 'CLOSED',
+        finalTestsAttested:fields.finalTestsAttested?.booleanValue===true,
+        version:Number(fields.version?.integerValue || 0)
+      },200,corsHeaders(request));
+    }
+
+    step = 'Administrator profile lookup';
+    const profile = await getFirestoreDocument(env, 'adminProfiles/' + claims.user_id, adminToken);
+    const email = String(claims.email || '').trim().toLowerCase();
+    const adminAllowed = email === 'irpa2412@gmail.com' || (profile?.fields?.active?.booleanValue === true && profile?.fields?.role?.stringValue === 'Administrator');
+    if (!adminAllowed) return json({ok:false,step,error:'Only an active IRPA Administrator may change actual-data access.'},403,corsHeaders(request));
+
     step = 'Validate request and attestation';
     const body = await request.json();
     const policy = evaluateActualDataAccessPolicy({adminAllowed,enabled:body.enabled,confirmation:body.confirmation});
-    if (!policy.allowed) return json({ok:false,step:policy.step,error:policy.error},policy.status,corsHeaders(request));
+    if (!policy.allowed) return json({ok:false,step,error:policy.error},policy.status,corsHeaders(request));
     const enabled = body.enabled;
     const version = Number(fields.version?.integerValue || 0) + 1;
     const now = new Date().toISOString();
