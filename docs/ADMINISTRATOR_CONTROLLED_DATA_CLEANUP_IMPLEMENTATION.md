@@ -1,6 +1,6 @@
 # Administrator-Controlled Data Cleanup — Implementation Contract
 
-Status: implementation in progress on `feat/admin-controlled-cleanup-20261120`; not merged or deployed. The legacy reset executor is not approved for reuse.
+Status: inventory gate and read-only plan API implemented on `feat/admin-controlled-cleanup-20261120`; destructive executor and Settings interface remain incomplete. Not merged or deployed. The legacy reset executor is disabled on this feature branch and is not approved for reuse.
 
 ## Objective
 Replace the broad System Reset / trial-reset pathway with a dedicated Cloudflare Gateway service and Settings interface. The browser may inventory, select, review and confirm records; only the authenticated Worker may authorise and execute mutations.
