@@ -14,6 +14,7 @@ const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
   .trim().split("\n").filter(Boolean).sort();
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
+  "scripts/meeting-portal-fixture-isolation-guard.sh",
   ".github/workflows/finance-production-reset.yml",
   "docs/ACTUAL_DATA_ACCESS_GATE.md",
   "scripts/reset-finance-production.js",
