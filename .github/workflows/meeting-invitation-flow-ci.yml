@@ -62,6 +62,7 @@ on:
       - "drive-gateway/src/meetingServices.mjs"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-quorum-reconciliation.test.mjs"
+      - "tests/meeting-attendance-dispatch-reconciliation.test.mjs"
 
   workflow_dispatch:
 
