@@ -68,7 +68,7 @@ jobs:
             curl --silent --show-error -D "diagnostic-output/$host-index.headers" "$base/?__irpa_hash_diagnostic=$bust" -o "diagnostic-output/$host-index.html"
             entry="$(node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script[^>]+src="([^"]+\.js)"/i);if(!m)process.exit(2);process.stdout.write(m[1]);' "diagnostic-output/$host-index.html")"
             curl --silent --show-error -D "diagnostic-output/$host-entry.headers" "$base$entry?__irpa_hash_diagnostic=$bust" -o "diagnostic-output/$host-entry.js"
-            live_asset="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/DocumentLifecycleModule[^"\\x27\\x60\\s]*\\.js/);if(!m)process.exit(3);process.stdout.write(m[0]);' "diagnostic-output/$host-entry.js")"
+            live_asset="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/DocumentLifecycleModule[A-Za-z0-9._-]*\.js/);if(!m)process.exit(3);process.stdout.write(m[0]);' "diagnostic-output/$host-entry.js")"
             printf '%s live entry: %s; live module: %s\n' "$host" "$entry" "$live_asset" | tee -a diagnostic-output/asset-names.txt
             status="$(curl --silent --show-error -D "diagnostic-output/$host.headers" -o "diagnostic-output/$host.js" -w '%{http_code}' "$base/assets/$live_asset?__irpa_hash_diagnostic=$bust")"
             printf '%s HTTP status: %s\n' "$host" "$status" | tee -a diagnostic-output/asset-names.txt
