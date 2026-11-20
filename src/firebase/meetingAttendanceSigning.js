@@ -110,7 +110,8 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   documentType:"Governance Document",documentUploadedAt:documentPayload.uploadedAt,
   signingMode:"Parallel",recipients,fields,ownerSigningEnabled
  });
- await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid)});
+ const gatewaySignerMap=(envelope.recipients||[]).filter(r=>r?.uid&&r?.email&&r.actionRequired!==false&&r.optionalSigning!==true&&!r.accessOnly&&!["View Only","Read Only","Information / FYI","Observer"].includes(String(r.role||"").trim())).sort((a,b)=>Number(a.routingOrder||1)-Number(b.routingOrder||1)).map((r,index)=>({signerId:"S"+String(index+1),participantUid:r.uid,participantEmail:clean(r.email).toLowerCase(),participantName:clean(r.name||r.displayName||r.email)}));
+ await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewaySignerMap});
  let started;
  try{
   started=await startSignatureWorkflow(envelope);
