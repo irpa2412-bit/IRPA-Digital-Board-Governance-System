@@ -74,6 +74,8 @@ jobs:
             exit 1
           fi
           echo "Production bundle references the canonical Cloudflare Google Drive Gateway."
+      - name: Generate SHA-256 manifest for this host's exact deployment output
+        run: node scripts/verify-document-lifecycle-host.mjs --write-manifest dist
       - name: Upload immutable production frontend artifact for browser verification
         uses: actions/upload-artifact@v4
         with:

@@ -112,6 +112,8 @@ jobs:
       - name: Independent production readability verification
         run: npm run verify:production-readability
 
+      - name: Generate SHA-256 manifest for this host's exact deployment output
+        run: node scripts/verify-document-lifecycle-host.mjs --write-manifest dist
       - name: Upload immutable Firebase production frontend artifact
         uses: actions/upload-artifact@v4
         with:
