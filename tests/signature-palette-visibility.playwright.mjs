@@ -54,6 +54,14 @@ async function assertDockDoesNotCoverPdf(page,fieldTestId){
  assert.equal(fieldExposed,true,"active signing field must remain reachable while the fixed dock is open");
  assert.equal(await dock.evaluate(el=>getComputedStyle(el).position),"fixed","signature dock must remain fixed to the viewport bottom");
  assert.equal(await dock.getAttribute("aria-modal"),"false","signature palette must not install a modal backdrop");
+ const footer=page.locator(".signature-confirmation-actions");
+ const useSaved=footer.getByRole("button",{name:"Use this signature",exact:true});
+ await useSaved.waitFor({state:"visible"});
+ const footerBox=await footer.boundingBox(),buttonBox=await useSaved.boundingBox();
+ assert.ok(footerBox&&buttonBox,"sticky saved-signature footer must be visible at every supported viewport");
+ assert.ok(buttonBox.x>=0&&buttonBox.x+buttonBox.width<=page.viewportSize().width,"sticky action must fit the viewport without horizontal clipping");
+ assert.equal(await footer.evaluate(el=>getComputedStyle(el).position),"sticky","saved-signature action footer must remain sticky inside the fixed dock");
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,"signing screen must not overflow horizontally");
 }
 async function runViewport(name,viewport){
  const context=await browser.newContext({viewport});
@@ -155,8 +163,8 @@ async function runViewport(name,viewport){
  await page.getByRole("button",{name:"Next page"}).click();
  assert.equal(await page.getByTestId("page-number").innerText(),"2");
  await page.getByTestId("field-sig-page-2").click();
- await page.getByRole("button",{name:"Use my saved signature"}).click();
- await page.getByRole("button",{name:"Confirm Signature"}).click();
+ const useSavedAction=page.locator(".signature-confirmation-actions").getByRole("button",{name:"Use this signature",exact:true});
+ await useSavedAction.click();
  await assertPlacedSignatureVisibleAndUncovered(page,"placed-sig-page-2");
  console.log("PASS "+name+": Saved specimen + explicit Confirm");
  // Page 1's two fields remain confirmed after page changes.
@@ -180,10 +188,10 @@ async function runViewport(name,viewport){
 try{
  await waitForServer();
  browser=await chromium.launch({headless:true});
- await runViewport("desktop",{width:1440,height:1000});
- await runViewport("mobile",{width:390,height:844});
- console.log("PASS desktop: Draw, Type, saved signature, explicit Confirm, multi-page, multi-field, zoom, reload, no palette overlap");
- console.log("PASS mobile: Draw, Type, saved signature, explicit Confirm, multi-page, multi-field, zoom, reload, no palette overlap");
+ for(const width of [360,412,768,1280]){
+  await runViewport("width-"+width,{width,height:900});
+  console.log("PASS width "+width+": Draw, Type, sticky Use this signature, multi-page, multi-field, zoom, reload, no horizontal overflow or palette overlap");
+ }
 }catch(error){
  console.error("FAIL signature palette Playwright:",error);
  if(activePage){
