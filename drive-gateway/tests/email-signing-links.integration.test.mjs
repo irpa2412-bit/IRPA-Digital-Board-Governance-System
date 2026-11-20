@@ -321,3 +321,29 @@ test("Title assignment is accepted, completed by the signer, and included in liv
   assert.equal(status.lastEvent.type,"envelope.completed");
   assert.equal(status.signers[0].title,"Board Secretary");
 });
+
+test("Meeting Portal draft minutes can be completed through a Signature Portal email-link signature",async()=>{
+  const f=await fixture({authority:false});
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Meeting Secretary",isAdmin:false},{
+    documentId:f.envelope.documentId,title:"Minutes — TEST Meeting 2026-11-20",
+    externalReference:"IRPA-MINUTES-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:[{identityType:"email-link",email:"minutes.secretary@example.org",name:"TEST Meeting Secretary",order:1,role:"Meeting Secretary"}],
+    fields:[{fieldId:"MINUTES-SIGNATURE",type:"Signature",signerId:"S1",page:1,x:12,y:72,width:28,height:8,required:true}]
+  });
+  const token=new URL(f.sent.at(-1).link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.77");
+  const signed=await sign(f.ctx,{
+    token:opened.sessionToken,signature:{type:"typed",value:"TEST Meeting Secretary"},
+    fieldApplications:[{fieldId:"MINUTES-SIGNATURE",confirmed:true,page:1,x:0.12,y:0.72,width:0.28,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:"TEST Meeting Secretary"}],
+    declarations:{name:"TEST Meeting Secretary",occupation:"Meeting Secretary",capacity:"Minutes approval"},
+    consent:true,user:null
+  });
+  assert.equal(signed.completed,true);
+  assert.equal(signed.status,"Completed");
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(status.status,"Completed");
+  assert.equal(status.signers[0].status,"Signed");
+  const completed=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(completed.signers[0].email,"minutes.secretary@example.org");
+});
