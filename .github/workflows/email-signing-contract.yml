@@ -1,0 +1,35 @@
+name: email-signing-contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: email-signing-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drive-gateway/package-lock.json
+      - name: Install Gateway dependencies
+        run: npm ci --prefix drive-gateway
+      - name: Run reusable-link and resend contract suite
+        run: node --test drive-gateway/tests/email-signing-contract.test.mjs
+      - name: Run email-signing integration regressions
+        run: node --test drive-gateway/tests/email-signing-links.integration.test.mjs
+      - name: Install root dependencies
+        run: npm ci
+      - name: Run seven-portal protection smoke tests
+        run: node scripts/portal-protection-smoke.mjs
