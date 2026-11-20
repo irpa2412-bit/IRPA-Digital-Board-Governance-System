@@ -3364,6 +3364,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
     token,
     user_id: payload.user_id || payload.sub,
     email: payload.email || null,
+    emailVerified: payload.email_verified === true,
     firebaseClaims: {
       admin: payload.admin === true,
       irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
