@@ -87,6 +87,7 @@ try {
       await page.getByText("TEST Guest — Position 2", { exact: true }).waitFor();
       await page.getByText("TEST Guest — Position 3", { exact: true }).waitFor();
       await page.getByText("TEST Active Board Member", { exact: true }).waitFor();
+      await page.getByText("4/4 Present", { exact: true }).waitFor();
       await page.waitForFunction(id => (window.__irpaFixtureActions || []).some(action => action.type === "quorum-assess" && action.meetingId === id), created.id);
 
       await page.getByRole("button", { name: /1\. Confirm the agenda/ }).click();
