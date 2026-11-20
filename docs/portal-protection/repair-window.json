@@ -197,7 +197,7 @@
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
       "reason": "Confirmed cause (d): openEmailSigning() consumes the invitation on the first GET, so link previews kill resent links; error messages are masked.",
-      "rollbackCommit": "433727282012c75cdaebca21dcdadcb28dba59fb",
+      "rollbackCommit": "dfb35cbb028749536973a616422d9aeb6829c2bf",
       "scope": [
         "drive-gateway/src/signing.mjs",
         "drive-gateway/src/emailSigningLinks.mjs",
@@ -220,8 +220,15 @@
           "at": "2026-11-20T17:08:47Z",
           "action": "opened",
           "description": "Owner-authorised 48-hour Signature Portal repair window. Rollback commit recorded from the repository's verified production rollback baseline: 433727282012c75cdaebca21dcdadcb28dba59fb. Existing Meeting Portal window remains unchanged and independently open."
+        },
+        {
+          "at": "2026-11-20T17:15:33Z",
+          "action": "rollback-reference-corrected",
+          "description": "Corrected Signature Portal rollback reference to dfb35cbb as directed; awaiting independent Worker /health confirmation. Meeting Portal baseline unchanged."
         }
-      ]
+      ],
+      "rollbackCommitEvidence": "Firebase web build reported by owner as dfb35cb, matching repository main dfb35cbb; Worker /health verification pending.",
+      "rollbackCommitStatus": "provisional-owner-confirmed"
     }
   ]
 }
