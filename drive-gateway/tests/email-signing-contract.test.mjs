@@ -202,10 +202,9 @@ test("bulk resend actually delivers a separate replacement link to every unsigne
 test("actual resend failure preserves the previous token hash and exposes the SMTP stage",async()=>{
   const f=await resendContext([{id:"S1",email:"one@example.org",emailLinkStatus:"send failed"}],{failMail:true});
   const oldHash=f.record.signers[0].tokenHash;
-  await assert.rejects(
-    ()=>resendAllUnsignedInvitations(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id),
-    /no error/i
-  ).catch(()=>{});
+  const result=await resendAllUnsignedInvitations(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id);
+  assert.equal(result.failed,1);
+  assert.equal(result.results[0].stageCode,"SUBMIT");
   const saved=await f.ctx.meta.get("envelopes",f.record.id);
   assert.equal(saved.signers[0].tokenHash,oldHash);
   assert.equal(saved.signers[0].resendAttempt,undefined);
