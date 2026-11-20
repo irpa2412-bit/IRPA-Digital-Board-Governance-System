@@ -39,6 +39,7 @@ jobs:
           printf 'VITE_BUILD_TIME=%s\n' "$live_build_time" >> "$GITHUB_ENV"
       - name: Build two clean copies with identical release inputs
         env:
+          VITE_BUILD_COMMIT: 17bba84842e2eff1f671e1bc9344c94828bb07ef
           VITE_BUILD_STAMP: 17bba84842e2eff1f671e1bc9344c94828bb07ef
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
