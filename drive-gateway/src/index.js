@@ -17,6 +17,7 @@ import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
 import { route as esignRoute } from "./router.mjs";
+import { maskEmailForConfirmation, formatEmailLinkExpiryEAT } from "./emailSigning/index.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
 import { isCurrentSigningAuthorityRecord } from "./signingAuthorityPolicy.mjs";
@@ -621,7 +622,7 @@ export default {
               const result=await resendGatewayInvitation(ctx,user,emailMatch[1],emailMatch[2]);
               const current=await ctx.meta.get("envelopes",emailMatch[1]);
               const signer=current?.signers?.find(item=>item.id===emailMatch[2]);
-              return emailRouteJson({...result,maskedRecipient:signer?.email?String(signer.email).replace(/^(.{1,2})[^@]*(@.*)$/,"$1***$2"):"recipient",confirmationText:"New link sent to "+(signer?.email?String(signer.email).replace(/^(.{1,2})[^@]*(@.*)$/,"$1***$2"):"recipient")+"...",expiresAtEAT:result.expiresAt?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(result.expiresAt))+" EAT":null},200);
+              return emailRouteJson({...result,maskedRecipient:signer?.email?maskEmailForConfirmation(signer.email):"recipient",confirmationText:"New link sent to "+(signer?.email?maskEmailForConfirmation(signer.email):"recipient")+"...",expiresAtEAT:result.expiresAt?formatEmailLinkExpiryEAT(result.expiresAt):null},200);
             }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
           }
           emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/resend-all$/);
