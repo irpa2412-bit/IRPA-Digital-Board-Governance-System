@@ -35,4 +35,5 @@ export const getMyMeetingSubscriptions = async () => (await callMeetingService("
 export const getAccessibleMeetingRecords = async () => (await callMeetingService("/api/meeting-register/list")).meetings || [];
 
 export const assessMeetingQuorum = payload => callMeetingService("/api/meeting-quorum/assess", payload);
-\nexport const listMeetingBoardMembers = async () => (await callMeetingService("/api/meeting-board-register/list")).boardMembers || [];\n
+
+export const listMeetingBoardMembers = async () => (await callMeetingService("/api/meeting-board-register/list")).boardMembers || [];
