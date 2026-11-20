@@ -179,7 +179,7 @@ test("Meeting Portal fixture runs on every repair branch and all Meeting Portal 
     "tests/fixtures/**",
     "vite.meeting-fixture.config.js"
   ]) assert.ok(workflow.includes(`"${path}"`), `missing fixture trigger: ${path}`);
-  assert.match(guard, /const allowed = new Set\\(\\[/);
+  assert.ok(guard.includes("const allowed = new Set(["));
   assert.ok(guard.includes('"drive-gateway/src/meetingServices.mjs"'));
   assert.ok(guard.includes('"src/firebase/meetingAttendanceSigning.js"'));
 });
