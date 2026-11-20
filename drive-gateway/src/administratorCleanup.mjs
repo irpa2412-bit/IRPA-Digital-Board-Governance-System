@@ -492,6 +492,10 @@ export function createAdministratorCleanupRouter(deps) {
       return "DELETED";
     }
     if (operation.type === "auth-delete") {
+      const currentUsers = await listFirebaseAuthUsers(env,authToken);
+      const currentAccount = currentUsers.find(user=>clean(user.localId || user.uid)===operation.uid);
+      if (!currentAccount) return "ALREADY_DELETED";
+      if (operation.email && clean(currentAccount.email).toLowerCase()!==operation.email) throw new Error("Firebase Auth UID/email binding changed immediately before deletion.");
       const url = "https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/accounts:delete";
       const response = await fetchImpl(url,{method:"POST",headers:{Authorization:"Bearer "+authToken,"Content-Type":"application/json"},body:JSON.stringify({localId:operation.uid})});
       const result = await response.json().catch(()=>({}));
