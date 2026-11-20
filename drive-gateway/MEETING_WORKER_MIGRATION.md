@@ -12,9 +12,9 @@ The existing `irpa-google-drive-gateway` Worker is the server-side meeting opera
 - Gate queue: `POST /api/meeting-entry-requests/list`, `/api/meeting-entry-requests/resolve`
 - Meeting room state/activity: `POST /api/meeting-register/update`, `/api/meeting-room/event`
 - Voting, decisions and actions: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`, `/api/meeting-decisions/create`, `/api/meeting-actions/create`
-- Daily attendance: `POST /api/meeting-attendance/daily/register`, `/daily/mark`, `/daily/dispatch`, plus the read-only legacy participant attendance register. The daily dispatch endpoint is host-owned and records the controlled Signature Portal envelope reference.
+- Daily attendance: `POST /api/meeting-attendance/daily/register` and `/daily/mark`, plus the read-only legacy participant attendance register. Existing `meetingAttendanceDispatches` records remain readable for historical reconciliation.
 - Working documents: `POST /api/meeting-working-documents/register`, `/api/meeting-working-documents/list`, `/api/meeting-working-documents/review`
-- Attendance e-signatures: the Meeting Portal prepares a controlled daily PDF and the host explicitly starts the existing Signature Portal email-link envelope. No separate Meeting Portal signature endpoint is used.
+- Attendance e-signatures: the Meeting Portal integration is temporarily disconnected. `POST /api/meeting-attendance/daily/dispatch` returns HTTP 410 without writing or changing dispatch records. Users can independently create signing requests in the Signature Portal; existing valid signing links remain usable.
 - Meeting invitation delivery: `POST /api/meeting-invitations/dispatch` (validates the issued meeting pass and sends through the existing Worker SMTP sender; invitation delivery metadata is written to the meeting participant record, not the general `invitations` collection).
 - Meeting register: `POST /api/meeting-register/create`, `/api/meeting-register/update`, `/api/meeting-register/delete`
 - Meeting voting control: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`
