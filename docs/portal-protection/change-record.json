@@ -3,33 +3,19 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal",
-      "Meeting Portal"
+      "Signature Portal"
     ],
-    "reason": "Restore Email-link E-signature to the verified production state before 11:00 EAT on 20 November 2026, while preserving the Meeting Portal's independent attendance, attendance-sheet and ordinary invitation functions. Shared SignaturePlatform and Gateway dependencies require explicit verification for both portals.",
+    "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
     "files": [
       "src/pages/SignaturePlatform.jsx",
-      "tests/signature-workflow-policy.test.mjs",
-      "drive-gateway/src/signing.mjs",
-      "drive-gateway/src/router.mjs",
-      "drive-gateway/src/index.js",
-      "drive-gateway/src/invitationEmail.mjs",
-      "src/pages/EmailSigningReadOnlyPage.jsx",
-      "drive-gateway/tests/email-signing-links.integration.test.mjs",
-      "drive-gateway/tests/email-signing-links.test.mjs",
-      "drive-gateway/tests/signing-invitation.test.mjs"
+      "tests/signature-workflow-policy.test.mjs"
     ],
-    "expectedEffect": "Restore the pre-11:00 EAT email-link invitation/open/PDF/signing lifecycle, with no time-based expiry for unused signer invitations or active signer sessions. The invitation bearer token is consumed once on first redemption; resend/replacement, revocation and envelope cancellation invalidate prior links. Preserve unrelated Gateway services and Meeting Portal attendance and ordinary invitations.",
+    "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
     "prohibitedChanges": [
       "Do not change Cloudflare Worker routes or token generation.",
       "Do not change Firestore rules, indexes, or production records.",
       "Do not change SMTP credentials, secrets, or deployment configuration.",
-      "Do not alter other portals, shared stylesheets, signature validation, or audit controls.",
-      "Do not change Firestore signing records, existing invitation tokens, completed PDFs or audit trails.",
-      "Do not change SMTP settings, secrets, bindings, or transport.",
-      "Do not add time-based expiry to email-link invitations or sessions.",
-      "Do not roll back Meeting Portal attendance, attendance sheets, or ordinary meeting invitations.",
-      "Do not change Firestore rules, indexes, cryptographic verification, PDF stamping, certificates or archive logic."
+      "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
     ]
   },
   "repairWindow": {
@@ -256,19 +242,23 @@
       "baselineSmoke": "PASS",
       "fullRegression": "PENDING",
       "portalSmoke": {
-        "Signature Portal": "PENDING"
+        "Signature Portal": "PENDING",
+        "Meeting Portal": "PENDING"
       },
       "behaviourDifferences": [
-        "Invitation-link preview/session lifecycle returns to the legacy pre-cutoff behavior.",
-        "Post-cutoff v2 email-signing routes and module are removed; legacy email-link routes remain.",
-        "Resend and signer-status behavior returns to the pre-cutoff implementation.",
-        "Existing signing records and links are not rewritten or revoked."
+        "The email-link invitation/open/PDF/signing lifecycle is restored to the verified pre-cutoff route implementation.",
+        "Email-link invitations have no time-based expiry, including after first open; the same email URL remains usable when the signer leaves without signing and returns later.",
+        "Opening does not rotate or consume the invitation token; legacy opened-but-unsigned invitation hashes remain accepted unless replaced, revoked, signed, or cancelled.",
+        "A successful replacement email delivery, authorised revocation, signer completion, or envelope cancellation controls when signing access changes.",
+        "Existing signing records, tokens, completed PDFs and audit trails are not rewritten."
       ],
       "evidence": [
-        "Production Gateway deployment run 44690520757: success, deployed exact commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd; live health check passed.",
-        "Signature source files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
-        "Post-cutoff signature changes were identified in commits 514249c, 67ba1ed, 386b73b and d8b52fd."
+        "Production Gateway deployment run 44690520757 confirmed commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd live at 09:49:57 EAT.",
+        "Signature files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
+        "Owner clarified that an opened-but-unsigned invitation must remain valid and reusable; implementation and regression tests now cover reopening the same email URL after more than one year.",
+        "Full regression and both affected-portal smoke checks are pending on the amended exact PR head; no production deployment has occurred."
       ]
-    }
+    },
+    "expectedEffect": "Restore the verified pre-11:00 EAT email-link signing implementation while keeping every dispatched email invitation non-expiring before and after opening. Opening, closing, or reopening the same email URL without signing does not consume or rotate the invitation. The same link remains valid until successful signing, authorised owner revocation, successful replacement delivery, or envelope cancellation. Existing Firestore records, tokens, audit events and completed PDFs are not rewritten."
   }
 }
