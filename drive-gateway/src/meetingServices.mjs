@@ -1,3 +1,4 @@
+import {calculateRequiredQuorum,normalizeMeetingGovernancePolicy,calculateVotingOutcome} from "../../src/utils/meetingGovernancePolicy.mjs";
 const clean = v => String(v ?? "").trim();
 const lower = v => clean(v).toLowerCase();
 const denied = new Set(["cancelled","canceled","revoked","removed","inactive","closed"]);
@@ -101,8 +102,10 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  const boardPresent=boardRows.filter(r=>r.meetingParticipantRegistered&&r.countsTowardQuorum&&!r.duplicateBoardMemberRegistration).length;
  const boardMeeting=isBoardMeeting(meeting);
  const denominator=boardMembers.length;
- const required=boardMeeting?(denominator?Math.ceil(denominator/3):null):0;
- const quorumMet=boardMeeting?Boolean(required&&boardPresent>=required):false;
+ const governancePolicy=normalizeMeetingGovernancePolicy(meeting.governancePolicy||{quorum:meeting.quorumPolicy,voting:meeting.votingPolicy,source:meeting.governancePolicySource});
+ const quorumRequirement=calculateRequiredQuorum(denominator,governancePolicy.quorum);
+ const required=boardMeeting?quorumRequirement.required:0;
+ const quorumMet=boardMeeting?Boolean(quorumRequirement.configured&&required&&boardPresent>=required):false;
  const displayRows=[...rows,...boardRows.filter(r=>!r.meetingParticipantRegistered)];
  const counts={
   registered:rows.length,boardRegisterMembers:denominator,boardMembers:denominator,registeredBoardMembers:boardRows.filter(r=>r.meetingParticipantRegistered).length,
@@ -119,7 +122,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
   boardMembersPresent:boardPresent
  };
  const registerUsable=denominator>0;
- return {meetingId,attendanceDate:attendanceDate||null,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?"One-third of the active UID-verified Board Members Register (rounded up)":"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!registerUsable?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",counts,rows:displayRows,assessedAt:new Date().toISOString(),sources:{boardRegister:"active members collection; UID-only; deduplicated by UID",participantRegistration:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:attendanceDate?"meetingDailyAttendance + Signature Portal envelope evidence":"meetingAttendanceSignatures"},reconciliation:{boardRegisterMembers:denominator,meetingParticipantRegistrations:registeredBoardRows.length,boardMembersNotRegistered:counts.boardMembersNotRegistered,unmatchedBoardRegistrations:unmatchedBoardRows.length,missingRegisterUid,duplicateRegisterUids:[...duplicateRegisterUids]}};
+ return {meetingId,attendanceDate:attendanceDate||null,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?(quorumRequirement.rule||"Quorum policy is not configured"):"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!quorumRequirement.configured?"NOT_CONFIGURED":!registerUsable?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",governancePolicySnapshot:governancePolicy,counts,rows:displayRows,assessedAt:new Date().toISOString(),sources:{boardRegister:"active members collection; UID-only; deduplicated by UID",participantRegistration:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:attendanceDate?"meetingDailyAttendance + Signature Portal envelope evidence":"meetingAttendanceSignatures"},reconciliation:{boardRegisterMembers:denominator,meetingParticipantRegistrations:registeredBoardRows.length,boardMembersNotRegistered:counts.boardMembersNotRegistered,unmatchedBoardRegistrations:unmatchedBoardRows.length,missingRegisterUid,duplicateRegisterUids:[...duplicateRegisterUids]}};
 };
 const recordLabel = type => ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",MEETING_REPORT:"Compiled Meeting Report",OTHER:"Other Meeting Record"})[type]||"Meeting Record";
 function toFs(v) { if(v===null||v===undefined)return {nullValue:null}; if(v instanceof Date)return {timestampValue:v.toISOString()}; if(typeof v==="boolean")return {booleanValue:v}; if(typeof v==="number")return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}; if(Array.isArray(v))return {arrayValue:{values:v.map(toFs)}}; if(typeof v==="object")return {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,toFs(x)]))}}; return {stringValue:String(v)}; }
