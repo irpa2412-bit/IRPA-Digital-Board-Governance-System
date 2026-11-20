@@ -147,7 +147,7 @@ export function createAdministratorCleanupRouter(deps) {
         const authUser = authByUid.get(clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid)) || authByEmail.get(email);
         const uid = clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid || authUser?.localId || authUser?.uid);
         const signerInProtectedEnvelope = collection === "members" || collection === "employees" || collection === "signatureProfiles" || collection === "signerIdentities"
-          ? [...envelopes.values()].some(envelope => ["signed","completed","in progress","inprogress","signing"].includes(clean(envelope.status).toLowerCase()) &&
+          ? [...envelopes.values()].some(envelope => ["signed","completed","in progress","inprogress","signing","pending","sent","opened","awaiting signature","awaiting_signature"].includes(clean(envelope.status).toLowerCase()) &&
             (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer =>
               (uid && clean(signer.uid || signer.profileUid) === uid) ||
               (email && clean(signer.email).toLowerCase() === email)))
@@ -166,7 +166,12 @@ export function createAdministratorCleanupRouter(deps) {
         const signedEnvelope = collection === "signatureEnvelopes" && ["signed","completed"].includes(envelopeStatus);
         const signedProductionEnvelope = signedEnvelope && !trialData;
         const missingTrialPdf = isSignedTrial && !clean(data.signedPdfReference || data.signedFileId || data.driveFileId);
-        const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory || signedProductionEnvelope || missingTrialPdf;
+        const linkedEnvelopeId = clean(data.envelopeId || data.gatewayEnvelopeId);
+        const linkedEnvelope = linkedEnvelopeId ? envelopes.get(linkedEnvelopeId) : null;
+        const signedProductionPortalRecord = ["signatures","documents","controlledDocuments"].includes(collection) &&
+          linkedEnvelope && signedState(linkedEnvelope.status) && !isTrialRecord(linkedEnvelope);
+        const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory ||
+          signedProductionEnvelope || missingTrialPdf || signedProductionPortalRecord;
         records.push({
           key: collection + "/" + id, collection, id, version: clean(doc.updateTime || doc.createTime), uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
@@ -197,7 +202,8 @@ export function createAdministratorCleanupRouter(deps) {
             signerInProtectedEnvelope ? "Signer on a signed or in-progress envelope." :
             immutableHistory ? "Immutable audit/signature history must be retained." :
             signedProductionEnvelope ? "Completed production signing envelopes must be retained." :
-            missingTrialPdf ? "Signed trial PDF reference is missing; safe deletion cannot be verified." : "",
+            missingTrialPdf ? "Signed trial PDF reference is missing; safe deletion cannot be verified." :
+            signedProductionPortalRecord ? "Portal record belongs to a completed production signing envelope." : "",
           decision: "STAYS", sourceDocument: doc
         });
       }
@@ -318,6 +324,17 @@ export function createAdministratorCleanupRouter(deps) {
       }
       add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected record"});
     }
+    const priority = operation => {
+      if (operation.type === "update-signers") return 1;
+      if (operation.type === "drive-delete") return 2;
+      if (operation.type === "firestore-delete" && operation.key.startsWith("invitations/")) return 3;
+      if (operation.type === "firestore-delete" && operation.key.startsWith("signatureEnvelopes/")) return 4;
+      if (operation.type === "firestore-delete" && ["signatures/","documents/","controlledDocuments/"].some(prefix=>operation.key.startsWith(prefix))) return 5;
+      if (operation.type === "auth-delete") return 6;
+      if (operation.type === "firestore-delete" && /^(members|employees)\//.test(operation.key)) return 7;
+      return 5;
+    };
+    operations.sort((a,b)=>priority(a)-priority(b));
     return {records:[...byKey.values()].map(({sourceDocument,...row})=>row),operations,blockers};
   }
   async function writeAuditEvent(env, token, event) {
@@ -335,6 +352,7 @@ export function createAdministratorCleanupRouter(deps) {
     const response = await fetchImpl(url,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({pageSize:100})});
     if (!response.ok) throw new Error("Unable to verify nested Firestore records for " + path + " (HTTP " + response.status + ").");
     const body = await response.json().catch(()=>({}));
+    if (body.nextPageToken) throw new Error("Nested Firestore collection listing is incomplete for " + path + "; cleanup is blocked.");
     return Array.isArray(body.collectionIds) ? body.collectionIds : [];
   }
   async function firestoreGet(env, token, path) {
@@ -414,6 +432,17 @@ export function createAdministratorCleanupRouter(deps) {
       if (fresh.protected) throw Object.assign(new Error("Protection state changed for " + row.key + ". Cleanup was stopped."),{status:409});
       if (JSON.stringify([...(fresh.linkedRecordKeys||[])].sort()) !== JSON.stringify([...(row.linkedRecordKeys||[])].sort())) {
         throw Object.assign(new Error("Record dependencies changed for " + row.key + ". Take a fresh inventory and review the plan again."),{status:409});
+      }
+    }
+    const authOperations = plan.executionOperations.filter(item=>item.type==="auth-delete");
+    if (authOperations.length) {
+      const authToken = await getFirebaseAuthAdminAccessToken(env);
+      const authUsers = await listFirebaseAuthUsers(env,authToken);
+      for (const operation of authOperations) {
+        const account = authUsers.find(user=>clean(user.localId || user.uid)===operation.uid);
+        if (account && operation.email && clean(account.email).toLowerCase()!==operation.email) {
+          throw Object.assign(new Error("Firebase Auth UID/email binding changed for " + operation.key + ". Cleanup was stopped."),{status:409});
+        }
       }
     }
     for (const operation of plan.executionOperations.filter(item=>["firestore-delete","update-signers"].includes(item.type))) {
