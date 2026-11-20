@@ -138,7 +138,10 @@
         ]
       },
       "tests": [
-        "tests/meeting-portal-protection.test.mjs"
+        "tests/meeting-portal-protection.test.mjs",
+        "tests/meeting-attendance-guest-identity.test.mjs",
+        "tests/meeting-daily-attendance-email-signing.test.mjs",
+        "tests/meeting-quorum-reconciliation.test.mjs"
       ]
     }
   },
