@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T11:42:00Z",
+  "lastActivityAt": "2026-11-20T11:44:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -99,6 +99,11 @@
       "at": "2026-11-20T11:42:00Z",
       "action": "repair",
       "description": "Aligned two legacy isolation-guard policy assertions with the already-present email-link identity exception; the policy logic itself is unchanged."
+    },
+    {
+      "at": "2026-11-20T11:44:00Z",
+      "action": "repair",
+      "description": "Adjusted Playwright selectors to target the actual Meeting Room form-field structure rather than inaccessible sibling labels. No application UI behavior changed."
     }
   ],
   "durationHours": 48,
