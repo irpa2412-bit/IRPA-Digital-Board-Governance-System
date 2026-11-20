@@ -116,3 +116,14 @@ test("cleanup plan rejects duplicate keys and invalid decisions", async () => {
   const invalid=await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"members/m1",decision:"DELETE"}]})}),env,"/api/admin/cleanup/plan");
   assert.equal(invalid.status,400);
 });
+
+test("inventory exposes related-record dependency keys for administrator review", async () => {
+  const {route,env}=harness({collections:{
+    members:[{id:"member-1",data:{uid:"member-uid",name:"Linked Member",email:"member@example.test"}}],
+    meetings:[{id:"meeting-1",data:{title:"Board Meeting",participantUids:["member-uid"]}}]
+  }});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const member=inventory.records.find(item=>item.key==="members/member-1");
+  assert.ok(member.linkedRecordKeys.includes("meetings/meeting-1"));
+  assert.equal(member.dependencyCount,1);
+});
