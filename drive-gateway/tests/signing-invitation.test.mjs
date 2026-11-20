@@ -80,7 +80,7 @@ test("another user cannot resend a signer invitation",async()=>{
 });
 
 
-test("email-link signer receives the email-signing URL and redeems the exact one-time token",async()=>{
+test("email-link signer receives a reusable non-expiring email-signing URL",async()=>{
   const f=await fixture({emailLink:true});
   assert.equal(f.sent.length,1);
   assert.equal(f.sent[0].emailLink,true);
@@ -92,6 +92,7 @@ test("email-link signer receives the email-signing URL and redeems the exact one
   const opened=await openEmailSigning(f.ctx,token,"192.0.2.10");
   assert.equal(opened.ok,true);
   assert.equal(opened.signer.email,"signer@example.test");
+  assert.equal(opened.sessionToken,token,"opening must not consume or rotate the email invitation");
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
   assert.equal(status.signers[0].emailLinkStatus,"opened");
 });
