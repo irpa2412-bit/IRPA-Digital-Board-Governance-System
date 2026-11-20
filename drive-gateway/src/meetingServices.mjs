@@ -386,7 +386,7 @@ return response(ctx,request,{ok:true,date,status:phase==="PREPARE"?"PREPARING":p
 }
 if(pathname==="/api/meeting-attendance/daily/close"){
 const meetingId=clean(data.meetingId),date=clean(data.date),uid=clean(claims.user_id);
-if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return fail(ctx,request,"Meeting and attendance date are required.",400);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(ctx,request,"Meeting and attendance date are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
 if(!c.canManage||!hostUid||hostUid!==uid)return fail(ctx,request,"Only the authenticated recorded meeting host may request closure of the attendance signing invitations.",403);
