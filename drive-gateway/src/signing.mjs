@@ -357,27 +357,45 @@ export async function resendInvitation(ctx,user,id,signerId){
   if(envelope.signers.some(s=>s.order<target.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position. Later signers cannot be emailed early.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
-  const secret=randomHex(32),now=ctx.now(),ttlDays=Math.max(1,Math.min(30,Number(emailLink?ctx.config?.emailLinkTtlDays:ctx.config?.ttlDays)||(emailLink?7:14))),expiresAt=new Date(now.getTime()+ttlDays*86400000).toISOString();
+  const secret=randomHex(32),now=ctx.now(),attemptId=randomHex(12),ttlDays=Math.max(1,Math.min(30,Number(emailLink?ctx.config?.emailLinkTtlDays:ctx.config?.ttlDays)||(emailLink?7:14))),expiresAt=new Date(now.getTime()+ttlDays*86400000).toISOString();
   const token=`${id}.${signerId}.${secret}`;
   const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(envelope.externalReference||"")}`;
+  // Reserve this signer before SMTP submission. The previous token remains usable until
+  // delivery succeeds, and concurrent resend clicks cannot invalidate one another's email.
+  await mutate(ctx,id,async current=>{
+    if(!owner(current,user))throw new HttpError(403,"Not authorized.");
+    if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(current.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
+    const signer=current.signers.find(s=>s.id===signerId);
+    if(!signer||signer.status==="Signed")throw new HttpError(409,"This signer assignment can no longer receive another link.");
+    if(current.signers.some(s=>s.order<signer.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position.");
+    const lock=signer.resendAttempt;
+    if(lock&&Number.isFinite(Date.parse(String(lock.startedAt||"")))&&now.getTime()-Date.parse(lock.startedAt)<10*60*1000)throw new HttpError(409,"A signing invitation resend is already in progress for this signer. Refresh delivery status before retrying.");
+    signer.resendAttempt={id:attemptId,startedAt:now.toISOString()};
+    return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.started",signerId,actor:user.uid,at:now.toISOString()})}};
+  });
   try{
     await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,expiresAt,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signerId,stage,outcome,category)}:{})});
   }catch(error){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
-    await mutate(ctx,id,async current=>({patch:{events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:now.toISOString()})}}));
+    await mutate(ctx,id,async current=>{
+      const signer=current.signers.find(s=>s.id===signerId);
+      if(signer?.resendAttempt?.id!==attemptId)return{patch:null};
+      delete signer.resendAttempt;
+      return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:now.toISOString()})}};
+    });
     const failure=new HttpError(502,"The signing invitation could not be delivered. The previous link remains valid; retry after resolving the delivery error.");failure.code=EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT";throw failure;
   }
   await mutate(ctx,id,async current=>{
     if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(current.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
     const signer=current.signers.find(s=>s.id===signerId);
-    if(!signer||signer.status==="Signed")throw new HttpError(409,"This signer assignment can no longer receive another link.");
+    if(!signer||signer.status==="Signed"||signer.resendAttempt?.id!==attemptId)throw new HttpError(409,"The invitation was sent but its signer reservation changed; refresh delivery status before another resend.");
     if(current.signers.some(s=>s.order<signer.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position.");
     signer.tokenHistory=[...(signer.tokenHistory||[]),{tokenHash:signer.tokenHash,status:"replaced",replacedAt:now.toISOString()}].slice(-20);
     if(signer.identityType==="email-link"){
-      signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]).map(item=>({...item,status:"replaced",replacedAt:now.toISOString()})),{tokenHash:signer.tokenHash,status:"replaced",replacedAt:now.toISOString()}].slice(-20);
+      signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"replaced",replacedAt:now.toISOString()}].slice(-20);
       signer.emailLinkStatus="issued";signer.emailLinkExpiresAt=expiresAt;signer.emailLinkAttemptCount=0;signer.emailLinkOpenCount=0;signer.emailLinkIpAttempts={};signer.emailLinkLastIpHash=null;signer.emailLinkOpenedAt=null;
     }
-    signer.tokenHash=await sha256Hex(secret);signer.tokenExpiresAt=expiresAt;signer.invitation="Sent";delete signer.deliveryStageCode;
+    signer.tokenHash=await sha256Hex(secret);signer.tokenExpiresAt=expiresAt;signer.invitation="Sent";delete signer.deliveryStageCode;delete signer.resendAttempt;
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:emailLink?"email_link.resent":"invitation.resent",signerId,actor:user.uid,expiresAt,at:now.toISOString()})}};
   });
   return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt};
