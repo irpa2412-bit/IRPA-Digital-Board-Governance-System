@@ -11,7 +11,6 @@ initializeApp(); const db = getFirestore();
 const { runGrantCrawlerScheduled, runGrantCrawlerNow } = require("./grantCrawler");
 exports.runGrantCrawlerScheduled = runGrantCrawlerScheduled;
 exports.runGrantCrawlerNow = runGrantCrawlerNow;
-const INVITE_SERVICE_KEY = defineSecret("INVITE_SERVICE_KEY");
 const { queueInductionEmail } = require("./queueInductionEmail");
 const { checkPasswordAttemptState, recordPasswordFailure, clearPasswordAttemptState, preparePasswordResetPhone } = require("./passwordSecurity");
 exports.checkPasswordAttemptState = checkPasswordAttemptState;
@@ -856,7 +855,7 @@ function scoreInductionApplication(item, records){
   return {percentage,correct,total,threshold,advanced:percentage>=threshold,issues,reasons,scoreItems};
 }
 
-exports.sendMemberInvitation = onCall({region:"us-central1", secrets:[INVITE_SERVICE_KEY]}, async request => {
+exports.sendMemberInvitation = onCall({region:"us-central1"}, async request => {
   const uid=request.auth?.uid;
   const actorEmail=String(request.auth?.token?.email||"").trim().toLowerCase();
   if(!uid) throw new HttpsError("unauthenticated","Administrator authentication is required.");
