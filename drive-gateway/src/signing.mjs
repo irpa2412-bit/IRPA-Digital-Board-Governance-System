@@ -223,7 +223,8 @@ async function consumeEmailLinkRateLimit(ctx,key,maxAttempts,now){
 
 export async function previewEmailSigning(ctx,token){
   const loaded=await load(ctx,token),{env,signer}=loaded;
-  if(signer.identityType!=="email-link"||loaded.tokenKind!=="invitation")throw new HttpError(401,genericEmailSigningFailure());
+  if(signer.identityType!=="email-link")throw new HttpError(401,genericEmailSigningFailure());
+  if(loaded.tokenKind==="session")return openSigning(ctx,token,null);
   active(ctx,env,signer);
   if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");
   const fields=readEnvelopeFields(ctx,env.fields).filter(field=>field.signerId===signer.id);
