@@ -3,6 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
+import { evaluateSignatureWindowAmendment } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -17,6 +18,7 @@ const allowed = new Set([
   "docs/portal-protection/repair-window.json",
   "docs/portal-protection/change-record.json",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "scripts/portal-repair-window-guard-policy.mjs",
   ".github/workflows/finance-production-reset.yml",
   "docs/ACTUAL_DATA_ACCESS_GATE.md",
   "scripts/reset-finance-production.js",
@@ -282,16 +284,21 @@ if (changed.includes("docs/portal-protection/change-record.json")) {
     throw new Error("Parallel repair-window amendment changed existing change-record history or another portal's record.");
   }
 }
-const parallelWindowRecordAmendment = changed.includes("docs/portal-protection/repair-window.json") &&
-  changed.includes("docs/portal-protection/change-record.json") &&
-  changed.includes("scripts/meeting-portal-fixture-isolation-guard.sh") &&
-  changed.includes("tests/meeting-isolation-guard.test.mjs") &&
-  changed.every(path => [
-    "docs/portal-protection/repair-window.json",
-    "docs/portal-protection/change-record.json",
-    "scripts/meeting-portal-fixture-isolation-guard.sh",
-    "tests/meeting-isolation-guard.test.mjs"
-  ].includes(path));
+const baselineChangeRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
+const currentChangeRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
+const currentRepairWindow = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/repair-window.json"], { encoding: "utf8" }));
+const parallelWindowDecision = evaluateSignatureWindowAmendment({
+  changedPaths: changed,
+  repairWindow: currentRepairWindow,
+  changeRecord: currentChangeRecord,
+  baselineChangeRecord,
+  currentChangeRecord
+});
+const parallelWindowRecordAmendment = parallelWindowDecision.pass;
+if (changed.includes("docs/portal-protection/repair-window.json") ||
+    changed.includes("docs/portal-protection/change-record.json")) {
+  if (!parallelWindowRecordAmendment) throw new Error(parallelWindowDecision.reason);
+}
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
