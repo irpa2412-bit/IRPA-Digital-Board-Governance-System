@@ -267,7 +267,7 @@ if(pathname==="/api/meeting-attendance/sign"){
 const meetingId=clean(data.meetingId),participantId=clean(data.participantId),typedName=clean(data.typedName),uid=clean(claims.user_id),email=lower(claims.email);
 if(data.confirmed!==true)return fail(ctx,request,"Confirm the attendance declaration before signing.",409);
 if(!meetingId||!participantId)return fail(ctx,request,"Meeting and registered participant are required.",400);
-if(!typedName||typedName.length>200)return fail(ctx,request,"Enter your registered full name (maximum 200 characters).",400);
+if(!typedName||typedName.length>200)return fail(ctx,request,"Enter your registered full name (maximum 200 characters).",400);const signatureImage=clean(data.signatureImage);if(signatureImage&&(!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signatureImage)||signatureImage.length>350000))return fail(ctx,request,"Attendance signature must be a PNG image no larger than 256 KB.",400);
 const meeting=await getDoc(ctx,env,token,"meetings",meetingId);if(!meeting)return fail(ctx,request,"Meeting not found.",404);
 if(terminal.has(lower(meeting.status)))return fail(ctx,request,"Attendance signing is closed for this meeting.",409);
 const participant=await getDoc(ctx,env,token,"participants",participantId);
@@ -286,16 +286,16 @@ const now=new Date(),signature={
  meetingId,participantId,meetingReference:clean(meeting.meetingReference||meeting.reference||meeting.title)||null,
  participantName:expected,participantRole:clean(participant.role||participant.participantRole||participant.participantType)||null,
  signerUid:uid,signerEmail:email||null,typedName:expected,
- signatureMethod:"AUTHENTICATED_TYPED_NAME_ATTESTATION",
+ signatureImage:signatureImage||null,signatureMethod:signatureImage?"AUTHENTICATED_DRAWN_SIGNATURE":"AUTHENTICATED_TYPED_NAME_ATTESTATION",
  declaration:"I confirm that I am the registered participant and that this signature records my attendance at this meeting.",
- signatureVersion:"1.0",signedAt:now,createdAt:now
+ signatureVersion:"1.1",signedAt:now,createdAt:now
 };
 const project=ctx.getFirebaseProjectId(env),base="projects/"+project+"/databases/(default)/documents/",auditId=crypto.randomUUID();
 try{
  await commitWrites(ctx,env,token,[
   {update:{name:base+"meetingAttendanceSignatures/"+signatureId,fields:fields(signature)},currentDocument:{exists:false}},
   {update:{name:base+"participants/"+participantId,fields:fields({attendanceStatus:"Present",attendanceRecordedAt:now,attendanceRecordedByUid:uid,updatedAt:now})},updateMask:{fieldPaths:["attendanceStatus","attendanceRecordedAt","attendanceRecordedByUid","updatedAt"]},currentDocument:{updateTime:participant.updateTime}},
-  {update:{name:base+"audit/"+auditId,fields:fields({action:"MEETING_ATTENDANCE_SIGNED",collection:"meetingAttendanceSignatures",recordId:signatureId,details:{meetingId,participantId,meetingReference:clean(meeting.meetingReference||meeting.reference||meeting.title),signatureVersion:"1.0",signatureMethod:"AUTHENTICATED_TYPED_NAME_ATTESTATION"},actorUid:uid,actorEmail:email||null,createdAt:now})},currentDocument:{exists:false}}
+  {update:{name:base+"audit/"+auditId,fields:fields({action:"MEETING_ATTENDANCE_SIGNED",collection:"meetingAttendanceSignatures",recordId:signatureId,details:{meetingId,participantId,meetingReference:clean(meeting.meetingReference||meeting.reference||meeting.title),signatureVersion:"1.1",signatureMethod:signature.signatureMethod},actorUid:uid,actorEmail:email||null,createdAt:now})},currentDocument:{exists:false}}
  ]);
 }catch(error){
  if(error.status===409){const latest=await getDoc(ctx,env,token,"meetingAttendanceSignatures",signatureId);if(latest)return response(ctx,request,{ok:true,signed:true,alreadySigned:true,signatureId,participantId,signedAt:iso(latest.signedAt)});}
@@ -330,7 +330,7 @@ if(!manager&&!participants.some(own))return fail(ctx,request,"You are not regist
 const byParticipant=new Map(signatures.map(row=>[clean(row.participantId),row]));
 const records=participants.filter(p=>manager||own(p)).map(p=>{
  const sig=byParticipant.get(p.id);
- return {participantId:p.id,name:clean(p.name||p.participantName||p.fullName||p.displayName),role:clean(p.role||p.participantRole||p.participantType),email:lower(p.email||p.participantEmail||p.invitedEmail||p.subscriberEmail),attendanceStatus:clean(p.attendanceStatus||p.status)||"Unmarked",signed:Boolean(sig),signatureMethod:sig?.signatureMethod||null,typedName:sig?.typedName||null,signedAt:iso(sig?.signedAt),signatureId:sig?.id||null};
+ return {participantId:p.id,name:clean(p.name||p.participantName||p.fullName||p.displayName),role:clean(p.role||p.participantRole||p.participantType),sourceType:clean(p.sourceType)||null,registrationCategory:clean(p.registrationCategory)||null,email:lower(p.email||p.participantEmail||p.invitedEmail||p.subscriberEmail),attendanceStatus:clean(p.attendanceStatus||p.status)||"Unmarked",signed:Boolean(sig),signatureMethod:sig?.signatureMethod||null,typedName:sig?.typedName||null,signedAt:iso(sig?.signedAt),signatureId:sig?.id||null};
 });
 return response(ctx,request,{ok:true,meetingId,meetingReference:clean(c.meeting.meetingReference||c.meeting.reference||c.meeting.title),meetingTitle:clean(c.meeting.title),meetingDate:clean(c.meeting.date),retrievedAt:new Date().toISOString(),canManage:manager,records});
 }
