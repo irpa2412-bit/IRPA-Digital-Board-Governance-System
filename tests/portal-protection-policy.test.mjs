@@ -10,7 +10,7 @@ const file = "src/pages/SignaturePlatform.jsx";
 const valid = {
   status: "complete",
   declaration: { affectedPortals: [portal], reason: "Repair", files: [file], expectedEffect: "Fix scoped defect", prohibitedChanges: ["No signing rule changes"] },
-  baseline: { commit: "b766e772", rollbackCommit: "b766e772" },
+  baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" },
   validation: { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { [portal]: "PASS" }, behaviourDifferences: [] }
 };
 const windowState = { status: "open", openedAt: "2026-11-19T18:00:00Z", scope: [file] };
@@ -23,7 +23,7 @@ test("24-hour inactivity closes the window", () => assert.equal(run([file], vali
 test("out-of-scope protected change fails", () => assert.equal(run([file], valid, { ...windowState, scope: ["src/pages/Invitations.jsx"] }).ok, false));
 test("shared dependency fans out to every dependent portal", () => {
   const result = run(["src/App.jsx"], { ...valid, declaration: { ...valid.declaration, affectedPortals: Object.keys(registry.portals), files: ["src/App.jsx"] }, validation: { ...valid.validation, portalSmoke: Object.fromEntries(Object.keys(registry.portals).map(p => [p, "PASS"])) } }, { ...windowState, scope: ["src/App.jsx"] });
-  assert.equal(result.affected.length, 6);
+  assert.equal(result.affected.length, 7);
   assert.equal(result.ok, true);
 });
 test("unrelated change passes without a repair window", () => assert.equal(run(["README.md"], null, null).ok, true));
