@@ -1,7 +1,7 @@
 import {sealAndPersist,rollbackCryptographicEvidence,importPublicKeyJwk,verifyCryptographicEvidence} from "./cryptographicGate.mjs";import {Conflict,VersionConflict} from "./adapters.mjs";import {archivePath,parseArchiveSelection,signerCopyPath} from "./archives.mjs";import {buildSignedPdf,validateSignatureInput} from "./pdf.mjs";import {HttpError,ID_RE,canonicalJson,cleanSegment,cleanText,randomHex,safeEqual,sha256Hex,validateEmail,validateName} from "./util.mjs";
 import {createEmailSigningToken,genericEmailSigningFailure} from "./emailSigningLinks.mjs";
 import {
-  EMAIL_SIGNING_REBUILD_ENABLED, EMAIL_SIGNING_ALREADY_SIGNED, issueEmailSigningLink,
+  EMAIL_SIGNING_REBUILD_ENABLED, EMAIL_SIGNING_ALREADY_SIGNED, issueEmailSigningLink, inspectEmailSigningLink,
   createFreshSigningSession, assertCanResendEmailSigningLink, reserveEmailSigningResend,
   rollbackEmailSigningResend, commitEmailSigningResend, updateEmailSignerContact, markEmailSignerSigned
 } from "./emailSigning/index.mjs";
@@ -32,7 +32,27 @@ function invitationFailureDiagnostics(error){
   return{errorType:String(error?.name||"Error").slice(0,60),errorCode,smtpResponseCode,failureClass,deliveryOutcome:error?.deliveryOutcome==="unknown"?"unknown":"not-confirmed",retryable:error?.retryable===false?false:(smtpResponseCode!==null?smtpResponseCode>=400&&smtpResponseCode<500:true)};
 }
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d+$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
-async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");const suppliedHash=await sha256Hex(secret);const invitationMatch=safeEqual(suppliedHash,String(s.tokenHash||""));const sessionMatch=Boolean(s.emailLinkSessionHash)&&safeEqual(suppliedHash,String(s.emailLinkSessionHash));if(!invitationMatch&&!sessionMatch){const replaced=[...(s.tokenHistory||[]),...(s.emailLinkTokenHistory||[])].some(item=>item?.status==="replaced"&&safeEqual(suppliedHash,String(item.tokenHash||"")));if(replaced)throw new HttpError(410,"This link was replaced. Please use the newest email.");throw new HttpError(403,"This signing link is not valid.");}const legacyOpenedSession=s.identityType==="email-link"&&invitationMatch&&s.emailLinkStatus==="opened"&&!s.emailLinkSessionHash;const tokenKind=sessionMatch||legacyOpenedSession?"session":"invitation";if(e.emailSigningModule==="v2"&&s.status==="Signed"&&invitationMatch)throw new HttpError(410,EMAIL_SIGNING_ALREADY_SIGNED);if(s.identityType==="email-link"&&(tokenKind==="session"?!(s.emailLinkSessionStatus==="active"||legacyOpenedSession||(s.emailLinkSessionStatus==="used"&&e.status==="Completed"&&s.status==="Signed")):!["issued","opened"].includes(s.emailLinkStatus)))throw new HttpError(401,genericEmailSigningFailure());const expiry=tokenKind==="session"?(s.emailLinkSessionExpiresAt||s.tokenExpiresAt):(s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt);const expiryMs=Date.parse(String(expiry||""));if(Number.isFinite(expiryMs)&&ctx.now().getTime()>expiryMs)throw new HttpError(410,"This signing link has expired. Contact the document owner for a new invitation.");return{env:e,signer:s,tokenKind}}
+async function load(ctx,t){
+  const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),signer=e?.signers.find(item=>item.id===sid);
+  if(!e||!signer)throw new HttpError(401,"Invalid signing link.");
+  if(e.emailSigningModule==="v2"&&signer.identityType==="email-link"){
+    const inspected=await inspectEmailSigningLink({token:t,envelope:e,signer,now:ctx.now()});
+    return{env:e,signer,tokenKind:inspected.tokenKind};
+  }
+  const suppliedHash=await sha256Hex(secret),invitationMatch=safeEqual(suppliedHash,String(signer.tokenHash||"")),sessionMatch=Boolean(signer.emailLinkSessionHash)&&safeEqual(suppliedHash,String(signer.emailLinkSessionHash));
+  if(!invitationMatch&&!sessionMatch){
+    const replaced=[...(signer.tokenHistory||[]),...(signer.emailLinkTokenHistory||[])].some(item=>item?.status==="replaced"&&safeEqual(suppliedHash,String(item.tokenHash||"")));
+    if(replaced)throw new HttpError(410,"This link was replaced. Please use the newest email.");
+    throw new HttpError(403,"This signing link is not valid.");
+  }
+  const legacyOpenedSession=signer.identityType==="email-link"&&invitationMatch&&signer.emailLinkStatus==="opened"&&!signer.emailLinkSessionHash;
+  const tokenKind=sessionMatch||legacyOpenedSession?"session":"invitation";
+  if(signer.identityType==="email-link"&&(tokenKind==="session"?!(signer.emailLinkSessionStatus==="active"||legacyOpenedSession||(signer.emailLinkSessionStatus==="used"&&e.status==="Completed"&&signer.status==="Signed")):signer.emailLinkStatus!=="issued"))throw new HttpError(401,genericEmailSigningFailure());
+  const expiry=tokenKind==="session"?(signer.emailLinkSessionExpiresAt||signer.tokenExpiresAt):(signer.tokenExpiresAt||signer.emailLinkExpiresAt||e.expiresAt);
+  const expiryMs=Date.parse(String(expiry||""));
+  if(Number.isFinite(expiryMs)&&ctx.now().getTime()>expiryMs)throw new HttpError(410,"This signing link has expired. Contact the document owner for a new invitation.");
+  return{env:e,signer,tokenKind};
+}
 function active(ctx,e,s=null){if(["Voided","Declined","Cancelled","Canceled"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");const expiry=s?.tokenExpiresAt||s?.emailLinkExpiresAt||e.expiresAt;if(expiry&&ctx.now().getTime()>new Date(expiry).getTime())throw new HttpError(403,"This signing link has expired.")}
 const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
