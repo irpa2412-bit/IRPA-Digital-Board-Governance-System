@@ -5,6 +5,5 @@ module.exports = {
   ...require("./meetingGateway"),
   ...require("./meetingRecords"),
   ...require("./meetingAttendanceRegister"),
-  ...require("./systemControl")
 };
 

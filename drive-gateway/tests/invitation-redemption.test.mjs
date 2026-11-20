@@ -472,23 +472,10 @@ test("password-set resumes an invitation that is already PROVISIONING_PENDING", 
   } finally { global.fetch=originalFetch; }
 });
 
-test("portal activation gate rejects a valid Firebase ID token whose member record is not Activated", async()=>{
-  const originalFetch=global.fetch;
-  const jwk=publicKey.export({format:"jwk"});
-  const idToken=makeFirebaseIdToken("pending-portal-uid");
-  global.fetch=async(url)=>{
-    const target=String(url);
-    if(target.includes("securetoken@system.gserviceaccount.com")) return new Response(JSON.stringify({keys:[{...jwk,kid:"invitation-test-key",alg:"RS256",use:"sig"}]}),{status:200});
-    if(target.includes("/documents/adminProfiles/pending-portal-uid")) return new Response("",{status:404});
-    if(target.includes("/documents/members/pending-portal-uid")) return new Response(JSON.stringify({fields:{status:{stringValue:"Pending"},accountActivated:{booleanValue:false}}}),{status:200});
-    if(target.includes("/documents/employees/pending-portal-uid")) return new Response("",{status:404});
-    throw new Error("Unexpected external request: "+target);
-  };
-  try{
-    const response=await handler.fetch(new Request("https://gw.test/api/esign/cleanup",{method:"POST",headers:{Authorization:"Bearer "+idToken,"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",ESIGN_MODULE_ENABLED:"true"});
-    assert.equal(response.status,403);
-    assert.deepEqual(await response.json(),{ok:false,error:"IRPA_INVITATION_FAILURE:PORTAL_ACTIVATION_REQUIRED"});
-  } finally { global.fetch=originalFetch; }
+test("legacy cleanup endpoint is retired in favour of administrator inventory-first cleanup", async()=>{
+  const response=await handler.fetch(new Request("https://gw.test/api/esign/cleanup",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}),{FIREBASE_PROJECT_ID:"irpa-digital-board-governance",ESIGN_MODULE_ENABLED:"true"});
+  assert.equal(response.status,410);
+  assert.deepEqual(await response.json(),{ok:false,code:"REPLACED_BY_ADMIN_CLEANUP",error:"The legacy cleanup executor is disabled. Take a mandatory administrator inventory and prepare a reviewed cleanup plan through /api/admin/cleanup before any reset."});
 });
 
 test("session-state returns the invitation state for the authenticated UID", async()=>{
