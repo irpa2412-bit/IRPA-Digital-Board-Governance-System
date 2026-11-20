@@ -58,9 +58,6 @@ on:
       - "scripts/meeting-portal-fixture-isolation-guard.sh"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   workflow_dispatch: {}
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
