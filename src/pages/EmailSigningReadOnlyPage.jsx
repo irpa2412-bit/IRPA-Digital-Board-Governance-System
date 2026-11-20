@@ -161,8 +161,6 @@ export default function EmailSigningReadOnlyPage({token}){
    const result=await response.json().catch(()=>({}));
    if(!response.ok||result.ok!==true||!result.sessionToken)throw Object.assign(new Error(result.error||"Signing session could not be opened. (SESSION_CREATE)"),{code:result.code||"SESSION_CREATE"});
    setSigningToken(result.sessionToken);setSessionActive(true);
-   const parts=String(token||"").split(".");
-   try{if(parts.length===3)window.sessionStorage.setItem("irpaEmailSigningSession:"+parts[0]+"."+parts[1],result.sessionToken);}catch{}
    setShowSigningPane(true);setSuccess("Signing session opened. Complete the assigned fields and review before submitting.");
   }catch(error){setError(error?.message||"Signing session could not be opened. (SESSION_CREATE)");}
   finally{setSessionOpening(false);}
