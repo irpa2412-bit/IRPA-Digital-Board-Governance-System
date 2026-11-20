@@ -78,7 +78,7 @@ try {
       await page.getByRole("button", { name: "Refresh Meeting Register" }).click();
       createdRow = page.locator("tr").filter({ hasText: createdTitle });
       await createdRow.getByRole("button", { name: "Open Workspace" }).click();
-      await page.getByRole("button", { name: "Meeting Room", exact: true }).click();
+      await page.getByRole("button", { name: "Meeting Room", exact: true }).first().click();
       await page.getByRole("heading", { name: "Meeting Room" }).waitFor();
 
       const meetingPicker = page.locator("select").first();
