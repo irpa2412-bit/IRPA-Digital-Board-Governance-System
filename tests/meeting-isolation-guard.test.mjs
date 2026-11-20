@@ -14,6 +14,8 @@ test("portal protection uses the active email-signing amendment without rewritin
   const active=changeRecord.activeAmendment;
   const window=repairWindow.parallelWindows.find(item=>item.portal==="Signature Portal");
   assert.deepEqual(changeRecord.declaration.affectedPortals,["Signature Portal"]);
+  assert.equal(changeRecord.baseline.rollbackCommit,changeRecord.baseline.commit,"the historical baseline record remains immutable");
+  assert.equal(active.repairWindow.rollbackCommit,"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd");
   assert.deepEqual(active.affectedPortals,["Signature Portal","Meeting Portal"]);
   assert.ok(active.files.includes("scripts/portal-protection-check.mjs"));
   assert.ok(window.scope.includes("scripts/portal-protection-check.mjs"));
