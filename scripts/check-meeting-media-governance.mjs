@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 
-const media=fs.readFileSync("src/components/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const media=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
 const gateway=fs.readFileSync("functions/meetingGateway.js","utf8");
 const room=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const meetingsCentre=fs.readFileSync("src/pages/Meetings.jsx","utf8");
@@ -13,6 +13,16 @@ const participantPage=fs.readFileSync("src/pages/OperationalGatewaysParticipants
 const entryGateway=fs.readFileSync("src/pages/MeetingEntryGateway.jsx","utf8");
 const invitationEmail=fs.readFileSync("drive-gateway/src/invitationEmail.mjs","utf8");
 const invitationWorker=fs.readFileSync("drive-gateway/src/index.js","utf8");
+const memberInvitationClient=fs.readFileSync("src/firebase/employeeRegistrationEmail.js","utf8");
+const meetingWorker=fs.readFileSync("drive-gateway/src/meetingPortal.mjs","utf8");
+const meetingApi=fs.readFileSync("src/firebase/meetingGatewayApi.js","utf8");
+const meetingServices=fs.readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
+const meetingAccessControl=fs.readFileSync("src/meeting/MeetingAccessControl.jsx","utf8");
+const attendanceClient=fs.readFileSync("src/firebase/meetingRecords.js","utf8");
+const mediaClient=fs.readFileSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx","utf8");
+const meetingRoom=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
+const meetingsPage=fs.readFileSync("src/pages/Meetings.jsx","utf8");
+const participantApi=fs.readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
 const roomSource=fs.readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const livekitCompose=fs.readFileSync("infra/livekit/docker-compose.yml","utf8");
 const livekitConfig=fs.readFileSync("infra/livekit/livekit.yaml.template","utf8");
@@ -23,12 +33,26 @@ const checks=[
  ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
  ["Firestore create retains registrar, initiator and meeting-category validation",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
- ["Meeting media client exists",fs.existsSync("src/components/IRPADGBSMeetingRoomMedia.jsx")],
+ ["Meeting media client exists",fs.existsSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
- ["Meeting access pass is sent through the authenticated IRPA mail gateway",participantPage.includes("sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess)")],
+ ["Meeting access pass is dispatched through the independent Meeting Worker API",participantPage.includes("dispatchMeetingInvitation")&&meetingApi.includes("/api/meeting-invitations/dispatch")],
  ["Undelivered meeting access pass is revoked",participantPage.includes("revokeMeetingAccessInvitation")&&gateway.includes("exports.revokeMeetingAccessInvitation")],
- ["Mail gateway verifies meeting and participant link before dispatch",invitationWorker.includes("fields.participantId?.stringValue")&&invitationWorker.includes("linkedMeeting!==meetingId||participantEmail!==email")],
- ["Meeting email template includes gate link and password only when supplied",invitationEmail.includes("meetingAccess")&&invitationEmail.includes("Meeting gate password")],
+ ["Meeting Worker verifies access pass, participant, meeting and organiser before SMTP dispatch",meetingWorker.includes('["/api/meeting-invitations/dispatch", "dispatch"]')&&meetingWorker.includes("pass.participantId")&&meetingWorker.includes("participant.meetingId !== pass.meetingId")&&meetingWorker.includes("Only an authorised meeting organiser")],
+ ["Meeting Worker uses the existing SMTP sender and existing Worker secrets",invitationWorker.includes("sendEmail: (env, message) => sendWithRetry(() => smtpSend(env, message))")&&invitationWorker.includes("enforceMailRateLimit,")&&meetingWorker.includes("ctx.sendEmail(env, { to: recipient, subject, text, html })")],
+ ["General member Invitation Portal rejects meeting-access payloads and remains member-only",invitationWorker.includes("Meeting invitations must use the dedicated Meeting Portal Worker")&&!invitationWorker.includes("meetingAccessSent")&&!memberInvitationClient.includes("meetingAccess")],
+ ["Meeting Worker has no dependency on the general invitations collection",!meetingServices.includes('"invitations"')&&!meetingServices.includes("/api/meeting-invitations/update")],
+ ["Meeting invitation records are stored on meeting participant records, not Invitation Portal",participantPage.includes("meetingInvitationRows=useMemo(()=>rows.filter")&&!participantPage.includes("COLLECTIONS.invitations")&&!participantPage.includes("sendMemberInvitationEmail")],
+ ["Meeting Worker email includes meeting-specific gate link and password",meetingWorker.includes("meetingToken")&&meetingWorker.includes("Gate password: ")&&meetingWorker.includes("IRPA Meeting Invitation")],
+ ["Meeting register create update delete and voting use Worker routes",["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open"].every(route=>meetingsPage.includes(route))&&!/\b(createRecord|updateRecord|deleteRecord|openVotingIssue)\(/.test(meetingsPage)],
+ ["Meeting participant create update and removal use Worker endpoints",meetingServices.includes("/api/meeting-participants/create")&&meetingServices.includes("/api/meeting-participants/update")&&meetingServices.includes("/api/meeting-participants/delete")&&participantApi.includes("/api/meeting-participants/create")&&participantApi.includes("/api/meeting-participants/update")&&participantApi.includes("/api/meeting-participants/delete")&&!participantApi.includes("COLLECTIONS.invitations")],
+ ["Meeting voting decisions and actions use Worker routes",meetingServices.includes("/api/meeting-voting/open")&&meetingServices.includes("/api/meeting-decisions/create")&&meetingServices.includes("/api/meeting-actions/create")&&meetingRoom.includes("/api/meeting-voting/open")&&meetingRoom.includes("/api/meeting-decisions/create")&&meetingRoom.includes("/api/meeting-actions/create")],
+ ["Meeting room status and activity events use Worker routes",meetingServices.includes("/api/meeting-room/event")&&meetingRoom.includes("/api/meeting-register/update")&&meetingRoom.includes("/api/meeting-room/event")&&!/\b(createRecord|updateRecord|deleteRecord|openVotingIssue)\(/.test(meetingRoom)&&!meetingRoom.includes("httpsCallable")],
+ ["Self and host attendance marking use Worker route",meetingServices.includes("/api/meeting-attendance/mark")&&attendanceClient.includes("/api/meeting-attendance/mark")&&meetingRoom.includes("markMeetingAttendance")],
+ ["Meeting gate queue and host admission decisions use Cloudflare Worker routes",meetingServices.includes("/api/meeting-entry-requests/list")&&meetingServices.includes("/api/meeting-entry-requests/resolve")&&meetingAccessControl.includes("/api/meeting-entry-requests/list")&&meetingAccessControl.includes("/api/meeting-entry-requests/resolve")&&!meetingAccessControl.includes("httpsCallable")],
+ ["Migrated meeting records client no longer invokes Firebase callables",!attendanceClient.includes("httpsCallable")&&!attendanceClient.includes("getFunctions")],
+ ["Meeting working-document registration listing and review use Worker routes",meetingServices.includes("/api/meeting-working-documents/register")&&meetingServices.includes("/api/meeting-working-documents/list")&&meetingServices.includes("/api/meeting-working-documents/review")&&attendanceClient.includes("/api/meeting-working-documents/register")&&attendanceClient.includes("/api/meeting-working-documents/list")&&attendanceClient.includes("/api/meeting-working-documents/review")],
+ ["Meeting attendance signing and register use Cloudflare Worker routes",meetingServices.includes("/api/meeting-attendance/sign")&&meetingServices.includes("/api/meeting-attendance/register")&&attendanceClient.includes("/api/meeting-attendance/sign")&&attendanceClient.includes("/api/meeting-attendance/register")],
+ ["Live media token issuance uses the shared Meeting Worker gateway",mediaClient.includes("issueLiveMeetingToken")&&!mediaClient.includes("VITE_LIVEKIT_TOKEN_WORKER_URL")&&!mediaClient.includes("httpsCallable")],
  ["Meeting entry asks for gate password separately from URL",entryGateway.includes('state==="password"')&&entryGateway.includes('type="password"')&&entryGateway.includes("Verify Password & Continue")],
  ["Meeting Room selects the meeting from the invitation gate context",room.includes("entryContext?.meetingId")&&room.includes("setSelectedId(invitedMeeting.id)")],
  ["Verified invitee context enables the media join control",room.includes("entryContext?.participantId")&&room.includes("entryContext?.meetingId===selected?.id")],
@@ -40,7 +64,7 @@ const checks=[
  ["Responsive media columns stack on mobile",media.includes('className="irpa-live-media-columns"')&&styles.includes("@media (max-width:760px)")&&styles.includes("grid-template-columns:minmax(0,1fr)")],
  ["Camera and microphone preflight checks real capture permission",media.includes("async function checkDevices()")&&media.includes("getUserMedia")&&media.includes("width:{ideal:1280}")],
  ["Meeting entry gateway exists",fs.existsSync("src/pages/MeetingEntryGateway.jsx")],
- ["Meeting access control exists",fs.existsSync("src/components/MeetingAccessControl.jsx")],
+ ["Meeting access control exists",fs.existsSync("src/meeting/MeetingAccessControl.jsx")],
  ["Live meeting token gateway exists",fs.existsSync("functions/liveMeeting.js")],
  ["Meeting access gateway exists",fs.existsSync("functions/meetingGateway.js")],
  ["Meeting gateway registered",fs.readFileSync("functions/bootstrap.js","utf8").includes('require("./meetingGateway")')],
@@ -78,7 +102,7 @@ const checks=[
  ["Meeting category selector exists",fs.readFileSync("src/pages/Meetings.jsx","utf8").includes('name="meetingCategory"')],
  ["Category controls Meeting Room facilities",room.includes("meetingCapabilities")&&room.includes("capabilities.facilities")],
  ["Governance exposes Governance Documents",policy.includes('documentsLabel:"Governance Documents"')&&room.includes("policy.documentsLabel")],
- ["Governance enables quorum and voting",policy.includes('GOVERNANCE:{')&&policy.includes("quorumAccess:true")&&policy.includes("votingEnabled:true")],
+ ["Board meeting types alone enable quorum while governance voting remains enabled",policy.includes("export function isBoardMeeting")&&policy.includes("quorum:boardMeeting")&&policy.includes("quorumRequired:boardMeeting")&&policy.includes("votingEnabled:true")],
  ["Administrative restricts quorum and voting",policy.includes('ADMINISTRATIVE:{')&&policy.includes("quorumAccess:false")&&policy.includes("votingEnabled:false")],
  ["Staff restricts signature and authorization",policy.includes('STAFF:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
@@ -106,7 +130,7 @@ const report={
  checks:checks.map(([name,ok])=>({name,status:ok?"PASS":"FAIL"})),
  summary:{total:checks.length,passed:checks.length-failed.length,failed:failed.length},
  categoryAccessMatrix:{
-  "Governance Meetings":"Auto registration, quorum registration/assessment, attendance, live media, Governance Documents, Authorization & Approvals, Signature Portal, Resolutions & Voting, Decisions & Actions, transcript/proceedings.",
+  "Governance Meetings":"Auto registration, Board-meeting-only one-third quorum assessment, attendance, live media, Governance Documents, Authorization & Approvals, Signature Portal, Resolutions & Voting, Decisions & Actions, transcript/proceedings.",
   "Administrative Meetings":"Auto registration, attendance, live media, Administrative Documents, Authorization & Approvals, Signature Portal, Decisions & Actions and transcript/proceedings; no quorum or formal resolutions/voting by default.",
   "Staff Meetings":"Auto registration, attendance, live media, Staff Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
   "General Meetings":"Auto registration, attendance, live media, General Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",

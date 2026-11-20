@@ -75,7 +75,7 @@ The callable binds `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` th
 1. Verify both DNS records point to the VM and Caddy obtains trusted certificates.
 2. Verify `https://meet.irpa.or.tz/` is reachable and `wss://meet.irpa.or.tz` passes an authenticated LiveKit RoomService API probe.
 3. Confirm the deployed staging callable issues separate short-lived participant tokens that reference the same deterministic room for one meeting.
-4. Send a real invitation through the Invitation Portal's authenticated mail gateway; confirm the invited participant receives the link and separate gate password.
+4. Create a meeting-specific participant record, issue its meeting access pass, and dispatch it through `POST /api/meeting-invitations/dispatch`. Confirm the existing Cloudflare SMTP Worker sends the link and gate password to a controlled test recipient; this path must not create or redeem a general Invitation Portal activation token.
 5. Use two separate authenticated browser sessions (host and invitee). Join the same meeting and confirm each browser publishes microphone and camera tracks and receives the other participant's audio/video.
 6. Inspect browser WebRTC stats for actual negotiated resolution, frame rate, packet loss and selected candidate pair. A 720p/1080p capture request is not proof of actual HD quality.
 7. Repeat on Android/mobile and with UDP blocked to verify TCP fallback and TURN/TLS connectivity; inspect LiveKit logs.

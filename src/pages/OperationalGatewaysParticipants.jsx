@@ -1,14 +1,14 @@
 // V3.0 participant/invitation integration: system records + controlled external invitees.
 import React,{useEffect,useMemo,useRef,useState}from"react";
-import{createRecord,getRecords,getMeetingScopedRecords,updateRecord,deleteRecord,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
-import{sendMemberInvitationEmail}from"../firebase/auth";
-import{createMeetingAccessInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
+import{getMeetingScopedRecords,COLLECTIONS,listMeetingInviteeDirectory,getAccessibleMeetingRecords}from"../firebase/data";
+
+import{callMeetingService,createMeetingAccessInvitation,dispatchMeetingInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
 const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
 const AUTHORITATIVE_ROLES=["Board Member","Board Committee Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"];
 const empty={participantName:"",participantUid:"",participantEmail:"",participantRole:"Invited Guest",participantType:"External Invitee",sourceType:"Manual Invitee",sourceRecordId:"",employeeId:"",boardMemberId:"",memberType:"Technical Advisor",meetingId:"",meetingReference:"",attendanceStatus:"Invited",notes:""};
 const SYSTEM_ROLES=["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson","Executive Director","Director Human Resources","Director Livestock","Director Environment","Director Outreach","Director Community Development","Director Field Operations","HR Manager","Director Finance & Administration","Finance Personnel","Finance Manager","Accountant","Finance Officer","Director Internal Oversight","Internal Oversight Officer","Secretariat","Procurement Officer","Programme/Technical Officer","Management","Operations Manager","IT Specialist","Information Technology Officer","Driver","Field Assistant","Administrative Assistant","Communications Officer","Monitoring & Evaluation Officer","Project Officer","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","Environment Officer","HR Officer","Employee"];
 export default function OperationalGatewaysParticipants(){
- const[rows,setRows]=useState([]),[meetings,setMeetings]=useState([]),[employees,setEmployees]=useState([]),[boardMembers,setBoardMembers]=useState([]),[members,setMembers]=useState([]),[invitations,setInvitations]=useState([]),[form,setForm]=useState(empty),[edit,setEdit]=useState(null),[selected,setSelected]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[busy,setBusy]=useState(false),[registersLoading,setRegistersLoading]=useState(false),[msg,setMsg]=useState(""),[err,setErr]=useState(""),[sourceMode,setSourceMode]=useState("system"),[resendingInvitationIds,setResendingInvitationIds]=useState([]),resendInFlight=useRef(new Set());
+ const[rows,setRows]=useState([]),[meetings,setMeetings]=useState([]),[employees,setEmployees]=useState([]),[boardMembers,setBoardMembers]=useState([]),[members,setMembers]=useState([]),[form,setForm]=useState(empty),[edit,setEdit]=useState(null),[selected,setSelected]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[busy,setBusy]=useState(false),[registersLoading,setRegistersLoading]=useState(false),[msg,setMsg]=useState(""),[err,setErr]=useState(""),[sourceMode,setSourceMode]=useState("system"),[resendingInvitationIds,setResendingInvitationIds]=useState([]),resendInFlight=useRef(new Set());
  function participantEnvironmentConfirmed(){
   try{
    const map=JSON.parse(window.sessionStorage.getItem("irpaPortalDataEntryVerifications")||"{}");
@@ -30,9 +30,8 @@ export default function OperationalGatewaysParticipants(){
    includeParticipantRecords?getMeetingScopedRecords(COLLECTIONS.participants,accessibleMeetingIds):Promise.resolve([]),
    Promise.resolve(accessibleMeetings),
    listMeetingInviteeDirectory(),
-   getMeetingScopedRecords(COLLECTIONS.invitations,accessibleMeetingIds)
   ];
-  const labels=["Participants Register","Meetings Register","Meeting Invitee Directory","Invitations Register"];
+  const labels=["Participants Register","Meetings Register","Meeting Invitee Directory"];
   const results=await Promise.allSettled(requests);
   const failures=[];
   let inviteeDirectoryUnavailable=false;
@@ -53,7 +52,7 @@ export default function OperationalGatewaysParticipants(){
    if(index===0)setRows(value);
    else if(index===1)setMeetings(value);
    else if(index===2){setEmployees(Array.isArray(result.value?.employees)?result.value.employees:[]);setBoardMembers(Array.isArray(result.value?.boardMembers)?result.value.boardMembers:[]);setMembers(Array.isArray(result.value?.members)?result.value.members:[])}
-   else if(index===3)setInvitations(value);
+
   });
   if(failures.length)setErr("Some participant registers could not be retrieved: "+failures.join(" | "));
   else if(inviteeDirectoryUnavailable)setErr("Meeting Invitee Directory is temporarily unavailable. Manual external invitees remain enabled; enter the participant's name and email, then use Register & Send Invitation. Institutional identities are not inferred.");
@@ -100,11 +99,6 @@ export default function OperationalGatewaysParticipants(){
   const sourceType=kind==="employee"?"Employee Register":kind==="member"?"Member Register":"Board Member Register";
   setForm({...empty,participantName:source.name||"",participantEmail:email,participantUid:source.uid||"",participantRole:role,participantType:kind==="employee"?"IRPA Personnel":kind==="member"?"IRPA Member":"IRPA Governance Member",sourceType,sourceRecordId:source.id,employeeId:kind==="employee"?source.id:(counterpart?.employeeNumber?counterpart.id:(kind==="member"&&counterpart&&employees.some(x=>x.id===counterpart.id)?counterpart.id:"")),boardMemberId:kind==="board"?source.id:(counterpart&&boardMembers.some(x=>x.id===counterpart.id)?counterpart.id:""),memberId:kind==="member"?source.id:"",memberType:source.memberType||(kind==="employee"?"Management":kind==="member"?"General Member":"Governance Member")});
  }
- function invitationPayload(participant,meeting){
-  const existing=invitations.find(i=>String(i.email||"").toLowerCase()===String(participant.participantEmail||"").toLowerCase()&&i.meetingId===participant.meetingId&&i.status!=="Cancelled");
-  if(existing)return existing;
-  return {participantId:participant.id||null,email:participant.participantEmail.trim().toLowerCase(),name:participant.participantName.trim(),role:participant.participantRole||"Invited Guest",memberType:participant.memberType||"Technical Advisor",roles:[participant.participantRole||"Invited Guest"],status:"Pending",deliveryStatus:"Preparing",employeeId:participant.employeeId||null,boardMemberId:participant.boardMemberId||null,institutionalRecordId:participant.sourceRecordId||null,institutionalRecordType:participant.sourceType==="Employee Register"?"Employee":participant.sourceType==="Board Member Register"?"Board Member":participant.sourceType==="Member Register"?"Member":null,memberId:participant.memberId||null,source:participant.sourceType==="Manual Invitee"?"Meeting Participant — Manual Invitee":"Institutional Register",meetingId:participant.meetingId,meetingIdentity:meeting?.meetingIdentity||participant.meetingIdentity||"",meetingReference:meeting?.meetingReference||participant.meetingReference||meeting?.title||"",meetingTitle:meeting?.title||participant.meetingTitle||"",meetingDate:meeting?.date||participant.meetingDate||"",meetingStartTime:meeting?.startTime||participant.meetingStartTime||"",meetingEndTime:meeting?.endTime||participant.meetingEndTime||"",meetingPlatform:meeting?.meetingPlatform||participant.meetingPlatform||"",platformAccessUrl:meeting?.platformAccessUrl||participant.platformAccessUrl||"",platformMeetingId:meeting?.platformMeetingId||participant.platformMeetingId||"",platformPasscode:meeting?.platformPasscode||participant.platformPasscode||"",meetingVenue:meeting?.venue||participant.meetingVenue||"",meetingChairperson:meeting?.chairperson||participant.meetingChairperson||"",meetingAgenda:meeting?.agenda||participant.meetingAgenda||"",deliveryProvider:"IRPA Mail Server",inductionOrientationProtocol:"Complete the Induction & Orientation pathway or use normal sign-in; the Administrator finalises registration by linking submitted information to the system record."};
- }
  async function resendAllFailedInvitations(){
   if(busy||resendInFlight.current.has("__bulk__"))return;
   const targets=meetingInvitationRows.filter(isInvitationError);
@@ -115,86 +109,64 @@ export default function OperationalGatewaysParticipants(){
   finally{resendInFlight.current.delete("__bulk__");setBusy(false);}
  }
  async function resendInvitation(i,fromBulk=false){
-  if(!i?.id||!i.meetingId||!i.participantId) {setErr("Cannot resend: invitation is missing its linked meeting or participant record. Reconcile the register first.");return;}
+  if(!i?.id||!i.meetingId){setErr("Cannot resend: the participant is missing its linked meeting record.");return;}
   if(resendInFlight.current.has(i.id)||(!fromBulk&&resendInFlight.current.has("__bulk__")))return;
-  const participant=rows.find(r=>r.id===i.participantId);
+  const participant=rows.find(r=>r.id===i.id);
   const meeting=meetings.find(m=>m.id===i.meetingId);
   if(!participant||!meeting){setErr("Cannot resend: the linked participant or authorised meeting record is not available.");return;}
   resendInFlight.current.add(i.id);
   setResendingInvitationIds(current=>current.includes(i.id)?current:[...current,i.id]);
   if(!fromBulk)setBusy(true);
-  setErr("");setMsg("Resending the meeting invitation to "+(i.email||rows.find(r=>r.id===i.participantId)?.participantEmail||"the invitee")+"; preparing a fresh access pass.");
+  setErr("");setMsg("Preparing a fresh meeting-only access pass for "+(participant.participantEmail||"the invitee")+".");
   let issuedAccess=null;
   try{
-   const issued=await createMeetingAccessInvitation({meetingId:i.meetingId,participantId:i.participantId});
+   const issued=await createMeetingAccessInvitation({meetingId:i.meetingId,participantId:i.id});
    issuedAccess=issued;
-   if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
-   const meetingGateUrl=new URL(window.location.origin+window.location.pathname);meetingGateUrl.searchParams.set("meetingToken",issued.accessToken);meetingGateUrl.searchParams.set("meetingId",issued.meetingId||i.meetingId);
-   const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,link:meetingGateUrl.toString(),meetingId:issued.meetingId||i.meetingId,participantId:issued.participantId||i.participantId,meetingIdentity:meeting.meetingIdentity||participant.meetingIdentity||"",meetingReference:meeting.meetingReference||participant.meetingReference||meeting.title||"",meetingTitle:meeting.title||"",meetingDate:meeting.date||"",meetingStartTime:meeting.startTime||"",meetingEndTime:meeting.endTime||"",meetingPlatform:meeting.meetingPlatform||"Platform not recorded",platformAccessUrl:meeting.platformAccessUrl||"",platformMeetingId:meeting.platformMeetingId||"",platformPasscode:meeting.platformPasscode||"",meetingVenue:meeting.venue||"",meetingChairperson:meeting.chairperson||"",meetingAgenda:meeting.agenda||"",password:issued.meetingPassword,expiresAt:issued.expiresAt};
-   const result=await sendMemberInvitationEmail(i.email||participant.participantEmail,i.id,i.role||participant.participantRole,i.memberType||participant.memberType,meetingAccess);
-   if(result.meetingAccessSent!==true)throw new Error("The IRPA Mail Server did not confirm dispatch of the meeting access link and gate token.");
-   const dispatchedAt=new Date().toISOString(),deliveryStatus=String(result.deliveryStatus||"Accepted by IRPA Mail Server; SMTP delivery status returned by gateway");
-   await updateRecord(COLLECTIONS.invitations,i.id,{status:result.deliveryStatus==="Sent"?"Sent":"Invitation Requested",deliveryStatus,sentAt:dispatchedAt,deliveryError:"",meetingAccessDispatched:true,meetingAccessDispatchStatus:"Confirmed",meetingInvitationLinkStatus:"Released by IRPA Mail Server",meetingTokenStatus:"Released by IRPA Mail Server",meetingAccessId:issued.accessId,meetingAccessTokenReference:issued.accessId,meetingAccessExpiresAt:issued.expiresAt||null,meetingAccessDispatchedAt:dispatchedAt,meetingAccessDeliveryStatus:deliveryStatus,meetingAccessDispatchError:"",meetingAccessDispatchFailedAt:null});
-   await updateRecord(COLLECTIONS.participants,i.participantId,{invitationId:i.id,invitationStatus:"Invitation Requested",meetingAccessDispatched:true,meetingAccessDispatchStatus:"Confirmed",meetingAccessId:issued.accessId,meetingAccessDispatchedAt:dispatchedAt,meetingAccessExpiresAt:issued.expiresAt||null,meetingAccessDispatchFailedAt:null,meetingAccessDispatchStage:""});
-   setMsg("Invitation resend requested for "+(i.email||participant.participantEmail)+". The new access pass was dispatched through the IRPA Mail Server; delivery confirmation reflects the gateway status.");
+   if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The Meeting Worker did not return a complete access pass.");
+   const result=await dispatchMeetingInvitation({accessId:issued.accessId,accessToken:issued.accessToken,meetingPassword:issued.meetingPassword});
+   if(result.meetingAccessSent!==true)throw new Error("The IRPA SMTP Worker did not confirm meeting invitation dispatch.");
+   setMsg(result.participantStatusPersisted===false?"SMTP accepted the meeting invitation, but the participant delivery status needs reconciliation. The access pass remains active.":"Meeting invitation accepted by the IRPA SMTP gateway for "+participant.participantEmail+".");
    await load();
   }catch(x){
-   if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered resent meeting access pass",revokeError?.code||"")}}
-   const failedAt=new Date().toISOString(),failure=x?.message||"Invitation resend failed.";
-   try{await updateRecord(COLLECTIONS.invitations,i.id,{deliveryStatus:"Failed",status:"Invitation Dispatch Failed",deliveryError:failure,meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingInvitationLinkStatus:"Not released",meetingTokenStatus:issuedAccess?.accessId?"Revoked after dispatch failure":"Not issued",meetingAccessId:issuedAccess?.accessId||null,meetingAccessTokenReference:issuedAccess?.accessId||null,meetingAccessDispatchedAt:null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"})}catch(persistError){console.error("Unable to persist meeting invitation resend failure",persistError?.code||"")}
-   try{await updateRecord(COLLECTIONS.participants,i.participantId,{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchStage:"resend"})}catch(persistError){console.error("Unable to persist participant resend failure",persistError?.code||"")}
-   setErr("Invitation resend failed: "+failure);
+   if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
+   const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation resend failed.";
+   try{await callMeetingService("/api/meeting-participants/update",{participantId:i.id,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"}})}catch(persistError){console.error("Unable to persist meeting dispatch failure",persistError?.code||"")}
+   setErr("Meeting invitation resend failed: "+failure);
    await load();
   }finally{resendInFlight.current.delete(i.id);setResendingInvitationIds(current=>current.filter(id=>id!==i.id));if(!fromBulk)setBusy(false)}
  }
  function startEdit(r){setEdit(r);setSelected(null);setSourceMode(r.sourceType==="Manual Invitee"?"manual":"system");setForm({...empty,...r});window.scrollTo({top:0,behavior:"smooth"})}
  async function save(e){e.preventDefault();setBusy(true);setErr("");setMsg("");try{
-  const m=meetings.find(x=>x.id===form.meetingId);if(!m)throw new Error("Select a meeting first.");if(!form.participantEmail.trim())throw new Error("An email address is required because this participant will be invited through the existing IRPA invitation protocol.");const inviteeEmail=form.participantEmail.trim().toLowerCase();const duplicate=rows.find(r=>r.meetingId===m.id&&r.id!==edit?.id&&String(r.participantEmail||r.email||"").trim().toLowerCase()===inviteeEmail&&!["cancelled","removed"].includes(String(r.status||"").toLowerCase()));if(duplicate)throw new Error("This email address is already registered for the selected meeting. Reuse the existing participant record so invitee and quorum counts are not duplicated.");
+  const m=meetings.find(x=>x.id===form.meetingId);if(!m)throw new Error("Select a meeting first.");if(!form.participantEmail.trim())throw new Error("An email address is required for the meeting-specific invitation.");const inviteeEmail=form.participantEmail.trim().toLowerCase();const duplicate=rows.find(r=>r.meetingId===m.id&&r.id!==edit?.id&&String(r.participantEmail||r.email||"").trim().toLowerCase()===inviteeEmail&&!["cancelled","removed"].includes(String(r.status||"").toLowerCase()));if(duplicate)throw new Error("This email address is already registered for the selected meeting. Reuse the existing participant record so invitee and quorum counts are not duplicated.");
   if(sourceMode==="manual"&&(AUTHORITATIVE_ROLES.includes(form.participantRole)||form.boardMemberId||form.employeeId||form.memberId))throw new Error("A provisional manual invitee must use an external participant role. Select the person from the Board Members, Members or Employees Register for an authoritative IRPA identity.");
-  const payload={...form,participantEmail:form.participantEmail.trim().toLowerCase(),meetingIdentity:m.meetingIdentity||`IRPA-MEET-${String(m.id||"").toUpperCase()}`,meetingReference:m.meetingReference||`IRPA-MTG-${String(m.date||new Date().getFullYear()).slice(0,4)}-${String(m.id||"").slice(0,8).toUpperCase()}`,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",attendanceStatus:form.attendanceStatus||"Invited",invitationStatus:edit?.invitationStatus||"Not Sent"};
-  if(edit){await updateRecord(COLLECTIONS.participants,edit.id,payload);setMsg("Participant record updated.");}
+  const payload={...form,participantEmail:inviteeEmail,meetingIdentity:m.meetingIdentity||`IRPA-MEET-${String(m.id||"").toUpperCase()}`,meetingReference:m.meetingReference||`IRPA-MTG-${String(m.date||new Date().getFullYear()).slice(0,4)}-${String(m.id||"").slice(0,8).toUpperCase()}`,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",attendanceStatus:form.attendanceStatus||"Invited",invitationStatus:edit?.invitationStatus||"Not Sent"};
+  if(edit){await callMeetingService("/api/meeting-participants/update",{participantId:edit.id,data:payload});setMsg("Participant record updated.");}
   else{
-   const participantId=await createRecord(COLLECTIONS.participants,payload);
-   const invite=invitationPayload({...payload,id:participantId},m);
-   let invitationId=invite.id;
-   if(!invitationId){
-    invitationId=await createRecord(COLLECTIONS.invitations,invite);
-    await updateRecord(COLLECTIONS.invitations,invitationId,{subscriptionLink:window.location.origin+"/?induction=1&applicant=1&route=subscription&memberInvite="+encodeURIComponent(invitationId),loginAssistanceLink:window.location.origin+"/?induction=1&applicant=1&route=assistance&memberInvite="+encodeURIComponent(invitationId)});
-   }
-   await updateRecord(COLLECTIONS.invitations,invitationId,{participantId,meetingId:payload.meetingId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title});
-   let issuedAccess=null,dispatchStage="issue-access-pass";
+   const created=await callMeetingService("/api/meeting-participants/create",{data:payload});const participantId=created.participantId;
+   let issuedAccess=null,dispatchStage="issue-meeting-access";
    try{
     const issued=await createMeetingAccessInvitation({meetingId:payload.meetingId,participantId});
     issuedAccess=issued;
-    if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The meeting gateway did not return a complete access pass.");
-    const meetingAccess={accessId:issued.accessId,accessToken:issued.accessToken,meetingId:issued.meetingId,participantId:issued.participantId,meetingIdentity:payload.meetingIdentity,meetingReference:payload.meetingReference,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",password:issued.meetingPassword,expiresAt:issued.expiresAt};
-    dispatchStage="send-email";
-    const result=await sendMemberInvitationEmail(payload.participantEmail,invitationId,payload.participantRole,payload.memberType,meetingAccess);
-    if(result.meetingAccessSent!==true)throw new Error("The IRPA Mail Server did not confirm dispatch of the meeting access link and gate token. The access pass will be revoked rather than counted as released.");
-    dispatchStage="persist-dispatch-confirmation";
-    const dispatchedAt=new Date().toISOString();
-    const deliveryStatus=String(result.deliveryStatus||"Accepted by IRPA Mail Server; SMTP delivery status returned by gateway");
-    await updateRecord(COLLECTIONS.invitations,invitationId,{status:result.deliveryStatus==="Sent"?"Sent":"Invitation Requested",deliveryStatus,sentAt:dispatchedAt,deliveryError:"",meetingAccessDispatched:true,meetingAccessDispatchStatus:"Confirmed",meetingInvitationLinkStatus:"Released by IRPA Mail Server",meetingTokenStatus:"Released by IRPA Mail Server",meetingAccessId:issued.accessId,meetingAccessTokenReference:issued.accessId,meetingAccessExpiresAt:issued.expiresAt||null,meetingAccessDispatchedAt:dispatchedAt,meetingAccessDeliveryStatus:deliveryStatus,meetingAccessDispatchError:""});
-    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Invitation Requested",invitationRole:payload.participantRole,meetingAccessDispatched:true,meetingAccessDispatchStatus:"Confirmed",meetingAccessId:issued.accessId,meetingAccessDispatchedAt:dispatchedAt,meetingAccessExpiresAt:issued.expiresAt||null});
-    setMsg("Participant registered. The invitation register now records the meeting link and gate-token release reference and updates its dispatch tally. The bearer token itself is sent to the invitee and is not stored in the register. Delivery status: "+deliveryStatus);
+    if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The Meeting Worker did not return a complete access pass.");
+    dispatchStage="smtp-dispatch";
+    const result=await dispatchMeetingInvitation({accessId:issued.accessId,accessToken:issued.accessToken,meetingPassword:issued.meetingPassword});
+    if(result.meetingAccessSent!==true)throw new Error("The IRPA SMTP Worker did not confirm meeting invitation dispatch.");
+    setMsg(result.participantStatusPersisted===false?"Participant registered and SMTP accepted the meeting invitation, but the participant delivery status needs reconciliation. The access pass remains active.":"Participant registered and meeting invitation accepted by the IRPA SMTP gateway. The invitation is recorded on the meeting participant record only.");
    }catch(x){
     console.error("IRPA meeting invitation dispatch failed",{stage:dispatchStage,errorCode:String(x?.code||""),errorMessage:String(x?.message||x).slice(0,240),meetingId:payload.meetingId,participantId});
     if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
-    const failedAt=new Date().toISOString();
-    await updateRecord(COLLECTIONS.invitations,invitationId,{deliveryStatus:"Failed",status:"Invitation Dispatch Failed",deliveryError:x.message||"Invitation request failed.",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingInvitationLinkStatus:"Not released",meetingTokenStatus:issuedAccess?.accessId?"Revoked after dispatch failure":"Not issued",meetingAccessId:issuedAccess?.accessId||null,meetingAccessTokenReference:issuedAccess?.accessId||null,meetingAccessDispatchedAt:null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:x.message||"Invitation request failed.",meetingAccessDispatchStage:dispatchStage});
-    await updateRecord(COLLECTIONS.participants,participantId,{invitationId,invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchStage:dispatchStage});
-    const failureCode=String(x?.code||"");
-    throw new Error("Participant was registered, but meeting invitation dispatch failed at "+dispatchStage+": "+(x.message||"Unknown invitation error")+(failureCode?" ("+failureCode+")":""));
+    const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation dispatch failed.";
+    await callMeetingService("/api/meeting-participants/update",{participantId,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:dispatchStage}});
+    throw new Error("Participant was registered, but the meeting invitation failed at "+dispatchStage+": "+failure);
    }
   }
   reset();await load()
  }catch(x){setErr(x.message||"Unable to save participant.")}finally{setBusy(false)}}
- async function remove(r){if(!window.confirm("Remove this participant record?"))return;setBusy(true);try{await deleteRecord(COLLECTIONS.participants,r.id);setMsg("Participant record removed.");await load()}catch(x){setErr(x.message||"Unable to remove participant.")}finally{setBusy(false)}}
+ async function remove(r){if(!window.confirm("Remove this participant record and revoke its meeting access pass?"))return;setBusy(true);try{await callMeetingService("/api/meeting-participants/delete",{participantId:r.id});setMsg("Participant removed and meeting access revoked.");await load()}catch(x){setErr(x.message||"Unable to remove participant.")}finally{setBusy(false)}}
  const metrics=useMemo(()=>({total:rows.length,present:rows.filter(x=>x.attendanceStatus==="Present").length,invited:rows.filter(x=>x.attendanceStatus==="Invited").length,absent:rows.filter(x=>x.attendanceStatus==="Absent").length}),[rows]);
- // The invitation register is the source of truth for dispatched meeting links and token releases.
- // Only metadata/reference IDs are retained here; the bearer token itself is delivered by email
- // and is deliberately not persisted in the broadly readable invitation register.
- const meetingInvitationRows=useMemo(()=>invitations.filter(x=>Boolean(String(x.meetingId||"").trim())).sort((a,b)=>String(b.sentAt||b.createdAt||"").localeCompare(String(a.sentAt||a.createdAt||""))),[invitations]);
+ // The meeting participant register is authoritative for meeting-specific dispatch status.
+ // Only access-pass reference metadata is retained; bearer tokens are delivered by SMTP and never stored in participant records.
+ const meetingInvitationRows=useMemo(()=>rows.filter(x=>Boolean(String(x.meetingId||"").trim())&&(x.meetingAccessDispatchStatus||x.invitationStatus)).map(x=>({...x,participantId:x.id,email:x.participantEmail,name:x.participantName,role:x.participantRole,deliveryStatus:x.meetingAccessDeliveryStatus||x.meetingAccessDispatchStatus,status:x.invitationStatus,deliveryError:x.meetingAccessDispatchError})).sort((a,b)=>String(b.meetingAccessDispatchedAt||b.createdAt||"").localeCompare(String(a.meetingAccessDispatchedAt||a.createdAt||""))),[rows]);
  const isInvitationError=(x)=>{const status=[x?.meetingAccessDispatchStatus,x?.deliveryStatus,x?.status].map(v=>String(v||"").trim().toLowerCase());if(status.some(v=>["cancelled","canceled","cancelled invitation","canceled invitation"].includes(v)))return false;return x?.meetingAccessDispatched===false||Boolean(String(x?.deliveryError||x?.meetingAccessDispatchError||"").trim())||status.some(v=>["failed","error","dispatch error","delivery error","undelivered","invitation dispatch failed","smtp error"].includes(v)||v.includes("error")||v.includes("undelivered"));};
  const invitationMetrics=useMemo(()=>({
   total:meetingInvitationRows.length,

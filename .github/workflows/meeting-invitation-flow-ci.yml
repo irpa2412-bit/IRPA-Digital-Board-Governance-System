@@ -29,6 +29,9 @@ on:
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
       - "tests/meeting-invitation-resend-quorum.test.mjs"
+      - "drive-gateway/src/meetingServices.mjs"
+      - "src/firebase/meetingPolicy.js"
+      - "tests/meeting-quorum-reconciliation.test.mjs"
   pull_request:
     branches:
       - main
@@ -55,6 +58,9 @@ on:
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
       - "tests/meeting-invitation-resend-quorum.test.mjs"
+      - "drive-gateway/src/meetingServices.mjs"
+      - "src/firebase/meetingPolicy.js"
+      - "tests/meeting-quorum-reconciliation.test.mjs"
 
   workflow_dispatch:
 
@@ -87,5 +93,7 @@ jobs:
         run: npm run test:meeting-entry-policy
       - name: Test failed invitation resend and quorum exclusion
         run: npm run test:meeting-invitation-resend
+      - name: Test three-source Board quorum reconciliation
+        run: npm run test:meeting-quorum
       - name: Build web application
         run: npm run build
