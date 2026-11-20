@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import Meetings from "../../src/pages/Meetings.jsx";
 import MeetingRoom from "../../src/pages/MeetingRoom.jsx";
+import Resolutions from "../../src/pages/Resolutions.jsx";
 import { setFixtureActor } from "./mocks.js";
 import "./meeting-portal-fixture.css";
 import "../../src/styles/app.css";
@@ -21,13 +22,17 @@ function FixtureApp() {
     window.__irpaNavigationCalls = [...(window.__irpaNavigationCalls || []), { module, context }];
     setNavigation({ module, context });
     if (module === "Meeting Room") setScreen("meeting-room");
+    else if (module === "Resolutions") setScreen("resolutions");
     else setScreen("meetings");
   };
   return <main data-testid="meeting-fixture-root" data-fixture="TEST-ONLY">
     <div className="meeting-fixture-banner" role="note">
       TEST ENVIRONMENT — isolated browser fixture. Local test records only. No production Firestore, Drive, SMTP or email delivery.
     </div>
-    {screen === "meeting-room" ? <>
+    {screen === "resolutions" ? <>
+      <div className="meeting-fixture-controls"><button type="button" onClick={() => setScreen("meetings")}>TEST: return to Meeting Centre</button></div>
+      <Resolutions/>
+    </> : screen === "meeting-room" ? <>
       <div className="meeting-fixture-controls">
         <button type="button" onClick={() => { setFixtureActor("host"); setActorVersion(v => v + 1); }}>TEST: restore host</button>
         <button type="button" onClick={() => { setFixtureActor("outsider"); setActorVersion(v => v + 1); }}>TEST: switch to outsider</button>
