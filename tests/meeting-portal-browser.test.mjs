@@ -58,7 +58,7 @@ try {
       await page.getByRole("button", { name: "Meeting Room", exact: true }).click();
       await page.getByRole("heading", { name: "Meeting Room" }).waitFor();
 
-      const meetingPicker = page.getByLabel("Meeting");
+      const meetingPicker = page.locator(".form-field").filter({ hasText: /^Meeting$/ }).locator("select");
       await meetingPicker.selectOption(created.id);
       await page.getByText("TEST Guest — Position 1", { exact: true }).waitFor();
       await page.getByText("TEST Guest — Position 2", { exact: true }).waitFor();
@@ -66,16 +66,16 @@ try {
       await page.getByText("TEST Active Board Member", { exact: true }).waitFor();
 
       await page.getByRole("button", { name: /1\. Confirm the agenda/ }).click();
-      await page.getByLabel("Motion").fill("TEST motion: approve the work plan.");
-      await page.getByLabel("Moved By").fill("TEST Board Member");
-      await page.getByLabel("Seconded By").fill("TEST Secretary");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Motion$/ }).locator("textarea").fill("TEST motion: approve the work plan.");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Moved By$/ }).locator("input").fill("TEST Board Member");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Seconded By$/ }).locator("input").fill("TEST Secretary");
       await page.getByRole("button", { name: "Record Motion" }).click();
       await page.getByRole("button", { name: "Open Anonymous Vote" }).click();
-      await page.getByLabel("Decision").fill("TEST decision: approve the work plan subject to quarterly review.");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Decision$/ }).locator("textarea").fill("TEST decision: approve the work plan subject to quarterly review.");
       await page.getByRole("button", { name: "Record Decision" }).click();
-      await page.getByLabel("Action").fill("TEST action: prepare quarterly implementation report.");
-      await page.getByLabel("Responsible").fill("TEST Programme Officer");
-      await page.getByLabel("Deadline").fill("2027-03-31");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Action$/ }).locator("input").fill("TEST action: prepare quarterly implementation report.");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Responsible$/ }).locator("input").fill("TEST Programme Officer");
+      await page.locator("#irpa-meeting-agenda .form-field").filter({ hasText: /^Deadline$/ }).locator('input[type="date"]').fill("2027-03-31");
       await page.getByRole("button", { name: "Record Action" }).click();
 
       const workflowRecords = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
