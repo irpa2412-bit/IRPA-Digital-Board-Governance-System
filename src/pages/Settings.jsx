@@ -3,12 +3,11 @@ import { getIdToken } from "firebase/auth";
 import { auth, firebaseConfig } from "../firebase/config";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { browserSupportsPush, listenForForegroundMessages, notificationPermissionState, requestPushPermission } from "../firebase/messaging";
-import SystemResetControl from "../components/SystemResetControl";
 import DepartmentArchiveRegistry from "../components/DepartmentArchiveRegistry";
 import ActualDataAccessControl from "../components/ActualDataAccessControl";
 import ReleaseReadiness from "../components/ReleaseReadiness";
 import { startGoogleDriveAuthorization } from "../firebase/signatureStorage";
-import { resetDocumentTrialData, resetEmployeeTrialData, resetMemberTrialData, resetSignatureEnvelopeTrialData, createExternalAuditorProfile, getRecords, COLLECTIONS, linkAdministratorToEmployee } from "../firebase/data";
+import { createExternalAuditorProfile, getRecords, COLLECTIONS, linkAdministratorToEmployee } from "../firebase/data";
 import { createAdministrator, reconcileRegisteredIdentityUids } from "../firebase/functions";
 
 export default function Settings({ admin = false, section = "settings" }) {
@@ -16,10 +15,6 @@ export default function Settings({ admin = false, section = "settings" }) {
   const [permission, setPermission] = useState("unknown");
   const [busy, setBusy] = useState(false);
   const [driveBusy, setDriveBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [selectedReset, setSelectedReset] = useState("");
-  const [result, setResult] = useState(null);
   const [message, setMessage] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
@@ -159,56 +154,6 @@ export default function Settings({ admin = false, section = "settings" }) {
       setMessage(error?.message || "Unable to enable push notifications.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  function prepareTrialReset(type) {
-    setSelectedReset(type);
-    setMessage("");
-    setResult(null);
-    const phrases = { documents: "RESET IRPA DOCUMENT TRIAL DATA", employees: "RESET IRPA EMPLOYEE TRIAL DATA", members: "RESET IRPA MEMBER TRIAL DATA", envelopes: "RESET IRPA TRIAL ENVELOPE DATA" };
-    setMessage(`Trial reset selected. Enter the exact confirmation phrase below: ${phrases[type]}`);
-    setTimeout(() => document.getElementById("trial-reset-confirmation")?.focus(), 0);
-  }
-
-  async function runTrialReset(type) {
-    const phrases = {
-      documents: "RESET IRPA DOCUMENT TRIAL DATA",
-      employees: "RESET IRPA EMPLOYEE TRIAL DATA",
-      members: "RESET IRPA MEMBER TRIAL DATA",
-      envelopes: "RESET IRPA TRIAL ENVELOPE DATA"
-    };
-    const phrase = phrases[type];
-    if (confirmation !== phrase) {
-      setMessage(`Enter the exact confirmation phrase: ${phrase}`);
-      return;
-    }
-    const warning = type === "documents"
-      ? "This permanently deletes all Controlled Document trial records. Employee, Member and Board Member records are not affected. Continue?"
-      : type === "employees"
-        ? "This permanently deletes all Employee records and resets the Employee Number counter. Member and Board Member records are not affected. Continue?"
-        : type === "members"
-          ? "This permanently deletes all general Member records and resets the Member Number counter. Board Member records are preserved. Continue?"
-          : "This permanently deletes trial Signature Envelope records, their linked signature transaction records and envelope events. Only records explicitly marked as trial are removed. Continue?";
-    if (!window.confirm(warning)) return;
-    setResetBusy(type);
-    setMessage("");
-    setResult(null);
-    try {
-      const data = type === "documents"
-        ? await resetDocumentTrialData()
-        : type === "employees"
-          ? await resetEmployeeTrialData()
-          : type === "members"
-            ? await resetMemberTrialData()
-            : await resetSignatureEnvelopeTrialData();
-      setConfirmation("");
-      setResult({ ...data, type });
-      setMessage(`${type === "documents" ? "Document" : type === "employees" ? "Employee" : type === "members" ? "Member" : "Signature Envelope"} trial reset completed successfully.`);
-    } catch (error) {
-      setMessage(error?.message || "The trial-data reset failed.");
-    } finally {
-      setResetBusy("");
     }
   }
 
