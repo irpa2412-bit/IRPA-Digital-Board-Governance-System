@@ -84,3 +84,12 @@ test("meeting participant registration cannot redefine the Board Register denomi
   assert.match(service,/missingRegisterUid/);
   assert.match(service,/!registerUsable\?"NOT_ASSESSABLE"/);
 });
+
+test("Meeting Participants portal loads its register directory from Cloudflare and filters Board candidates by UID",()=>{
+  const participants=readFileSync("src/pages/OperationalGatewaysParticipants.jsx","utf8");
+  assert.match(api,/\/api\/meeting-invitee-directory\/list/);
+  assert.match(service,/\/api\/meeting-invitee-directory\/list/);
+  assert.match(service,/source:"ACTIVE_REGISTERS_BOARD_UID_ONLY"/);
+  assert.match(participants,/listMeetingInviteeDirectory/);
+  assert.doesNotMatch(participants,/listMeetingInviteeDirectory.*from"\.\.\/firebase\/data"/);
+});
