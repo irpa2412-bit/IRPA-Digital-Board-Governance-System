@@ -344,7 +344,7 @@ return response(ctx,request,{ok:true,attendanceDate:date,participantId,attendanc
 }
 if(pathname==="/api/meeting-attendance/daily/dispatch"){
 const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
-if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
 if(!c.canManage||!hostUid||ownerUid!==uid||hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
