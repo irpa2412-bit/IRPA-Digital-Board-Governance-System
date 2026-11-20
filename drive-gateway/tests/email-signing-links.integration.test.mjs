@@ -157,26 +157,25 @@ test("email signing links expire after their configured lifetime and become unus
   assert.equal((await inspectEmailSigningToken(issued.token,revoked,oneYearLater)).ok,false);
 });
 
-test("email link opens once, changes status to opened and exposes only its controlled PDF",async()=>{
+test("email link remains valid after opening without signing and reopens from the same URL",async()=>{
   const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
   assert.equal(opened.ok,true);
   assert.equal(opened.title,"Email Link Governance Instrument");
   assert.equal(opened.ownerName,"Document Owner");
-  assert.notEqual(opened.sessionToken,f.token,"the one-time invitation token must be replaced by a browser-session token");
+  assert.equal(opened.sessionToken,f.token,"opening must not rotate or consume the email invitation");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(stored.signers[0].emailLinkStatus,"opened");
   assert.equal(stored.signers[0].emailLinkOpenCount,1);
-  assert.equal(stored.signers[0].tokenHash,await sha256Hex(opened.sessionToken.split(".")[2]));
-  assert.notEqual(stored.signers[0].tokenHash,await sha256Hex(f.token.split(".")[2]));
-  const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
+  assert.equal(stored.signers[0].tokenHash,await sha256Hex(f.token.split(".")[2]));
+  const pdf=await getSigningPdf(f.ctx,f.token,null);
   assert.equal(pdf.fileName,"email-link.pdf");
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"),error=>error.message===genericEmailSigningFailure());
-  const resumed=await openEmailSigning(f.ctx,opened.sessionToken,"198.51.100.8");
-  assert.equal(resumed.ok,true);
-  assert.equal(resumed.sessionToken,opened.sessionToken);
-  const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(resumedEnvelope.signers[0].emailLinkOpenCount,1,"resuming the session must not redeem the invitation a second time");
+  f.now(new Date("2027-11-16T08:00:00.000Z"));
+  const reopened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  assert.equal(reopened.ok,true,"the same opened-but-unused email link remains valid after one year");
+  assert.equal(reopened.sessionToken,f.token);
+  const reopenedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(reopenedEnvelope.signers[0].emailLinkOpenCount,2);
 });
 
 test("tampered and unknown links return the same neutral response",async()=>{
@@ -186,7 +185,7 @@ test("tampered and unknown links return the same neutral response",async()=>{
   await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+"a".repeat(64),"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
-test("an unused email signing link remains valid indefinitely despite legacy expiry fields, then is consumed once",async()=>{
+test("an unused email signing link remains valid indefinitely before and after opening despite legacy expiry fields",async()=>{
   const f=await fixture();
   const legacy=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   legacy.signers[0].emailLinkExpiresAt="2026-11-23T08:00:00.000Z";
@@ -201,7 +200,10 @@ test("an unused email signing link remains valid indefinitely despite legacy exp
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
   assert.equal(status.signers[0].linkExpiresAt,null);
   assert.equal(status.signers[0].linkExpired,false);
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.message===genericEmailSigningFailure());
+  f.now(new Date("2028-11-24T08:00:00.000Z"));
+  const reopened=await openEmailSigning(f.ctx,f.token,"198.51.100.19");
+  assert.equal(reopened.ok,true,"opening without signing does not expire the same email invitation");
+  assert.equal(reopened.sessionToken,f.token);
 });
 
 test("owner revoke invalidates a guest link; resend rotates token and marks the previous hash replaced",async()=>{
