@@ -284,6 +284,19 @@ export function createAdministratorCleanupRouter(deps) {
     return ["pending","invited","sent","queued","created","awaiting activation","awaiting_activation"].includes(status) &&
       redemption !== "ACTIVATED" && data.accountActivated !== true;
   }
+  function extractDriveFileId(data) {
+    for (const value of [data?.fileId,data?.driveFileId,data?.signedFileId,data?.storageFileId,data?.fileReference,data?.signedPdfReference]) {
+      const id = clean(value);
+      if (id && /^[A-Za-z0-9_-]{10,}$/.test(id)) return id;
+    }
+    for (const value of [data?.fileUrl,data?.webViewLink,data?.signedPdfUrl,data?.downloadUrl,data?.url]) {
+      const url = clean(value);
+      if (!/drive\.google\.com/i.test(url)) continue;
+      const match = url.match(/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i) || url.match(/[?&]id=([A-Za-z0-9_-]+)/i);
+      if (match?.[1]) return match[1];
+    }
+    return "";
+  }
   function signedState(value) { return ["signed","completed"].includes(clean(value).toLowerCase()); }
   function unsentEnvelope(value) { return !["signed","completed","in progress","inprogress","signing"].includes(clean(value).toLowerCase()); }
   function scrubBackup(value, key = "") {
@@ -376,6 +389,10 @@ export function createAdministratorCleanupRouter(deps) {
         for (const portalRow of portalRows) cascadeDelete(portalRow);
         continue;
       }
+      if (["documents","controlledDocuments"].includes(row.collection)) {
+        const driveFileId = extractDriveFileId(data);
+        if (driveFileId) add({type:"drive-delete",key:row.key,fileId:driveFileId,reason:"Delete selected document's Drive file after backup"});
+      }
       add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected record"});
     }
     const priority = operation => {
@@ -434,10 +451,8 @@ export function createAdministratorCleanupRouter(deps) {
     const fileIds = new Set();
     for (const row of plan.records.filter(item=>item.decision==="GOES")) {
       const data = dataOf(inventory.records.find(item=>item.key===row.key));
-      for (const value of [row.signedPdfReference,data.fileId,data.driveFileId,data.signedFileId,data.storageFileId,data.fileReference]) {
-        const id = clean(value);
-        if (id && /^[A-Za-z0-9_-]{10,}$/.test(id)) fileIds.add(id);
-      }
+      const id = clean(row.signedPdfReference) || extractDriveFileId(data);
+      if (id) fileIds.add(id);
     }
     for (const fileId of fileIds) {
       const copied = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"/copy?fields=id,name,webViewLink",{
