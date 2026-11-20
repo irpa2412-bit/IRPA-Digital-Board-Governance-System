@@ -60,6 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           node <<'NODE'
+          (async () => {
           const crypto = require("node:crypto");
           const recipient = process.env.TEST_RECIPIENT;
           const base = process.env.STAGING_GATEWAY_URL.replace(/\/+$/, "");
@@ -106,4 +107,5 @@ jobs:
             if (/mock|test accepted/i.test(String(body.messageId))) throw new Error("Gateway returned a mock receipt; real SMTP delivery is not verified.");
             console.log(JSON.stringify({result:"SMTP_ACCEPTED",recipientDomain:recipient.split("@").pop(),messageId:body.messageId,reference:marker}));
           }).catch(error => { console.error(error.message); process.exitCode=1; });
+          })().catch(error => { console.error(error.message); process.exitCode=1; });
           NODE
