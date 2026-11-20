@@ -267,10 +267,13 @@ test("isolation guard permits only the separate unexpired Signature Portal windo
 
 const signatureRepairFixture = () => {
   const changedPaths = [
+    "drive-gateway/src/emailSigning/index.mjs",
+    "drive-gateway/src/emailSigningLinks.mjs",
     "drive-gateway/src/signing.mjs",
-    "drive-gateway/src/router.mjs",
+    "drive-gateway/src/index.js",
     "src/pages/EmailSigningReadOnlyPage.jsx",
-    "drive-gateway/tests/email-signing-links.integration.test.mjs",
+    "src/pages/SignaturePlatform.jsx",
+    "drive-gateway/tests/email-signing-contract.test.mjs",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "scripts/portal-repair-window-guard-policy.mjs",
     "tests/meeting-isolation-guard.test.mjs"
@@ -281,11 +284,17 @@ const signatureRepairFixture = () => {
     activeAmendment: {
       status: "open",
       files: [
+        "drive-gateway/src/emailSigning/",
+        "drive-gateway/src/emailSigningLinks.mjs",
         "drive-gateway/src/signing.mjs",
-        "drive-gateway/src/router.mjs",
+        "drive-gateway/src/index.js",
         "src/pages/EmailSigningReadOnlyPage.jsx",
-        "drive-gateway/tests/",
-        "tests/"
+        "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/tests/email-signing-contract.test.mjs",
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "tests/email-signing-contract.test.mjs",
+        ".github/workflows/email-signing-contract.yml"
       ]
     }
   };
