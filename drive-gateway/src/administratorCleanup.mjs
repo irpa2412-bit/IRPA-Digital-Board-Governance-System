@@ -553,7 +553,7 @@ export function createAdministratorCleanupRouter(deps) {
       if (checked.has(operation.path)) continue;
       checked.add(operation.path);
       const nested = await listSubcollections(env,auth.token,operation.path);
-      if (nested.length) throw Object.assign(new Error("Nested Firestore collections exist under " + operation.path + ": " + nested.join(", ") + ". Inventory and select those child records before retrying; no records were deleted."),{status:409});
+      if (nested.length) throw Object.assign(new Error("Nested Firestore collections exist under " + operation.path + ": " + nested.join(", ") + ". Child documents are not yet part of the inventory; cleanup is blocked until they are inventoried. No records were deleted."),{status:409});
     }
   }
   async function executeOperation(env, auth, operation, driveToken, authToken) {
