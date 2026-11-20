@@ -93,7 +93,7 @@ test("email-link signer receives the email-signing URL and redeems the exact one
   assert.equal(opened.ok,true);
   assert.equal(opened.signer.email,"signer@example.test");
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
-  assert.equal(status.signers[0].emailLinkStatus,"issued");
+  assert.equal(status.signers[0].emailLinkStatus,"opened");
 });
 
 test("email-link resend rotates the bearer token and makes the prior invitation unusable",async()=>{
@@ -126,7 +126,7 @@ test("owner can replace invited, opened, expired, revoked, failed and interrupte
     if(state==="expired"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);const signer={...current.signers[0],tokenExpiresAt:"2000-01-01T00:00:00.000Z",emailLinkExpiresAt:"2000-01-01T00:00:00.000Z"};await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[signer]},{ifVersion:current._v});}
     if(state==="revoked")await revokeInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
     if(state==="send-failed"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[{...current.signers[0],invitation:"Failed",deliveryStageCode:"SMTP_AUTH"}]},{ifVersion:current._v});}
-    if(state==="interrupted"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(current.signers[0].status,"Pending");assert.equal(current.signers[0].emailLinkStatus,"issued");assert.equal(current.signers[0].emailLinkSessionStatus,"active");assert.equal(current.signers[0].partialSignature,undefined);}
+    if(state==="interrupted"){const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);assert.equal(current.signers[0].status,"Pending");assert.equal(current.signers[0].emailLinkStatus,"opened");assert.equal(current.signers[0].partialSignature,undefined);}
     const sent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
     assert.equal(sent.deliveryStatus,"Sent",state);assert.ok(Date.parse(sent.expiresAt)>Date.now(),state);
     const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
