@@ -124,7 +124,23 @@ export function createAdministratorCleanupRouter(deps) {
         if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup plan belongs to a different administrator."},403,corsHeaders(request));
         return json({ok:true,...plan},200,corsHeaders(request));
       }
-      if (pathname.startsWith("/api/admin/cleanup/status/") && request.method === "GET") {\n        const planId = pathname.split("/").pop();\n        const raw = await env.DRIVE_KV.get("admin-cleanup:plan:" + planId);\n        if (!raw) return json({ok:false,error:"Cleanup status not found or expired."},404,corsHeaders(request));\n        const plan = JSON.parse(raw);\n        if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup plan belongs to a different administrator."},403,corsHeaders(request));\n        return json({ok:true,planId:plan.planId,status:plan.status,inventoryId:plan.inventoryId,stays:plan.records.filter(row=>row.decision==="STAYS").length,goes:plan.records.filter(row=>row.decision==="GOES").length,executionEnabled:false},200,corsHeaders(request));\n      }\n      if (pathname.startsWith("/api/admin/cleanup/backup/") && request.method === "GET") {\n        const planId = pathname.split("/").pop();\n        const raw = await env.DRIVE_KV.get("admin-cleanup:plan:" + planId);\n        if (!raw) return json({ok:false,error:"Cleanup backup not found or expired."},404,corsHeaders(request));\n        const plan = JSON.parse(raw);\n        if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup backup belongs to a different administrator."},403,corsHeaders(request));\n        return json({ok:true,backup:{planId:plan.planId,inventoryId:plan.inventoryId,createdAt:plan.createdAt,administratorUid:plan.administratorUid,administratorEmail:plan.administratorEmail,selections:plan.records.map(row=>({key:row.key,collection:row.collection,recordId:row.id,name:row.name,email:row.email,decision:row.decision,protected:row.protected,protectionReason:row.protectionReason,linkedIdentityUid:row.uid,signedPdfReference:row.signedPdfReference})),operationOutcomes:[],status:plan.status}},200,corsHeaders(request));\n      }\n      if (pathname === "/api/admin/cleanup/execute" && request.method === "POST") {
+      if (pathname.startsWith("/api/admin/cleanup/status/") && request.method === "GET") {
+        const planId = pathname.split("/").pop();
+        const raw = await env.DRIVE_KV.get("admin-cleanup:plan:" + planId);
+        if (!raw) return json({ok:false,error:"Cleanup status not found or expired."},404,corsHeaders(request));
+        const plan = JSON.parse(raw);
+        if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup plan belongs to a different administrator."},403,corsHeaders(request));
+        return json({ok:true,planId:plan.planId,status:plan.status,inventoryId:plan.inventoryId,stays:plan.records.filter(row=>row.decision==="STAYS").length,goes:plan.records.filter(row=>row.decision==="GOES").length,executionEnabled:false},200,corsHeaders(request));
+      }
+      if (pathname.startsWith("/api/admin/cleanup/backup/") && request.method === "GET") {
+        const planId = pathname.split("/").pop();
+        const raw = await env.DRIVE_KV.get("admin-cleanup:plan:" + planId);
+        if (!raw) return json({ok:false,error:"Cleanup backup not found or expired."},404,corsHeaders(request));
+        const plan = JSON.parse(raw);
+        if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup backup belongs to a different administrator."},403,corsHeaders(request));
+        return json({ok:true,backup:{planId:plan.planId,inventoryId:plan.inventoryId,createdAt:plan.createdAt,administratorUid:plan.administratorUid,administratorEmail:plan.administratorEmail,selections:plan.records.map(row=>({key:row.key,collection:row.collection,recordId:row.id,name:row.name,email:row.email,decision:row.decision,protected:row.protected,protectionReason:row.protectionReason,linkedIdentityUid:row.uid,signedPdfReference:row.signedPdfReference})),operationOutcomes:[],status:plan.status}},200,corsHeaders(request));
+      }
+      if (pathname === "/api/admin/cleanup/execute" && request.method === "POST") {
         const body = await request.json().catch(() => ({}));
         const planId = clean(body.planId);
         const raw = planId ? await env.DRIVE_KV.get("admin-cleanup:plan:" + planId) : null;
