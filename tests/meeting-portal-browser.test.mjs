@@ -126,7 +126,7 @@ try {
       await page.getByRole("button", { name: "Sign a Document" }).click();
       const signingNavigation = await page.evaluate(() => (window.__irpaNavigationCalls || []).findLast(x => x.module === "Signature Platform") || null);
       assert.equal(signingNavigation?.context?.meetingId, created.id, "minutes signing navigation must retain meeting identity");
-      assert.equal(signingNavigation?.context?.meetingReference, created.meetingReference || created.reference || created.title,
+      assert.equal(signingNavigation?.context?.meetingReference, created.reference || created.title,
         "minutes signing navigation must retain the canonical meeting reference");
 
       await page.getByRole("button", { name: "TEST: switch to outsider" }).click();
