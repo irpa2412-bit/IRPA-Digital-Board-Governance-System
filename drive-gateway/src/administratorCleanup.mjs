@@ -455,11 +455,16 @@ export function createAdministratorCleanupRouter(deps) {
       if (id) fileIds.add(id);
     }
     for (const fileId of fileIds) {
+      const original = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"?fields=id,name,mimeType,modifiedTime,trashed");
+      if (!original.id || original.trashed === true) throw new Error("A selected Drive file is missing or already trashed; no records were deleted.");
+      const expectedPdf = plan.records.some(row=>row.decision==="GOES" && row.signedPdfReference===fileId);
+      if (expectedPdf && original.mimeType !== "application/pdf") throw new Error("The signed trial PDF reference does not resolve to a PDF; no records were deleted.");
       const copied = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"/copy?fields=id,name,webViewLink",{
         method:"POST",body:JSON.stringify({name:"IRPA-Cleanup-Backup-"+plan.planId+"-"+fileId,parents:[folderId]})
       });
       if (!copied.id) throw new Error("Drive backup copy did not return a file ID; no records were deleted.");
-      driveFileCopies.push({originalFileId:fileId,backupFileId:copied.id,name:copied.name || "",webViewLink:copied.webViewLink || ""});
+      driveFileCopies.push({originalFileId:fileId,originalName:original.name||"",mimeType:original.mimeType||"",
+        modifiedTime:original.modifiedTime||"",backupFileId:copied.id,name:copied.name || "",webViewLink:copied.webViewLink || ""});
     }
     const archive = {
       schemaVersion:1,createdAt:new Date().toISOString(),planId:plan.planId,inventoryId:plan.inventoryId,
