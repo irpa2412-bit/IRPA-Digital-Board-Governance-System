@@ -5,7 +5,7 @@ import { uploadControlledDocumentRouted, registerControlledDocumentRecord } from
 import { createSignatureEnvelope, startSignatureWorkflow } from "./signaturePlatform";
 import { callMeetingService } from "./meetingGatewayApi";
 
-const PAGE={width:842,height:595,margin:28,top:92,rowHeight:22,rowsPerPage:20};
+const PAGE={width:842,height:595,margin:28,top:112,rowHeight:22,rowsPerPage:20};
 const clean=value=>String(value??"").trim();
 const categoryLabel=value=>({
  BOARD_MEMBER:"Board Member",BOARD_COMMITTEE_MEMBER:"Board Committee",
