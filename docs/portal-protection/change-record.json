@@ -3,19 +3,33 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal"
+      "Signature Portal",
+      "Meeting Portal"
     ],
-    "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
+    "reason": "Restore Email-link E-signature to the verified production state before 11:00 EAT on 20 November 2026, while preserving the Meeting Portal's independent attendance, attendance-sheet and ordinary invitation functions. Shared SignaturePlatform and Gateway dependencies require explicit verification for both portals.",
     "files": [
       "src/pages/SignaturePlatform.jsx",
-      "tests/signature-workflow-policy.test.mjs"
+      "tests/signature-workflow-policy.test.mjs",
+      "drive-gateway/src/signing.mjs",
+      "drive-gateway/src/router.mjs",
+      "drive-gateway/src/index.js",
+      "drive-gateway/src/invitationEmail.mjs",
+      "src/pages/EmailSigningReadOnlyPage.jsx",
+      "drive-gateway/tests/email-signing-links.integration.test.mjs",
+      "drive-gateway/tests/email-signing-links.test.mjs",
+      "drive-gateway/tests/signing-invitation.test.mjs"
     ],
-    "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
+    "expectedEffect": "Restore the pre-11:00 EAT email-link invitation/open/PDF/signing lifecycle, with no time-based expiry for unused signer invitations or active signer sessions. The invitation bearer token is consumed once on first redemption; resend/replacement, revocation and envelope cancellation invalidate prior links. Preserve unrelated Gateway services and Meeting Portal attendance and ordinary invitations.",
     "prohibitedChanges": [
       "Do not change Cloudflare Worker routes or token generation.",
       "Do not change Firestore rules, indexes, or production records.",
       "Do not change SMTP credentials, secrets, or deployment configuration.",
-      "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
+      "Do not alter other portals, shared stylesheets, signature validation, or audit controls.",
+      "Do not change Firestore signing records, existing invitation tokens, completed PDFs or audit trails.",
+      "Do not change SMTP settings, secrets, bindings, or transport.",
+      "Do not add time-based expiry to email-link invitations or sessions.",
+      "Do not roll back Meeting Portal attendance, attendance sheets, or ordinary meeting invitations.",
+      "Do not change Firestore rules, indexes, cryptographic verification, PDF stamping, certificates or archive logic."
     ]
   },
   "repairWindow": {
@@ -25,12 +39,13 @@
   },
   "baseline": {
     "commit": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
-    "rollbackCommit": "8bfa67b2a8757519befb2f6be1074c0f34457c99"
+    "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
   },
   "validation": {
     "baselineSmoke": "PASS",
     "portalSmoke": {
-      "Signature Portal": "PASS"
+      "Signature Portal": "PENDING",
+      "Meeting Portal": "PENDING"
     },
     "dependentSmoke": {
       "Signature envelope refresh and delivery regression": "PASS",
@@ -38,18 +53,19 @@
       "Production application build": "PASS",
       "Complete root test suite": "PASS"
     },
-    "fullRegression": "PASS",
+    "fullRegression": "PENDING",
     "behaviourDifferences": [
-      "Signer status responses are now associated with the selected Gateway envelope ID locally for refresh, resend, revoke, and completed-distribution retry.",
-      "The Signature Portal root and signer status panel retain full opacity and readable text during aria-busy refresh state.",
-      "Signer metadata wraps on narrow screens to avoid clipping."
+      "Post-cutoff V2 invitation preview/session routes and reusable-link lifecycle are removed; the pre-cutoff legacy email-link route is restored.",
+      "Email-link invitations have no time-based expiry, including records with legacy expiry timestamps; invitation tokens are consumed once on first redemption.",
+      "Signer sessions remain usable without time expiry; resend/replacement, owner revocation and envelope cancellation invalidate prior access.",
+      "Existing Firestore signing records, tokens, completed PDFs and audit trails are not rewritten.",
+      "Unrelated Gateway invitation-service and actual-data-gate changes remain preserved; Meeting Portal attendance and ordinary invitation functions are unchanged."
     ],
     "evidence": [
-      "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
-      "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
-      "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
-      "IRPA Release Build completed successfully on the exact PR head before scope correction.",
-      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
+      "Production Gateway deployment run 44690520757 confirmed commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd live at 09:49:57 EAT.",
+      "Signature files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
+      "No-time-expiry requirement is carried forward from the user's 18 Nov 2026 instruction: unused invitation remains valid until one-time redemption, revocation or envelope cancellation.",
+      "Full restoration and cross-portal regression checks are pending on this PR; no production deployment has occurred."
     ]
   },
   "closure": {
