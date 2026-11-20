@@ -8,7 +8,7 @@ const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const api=readFileSync("src/firebase/meetingGatewayApi.js","utf8");
 const meetings=readFileSync("src/pages/Meetings.jsx","utf8");
 
-test("only explicit Board and Board Meeting types require the one-third quorum",()=>{
+test("only explicit Board and Board Meeting types require a configured quorum",()=>{
   for(const meetingType of ["Board","Board Meeting"]){
     const meeting={meetingCategory:"GOVERNANCE",meetingType};
     assert.equal(isBoardMeeting(meeting),true);
