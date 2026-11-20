@@ -238,7 +238,7 @@ export function createAdministratorCleanupRouter(deps) {
             signedProductionEnvelope ? "Completed production signing envelopes must be retained." :
             missingTrialPdf ? "Signed trial PDF reference is missing; safe deletion cannot be verified." :
             signedProductionPortalRecord ? "Portal record belongs to a completed production signing envelope." : "",
-          decision: "STAYS", sourceDocument: doc
+          decision: "STAYS", sourceDocument: doc, sourceAuthUser: authUser || null
         });
       }
     }
