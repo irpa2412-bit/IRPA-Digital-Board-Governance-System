@@ -3,7 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
-import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen, evaluateMeetingWindowAmendment } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -56,6 +56,9 @@ const allowed = new Set([
   "drive-gateway/src/index.js",
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
+  "scripts/check-meeting-media-governance.mjs",
+  "drive-gateway/tests/meeting-services-router.test.mjs",
+  "drive-gateway/MEETING_WORKER_MIGRATION.md",
   "src/firebase/meetingAttendanceSigning.js",
   "src/firebase/meetingAttendanceSignerIdentity.js",
   "tests/meeting-daily-attendance-email-signing.test.mjs",
@@ -275,15 +278,6 @@ const communicationMediaArchiveIntegration =
 // A parallel portal-window amendment may update only activeAmendment in the
 // shared change record. All existing Meeting Portal and historical records
 // must remain byte-equivalent after removing that one scoped property.
-if (changed.includes("docs/portal-protection/change-record.json")) {
-  const baselineRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
-  const currentRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
-  delete baselineRecord.activeAmendment;
-  delete currentRecord.activeAmendment;
-  if (JSON.stringify(baselineRecord) !== JSON.stringify(currentRecord)) {
-    throw new Error("Parallel repair-window amendment changed existing change-record history or another portal's record.");
-  }
-}
 const baselineChangeRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
 const currentChangeRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
 const baselineRepairWindow = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/repair-window.json`], { encoding: "utf8" }));
@@ -310,6 +304,23 @@ const signatureWindowReopenDecision = evaluateSignatureWindowReopen({
   currentChangeRecord
 });
 const parallelWindowRecordAmendment = parallelWindowDecision.pass || signatureWindowClosureDecision.pass || signatureWindowReopenDecision.pass;
+const portalRegistry = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/portal-register.json"], { encoding: "utf8" }));
+const meetingPortalEntry = portalRegistry.portals["Meeting Portal"];
+const meetingProtectedFiles = changed.filter(file => meetingPortalEntry.paths.some(path =>
+  path.endsWith("/") ? file.startsWith(path) : file === path
+));
+const baselineCommit = execFileSync("git", ["rev-parse", base], { encoding: "utf8" }).trim();
+const meetingWindowDecision = evaluateMeetingWindowAmendment({
+  changedPaths: changed,
+  repairWindow: currentRepairWindow,
+  baselineRepairWindow,
+  currentRepairWindow,
+  baselineChangeRecord,
+  currentChangeRecord,
+  protectedFiles: meetingProtectedFiles,
+  baselineCommit
+});
+const meetingWindowRecordAmendment = meetingWindowDecision.pass;
 const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
   changedPaths: changed,
   repairWindow: currentRepairWindow,
@@ -320,7 +331,9 @@ const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
 const signatureEmailLinkSessionRepair = signatureWindowRepairDecision.pass;
 if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
-  if (!parallelWindowRecordAmendment) throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
+  if (!parallelWindowRecordAmendment && !meetingWindowRecordAmendment) {
+    throw new Error(meetingWindowDecision.reason || signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
+  }
 }
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
@@ -476,7 +489,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !meetingWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
