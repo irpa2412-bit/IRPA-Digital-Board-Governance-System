@@ -203,6 +203,7 @@ export function createAdministratorCleanupRouter(deps) {
             (authUser ? (authUser.disabled ? "Disabled" : "Active") : ""),
           sourceStatus: clean(data.status || data.registrationStatus || data.employmentStatus) || null,
           authAccountPresent: Boolean(authUser),
+          authEmail: authUser?.email ? clean(authUser.email).toLowerCase() : null,
           authCreatedAt: authUser?.createdAt || null,
           authDisplayName: authUser?.displayName || null,
           authDisabled: authUser?.disabled === true,
@@ -258,7 +259,7 @@ export function createAdministratorCleanupRouter(deps) {
         key:"firebaseAuthAccounts/"+uid,collection:"firebaseAuthAccounts",id:uid,version:[user.createdAt||"",email,user.disabled===true?"disabled":"enabled"].join("|"),
         uid,name:clean(user.displayName || email || uid),email,registerType:"Firebase Authentication",
         role:"Unlinked Auth Account",createdAt:user.createdAt||null,status:user.disabled===true?"Disabled":"Active",
-        authAccountPresent:true,authCreatedAt:user.createdAt||null,authDisplayName:user.displayName||null,
+        authAccountPresent:true,authEmail:email,authCreatedAt:user.createdAt||null,authDisplayName:user.displayName||null,
         authDisabled:user.disabled===true,authEmailVerified:user.emailVerified===true,
         recordOrigin:"FIREBASE_AUTH",trialData:false,signedTrialDocument:false,signedPdfReference:null,
         protected:protectedAccount,protectionReason:protectedAccount?"Primary administrator account is protected.":"",
@@ -559,17 +560,14 @@ export function createAdministratorCleanupRouter(deps) {
     }
 
     const authOperations = plan.executionOperations.filter(item=>item.type==="auth-delete");
-    if (authOperations.length) {
-      const authToken = await getFirebaseAuthAdminAccessToken(env);
-      const authUsers = await listFirebaseAuthUsers(env,authToken);
-      for (const operation of authOperations) {
-        const account = authUsers.find(user=>clean(user.localId || user.uid)===operation.uid);
-        if (account && operation.email && clean(account.email).toLowerCase()!==operation.email) {
-          throw Object.assign(new Error("Firebase Auth UID/email binding changed for " + operation.key + ". Cleanup was stopped."),{status:409});
-        }
-        if (account && completedIds.has(operation.operationId)) {
-          throw Object.assign(new Error("A Firebase Auth account reappeared after its approved deletion: " + operation.key),{status:409});
-        }
+    for (const operation of authOperations) {
+      const accountRows = freshRecords.filter(row=>row.uid===operation.uid && row.authAccountPresent);
+      if (completedIds.has(operation.operationId) && accountRows.length) {
+        throw Object.assign(new Error("A Firebase Auth account reappeared after its approved deletion: " + operation.key),{status:409});
+      }
+      if (!completedIds.has(operation.operationId) && operation.email &&
+          accountRows.some(row=>row.authEmail && row.authEmail!==operation.email)) {
+        throw Object.assign(new Error("Firebase Auth UID/email binding changed for " + operation.key + ". Cleanup was stopped."),{status:409});
       }
     }
 
