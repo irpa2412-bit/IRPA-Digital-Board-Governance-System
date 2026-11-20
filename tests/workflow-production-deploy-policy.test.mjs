@@ -126,9 +126,9 @@ test("production Gateway deployment requires SMTP_PASSWORD secret and configures
   assert.doesNotMatch(source,/INVITE_SERVICE_KEY/);
   const gateway=readFileSync(resolve(ROOT,"drive-gateway/src/index.js"),"utf8");
   const mailRoute=readFileSync(resolve(ROOT,"drive-gateway/src/invitationEmail.mjs"),"utf8");
-  assert.match(gateway,/emailDeliveryService: payload\\.irpaEmailDeliveryService === true/);
-  assert.match(mailRoute,/claims\\?\\.user_id !== "irpa-email-dispatcher"/);
-  assert.match(mailRoute,/claims\\?\\.firebaseClaims\\?\\.emailDeliveryService !== true/);
+  assert.match(gateway,/emailDeliveryService: payload\.irpaEmailDeliveryService === true/);
+  assert.match(mailRoute,/claims\?\.user_id !== "irpa-email-dispatcher"/);
+  assert.match(mailRoute,/claims\?\.firebaseClaims\?\.emailDeliveryService !== true/);
   assert.match(source,/SMTP_HOST: "mail\.irpa\.or\.tz"/);
   assert.match(source,/SMTP_PORT: "465"/);
   assert.match(source,/SMTP_FROM: "info@irpa\.or\.tz"/);
