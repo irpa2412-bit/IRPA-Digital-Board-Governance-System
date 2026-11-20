@@ -54,7 +54,29 @@ try {
 
       await page.getByRole("button", { name: "Refresh Meeting Register" }).click();
       await page.getByText(createdTitle, { exact: true }).waitFor();
-      const createdRow = page.locator("tr").filter({ hasText: createdTitle });
+      let createdRow = page.locator("tr").filter({ hasText: createdTitle });
+      await createdRow.getByRole("button", { name: "Open Workspace" }).click();
+      await page.getByRole("button", { name: "Resolutions", exact: true }).click();
+      await page.getByRole("heading", { name: "Resolutions" }).waitFor();
+      await page.getByRole("button", { name: "+ New Resolution" }).click();
+      await page.locator('select[name="meetingId"]').selectOption(created.id);
+      await page.locator('textarea[name="matterPresented"]').fill("TEST matter: approval of the annual work plan.");
+      await page.locator('textarea[name="proposedResolution"]').fill("TEST resolution: the Board approves the annual work plan subject to quarterly reporting.");
+      await page.locator('input[name="mover"]').fill("TEST Board Member");
+      await page.locator('input[name="seconder"]').fill("TEST Board Secretary");
+      await page.locator('input[name="votingRequired"]').check();
+      await page.getByRole("button", { name: "Create Resolution" }).click();
+      await page.getByText("Resolution created and linked to its originating meeting.", { exact: true }).waitFor();
+      await page.getByRole("button", { name: "Open Anonymous Voting" }).click();
+      await page.getByText("Voting Open", { exact: true }).waitFor();
+      const resolutionState = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
+      assert.equal(resolutionState.resolutions.length, 1, "resolution should be saved against the created meeting");
+      assert.equal(resolutionState.resolutions[0].meetingId, created.id);
+      assert.ok(resolutionState.resolutions[0].votingIssueId, "resolution voting should link to a vote issue");
+      await page.getByRole("button", { name: "TEST: return to Meeting Centre" }).click();
+      await page.getByRole("heading", { name: "Meeting Centre" }).waitFor();
+      await page.getByRole("button", { name: "Refresh Meeting Register" }).click();
+      createdRow = page.locator("tr").filter({ hasText: createdTitle });
       await createdRow.getByRole("button", { name: "Open Workspace" }).click();
       await page.getByRole("button", { name: "Meeting Room", exact: true }).click();
       await page.getByRole("heading", { name: "Meeting Room" }).waitFor();
@@ -80,8 +102,9 @@ try {
       await page.getByRole("button", { name: "Record Action" }).click();
 
       const workflowRecords = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
-      assert.equal(workflowRecords.votes.length, 1, "anonymous vote should be opened in the TEST store");
+      assert.equal(workflowRecords.votes.length, 2, "resolution and agenda votes should be opened in the TEST store");
       assert.equal(workflowRecords.decisions.length, 1, "decision should be recorded in the TEST store");
+      assert.equal(workflowRecords.resolutions.length, 1, "resolution should remain in the TEST store");
       assert.equal(workflowRecords.actions.length, 1, "action should be recorded in the TEST store");
 
       await page.getByRole("button", { name: "Dispatch Signing Requests" }).click();
