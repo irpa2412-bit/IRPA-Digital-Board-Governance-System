@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T12:02:00Z",
+  "lastActivityAt": "2026-11-20T12:03:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -154,6 +154,11 @@
       "at": "2026-11-20T12:02:00Z",
       "action": "repair",
       "description": "Removed a stale section-ID assumption from the browser test and target Motion, Decision and Action fields by their rendered form-field labels."
+    },
+    {
+      "at": "2026-11-20T12:03:00Z",
+      "action": "repair",
+      "description": "Aligned the minutes-capture mock with MeetingRoom's recordType payload so the fixture records the correct draft-minutes type."
     }
   ],
   "durationHours": 48,
