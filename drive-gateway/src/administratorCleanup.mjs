@@ -183,7 +183,7 @@ export function createAdministratorCleanupRouter(deps) {
         const envelopeStatus = clean(data.status).toLowerCase();
         const signedEnvelope = collection === "signatureEnvelopes" && ["signed","completed"].includes(envelopeStatus);
         const signedProductionEnvelope = signedEnvelope && !trialData;
-        const missingTrialPdf = isSignedTrial && !clean(data.signedPdfReference || data.signedFileId || data.driveFileId);
+        const missingTrialPdf = isSignedTrial && !clean(data.signedPdfReference || data.signedFileId);
         const linkedEnvelopeId = clean(data.envelopeId || data.gatewayEnvelopeId);
         const linkedEnvelope = linkedEnvelopeId ? envelopes.get(linkedEnvelopeId) : null;
         const signedProductionPortalRecord = ["signatures","documents","controlledDocuments"].includes(collection) &&
@@ -206,7 +206,7 @@ export function createAdministratorCleanupRouter(deps) {
           recordOrigin: clean(data.recordOrigin || data.source || ""),
           trialData,
           signedTrialDocument: isSignedTrial,
-          signedPdfReference: isSignedTrial ? clean(data.signedPdfReference || data.signedFileId || data.driveFileId) || null : null,
+          signedPdfReference: isSignedTrial ? clean(data.signedPdfReference || data.signedFileId) || null : null,
           relationshipRefs: [...new Set([
             data.meetingId, data.documentId, data.envelopeId, data.gatewayEnvelopeId, data.signatureEnvelopeId, data.invitationId,
             data.memberUid, data.employeeUid, data.participantUid, data.subscriberUid, data.ownerUid,
