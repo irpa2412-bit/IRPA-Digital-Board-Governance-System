@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   issueEmailSigningLink, inspectEmailSigningLink, createFreshSigningSession,
   canResendEmailSigningLink, reserveEmailSigningResend, rollbackEmailSigningResend,
-  commitEmailSigningResend, updateEmailSignerContact, markEmailSignerSigned,
+  commitEmailSigningResend, updateEmailSignerContact, markEmailSignerSigned, maskEmailForConfirmation,
   formatEmailLinkExpiryEAT, EMAIL_SIGNING_ALREADY_SIGNED, EMAIL_SIGNING_RESEND_STATUSES
 } from "../src/emailSigning/index.mjs";
 import { inspectEmailSigningToken } from "../src/emailSigningLinks.mjs";
@@ -274,4 +274,10 @@ test("v2 invitation copy and Worker routes describe a reusable, signer-scoped li
   assert.ok(worker.includes("previewGatewayEmailSigning"));
   assert.ok(worker.includes("openGatewayEmailSigning"));
   assert.ok(signing.includes('emailSigningModule==="v2"'));
+});
+
+
+test("resend confirmation masks the recipient and formats expiry in EAT", () => {
+  assert.equal(maskEmailForConfirmation("board.secretary@example.org"), "bo***@example.org");
+  assert.match(formatEmailLinkExpiryEAT(EXPIRY), /EAT$/);
 });
