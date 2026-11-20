@@ -30,6 +30,8 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/Math\.ceil\(boardRows\.length\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
+  assert.match(service,/seenBoardIdentities\.has\(identity\)/);
+  assert.match(service,/duplicateBoardMemberRegistrations/);
 });
 
 test("Board quorum excludes Board Committee members and external/manual invitees",()=>{
