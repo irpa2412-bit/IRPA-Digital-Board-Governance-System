@@ -6,6 +6,8 @@ import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 export default function AdministratorCleanupControl() {
   const [inventory, setInventory] = useState(null);
   const [plan, setPlan] = useState(null);
+  const [confirmation, setConfirmation] = useState("");
+  const [execution, setExecution] = useState(null);
   const [decisions, setDecisions] = useState({});
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("ALL");
@@ -54,12 +56,24 @@ export default function AdministratorCleanupControl() {
 
   async function preparePlan() {
     if (!inventory?.inventoryId) { setError("Take a fresh inventory before preparing a cleanup plan."); return; }
-    setBusy(true); setError(""); setNotice("");
+    setBusy(true); setError(""); setNotice(""); setExecution(null); setConfirmation("");
     try {
       const selections = rows.map(row => ({ key: row.key, decision: decisions[row.key] || "STAYS" }));
       const data = await request("/api/admin/cleanup/plan", "POST", { inventoryId: inventory.inventoryId, selections });
       setPlan(data);
       setNotice("Review the exact GOES list and protection reasons. No records have been deleted.");
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function executeCleanup() {
+    if (!plan?.planId || confirmation !== "DELETE") return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const data = await request("/api/admin/cleanup/execute", "POST", { planId: plan.planId, confirmation });
+      setExecution(data);
+      setPlan(old => old ? { ...old, status: data.status } : old);
+      setNotice(data.status === "COMPLETE" ? "Cleanup completed. The durable backup is available in Google Drive." : "Cleanup batch completed. Continue to process the remaining reviewed operations.");
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -102,10 +116,30 @@ export default function AdministratorCleanupControl() {
       <div className="form-actions" style={{marginTop:18}}><button type="button" onClick={preparePlan} disabled={busy}>Prepare Review Plan</button></div>
     </>}
     {plan && <div className="stat-card" style={{marginTop:18}}>
-      <strong>Review plan prepared — no deletion performed</strong>
+      <strong>Review plan: {plan.status || "AWAITING_REVIEW"}</strong>
       <p>Plan ID: {plan.planId}</p>
-      <p>{plan.summary?.stays || 0} STAYS · {plan.summary?.goes || 0} GOES · {plan.summary?.blocked || 0} protected</p>
-      <p>Destructive execution remains locked until the complete server-side deletion, backup and staging acceptance controls are released.</p>
+      <p>{plan.summary?.stays || 0} STAYS · {plan.summary?.goes || 0} GOES · {plan.summary?.blocked || 0} protected · {plan.summary?.operations || 0} operations</p>
+      <p>Review all GOES records and the approved related-record actions before confirming.</p>
+      <div className="table-wrapper">
+        <table><thead><tr><th>Planned operation</th><th>Record</th><th>Reason</th></tr></thead><tbody>
+          {(plan.executionOperations || []).map(operation => <tr key={operation.operationId}>
+            <td>{operation.type}</td><td>{operation.key || operation.uid || operation.fileId}</td><td>{operation.reason}</td>
+          </tr>)}
+        </tbody></table>
+      </div>
+      {plan.status !== "COMPLETE" && <>
+        <label className="field" style={{marginTop:16}}><span>Type DELETE to authorize the reviewed plan</span>
+          <input value={confirmation} onChange={e=>setConfirmation(e.target.value)} placeholder="DELETE" autoComplete="off"/>
+        </label>
+        <div className="form-actions" style={{marginTop:12}}>
+          <button type="button" onClick={executeCleanup} disabled={busy || confirmation !== "DELETE"}>
+            {busy ? "Executing…" : execution?.status === "IN_PROGRESS" || execution?.status === "PAUSED" ? "Continue / Retry Cleanup" : "Execute Reviewed Cleanup"}
+          </button>
+        </div>
+      </>}
+      {execution && <p role="status">{execution.status}: {execution.completedOperations ?? execution.operationOutcomes?.length ?? 0} operation results recorded.</p>}
+      {(execution?.backupUrl || plan.backupUrl) && <p><a href={execution?.backupUrl || plan.backupUrl} target="_blank" rel="noreferrer">Open durable cleanup backup</a></p>}
+      <p>Execution rechecks the inventory, protects restricted records, creates a Drive backup first and processes deletions in resumable batches.</p>
     </div>}
     {notice && <p className="success-message" role="status">{notice}</p>}
     {error && <p className="auth-message" role="alert">{error}</p>}
