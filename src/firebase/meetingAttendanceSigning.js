@@ -67,7 +67,8 @@ async function buildDailyAttendancePdf({meeting,date,records}){
 export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  const owner=auth.currentUser;
  if(!owner?.uid||!owner?.email)throw new Error("The meeting host must be signed in with an authenticated email account.");
- const meetingHostUid=clean(meeting?.meetingHostUid||meeting?.hostUid||meeting?.initiatorUid||meeting?.createdByUid||meeting?.ownerUid);\n if(meetingHostUid&&meetingHostUid!==owner.uid)throw new Error("Only the recorded meeting host may own this attendance document and dispatch its signing request.");
+ const meetingHostUid=clean(meeting?.meetingHostUid||meeting?.hostUid||meeting?.initiatorUid||meeting?.createdByUid||meeting?.ownerUid);
+ if(meetingHostUid&&meetingHostUid!==owner.uid)throw new Error("Only the recorded meeting host may own this attendance document and dispatch its signing request.");
  if(!meeting?.id||!date||!Array.isArray(records)||!records.length)throw new Error("A meeting, attendance date and compiled participant register are required.");
  const {bytes,fields,present}=await buildDailyAttendancePdf({meeting,date,records});
  if(!present.length)throw new Error("There are no participants marked Present for this day. No signing request was dispatched.");
