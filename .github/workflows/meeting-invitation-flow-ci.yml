@@ -32,6 +32,7 @@ on:
       - "drive-gateway/src/meetingServices.mjs"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-quorum-reconciliation.test.mjs"
+      - "tests/meeting-attendance-dispatch-reconciliation.test.mjs"
   pull_request:
     branches:
       - main
@@ -95,5 +96,7 @@ jobs:
         run: npm run test:meeting-invitation-resend
       - name: Test three-source Board quorum reconciliation
         run: npm run test:meeting-quorum
+      - name: Test attendance dispatch reconciliation and host closure
+        run: node --test tests/meeting-attendance-dispatch-reconciliation.test.mjs
       - name: Build web application
         run: npm run build
