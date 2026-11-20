@@ -197,7 +197,7 @@
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
       "reason": "Confirmed cause (d): openEmailSigning() consumes the invitation on the first GET, so link previews kill resent links; error messages are masked.",
-      "rollbackCommit": "dfb35cbb028749536973a616422d9aeb6829c2bf",
+      "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
       "scope": [
         "drive-gateway/src/signing.mjs",
         "drive-gateway/src/emailSigningLinks.mjs",
@@ -225,10 +225,15 @@
           "at": "2026-11-20T17:15:33Z",
           "action": "rollback-reference-corrected",
           "description": "Corrected Signature Portal rollback reference to dfb35cbb as directed; awaiting independent Worker /health confirmation. Meeting Portal baseline unchanged."
+        },
+        {
+          "at": "2026-11-20T17:20:46Z",
+          "action": "rollback-reference-verified",
+          "description": "Read successful production Worker no-secret-sync deployment run 44737326668; its production health gate confirms deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8. Signature Portal rollback reference corrected. Meeting Portal window and baseline remain unchanged."
         }
       ],
-      "rollbackCommitEvidence": "Firebase web build reported by owner as dfb35cb, matching repository main dfb35cbb; Worker /health verification pending.",
-      "rollbackCommitStatus": "provisional-owner-confirmed"
+      "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; its live production health gate verified the exact deployed target commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+      "rollbackCommitStatus": "verified-production-worker-deploy"
     }
   ]
 }
