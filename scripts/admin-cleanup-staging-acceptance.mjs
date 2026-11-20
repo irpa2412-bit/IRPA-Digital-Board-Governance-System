@@ -129,6 +129,12 @@ try {
   }
   const result = await call("/api/admin/cleanup/execute","POST",{planId:plan.planId,confirmation:"DELETE"});
   if (result.status!=="COMPLETE" || !result.backupDriveFileId || !result.backupUrl) throw new Error("Cleanup did not complete with a durable Drive backup.");
+  const backupCheck = await call("/api/admin/cleanup/backup/"+plan.planId+"/verify");
+  if (backupCheck.backupVerified!==true || backupCheck.recordCount!==inventory.records.length ||
+      backupCheck.goesCount!==2 || backupCheck.operationOutcomeCount!==(result.operationOutcomes||[]).length ||
+      backupCheck.auditRefCount<1 || backupCheck.executionStatus!=="COMPLETE") {
+    throw new Error("The durable Drive backup failed integrity verification.");
+  }
   if ((result.operationOutcomes||[]).some(item=>!["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"].includes(item.status))) throw new Error("Cleanup returned an unsuccessful operation outcome.");
 
   if (await firestoreRead("members/"+uid)) throw new Error("Member register entry remained after cleanup.");
