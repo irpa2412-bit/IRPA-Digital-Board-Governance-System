@@ -27,11 +27,11 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/listByField\(ctx,env,token,"meetingAccessTokens","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingEntryRequests","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId\)/);
-  assert.match(service,/Math\.ceil\(boardRows\.length\/3\)/);
+  assert.match(service,/Math\.ceil\(denominator\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
-  assert.match(service,/seenBoardIdentities\.has\(identity\)/);
-  assert.match(service,/duplicateBoardMemberRegistrations/);
+  assert.match(service,/registerByUid\.has\(uid\)/);
+  assert.match(service,/duplicateBoardMemberRegistrations/);\n  assert.match(service,/listCollection\(ctx,env,token,"members"\)/);\n  assert.match(service,/boardRegisterMembers:denominator/);\n  assert.match(service,/boardMembersNotRegistered/);
 });
 
 test("Board quorum excludes Board Committee members and external/manual invitees",()=>{
@@ -61,4 +61,23 @@ test("Meeting Room presents dispatch, queue and signed-attendance reconciliation
   assert.match(room,/Signed Attendance/);
   assert.match(room,/quorumAssessment\.rows\.map/);
   assert.match(room,/assessMeetingQuorum\(\{meetingId:selected\.id,save\}\)/);
+});
+
+test("Board Register is the authoritative UID-only quorum denominator",()=>{
+  assert.match(service,/\/api\/meeting-board-register\/list/);
+  assert.match(service,/SOURCE:ACTIVE_BOARD_MEMBERS_REGISTER_UID_ONLY/);
+  assert.match(service,/uid=clean\(member\.uid\|\|member\.authUid\|\|member\.userUid\)/);
+  assert.match(service,/const denominator=boardMembers\.length/);
+  assert.match(service,/registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false/);
+  assert.match(service,/UNMATCHED_BOARD_REGISTRATION/);
+  assert.match(api,/\/api\/meeting-board-register\/list/);
+  assert.match(meetings,/includes\(String\(m\.uid\)\)/);
+  assert.match(meetings,/selectedBoardMemberIds:Array\.isArray\(m\.participantUids\)/);
+});
+test("meeting participant registration cannot redefine the Board Register denominator",()=>{
+  assert.match(service,/boardRegister:"active members collection; UID-only; deduplicated by UID"/);
+  assert.match(service,/boardMembersNotRegistered/);
+  assert.match(service,/duplicateRegisterUids/);
+  assert.match(service,/missingRegisterUid/);
+  assert.match(service,/!registerUsable\?"NOT_ASSESSABLE"/);
 });
