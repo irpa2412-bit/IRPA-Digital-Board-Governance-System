@@ -40,30 +40,30 @@ export async function verifyHostAssets({ baseUrl, manifest, fetchImpl = fetch, r
 
   const htmlBytes = await get("/", "b");
   const html = new TextDecoder().decode(htmlBytes);
-  const entryMatch = html.match(/<script\\b[^>]*type=["']module["'][^>]*src=["']([^"']+)["'][^>]*>/i)
-    || html.match(/<script\\b[^>]*src=["']([^"']+)["'][^>]*type=["']module["'][^>]*>/i);
+  const entryMatch = html.match(/<script\b[^>]*type=["']module["'][^>]*src=["']([^"']+)["'][^>]*>/i)
+    || html.match(/<script\b[^>]*src=["']([^"']+)["'][^>]*type=["']module["'][^>]*>/i);
   if (!entryMatch) fail("b", "Live index.html does not reference a module entry bundle.");
   const entryPath = new URL(entryMatch[1], base).pathname;
-  const entryRelative = entryPath.replace(/^\\//, "");
+  const entryRelative = entryPath.replace(/^\//, "");
   if (!manifest.files?.[entryRelative]) fail("b", `Entry bundle ${entryRelative} is absent from this host's deploy manifest.`);
   await get(entryPath, "b");
 
-  const moduleName = Object.keys(manifest.files).find(name => /DocumentLifecycleModule.*\\.js$/i.test(name));
+  const moduleName = Object.keys(manifest.files).find(name => /DocumentLifecycleModule.*\.js$/i.test(name));
   if (!moduleName) fail("a", "Deploy manifest has no DocumentLifecycleModule JavaScript asset.");
   const moduleBytes = await get("/" + moduleName, "a");
   const actualHash = sha256(moduleBytes);
   if (actualHash !== manifest.files[moduleName].sha256) fail("a", `DocumentLifecycleModule SHA-256 mismatch for ${moduleName}: expected ${manifest.files[moduleName].sha256}, received ${actualHash}`);
   const moduleSource = new TextDecoder().decode(moduleBytes);
-  const imports = [...moduleSource.matchAll(/(?:from\\s*|import\\s*(?:\\(\\s*)?)["']([^"']+)["']/g)].map(m => m[1]);
+  const imports = [...moduleSource.matchAll(/(?:from\s*|import\s*(?:\(\s*)?)["']([^"']+)["']/g)].map(m => m[1]);
   for (const specifier of imports) {
     if (/^(https?:|data:)/i.test(specifier)) continue;
     const resolved = new URL(specifier, new URL("/" + moduleName, base));
-    const rel = resolved.pathname.replace(/^\\//, "");
+    const rel = resolved.pathname.replace(/^\//, "");
     if (!manifest.files[rel]) fail("d", `Imported asset ${rel} is absent from the deploy manifest.`);
     await get(resolved.pathname, "d");
   }
   const entrySource = new TextDecoder().decode(await get(entryPath, "b"));
-  const entryImport = [...entrySource.matchAll(/(?:from\\s*|import\\s*\\()["']([^"']+DocumentLifecycleModule[^"']*\\.js(?:\\?[^"']*)?)["']/g)][0]?.[1];
+  const entryImport = [...entrySource.matchAll(/(?:from\s*|import\s*\()["']([^"']+DocumentLifecycleModule[^"']*\.js(?:\?[^"']*)?)["']/g)][0]?.[1];
   if (!entryImport) fail("c", "Live entry bundle does not import DocumentLifecycleModule.");
   const importedPath = new URL(entryImport, new URL(entryPath, base)).pathname;
   if (importedPath !== "/" + moduleName) fail("c", `Entry bundle imports ${importedPath}, but the manifest module is /${moduleName}.`);
@@ -73,7 +73,7 @@ export async function verifyHostAssets({ baseUrl, manifest, fetchImpl = fetch, r
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
   if (process.argv[2] === "--write-manifest") {
     const root = path.resolve(process.argv[3] || "dist");
-    fs.writeFileSync(path.join(root, "deploy-manifest.json"), JSON.stringify(createManifest(root), null, 2) + "\\n");
+    fs.writeFileSync(path.join(root, "deploy-manifest.json"), JSON.stringify(createManifest(root), null, 2) + "\n");
   } else {
     const baseUrl = process.argv[2];
     const manifestPath = process.argv[3];
