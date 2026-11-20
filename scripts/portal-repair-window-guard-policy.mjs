@@ -45,6 +45,96 @@ export function evaluateSignatureWindowAmendment({
   return { pass: true, reason: "Only the separate Signature Portal window amendment is permitted." };
 }
 
+
+export const MEETING_WINDOW_CHANGE_PATHS = new Set([
+  "docs/portal-protection/change-record.json",
+  "src/pages/MeetingRoom.jsx",
+  "drive-gateway/src/meetingServices.mjs",
+  "scripts/check-meeting-media-governance.mjs",
+  "tests/meeting-daily-attendance-email-signing.test.mjs",
+  "tests/meeting-quorum-reconciliation.test.mjs",
+  "tests/meeting-portal-browser.test.mjs",
+  "drive-gateway/tests/meeting-services-router.test.mjs",
+  "drive-gateway/MEETING_WORKER_MIGRATION.md",
+  "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "scripts/portal-repair-window-guard-policy.mjs",
+  "tests/meeting-isolation-guard.test.mjs"
+]);
+
+export function evaluateMeetingWindowAmendment({
+  changedPaths, repairWindow, baselineRepairWindow, currentRepairWindow,
+  baselineChangeRecord, currentChangeRecord, protectedFiles = [],
+  baselineCommit, now = new Date()
+}) {
+  const changed = [...new Set(changedPaths)].sort();
+  if (!changed.includes("docs/portal-protection/change-record.json") ||
+      changed.includes("docs/portal-protection/repair-window.json") ||
+      !changed.every(path => MEETING_WINDOW_CHANGE_PATHS.has(path))) {
+    return { pass: false, reason: "Meeting Portal Change Record amendment is not limited to its declared repair files." };
+  }
+  if (!protectedFiles.length) {
+    return { pass: false, reason: "No protected Meeting Portal source file is included in the Change Record amendment." };
+  }
+  const scope = repairWindow?.scope ?? [];
+  const inScope = path => scope.some(item => item.endsWith("/") ? path.startsWith(item) : path === item);
+  if (repairWindow?.status !== "open" || !protectedFiles.every(inScope)) {
+    return { pass: false, reason: "Protected Meeting Portal files are outside the active Meeting Portal repair window." };
+  }
+  const openedAt = Date.parse(repairWindow.openedAt || "");
+  const lastActivityAt = Date.parse(repairWindow.lastActivityAt || "");
+  const inactivityMs = Number(repairWindow.inactivityCloseHours || 24) * 60 * 60 * 1000;
+  if (!Number.isFinite(openedAt) || !Number.isFinite(lastActivityAt) ||
+      lastActivityAt < openedAt || now.getTime() < lastActivityAt ||
+      now.getTime() - lastActivityAt >= inactivityMs) {
+    return { pass: false, reason: "Meeting Portal repair window is closed or has exceeded its inactivity limit." };
+  }
+  if (JSON.stringify(baselineRepairWindow) !== JSON.stringify(currentRepairWindow)) {
+    return { pass: false, reason: "Meeting Portal Change Record amendment altered the repair-window declaration or another portal's window." };
+  }
+  if (JSON.stringify(baselineChangeRecord.activeAmendment) !== JSON.stringify(currentChangeRecord.activeAmendment)) {
+    return { pass: false, reason: "Meeting Portal Change Record amendment altered the independent Signature Portal amendment." };
+  }
+  const previous = currentChangeRecord.previousTopLevelRecord;
+  const expectedPrevious = {
+    declaration: baselineChangeRecord.declaration,
+    baseline: baselineChangeRecord.baseline,
+    validation: baselineChangeRecord.validation,
+    repairWindow: baselineChangeRecord.repairWindow,
+    closure: baselineChangeRecord.closure
+  };
+  if (JSON.stringify(previous) !== JSON.stringify(expectedPrevious)) {
+    return { pass: false, reason: "The previous top-level Change Record has not been preserved exactly." };
+  }
+  const strip = value => {
+    const copy = structuredClone(value);
+    for (const key of ["declaration", "baseline", "validation", "repairWindow", "previousTopLevelRecord"]) delete copy[key];
+    return copy;
+  };
+  if (JSON.stringify(strip(baselineChangeRecord)) !== JSON.stringify(strip(currentChangeRecord))) {
+    return { pass: false, reason: "Meeting Portal amendment changed the active Signature Portal window or unrelated Change Record history." };
+  }
+  const record = currentChangeRecord;
+  const declaration = record.declaration ?? {};
+  if (record.status !== "complete" ||
+      !declaration.affectedPortals?.includes("Meeting Portal") ||
+      !protectedFiles.every(file => declaration.files?.includes(file)) ||
+      !declaration.reason || !declaration.expectedEffect ||
+      !Array.isArray(declaration.prohibitedChanges) || !declaration.prohibitedChanges.length) {
+    return { pass: false, reason: "Meeting Portal Change Record must declare every protected file, affected portal, reason, expected effect and prohibited changes." };
+  }
+  if (!baselineCommit || record.baseline?.commit !== baselineCommit ||
+      record.baseline?.rollbackCommit !== baselineCommit) {
+    return { pass: false, reason: "Meeting Portal baseline and rollback commits must match the verified production base." };
+  }
+  const validation = record.validation ?? {};
+  if (validation.baselineSmoke !== "PASS" || validation.fullRegression !== "PASS" ||
+      validation.portalSmoke?.["Meeting Portal"] !== "PASS" ||
+      !Array.isArray(validation.behaviourDifferences)) {
+    return { pass: false, reason: "Meeting Portal Change Record requires passing baseline smoke, full regression and portal smoke evidence." };
+  }
+  return { pass: true, reason: "Meeting Portal Change Record amendment is scoped, evidence-backed and preserves the independent Signature Portal record." };
+}
+
 export function protectedSignatureChangeHasRecord({ changedPaths, changeRecord }) {
   const protectedPaths = [
     "drive-gateway/src/signing.mjs",
