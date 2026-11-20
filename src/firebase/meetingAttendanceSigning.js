@@ -103,7 +103,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  if(new Set(presentUids).size!==presentUids.length)throw new Error("The daily attendance sheet contains duplicate participant UIDs. Correct the participant register before dispatching signing requests.");
  const recipients=[...new Map(present.map(row=>{
   const uid=clean(row.participantUid||row.uid||row.userId);
-  return [uid,{uid,email:clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase(),name:clean(row.name||row.participantName||row.fullName),role:clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),institutionalRole:clean(row.role||row.participantRole)}];
+  const role=clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),title=clean(row.title||row.position||row.boardPosition),occupation=clean(row.occupation||row.capacity||row.profession||title||role),capacity=clean(row.capacity||row.occupation||title||role);return [uid,{uid,email:clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase(),name:clean(row.name||row.participantName||row.fullName),role,institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),roleAssignments:[{role,title,capacity,occupation}]}];
  })).values()];
  const documentId=doc(collection(db,"documents")).id;
  const reference="IRPA-ATT-"+String(meeting.reference||meeting.id).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+date;
