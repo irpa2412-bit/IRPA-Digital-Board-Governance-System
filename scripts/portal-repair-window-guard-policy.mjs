@@ -107,3 +107,69 @@ export function evaluateSignatureWindowRepair({
   }
   return { pass: true, reason: "Repair is limited to the active Signature Portal window." };
 }
+
+
+export function evaluateSignatureWindowClosure({
+  changedPaths, baselineRepairWindow, currentRepairWindow,
+  baselineChangeRecord, currentChangeRecord, now = new Date()
+}) {
+  const changed = [...new Set(changedPaths)].sort();
+  const expected = [...SIGNATURE_WINDOW_AMENDMENT_PATHS].sort();
+  if (JSON.stringify(changed) !== JSON.stringify(expected)) {
+    return { pass: false, reason: "Window closure must be a separate five-file Change Record amendment." };
+  }
+  const baselineSignature = baselineRepairWindow?.parallelWindows?.find(item => item.portal === "Signature Portal");
+  const currentSignature = currentRepairWindow?.parallelWindows?.find(item => item.portal === "Signature Portal");
+  const meetingWindows = doc => (doc?.parallelWindows || []).filter(item => item.portal !== "Signature Portal");
+  if (JSON.stringify(meetingWindows(baselineRepairWindow)) !== JSON.stringify(meetingWindows(currentRepairWindow))) {
+    return { pass: false, reason: "Closing the Signature Portal window changed the independent Meeting Portal window." };
+  }
+  const stripSignature = item => {
+    const copy = structuredClone(item);
+    for (const key of ["status", "closedAt", "lastActivityAt", "closureEvidence", "activityLog"]) delete copy[key];
+    return copy;
+  };
+  if (!baselineSignature || baselineSignature.status !== "open" ||
+      !currentSignature || currentSignature.status !== "closed" ||
+      !currentSignature.closedAt || !currentSignature.closureEvidence) {
+    return { pass: false, reason: "The Signature Portal window is not being closed with completion evidence." };
+  }
+  if (JSON.stringify(stripSignature(baselineSignature)) !== JSON.stringify(stripSignature(currentSignature))) {
+    return { pass: false, reason: "The Signature Portal scope, rollback reference, or prohibitions changed during closure." };
+  }
+  const baselineActivity = baselineSignature.activityLog || [];
+  const currentActivity = currentSignature.activityLog || [];
+  if (currentActivity.length !== baselineActivity.length + 1 ||
+      JSON.stringify(currentActivity.slice(0, baselineActivity.length)) !== JSON.stringify(baselineActivity) ||
+      currentActivity.at(-1)?.action !== "closed") {
+    return { pass: false, reason: "The Signature Portal activity history was rewritten instead of appended with one closure record." };
+  }
+  const baselineAmendment = baselineChangeRecord?.activeAmendment;
+  const currentAmendment = currentChangeRecord?.activeAmendment;
+  const stripAmendment = item => {
+    const copy = structuredClone(item);
+    for (const key of ["status", "closedAt", "completion"]) delete copy[key];
+    return copy;
+  };
+  if (!baselineAmendment || baselineAmendment.status !== "open" ||
+      !currentAmendment || currentAmendment.status !== "closed" ||
+      !currentAmendment.closedAt || !currentAmendment.completion) {
+    return { pass: false, reason: "The active Change Record is not being closed with merge, deployment and smoke evidence." };
+  }
+  if (JSON.stringify(stripAmendment(baselineAmendment)) !== JSON.stringify(stripAmendment(currentAmendment))) {
+    return { pass: false, reason: "The Signature Portal Change Record scope or original authorisation changed during closure." };
+  }
+  const stripOtherHistory = value => {
+    const copy = structuredClone(value);
+    delete copy.activeAmendment;
+    return copy;
+  };
+  if (JSON.stringify(stripOtherHistory(baselineChangeRecord)) !== JSON.stringify(stripOtherHistory(currentChangeRecord))) {
+    return { pass: false, reason: "Closing the Signature Portal amendment changed another portal's Change Record or history." };
+  }
+  const closedAt = Date.parse(currentSignature.closedAt);
+  if (!Number.isFinite(closedAt) || closedAt > now.getTime() + 5 * 60 * 1000) {
+    return { pass: false, reason: "The Signature Portal closure timestamp is invalid." };
+  }
+  return { pass: true, reason: "Only the completed Signature Portal repair window and its Change Record were closed." };
+}
