@@ -531,14 +531,33 @@ export function createAdministratorCleanupRouter(deps) {
   async function revalidatePlan(env, auth, plan, inventory) {
     const freshRecords = await loadInventory(env,auth);
     const freshByKey = new Map(freshRecords.map(row=>[row.key,row]));
+    const successfulStatuses = new Set(["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"]);
+    const completedIds = new Set((plan.operationOutcomes||[]).filter(item=>successfulStatuses.has(item.status)).map(item=>item.operationId));
+    const completedDependencyKeys = new Set(plan.executionOperations.filter(operation=>
+      completedIds.has(operation.operationId) && ["firestore-delete","update-signers"].includes(operation.type)).map(operation=>operation.key));
+
     for (const row of plan.records.filter(item=>item.decision==="GOES")) {
       const fresh = freshByKey.get(row.key);
-      if (!fresh || !row.version || fresh.version !== row.version) throw Object.assign(new Error("Inventory is stale for " + row.key + ". Take a fresh inventory and review the plan again."),{status:409});
+      const rowDelete = plan.executionOperations.find(operation=>operation.type==="firestore-delete" && operation.key===row.key);
+      const authDelete = plan.executionOperations.find(operation=>operation.type==="auth-delete" &&
+        (operation.key===row.key || (row.uid && operation.uid===row.uid)));
+      const rowAlreadyRemoved = (rowDelete && completedIds.has(rowDelete.operationId)) ||
+        (row.collection==="firebaseAuthAccounts" && authDelete && completedIds.has(authDelete.operationId));
+      if (!fresh) {
+        if (rowAlreadyRemoved) continue;
+        throw Object.assign(new Error("Inventory record disappeared before its approved operation completed: " + row.key),{status:409});
+      }
+      if (!row.version || fresh.version !== row.version) throw Object.assign(new Error("Inventory is stale for " + row.key + ". Take a fresh inventory and review the plan again."),{status:409});
       if (fresh.protected) throw Object.assign(new Error("Protection state changed for " + row.key + ". Cleanup was stopped."),{status:409});
-      if (JSON.stringify([...(fresh.linkedRecordKeys||[])].sort()) !== JSON.stringify([...(row.linkedRecordKeys||[])].sort())) {
+      const expectedLinks = (row.linkedRecordKeys||[]).filter(key=>!completedDependencyKeys.has(key)).sort();
+      const freshLinks = (fresh.linkedRecordKeys||[]).sort();
+      const addedLinks = freshLinks.filter(key=>!(row.linkedRecordKeys||[]).includes(key));
+      const missingUncompletedLinks = expectedLinks.filter(key=>!freshLinks.includes(key));
+      if (addedLinks.length || missingUncompletedLinks.length) {
         throw Object.assign(new Error("Record dependencies changed for " + row.key + ". Take a fresh inventory and review the plan again."),{status:409});
       }
     }
+
     const authOperations = plan.executionOperations.filter(item=>item.type==="auth-delete");
     if (authOperations.length) {
       const authToken = await getFirebaseAuthAdminAccessToken(env);
@@ -548,15 +567,26 @@ export function createAdministratorCleanupRouter(deps) {
         if (account && operation.email && clean(account.email).toLowerCase()!==operation.email) {
           throw Object.assign(new Error("Firebase Auth UID/email binding changed for " + operation.key + ". Cleanup was stopped."),{status:409});
         }
+        if (account && completedIds.has(operation.operationId)) {
+          throw Object.assign(new Error("A Firebase Auth account reappeared after its approved deletion: " + operation.key),{status:409});
+        }
       }
     }
-    for (const operation of plan.executionOperations.filter(item=>["firestore-delete","update-signers"].includes(item.type))) {
+
+    const pendingRecordOperations = plan.executionOperations.filter(item=>
+      ["firestore-delete","update-signers"].includes(item.type) && !completedIds.has(item.operationId));
+    for (const operation of pendingRecordOperations) {
       const fresh = freshByKey.get(operation.key);
-      if (!fresh || !operation.version || fresh.version !== operation.version) throw Object.assign(new Error("A related record changed after inventory: " + operation.key),{status:409});
-      if (operation.type === "update-signers" && !unsentEnvelope(dataOf(fresh).status)) throw Object.assign(new Error("A signing assignment became active or completed; cleanup was stopped."),{status:409});
+      if (!fresh || !operation.version || fresh.version !== operation.version) {
+        throw Object.assign(new Error("A related record changed after inventory: " + operation.key),{status:409});
+      }
+      if (operation.type === "update-signers" && !unsentEnvelope(dataOf(fresh).status)) {
+        throw Object.assign(new Error("A signing assignment became active or completed; cleanup was stopped."),{status:409});
+      }
     }
+
     const checked = new Set();
-    for (const operation of plan.executionOperations.filter(item=>item.type==="firestore-delete")) {
+    for (const operation of pendingRecordOperations.filter(item=>item.type==="firestore-delete")) {
       if (checked.has(operation.path)) continue;
       checked.add(operation.path);
       const nested = await listSubcollections(env,auth.token,operation.path);
