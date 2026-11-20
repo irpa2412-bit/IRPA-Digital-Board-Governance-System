@@ -183,6 +183,7 @@ export async function callMeetingService(path, payload = {}) {
 }
 export async function assessMeetingQuorum({ meetingId } = {}) {
   const store = readStore();
+  recordAction({ type: "quorum-assess", meetingId, quorumMet: true });
   const participants = store.participants.filter(p => p.meetingId === meetingId);
   const boardMembers = participants.filter(p => p.participantUid);
   return { assessment: {
