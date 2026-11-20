@@ -127,16 +127,14 @@ try {
       assert.equal(workflowRecords.resolutions.length, 1, "resolution should remain in the TEST store");
       assert.equal(workflowRecords.actions.length, 1, "action should be recorded in the TEST store");
 
-      await page.getByRole("button", { name: "Dispatch Signing Requests" }).click();
-      await page.getByText(/Signing requests dispatched through the Signature Portal email-link workflow/).waitFor();
-      const signing = await page.evaluate(() => (window.__irpaFixtureActions || []).findLast(x => x.type === "attendance-signing-mock"));
-      assert.ok(signing, "attendance signing must use the Signature Portal mock");
-      assert.equal(signing.assignments.length, 4, "registered member and three guest positions must each receive a signer");
-      assert.equal(signing.sameEmailCount, 3, "three guest positions sharing one email must remain separate signers");
-      assert.equal(signing.emailSent, false, "the fixture must never send real email");
+      await page.getByRole("button", { name: "Open Signature Portal" }).click();
+      const attendanceSigningNavigation = await page.evaluate(() => (window.__irpaNavigationCalls || []).findLast(x => x.module === "Signature Platform") || null);
+      assert.equal(attendanceSigningNavigation?.context?.meetingId, created.id, "standalone Signature Portal navigation must retain the selected meeting context");
+      assert.equal(attendanceSigningNavigation?.context?.meetingReference, created.reference || created.title, "standalone Signature Portal navigation must retain the canonical meeting reference");
+      const attendanceSigningMocks = await page.evaluate(() => (window.__irpaFixtureActions || []).filter(x => x.type === "attendance-signing-mock"));
+      assert.equal(attendanceSigningMocks.length, 0, "Meeting Portal attendance must not automatically create or dispatch a signing envelope");
       const allMockActions = await page.evaluate(() => window.__irpaFixtureActions || []);
       assert.ok(allMockActions.every(action => action.emailSent === false), "no fixture action may send real email");
-      assert.equal(new Set(signing.assignments.map(x => x.signerId)).size, 4, "each participant position must have its own signer ID");
 
       await page.getByPlaceholder(/The AI Assistant transcript appears here automatically/).fill("TEST minutes source: the Board reviewed and approved the work plan.");
       await page.getByRole("button", { name: "Save Transcript Now" }).click();
