@@ -540,7 +540,12 @@ export function createAdministratorCleanupRouter(deps) {
         if (!raw) return json({ok:false,error:"Cleanup status not found or expired."},404,corsHeaders(request));
         const plan = JSON.parse(raw);
         if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup plan belongs to a different administrator."},403,corsHeaders(request));
-        return json({ok:true,planId:plan.planId,status:plan.status,inventoryId:plan.inventoryId,stays:plan.records.filter(row=>row.decision==="STAYS").length,goes:plan.records.filter(row=>row.decision==="GOES").length,executionEnabled:false},200,corsHeaders(request));
+        return json({ok:true,planId:plan.planId,status:plan.status,inventoryId:plan.inventoryId,
+          stays:plan.records.filter(row=>row.decision==="STAYS").length,goes:plan.records.filter(row=>row.decision==="GOES").length,
+          operationCount:(plan.executionOperations||[]).length,operationOutcomes:plan.operationOutcomes||[],
+          backupUrl:plan.backupUrl||null,backupDriveFileId:plan.backupDriveFileId||null,
+          completed:(plan.operationOutcomes||[]).filter(item=>["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"].includes(item.status)).length,
+          executionEnabled:true},200,corsHeaders(request));
       }
       if (pathname.startsWith("/api/admin/cleanup/backup/") && request.method === "GET") {
         const planId = pathname.split("/").pop();
@@ -548,7 +553,13 @@ export function createAdministratorCleanupRouter(deps) {
         if (!raw) return json({ok:false,error:"Cleanup backup not found or expired."},404,corsHeaders(request));
         const plan = JSON.parse(raw);
         if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup backup belongs to a different administrator."},403,corsHeaders(request));
-        return json({ok:true,backup:{planId:plan.planId,inventoryId:plan.inventoryId,createdAt:plan.createdAt,administratorUid:plan.administratorUid,administratorEmail:plan.administratorEmail,selections:plan.records.map(row=>({key:row.key,collection:row.collection,recordId:row.id,name:row.name,email:row.email,decision:row.decision,protected:row.protected,protectionReason:row.protectionReason,linkedIdentityUid:row.uid,signedPdfReference:row.signedPdfReference})),operationOutcomes:[],status:plan.status}},200,corsHeaders(request));
+        return json({ok:true,backup:{planId:plan.planId,inventoryId:plan.inventoryId,createdAt:plan.createdAt,
+          administratorUid:plan.administratorUid,administratorEmail:plan.administratorEmail,
+          selections:plan.records.map(row=>({key:row.key,collection:row.collection,recordId:row.id,name:row.name,email:row.email,
+            decision:row.decision,decisionSource:row.decisionSource,protected:row.protected,protectionReason:row.protectionReason,
+            linkedRecordKeys:row.linkedRecordKeys,signedPdfReference:row.signedPdfReference})),
+          operationOutcomes:plan.operationOutcomes||[],auditRefs:plan.auditRefs||[],status:plan.status,
+          driveBackupFileId:plan.backupDriveFileId||null,driveBackupUrl:plan.backupUrl||null}},200,corsHeaders(request));
       }
       if (pathname === "/api/admin/cleanup/execute" && request.method === "POST") {
         const body = await request.json().catch(() => ({}));
@@ -558,7 +569,95 @@ export function createAdministratorCleanupRouter(deps) {
         const plan = JSON.parse(raw);
         if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup plan belongs to a different administrator."},403,corsHeaders(request));
         if (body.confirmation !== "DELETE") return json({ok:false,error:"Type DELETE exactly to confirm the reviewed cleanup plan."},400,corsHeaders(request));
-        return json({ok:false,code:"EXECUTOR_NOT_READY",error:"Execution is locked. The inventory and review gate is active, but destructive record handlers must pass staging acceptance before any reset can run.",planId},423,corsHeaders(request));
+        if (plan.status === "COMPLETE") return json({ok:true,planId,status:"COMPLETE",backupUrl:plan.backupUrl,operationOutcomes:plan.operationOutcomes||[]},200,corsHeaders(request));
+        if (!Array.isArray(plan.executionOperations) || !plan.executionOperations.length) return json({ok:false,error:"The reviewed plan contains no executable GOES records."},409,corsHeaders(request));
+        const inventoryRaw = await env.DRIVE_KV.get("admin-cleanup:inventory:" + plan.inventoryId);
+        if (!inventoryRaw) return json({ok:false,error:"The source inventory expired. Take a fresh inventory and prepare a new plan."},409,corsHeaders(request));
+        const inventory = JSON.parse(inventoryRaw);
+        let driveToken;
+        try {
+          driveToken = await getDriveAccessToken(env);
+          if (!plan.backupDriveFileId) {
+            await revalidatePlan(env,auth,plan,inventory);
+            const backup = await uploadBackup(env,plan,inventory,auth,driveToken);
+            plan.backupDriveFileId = backup.fileId;
+            plan.backupUrl = backup.url;
+            plan.backupFolderId = backup.folderId;
+            plan.backupDriveFileCopies = backup.driveFileCopies;
+            plan.backupArchive = backup.archive;
+            plan.status = "BACKUP_CREATED";
+            const auditRef = await writeAuditEvent(env,auth.token,{eventType:"EXECUTION_STARTED",planId:plan.planId,
+              inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,backupDriveFileId:plan.backupDriveFileId,
+              startedAt:new Date().toISOString(),operationCount:plan.executionOperations.length});
+            plan.auditRefs.push(auditRef);
+            plan.backupArchive.auditRefs = plan.auditRefs;
+            plan.backupArchive.backupDriveFileId = plan.backupDriveFileId;
+            plan.backupArchive.backupUrl = plan.backupUrl;
+            await updateBackup(env,plan,driveToken);
+            await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
+          }
+          const outcomesById = new Map((plan.operationOutcomes||[]).map(item=>[item.operationId,item]));
+          const pending = plan.executionOperations.filter(operation=>!outcomesById.has(operation.operationId) ||
+            !["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"].includes(outcomesById.get(operation.operationId).status));
+          if (!pending.length) {
+            plan.status = "COMPLETE";
+            await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
+            return json({ok:true,planId,status:plan.status,backupUrl:plan.backupUrl,operationOutcomes:plan.operationOutcomes},200,corsHeaders(request));
+          }
+          const batch = pending.slice(0,Math.min(10,Number(plan.batchSize)||10));
+          const batchAuditRef = await writeAuditEvent(env,auth.token,{eventType:"BATCH_STARTED",planId:plan.planId,
+            inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,startedAt:new Date().toISOString(),
+            operationIds:batch.map(operation=>operation.operationId)});
+          plan.auditRefs.push(batchAuditRef);
+          const authToken = batch.some(operation=>operation.type==="auth-delete") ? await getFirebaseAuthAdminAccessToken(env) : "";
+          for (const operation of batch) {
+            try {
+              const result = await executeOperation(env,auth,operation,driveToken,authToken);
+              plan.operationOutcomes = [...(plan.operationOutcomes||[]),{operationId:operation.operationId,type:operation.type,
+                key:operation.key,status:result,completedAt:new Date().toISOString()}];
+              await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
+            } catch (operationError) {
+              plan.operationOutcomes = [...(plan.operationOutcomes||[]),{operationId:operation.operationId,type:operation.type,
+                key:operation.key,status:"FAILED",error:String(operationError?.message||operationError).slice(0,500),
+                failedAt:new Date().toISOString()}];
+              plan.status = "PAUSED";
+              try {
+                const failedAuditRef = await writeAuditEvent(env,auth.token,{eventType:"OPERATION_FAILED",planId:plan.planId,
+                  inventoryId:plan.inventoryId,actorUid:auth.uid,operationId:operation.operationId,
+                  recordKey:operation.key,error:String(operationError?.message||operationError).slice(0,500),failedAt:new Date().toISOString()});
+                plan.auditRefs.push(failedAuditRef);
+                plan.backupArchive.operationOutcomes = plan.operationOutcomes;
+                plan.backupArchive.auditRefs = plan.auditRefs;
+                await updateBackup(env,plan,driveToken);
+              } catch {}
+              await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
+              return json({ok:false,code:"CLEANUP_PAUSED",planId,status:plan.status,error:String(operationError?.message||operationError).slice(0,500),
+                backupUrl:plan.backupUrl,operationOutcomes:plan.operationOutcomes},409,corsHeaders(request));
+            }
+          }
+          const completed = plan.operationOutcomes.filter(item=>["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"].includes(item.status)).length;
+          const remaining = plan.executionOperations.length - completed;
+          plan.status = remaining > 0 ? "IN_PROGRESS" : "COMPLETE";
+          const batchCompleteAudit = await writeAuditEvent(env,auth.token,{eventType:remaining>0?"BATCH_COMPLETED":"EXECUTION_COMPLETED",
+            planId:plan.planId,inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,
+            completedOperations:completed,totalOperations:plan.executionOperations.length,completedAt:new Date().toISOString(),
+            backupDriveFileId:plan.backupDriveFileId});
+          plan.auditRefs.push(batchCompleteAudit);
+          plan.backupArchive.operationOutcomes = plan.operationOutcomes;
+          plan.backupArchive.auditRefs = plan.auditRefs;
+          plan.backupArchive.executionStatus = plan.status;
+          plan.backupArchive.updatedAt = new Date().toISOString();
+          await updateBackup(env,plan,driveToken);
+          await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
+          return json({ok:true,planId,status:plan.status,completedOperations:completed,totalOperations:plan.executionOperations.length,
+            remainingOperations:remaining,backupDriveFileId:plan.backupDriveFileId,backupUrl:plan.backupUrl,
+            operationOutcomes:plan.operationOutcomes,continueRequired:remaining>0},remaining>0?202:200,corsHeaders(request));
+        } catch (executionError) {
+          plan.status = plan.backupDriveFileId ? "PAUSED" : "AWAITING_REVIEW";
+          plan.lastError = String(executionError?.message||executionError).slice(0,500);
+          await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
+          return json({ok:false,code:"CLEANUP_EXECUTION_BLOCKED",error:plan.lastError,planId,backupUrl:plan.backupUrl||null},Number(executionError?.status||502),corsHeaders(request));
+        }
       }
       return json({ok:false,error:"Method not allowed or cleanup route not found."},405,corsHeaders(request));
     } catch (error) {
