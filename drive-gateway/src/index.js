@@ -40,7 +40,15 @@ import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { createReleaseReadinessRoute } from "./releaseReadinessRoutes.mjs";
 import { createEmergencyStorageDiscoveryRoute } from "./emergencyStorageDiscovery.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
-import { getEnvelopeStatus as getGatewayEnvelopeStatus } from "./signing.mjs";
+import {
+  getEnvelopeStatus as getGatewayEnvelopeStatus,
+  previewEmailSigning as previewGatewayEmailSigning,
+  openEmailSigning as openGatewayEmailSigning,
+  getSigningPdf as getGatewaySigningPdf,
+  resendInvitation as resendGatewayInvitation,
+  resendAllUnsignedInvitations as resendAllGatewayUnsignedInvitations,
+  updateSignerContact as updateGatewaySignerContact
+} from "./signing.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
@@ -574,6 +582,50 @@ export default {
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
+          const emailRouteUrl = new URL(request.url);
+          const emailToken = request.headers.get("x-signing-token") || "";
+          const emailRouteJson = (payload,status=200) => json(payload,status,corsHeaders(request));
+          if(request.method==="GET"&&emailRouteUrl.pathname==="/api/sign/email/open"){
+            try{return emailRouteJson(await previewGatewayEmailSigning(ctx,emailToken),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation preview unavailable."),code:error?.code||"TOKEN_LOOKUP"},Number(error?.status||404));}
+          }
+          if(request.method==="POST"&&emailRouteUrl.pathname==="/api/sign/email/session"){
+            try{return emailRouteJson(await openGatewayEmailSigning(ctx,emailToken,request.headers.get("cf-connecting-ip")||""),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Signing session could not be opened."),code:error?.code||"SESSION_CREATE"},Number(error?.status||401));}
+          }
+          if(request.method==="GET"&&emailRouteUrl.pathname==="/api/sign/email/pdf"){
+            try{
+              const pdf=await getGatewaySigningPdf(ctx,emailToken,null);
+              return new Response(pdf.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf","content-disposition":"inline","x-document-sha256":pdf.hash,"cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; sandbox"}});
+            }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Document preview unavailable."),code:error?.code||"PDF_PREVIEW"},Number(error?.status||404));}
+          }
+          let emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/(S\\d+)\\/resend$/);
+          if(request.method==="POST"&&emailMatch){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{
+              const result=await resendGatewayInvitation(ctx,user,emailMatch[1],emailMatch[2]);
+              const current=await ctx.meta.get("envelopes",emailMatch[1]);
+              const signer=current?.signers?.find(item=>item.id===emailMatch[2]);
+              return emailRouteJson({...result,maskedRecipient:signer?.email?String(signer.email).replace(/^(.{1,2})[^@]*(@.*)$/,"$1***$2"):"recipient",confirmationText:"New link sent to "+(signer?.email?String(signer.email).replace(/^(.{1,2})[^@]*(@.*)$/,"$1***$2"):"recipient")+"...",expiresAtEAT:result.expiresAt?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(result.expiresAt))+" EAT":null},200);
+            }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
+          }
+          emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/resend-all$/);
+          if(request.method==="POST"&&emailMatch){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{return emailRouteJson(await resendAllGatewayUnsignedInvitations(ctx,user,emailMatch[1]),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Bulk resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
+          }
+          emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/(S\\d+)\\/contact$/);
+          if(request.method==="PATCH"&&emailMatch){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{
+              const body=await request.json();
+              return emailRouteJson(await updateGatewaySignerContact(ctx,user,emailMatch[1],emailMatch[2],body),200);
+            }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Signer contact update failed."),code:error?.code||"CONTACT_UPDATE"},Number(error?.status||400));}
+          }
           const response = await esignRoute(request,ctx);
           const headers = new Headers(response.headers);
           for (const [k,v] of Object.entries(corsHeaders(request))) headers.set(k,v);
