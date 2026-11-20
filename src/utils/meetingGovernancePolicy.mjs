@@ -6,12 +6,13 @@ export function normalizeMeetingGovernancePolicy(input={}){
  const thresholdType=String(voting.thresholdType||"").toLowerCase(),thresholdNumerator=integer(voting.numerator),thresholdDenominator=integer(voting.denominator);
  const thresholdConfigured=["simple_majority","one_third","two_thirds"].includes(thresholdType)||(thresholdType==="custom"&&Number.isInteger(thresholdNumerator)&&thresholdNumerator>0&&Number.isInteger(thresholdDenominator)&&thresholdDenominator>0&&thresholdNumerator<=thresholdDenominator);
  const votingDenominator=String(voting.denominatorBasis||"").toLowerCase();
+ const sourceReference=String(input.source?.reference||input.policyReference||"").trim(),effectiveDate=String(input.source?.effectiveDate||input.effectiveDate||"").trim();
  return {
   version:1,
-  status:configured&&thresholdConfigured&&["votes_cast","eligible_present","total_eligible"].includes(votingDenominator)?"CONFIGURED":"UNCONFIGURED",
+  status:configured&&thresholdConfigured&&["votes_cast","eligible_present","total_eligible"].includes(votingDenominator)&&Boolean(sourceReference)&&Boolean(effectiveDate)?"CONFIGURED":"UNCONFIGURED",
   quorum:{basis,fixedCount:Number.isFinite(fixedCount)?fixedCount:null,numerator:Number.isFinite(numerator)?numerator:null,denominator:Number.isFinite(denominator)?denominator:null,denominatorSource:"active_eligible_members"},
   voting:{thresholdType,numerator:Number.isFinite(thresholdNumerator)?thresholdNumerator:null,denominator:Number.isFinite(thresholdDenominator)?thresholdDenominator:null,denominatorBasis:votingDenominator,abstentionTreatment:voting.abstentionTreatment==="count_as_against"?"count_as_against":"exclude",tiePolicy:["rejected","pending","chair_decides"].includes(voting.tiePolicy)?voting.tiePolicy:"pending",requireQuorumAtVoteOpen:voting.requireQuorumAtVoteOpen!==false,requireQuorumAtVoteClose:voting.requireQuorumAtVoteClose!==false,eligibleVoterGroup:String(voting.eligibleVoterGroup||"board_members"),secondingRequired:voting.secondingRequired===true},
-  source:{reference:String(input.source?.reference||input.policyReference||"").trim(),effectiveDate:String(input.source?.effectiveDate||input.effectiveDate||"").trim()}
+  source:{reference:sourceReference,effectiveDate}
  };
 }
 export function calculateRequiredQuorum(eligibleCount,policyInput={}){
