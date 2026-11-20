@@ -49,7 +49,6 @@ export function protectedSignatureChangeHasRecord({ changedPaths, changeRecord }
   const protectedPaths = [
     "drive-gateway/src/signing.mjs",
     "drive-gateway/src/emailSigningLinks.mjs",
-    "drive-gateway/src/emailSigningLinks.mjs",
     "drive-gateway/src/index.js",
     "drive-gateway/src/router.mjs",
     "src/pages/EmailSigningReadOnlyPage.jsx",
