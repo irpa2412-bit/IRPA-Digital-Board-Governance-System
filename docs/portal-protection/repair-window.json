@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T11:38:00Z",
+  "lastActivityAt": "2026-11-20T11:40:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -89,6 +89,11 @@
       "at": "2026-11-20T11:38:00Z",
       "action": "repair",
       "description": "Corrected a malformed regular expression in the extracted workflow-isolation regression test. The first real job now reaches the policy test instead of failing at JavaScript parse time."
+    },
+    {
+      "at": "2026-11-20T11:40:00Z",
+      "action": "repair",
+      "description": "Added the repair-window declaration to the extracted isolation allowlist so the fixture workflow can validate its own authorised repair evidence."
     }
   ],
   "durationHours": 48,
