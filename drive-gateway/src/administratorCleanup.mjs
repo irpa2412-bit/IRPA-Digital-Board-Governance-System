@@ -231,6 +231,24 @@ export function createAdministratorCleanupRouter(deps) {
         });
       }
     }
+    const linkedAuthUids = new Set(records.filter(row=>["members","employees","signatureProfiles","signerIdentities","adminProfiles"].includes(row.collection))
+      .map(row=>clean(row.uid)).filter(Boolean));
+    for (const user of users) {
+      const uid = clean(user.localId || user.uid);
+      const email = clean(user.email).toLowerCase();
+      if (!uid || linkedAuthUids.has(uid)) continue;
+      const protectedAccount = uid === auth.uid || email === PRIMARY_ADMIN_EMAIL;
+      records.push({
+        key:"firebaseAuthAccounts/"+uid,collection:"firebaseAuthAccounts",id:uid,version:[user.createdAt||"",email,user.disabled===true?"disabled":"enabled"].join("|"),
+        uid,name:clean(user.displayName || email || uid),email,registerType:"Firebase Authentication",
+        role:"Unlinked Auth Account",createdAt:user.createdAt||null,status:user.disabled===true?"Disabled":"Active",
+        authAccountPresent:true,authCreatedAt:user.createdAt||null,authDisplayName:user.displayName||null,
+        authDisabled:user.disabled===true,authEmailVerified:user.emailVerified===true,
+        recordOrigin:"FIREBASE_AUTH",trialData:false,signedTrialDocument:false,signedPdfReference:null,
+        protected:protectedAccount,protectionReason:protectedAccount?"Primary administrator account is protected.":"",
+        relationshipRefs:[],linkedRecordKeys:[],dependencyCount:0,sourceAuthUser:user
+      });
+    }
     const lookup = new Map();
     for (const row of records) {
       for (const identifier of [row.id, row.uid, row.email, row.key].map(value => clean(value).toLowerCase()).filter(Boolean)) {
@@ -251,7 +269,7 @@ export function createAdministratorCleanupRouter(deps) {
     return records.map(row => {
       const linked = new Set(reverseLinks.get(row.key) || []);
       for (const ref of row.relationshipRefs || []) for (const key of lookup.get(ref) || []) if (key !== row.key) linked.add(key);
-      const { relationshipRefs, ...safeRow } = row;
+      const { relationshipRefs, sourceAuthUser, ...safeRow } = row;
       return { ...safeRow, linkedRecordKeys: [...linked].sort(), dependencyCount: linked.size };
     });
   }
@@ -306,6 +324,10 @@ export function createAdministratorCleanupRouter(deps) {
     };
     for (const row of [...byKey.values()].filter(item => item.decision === "GOES" && item.decisionSource === "ADMIN_SELECTION")) {
       const data = dataOf(row);
+      if (row.collection === "firebaseAuthAccounts") {
+        add({type:"auth-delete",key:row.key,uid:row.uid,email:row.email,reason:"Administrator-selected unlinked Firebase Auth account"});
+        continue;
+      }
       if (row.collection === "members" || row.collection === "employees") {
         add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected register record"});
         const uid = clean(row.uid);
@@ -367,7 +389,7 @@ export function createAdministratorCleanupRouter(deps) {
       return 5;
     };
     operations.sort((a,b)=>priority(a)-priority(b));
-    return {records:[...byKey.values()].map(({sourceDocument,...row})=>row),operations,blockers};
+    return {records:[...byKey.values()].map(({sourceDocument,sourceAuthUser,...row})=>row),operations,blockers};
   }
   async function writeAuditEvent(env, token, event) {
     const id = clean(event.planId) + "-" + clean(event.eventType).toLowerCase() + "-" + crypto.randomUUID();
@@ -431,7 +453,7 @@ export function createAdministratorCleanupRouter(deps) {
         decision:plan.records.find(item=>item.key===row.key)?.decision || "STAYS",
         decisionSource:plan.records.find(item=>item.key===row.key)?.decisionSource || "DEFAULT",
         protected:row.protected,protectionReason:row.protectionReason,linkedRecordKeys:row.linkedRecordKeys,
-        document:scrubBackup(row.sourceDocument)})),
+        document:scrubBackup(row.sourceDocument),authAccount:scrubBackup(row.sourceAuthUser)})),
       operations:plan.executionOperations,operationOutcomes:plan.operationOutcomes || [],
       auditRefs:inventory.records.filter(row=>["audit","signatureEvents","adminCleanupAudit"].includes(row.collection)).map(row=>row.key),
       driveFileCopies
@@ -563,7 +585,7 @@ export function createAdministratorCleanupRouter(deps) {
         const inventoryId = crypto.randomUUID();
         const internalSnapshot = { inventoryId, createdAt: new Date().toISOString(), administratorUid: auth.uid,
           administratorEmail: auth.email, records, status: "INVENTORY_READY", mandatoryBeforeReset: true };
-        const publicSnapshot = { ...internalSnapshot, records: records.map(({sourceDocument, ...row}) => row) };
+        const publicSnapshot = { ...internalSnapshot, records: records.map(({sourceDocument,sourceAuthUser, ...row}) => row) };
         const serializedSnapshot = JSON.stringify(internalSnapshot);
         if (new TextEncoder().encode(serializedSnapshot).byteLength > 20 * 1024 * 1024) {
           return json({ok:false,code:"INVENTORY_TOO_LARGE",error:"The complete inventory exceeds the safe single-snapshot storage limit. No cleanup plan was created; inventory must be safely partitioned before proceeding."},413,corsHeaders(request));
