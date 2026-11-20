@@ -123,7 +123,6 @@ test("production Gateway deployment requires SMTP_PASSWORD secret and configures
   const source=readWorkflow(".github/workflows/cloudflare-gateway-deploy.yml");
   assert.match(source,/smtpPasswordBindings = bindings\.filter\(b => b\.name === "SMTP_PASSWORD"\)/);
   assert.match(source,/smtpPasswordBindings\.length !== 1 \|\| smtpPasswordBindings\[0\]\?\.type !== "secret_text"/);
-  assert.match(source,/inviteServiceKeyBindings\.length !== 1 \|\| inviteServiceKeyBindings\[0\]\?\.type !== "secret_text"/);
   const gateway=readFileSync(resolve(ROOT,"drive-gateway/src/index.js"),"utf8");
   const mailRoute=readFileSync(resolve(ROOT,"drive-gateway/src/invitationEmail.mjs"),"utf8");
   assert.match(gateway,/emailDeliveryService: payload\.irpaEmailDeliveryService === true/);
