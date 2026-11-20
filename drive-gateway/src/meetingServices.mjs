@@ -6,6 +6,70 @@ const retention = { GOVERNANCE:7, ADMINISTRATIVE:5, STAFF:3, GENERAL:3, OTHER:3 
 const hash = async value => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value))))].map(x=>x.toString(16).padStart(2,"0")).join("");
 const yearsFrom = (date, years) => { const d = new Date(date); d.setUTCFullYear(d.getUTCFullYear()+years); return d; };
 const categoryOf = m => { const raw=clean(m.meetingCategory||m.meetingPolicyId||m.category||m.meetingType).toUpperCase(); if(["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw))return "GOVERNANCE"; if(["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw))return "ADMINISTRATIVE"; if(["STAFF","STAFF MEETING"].includes(raw))return "STAFF"; if(["GENERAL","GENERAL MEETING"].includes(raw))return "GENERAL"; return "OTHER"; };
+const isBoardMeeting = meeting => {
+ const type=lower(meeting.meetingType||meeting.title||"");
+ return ["board","board meeting"].includes(type);
+};
+const boardMemberRole = participant => {
+ const role=lower(participant.participantRole||participant.role||participant.boardPosition);
+ return ["board member","board chairperson","board treasurer","board vice chairperson"].includes(role)
+   && lower(participant.sourceType)!=="manual invitee"
+   && !/external|guest|observer|non.?voting|committee/.test(lower(participant.participantType||""));
+};
+const participantCategory = participant => {
+ const role=lower(participant.participantRole||participant.role||"");
+ const type=lower(participant.participantType||"");
+ if(boardMemberRole(participant))return "BOARD_MEMBER";
+ if(role==="board committee member"||type.includes("board committee"))return "BOARD_COMMITTEE_MEMBER";
+ if(/management|executive director|director|manager/.test(role)||type.includes("management"))return "MANAGEMENT";
+ if(/staff|employee|personnel/.test(role)||type.includes("staff")||type.includes("personnel"))return "STAFF";
+ if(type.includes("member")||lower(participant.sourceType)==="member register")return "IRPA_MEMBER";
+ if(/external|guest|partner|donor|consultant|technical expert|government representative|observer/.test(role)||type.includes("external"))return "EXTERNAL_INVITEE";
+ return "OTHER";
+};
+async function buildQuorumAssessment(ctx,env,token,meeting){
+ const meetingId=clean(meeting.id);
+ const [participants,passes,queue,signatures]=await Promise.all([
+  listByField(ctx,env,token,"participants","meetingId",meetingId),
+  listByField(ctx,env,token,"meetingAccessTokens","meetingId",meetingId),
+  listByField(ctx,env,token,"meetingEntryRequests","meetingId",meetingId),
+  listByField(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId)
+ ]);
+ const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
+ const signatureByParticipant=new Map(signatures.map(s=>[clean(s.participantId),s]));
+ const queueByParticipant=new Map();
+ for(const q of queue){const key=clean(q.participantId);if(key)queueByParticipant.set(key,q);}
+ const passByParticipant=new Map();
+ for(const p of passes){const key=clean(p.participantId);if(key){const previous=passByParticipant.get(key);if(!previous||new Date(p.createdAt||0)>new Date(previous.createdAt||0))passByParticipant.set(key,p);}}
+ const rows=active.map(p=>{
+  const id=clean(p.id),signature=signatureByParticipant.get(id),entry=queueByParticipant.get(id),pass=passByParticipant.get(id);
+  const category=participantCategory(p);
+  const attendanceStatus=clean(p.attendanceStatus||p.status)||"Unmarked";
+  const signed=Boolean(signature&&signature.signatureMethod&&signature.signedAt);
+  const invitationDispatched=p.meetingAccessDispatched===true||["sent","accepted","dispatched"].includes(lower(p.meetingAccessDispatchStatus));
+  const queueStatus=clean(entry?.status)||"Not queued";
+  const present=lower(attendanceStatus)==="present"&&signed;
+  return {participantId:id,name:clean(p.participantName||p.name),email:lower(p.participantEmail||p.email),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
+ });
+ const boardRows=rows.filter(r=>r.registrationCategory==="BOARD_MEMBER");
+ const boardPresent=boardRows.filter(r=>r.countsTowardQuorum).length;
+ const boardMeeting=isBoardMeeting(meeting);
+ const required=boardMeeting?(boardRows.length?Math.ceil(boardRows.length/3):null):0;
+ const quorumMet=boardMeeting?Boolean(required&&boardPresent>=required):false;
+ const counts={
+  registered:rows.length,boardMembers:boardRows.length,boardCommitteeMembers:rows.filter(r=>r.registrationCategory==="BOARD_COMMITTEE_MEMBER").length,
+  management:rows.filter(r=>r.registrationCategory==="MANAGEMENT").length,staff:rows.filter(r=>r.registrationCategory==="STAFF").length,
+  irpaMembers:rows.filter(r=>r.registrationCategory==="IRPA_MEMBER").length,externalInvitees:rows.filter(r=>r.registrationCategory==="EXTERNAL_INVITEE").length,
+  other:rows.filter(r=>r.registrationCategory==="OTHER").length,
+  invitationsDispatched:rows.filter(r=>r.invitationDispatched).length,
+  queued:rows.filter(r=>["pending","admitted"].includes(lower(r.queueStatus))).length,
+  admitted:rows.filter(r=>lower(r.queueStatus)==="admitted").length,
+  signedAttendance:rows.filter(r=>r.signed).length,
+  present:rows.filter(r=>lower(r.attendanceStatus)==="present").length,
+  boardMembersPresent:boardPresent
+ };
+ return {meetingId,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?"One-third of registered Board members (rounded up)":"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!required?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",counts,rows,assessedAt:new Date().toISOString(),sources:{participants:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:"meetingAttendanceSignatures"}};
+};
 const recordLabel = type => ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",MEETING_REPORT:"Compiled Meeting Report",OTHER:"Other Meeting Record"})[type]||"Meeting Record";
 function toFs(v) { if(v===null||v===undefined)return {nullValue:null}; if(v instanceof Date)return {timestampValue:v.toISOString()}; if(typeof v==="boolean")return {booleanValue:v}; if(typeof v==="number")return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}; if(Array.isArray(v))return {arrayValue:{values:v.map(toFs)}}; if(typeof v==="object")return {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,toFs(x)]))}}; return {stringValue:String(v)}; }
 const fields = o => Object.fromEntries(Object.entries(o).map(([k,v])=>[k,toFs(v)]));
@@ -65,7 +129,20 @@ export function createR2RecordingOutput(env, filepath, meeting = {}) {
   };
 }
 async function liveKitRequest(env,endpoint,body,method="POST"){const host=clean(env.LIVEKIT_URL).replace(/^wss:/i,"https:").replace(/^ws:/i,"http:").replace(/\/$/,""),key=clean(env.LIVEKIT_API_KEY),secret=clean(env.LIVEKIT_API_SECRET);if(!host||!key||!secret)throw Object.assign(new Error("Live meeting infrastructure is not configured in Cloudflare secrets."),{status:503});const now=Math.floor(Date.now()/1000),auth=await signedJwt(key,secret,{iss:key,sub:key,nbf:now-5,exp:now+60,video:{roomRecord:true,roomAdmin:true,roomCreate:true}});const r=await fetch(host+endpoint,{method,headers:{Authorization:"Bearer "+auth,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});const result=await r.json().catch(()=>({}));if(!r.ok){const e=new Error("LiveKit request failed ("+r.status+").");e.status=r.status;throw e;}return result;}
-export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/sign","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/sign","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-quorum/assess","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+if(pathname==="/api/meeting-quorum/assess"){
+ const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
+ const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
+ const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting);
+ if(data.save===true){
+  if(!c.canManage)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may save a quorum assessment.",403);
+  const snapshot={...assessment,rows:assessment.rows.map(r=>({...r,email:undefined}))};
+  const patch={quorumAssessment:snapshot,quorumRequired:assessment.required||0,quorumVerified:assessment.boardMeeting?assessment.quorumMet:false,quorumVerifiedAt:assessment.boardMeeting&&assessment.quorumMet?new Date():null,quorumAssessmentStatus:assessment.status,quorumAssessmentAt:new Date()};
+  await patchDoc(ctx,env,token,"meetings",meetingId,patch);
+  await audit(ctx,env,token,claims,"MEETING_QUORUM_ASSESSED",c.meeting,meetingId,{status:assessment.status,boardMeeting:assessment.boardMeeting,required:assessment.required,present:assessment.present,counts:assessment.counts});
+ }
+ return response(ctx,request,{ok:true,assessment,saved:data.save===true});
+}
 if(pathname==="/api/meeting-working-documents/register"){
 const meetingId=clean(data.meetingId),documentId=clean(data.documentId);
 if(!meetingId||!documentId)return fail(ctx,request,"Meeting and controlled document IDs are required.",400);
@@ -242,6 +319,12 @@ if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,c
 const controller=c.isAdmin||clean(current.initiatorUid)===c.uid||clean(current.chairpersonUid)===c.uid||clean(current.secretaryUid)===c.uid||lower(current.initiatorEmail)===c.email||lower(current.chairpersonEmail)===c.email||lower(current.secretaryEmail)===c.email;
 if(!controller)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may update this meeting.",403);
 if(changed.status&&!["Scheduled","In Progress","Completed","Cancelled"].includes(clean(changed.status)))return fail(ctx,request,"Unsupported meeting status transition.",400);
+if(lower(changed.status)==="in progress"&&isBoardMeeting(current)){
+ const assessment=await buildQuorumAssessment(ctx,env,token,current);
+ if(!assessment.quorumMet)return fail(ctx,request,assessment.status==="NOT_ASSESSABLE"?"A Board meeting cannot start: no eligible registered Board members are recorded for quorum.":`A Board meeting cannot start without quorum: ${assessment.present} of ${assessment.counts.boardMembers} registered Board members present; ${assessment.required} required.`,409);
+ changed.quorumRequired=assessment.required;changed.quorumVerified=true;changed.quorumVerifiedAt=new Date();changed.quorumAssessment={...assessment,rows:assessment.rows.map(r=>({...r,email:undefined}))};changed.quorumAssessmentStatus=assessment.status;changed.quorumAssessmentAt=new Date();
+}
+
 if(terminal.has(lower(current.status))&&changed.status&&lower(changed.status)!==lower(current.status))return fail(ctx,request,"A terminal meeting status cannot be changed through the meeting portal.",409);
 const sessionFields=new Set(["status","proceedingsStatus","quorumRequired","quorumVerified","quorumVerifiedAt","closedAt","currentAgendaItem","currentAgendaItemIndex","currentAgendaItemStatus","currentMotion","transcript","transcriptAutoSavedAt","transcriptCaptureStartedAt","transcriptCaptureLimitHours","currentDecision","votingRequired","votingReference","votingIssueId","votingStatus","votingResult","actionItems","actionId","actionReference","decisionId","decisionReference","signingFields","signingFieldSetVersion","updatedAt","updatedByUid","updatedByEmail","recordingStatus","recordingEgressId","recordingStartedAt","recordingStartedByUid","recordingStoppedAt","recordingStoppedByUid","recordingStorage"]);
 if(!c.isAdmin&&Object.keys(changed).some(key=>!sessionFields.has(key)))return fail(ctx,request,"This meeting is registered. Non-administrator updates are limited to authorised meeting-session and proceedings fields.",403);
