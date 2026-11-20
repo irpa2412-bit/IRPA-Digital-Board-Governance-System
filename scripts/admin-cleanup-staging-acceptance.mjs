@@ -92,6 +92,9 @@ try {
   });
   await firestoreWrite("signatureEnvelopes",envelopeId,{
     status:string("Draft"),recordOrigin:string("TRIAL"),trialData:bool(true),
+    participantUids:array([string(uid)]),actionUids:array([string(uid)]),
+    recipients:array([map({uid:string(uid),email:string(email),status:string("Invited")})]),
+    fields:array([map({id:string("fixture-field"),signerUid:string(uid),signerEmail:string(email)})]),
     signers:array([map({uid:string(uid),email:string(email),name:string("Staging Cleanup Acceptance Fixture"),status:string("Invited")})])
   });
   await firestoreWrite("signatureEvents",eventId,{
@@ -132,7 +135,9 @@ try {
   if (await firestoreRead("invitations/"+invitationId)) throw new Error("Pending invitation remained after member cleanup.");
   const envelope = await firestoreRead("signatureEnvelopes/"+envelopeId);
   if (!envelope) throw new Error("The envelope containing the unsent assignment was unexpectedly deleted.");
-  if ((envelope.fields?.signers?.arrayValue?.values||[]).length!==0) throw new Error("Unsent signing assignment was not removed.");
+  for (const field of ["signers","recipients","fields","participantUids","actionUids"]) {
+    if ((envelope.fields?.[field]?.arrayValue?.values||[]).length!==0) throw new Error("Unsent signing assignment reference remained in "+field+".");
+  }
   if (!await firestoreRead("signatureEvents/"+eventId)) throw new Error("Immutable signature event history was deleted.");
   const loginCheck = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
     method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})
