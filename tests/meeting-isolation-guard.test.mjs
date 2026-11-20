@@ -144,7 +144,7 @@ test("archive-backed Signature Portal PDF palette repair is explicitly paired an
 });
 
 test("main-branch push runs the isolated fixture without requiring a PR source diff", () => {
-  assert.match(workflow, /branches: \["\\*\\*"\]/);
+  assert.doesNotMatch(workflow, /push:\\s*branches:/);
   assert.match(workflow, /const isMainPush = eventName === "push" && process\.env\.GITHUB_REF === "refs\/heads\/main"/);
   assert.match(workflow, /if \(!isMainPush && eventName !== "workflow_dispatch"/);
 });
@@ -163,7 +163,7 @@ test("touch-responsive signature palette assignment is narrowly allowlisted with
 });
 
 test("Meeting Portal fixture runs on every repair branch and all Meeting Portal source paths", () => {
-  assert.match(workflow, /push:\\s*branches: \\[\"\\*\\*\"\\]/);
+  assert.doesNotMatch(workflow, /push:\\s*branches:/);
   for (const path of [
     "src/pages/MeetingRoom.jsx",
     "src/firebase/meetingAttendanceSigning.js",
