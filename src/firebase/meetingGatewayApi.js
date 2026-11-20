@@ -37,3 +37,5 @@ export const getAccessibleMeetingRecords = async () => (await callMeetingService
 export const assessMeetingQuorum = payload => callMeetingService("/api/meeting-quorum/assess", payload);
 
 export const listMeetingBoardMembers = async () => (await callMeetingService("/api/meeting-board-register/list")).boardMembers || [];
+
+export const listMeetingInviteeDirectory = async () => callMeetingService("/api/meeting-invitee-directory/list");
