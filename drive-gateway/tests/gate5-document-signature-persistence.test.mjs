@@ -288,13 +288,8 @@ test("G5-03 — original document preservation", async () => {
   const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
-  assert.equal(
-    (await route(
-      submit(token, { type: "typed", value: "Preservation Signature" }),
-      s.ctx,
-    )).status,
-    200,
-  );
+  const submitted = await route(submit(token, { type: "typed", value: "Preservation Signature" }), s.ctx);
+  assert.equal(submitted.status, 200, JSON.stringify(await submitted.clone().json()));
 
   const after = await s.meta.get("documents", "DOC-G5");
   assert.equal(after.hash, original.hash);
