@@ -107,7 +107,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   const participantId=clean(row.participantId||row.id),email=clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase();
   const role=clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),title=clean(row.title||row.position||row.boardPosition),occupation=clean(row.occupation||row.capacity||row.profession||title||role),capacity=clean(row.capacity||row.occupation||title||role);
   if(!email)throw new Error("Cannot dispatch attendance signing for "+clean(row.name||row.participantName||"this participant")+": a valid email address is required for the individual signing link.");
-  return {id:participantId,signerId:participantId,identityType:"email-link",email,name:clean(row.name||row.participantName||row.fullName),role,institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),participantUid:clean(row.participantUid||row.uid||row.userId)||null,roleAssignments:[{role,title,capacity,occupation}]};
+  return {id:participantId,signerId:participantId,identityType:"email-link",email,name:clean(row.name||row.participantName||row.fullName),role:"Attendance Signer",institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),participantUid:clean(row.participantUid||row.uid||row.userId)||null,roleAssignments:[{role,title,capacity,occupation}]};
  });
  const documentId=doc(collection(db,"documents")).id;
  const reference="IRPA-ATT-"+String(meeting.reference||meeting.id).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+date;
