@@ -144,7 +144,7 @@ test("archive-backed Signature Portal PDF palette repair is explicitly paired an
 });
 
 test("main-branch push runs the isolated fixture without requiring a PR source diff", () => {
-  assert.match(workflow, /branches: \[main, feat\/secure-meeting-invitation-flow-20261013/);
+  assert.match(workflow, /branches: \["\\*\\*"\]/);
   assert.match(workflow, /const isMainPush = eventName === "push" && process\.env\.GITHUB_REF === "refs\/heads\/main"/);
   assert.match(workflow, /if \(!isMainPush && eventName !== "workflow_dispatch"/);
 });
@@ -160,4 +160,24 @@ test("touch-responsive signature palette assignment is narrowly allowlisted with
   assert.match(workflow, /!signaturePaletteDirectAssignmentRepair/);
   assert.match(workflow, /signaturePaletteDirectAssignmentRepair &&/);
   assert.ok(workflow.includes('"src/styles/signature-portal.css"'));
+});
+
+test("Meeting Portal fixture runs on every repair branch and all Meeting Portal source paths", () => {
+  assert.match(workflow, /push:\\s*branches: \\[\"\\*\\*\"\\]/);
+  for (const path of [
+    "src/pages/MeetingRoom.jsx",
+    "src/firebase/meetingAttendanceSigning.js",
+    "src/firebase/meetingAttendanceSignerIdentity.js",
+    "drive-gateway/src/meetingServices.mjs",
+    "tests/meeting-daily-attendance-email-signing.test.mjs",
+    "tests/meeting-attendance-guest-identity.test.mjs",
+    "tests/meeting-time-eat.test.mjs",
+    "tests/meeting-registration-connectivity.test.mjs",
+    "tests/meeting-configurable-quorum.test.mjs",
+    "tests/fixtures/**",
+    "vite.meeting-fixture.config.js"
+  ]) assert.ok(workflow.includes(`"${path}"`), `missing fixture trigger: ${path}`);
+  assert.match(workflow, /const allowed = new Set\\(\\[/);
+  assert.ok(workflow.includes('"drive-gateway/src/meetingServices.mjs"'));
+  assert.ok(workflow.includes('"src/firebase/meetingAttendanceSigning.js"'));
 });
