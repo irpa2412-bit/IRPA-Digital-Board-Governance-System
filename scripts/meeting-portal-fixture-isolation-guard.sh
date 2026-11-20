@@ -15,6 +15,7 @@ const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
   "docs/portal-protection/repair-window.json",
+  "docs/portal-protection/change-record.json",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
   ".github/workflows/finance-production-reset.yml",
   "docs/ACTUAL_DATA_ACCESS_GATE.md",
@@ -269,6 +270,18 @@ const communicationMediaArchiveIntegration =
   !changed.includes("src/pages/Meetings.jsx") &&
   !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
   changed.every(path => allowed.has(path) || communicationMediaArchivePaths.has(path));
+// A parallel portal-window amendment may update only activeAmendment in the
+// shared change record. All existing Meeting Portal and historical records
+// must remain byte-equivalent after removing that one scoped property.
+if (changed.includes("docs/portal-protection/change-record.json")) {
+  const baselineRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
+  const currentRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
+  delete baselineRecord.activeAmendment;
+  delete currentRecord.activeAmendment;
+  if (JSON.stringify(baselineRecord) !== JSON.stringify(currentRecord)) {
+    throw new Error("Parallel repair-window amendment changed existing change-record history or another portal's record.");
+  }
+}
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
