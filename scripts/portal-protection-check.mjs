@@ -43,19 +43,23 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   const scope = windowState.scope ?? [];
   const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
   if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
-  const declaredFiles = record.declaration?.files ?? [];
+  const activeAmendment = record.activeAmendment?.status === "open" ? record.activeAmendment : null;
+  const declaration = activeAmendment ?? record.declaration;
+  const validation = activeAmendment?.validation ?? record.validation;
+  const declaredFiles = declaration?.files ?? [];
   const missingDeclarations = protectedFiles.filter((file) => !declaredFiles.some((p) => isWithin(file, p)));
   if (missingDeclarations.length) return fail("Change Record omits changed files: " + missingDeclarations.join(", "));
-  const declaredPortals = new Set(record.declaration?.affectedPortals ?? []);
+  const declaredPortals = new Set(declaration?.affectedPortals ?? []);
   const missingPortals = [...affected].filter((portal) => !declaredPortals.has(portal));
   if (missingPortals.length) return fail("Change Record omits affected portals: " + missingPortals.join(", "));
-  if (!record.declaration?.reason || !record.declaration?.expectedEffect || !Array.isArray(record.declaration?.prohibitedChanges) || !record.declaration.prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.");
-  if (!record.baseline?.commit || !record.baseline?.rollbackCommit) return fail("Baseline and rollback commits are mandatory.");
-  if (record.validation?.baselineSmoke !== "PASS" || record.validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.");
-  const smoke = record.validation?.portalSmoke ?? {};
+  if (!declaration?.reason || !declaration?.expectedEffect || !Array.isArray(declaration?.prohibitedChanges) || !declaration.prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.");
+  const rollbackCommit = activeAmendment?.repairWindow?.rollbackCommit ?? record.baseline?.rollbackCommit;
+  if (!record.baseline?.commit || !rollbackCommit) return fail("Baseline and rollback commits are mandatory.");
+  if (validation?.baselineSmoke !== "PASS" || validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.");
+  const smoke = validation?.portalSmoke ?? {};
   const missingSmoke = [...affected].filter((portal) => smoke[portal] !== "PASS");
   if (missingSmoke.length) return fail("Missing passing smoke evidence for: " + missingSmoke.join(", "));
-  if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
+  if (!Array.isArray(validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
   return { ok: true, affected: [...affected].sort(), protectedFiles, reason: "Protected changes are declared and within the active repair window." };
 }
 
