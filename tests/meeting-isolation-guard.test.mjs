@@ -195,3 +195,10 @@ test("only stale runs for the same pull request are cancelled", () => {
   assert.ok(workflow.includes("cancel-in-progress: true"));
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
+
+test("parallel portal window amendments preserve existing meeting and historical change records", () => {
+  assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
+  assert.match(guard, /delete baselineRecord\.activeAmendment/);
+  assert.match(guard, /delete currentRecord\.activeAmendment/);
+  assert.match(guard, /Parallel repair-window amendment changed existing change-record history or another portal's record/);
+});
