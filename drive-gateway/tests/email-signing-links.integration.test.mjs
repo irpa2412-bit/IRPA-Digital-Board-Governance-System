@@ -186,13 +186,21 @@ test("tampered and unknown links return the same neutral response",async()=>{
   await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+"a".repeat(64),"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
-test("an unused email signing link remains valid indefinitely until its one-time redemption",async()=>{
+test("an unused email signing link remains valid indefinitely despite legacy expiry fields, then is consumed once",async()=>{
   const f=await fixture();
+  const legacy=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  legacy.signers[0].emailLinkExpiresAt="2026-11-23T08:00:00.000Z";
+  legacy.signers[0].tokenExpiresAt="2026-11-23T08:00:00.000Z";
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:legacy.signers});
   f.now(new Date("2027-11-24T08:00:00.000Z"));
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.19");
-  assert.equal(opened.ok,true,"the invitation remains valid more than one year after issue");
+  assert.equal(opened.ok,true,"the invitation remains valid more than one year after issue and ignores legacy expiry fields");
+  assert.equal(opened.linkExpiresAt,null,"the signer invitation has no time-based expiry");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(stored.signers[0].emailLinkStatus,"opened");
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
+  assert.equal(status.signers[0].linkExpiresAt,null);
+  assert.equal(status.signers[0].linkExpired,false);
   await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.message===genericEmailSigningFailure());
 });
 
