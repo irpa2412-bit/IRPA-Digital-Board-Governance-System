@@ -37,7 +37,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
  const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
  const signatureByParticipant=new Map(signatures.map(s=>[clean(s.participantId),s]));
  const queueByParticipant=new Map();
- for(const q of queue){const key=clean(q.participantId);if(key)queueByParticipant.set(key,q);}
+ for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
  for(const p of passes){const key=clean(p.participantId);if(key){const previous=passByParticipant.get(key);if(!previous||new Date(p.createdAt||0)>new Date(previous.createdAt||0))passByParticipant.set(key,p);}}
  const rows=active.map(p=>{
@@ -46,9 +46,10 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   const attendanceStatus=clean(p.attendanceStatus||p.status)||"Unmarked";
   const signed=Boolean(signature&&signature.signatureMethod&&signature.signedAt);
   const invitationDispatched=p.meetingAccessDispatched===true||["sent","accepted","confirmed","dispatched"].includes(lower(p.meetingAccessDispatchStatus));
+  const accessPassStatus=clean(pass?.status)||"Not issued";
   const queueStatus=clean(entry?.status)||"Not queued";
   const present=lower(attendanceStatus)==="present"&&signed;
-  return {participantId:id,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
+  return {participantId:id,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,accessPassStatus,accessPassExpiresAt:iso(pass?.expiresAt),invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
  });
  const boardRows=rows.filter(r=>r.registrationCategory==="BOARD_MEMBER");
  const boardPresent=boardRows.filter(r=>r.countsTowardQuorum).length;
@@ -60,7 +61,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   management:rows.filter(r=>r.registrationCategory==="MANAGEMENT").length,staff:rows.filter(r=>r.registrationCategory==="STAFF").length,
   irpaMembers:rows.filter(r=>r.registrationCategory==="IRPA_MEMBER").length,externalInvitees:rows.filter(r=>r.registrationCategory==="EXTERNAL_INVITEE").length,
   other:rows.filter(r=>r.registrationCategory==="OTHER").length,
-  invitationsDispatched:rows.filter(r=>r.invitationDispatched).length,
+  invitationsDispatched:rows.filter(r=>r.invitationDispatched).length,activeAccessPasses:rows.filter(r=>lower(r.accessPassStatus)==="active").length,
   queued:rows.filter(r=>lower(r.queueStatus)==="pending").length,
   admitted:rows.filter(r=>lower(r.queueStatus)==="admitted").length,
   signedAttendance:rows.filter(r=>r.signed).length,
