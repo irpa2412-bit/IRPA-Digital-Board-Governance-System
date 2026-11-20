@@ -219,7 +219,7 @@ if(pathname==="/api/meeting-board-register/list"){
 if(pathname==="/api/meeting-quorum/assess"){
  const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
  const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
- const attendanceDate=clean(data.date)||null;if(attendanceDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(attendanceDate))return fail(ctx,request,"A valid attendance date is required.",400);const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting,attendanceDate,claims);
+ const attendanceDate=clean(data.date)||null;if(attendanceDate&&!/^\d{4}-\d{2}-\d{2}$/.test(attendanceDate))return fail(ctx,request,"A valid attendance date is required.",400);const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting,attendanceDate,claims);
  if(data.save===true){
   if(!c.canManage)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may save a quorum assessment.",403);
   const snapshot={...assessment,rows:assessment.rows.map(r=>({...r,email:undefined}))};
@@ -274,7 +274,7 @@ return response(ctx,request,{ok:true,reviewId,status:"SUBMITTED"});
 }
 if(pathname==="/api/meeting-attendance/daily/register"){
 const meetingId=clean(data.meetingId),date=clean(data.date),uid=clean(claims.user_id);
-if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return fail(ctx,request,"Meeting ID and a valid attendance date are required.",400);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(ctx,request,"Meeting ID and a valid attendance date are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may compile daily attendance.",403);
 const [participants,memberRecords,dailyRows,dispatchRows]=await Promise.all([
@@ -315,11 +315,11 @@ const gatewaySignersById=new Map((Array.isArray(verifiedGatewaySigners)?verified
 const signedByUid=new Map((Array.isArray(dispatch?.gatewaySignerMap)?dispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantUid,signer])=>participantUid&&signer?.status==="Signed"));
 for(const row of rows){const signer=signedByUid.get(clean(row.participantUid));if(signer){row.signed=true;row.signedAt=iso(signer.signedAt);}}
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
-return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null,gatewayEnvelopeId:dispatch.gatewayEnvelopeId||null,gatewaySignerMap:Array.isArray(dispatch.gatewaySignerMap)?dispatch.gatewaySignerMap:[]}:null});
+return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||null,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null,gatewayEnvelopeId:dispatch.gatewayEnvelopeId||null,gatewaySignerMap:Array.isArray(dispatch.gatewaySignerMap)?dispatch.gatewaySignerMap:[]}:null});
 }
 if(pathname==="/api/meeting-attendance/daily/mark"){
 const meetingId=clean(data.meetingId),date=clean(data.date),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
-if(!meetingId||!participantId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["Present","Absent","Excused","N/A"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
+if(!meetingId||!participantId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["Present","Absent","Excused","N/A"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may update daily attendance.",403);
 const participant=await getDoc(ctx,env,token,"participants",participantId);
@@ -334,10 +334,10 @@ return response(ctx,request,{ok:true,attendanceDate:date,participantId,attendanc
 }
 if(pathname==="/api/meeting-attendance/daily/dispatch"){
 const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
-if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-const hostUid=clean(c.meeting.meetingHostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
-if(!c.canManage||ownerUid!==uid||hostUid&&hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
+const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
+if(!c.canManage||!hostUid||ownerUid!==uid||hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
 const id=await hash(meetingId+"\\0"+date),existing=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id),now=new Date();
 if(phase==="PREPARE"){
  if(existing&&["PREPARING","DISPATCHED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared or dispatched.",409);
