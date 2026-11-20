@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import AdministratorCleanupControl from "../admin/AdministratorCleanupControl";
 import { getIdToken } from "firebase/auth";
 import { auth, firebaseConfig } from "../firebase/config";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
@@ -423,18 +424,7 @@ export default function Settings({ admin = false, section = "settings" }) {
       )}
       {section === "settings" && <section className="panel" style={{ marginBottom: 16 }}><h2>Release Readiness</h2><p className="panel-description">{admin ? "Open the administrator-only release checks." : "Required role: Administrator. Your account does not have this role."}</p><button type="button" onClick={() => { window.location.hash = "release-readiness"; document.getElementById("release-readiness")?.scrollIntoView({ behavior: "smooth" }); }}>Release Readiness</button></section>}{section === "settings" && <div id="release-readiness">{admin ? <ReleaseReadiness admin={admin}/> : <section className="panel" role="status"><h2>Release Readiness unavailable</h2><p>Required role: Administrator. Contact an IRPA Administrator if you need access.</p></section>}</div>}
       {admin && section === "settings" && <ActualDataAccessControl/>}
-      {admin && section === "settings" && (
-        <section className="panel" style={{ marginTop: 20 }} aria-labelledby="cleanup-retired-title">
-          <div className="panel-header">
-            <div>
-              <span className="eyebrow">ADMINISTRATOR CONTROL</span>
-              <h2 id="cleanup-retired-title">Data Cleanup</h2>
-              <p className="panel-description">The previous broad reset and trial-reset controls have been retired from Settings. The replacement administrator-controlled cleanup service is being implemented with per-record STAYS/GOES selection, dependency review, protected-record checks and server-authorised execution. No cleanup is available through this retired interface.</p>
-            </div>
-          </div>
-          <div role="status">Legacy cleanup controls disabled. No records were changed.</div>
-        </section>
-      )}
+      {admin && section === "settings" && <AdministratorCleanupControl/>}
 
       {section === "settings" && (
         <footer className="panel" aria-label="Application build information" style={{ marginTop: 20, padding: "12px 16px", fontSize: 12, opacity: 0.85 }}>
