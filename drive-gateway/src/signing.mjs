@@ -381,7 +381,7 @@ export async function resendInvitation(ctx,user,id,signerId){
     if(!signer||signer.status==="Signed")throw new HttpError(409,"This signer assignment can no longer receive another link.");
     if(current.emailSigningModule!=="v2"&&(current.signingMode||"Sequential")==="Sequential"&&current.signers.some(s=>s.order<signer.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position.");
     const lock=signer.resendAttempt;
-    if(lock&&Number.isFinite(Date.parse(String(lock.startedAt||"")))&&now.getTime()-Date.parse(lock.startedAt)<10*60*1000)throw new HttpError(409,"A signing invitation resend is already in progress for this signer. Refresh delivery status before retrying.");
+    if(current.emailSigningModule!=="v2"&&lock&&Number.isFinite(Date.parse(String(lock.startedAt||"")))&&now.getTime()-Date.parse(lock.startedAt)<10*60*1000)throw new HttpError(409,"A signing invitation resend is already in progress for this signer. Refresh delivery status before retrying.");
     Object.assign(signer,current.emailSigningModule==="v2"?reserveEmailSigningResend(signer,attemptId,now):{...signer,resendAttempt:{id:attemptId,startedAt:now.toISOString()}});
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.started",signerId,actor:user.uid,at:now.toISOString()})}};
   });
