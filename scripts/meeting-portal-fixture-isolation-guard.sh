@@ -16,7 +16,7 @@ const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
   "docs/portal-protection/repair-window.json",
-  "docs/portal-protection/change-record.json",
+  "docs/portal-protection/change-record.json", "docs/portal-protection/repair-window.json", "scripts/meeting-portal-fixture-isolation-guard.sh",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
   "scripts/portal-repair-window-guard-policy.mjs",
   ".github/workflows/finance-production-reset.yml",
