@@ -1,8 +1,98 @@
 const PRIMARY_ADMIN_EMAIL = "irpa2412@gmail.com";
 const COLLECTIONS = Object.freeze([
-  "members","employees","signatureProfiles","signerIdentities","invitations",
-  "meetings","participants","meetingSubscriptions","attendance",
-  "documents","controlledDocuments","signatureEnvelopes","signatures"
+  "members",
+  "employees",
+  "employeeCounters",
+  "memberCounters",
+  "participants",
+  "meetings",
+  "meetingSubscriptions",
+  "meetingRoomEvents",
+  "transcriptions",
+  "resolutions",
+  "votes",
+  "voteLocks",
+  "voteCorrections",
+  "votingIssues",
+  "actions",
+  "documents",
+  "documentTranslationRequests",
+  "signatures",
+  "decisions",
+  "risks",
+  "audit",
+  "reports",
+  "authorizationRequests",
+  "workflowActions",
+  "staffPaymentRequests",
+  "financeBudgets",
+  "financeTransactions",
+  "financeFunding",
+  "financeApprovals",
+  "financeCommitments",
+  "financeGrants",
+  "financeBankAccounts",
+  "financeReconciliations",
+  "financeAssets",
+  "financeRisks",
+  "financeReports",
+  "financeChartOfAccounts",
+  "financeJournalBatches",
+  "financePeriods",
+  "financeLedgerJournals",
+  "financeLedgerEntries",
+  "financePaymentMatches",
+  "financePaymentTrace",
+  "financeReferenceRegistry",
+  "procurementVendors",
+  "procurementRequests",
+  "procurementVendorScores",
+  "procurementVendorBlacklist",
+  "procurementVendorProbation",
+  "invitations",
+  "registrationRequests",
+  "inductionRecords",
+  "adminProfiles",
+  "auditorProfiles",
+  "systemSettings",
+  "mail",
+  "donorFunders",
+  "grantReportingObligations",
+  "researchStudies",
+  "researchDatasets",
+  "researchObservations",
+  "researchAnalyses",
+  "researchKnowledge",
+  "researchOutputs",
+  "researchInstruments",
+  "researchSubmissions",
+  "researchInformationRequests",
+  "researchInformationGrants",
+  "researchSharedInformation",
+  "researchUpdates",
+  "researchToolPermissions",
+  "researchPortalAlerts",
+  "institutionalDepartments",
+  "departmentArchives",
+  "signatureProfiles",
+  "signerIdentities",
+  "signatureEnvelopes",
+  "signatureEvents",
+  "controlledDocuments",
+  "meetingInvitations",
+  "meetingRecords",
+  "meetingAttendanceSignatures",
+  "meetingMediaRecordings",
+  "liveMeetingSessions",
+  "socialMediaAccounts",
+  "socialMediaAccountsAudit",
+  "communicationMediaAssets",
+  "communicationMediaItems",
+  "communicationSocialPosts",
+  "communicationOperations",
+  "portalDefinitions",
+  "systemResetRequests",
+  "dataResetRequests"
 ]);
 const TTL_SECONDS = 60 * 60 * 24;
 const clean = value => String(value ?? "").trim();
@@ -47,15 +137,19 @@ export function createAdministratorCleanupRouter(deps) {
         const uid = clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid);
         const authUser = authByUid.get(uid);
         const signerInProtectedEnvelope = collection === "members" || collection === "employees" || collection === "signatureProfiles" || collection === "signerIdentities"
-          ? [...envelopes.values()].some(envelope => ["Signed","In Progress","Pending","Signing"].includes(clean(envelope.status)) &&
+          ? [...envelopes.values()].some(envelope => ["signed","completed","in progress","inprogress","signing"].includes(clean(envelope.status).toLowerCase()) &&
             (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer => clean(signer.uid || signer.profileUid) === uid))
           : false;
         const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle);
-        const protectedRole = /administrator|executive director|board chair|chairperson|board secretary/i.test(role);
+        const roleValues = [data.role, data.boardPosition, data.designation, data.jobTitle, data.title, data.position,
+          ...(Array.isArray(data.roles) ? data.roles : []), ...(Array.isArray(data.assignedRoles) ? data.assignedRoles : []),
+          ...(Array.isArray(data.selectedRoles) ? data.selectedRoles : [])].map(value => clean(value)).filter(Boolean);
+        const protectedRole = roleValues.some(value => /administrator|executive director|board chair|chairperson|board secretary/i.test(value));
         const isAdmin = uid === auth.uid;
         const isSignedTrial = collection === "signatureEnvelopes" && data.trialData === true &&
           ["Completed","Signed"].includes(clean(data.status));
-        const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope;
+        const immutableHistory = collection === "audit" || collection === "signatureEvents";
+        const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory;
         records.push({
           key: collection + "/" + id, collection, id, uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
@@ -69,7 +163,8 @@ export function createAdministratorCleanupRouter(deps) {
           protected: protectedRecord,
           protectionReason: isAdmin ? "Signed-in administrator cannot be removed." :
             protectedRole ? "Protected governance or administrator role." :
-            signerInProtectedEnvelope ? "Signer on a signed or in-progress envelope." : "",
+            signerInProtectedEnvelope ? "Signer on a signed or in-progress envelope." :
+            immutableHistory ? "Immutable audit/signature history must be retained." : "",
           decision: "STAYS"
         });
       }
