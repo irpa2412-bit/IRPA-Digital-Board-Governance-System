@@ -203,7 +203,12 @@ export function createAdministratorCleanupRouter(deps) {
             ...(Array.isArray(data.memberUids) ? data.memberUids : []),
             ...(Array.isArray(data.invitedUids) ? data.invitedUids : []),
             ...(Array.isArray(data.subscriberUids) ? data.subscriberUids : []),
-            ...(Array.isArray(data.signers) ? data.signers.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : [])
+            ...(Array.isArray(data.actionUids) ? data.actionUids : []),
+            ...(Array.isArray(data.participantEmails) ? data.participantEmails : []),
+            ...(Array.isArray(data.signers) ? data.signers.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : []),
+            ...(Array.isArray(data.recipients) ? data.recipients.flatMap(recipient => [recipient.uid, recipient.userId, recipient.profileUid, recipient.email]) : []),
+            ...(Array.isArray(data.signerAssignments) ? data.signerAssignments.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : []),
+            ...(Array.isArray(data.fields) ? data.fields.flatMap(field => [field.signerUid, field.assignedSignerUid, field.recipientUid, field.assignedToUid, field.signerEmail]) : [])
           ].map(value => clean(value).toLowerCase()).filter(Boolean))],
           protected: protectedRecord,
           protectionReason: isAdmin ? "Signed-in administrator cannot be removed." :
@@ -308,12 +313,18 @@ export function createAdministratorCleanupRouter(deps) {
           if (envelope.collection !== "signatureEnvelopes") continue;
           const envelopeData = dataOf(envelope);
           if (!unsentEnvelope(envelopeData.status)) continue;
-          const signers = Array.isArray(envelopeData.signers) ? envelopeData.signers : [];
-          const hasUnsentAssignment = signers.some(signer => {
-            const matches = (uid && clean(signer.uid || signer.profileUid) === uid) ||
-              (email && clean(signer.email).toLowerCase() === email);
+          const assignedRows = [
+            ...(Array.isArray(envelopeData.signers) ? envelopeData.signers : []),
+            ...(Array.isArray(envelopeData.recipients) ? envelopeData.recipients : []),
+            ...(Array.isArray(envelopeData.signerAssignments) ? envelopeData.signerAssignments : []),
+            ...(Array.isArray(envelopeData.fields) ? envelopeData.fields : [])
+          ];
+          const hasUnsentAssignment = assignedRows.some(signer => {
+            const matches = (uid && [signer.uid,signer.profileUid,signer.userId,signer.signerUid,signer.assignedSignerUid,signer.recipientUid,signer.assignedToUid].some(value=>clean(value)===uid)) ||
+              (email && [signer.email,signer.signerEmail].some(value=>clean(value).toLowerCase()===email));
             return matches && clean(signer.status).toLowerCase() !== "signed";
-          });
+          }) || (uid && [...(Array.isArray(envelopeData.participantUids)?envelopeData.participantUids:[]),
+            ...(Array.isArray(envelopeData.actionUids)?envelopeData.actionUids:[])].some(value=>clean(value)===uid));
           if (hasUnsentAssignment) add({type:"update-signers",key:envelope.key,path:firestorePath(envelope.collection,envelope.id),
             version:envelope.version,uid,email,reason:"Remove unsent signing assignment for deleted member"});
         }
@@ -492,21 +503,37 @@ export function createAdministratorCleanupRouter(deps) {
       const current = await firestoreGet(env,auth.token,operation.path);
       if (!current) return "ALREADY_DELETED";
       if (operation.version && clean(current.updateTime) !== operation.version) throw new Error("Signing assignment record changed after inventory: " + operation.path);
-      const signers = firestoreDocumentToPlain({fields:{signers:current.fields?.signers}})?.signers || [];
-      const retained = signers.filter(signer => {
-        const matches = (operation.uid && clean(signer.uid || signer.profileUid) === operation.uid) ||
-          (operation.email && clean(signer.email).toLowerCase() === operation.email);
-        return !(matches && clean(signer.status).toLowerCase() !== "signed");
-      });
-      if (retained.length === signers.length) return "ALREADY_REMOVED";
-      const values = (current.fields?.signers?.arrayValue?.values || []).filter(value => {
-        const signer = firestoreDocumentToPlain({fields:{signer:value}})?.signer || {};
-        const matches = (operation.uid && clean(signer.uid || signer.profileUid) === operation.uid) ||
-          (operation.email && clean(signer.email).toLowerCase() === operation.email);
-        return !(matches && clean(signer.status).toLowerCase() !== "signed");
-      });
-      const url = "https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/databases/(default)/documents/"+operation.path.split("/").map(encodeURIComponent).join("/")+"?updateMask.fieldPaths=signers";
-      const response = await fetchImpl(url,{method:"PATCH",headers:{Authorization:"Bearer "+auth.token,"Content-Type":"application/json"},body:JSON.stringify({fields:{signers:{arrayValue:{values}}}})});
+      const plain = firestoreDocumentToPlain(current) || {};
+      const matches = item => {
+        if (typeof item === "string") return (operation.uid && item === operation.uid) || (operation.email && item.toLowerCase() === operation.email);
+        const uidMatch = operation.uid && [item?.uid,item?.profileUid,item?.userId,item?.signerUid,item?.assignedSignerUid,item?.recipientUid,item?.assignedToUid].some(value=>clean(value)===operation.uid);
+        const emailMatch = operation.email && [item?.email,item?.signerEmail].some(value=>clean(value).toLowerCase()===operation.email);
+        return Boolean(uidMatch || emailMatch) && clean(item?.status).toLowerCase() !== "signed";
+      };
+      const changed = {};
+      for (const field of ["signers","recipients","signerAssignments","fields"]) {
+        if (Array.isArray(plain[field])) {
+          const retained = plain[field].filter(item=>!matches(item));
+          if (retained.length !== plain[field].length) changed[field] = retained;
+        }
+      }
+      for (const field of ["participantUids","actionUids"]) {
+        if (Array.isArray(plain[field]) && operation.uid) {
+          const retained = plain[field].filter(value=>clean(value)!==operation.uid);
+          if (retained.length !== plain[field].length) changed[field] = retained;
+        }
+      }
+      if (Array.isArray(plain.participantEmails) && operation.email) {
+        const retained = plain.participantEmails.filter(value=>clean(value).toLowerCase()!==operation.email);
+        if (retained.length !== plain.participantEmails.length) changed.participantEmails = retained;
+      }
+      const changedFields = Object.keys(changed);
+      if (!changedFields.length) return "ALREADY_REMOVED";
+      const fields = Object.fromEntries(changedFields.map(field=>[field,firestoreValue(changed[field])]));
+      const params = new URLSearchParams();
+      for (const field of changedFields) params.append("updateMask.fieldPaths",field);
+      const url = "https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/databases/(default)/documents/"+operation.path.split("/").map(encodeURIComponent).join("/")+"?"+params.toString();
+      const response = await fetchImpl(url,{method:"PATCH",headers:{Authorization:"Bearer "+auth.token,"Content-Type":"application/json"},body:JSON.stringify({fields})});
       if (!response.ok) throw new Error("Unsent signer assignment removal failed (HTTP " + response.status + ").");
       return "UPDATED";
     }
