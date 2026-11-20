@@ -19,7 +19,7 @@ export default function AdministratorCleanupControl() {
   const visibleRows = useMemo(() => rows.filter(row => {
     const text = [row.name, row.email, row.role, row.collection, row.status].join(" ").toLowerCase();
     const matchesQuery = text.includes(query.trim().toLowerCase());
-    const status = String(row.status || "").toLowerCase();
+    const status = [row.status,row.sourceStatus].join(" ").toLowerCase();
     const matchesFilter = filter === "ALL" ||
       (filter === "TRIAL" && (row.trialData || /trial|test/i.test(row.recordOrigin) || /trial|test/i.test(status))) ||
       (filter === "INVITED" && /invited|pending invitation/i.test(status)) ||
