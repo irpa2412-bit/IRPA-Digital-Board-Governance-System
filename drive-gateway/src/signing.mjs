@@ -365,6 +365,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   const target=envelope.signers.find(s=>s.id===signerId);
   if(!target)throw new HttpError(404,"Signer assignment not found.");
   if(target.status==="Signed")throw new HttpError(409,"A signer who has completed signing cannot receive another link.");
+  if(envelope.emailSigningModule==="v2")assertCanResendEmailSigningLink(envelope,target);
   if(envelope.emailSigningModule!=="v2"&&(envelope.signingMode||"Sequential")==="Sequential"&&envelope.signers.some(s=>s.order<target.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position. Later signers cannot be emailed early.");
   if(typeof ctx.sendInvitation!=="function")throw new HttpError(503,"Signing invitation transport is not configured.");
   const emailLink=target.identityType==="email-link";
@@ -413,6 +414,38 @@ export async function resendInvitation(ctx,user,id,signerId){
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:emailLink?"email_link.resent":"invitation.resent",signerId,actor:user.uid,expiresAt,at:now.toISOString()})}};
   });
   return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt};
+}
+
+
+export async function resendAllUnsignedInvitations(ctx,user,id){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
+  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed");
+  const results=[];
+  for(const signer of targets){
+    try{results.push(await resendInvitation(ctx,user,id,signer.id));}
+    catch(error){results.push({ok:false,signerId:signer.id,stageCode:error?.code||"SUBMIT",error:String(error?.message||"Delivery failed.")});}
+  }
+  return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:results.filter(item=>item.ok===false).length,results};
+}
+
+export async function updateSignerContact(ctx,user,id,signerId,{email,name}={}){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot be changed.");
+  const target=(envelope.signers||[]).find(signer=>signer.id===signerId);
+  if(!target||target.identityType!=="email-link")throw new HttpError(404,"Email signer assignment not found.");
+  if(target.status==="Signed")throw new HttpError(409,"Signer details cannot be changed after signing.");
+  const changed=await updateEmailSignerContact(target,{email,name,now:ctx.now()});
+  await mutate(ctx,id,async current=>{
+    if(!owner(current,user))throw new HttpError(403,"Not authorized.");
+    const signer=current.signers.find(item=>item.id===signerId);
+    if(!signer||signer.status==="Signed")throw new HttpError(409,"Signer details cannot be changed after signing.");
+    Object.assign(signer,changed.signer);
+    return{patch:{signers:current.signers,events:await chainEvents(current.events,{...changed.audit,actor:user.uid})}};
+  });
+  return{ok:true,envelopeId:id,signerId,email:changed.signer.email,name:changed.signer.name,requiresNewLink:true};
 }
 
 export async function revokeInvitation(ctx,user,id,signerId){
