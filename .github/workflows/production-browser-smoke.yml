@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -30,38 +31,13 @@ jobs:
           cache: npm
       - name: Install application dependencies
         run: npm ci
-      - name: Capture deployed build timestamp for reproducible asset verification
-        env:
-          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-        run: |
-          set -euo pipefail
-          live_html="$RUNNER_TEMP/cloudflare-live-index.html"
-          live_url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 30 \
-            -H "Cache-Control: no-cache" "${live_url}?__irpa_smoke=${TARGET_SHA}" -o "$live_html"
-          live_commit="$(node -e 'const fs=require("node:fs");const html=fs.readFileSync(process.argv[1],"utf8");const match=html.match(/<meta name="irpa-build-version" content="([^"]+)"/i);process.stdout.write(match?.[1]||"");' "$live_html")"
-          live_build_time="$(node -e 'const fs=require("node:fs");const html=fs.readFileSync(process.argv[1],"utf8");const match=html.match(/<meta name="irpa-build-time" content="([^"]+)"/i);process.stdout.write(match?.[1]||"");' "$live_html")"
-          if [ "$live_commit" != "$TARGET_SHA" ]; then
-            echo "Live Cloudflare build commit mismatch: expected $TARGET_SHA, received ${live_commit:-missing}." >&2
-            exit 1
-          fi
-          if ! [[ "$live_build_time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
-            echo "Live Cloudflare build timestamp is missing or invalid." >&2
-            exit 1
-          fi
-          echo "VITE_BUILD_TIME=$live_build_time" >> "$GITHUB_ENV"
-          echo "Using the deployed UTC build timestamp for byte-for-byte asset reproduction."
-
-      - name: Rebuild exact frontend commit for asset verification
-        env:
-          VITE_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
-          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
-          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
-          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
-          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
-          VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
-        run: npm run build
+      - name: Download the exact deployed frontend build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: production-frontend-${{ github.event.workflow_run.head_sha || github.sha }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: dist/
       - name: Install Playwright Chromium
         run: |
           npm install --no-save --package-lock=false playwright
