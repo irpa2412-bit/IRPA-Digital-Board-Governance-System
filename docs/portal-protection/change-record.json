@@ -49,10 +49,10 @@
       "Full regression and both affected-portal smoke checks are pending on the amended exact PR head; no production deployment has occurred."
     ],
     "dependentSmoke": {
-      "Signature envelope refresh and delivery regression": "PASS",
-      "Readability CI and token contrast": "PASS",
-      "Production application build": "PASS",
-      "Complete root test suite": "PASS"
+      "Signature envelope refresh and delivery regression": "PENDING",
+      "Readability CI and token contrast": "PENDING",
+      "Production application build": "PENDING",
+      "Complete root test suite": "PENDING"
     }
   },
   "closure": {
@@ -261,10 +261,10 @@
         "Full regression and both affected-portal smoke checks are pending on the amended exact PR head; no production deployment has occurred."
       ],
       "dependentSmoke": {
-        "Signature envelope refresh and delivery regression": "PASS",
-        "Readability CI and token contrast": "PASS",
-        "Production application build": "PASS",
-        "Complete root test suite": "PASS"
+        "Signature envelope refresh and delivery regression": "PENDING",
+        "Readability CI and token contrast": "PENDING",
+        "Production application build": "PENDING",
+        "Complete root test suite": "PENDING"
       }
     },
     "expectedEffect": "Restore the verified pre-11:00 EAT email-link signing implementation while keeping every dispatched email invitation non-expiring before and after opening. Opening, closing, or reopening the same email URL without signing does not consume or rotate the invitation. The same link remains valid until successful signing, authorised owner revocation, successful replacement delivery, or envelope cancellation. Existing Firestore records, tokens, audit events and completed PDFs are not rewritten."
