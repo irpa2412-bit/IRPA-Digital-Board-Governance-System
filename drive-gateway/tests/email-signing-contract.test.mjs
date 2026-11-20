@@ -263,3 +263,15 @@ test("owner/admin SMTP self-check remains protected by the existing Worker route
   assert.ok(router.includes("user.isAdmin!==true&&user.isOwner!==true"));
   assert.ok(diagnostics.includes('profile?.fields?.role?.stringValue==="Administrator"'));
 });
+
+
+test("v2 invitation copy and Worker routes describe a reusable, signer-scoped link", () => {
+  const worker = fs.readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+  const signing = fs.readFileSync(new URL("../src/signing.mjs", import.meta.url), "utf8");
+  assert.ok(worker.includes("Your link is reusable"));
+  assert.ok(worker.includes("Previewing the link does not consume it"));
+  assert.ok(worker.includes("reopen the same email link"));
+  assert.ok(worker.includes("previewGatewayEmailSigning"));
+  assert.ok(worker.includes("openGatewayEmailSigning"));
+  assert.ok(signing.includes('emailSigningModule==="v2"'));
+});
