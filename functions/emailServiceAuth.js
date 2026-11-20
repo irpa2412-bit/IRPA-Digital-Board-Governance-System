@@ -15,10 +15,10 @@ async function createEmailDeliveryIdToken({
   auth,
   projectId
 } = {}) {
-  const adminApp = require("firebase-admin/app");
-  const authSdk = require("firebase-admin/auth");
-  const project = String(projectId || adminApp.getApp().options.projectId || env.GCLOUD_PROJECT || env.GCP_PROJECT || "").trim();
-  const authClient = auth || authSdk.getAuth();
+  let resolvedProject = projectId;
+  if (!resolvedProject) resolvedProject = require("firebase-admin/app").getApp().options.projectId || env.GCLOUD_PROJECT || env.GCP_PROJECT;
+  const project = String(resolvedProject || "").trim();
+  const authClient = auth || require("firebase-admin/auth").getAuth();
   const apiKey = String(env.FIREBASE_WEB_API_KEY || FIREBASE_WEB_API_KEYS[project] || "").trim();
   if (!project || !apiKey) throw new Error("Firebase email-service authentication is not configured for this project.");
 
