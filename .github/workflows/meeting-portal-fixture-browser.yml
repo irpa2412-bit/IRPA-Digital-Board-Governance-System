@@ -3,7 +3,7 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: [main, fix/workflow-main-push-validation-20261114, feat/secure-meeting-invitation-flow-20261013, test/meeting-signature-portal-browser-regression-20261014, fix/signature-gateway-cryptographic-bridge-20261015, fix/signature-email-link-identity-isolation-20261119]
+    branches: ["**"]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
