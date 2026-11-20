@@ -108,7 +108,7 @@ const meetingServicesRouter = createMeetingServicesRouter({
   getGatewayEnvelopeStatus: async (ownerUid, env, envelopeId) => {
     const esignContext=buildEsignContext({env,verifyUser:async()=>null,sendInvitation:async()=>{},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
     return getGatewayEnvelopeStatus(esignContext,{uid:String(ownerUid||""),isAdmin:false},envelopeId);
-  }
+  },
   json,
   corsHeaders
 });
