@@ -132,7 +132,7 @@ export async function deleteRecord(collection, id) {
   store[collection] = (store[collection] || []).filter(record => String(record.id) !== String(id));
   writeStore(store); return { id };
 }
-export async function openVotingIssue() { return { id: "TEST-vote-001" }; }
+export async function openVotingIssue(payload = {}) { const store = readStore(); const issue = { id: `TEST-vote-${store.nextId++}`, ...(payload || {}), status: "Open" }; store.votes.push(issue); writeStore(store); recordAction({ type: "resolution-vote-open", issueId: issue.id }); return issue; }
 export async function listMeetingRecords(meetingId) { return clone(readStore().meetingRecords.filter(r => r.meetingId === meetingId)); }
 export async function retrieveMeetingRecord(id) { return clone(readStore().meetingRecords.find(r => r.id === id) || null); }
 export async function saveMeetingAssistantDraft() { return { id: "TEST-draft-001" }; }
@@ -244,6 +244,8 @@ export async function registerMeetingWorkingDocument({ meetingId, documentId }) 
 export async function submitMeetingDocumentReview() { return { ok: true, testOnly: true }; }
 export async function translateMeetingPhrase({ content }) { return { translatedText: "TEST translation: " + content, testOnly: true }; }
 export function withWorkflowLinks(value) { return value; }
+export function readWorkflowContext() { return null; }
+export function clearWorkflowContext() {}
 export function navigateWorkflow(module, context = {}) {
   if (typeof window !== "undefined") window.__irpaNavigationCalls = [...(window.__irpaNavigationCalls || []), { module, context }];
 }
