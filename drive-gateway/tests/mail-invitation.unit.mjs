@@ -43,8 +43,8 @@ test("rejects a service UID without the verified service claim",async()=>{
 test("rejects malformed JSON, invalid recipients and unsafe headers",async()=>{
   assert.equal((await handleSendInvitationEmail(req("{"),makeEnv(),deps())).status,400);
   assert.equal((await handleSendInvitationEmail(req({...good,to:"not-an-email"}),makeEnv(),deps())).status,400);
-  assert.equal((await handleSendInvitationEmail(req({...good,to:"a@example.org\\r\\nBcc: x@y.z"}),makeEnv(),deps())).status,400);
-  assert.equal((await handleSendInvitationEmail(req({...good,subject:"Hello\\r\\nBcc: x@y.z"}),makeEnv(),deps())).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,to:"a@example.org\r\nBcc: x@y.z"}),makeEnv(),deps())).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,subject:"Hello\r\nBcc: x@y.z"}),makeEnv(),deps())).status,400);
 });
 test("requires text and HTML message bodies",async()=>{
   assert.equal((await handleSendInvitationEmail(req({...good,html:7}),makeEnv(),deps())).status,400);
