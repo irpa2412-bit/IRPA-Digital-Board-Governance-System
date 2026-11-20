@@ -32,7 +32,7 @@ export function calculateVotingOutcome({forCount=0,againstCount=0,abstainCount=0
  else if(v.thresholdType==="one_third"){numerator=1;denom=3;}
  else if(v.thresholdType==="two_thirds"){numerator=2;denom=3;}
  else {numerator=v.numerator;denom=v.denominator;}
- const requiredFor=Math.ceil(denominator*numerator/denom);
+ const requiredFor=v.thresholdType==="simple_majority"?Math.floor(denominator/2)+1:Math.ceil(denominator*numerator/denom);
  if(v.requireQuorumAtVoteClose&&quorumMet!==true)return {result:"INVALID_QUORUM",denominator,requiredFor,forCount:forVotes,againstCount:against,abstainCount:abstain,policyVersion:policy.version};
  if(denominator===0)return {result:"NO_VALID_DENOMINATOR",denominator,requiredFor,forCount:forVotes,againstCount:against,abstainCount:abstain,policyVersion:policy.version};
  const tied=forVotes===against;
