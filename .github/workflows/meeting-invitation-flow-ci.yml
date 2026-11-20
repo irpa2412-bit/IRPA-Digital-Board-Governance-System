@@ -1,6 +1,7 @@
 name: Meeting Invitation Flow CI
 # Build and entry-policy verification only; this workflow never deploys.
 # Verification-only regression workflow; no production deployment is performed.
+# Attendance dispatch reconciliation regression is executed as part of the pull-request gate.
 
 on:
   push:
