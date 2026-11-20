@@ -376,3 +376,36 @@ test("Title assignment is accepted, completed by the signer, and included in liv
   assert.equal(status.lastEvent.type,"envelope.completed");
   assert.equal(status.signers[0].title,"Board Secretary");
 });
+
+
+test("v2 reusable invitation is read-only on preview, creates fresh sessions, and expires with the exact signed message",async()=>{
+  const f=await fixture();
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{emailSigningModule:"v2"},{ifVersion:current._v});
+  const before=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const preview=await previewEmailSigning(f.ctx,f.token);
+  assert.equal(preview.ok,true);
+  const afterPreview=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.deepEqual(afterPreview,before,"GET preview and link previews must not change state or audit history");
+  const first=await openEmailSigning(f.ctx,f.token,"198.51.100.81");
+  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.82");
+  assert.notEqual(first.sessionToken,second.sessionToken,"each explicit open creates a fresh isolated session");
+  const reopened=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(reopened.signers[0].emailLinkStatus,"issued","opening never consumes the invitation link");
+  assert.equal(reopened.signers[0].emailLinkSessionStatus,"active");
+  assert.notEqual(reopened.signers[0].emailLinkSessionHash,await sha256Hex(first.sessionToken.split(".")[2]));
+  const signer=reopened.signers[0];
+  signer.status="Signed";
+  signer.emailLinkStatus="used";
+  signer.emailLinkSessionStatus="used";
+  signer.signedAt=NOW.toISOString();
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:reopened.signers},{ifVersion:reopened._v});
+  await assert.rejects(
+    ()=>previewEmailSigning(f.ctx,f.token),
+    error=>error.status===410&&error.message==="This document is already signed."
+  );
+  await assert.rejects(
+    ()=>openEmailSigning(f.ctx,f.token,"198.51.100.82"),
+    error=>error.status===410&&error.message==="This document is already signed."
+  );
+});
