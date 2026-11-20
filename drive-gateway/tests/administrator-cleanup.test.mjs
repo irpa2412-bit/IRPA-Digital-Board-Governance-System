@@ -156,3 +156,40 @@ test("inventory exposes related-record dependency keys for administrator review"
   assert.ok(member.linkedRecordKeys.includes("meetings/meeting-1"));
   assert.equal(member.dependencyCount,1);
 });
+
+test("member GOES plan explicitly lists pending invitation, Auth account and unsent signer assignment cascades", async () => {
+  const {route,env}=harness({collections:{
+    members:[{id:"member-1",data:{uid:"member-1",fullName:"Cascade Member",email:"cascade@example.test"}}],
+    invitations:[{id:"invite-1",data:{uid:"member-1",email:"cascade@example.test",status:"Pending"}}],
+    signatureEnvelopes:[{id:"draft-1",data:{status:"Draft",signers:[{uid:"member-1",email:"cascade@example.test",status:"Invited"}]}}]
+  }});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"members/member-1",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan")).json();
+  assert.equal(plan.summary.goes,2);
+  assert.equal(plan.records.find(row=>row.key==="invitations/invite-1").decisionSource,"APPROVED_CASCADE");
+  assert.ok(plan.executionOperations.some(operation=>operation.type==="auth-delete"));
+  assert.ok(plan.executionOperations.some(operation=>operation.type==="update-signers" && operation.key==="signatureEnvelopes/draft-1"));
+});
+
+test("signed trial document GOES removes its PDF, envelope and portal record while audit history stays protected", async () => {
+  const {route,env}=harness({collections:{
+    signatureEnvelopes:[{id:"trial-env",data:{recordOrigin:"TRIAL",trialData:true,status:"Completed",signedPdfReference:"drive-file-123456789"}}],
+    signatures:[{id:"trial-portal",data:{envelopeId:"trial-env",gatewayEnvelopeId:"trial-env",recordOrigin:"TRIAL",trialData:true,status:"Signed"}}],
+    signatureEvents:[{id:"trial-audit",data:{envelopeId:"trial-env",eventType:"SIGNATURE_COMPLETED"}}]
+  }});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"signatureEnvelopes/trial-env",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan")).json();
+  assert.equal(plan.summary.goes,2);
+  assert.ok(plan.executionOperations.some(operation=>operation.type==="drive-delete" && operation.fileId==="drive-file-123456789"));
+  assert.ok(plan.executionOperations.some(operation=>operation.key==="signatures/trial-portal"));
+  assert.equal(plan.records.find(row=>row.key==="signatureEvents/trial-audit").decision,"STAYS");
+  assert.equal(plan.records.find(row=>row.key==="signatureEvents/trial-audit").protected,true);
+});
+
+test("completed production envelope cannot be selected for GOES", async () => {
+  const {route,env}=harness({collections:{signatureEnvelopes:[{id:"prod-env",data:{recordOrigin:"PRODUCTION",status:"Completed",signedPdfReference:"drive-file-production"}}]}});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"signatureEnvelopes/prod-env",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan")).json();
+  assert.equal(plan.records.find(row=>row.key==="signatureEnvelopes/prod-env").decision,"STAYS");
+  assert.equal(plan.records.find(row=>row.key==="signatureEnvelopes/prod-env").protected,true);
+});
