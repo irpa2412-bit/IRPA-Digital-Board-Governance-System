@@ -36,7 +36,7 @@ test("server assessment reconciles participant registration, invitation passes, 
 
 test("Board quorum excludes Board Committee members and external/manual invitees",()=>{
   assert.match(service,/boardMemberRole = participant =>/);
-  assert.match(service,/\["board member","board chairperson","board treasurer","board vice chairperson"\]/);
+  assert.match(service,/authoritativeBoardRecord=lower\(participant\.sourceType\)==="board member register"/);\n  assert.match(service,/\["board member","board chairperson","board treasurer","board vice chairperson","chairperson","vice chairperson","treasurer"\]/);\n  assert.match(service,/!\/external\|guest\|observer\|non\.?voting\|committee\|secretary\//);
   assert.match(service,/sourceType\)!=="manual invitee"/);
   assert.match(service,/BOARD_COMMITTEE_MEMBER/);
   assert.match(service,/EXTERNAL_INVITEE/);
