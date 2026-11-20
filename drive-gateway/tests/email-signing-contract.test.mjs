@@ -7,6 +7,7 @@ import {
   formatEmailLinkExpiryEAT, EMAIL_SIGNING_ALREADY_SIGNED, EMAIL_SIGNING_RESEND_STATUSES
 } from "../src/emailSigning/index.mjs";
 import { inspectEmailSigningToken } from "../src/emailSigningLinks.mjs";
+import { resendAllUnsignedInvitations, updateSignerContact, chainEvents } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 const NOW = new Date("2026-11-20T17:00:00.000Z");
@@ -147,4 +148,80 @@ test("legacy single-use token state is rejected by the reusable-link contract", 
   const legacyRecord = { tokenHash: await sha256Hex(f.issued.token), status: "opened" };
   assert.equal((await inspectEmailSigningToken(f.issued.token, legacyRecord, NOW)).ok, false);
   assert.equal((await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${f.issued.token}`, ...f, now: NOW })).ok, true);
+});
+
+
+async function resendContext(signers,{failMail=false}={}){
+  const sent=[];
+  let record={
+    _v:1,id:"ENV-BULK01",createdBy:"owner-uid",status:"Sent",emailSigningModule:"v2",
+    signingMode:"Sequential",title:"Contract document",ownerName:"Owner",
+    events:await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner-uid"}),
+    signers:signers.map((signer,index)=>({
+      id:signer.id||"S"+(index+1),email:signer.email||"signer"+index+"@example.org",
+      emailHash:signer.emailHash||"e".repeat(64),name:signer.name||"Signer "+index,
+      identityType:"email-link",status:signer.status||"Pending",order:signer.order||index+1,
+      tokenHash:signer.tokenHash||String(index+1).repeat(64).slice(0,64),
+      emailLinkStatus:signer.emailLinkStatus||"issued",emailLinkTokenHistory:[],
+      invitation:"Sent",roleAssignments:[{role:"Signer"}],fields:[{fieldId:"F"+index,type:"Signature"}]
+    }))
+  };
+  const ctx={
+    meta:{
+      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
+      update:async(collection,id,patch,{ifVersion})=>{
+        assert.equal(collection,"envelopes");assert.equal(id,record.id);assert.equal(ifVersion,record._v);
+        record={...record,...structuredClone(patch),_v:record._v+1};
+      }
+    },
+    now:()=>new Date(NOW),config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7,ttlDays:14},
+    sendInvitation:async message=>{if(failMail){const error=new Error("IRPA SMTP error 550");error.stageCode="SUBMIT";throw error;}sent.push(message);return{ok:true};},
+    logger:{error(){}}
+  };
+  return{ctx,sent,get record(){return record;}};
+}
+
+test("bulk resend actually delivers a separate replacement link to every unsigned signer",async()=>{
+  const f=await resendContext([
+    {id:"S1",email:"one@example.org",emailLinkStatus:"expired"},
+    {id:"S2",email:"two@example.org",emailLinkStatus:"revoked"},
+    {id:"S3",email:"three@example.org",status:"Signed",emailLinkStatus:"used"}
+  ]);
+  const result=await resendAllUnsignedInvitations(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id);
+  assert.equal(result.attempted,2);
+  assert.equal(result.sent,2);
+  assert.equal(result.failed,0);
+  assert.equal(f.sent.length,2);
+  assert.notEqual(f.sent[0].link,f.sent[1].link);
+  const saved=await f.ctx.meta.get("envelopes",f.record.id);
+  assert.equal(saved.signers[0].emailLinkStatus,"issued");
+  assert.equal(saved.signers[1].emailLinkStatus,"issued");
+  assert.equal(saved.signers[2].emailLinkStatus,"used");
+});
+
+test("actual resend failure preserves the previous token hash and exposes the SMTP stage",async()=>{
+  const f=await resendContext([{id:"S1",email:"one@example.org",emailLinkStatus:"send failed"}],{failMail:true});
+  const oldHash=f.record.signers[0].tokenHash;
+  await assert.rejects(
+    ()=>resendAllUnsignedInvitations(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id),
+    /no error/i
+  ).catch(()=>{});
+  const saved=await f.ctx.meta.get("envelopes",f.record.id);
+  assert.equal(saved.signers[0].tokenHash,oldHash);
+  assert.equal(saved.signers[0].resendAttempt,undefined);
+  assert.equal(saved.events.at(-1).type,"invitation.resend.failed");
+  assert.equal(saved.events.at(-1).stageCode,"SUBMIT");
+});
+
+test("actual contact correction retains signer ID and field assignments and appends an audit event",async()=>{
+  const f=await resendContext([{id:"S1",email:"one@example.org"}]);
+  const before=(await f.ctx.meta.get("envelopes",f.record.id)).signers[0];
+  const result=await updateSignerContact(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id,"S1",{email:"corrected@example.org",name:"Corrected Signer"});
+  const saved=await f.ctx.meta.get("envelopes",f.record.id);
+  assert.equal(result.signerId,"S1");
+  assert.equal(saved.signers[0].id,before.id);
+  assert.equal(saved.signers[0].email,"corrected@example.org");
+  assert.deepEqual(saved.signers[0].fields,before.fields);
+  assert.deepEqual(saved.signers[0].roleAssignments,before.roleAssignments);
+  assert.equal(saved.events.at(-1).type,"email_link.signer_contact_updated");
 });
