@@ -193,7 +193,7 @@
       "portal": "Signature Portal",
       "status": "open",
       "openedAt": "2026-11-20T17:08:47Z",
-      "lastActivityAt": "2026-11-20T20:20:00Z",
+      "lastActivityAt": "2026-11-20T20:38:35Z",
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
       "reason": "Owner-authorised restoration of the Email-link E-signature system to its verified production state before 11:00 EAT on 20 Nov 2026. Preserve Meeting Portal functionality and all existing signing records. Shared Signature Platform/Gateway dependencies are included only for restoration; verify Meeting Portal attendance and ordinary invitation behaviour independently.",
@@ -266,6 +266,11 @@
           "at": "2026-11-20T20:20:00Z",
           "action": "scope-and-non-expiry-amended",
           "description": "Owner authorised restoration and explicitly required no time-based expiry for dispatched signer links. The link remains valid until one-time redemption, revocation or envelope cancellation. Shared Signature Platform/Gateway dependencies require Meeting Portal regression verification; its independent attendance and ordinary invitation behaviour remain preserved."
+        },
+        {
+          "at": "2026-11-20T20:38:35Z",
+          "action": "opened-link-non-expiry-amended",
+          "description": "Owner clarified that an invitation opened but not signed must remain valid and reusable. Opening does not consume or rotate the email URL; the same invitation remains usable indefinitely until successful signing, authorised revocation, successful replacement delivery, or envelope cancellation. Existing signing records and tokens are not rewritten."
         }
       ],
       "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.",
