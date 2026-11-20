@@ -237,9 +237,9 @@ export async function dispatchDailyAttendanceSigning({ meeting, date, records })
   return { envelopeId: dispatch.envelopeId, documentId: dispatch.documentId, signerCount: assignments.length, status: "TEST_MOCKED" };
 }
 export async function resumeDailyAttendanceSigning(args) { return dispatchDailyAttendanceSigning({ ...args, records: args.records || [] }); }
-export async function captureMeetingRecord({ meetingId, type, content, title }) {
+export async function captureMeetingRecord({ meetingId, recordType, type, content, title }) {
   const store = readStore();
-  const record = { id: `TEST-record-${store.nextId++}`, meetingId, recordType: type, title, content, recordLabel: "TEST Meeting Minutes", capturedAt: "2026-11-20T09:00:00.000Z", integrityStatus: "TEST_FIXTURE", storageDestination: "TEST_LOCAL_FIXTURE", contentHash: "TEST-NOT-A-REAL-HASH", retainUntil: "2027-11-20", retentionYears: 1, legalHold: false };
+  const record = { id: `TEST-record-${store.nextId++}`, meetingId, recordType: recordType || type || "TEST_DRAFT", title, content, recordLabel: "TEST Meeting Minutes", capturedAt: "2026-11-20T09:00:00.000Z", integrityStatus: "TEST_FIXTURE", storageDestination: "TEST_LOCAL_FIXTURE", contentHash: "TEST-NOT-A-REAL-HASH", retainUntil: "2027-11-20", retentionYears: 1, legalHold: false };
   store.meetingRecords.push(record); writeStore(store); recordAction({ type: "minutes-capture", recordId: record.id });
   return record;
 }
