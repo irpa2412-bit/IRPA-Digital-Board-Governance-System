@@ -193,9 +193,10 @@ test("completed email-link signing consumes the invitation and session exactly o
   assert.equal(stored.signers[0].status,"Signed");
   assert.equal(stored.signers[0].emailLinkStatus,"used");
   assert.equal(stored.signers[0].emailLinkSessionStatus,"used");
-  assert.equal(stored.signers[0].emailLinkSessionHash,null);
+  assert.ok(stored.signers[0].emailLinkSessionHash,"the consumed session hash remains only to authorize read-only retrieval of the completed PDF");
   await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"));
-  await assert.rejects(()=>getSigningPdf(f.ctx,opened.sessionToken,null));
+  await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary"},consent:true,user:null}));
+  if(result.completed===true){const finalPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);assert.match(finalPdf.fileName,/signed-/);}
 });
 
 test("tampered and unknown links return the same neutral response",async()=>{
