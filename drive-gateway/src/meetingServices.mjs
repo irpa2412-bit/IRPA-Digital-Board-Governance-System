@@ -27,14 +27,16 @@ const participantCategory = participant => {
  if(/external|guest|partner|donor|consultant|technical expert|government representative|observer/.test(role)||type.includes("external"))return "EXTERNAL_INVITEE";
  return "OTHER";
 };
-async function buildQuorumAssessment(ctx,env,token,meeting){
+async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null){
  const meetingId=clean(meeting.id);
  const [participants,passes,queue,signatures,memberRecords]=await Promise.all([
   listByField(ctx,env,token,"participants","meetingId",meetingId),
   listByField(ctx,env,token,"meetingAccessTokens","meetingId",meetingId),
   listByField(ctx,env,token,"meetingEntryRequests","meetingId",meetingId),
   listByField(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId),
-  listCollection(ctx,env,token,"members")
+  listCollection(ctx,env,token,"members"),
+  listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId),
+  listByField(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId)
  ]);
  const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
  const activeBoardRecords=memberRecords.filter(m=>{
@@ -53,6 +55,10 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
  }
  const boardMembers=[...registerByUid.values()];
  const signatureByParticipant=new Map(signatures.map(s=>[clean(s.participantId),s]));
+ const dailyByParticipant=new Map(dailyRows.filter(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate).map(r=>[clean(r.participantId),r]));
+ const dailyDispatch=dispatchRows.find(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate);
+ const dailyEnvelope=dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.envelopeId?await getDoc(ctx,env,token,"signatureEnvelopes",clean(dailyDispatch.envelopeId)):null;
+ const dailySignerByUid=new Map((Array.isArray(dailyEnvelope?.recipients)?dailyEnvelope.recipients:[]).filter(r=>clean(r.uid)&&clean(r.status)==="Signed").map(r=>[clean(r.uid),r]));
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
@@ -60,11 +66,11 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
  const uidOf=p=>clean(p.participantUid||p.uid||p.userId);
  const rows=active.map(p=>{
   const id=clean(p.id),signature=signatureByParticipant.get(id),entry=queueByParticipant.get(id),pass=passByParticipant.get(id);
-  const uid=uidOf(p),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
+  const uid=uidOf(p),daily=dailyByParticipant.get(id),dailySigner=dailySignerByUid.get(uid),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
   const explicitCommittee=lower(p.participantRole||p.role)==="board committee member"||lower(p.participantType).includes("board committee");
   const category=explicitCommittee?"BOARD_COMMITTEE_MEMBER":registerMatch?"BOARD_MEMBER":boardMemberRole(p)?"UNMATCHED_BOARD_REGISTRATION":participantCategory(p);
-  const attendanceStatus=clean(p.attendanceStatus)||"Unmarked";
-  const signed=Boolean(signature&&clean(signature.signatureMethod)&&signature.signedAt);
+  const attendanceStatus=attendanceDate?(clean(daily?.attendanceStatus)||"N/A"):clean(p.attendanceStatus)||"Unmarked";
+  const signed=Boolean(dailySigner||(!attendanceDate&&signature&&clean(signature.signatureMethod)&&signature.signedAt));
   const invitationDispatched=p.meetingAccessDispatched===true||["sent","accepted","confirmed","dispatched"].includes(lower(p.meetingAccessDispatchStatus));
   const accessPassStatus=clean(pass?.status)||"Not issued";
   const queueStatus=clean(entry?.status)||"Not queued";
@@ -110,7 +116,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   boardMembersPresent:boardPresent
  };
  const registerUsable=denominator>0;
- return {meetingId,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?"One-third of the active UID-verified Board Members Register (rounded up)":"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!registerUsable?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",counts,rows:displayRows,assessedAt:new Date().toISOString(),sources:{boardRegister:"active members collection; UID-only; deduplicated by UID",participantRegistration:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:"meetingAttendanceSignatures"},reconciliation:{boardRegisterMembers:denominator,meetingParticipantRegistrations:registeredBoardRows.length,boardMembersNotRegistered:counts.boardMembersNotRegistered,unmatchedBoardRegistrations:unmatchedBoardRows.length,missingRegisterUid,duplicateRegisterUids:[...duplicateRegisterUids]}};
+ return {meetingId,attendanceDate:attendanceDate||null,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?"One-third of the active UID-verified Board Members Register (rounded up)":"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!registerUsable?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",counts,rows:displayRows,assessedAt:new Date().toISOString(),sources:{boardRegister:"active members collection; UID-only; deduplicated by UID",participantRegistration:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:attendanceDate?"meetingDailyAttendance + Signature Portal envelope evidence":"meetingAttendanceSignatures"},reconciliation:{boardRegisterMembers:denominator,meetingParticipantRegistrations:registeredBoardRows.length,boardMembersNotRegistered:counts.boardMembersNotRegistered,unmatchedBoardRegistrations:unmatchedBoardRows.length,missingRegisterUid,duplicateRegisterUids:[...duplicateRegisterUids]}};
 };
 const recordLabel = type => ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",MEETING_REPORT:"Compiled Meeting Report",OTHER:"Other Meeting Record"})[type]||"Meeting Record";
 function toFs(v) { if(v===null||v===undefined)return {nullValue:null}; if(v instanceof Date)return {timestampValue:v.toISOString()}; if(typeof v==="boolean")return {booleanValue:v}; if(typeof v==="number")return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}; if(Array.isArray(v))return {arrayValue:{values:v.map(toFs)}}; if(typeof v==="object")return {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,toFs(x)]))}}; return {stringValue:String(v)}; }
@@ -210,7 +216,7 @@ if(pathname==="/api/meeting-board-register/list"){
 if(pathname==="/api/meeting-quorum/assess"){
  const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
  const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
- const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting);
+ const attendanceDate=clean(data.date)||null;if(attendanceDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(attendanceDate))return fail(ctx,request,"A valid attendance date is required.",400);const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting,attendanceDate);
  if(data.save===true){
   if(!c.canManage)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may save a quorum assessment.",403);
   const snapshot={...assessment,rows:assessment.rows.map(r=>({...r,email:undefined}))};
