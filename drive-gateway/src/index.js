@@ -1618,7 +1618,7 @@ async function uploadControlledDocument(request, env) {
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
-  const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
+  const title = cleanName(data.title || fileName.replace(/\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"STEP upload-controlled-document: the final Firestore document ID is required before Drive upload."},400,corsHeaders(request));
@@ -2907,7 +2907,7 @@ async function enforceMailRateLimit(env, uid) {
 async function enforceServiceMailRateLimit(env, recipient) {
   if (!env?.DRIVE_KV) throw new Error("Email rate-limit storage is unavailable.");
   const address = String(recipient || "").trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(address)) throw new Error("Invalid recipient.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error("Invalid recipient.");
   const hour = Math.floor(Date.now() / 3600000);
   const recipientHash = await sha256Hex(address);
   const limits = [
