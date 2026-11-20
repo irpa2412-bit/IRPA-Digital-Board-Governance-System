@@ -8,7 +8,7 @@ const sleep = async () => {};
 
 function makeEnv() {
   const store = new Map();
-  return { IRPA_APP_URL:"https://app.example.test", DRIVE_KV:{get:async k=>store.get(k)??null,put:async(k,v)=>void store.set(k,v)} };
+  return { INVITE_SERVICE_KEY:"test-key", IRPA_APP_URL:"https://app.example.test", DRIVE_KV:{get:async k=>store.get(k)??null,put:async(k,v)=>void store.set(k,v)} };
 }
 function req(body, token="valid-token") {
   return new Request("https://gw.test/api/send-invitation-email", {
@@ -16,7 +16,12 @@ function req(body, token="valid-token") {
     body:typeof body==="string"?body:JSON.stringify(body)
   });
 }
-const good = {to:"a@example.org",name:"Amina",subject:"IRPA test",text:"Hello",html:"<p>Hello</p>"};
+function legacyReq(body,key="test-key") {
+  return new Request("https://gw.test/api/send-invitation-email", {
+    method:"POST", headers:{"x-irpa-service-key":key,"content-type":"application/json"},
+    body:JSON.stringify(body)
+  });
+}const good = {to:"a@example.org",name:"Amina",subject:"IRPA test",text:"Hello",html:"<p>Hello</p>"};
 const serviceClaims={user_id:"irpa-email-dispatcher",firebaseClaims:{emailDeliveryService:true}};
 function deps(overrides={}) {
   return {
@@ -31,6 +36,12 @@ function deps(overrides={}) {
 test("rejects requests without Firebase service authentication",async()=>{
   const result=await handleSendInvitationEmail(req(good,null),makeEnv(),deps({authenticateFirebaseRequest:async()=>{throw new Error("no token");}}));
   assert.equal(result.status,401);
+});
+test("accepts the old service key only as a temporary compatibility path",async()=>{
+  const sent=[];
+  const result=await handleSendInvitationEmail(legacyReq(good),makeEnv(),deps({smtpSend:async(_env,message)=>{sent.push(message);return{messageId:"legacy-1"};}}));
+  assert.equal(result.status,200);assert.equal(sent.length,1);
+  assert.equal((await handleSendInvitationEmail(legacyReq(good,"wrong-key"),makeEnv(),deps())).status,401);
 });
 test("rejects authenticated users that are not the dedicated email service",async()=>{
   const result=await handleSendInvitationEmail(req(good),makeEnv(),deps({authenticateFirebaseRequest:async()=>({user_id:"ordinary-user",firebaseClaims:{emailDeliveryService:true}})}));
