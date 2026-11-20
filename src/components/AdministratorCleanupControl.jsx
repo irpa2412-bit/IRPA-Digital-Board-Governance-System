@@ -92,7 +92,7 @@ export default function AdministratorCleanupControl() {
         <table><thead><tr><th>Record / Full name</th><th>Email</th><th>Role / Type</th><th>Status</th><th>Protection</th><th>Decision</th></tr></thead>
           <tbody>{visibleRows.map(row=><tr key={row.key}>
             <td><strong>{row.name || row.id}</strong><small style={{display:"block"}}>{row.collection} · {row.id}</small></td>
-            <td>{row.email || "—"}</td><td>{row.role || row.collection}</td><td>{row.status || "—"}</td>
+            <td>{row.email || "—"}</td><td>{row.role || row.registerType || row.collection}</td><td>{row.status || "—"}</td>
             <td>{row.protected ? (row.protectionReason || "Protected") : "—"}</td>
             <td><select aria-label={"Decision for " + (row.name || row.id)} value={decisions[row.key] || "STAYS"} disabled={row.protected} onChange={e=>{setDecisions(old=>({...old,[row.key]:e.target.value}));setPlan(null);}}><option value="STAYS">STAYS</option><option value="GOES">GOES</option></select></td>
           </tr>)}</tbody>
