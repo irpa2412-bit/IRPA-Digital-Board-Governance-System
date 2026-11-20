@@ -20,3 +20,7 @@ export async function submitMeetingDocumentReview(payload){return callMeetingSer
 export async function signMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/sign",payload);}
 export async function markMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/mark",payload);}
 export async function getMeetingAttendanceRegister(meetingId){return callMeetingService("/api/meeting-attendance/register",{meetingId});}
+
+export async function getDailyMeetingAttendance(meetingId,date){return callMeetingService("/api/meeting-attendance/daily/register",{meetingId,date});}
+export async function markDailyMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/daily/mark",payload);}
+export async function updateDailyMeetingAttendanceDispatch(payload){return callMeetingService("/api/meeting-attendance/daily/dispatch",payload);}
