@@ -4,7 +4,7 @@ import{trimSignatureCanvas}from"../utils/signatureImageCanvas.mjs";
 export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="",savedInitialsUrl="",onConfirm,onCancel,allowTyped=true}){
   const canvasRef=useRef(null),drawing=useRef(false),last=useRef(null),canvasSize=useRef({width:0,height:0}),dirtyRef=useRef(false);
   const hasSavedSpecimen=Boolean(field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl);
-  const[mode,setMode]=useState(hasSavedSpecimen?"Use my saved signature":"Draw"),[typed,setTyped]=useState(""),[dirty,setDirty]=useState(false),[error,setError]=useState("");
+  const[mode,setMode]=useState(hasSavedSpecimen?"Use my saved signature":"Draw"),[typed,setTyped]=useState(""),[dirty,setDirty]=useState(false),[error,setError]=useState(""),[busy,setBusy]=useState(false);
   const label=field?.type==="Initials"?"initials":"signature";
   useLayoutEffect(()=>{
     const canvas=canvasRef.current;
@@ -58,7 +58,22 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
     if(mode==="Use my saved signature")setMode("Draw");
     setTyped("");dirtyRef.current=false;setDirty(false);setError("");
   };
+  async function confirmSavedSignature(){
+    if(!hasSavedSpecimen||busy)return;
+    setBusy(true);setError("");
+    try{
+      const src=field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl;
+      const img=new Image();img.crossOrigin="anonymous";img.src=src;
+      await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error("The saved specimen could not be loaded. Choose Draw or Type instead."));});
+      const specimen=trimSignatureCanvas(img,{padding:4});
+      if(!specimen.dataUrl.startsWith("data:image/png;base64,"))throw new Error("The saved signature image could not be prepared.");
+      await onConfirm(specimen.dataUrl,field);
+    }catch(e){setError(e?.message||"The saved signature was not applied.");}
+    finally{setBusy(false);}
+  }
   async function confirm(){
+    if(busy)return;
+    setBusy(true);
     try{
       let specimen;
       if(mode==="Draw"){
@@ -86,6 +101,7 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       if(!specimen.dataUrl.startsWith("data:image/png;base64,"))throw new Error("The signature image could not be prepared.");
       await onConfirm(specimen.dataUrl,field);
     }catch(e){setError(e?.message||"The signature was not confirmed.");}
+    finally{setBusy(false);}
   }
   return <section role="dialog" aria-modal="false" aria-label={"Confirm "+label} className="panel signature-confirmation-dock" style={{position:"fixed",left:0,right:0,bottom:0,zIndex:1000,maxHeight:"70vh",overflowY:"auto",background:"#ffffff",boxShadow:"0 -4px 16px rgba(0,0,0,0.25)",paddingBottom:"env(safe-area-inset-bottom)"}}>
       <h2>Confirm {field?.type||"Signature"}</h2><p className="muted">Assigned field: page {field?.page||1}, {Number(field?.x||0).toFixed(1)}% from left, {Number(field?.y||0).toFixed(1)}% from top. If an active saved specimen is available in your own profile, it is selected for your review. Nothing is applied until you tap Confirm. Nothing is stamped until you tap Confirm.</p>
@@ -94,6 +110,6 @@ export default function SignatureFieldConfirmationPad({field,savedSignatureUrl="
       </div>
       {mode==="Draw"?<canvas ref={canvasRef} width={900} height={240} aria-label="Draw signature" onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} style={{position:"relative",zIndex:1,width:"100%",height:220,border:"2px solid var(--border)",borderRadius:8,background:"#fff",touchAction:"none",pointerEvents:"auto",userSelect:"none",display:"block"}}/>:mode==="Type"?<label style={{display:"block"}}>Type your signature<input autoComplete="off" value={typed} onChange={e=>setTyped(e.target.value)} placeholder="Type the name you want to sign with" style={{display:"block",width:"100%",marginTop:8}}/><div aria-label="Typed signature preview" style={{fontFamily:"cursive",fontStyle:"italic",fontSize:36,minHeight:64,padding:12}}>{typed||"Signature preview"}</div></label>:<div className="stat-card">{(field?.type==="Initials"?savedInitialsUrl:savedSignatureUrl)?"Your saved specimen is selected. Tap Confirm to apply it.":"No saved specimen is available; choose Draw or Type."}</div>}
       {error&&<p role="alert" className="error-message">{error}</p>}
-      <div style={{position:"relative",zIndex:2,display:"flex",justifyContent:"flex-end",gap:8,marginTop:14,flexWrap:"wrap"}}><button type="button" className="secondary-button" onClick={clear}>Clear and redo</button><button type="button" className="secondary-button" onClick={onCancel}>Cancel</button><button type="button" onClick={confirm}>Confirm {field?.type||"Signature"}</button></div>
+      <div className="signature-confirmation-actions" style={{position:"sticky",bottom:0,zIndex:5,display:"flex",justifyContent:"flex-end",alignItems:"center",gap:8,marginTop:14,padding:"12px 0 calc(12px + env(safe-area-inset-bottom))",background:"#ffffff",borderTop:"1px solid #d1d5db",flexWrap:"wrap"}}>{hasSavedSpecimen&&<button type="button" disabled={busy} onClick={confirmSavedSignature} aria-label="Use this signature" style={{minHeight:48,flex:"1 1 180px"}}>{busy?"Applying…":"Use this signature"}</button>}<button type="button" className="secondary-button" disabled={busy} onClick={clear}>Clear and redo</button><button type="button" className="secondary-button" disabled={busy} onClick={onCancel}>Cancel</button><button type="button" disabled={busy} onClick={confirm}>Confirm {field?.type||"Signature"}</button></div>
   </section>
 }
