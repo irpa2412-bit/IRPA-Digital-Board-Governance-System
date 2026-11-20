@@ -17,6 +17,7 @@ import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
 import { route as esignRoute } from "./router.mjs";
+import { maskEmailForConfirmation, formatEmailLinkExpiryEAT } from "./emailSigning/index.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
 import { isCurrentSigningAuthorityRecord } from "./signingAuthorityPolicy.mjs";
@@ -40,7 +41,15 @@ import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { createReleaseReadinessRoute } from "./releaseReadinessRoutes.mjs";
 import { createEmergencyStorageDiscoveryRoute } from "./emergencyStorageDiscovery.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
-import { getEnvelopeStatus as getGatewayEnvelopeStatus } from "./signing.mjs";
+import {
+  getEnvelopeStatus as getGatewayEnvelopeStatus,
+  previewEmailSigning as previewGatewayEmailSigning,
+  openEmailSigning as openGatewayEmailSigning,
+  getSigningPdf as getGatewaySigningPdf,
+  resendInvitation as resendGatewayInvitation,
+  resendAllUnsignedInvitations as resendAllGatewayUnsignedInvitations,
+  updateSignerContact as updateGatewaySignerContact
+} from "./signing.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
@@ -546,7 +555,21 @@ export default {
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
               const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"||ownerProfile.isOwner===true||String(ownerProfile.role||"").trim().toLowerCase()==="owner"};
             },
-            sendInvitation: async ({to,name,link,emailLink,title,ownerName,expiresAt,envelopeId,signerId,onStage}) => emailLink?sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console}):sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console}),
+            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,onStage}) => {
+              if(!emailLink)return sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console});
+              if(emailSigningModule==="v2"){
+                const safeName=String(name||"IRPA signer").replace(/[\\r\\n]+/g," ").slice(0,160);
+                const safeOwner=String(ownerName||"IRPA Document Owner").replace(/[\\r\\n]+/g," ").slice(0,160);
+                const safeTitle=String(title||"Controlled document").replace(/[\\r\\n]+/g," ").slice(0,180);
+                const expiryDate=expiresAt?new Date(expiresAt):null;
+                const expiryLabel=expiryDate&&Number.isFinite(expiryDate.getTime())?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(expiryDate)+" EAT":"the configured expiry shown in the signing portal";
+                const subject="IRPA secure document-signing invitation";
+                const text="Dear "+safeName+",\\n\\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\\n\\nDocument: "+safeTitle+"\\nLink expiry: "+expiryLabel+".\\n\\nYour link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit Open document to sign action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.\\n\\nOpen your document: "+String(link||"")+"\\n\\nDo not forward this link. This link controls access to this signing assignment only; it does not independently verify legal identity or institutional authority. If you did not expect this invitation, contact IRPA Administration.";
+                const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>"+escapeMailHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeMailHtml(expiryLabel)+"</p><p>Your link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit <strong>Open document to sign</strong> action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.</p><p><a href='"+escapeMailHtml(String(link||""))+"'>Open your document</a></p><p>Do not forward this link. It controls access to this signing assignment only and does not independently verify legal identity or institutional authority.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
+                return smtpSend(env,{to,subject,text,html,onStage});
+              }
+              return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console});
+            },
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA participant").slice(0,160);
@@ -574,6 +597,51 @@ export default {
             verifySigningAuthority: (user, manualAuthority) => verifyGatewaySigningAuthority(env, user, manualAuthority),
             driveHelpers: {getDriveAccessToken,driveFetch}
           });
+          const emailRouteUrl = new URL(request.url);
+          const emailToken = request.headers.get("x-signing-token") || "";
+          const emailRouteJson = (payload,status=200) => json(payload,status,corsHeaders(request));
+          if(request.method==="GET"&&emailRouteUrl.pathname==="/api/sign/email/open"){
+            try{return emailRouteJson(await previewGatewayEmailSigning(ctx,emailToken),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation preview unavailable."),code:error?.code||"TOKEN_LOOKUP"},Number(error?.status||404));}
+          }
+          if(request.method==="POST"&&emailRouteUrl.pathname==="/api/sign/email/session"){
+            try{return emailRouteJson(await openGatewayEmailSigning(ctx,emailToken,request.headers.get("cf-connecting-ip")||""),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Signing session could not be opened."),code:error?.code||"SESSION_CREATE"},Number(error?.status||401));}
+          }
+          if(request.method==="GET"&&emailRouteUrl.pathname==="/api/sign/email/pdf"){
+            try{
+              const pdf=await getGatewaySigningPdf(ctx,emailToken,null);
+              return new Response(pdf.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf","content-disposition":"inline","x-document-sha256":pdf.hash,"cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; sandbox"}});
+            }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Document preview unavailable."),code:error?.code||"PDF_PREVIEW"},Number(error?.status||404));}
+          }
+          const emailPathParts=emailRouteUrl.pathname.split("/");
+          const validEnvelopeId=value=>/^[A-Za-z0-9_-]{3,64}$/.test(String(value||""));
+          const validSignerId=value=>/^S\\d+$/.test(String(value||""));
+          if(request.method==="POST"&&emailPathParts.length===7&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&validSignerId(emailPathParts[5])&&emailPathParts[6]==="resend"){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{
+              const result=await resendGatewayInvitation(ctx,user,emailPathParts[3],emailPathParts[5]);
+              const current=await ctx.meta.get("envelopes",emailPathParts[3]);
+              const signer=current?.signers?.find(item=>item.id===emailPathParts[5]);
+              const masked=signer?.email?maskEmailForConfirmation(signer.email):"recipient";
+              return emailRouteJson({...result,maskedRecipient:masked,confirmationText:"New link sent to "+masked+"...",expiresAtEAT:result.expiresAt?formatEmailLinkExpiryEAT(result.expiresAt):null},200);
+            }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
+          }
+          if(request.method==="POST"&&emailPathParts.length===6&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&emailPathParts[5]==="resend-all"){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{return emailRouteJson(await resendAllGatewayUnsignedInvitations(ctx,user,emailPathParts[3]),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Bulk resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
+          }
+          if(request.method==="PATCH"&&emailPathParts.length===7&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&validSignerId(emailPathParts[5])&&emailPathParts[6]==="contact"){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{
+              const body=await request.json();
+              return emailRouteJson(await updateGatewaySignerContact(ctx,user,emailPathParts[3],emailPathParts[5],body),200);
+            }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Signer contact update failed."),code:error?.code||"CONTACT_UPDATE"},Number(error?.status||400));}
+          }
           const response = await esignRoute(request,ctx);
           const headers = new Headers(response.headers);
           for (const [k,v] of Object.entries(corsHeaders(request))) headers.set(k,v);
