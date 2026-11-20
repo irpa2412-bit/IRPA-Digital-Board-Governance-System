@@ -25,7 +25,7 @@
   },
   "baseline": {
     "commit": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
-    "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
+    "rollbackCommit": "8bfa67b2a8757519befb2f6be1074c0f34457c99"
   },
   "validation": {
     "baselineSmoke": "PASS",
