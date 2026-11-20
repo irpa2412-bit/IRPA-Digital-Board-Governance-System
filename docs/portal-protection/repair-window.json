@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T12:09:00Z",
+  "lastActivityAt": "2026-11-20T17:08:47Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -187,5 +187,41 @@
     }
   ],
   "durationHours": 48,
-  "closesAt": "2026-11-22T11:08:48Z"
+  "closesAt": "2026-11-22T11:08:48Z",
+  "parallelWindows": [
+    {
+      "portal": "Signature Portal",
+      "status": "open",
+      "openedAt": "2026-11-20T17:08:47Z",
+      "lastActivityAt": "2026-11-20T17:08:47Z",
+      "durationHours": 48,
+      "closesAt": "2026-11-22T17:08:47Z",
+      "reason": "Confirmed cause (d): openEmailSigning() consumes the invitation on the first GET, so link previews kill resent links; error messages are masked.",
+      "rollbackCommit": "433727282012c75cdaebca21dcdadcb28dba59fb",
+      "scope": [
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/emailSigningLinks.mjs",
+        "drive-gateway/src/index.js",
+        "drive-gateway/src/router.mjs",
+        "src/pages/EmailSigningReadOnlyPage.jsx",
+        "drive-gateway/tests/",
+        "tests/"
+      ],
+      "prohibitions": [
+        "secrets",
+        "SMTP",
+        "Firestore rules",
+        "certificate logic",
+        "hash logic",
+        "archive logic"
+      ],
+      "activityLog": [
+        {
+          "at": "2026-11-20T17:08:47Z",
+          "action": "opened",
+          "description": "Owner-authorised 48-hour Signature Portal repair window. Rollback commit recorded from the repository's verified production rollback baseline: 433727282012c75cdaebca21dcdadcb28dba59fb. Existing Meeting Portal window remains unchanged and independently open."
+        }
+      ]
+    }
+  ]
 }
