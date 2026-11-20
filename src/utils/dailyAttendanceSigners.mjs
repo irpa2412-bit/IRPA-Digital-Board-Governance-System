@@ -13,8 +13,10 @@ export function buildDailyAttendanceSignerAssignments(rows=[],date=""){
   return rows.map((row,index)=>{
     const participantId=clean(row?.participantId||row?.id);
     if(!participantId)throw new Error("Every present attendance row must have its own participant ID.");
-    const signerId=clean(row?.signerId)||("ATT-"+clean(date)+"-"+participantId.replace(/[^A-Za-z0-9_-]/g,"-"));
-    if(!signerId)throw new Error("Every attendance signer must have a signer ID.");
+    const expectedSignerId="ATT-"+clean(date)+"-"+participantId.replace(/[^A-Za-z0-9_-]/g,"-");
+    const suppliedSignerId=clean(row?.signerId);
+    if(suppliedSignerId&&suppliedSignerId!==expectedSignerId)throw new Error("The attendance signer ID does not match this participant identity.");
+    const signerId=expectedSignerId;
     if(seenSignerIds.has(signerId))throw new Error("The daily attendance sheet contains the same signer ID more than once: "+signerId);
     seenSignerIds.add(signerId);
     const accountUid=clean(row?.participantUid||row?.uid||row?.userId);
