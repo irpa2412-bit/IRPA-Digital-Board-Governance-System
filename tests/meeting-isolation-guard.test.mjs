@@ -197,11 +197,12 @@ test("only stale runs for the same pull request are cancelled", () => {
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
 
-test("parallel portal window amendments preserve existing meeting and historical change records", () => {
+test("parallel and Meeting Portal Change Record amendments preserve independent portal history", () => {
   assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
-  assert.match(guard, /delete baselineRecord\.activeAmendment/);
-  assert.match(guard, /delete currentRecord\.activeAmendment/);
-  assert.match(guard, /Parallel repair-window amendment changed existing change-record history or another portal's record/);
+  assert.match(guard, /evaluateMeetingWindowAmendment/);
+  assert.match(policy, /JSON\.stringify\(baselineChangeRecord\.activeAmendment\) !== JSON\.stringify\(currentChangeRecord\.activeAmendment\)/);
+  assert.match(policy, /previousTopLevelRecord/);
+  assert.match(policy, /Another portal's window or unrelated Change Record history/);
 });
 
 test("parallel portal window amendment delegates to the executable exact-scope policy", () => {
