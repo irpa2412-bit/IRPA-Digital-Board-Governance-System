@@ -39,7 +39,8 @@ test("daily PDF places signature fields in the final column only for Present par
 
 test("dispatch button creates the existing Signature Portal email-link envelope and sends only after host action",()=>{
  assert.match(helper,/createSignatureEnvelope/);
- assert.match(helper,/startSignatureWorkflow/);\n assert.match(helper,/resumeDailyAttendanceSigning/);
+ assert.match(helper,/startSignatureWorkflow/);
+ assert.match(helper,/resumeDailyAttendanceSigning/);
  assert.match(helper,/signingMode:"Parallel"/);
  const prepare=helper.indexOf('phase:"PREPARE"');
  const start=helper.indexOf("startSignatureWorkflow(envelope)");
