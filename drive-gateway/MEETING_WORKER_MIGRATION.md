@@ -12,9 +12,9 @@ The existing `irpa-google-drive-gateway` Worker is the server-side meeting opera
 - Gate queue: `POST /api/meeting-entry-requests/list`, `/api/meeting-entry-requests/resolve`
 - Meeting room state/activity: `POST /api/meeting-register/update`, `/api/meeting-room/event`
 - Voting, decisions and actions: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`, `/api/meeting-decisions/create`, `/api/meeting-actions/create`
-- Attendance operations: `POST /api/meeting-attendance/sign`, `/api/meeting-attendance/mark`, `/api/meeting-attendance/register`
+- Daily attendance: `POST /api/meeting-attendance/daily/register`, `/daily/mark`, `/daily/dispatch`, plus the read-only legacy participant attendance register. The daily dispatch endpoint is host-owned and records the controlled Signature Portal envelope reference.
 - Working documents: `POST /api/meeting-working-documents/register`, `/api/meeting-working-documents/list`, `/api/meeting-working-documents/review`
-- Attendance signature/register: `POST /api/meeting-attendance/sign`, `/api/meeting-attendance/register`
+- Attendance e-signatures: the Meeting Portal prepares a controlled daily PDF and the host explicitly starts the existing Signature Portal email-link envelope. No separate Meeting Portal signature endpoint is used.
 - Meeting invitation delivery: `POST /api/meeting-invitations/dispatch` (validates the issued meeting pass and sends through the existing Worker SMTP sender; invitation delivery metadata is written to the meeting participant record, not the general `invitations` collection).
 - Meeting register: `POST /api/meeting-register/create`, `/api/meeting-register/update`, `/api/meeting-register/delete`
 - Meeting voting control: `POST /api/meeting-voting/open`, `/api/meeting-voting/close`
@@ -32,11 +32,11 @@ All routes require a verified Firebase ID token. The Worker performs server-side
 These operations do not inherently depend on callable Cloud Functions and can remain client-side only while the Firestore rules remain enforced and tested:
 
 - Meeting/participant realtime listeners and authorized meeting-register reads.
-- Attendance check-in and controller attendance updates, constrained to the allowed attendance fields.
+- Meeting/participant realtime listeners and authorised meeting-register reads. Daily attendance records are written through the authenticated Worker routes; signature capture and evidence remain exclusively in the Signature Portal email-link workflow.
 - Casting an anonymous vote: the client transaction writes the per-issue participant marker and vote together; rules reject a second marker, a closed issue, mismatched meeting/issue references, and voter identity fields in the vote record. Vote outcomes are only returned by the Worker after the linked issue is closed.
 - Meeting-room event writes and action creation where existing governance-role rules allow them. Event history, vote tally reads, and the current user’s subscription list use scoped Worker queries to avoid downloading other meetings’ records into the browser.
 
-Meeting-register and participant-registration writes, room status/activity events, voting issue open/close, meeting-linked decision creation, gate queue decisions, attendance marking/signature/register, working-document registration/list/review, record lifecycle, transcript persistence/translation, report dispatch and LiveKit controls are routed through the Worker because the previous direct client or callable path was either restricted by Firestore rules or depended on server-side secrets/privileged execution.
+Meeting-register and participant-registration writes, room status/activity events, voting issue open/close, meeting-linked decision creation, gate queue decisions, daily attendance register/mark/dispatch, Signature Portal email-link signing, working-document registration/list/review, record lifecycle, transcript persistence/translation, report dispatch and LiveKit controls are routed through the Worker because the previous direct client or callable path was either restricted by Firestore rules or depended on server-side secrets/privileged execution.
 
 ## Required Cloudflare configuration
 
