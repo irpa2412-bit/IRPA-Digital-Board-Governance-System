@@ -3,19 +3,20 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal"
+      "Signature Portal",
+      "Meeting Portal"
     ],
-    "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
+    "reason": "The Email Signing rebuild changes the signer-invitation panel in the shared SignaturePlatform page. The changed controls are confined to the Signature Portal Sign Document tab; Meeting Portal is declared as a shared-file dependency only, with no Meeting Portal workflow change.",
     "files": [
       "src/pages/SignaturePlatform.jsx",
       "tests/signature-workflow-policy.test.mjs"
     ],
-    "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
+    "expectedEffect": "New Signature Portal envelopes use reusable envelope-and-signer-bound links with fresh explicit-open sessions, configured expiry, atomic resend and audit. SignaturePlatform.jsx is shared with Meeting Portal, but the changes are confined to the Signature Portal Sign Document tab; the Meeting Portal workflow, independent repair window and baseline remain unchanged.",
     "prohibitedChanges": [
       "Do not change Cloudflare Worker routes or token generation.",
       "Do not change Firestore rules, indexes, or production records.",
       "Do not change SMTP credentials, secrets, or deployment configuration.",
-      "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
+      "Do not alter Meeting Portal behavior, its independent repair window, or its baseline; do not change shared stylesheets, signature validation, or audit controls."
     ]
   },
   "repairWindow": {
@@ -30,7 +31,8 @@
   "validation": {
     "baselineSmoke": "PASS",
     "portalSmoke": {
-      "Signature Portal": "PASS"
+      "Signature Portal": "PASS",
+      "Meeting Portal": "PASS"
     },
     "dependentSmoke": {
       "Signature envelope refresh and delivery regression": "PASS",
@@ -42,14 +44,16 @@
     "behaviourDifferences": [
       "Signer status responses are now associated with the selected Gateway envelope ID locally for refresh, resend, revoke, and completed-distribution retry.",
       "The Signature Portal root and signer status panel retain full opacity and readable text during aria-busy refresh state.",
-      "Signer metadata wraps on narrow screens to avoid clipping."
+      "Signer metadata wraps on narrow screens to avoid clipping.",
+      "The shared SignaturePlatform.jsx dependency is changed only in the Signature Portal Sign Document tab; Meeting Portal behavior and its separate baseline remain unchanged."
     ],
     "evidence": [
       "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
       "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
       "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
       "IRPA Release Build completed successfully on the exact PR head before scope correction.",
-      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
+      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction.",
+      "Email Signing contract workflow run 44791209355 passed the reusable-link/resend contract suite, integration regressions, and seven-portal protection smoke on PR #822 head e57170b81bc6e96874fafb4500006ac02b6e9e8a."
     ]
   },
   "closure": {
@@ -59,9 +63,10 @@
   "activeAmendment": {
     "status": "open",
     "affectedPortals": [
-      "Signature Portal"
+      "Signature Portal",
+      "Meeting Portal"
     ],
-    "reason": "Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
+    "reason": "Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check. The shared SignaturePlatform.jsx dependency is declared as a Meeting Portal impact only; its independent window and baseline are not changed.",
     "files": [
       "drive-gateway/src/emailSigning/",
       "drive-gateway/src/emailSigningLinks.mjs",
@@ -76,7 +81,8 @@
       ".github/workflows/email-signing-contract.yml",
       "scripts/meeting-portal-fixture-isolation-guard.sh",
       "scripts/portal-repair-window-guard-policy.mjs",
-      "tests/meeting-isolation-guard.test.mjs"
+      "tests/meeting-isolation-guard.test.mjs",
+      "docs/portal-protection/change-record.json"
     ],
     "repairWindow": {
       "openedAt": "2026-11-20T17:08:47Z",
