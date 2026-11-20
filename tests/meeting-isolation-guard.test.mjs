@@ -261,3 +261,12 @@ test("isolation guard permits only the separate unexpired Signature Portal windo
   const fixture = isolatedWindowFixture();
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
 });
+
+
+test("email-signing rebuild is explicitly protected by the active Signature Portal window", () => {
+  assert.match(guard, /const emailSigningRebuildIntegration =/);
+  assert.match(guard, /drive-gateway\\/src\\/emailSigning\\//);
+  assert.match(guard, /src\\/pages\\/SignaturePlatform\\.jsx/);
+  assert.match(guard, /email-signing-contract\\.test\\.mjs/);
+  assert.match(policy, /path.startsWith\\("drive-gateway\\/src\\/emailSigning\\/"\\)/);
+});
