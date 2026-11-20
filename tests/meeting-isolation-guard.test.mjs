@@ -144,8 +144,8 @@ test("archive-backed Signature Portal PDF palette repair is explicitly paired an
   assert.match(guard, /changed\.every\(path => \["\.github\/workflows\/meeting-portal-fixture-browser\.yml", "tests\/meeting-isolation-guard\.test\.mjs", "src\/firebase\/data\.js", "src\/pages\/SignaturePlatform\.jsx", "tests\/signature-workflow-policy\.test\.mjs"\]\.includes\(path\)\)/);
 });
 
-test("main-branch push runs the isolated fixture without requiring a PR source diff", () => {
-  assert.doesNotMatch(workflow, /push:\\s*branches:/);
+test("source-isolation guard accepts the protected main push path without requiring a PR diff", () => {
+  assert.doesNotMatch(workflow, /^\\s*push:/m);
   assert.match(guard, /const isMainPush = eventName === "push" && process\.env\.GITHUB_REF === "refs\/heads\/main"/);
   assert.match(guard, /if \(!isMainPush && eventName !== "workflow_dispatch"/);
 });
@@ -164,7 +164,7 @@ test("touch-responsive signature palette assignment is narrowly allowlisted with
 });
 
 test("Meeting Portal fixture runs on every repair branch and all Meeting Portal source paths", () => {
-  assert.doesNotMatch(workflow, /push:\\s*branches:/);
+  assert.doesNotMatch(workflow, /^\\s*push:/m);
   for (const path of [
     "docs/portal-protection/repair-window.json",
     "src/pages/MeetingRoom.jsx",
@@ -190,6 +190,8 @@ test("workflow delegates its source-isolation gate to the extracted guard script
   assert.ok(guard.includes('"docs/portal-protection/repair-window.json"'));
 });
 
-test("fixture runs are not cancelled by concurrent push and pull-request events", () => {
-  assert.doesNotMatch(workflow, /cancel-in-progress:\\s*true/);
+test("only stale runs for the same pull request are cancelled", () => {
+  assert.match(workflow, /group: meeting-portal-browser-\\$\\{\\{ github\\.event\\.pull_request\\.number \\|\\| github\\.ref \\}\\}/);
+  assert.match(workflow, /cancel-in-progress:\\s*true/);
+  assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
