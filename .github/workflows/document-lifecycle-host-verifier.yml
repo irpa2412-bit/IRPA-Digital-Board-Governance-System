@@ -1,0 +1,26 @@
+name: DocumentLifecycle per-host verifier regression tests
+on:
+  pull_request:
+    paths:
+      - "scripts/verify-document-lifecycle-host.mjs"
+      - "tests/document-lifecycle-host-verifier.test.mjs"
+      - "package.json"
+      - ".github/workflows/document-lifecycle-host-verifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/verify-document-lifecycle-host.mjs"
+      - "tests/document-lifecycle-host-verifier.test.mjs"
+      - "package.json"
+      - ".github/workflows/document-lifecycle-host-verifier.yml"
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/document-lifecycle-host-verifier.test.mjs
