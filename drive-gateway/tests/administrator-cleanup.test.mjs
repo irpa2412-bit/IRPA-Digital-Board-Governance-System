@@ -78,7 +78,7 @@ test("execution creates a durable backup before deleting the selected member and
   assert.ok(plan.executionOperations.some(operation=>operation.type==="auth-delete"));
   const res=await route(new Request("https://gateway.test/api/admin/cleanup/execute",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({planId:plan.planId,confirmation:"DELETE"})}),env,"/api/admin/cleanup/execute");
   const body=await res.json();
-  assert.equal(res.status,200);
+  assert.equal(res.status,200,body.error||JSON.stringify(body));
   assert.equal(body.status,"COMPLETE");
   assert.equal(body.backupDriveFileId,"backup-json-file");
   assert.equal(body.operationOutcomes.length,2);
