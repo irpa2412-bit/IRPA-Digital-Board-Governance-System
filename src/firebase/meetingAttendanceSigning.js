@@ -50,7 +50,7 @@ async function buildDailyAttendancePdf({meeting,date,records}){
     const globalIndex=group.rows.indexOf(row),top=PAGE.top+index*PAGE.rowHeight,y=PAGE.height-top,status=attendanceStatus(row);
     const name=clean(row.name||row.participantName||row.fullName||"Unnamed participant").slice(0,25);
     const email=clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase().slice(0,31);
-    const occupation=clean(row.occupation||row.capacity||row.title||row.role||row.participantRole||"—").slice(0,23);
+    const occupation=[clean(row.occupation||row.capacity||row.title||row.role||row.participantRole),clean(row.department),clean(row.institution)].filter(Boolean).join(" · ").slice(0,38)||"—";
     page.drawText(String(globalIndex+1),{x:cols[0],y,size:7,font});
     page.drawText(name,{x:cols[1],y,size:7,font});
     page.drawText(email||"—",{x:cols[2],y,size:6.5,font});
