@@ -36,6 +36,13 @@ try {
       await page.locator('select[name="meetingPlatform"]').selectOption({ label: "Physical Venue" });
       await page.locator('input[name="venue"]').fill("TEST Longido Meeting Room");
       await page.locator('input[name="chairperson"]').fill("TEST Fixture Chairperson");
+      await page.locator('select[name="quorumBasis"]').selectOption("percentage");
+      await page.locator('input[name="quorumNumerator"]').fill("1");
+      await page.locator('input[name="quorumDenominator"]').fill("3");
+      await page.locator('select[name="votingThresholdType"]').selectOption("simple_majority");
+      await page.locator('select[name="votingDenominatorBasis"]').selectOption("votes_cast");
+      await page.locator('input[name="policyReference"]').fill("TEST IRPA Constitution");
+      await page.locator('input[name="policyEffectiveDate"]').fill("2026-01-01");
       await page.locator('textarea[name="agenda"]').fill("1. Confirm the agenda\n2. Review the work plan");
       await picker.locator("label").filter({ hasText: "TEST Active Board Member" }).locator('input[type="checkbox"]').check();
       await page.getByRole("button", { name: "Schedule Meeting" }).click();
