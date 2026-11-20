@@ -232,14 +232,15 @@ export function createAdministratorCleanupRouter(deps) {
       if (pathname === "/api/admin/cleanup/inventory" && request.method === "GET") {
         const records = await loadInventory(env, auth);
         const inventoryId = crypto.randomUUID();
-        const snapshot = { inventoryId, createdAt: new Date().toISOString(), administratorUid: auth.uid,
+        const internalSnapshot = { inventoryId, createdAt: new Date().toISOString(), administratorUid: auth.uid,
           administratorEmail: auth.email, records, status: "INVENTORY_READY", mandatoryBeforeReset: true };
-        const serializedSnapshot = JSON.stringify(snapshot);
+        const publicSnapshot = { ...internalSnapshot, records: records.map(({sourceDocument, ...row}) => row) };
+        const serializedSnapshot = JSON.stringify(internalSnapshot);
         if (new TextEncoder().encode(serializedSnapshot).byteLength > 20 * 1024 * 1024) {
           return json({ok:false,code:"INVENTORY_TOO_LARGE",error:"The complete inventory exceeds the safe single-snapshot storage limit. No cleanup plan was created; inventory must be safely partitioned before proceeding."},413,corsHeaders(request));
         }
         await env.DRIVE_KV.put("admin-cleanup:inventory:" + inventoryId, serializedSnapshot, { expirationTtl: TTL_SECONDS });
-        return json({ ok: true, ...snapshot, summary: { total: records.length, stays: records.length, goes: 0,
+        return json({ ok: true, ...publicSnapshot, summary: { total: records.length, stays: records.length, goes: 0,
           protected: records.filter(row => row.protected).length } }, 200, corsHeaders(request));
       }
       if (pathname === "/api/admin/cleanup/plan" && request.method === "POST") {
