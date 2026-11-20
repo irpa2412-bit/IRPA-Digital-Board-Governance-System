@@ -98,11 +98,11 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   uploadedAt:new Date().toISOString(),recordOrigin:"PRODUCTION"
  };
  await registerControlledDocumentRecord({documentId,documentPayload});
- const envelope=await createSignatureEnvelope({
+ const ownerSigningEnabled=present.some(row=>clean(row.participantUid||row.uid||row.userId)===owner.uid);\n const envelope=await createSignatureEnvelope({
   title,documentId,documentReference:reference,documentUrl:"drive://"+archive.file.fileId,
   documentClassification:documentPayload.classification,documentArchiveCategory:"Meeting Records",
   documentType:"Governance Document",documentUploadedAt:documentPayload.uploadedAt,
-  signingMode:"Parallel",recipients,fields,ownerSigningEnabled:false
+  signingMode:"Parallel",recipients,fields,ownerSigningEnabled
  });
  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid)});
  let started;
@@ -117,5 +117,5 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  }catch(error){
   throw new Error("The Signature Portal workflow started and email invitations may have been sent, but the Meeting Portal dispatch record could not be reconciled. Do not press Dispatch again; ask the host administrator to reconcile envelope "+envelope.id+".");
  }
- return {envelopeId:envelope.id,documentId,reference,signerCount:recipients.length,status:started.gatewayInvitationStatus||"Sent"};
+ if(started.ownerSigningToken&&ownerSigningEnabled)window.location.assign("/?emailSignToken="+encodeURIComponent(started.ownerSigningToken));\n return {envelopeId:envelope.id,documentId,reference,signerCount:recipients.length,status:started.gatewayInvitationStatus||"Sent"};
 }
