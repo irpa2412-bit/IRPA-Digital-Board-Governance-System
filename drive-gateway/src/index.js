@@ -2907,7 +2907,7 @@ async function enforceMailRateLimit(env, uid) {
 async function enforceServiceMailRateLimit(env, recipient) {
   if (!env?.DRIVE_KV) throw new Error("Email rate-limit storage is unavailable.");
   const address = String(recipient || "").trim().toLowerCase();
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(address)) throw new Error("Invalid recipient.");
+  if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(address)) throw new Error("Invalid recipient.");
   const hour = Math.floor(Date.now() / 3600000);
   const recipientHash = await sha256Hex(address);
   const limits = [
