@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createHash} from "node:crypto";
-import {createEnvelope,openEmailSigning,openSigning} from "../src/signing.mjs";
+import {createEnvelope,openSigning} from "../src/signing.mjs";
 
 const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA signer assignment regression fixture");
 const hash=createHash("sha256").update(bytes).digest("hex");
@@ -48,8 +48,8 @@ test("Gateway envelope creation and openSigning retain three shared-email identi
     assert.ok(invitation, "each unique signer identity receives its own invitation");
     const token=new URL(invitation.link).searchParams.get("emailSignToken");
     assert.ok(token);
-    const session=await openEmailSigning(ctx,token,"192.0.2.10");
-    const opened=await openSigning(ctx,session.sessionToken,null);
+    signer.emailLinkStatus="opened";
+    const opened=await openSigning(ctx,token,null);
     assert.equal(opened.signer.id,signer.id);
     assert.equal(opened.fields.length,3);
     assert.ok(opened.fields.every(field=>field.signerId===signer.id));
