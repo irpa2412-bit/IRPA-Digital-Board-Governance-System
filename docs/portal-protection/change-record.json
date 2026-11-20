@@ -76,6 +76,7 @@
       "src/pages/EmailSigningReadOnlyPage.jsx",
       "src/pages/SignaturePlatform.jsx",
       "drive-gateway/src/emailSigning/index.mjs",
+      "drive-gateway/src/emailSigningLinks.mjs",
       "drive-gateway/tests/email-signing-contract.test.mjs",
       ".github/workflows/email-signing-contract.yml",
       "drive-gateway/tests/email-signing-links.integration.test.mjs",
