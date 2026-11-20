@@ -269,8 +269,12 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   assert.equal(completed.signers[0].signerDeclarations.occupation,"External Consultant");
   assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
   assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
-  const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
-  assert.equal(pdf.fileName.includes("-signed-"),true);
+  assert.equal(completed.signers[0].emailLinkStatus,"used","successful signing, not opening, consumes the invitation");
+  assert.equal(completed.signers[0].emailLinkTokenHistory.at(-1).status,"used");
+  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.22"),error=>error.message===genericEmailSigningFailure());
+  const finalPdf=await f.ctx.storage.get(completed.completion.primaryStorageId);
+  assert.ok(finalPdf,"the completed PDF remains stored and distributed independently of the invitation link");
+  assert.equal(await sha256Hex(finalPdf),completed.completion.finalHash);
 });
 
 test("email-link invitations do not require register, authority-matrix or Firebase UID matches",async()=>{
