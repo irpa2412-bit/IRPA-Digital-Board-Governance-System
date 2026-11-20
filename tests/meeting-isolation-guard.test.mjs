@@ -263,10 +263,11 @@ test("isolation guard permits only the separate unexpired Signature Portal windo
 });
 
 
+
 test("email-signing rebuild is explicitly protected by the active Signature Portal window", () => {
-  assert.match(guard, /const emailSigningRebuildIntegration =/);
-  assert.match(guard, /drive-gateway\\/src\\/emailSigning\\//);
-  assert.match(guard, /src\\/pages\\/SignaturePlatform\\.jsx/);
-  assert.match(guard, /email-signing-contract\\.test\\.mjs/);
-  assert.match(policy, /path.startsWith\\("drive-gateway\\/src\\/emailSigning\\/"\\)/);
+  assert.ok(guard.includes("const emailSigningRebuildIntegration ="));
+  assert.ok(guard.includes('path.startsWith("drive-gateway/src/emailSigning/")'));
+  assert.ok(guard.includes('"src/pages/SignaturePlatform.jsx"'));
+  assert.ok(guard.includes("email-signing-contract.test.mjs"));
+  assert.ok(policy.includes('path.startsWith("drive-gateway/src/emailSigning/")'));
 });
