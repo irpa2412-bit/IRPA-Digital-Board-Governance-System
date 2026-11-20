@@ -16,9 +16,10 @@ test("three positions sharing one email retain three separate signer IDs and ide
  assert.equal(signers.length,3);assert.equal(new Set(signers.map(s=>s.signerId)).size,3);assert.equal(new Set(signers.map(s=>s.signerUid)).size,3);assert.ok(signers.every(s=>s.email==="shared@example.test"));
 });
 test("same signer ID twice is rejected; email equality alone is not a duplicate",()=>{
- assert.throws(()=>buildDailyAttendanceSignerAssignments([{participantId:"one",signerId:"SAME",name:"One",email:"x@example.test"},{participantId:"two",signerId:"SAME",name:"Two",email:"x@example.test"}],"2026-11-20"),/same signer ID/);
+ assert.throws(()=>buildDailyAttendanceSignerAssignments([{participantId:"one",name:"One",email:"x@example.test"},{participantId:"one",name:"Duplicate row",email:"x@example.test"}],"2026-11-20"),/same signer ID/);
  assert.equal(buildDailyAttendanceSignerAssignments([{participantId:"one",name:"One",email:"x@example.test"},{participantId:"two",name:"Two",email:"x@example.test"}],"2026-11-20").length,2);
 });
 test("a guest without a participant identity is rejected",()=>{
  assert.throws(()=>buildDailyAttendanceSignerAssignments([{name:"Guest",email:"x@example.test"}],"2026-11-20"),/participant ID/);
 });
+\ntest("a signer ID bound to a different participant identity is rejected",()=>{\n assert.throws(()=>buildDailyAttendanceSignerAssignments([{participantId:"guest-a",signerId:"ATT-2026-11-20-guest-b",name:"Guest A",email:"shared@example.test"}],"2026-11-20"),/does not match this participant identity/);\n});\n
