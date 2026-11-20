@@ -8,7 +8,7 @@ import {
   formatEmailLinkExpiryEAT, EMAIL_SIGNING_ALREADY_SIGNED, EMAIL_SIGNING_RESEND_STATUSES
 } from "../src/emailSigning/index.mjs";
 import { inspectEmailSigningToken } from "../src/emailSigningLinks.mjs";
-import { resendAllUnsignedInvitations, updateSignerContact, chainEvents } from "../src/signing.mjs";
+import { resendAllUnsignedInvitations, resendInvitation, updateSignerContact, chainEvents } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 const NOW = new Date("2026-11-20T17:00:00.000Z");
@@ -182,24 +182,22 @@ async function resendContext(signers,{failMail=false}={}){
   return{ctx,sent,get record(){return record;}};
 }
 
-test("bulk resend actually delivers a separate replacement link to every unsigned signer",async()=>{
-  const f=await resendContext([
-    {id:"S1",email:"one@example.org",emailLinkStatus:"expired"},
-    {id:"S2",email:"two@example.org",emailLinkStatus:"revoked"},
-    {id:"S3",email:"three@example.org",status:"Signed",emailLinkStatus:"used"}
-  ]);
+test("bulk resend delivers a separate replacement link for every unsigned signer in all seven required states",async()=>{
+  const statuses=["invited","opened","expired","replaced","revoked","send failed","signing interrupted"];
+  const f=await resendContext(statuses.map((status,index)=>({id:"S"+(index+1),email:"same@example.org",emailLinkStatus:status})).concat([{id:"S8",email:"signed@example.org",status:"Signed",emailLinkStatus:"used"}]));
   const result=await resendAllUnsignedInvitations(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id);
-  assert.equal(result.attempted,2);
-  assert.equal(result.sent,2);
-  assert.equal(result.failed,0);
-  assert.equal(f.sent.length,2);
-  assert.notEqual(f.sent[0].link,f.sent[1].link);
+  assert.equal(result.attempted,7);assert.equal(result.sent,7);assert.equal(result.failed,0);assert.equal(f.sent.length,7);
+  assert.equal(new Set(f.sent.map(item=>item.link)).size,7,"same email in different signer positions gets independent links");
   const saved=await f.ctx.meta.get("envelopes",f.record.id);
-  assert.equal(saved.signers[0].emailLinkStatus,"issued");
-  assert.equal(saved.signers[1].emailLinkStatus,"issued");
-  assert.equal(saved.signers[2].emailLinkStatus,"used");
+  for(let index=0;index<7;index++)assert.equal(saved.signers[index].emailLinkStatus,"issued",statuses[index]);
+  assert.equal(saved.signers[7].emailLinkStatus,"used");
 });
 
+test("actual resend is blocked after signer completion",async()=>{
+  const f=await resendContext([{id:"S1",status:"Signed",emailLinkStatus:"used"}]);
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id,"S1"),error=>error.status===409&&/completed signing/.test(error.message));
+  assert.equal(f.sent.length,0);
+});
 test("actual resend failure preserves the previous token hash and exposes the SMTP stage",async()=>{
   const f=await resendContext([{id:"S1",email:"one@example.org",emailLinkStatus:"send failed"}],{failMail:true});
   const oldHash=f.record.signers[0].tokenHash;
