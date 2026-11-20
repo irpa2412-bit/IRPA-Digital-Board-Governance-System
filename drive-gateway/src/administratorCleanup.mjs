@@ -157,7 +157,7 @@ export function createAdministratorCleanupRouter(deps) {
           ...(Array.isArray(data.roles) ? data.roles : []), ...(Array.isArray(data.assignedRoles) ? data.assignedRoles : []),
           ...(Array.isArray(data.selectedRoles) ? data.selectedRoles : [])].map(value => clean(value)).filter(Boolean);
         const protectedRole = roleValues.some(value => /administrator|executive director|board chair|chairperson|board secretary/i.test(value));
-        const isAdmin = uid === auth.uid;
+        const isAdmin = uid === auth.uid || email === PRIMARY_ADMIN_EMAIL;
         const trialData = isTrialRecord(data);
         const isSignedTrial = collection === "signatureEnvelopes" && trialData &&
           ["completed","signed"].includes(clean(data.status).toLowerCase());
@@ -318,9 +318,12 @@ export function createAdministratorCleanupRouter(deps) {
       if (row.collection === "signatureEnvelopes" && row.signedTrialDocument) {
         const fileId = clean(row.signedPdfReference);
         if (!fileId) { blockers.push(row.key + ": signed trial PDF reference is missing"); continue; }
+        const envelopeData = dataOf(row);
+        const envelopeDocumentId = clean(envelopeData.documentId);
         const portalRows = (row.linkedRecordKeys || []).map(key => byKey.get(key)).filter(candidate =>
-          candidate && ["signatures","documents","controlledDocuments"].includes(candidate.collection) &&
-          (candidate.trialData || isTrialRecord(dataOf(candidate))));
+          candidate && (candidate.collection === "signatures" ||
+            (["documents","controlledDocuments"].includes(candidate.collection) &&
+              (candidate.id === envelopeDocumentId || candidate.trialData || isTrialRecord(dataOf(candidate))))));
         if (!portalRows.length) { blockers.push(row.key + ": associated trial-document portal record was not found"); continue; }
         add({type:"drive-delete",key:row.key,fileId,reason:"Delete explicitly selected signed trial PDF"});
         add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Delete explicitly selected signed trial envelope"});
