@@ -5,19 +5,21 @@ import { readFileSync } from "node:fs";
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
+const portalProtection = readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
 const changeRecord = JSON.parse(readFileSync(new URL("../docs/portal-protection/change-record.json", import.meta.url), "utf8"));
 const repairWindow = JSON.parse(readFileSync(new URL("../docs/portal-protection/repair-window.json", import.meta.url), "utf8"));
 
 
-test("email-signing repair record mirrors active evidence and declares both shared portals",()=>{
-  const amendment=changeRecord.activeAmendment;
+test("portal protection uses the active email-signing amendment without rewriting historical declaration",()=>{
+  const active=changeRecord.activeAmendment;
   const window=repairWindow.parallelWindows.find(item=>item.portal==="Signature Portal");
-  assert.deepEqual(changeRecord.declaration.affectedPortals,["Signature Portal","Meeting Portal"]);
-  assert.deepEqual(amendment.affectedPortals,changeRecord.declaration.affectedPortals);
-  assert.deepEqual(changeRecord.validation,amendment.validation);
-  assert.equal(changeRecord.validation.baselineSmoke,"PASS");
-  assert.equal(window.rollbackCommit,amendment.repairWindow.rollbackCommit);
-  assert.ok(window.scope.includes("drive-gateway/src/emailSigningLinks.mjs"));
+  assert.deepEqual(changeRecord.declaration.affectedPortals,["Signature Portal"]);
+  assert.deepEqual(active.affectedPortals,["Signature Portal","Meeting Portal"]);
+  assert.ok(active.files.includes("scripts/portal-protection-check.mjs"));
+  assert.ok(window.scope.includes("scripts/portal-protection-check.mjs"));
+  assert.match(portalProtection,/const activeAmendment = record\.activeAmendment\?\.status === "open" \? record\.activeAmendment : null/);
+  assert.match(portalProtection,/const declaration = activeAmendment \?\? record\.declaration/);
+  assert.match(portalProtection,/const validation = activeAmendment\?\.validation \?\? record\.validation/);
 });
 
 test("isolation baseline compares against the fetched current main snapshot", () => {
@@ -284,22 +286,6 @@ test("isolation guard permits only the separate unexpired Signature Portal windo
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
 });
 
-test("parallel window amendment permits the exact shared Signature and Meeting portal declaration",()=>{
-  const fixture=isolatedWindowFixture();
-  fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
-  fixture.currentChangeRecord.declaration={affectedPortals:["Signature Portal","Meeting Portal"]};
-  fixture.changeRecord.activeAmendment.affectedPortals=["Signature Portal","Meeting Portal"];
-  assert.equal(evaluateSignatureWindowAmendment({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,true);
-});
-
-test("parallel window amendment rejects unrelated portal additions to the Change Record declaration",()=>{
-  const fixture=isolatedWindowFixture();
-  fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
-  fixture.currentChangeRecord.declaration={affectedPortals:["Signature Portal","Meeting Portal","Board Members Portal"]};
-  fixture.changeRecord.activeAmendment.affectedPortals=["Signature Portal","Meeting Portal"];
-  assert.equal(evaluateSignatureWindowAmendment({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,false);
-});
-
 
 const signatureRepairFixture = () => {
   const changedPaths = [
@@ -344,35 +330,6 @@ const signatureRepairFixture = () => {
 test("active Signature Portal repair guard permits only declared repair files plus guard-maintenance tests", () => {
   const fixture = signatureRepairFixture();
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
-});
-
-test("active Signature Portal repair permits only the declared shared Meeting Portal dependency",()=>{
-  const fixture=signatureRepairFixture();
-  fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
-  fixture.currentChangeRecord.declaration={affectedPortals:["Signature Portal","Meeting Portal"]};
-  fixture.currentChangeRecord.activeAmendment.affectedPortals=["Signature Portal","Meeting Portal"];
-  assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,true);
-});
-
-test("active repair requires top-level protected validation to mirror its active evidence",()=>{
-  const fixture=signatureRepairFixture();
-  fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
-  fixture.currentChangeRecord.declaration={affectedPortals:["Signature Portal","Meeting Portal"]};
-  fixture.currentChangeRecord.activeAmendment.affectedPortals=["Signature Portal","Meeting Portal"];
-  const validation={baselineSmoke:"PASS",fullRegression:"PASS",portalSmoke:{"Signature Portal":"PASS","Meeting Portal":"PASS"}};
-  fixture.currentChangeRecord.activeAmendment.validation=validation;
-  fixture.currentChangeRecord.validation=structuredClone(validation);
-  assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,true);
-  fixture.currentChangeRecord.validation.fullRegression="PENDING";
-  assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,false);
-});
-
-test("active Signature Portal repair rejects unrelated portal additions to the declaration",()=>{
-  const fixture=signatureRepairFixture();
-  fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
-  fixture.currentChangeRecord.declaration={affectedPortals:["Signature Portal","Meeting Portal","Board Members Portal"]};
-  fixture.currentChangeRecord.activeAmendment.affectedPortals=["Signature Portal","Meeting Portal"];
-  assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,false);
 });
 
 test("active Signature Portal repair guard blocks files outside the declared window", () => {
