@@ -90,7 +90,8 @@
         "src/firebase/meetingAttendanceSigning.js",
         "src/firebase/meetingRecords.js",
         "drive-gateway/src/meetingPortal.mjs",
-        "drive-gateway/src/meetingServices.mjs"
+        "drive-gateway/src/meetingServices.mjs",
+        "src/utils/dailyAttendanceSigners.mjs"
       ],
       "sharedDependencies": [
         "src/App.jsx",
