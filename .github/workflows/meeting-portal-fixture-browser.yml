@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "src/pages/Meetings.jsx"
+      - "docs/portal-protection/repair-window.json"
       - "src/pages/MeetingRoom.jsx"
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "src/firebase/meetingPolicy.js"
@@ -32,6 +33,7 @@ on:
     branches: [main]
     paths:
       - "src/pages/Meetings.jsx"
+      - "docs/portal-protection/repair-window.json"
       - "src/pages/MeetingRoom.jsx"
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "src/firebase/meetingPolicy.js"
