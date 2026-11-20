@@ -88,10 +88,6 @@ jobs:
           ]);
           const variableTypes = new Set(["plain_text", "secret_text"]);
 
-          const inviteServiceKeyBindings = bindings.filter(b => b.name === "INVITE_SERVICE_KEY");
-          if (inviteServiceKeyBindings.length !== 1 || inviteServiceKeyBindings[0]?.type !== "secret_text") {
-            throw new Error("Safety stop: temporary compatibility release requires exactly one INVITE_SERVICE_KEY binding until Firebase Functions rollout is verified; the secret value is never read or printed.");
-          }
           const smtpPasswordBindings = bindings.filter(b => b.name === "SMTP_PASSWORD");
           if (smtpPasswordBindings.length !== 1 || smtpPasswordBindings[0]?.type !== "secret_text") {
             throw new Error("Safety stop: production Gateway requires exactly one SMTP_PASSWORD secret binding; the secret value is never read or printed.");
