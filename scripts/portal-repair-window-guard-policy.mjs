@@ -49,11 +49,13 @@ export function protectedSignatureChangeHasRecord({ changedPaths, changeRecord }
   const protectedPaths = [
     "drive-gateway/src/signing.mjs",
     "drive-gateway/src/emailSigningLinks.mjs",
+    "drive-gateway/src/emailSigningLinks.mjs",
     "drive-gateway/src/index.js",
     "drive-gateway/src/router.mjs",
-    "src/pages/EmailSigningReadOnlyPage.jsx"
+    "src/pages/EmailSigningReadOnlyPage.jsx",
+    "src/pages/SignaturePlatform.jsx"
   ];
   const touchesProtected = changedPaths.some(path => protectedPaths.includes(path) ||
-    path.startsWith("drive-gateway/tests/") || path.startsWith("tests/"));
+    path.startsWith("drive-gateway/src/emailSigning/") || path.startsWith("drive-gateway/tests/") || path.startsWith("tests/"));
   return !touchesProtected || Boolean(changeRecord?.activeAmendment?.status === "open");
 }
