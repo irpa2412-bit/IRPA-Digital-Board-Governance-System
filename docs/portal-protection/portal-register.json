@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "baseline": {
-    "commit": "b766e7727722161f4f779bbd86d8ef21830eefa8",
-    "source": "main commit verified by successful production deployment and live frontend verification workflow"
+    "commit": "433727282012c75cdaebca21dcdadcb28dba59fb",
+    "source": "authorised repair-window rollback and verified production baseline (2026-11-20)"
   },
   "portals": {
     "Invitation Portal": {
@@ -76,6 +76,70 @@
         "tests/communication-media-policy.test.mjs",
         "tests/social-studio-policy.test.mjs"
       ]
+    },
+    "Meeting Portal": {
+      "type": "independent portal within the shared IRPA-DBGS application",
+      "baselineCommit": "433727282012c75cdaebca21dcdadcb28dba59fb",
+      "paths": [
+        "src/pages/Meetings.jsx",
+        "src/pages/MeetingRoom.jsx",
+        "src/pages/OperationalGatewaysParticipants.jsx",
+        "src/pages/SignaturePlatform.jsx",
+        "src/firebase/meetingGatewayApi.js",
+        "src/firebase/meetingPolicy.js",
+        "src/firebase/meetingAttendanceSigning.js",
+        "src/firebase/meetingRecords.js",
+        "drive-gateway/src/meetingPortal.mjs",
+        "drive-gateway/src/meetingServices.mjs"
+      ],
+      "sharedDependencies": [
+        "src/App.jsx",
+        "src/main.jsx",
+        "src/firebase/auth.js",
+        "src/firebase/data.js",
+        "src/components/",
+        "src/styles/",
+        "src/components/ControlledDocumentUpload.jsx",
+        "src/firebase/signaturePlatform.js",
+        "src/firebase/signatureStorage.js",
+        "src/firebase/signatureWorkflowPolicy.js",
+        "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/src/index.js",
+        "drive-gateway/src/router.mjs"
+      ],
+      "collections": [
+        "meetings",
+        "participants",
+        "meetingAccessTokens",
+        "meetingEntryRequests",
+        "meetingAttendanceSignatures",
+        "meetingDailyAttendance",
+        "meetingAttendanceDispatches",
+        "meetingSubscriptions",
+        "meetingWorkingDocuments",
+        "meetingDocumentReviews",
+        "meetingRoomEvents",
+        "meetingRecords",
+        "meetingMediaRecordings",
+        "votes",
+        "resolutions",
+        "decisions",
+        "actions",
+        "members",
+        "employees"
+      ],
+      "knownIssues": {
+        "issues": [
+          229,
+          207
+        ],
+        "pullRequests": [
+          787
+        ]
+      },
+      "tests": [
+        "tests/meeting-portal-protection.test.mjs"
+      ]
     }
   },
   "shared": [
@@ -87,7 +151,8 @@
         "Signature Portal",
         "Board Members Portal",
         "Members and Employees Portal",
-        "Communication and Media Portal"
+        "Communication and Media Portal",
+        "Meeting Portal"
       ]
     },
     {
@@ -98,7 +163,8 @@
         "Signature Portal",
         "Board Members Portal",
         "Members and Employees Portal",
-        "Communication and Media Portal"
+        "Communication and Media Portal",
+        "Meeting Portal"
       ]
     },
     {
@@ -109,7 +175,8 @@
         "Signature Portal",
         "Board Members Portal",
         "Members and Employees Portal",
-        "Communication and Media Portal"
+        "Communication and Media Portal",
+        "Meeting Portal"
       ]
     },
     {
@@ -120,7 +187,8 @@
         "Signature Portal",
         "Board Members Portal",
         "Members and Employees Portal",
-        "Communication and Media Portal"
+        "Communication and Media Portal",
+        "Meeting Portal"
       ]
     },
     {
@@ -131,7 +199,50 @@
         "Signature Portal",
         "Board Members Portal",
         "Members and Employees Portal",
-        "Communication and Media Portal"
+        "Communication and Media Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/pages/SignaturePlatform.jsx",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/signaturePlatform.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/signatureStorage.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/signatureWorkflowPolicy.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/components/ControlledDocumentUpload.jsx",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/meetingAttendanceSigning.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
       ]
     }
   ],

@@ -1,30 +1,63 @@
 {
   "schemaVersion": 1,
   "status": "open",
-  "openedAt": "2026-11-20T09:18:00Z",
-  "lastActivityAt": "2026-11-20T09:23:00Z",
-  "reason": "Repair Signature Portal signer-status readability and bind status refresh/resend/revoke/distribution responses to the selected envelope. Frontend and regression test only.",
+  "openedAt": "2026-11-20T11:08:48Z",
+  "lastActivityAt": "2026-11-20T11:16:00Z",
+  "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
+    "docs/portal-protection/portal-register.json",
+    "docs/portal-protection/repair-window.json",
+    "tests/portal-protection-policy.test.mjs",
+    "tests/meeting-portal-protection.test.mjs",
+    "tests/meeting-portal-browser.test.mjs",
+    "tests/meeting-daily-attendance-email-signing.test.mjs",
+    "tests/meeting-invitation-resend-quorum.test.mjs",
+    "tests/meeting-quorum-reconciliation.test.mjs",
+    "tests/meeting-category-policy.test.mjs",
+    "tests/meeting-registration-connectivity.test.mjs",
+    "tests/meeting-configurable-quorum.test.mjs",
+    "tests/meeting-attendance-guest-identity.test.mjs",
+    "tests/meeting-time-eat.test.mjs",
+    "tests/fixtures/",
+    ".github/workflows/meeting-portal-fixture-browser.yml",
+    "scripts/portal-protection-smoke.mjs",
+    "src/firebase/meetingAttendanceSigning.js",
+    "src/firebase/meetingPolicy.js",
+    "src/firebase/meetingGatewayApi.js",
+    "src/firebase/meetingRecords.js",
+    "src/pages/Meetings.jsx",
+    "src/pages/MeetingRoom.jsx",
+    "src/pages/OperationalGatewaysParticipants.jsx",
     "src/pages/SignaturePlatform.jsx",
-    "tests/signature-workflow-policy.test.mjs"
+    "drive-gateway/src/meetingPortal.mjs",
+    "drive-gateway/src/meetingServices.mjs",
+    "drive-gateway/src/router.mjs",
+    "drive-gateway/src/index.js",
+    "drive-gateway/tests/meeting-portal.test.mjs",
+    "drive-gateway/tests/meeting-portal-router.test.mjs",
+    "drive-gateway/tests/meeting-services-router.test.mjs",
+    "docs/portal-protection/change-record.json",
+    "package.json"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
   "activityLog": [
     {
-      "at": "2026-11-20T09:18:00Z",
+      "at": "2026-11-20T11:08:48Z",
       "action": "opened",
-      "description": "Opened a narrowly scoped Signature Portal repair window on current main before protected changes."
+      "description": "Opened the 48-hour Meeting Portal repair window from the user-authorised request. Rollback baseline is production commit 433727282012c75cdaebca21dcdadcb28dba59fb."
     },
     {
-      "at": "2026-11-20T09:19:23Z",
+      "at": "2026-11-20T11:11:00Z",
       "action": "repair",
-      "description": "Ported the signer status envelope-ID binding and initial readability styles onto current main."
+      "description": "Inspected current main, registered Meeting Portal protection, and added portal-protection smoke coverage on an isolated branch. No production changes."
     },
     {
-      "at": "2026-11-20T09:23:00Z",
-      "action": "scope-correction",
-      "description": "Kept readability styles local to the Signature Portal component to avoid modifying the shared stylesheet dependency used by all portals."
+      "at": "2026-11-20T11:16:00Z",
+      "action": "repair",
+      "description": "Connected the seven-portal protected regression runner to the full test:all command; all seven portal entries are executed by the existing portal smoke script."
     }
-  ]
+  ],
+  "durationHours": 48,
+  "closesAt": "2026-11-22T11:08:48Z"
 }
