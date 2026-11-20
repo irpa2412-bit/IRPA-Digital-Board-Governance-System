@@ -166,6 +166,7 @@ test("touch-responsive signature palette assignment is narrowly allowlisted with
 test("Meeting Portal fixture runs on every repair branch and all Meeting Portal source paths", () => {
   assert.doesNotMatch(workflow, /push:\\s*branches:/);
   for (const path of [
+    "docs/portal-protection/repair-window.json",
     "src/pages/MeetingRoom.jsx",
     "src/firebase/meetingAttendanceSigning.js",
     "src/firebase/meetingAttendanceSignerIdentity.js",
