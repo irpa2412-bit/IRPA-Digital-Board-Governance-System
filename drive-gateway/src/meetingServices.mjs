@@ -64,12 +64,12 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  const gatewaySignerBindings=Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[];
  const dailySignerByParticipant=new Map(gatewaySignerBindings.map(binding=>[clean(binding.participantId),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantId,signer])=>participantId&&signer?.status==="Signed"));
  const dailySignerByLegacyUid=new Map(gatewaySignerBindings.filter(binding=>!clean(binding.participantId)).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantUid,signer])=>participantUid&&signer?.status==="Signed"));
+ const uidOf=p=>clean(p.participantUid||p.uid||p.userId);
  const participantCountByUid=new Map();for(const participant of active){const participantUid=uidOf(participant);if(participantUid)participantCountByUid.set(participantUid,(participantCountByUid.get(participantUid)||0)+1);}
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
  for(const p of passes){const key=clean(p.participantId);if(key){const previous=passByParticipant.get(key);if(!previous||new Date(p.createdAt||0)>new Date(previous.createdAt||0))passByParticipant.set(key,p);}}
- const uidOf=p=>clean(p.participantUid||p.uid||p.userId);
  const rows=active.map(p=>{
   const id=clean(p.id),signature=signatureByParticipant.get(id),entry=queueByParticipant.get(id),pass=passByParticipant.get(id);
   const uid=uidOf(p),daily=dailyByParticipant.get(id),dailySigner=dailySignerByParticipant.get(id)||(participantCountByUid.get(uid)===1?dailySignerByLegacyUid.get(uid):null),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
