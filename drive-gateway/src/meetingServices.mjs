@@ -172,7 +172,7 @@ export function createR2RecordingOutput(env, filepath, meeting = {}) {
   };
 }
 async function liveKitRequest(env,endpoint,body,method="POST"){const host=clean(env.LIVEKIT_URL).replace(/^wss:/i,"https:").replace(/^ws:/i,"http:").replace(/\/$/,""),key=clean(env.LIVEKIT_API_KEY),secret=clean(env.LIVEKIT_API_SECRET);if(!host||!key||!secret)throw Object.assign(new Error("Live meeting infrastructure is not configured in Cloudflare secrets."),{status:503});const now=Math.floor(Date.now()/1000),auth=await signedJwt(key,secret,{iss:key,sub:key,nbf:now-5,exp:now+60,video:{roomRecord:true,roomAdmin:true,roomCreate:true}});const r=await fetch(host+endpoint,{method,headers:{Authorization:"Bearer "+auth,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});const result=await r.json().catch(()=>({}));if(!r.ok){const e=new Error("LiveKit request failed ("+r.status+").");e.status=r.status;throw e;}return result;}
-export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/sign","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/sign","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-attendance/daily/register","/api/meeting-attendance/daily/mark","/api/meeting-attendance/daily/dispatch","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
 if(pathname==="/api/meeting-invitee-directory/list"){
  const [memberRecords,employeeRecords]=await Promise.all([listCollection(ctx,env,token,"members"),listCollection(ctx,env,token,"employees")]);
  const activeRecord=row=>[row.status,row.employmentStatus,row.registrationStatus].map(lower).some(v=>["active","activated"].includes(v));
@@ -262,6 +262,74 @@ const reviewId=crypto.randomUUID(),now=new Date();
 await writeDoc(ctx,env,token,"meetingDocumentReviews",reviewId,{meetingId,workingDocumentId,documentId:clean(document.documentId),reviewType,comment,reviewerUid:c.uid,reviewerEmail:c.email||null,reviewerName,status:"SUBMITTED",createdAt:now,updatedAt:now},false);
 await audit(ctx,env,token,claims,"MEETING_WORKING_DOCUMENT_REVIEW_SUBMITTED",c.meeting,reviewId,{workingDocumentId,reviewType,commentLength:comment.length});
 return response(ctx,request,{ok:true,reviewId,status:"SUBMITTED"});
+}
+if(pathname==="/api/meeting-attendance/daily/register"){
+const meetingId=clean(data.meetingId),date=clean(data.date),uid=clean(claims.user_id);
+if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return fail(ctx,request,"Meeting ID and a valid attendance date are required.",400);
+const c=await context(ctx,env,token,claims,meetingId);
+if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may compile daily attendance.",403);
+const [participants,memberRecords,dailyRows,dispatchRows]=await Promise.all([
+ listByField(ctx,env,token,"participants","meetingId",meetingId),
+ listCollection(ctx,env,token,"members"),
+ listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId),
+ listByField(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId)
+]);
+const boardUids=new Set(memberRecords.filter(m=>{
+ const active=["active","activated"].includes(lower(m.status||m.registrationStatus));
+ const isBoard=m.boardMember===true||lower(m.role)==="board member"||Boolean(clean(m.boardPosition))||clean(m.department)==="Board of Directors";
+ return active&&isBoard;
+}).map(m=>clean(m.uid||m.authUid||m.userUid)).filter(Boolean));
+const dayByParticipant=new Map(dailyRows.filter(r=>clean(r.attendanceDate)===date).map(r=>[clean(r.participantId),r]));
+const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
+const rows=active.map(p=>{
+ const role=clean(p.participantRole||p.role||p.participantType),uid=clean(p.participantUid||p.uid||p.userId);
+ const committee=lower(role)==="board committee member"||lower(p.participantType).includes("board committee");
+ const registrationCategory=committee?"BOARD_COMMITTEE_MEMBER":boardUids.has(uid)&&lower(p.sourceType)!=="manual invitee"?"BOARD_MEMBER":/management|executive director|director|manager/i.test(role)?"MANAGEMENT":/staff|employee|personnel|secretary|secretariat|officer/i.test(role)||lower(p.sourceType)==="employee register"?"STAFF":lower(p.sourceType)==="member register"||lower(p.participantType).includes("member")?"IRPA_MEMBER":/external|guest|partner|donor|consultant|technical expert|government representative|observer/i.test(role)||lower(p.participantType).includes("external")?"EXTERNAL_INVITEE":"OTHER";
+ const day=dayByParticipant.get(p.id);
+ return {participantId:p.id,participantUid:uid||null,name:clean(p.participantName||p.name||p.fullName||p.displayName),email:lower(p.participantEmail||p.email||p.invitedEmail||p.subscriberEmail),role,sourceType:clean(p.sourceType)||null,registrationCategory,dailyAttendanceStatus:clean(day?.attendanceStatus)||"N/A",attendanceStatus:clean(day?.attendanceStatus)||"N/A",dailyAttendanceRecordedAt:iso(day?.recordedAt),signed:false};
+});
+const dispatch=dispatchRows.find(r=>clean(r.attendanceDate)===date)||null;
+const hostUid=clean(c.meeting.meetingHostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
+return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null}:null});
+}
+if(pathname==="/api/meeting-attendance/daily/mark"){
+const meetingId=clean(data.meetingId),date=clean(data.date),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
+if(!meetingId||!participantId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["Present","Absent","Excused"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
+const c=await context(ctx,env,token,claims,meetingId);
+if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may update daily attendance.",403);
+const participant=await getDoc(ctx,env,token,"participants",participantId);
+if(!participant||participant.meetingId!==meetingId||denied.has(lower(participant.status||participant.registrationStatus)))return fail(ctx,request,"An active registered participant for this meeting is required.",404);
+const priorDispatch=(await listByField(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId)).find(r=>clean(r.attendanceDate)===date);
+if(priorDispatch&&["PREPARING","DISPATCHED"].includes(clean(priorDispatch.status)))return fail(ctx,request,"Daily attendance is locked because its signing request has been prepared or dispatched.",409);
+const id=await hash(meetingId+"\\0"+date+"\\0"+participantId),now=new Date(),existing=await getDoc(ctx,env,token,"meetingDailyAttendance",id);
+const record={meetingId,attendanceDate:date,participantId,participantUid:clean(participant.participantUid||participant.uid||participant.userId)||null,attendanceStatus,recordedByUid:clean(claims.user_id),recordedAt:now,updatedAt:now};
+if(existing)await patchDoc(ctx,env,token,"meetingDailyAttendance",id,record);else await writeDoc(ctx,env,token,"meetingDailyAttendance",id,{...record,createdAt:now},false);
+await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_MARKED",c.meeting,id,{date,participantId,attendanceStatus});
+return response(ctx,request,{ok:true,attendanceDate:date,participantId,attendanceStatus,recordedAt:now.toISOString()});
+}
+if(pathname==="/api/meeting-attendance/daily/dispatch"){
+const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
+if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
+const c=await context(ctx,env,token,claims,meetingId);
+const hostUid=clean(c.meeting.meetingHostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
+if(!c.canManage||ownerUid!==uid||hostUid&&hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
+const id=await hash(meetingId+"\\0"+date),existing=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id),now=new Date();
+if(phase==="PREPARE"){
+ if(existing&&["PREPARING","DISPATCHED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared or dispatched.",409);
+ const [participants,dailyRows]=await Promise.all([listByField(ctx,env,token,"participants","meetingId",meetingId),listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId)]);
+ const dayRows=dailyRows.filter(r=>clean(r.attendanceDate)===date&&clean(r.attendanceStatus)==="Present");
+ const presentUids=new Set(dayRows.map(r=>clean(r.participantUid)).filter(Boolean));
+ const supplied=new Set(Array.isArray(data.signerUids)?data.signerUids.map(clean):[]);
+ if(!presentUids.size||presentUids.size!==supplied.size||[...presentUids].some(value=>!supplied.has(value)))return fail(ctx,request,"The email-link signer list must exactly match the UID-identified participants marked Present for this date.",409);
+ const record={meetingId,attendanceDate:date,status:"PREPARING",envelopeId,documentId,ownerUid:uid,signerUids:[...presentUids],preparedAt:now,updatedAt:now};
+ if(existing)await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,record);else await writeDoc(ctx,env,token,"meetingAttendanceDispatches",id,{...record,createdAt:now},false);
+}else{
+ if(!existing||clean(existing.envelopeId)!==envelopeId||clean(existing.ownerUid)!==uid)return fail(ctx,request,"No matching host-owned prepared signing request exists for this date.",409);
+ const patch=phase==="SENT"?{status:"DISPATCHED",dispatchedAt:now,gatewayEnvelopeId:clean(data.gatewayEnvelopeId)||null,gatewayInvitationStatus:clean(data.gatewayInvitationStatus)||"Sent"}:{status:"FAILED",dispatchError:clean(data.error).slice(0,500),failedAt:now};
+ await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{...patch,updatedAt:now});
+}
+await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_SIGNING_"+phase,c.meeting,id,{date,envelopeId,documentId,ownerUid:uid});
+return response(ctx,request,{ok:true,date,status:phase==="PREPARE"?"PREPARING":phase==="SENT"?"DISPATCHED":"FAILED",envelopeId});
 }
 if(pathname==="/api/meeting-attendance/sign"){
 const meetingId=clean(data.meetingId),participantId=clean(data.participantId),typedName=clean(data.typedName),uid=clean(claims.user_id),email=lower(claims.email);
