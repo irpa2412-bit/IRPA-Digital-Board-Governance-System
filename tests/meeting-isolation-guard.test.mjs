@@ -231,7 +231,7 @@ test("parallel portal window amendment delegates to the executable exact-scope p
   assert.match(guard, /parallelWindowDecision\.pass \|\| signatureWindowClosureDecision\.pass/);
   assert.match(guard, /evaluateSignatureWindowReopen/);
   assert.match(guard, /signatureWindowClosureDecision\.pass \|\| signatureWindowReopenDecision\.pass/);
-  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowReopenDecision\.reason \|\| signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
+  assert.match(guard, /if \(!parallelWindowRecordAmendment && !signatureWindowRepairDecision\.pass\)/);
 });
 
 
