@@ -78,13 +78,14 @@ export async function resumeDailyAttendanceSigning({meeting,date,dispatch}={}){
  if(!owner?.uid||!owner?.email)throw new Error("The meeting host must be signed in with an authenticated email account.");
  const meetingHostUid=clean(meeting?.meetingHostUid||meeting?.hostUid||meeting?.organizerUid||meeting?.organiserUid||meeting?.initiatorUid||meeting?.createdByUid||meeting?.ownerUid||meeting?.chairpersonUid);
  if(!meetingHostUid||meetingHostUid!==owner.uid)throw new Error("Only the recorded meeting host may resume this attendance signing request.");
- if(dispatch?.status!=="PREPARING"||!dispatch?.envelopeId||!dispatch?.documentId)throw new Error("There is no prepared daily attendance signing request to resume.");
+ if(dispatch?.status!=="PREPARING"||!dispatch?.envelopeId||!dispatch?.documentId)throw new Error(dispatch?.status==="RECONCILIATION_REQUIRED"?"This dispatch has an uncertain outcome. Reconcile its existing Signature Portal and Gateway envelope before any retry; no new invitation will be sent.":"There is no prepared daily attendance signing request to resume.");
  const envelope=await getSignatureEnvelope(dispatch.envelopeId);
+ if(envelope?.status!=="Draft"||envelope?.gatewayEnvelopeId)throw new Error("An existing Signature Portal or Gateway workflow is already recorded. Reconcile its current Gateway envelope and invitation status before any retry; no new invitation will be sent.");
  let started;
  try{
   started=await startSignatureWorkflow(envelope);
  }catch(error){
-  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"FAILED",envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:owner.uid,error:String(error?.message||"Email-link dispatch failed").slice(0,500)}).catch(()=>null);
+  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"UNCERTAIN",envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:owner.uid,error:String(error?.message||"Signing workflow dispatch outcome is uncertain").slice(0,500)}).catch(()=>null);
   throw error;
  }
  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:owner.uid,gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
@@ -142,7 +143,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  try{
   started=await startSignatureWorkflow(envelope);
  }catch(error){
-  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"FAILED",envelopeId:envelope.id,documentId,ownerUid:owner.uid,error:String(error?.message||"Email-link dispatch failed").slice(0,500)}).catch(()=>null);
+  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"UNCERTAIN",envelopeId:envelope.id,documentId,ownerUid:owner.uid,error:String(error?.message||"Signing workflow dispatch outcome is uncertain").slice(0,500)}).catch(()=>null);
   throw error;
  }
  try{
