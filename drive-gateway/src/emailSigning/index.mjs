@@ -97,22 +97,17 @@ export function assertCanResendEmailSigningLink(envelope, signer) {
 }
 
 export function reserveEmailSigningResend(signer, attemptId, now = new Date()) {
-  const lock = signer?.resendAttempt;
-  if (lock && Number.isFinite(Date.parse(String(lock.startedAt || ""))) && new Date(now).getTime() - Date.parse(lock.startedAt) < 10 * 60 * 1000) {
-    throw new HttpError(409, "A signing invitation resend is already in progress for this signer. Refresh delivery status before retrying.");
-  }
-  return { ...signer, resendAttempt: { id: String(attemptId), startedAt: new Date(now).toISOString() } };
+  const attempts = Array.isArray(signer?.resendAttempts) ? signer.resendAttempts : [];
+  return { ...signer, resendAttempts: [...attempts, { id: String(attemptId), startedAt: new Date(now).toISOString() }] };
 }
 
 export function rollbackEmailSigningResend(signer, attemptId) {
-  if (signer?.resendAttempt?.id !== String(attemptId)) return signer;
-  const next = { ...signer };
-  delete next.resendAttempt;
-  return next;
+  const attempts = Array.isArray(signer?.resendAttempts) ? signer.resendAttempts : [];
+  return { ...signer, resendAttempts: attempts.filter(item => item?.id !== String(attemptId)) };
 }
 
 export async function commitEmailSigningResend(signer, { attemptId, tokenHash, expiresAt, now = new Date(), emailHash = null }) {
-  if (!signer || signer.status === "Signed" || signer.resendAttempt?.id !== String(attemptId)) {
+  if (!signer || signer.status === "Signed" || !(Array.isArray(signer.resendAttempts) && signer.resendAttempts.some(item => item?.id === String(attemptId)))) {
     throw new HttpError(409, "The invitation was sent but its signer reservation changed; refresh delivery status before another resend.");
   }
   const at = new Date(now).toISOString();
@@ -136,7 +131,7 @@ export async function commitEmailSigningResend(signer, { attemptId, tokenHash, e
     emailLinkTokenHistory: history,
     invitation: "Sent"
   };
-  delete next.resendAttempt;
+  next.resendAttempts = (Array.isArray(next.resendAttempts) ? next.resendAttempts : []).filter(item => item?.id !== String(attemptId));
   return next;
 }
 
