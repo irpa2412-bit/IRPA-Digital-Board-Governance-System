@@ -11,9 +11,10 @@ import{captureMeetingRecord,listMeetingRecords,retrieveMeetingRecord,updateMeeti
 import IRPADGBSMeetingRoomMedia from"../meeting/IRPADGBSMeetingRoomMedia";
 import ControlledDocumentUpload from"../components/ControlledDocumentUpload";
 import GovernanceFieldPalette from"../components/GovernanceFieldPalette";import MeetingAccessControl from"../meeting/MeetingAccessControl";import{dispatchDailyAttendanceSigning,resumeDailyAttendanceSigning}from"../firebase/meetingAttendanceSigning";
+import{meetingDateTimeFromIso}from"../utils/meetingTimeEAT.mjs";
 const PROCEEDINGS=["Not Started","In Progress","Transcript Saved","Draft Minutes","Reviewed","Approved","Final"],ATTENDANCE=["Present","Absent","Excused"],ITEM_STATUS=["Pending","In Discussion","Motion Recorded","Voting","Decision Recorded","Deferred","Completed"];
 const emptyMotion={text:"",movedBy:"",secondedBy:""},emptyAction={description:"",responsiblePerson:"",deadline:""};
-const localDateInputValue=()=>{const date=new Date();date.setMinutes(date.getMinutes()-date.getTimezoneOffset());return date.toISOString().slice(0,10)};
+const localDateInputValue=()=>meetingDateTimeFromIso(new Date().toISOString()).date;
 function MeetingFacilities({meeting,onNavigate,onRegister,registered}){
  const capabilities=meetingCapabilities(meeting||{});
  const policy=capabilities.policy;
