@@ -727,6 +727,15 @@ export function createAdministratorCleanupRouter(deps) {
         if (!archive || archive.planId !== planId || !Array.isArray(archive.records) || !Array.isArray(archive.operationOutcomes)) {
           return json({ok:false,error:"The Drive backup archive failed its integrity checks."},502,corsHeaders(request));
         }
+        for (const copy of Array.isArray(archive.driveFileCopies)?archive.driveFileCopies:[]) {
+          const copyResponse = await fetchImpl("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(copy.backupFileId)+"?fields=id,trashed",{
+            headers:{Authorization:"Bearer "+driveToken}
+          });
+          const copyMetadata = await copyResponse.json().catch(()=>({}));
+          if (!copyResponse.ok || !copyMetadata.id || copyMetadata.trashed === true) {
+            return json({ok:false,error:"A copied Drive file in the cleanup backup is missing or trashed."},502,corsHeaders(request));
+          }
+        }
         const archivedDecisions = new Map(archive.records.map(row=>[row.key,row.decision]));
         const decisionsMatch = plan.records.every(row=>archivedDecisions.get(row.key)===row.decision);
         const outcomesMatch = archive.operationOutcomes.length === (plan.operationOutcomes||[]).length &&
