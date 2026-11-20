@@ -7,6 +7,8 @@ const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const helper=readFileSync("src/firebase/meetingAttendanceSigning.js","utf8");
 const records=readFileSync("src/firebase/meetingRecords.js","utf8");
 const index=readFileSync("drive-gateway/src/index.js","utf8");
+const signaturePlatform=readFileSync("src/firebase/signaturePlatform.js","utf8");
+const signatureStorage=readFileSync("src/firebase/signatureStorage.js","utf8");
 
 test("Meeting Portal compiles daily categorical attendance and defaults missing attendance to N/A",()=>{
  assert.match(room,/getDailyMeetingAttendance/);
@@ -52,7 +54,10 @@ test("daily PDF places signature fields in the final column only for Present par
  assert.match(helper,/UNMATCHED_BOARD_REGISTRATION/);
  assert.match(helper,/status==="Present"/);
  assert.match(helper,/type:"Signature"/);
- assert.match(helper,/signerUid:uid/);
+ assert.match(helper,/signerId:participantId/);
+ assert.match(helper,/identityType:"email-link"/);
+ assert.match(helper,/participantIds:recipients\.map\(r=>r\.id\)/);
+ assert.doesNotMatch(helper,/signerUid:uid/);
  assert.match(helper,/GOVERNANCE_FIELD_TYPES/);
  assert.match(helper,/Email address/);
  assert.match(helper,/Occupation \/ position/);
@@ -88,8 +93,23 @@ test("daily Board quorum uses signed Signature Portal envelope recipients rather
  assert.match(service,/auditChainValid===true/);
  assert.match(index,/getEnvelopeStatus as getGatewayEnvelopeStatus/);
  assert.match(index,/getGatewayEnvelopeStatus: async \(ownerUid/);
- assert.match(service,/dailySignerByUid/);
+ assert.match(service,/dailySignerByParticipant/);
+ assert.match(service,/presentParticipantIds/);
+ assert.match(service,/Shared email addresses are allowed/);
  assert.match(service,/Math\.ceil\(denominator\/3\)/);
  assert.match(records,/\/api\/meeting-attendance\/daily\/dispatch/);
  assert.doesNotMatch(service,/\/api\/meeting-attendance\/sign/);
+});
+
+test("guest attendance and same-email positions retain independent email-link signer IDs",()=>{
+ assert.match(helper,/const recipients=present\.map\(row=>/);
+ assert.doesNotMatch(helper,/new Map\(present\.map/);
+ assert.match(helper,/id:participantId,signerId:participantId,identityType:"email-link"/);
+ assert.match(signaturePlatform,/identityType==="email-link"/);
+ assert.match(signaturePlatform,/gatewaySignerId/);
+ assert.match(signaturePlatform,/matches\.length===1/);
+ assert.match(signatureStorage,/identityType:"email-link"/);
+ assert.match(signatureStorage,/signerAssignmentByKey/);
+ assert.match(service,/participantId/);
+ assert.match(service,/mappedIds\.size===gatewaySignerMap\.length/);
 });
