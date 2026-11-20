@@ -9,9 +9,9 @@ const now = Date.parse("2026-11-19T20:00:00Z");
 const file = "src/pages/SignaturePlatform.jsx";
 const valid = {
   status: "complete",
-  declaration: { affectedPortals: [portal], reason: "Repair", files: [file], expectedEffect: "Fix scoped defect", prohibitedChanges: ["No signing rule changes"] },
+  declaration: { affectedPortals: [portal, "Meeting Portal"], reason: "Repair", files: [file], expectedEffect: "Fix scoped defect", prohibitedChanges: ["No signing rule changes"] },
   baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" },
-  validation: { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { [portal]: "PASS" }, behaviourDifferences: [] }
+  validation: { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { [portal]: "PASS", "Meeting Portal": "PASS" }, behaviourDifferences: [] }
 };
 const windowState = { status: "open", openedAt: "2026-11-19T18:00:00Z", scope: [file] };
 const run = (changedFiles, record = valid, win = windowState, activity = "2026-11-19T19:59:00Z") =>
