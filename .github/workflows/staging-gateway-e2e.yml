@@ -1387,7 +1387,7 @@ jobs:
 
   acceptance-staging:
     needs: repair-staging
-    if: needs.repair-staging.result == 'success'
+    if: needs.repair-staging.result == 'success' && github.ref != 'refs/heads/feat/admin-controlled-cleanup-20261120'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -1631,6 +1631,26 @@ jobs:
 # Final Worker route migrations are included in this explicit staging acceptance dispatch.
 # This commit deliberately requests the existing isolated staging workflow_dispatch; no production target is used.
 # Archive acceptance is staging-only; production deployment remains separately manual.
+
+  cleanup-staging-acceptance:
+    needs: repair-staging
+    if: needs.repair-staging.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/admin-controlled-cleanup-20261120'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run administrator cleanup acceptance on isolated staging only
+        env:
+          STAGING_URL: ${{ needs.repair-staging.outputs.staging_url }}
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+          STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
+          STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/admin-cleanup-staging-acceptance.mjs
 
   preflight-staging:
     if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || github.ref == 'refs/heads/feat/admin-controlled-cleanup-20261120'))) 
