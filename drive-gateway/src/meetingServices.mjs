@@ -520,11 +520,15 @@ const c=await context(ctx,env,token,claims,meetingId);
 const controller=c.isAdmin||clean(c.meeting.initiatorUid)===c.uid||clean(c.meeting.chairpersonUid)===c.uid||clean(c.meeting.secretaryUid)===c.uid||lower(c.meeting.initiatorEmail)===c.email||lower(c.meeting.chairpersonEmail)===c.email||lower(c.meeting.secretaryEmail)===c.email;
 if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may open voting.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Voting cannot be opened for a closed meeting.",409);
+const governancePolicy=normalizeMeetingGovernancePolicy(c.meeting.governancePolicy||{quorum:c.meeting.quorumPolicy,voting:c.meeting.votingPolicy,source:c.meeting.governancePolicySource});
+if(governancePolicy.status!=="CONFIGURED")return fail(ctx,request,"Voting is blocked until an authorised quorum and voting policy is configured on the meeting record.",409);
+const quorumAssessment=await buildQuorumAssessment(ctx,env,token,c.meeting,null,claims);
+if(isBoardMeeting(c.meeting)&&governancePolicy.voting.requireQuorumAtVoteOpen&&!quorumAssessment.quorumMet)return fail(ctx,request,"Voting cannot open because the configured Board quorum is not met.",409);
 if(resolutionId){const resolution=await getDoc(ctx,env,token,"resolutions",resolutionId);if(!resolution||resolution.meetingId!==meetingId)return fail(ctx,request,"The linked resolution must belong to the selected meeting.",409);}
 const id=await hash(meetingId+"|"+resolutionId+"|"+reference.toLowerCase());
 const prior=await getDoc(ctx,env,token,"votingIssues",id);
 if(prior&&lower(prior.status)!=="cancelled")return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});
-const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,status:"Open",result:"Pending",anonymous:true,openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
+const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,status:"Open",result:"Pending",anonymous:true,governancePolicySnapshot:governancePolicy,quorumSnapshot:{required:quorumAssessment.required,present:quorumAssessment.present,eligible:quorumAssessment.counts.boardMembers,quorumMet:quorumAssessment.quorumMet,status:quorumAssessment.status},openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
 if(prior)await patchDoc(ctx,env,token,"votingIssues",id,issue);else await writeDoc(ctx,env,token,"votingIssues",id,issue,false);
 await audit(ctx,env,token,claims,"MEETING_VOTING_ISSUE_OPENED",c.meeting,id,{votingReference:reference,resolutionId:resolutionId||null,anonymous:true});
 return response(ctx,request,{ok:true,issue:{...issue,id},alreadyOpen:false});
@@ -561,7 +565,7 @@ await audit(ctx,env,token,claims,"MEETING_DECISION_RECORDED",c.meeting,id,{decis
 return response(ctx,request,{ok:true,id,decisionReference:clean(record.decisionReference)});
 }
 if(pathname==="/api/meeting-voting/close"){
-const issueId=clean(data.votingIssueId),resultValue=["Passed","Rejected","Pending"].includes(clean(data.result))?clean(data.result):"Pending";
+const issueId=clean(data.votingIssueId);
 if(!issueId)return fail(ctx,request,"A voting issue is required.",400);
 const issue=await getDoc(ctx,env,token,"votingIssues",issueId);
 if(!issue)return fail(ctx,request,"Voting issue not found.",404);
@@ -569,6 +573,14 @@ const c=await context(ctx,env,token,claims,issue.meetingId);
 const controller=c.isAdmin||clean(c.meeting.initiatorUid)===c.uid||clean(c.meeting.chairpersonUid)===c.uid||clean(c.meeting.secretaryUid)===c.uid||lower(c.meeting.initiatorEmail)===c.email||lower(c.meeting.chairpersonEmail)===c.email||lower(c.meeting.secretaryEmail)===c.email;
 if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may close voting.",403);
 if(issue.status!=="Open")return fail(ctx,request,"This voting issue is already closed.",409);
+const policy=normalizeMeetingGovernancePolicy(issue.governancePolicySnapshot||{});
+if(policy.status!=="CONFIGURED")return fail(ctx,request,"The voting policy snapshot is missing or invalid; this issue cannot be closed.",409);
+const votes=await listByField(ctx,env,token,"votes","votingIssueId",issueId);
+const forCount=votes.filter(v=>clean(v.outcome)==="For").length,againstCount=votes.filter(v=>clean(v.outcome)==="Against").length,abstainCount=votes.filter(v=>clean(v.outcome)==="Abstain").length;
+const quorumAssessment=await buildQuorumAssessment(ctx,env,token,c.meeting,null,claims);
+const outcome=calculateVotingOutcome({forCount,againstCount,abstainCount,eligibleCount:quorumAssessment.counts.boardMembers||0,presentCount:quorumAssessment.counts.boardMembersPresent||0,quorumMet:!quorumAssessment.boardMeeting||quorumAssessment.quorumMet,policy:policy.voting});
+if(["NOT_CONFIGURED","INVALID_QUORUM","NO_VALID_DENOMINATOR","CHAIR_DECISION_REQUIRED"].includes(outcome.result))return fail(ctx,request,"The configured voting policy does not permit a final result: "+outcome.result+".",409);
+const resultValue=outcome.result;
 const now=new Date(),base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/",writes=[];
 writes.push({update:{name:base+"votingIssues/"+issueId,fields:fields({status:"Closed",result:resultValue,closedAt:now,updatedAt:now})},updateMask:{fieldPaths:["status","result","closedAt","updatedAt"]},currentDocument:{updateTime:issue.updateTime}});
 if(issue.resolutionId){
@@ -577,7 +589,7 @@ if(!resolution||resolution.meetingId!==issue.meetingId)return fail(ctx,request,"
 writes.push({update:{name:base+"resolutions/"+issue.resolutionId,fields:fields({status:resultValue,votingStatus:"Completed",votingResult:resultValue,votingIssueId:issueId,updatedAt:now})},updateMask:{fieldPaths:["status","votingStatus","votingResult","votingIssueId","updatedAt"]},currentDocument:{updateTime:resolution.updateTime}});
 }
 const auditId=crypto.randomUUID();
-writes.push({update:{name:base+"audit/"+auditId,fields:fields({action:"VOTING_ISSUE_CLOSED",collection:"votingIssues",recordId:issueId,details:{result:resultValue,resolutionId:issue.resolutionId||null},actorUid:c.uid,actorEmail:c.email||null,createdAt:now})},currentDocument:{exists:false}});
+writes.push({update:{name:base+"audit/"+auditId,fields:fields({action:"VOTING_ISSUE_CLOSED",collection:"votingIssues",recordId:issueId,details:{result:resultValue,resolutionId:issue.resolutionId||null,forCount,againstCount,abstainCount,denominator:outcome.denominator,requiredFor:outcome.requiredFor,policyVersion:outcome.policyVersion,quorumSnapshot:{required:quorumAssessment.required,present:quorumAssessment.present,eligible:quorumAssessment.counts.boardMembers,quorumMet:quorumAssessment.quorumMet}},actorUid:c.uid,actorEmail:c.email||null,createdAt:now})},currentDocument:{exists:false}});
 await commitWrites(ctx,env,token,writes);
 return response(ctx,request,{ok:true,result:resultValue,votingIssueId:issueId});
 }
