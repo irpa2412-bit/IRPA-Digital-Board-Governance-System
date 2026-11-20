@@ -282,6 +282,16 @@ if (changed.includes("docs/portal-protection/change-record.json")) {
     throw new Error("Parallel repair-window amendment changed existing change-record history or another portal's record.");
   }
 }
+const parallelWindowRecordAmendment = changed.includes("docs/portal-protection/repair-window.json") &&
+  changed.includes("docs/portal-protection/change-record.json") &&
+  changed.includes("scripts/meeting-portal-fixture-isolation-guard.sh") &&
+  changed.includes("tests/meeting-isolation-guard.test.mjs") &&
+  changed.every(path => [
+    "docs/portal-protection/repair-window.json",
+    "docs/portal-protection/change-record.json",
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "tests/meeting-isolation-guard.test.mjs"
+  ].includes(path));
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
@@ -419,7 +429,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
