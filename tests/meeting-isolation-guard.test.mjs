@@ -209,7 +209,9 @@ test("parallel portal window amendment delegates to the executable exact-scope p
   assert.ok(guard.includes('"scripts/portal-repair-window-guard-policy.mjs"'));
   assert.match(guard, /evaluateSignatureWindowClosure/);
   assert.match(guard, /parallelWindowDecision\.pass \|\| signatureWindowClosureDecision\.pass/);
-  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
+  assert.match(guard, /evaluateSignatureWindowReopen/);
+  assert.match(guard, /signatureWindowClosureDecision\.pass \|\| signatureWindowReopenDecision\.pass/);
+  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowReopenDecision\.reason \|\| signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
 });
 
 
