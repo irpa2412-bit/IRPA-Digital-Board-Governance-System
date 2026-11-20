@@ -19,9 +19,10 @@ export function calculateRequiredQuorum(eligibleCount,policyInput={}){
  const count=Math.max(0,integer(eligibleCount)||0),basis=String(policyInput.basis||"").toLowerCase();
  const fixedCount=integer(policyInput.fixedCount),numerator=integer(policyInput.numerator),denominator=integer(policyInput.denominator);
  const configured=basis==="fixed"?Number.isInteger(fixedCount)&&fixedCount>0:basis==="percentage"&&Number.isInteger(numerator)&&numerator>0&&Number.isInteger(denominator)&&denominator>0&&numerator<=denominator;
- if(!configured||count===0)return {configured:false,required:null,eligibleCount:count,status:"NOT_CONFIGURED"};
+ if(!configured)return {configured:false,required:null,eligibleCount:count,status:"NOT_CONFIGURED"};
+ if(count===0)return {configured:true,required:null,eligibleCount:count,status:"NOT_ASSESSABLE"};
  const required=basis==="fixed"?fixedCount:Math.ceil(count*numerator/denominator);
- return {configured:true,required:Math.min(count,required),eligibleCount:count,status:"CONFIGURED",rule:basis==="fixed"?`Fixed count: ${required}`:`Ceiling(${count} × ${numerator}/${denominator}) = ${required}`};
+ return {configured:true,required,eligibleCount:count,status:"CONFIGURED",rule:basis==="fixed"?`Fixed count: ${required}`:`Ceiling(${count} × ${numerator}/${denominator}) = ${required}`};
 }
 export function calculateVotingOutcome({forCount=0,againstCount=0,abstainCount=0,eligibleCount=0,presentCount=0,quorumMet=false,policy:policyInput={}}={}){
  const policy=normalizeMeetingGovernancePolicy({quorum:{basis:"fixed",fixedCount:1},voting:policyInput.voting||policyInput,source:{reference:"validated meeting policy snapshot",effectiveDate:"1970-01-01"}});
