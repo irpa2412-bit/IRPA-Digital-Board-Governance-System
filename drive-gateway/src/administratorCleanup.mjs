@@ -177,6 +177,7 @@ export function createAdministratorCleanupRouter(deps) {
           ...(Array.isArray(data.selectedRoles) ? data.selectedRoles.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : []), ...(Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : [])].map(value => clean(value)).filter(Boolean);
         const protectedRole = roleValues.some(value => /administrator|executive director|board chair|chairperson|board secretary/i.test(value));
         const isAdmin = uid === auth.uid || email === PRIMARY_ADMIN_EMAIL;
+        const authEmailMismatch = Boolean(authUser && email && clean(authUser.email).toLowerCase() !== email);
         const trialData = isTrialRecord(data);
         const isSignedTrial = collection === "signatureEnvelopes" && trialData &&
           ["completed","signed"].includes(clean(data.status).toLowerCase());
@@ -192,7 +193,7 @@ export function createAdministratorCleanupRouter(deps) {
         const signedProductionPortalRecord = ["signatures","documents","controlledDocuments"].includes(collection) &&
           linkedEnvelope && signedState(linkedEnvelope.status) && !isTrialRecord(linkedEnvelope);
         const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory ||
-          signedProductionEnvelope || missingTrialPdf || signedProductionPortalRecord || protectedSystemCollection;
+          signedProductionEnvelope || missingTrialPdf || signedProductionPortalRecord || protectedSystemCollection || authEmailMismatch;
         records.push({
           key: collection + "/" + id, collection, id, version: clean(doc.updateTime || doc.createTime), uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
