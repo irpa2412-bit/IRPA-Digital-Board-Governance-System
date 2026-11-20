@@ -409,14 +409,15 @@ export async function syncGatewaySigningMirror(envelopeId,gatewayStatus){
   const gatewaySigners=Array.isArray(gatewayStatus.signers)?gatewayStatus.signers:[];
   const gatewaySignerById=new Map(gatewaySigners.map(item=>[String(item.id||""),item]).filter(([id])=>id));
   const uniqueEmailSigner=recipient=>{const email=String(recipient?.email||"").trim().toLowerCase();if(!email)return null;const matches=gatewaySigners.filter(item=>String(item.email||"").trim().toLowerCase()===email);return matches.length===1?matches[0]:null;};
-  const resolveGatewaySigner=recipient=>recipient?.gatewaySignerId?gatewaySignerById.get(String(recipient.gatewaySignerId)):recipient?.uid?gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid)||uniqueEmailSigner(recipient):uniqueEmailSigner(recipient);
+  const isGatewayActionRecipient=recipient=>recipient?.optionalSigning!==true&&recipient?.actionRequired!==false&&!isViewOnlyRecipient(recipient);
+  const resolveGatewaySigner=recipient=>!isGatewayActionRecipient(recipient)?null:recipient?.gatewaySignerId?gatewaySignerById.get(String(recipient.gatewaySignerId)):recipient?.uid?gatewaySigners.find(item=>item.uid&&item.uid===recipient.uid)||uniqueEmailSigner(recipient):uniqueEmailSigner(recipient);
   const recipients=(envelope.recipients||[]).map(recipient=>{
     const signer=resolveGatewaySigner(recipient);
     if(!signer)return recipient;
     const firstPending=gatewaySigners.filter(item=>item.status==="Pending").sort((a,b)=>a.order-b.order)[0];const isFirstPending=Boolean(firstPending&&(recipient.gatewaySignerId?firstPending.id===recipient.gatewaySignerId:recipient.uid?firstPending.uid===recipient.uid:uniqueEmailSigner(recipient)?.id===firstPending.id));const status=signer.status==="Signed"?"Signed":signer.status==="Declined"?"Declined":signer.status==="Pending"?(gatewayStatus.signingMode==="Parallel"?"Pending":isFirstPending?"Current":"Pending"):recipient.status;
     return {...recipient,status,completedAt:signer.signedAt||recipient.completedAt||null};
   });
-  const pending=gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order);const currentPending=pending[0];const currentRecipient=currentPending?(envelope.recipients||[]).find(r=>r.gatewaySignerId?currentPending.id===r.gatewaySignerId:r.uid?currentPending.uid===r.uid:uniqueEmailSigner(r)?.id===currentPending.id):null;
+  const pending=gatewaySigners.filter(x=>x.status==="Pending").sort((a,b)=>a.order-b.order);const currentPending=pending[0];const currentRecipient=currentPending?(envelope.recipients||[]).find(r=>isGatewayActionRecipient(r)&&(r.gatewaySignerId?currentPending.id===r.gatewaySignerId:r.uid?currentPending.uid===r.uid:uniqueEmailSigner(r)?.id===currentPending.id)):null;
   const overall=gatewayStatus.status==="Completed"?"Completed":gatewayStatus.status==="Declined"?"Declined":gatewayStatus.status==="Voided"?"Cancelled":"In Progress";
   const patch={
     recipients,
