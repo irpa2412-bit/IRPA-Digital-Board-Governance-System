@@ -25,7 +25,7 @@ export function calculateRequiredQuorum(eligibleCount,policyInput={}){
  return {configured:true,required,eligibleCount:count,status:"CONFIGURED",rule:basis==="fixed"?`Fixed count: ${required}`:`Ceiling(${count} × ${numerator}/${denominator}) = ${required}`};
 }
 export function calculateVotingOutcome({forCount=0,againstCount=0,abstainCount=0,eligibleCount=0,presentCount=0,quorumMet=false,policy:policyInput={}}={}){
- const policy=normalizeMeetingGovernancePolicy({quorum:{basis:"fixed",fixedCount:1},voting:policyInput.voting||policyInput,source:{reference:"validated meeting policy snapshot",effectiveDate:"1970-01-01"}});
+ const policy=normalizeMeetingGovernancePolicy(policyInput);
  if(policy.status!=="CONFIGURED")return {result:"NOT_CONFIGURED",denominator:0,requiredFor:null,policyVersion:policy.version};
  const v=policy.voting,forVotes=Math.max(0,integer(forCount)||0),against=Math.max(0,integer(againstCount)||0),abstain=Math.max(0,integer(abstainCount)||0);
  const denominator=v.denominatorBasis==="total_eligible"?Math.max(0,integer(eligibleCount)||0):v.denominatorBasis==="eligible_present"?Math.max(0,integer(presentCount)||0):(forVotes+against+(v.abstentionTreatment==="count_as_against"?abstain:0));

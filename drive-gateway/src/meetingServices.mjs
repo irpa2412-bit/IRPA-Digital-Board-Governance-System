@@ -583,7 +583,7 @@ if(policy.status!=="CONFIGURED")return fail(ctx,request,"The voting policy snaps
 const votes=await listByField(ctx,env,token,"votes","votingIssueId",issueId);
 const forCount=votes.filter(v=>clean(v.outcome)==="For").length,againstCount=votes.filter(v=>clean(v.outcome)==="Against").length,abstainCount=votes.filter(v=>clean(v.outcome)==="Abstain").length;
 const quorumAssessment=await buildQuorumAssessment(ctx,env,token,c.meeting,null,claims);
-const outcome=calculateVotingOutcome({forCount,againstCount,abstainCount,eligibleCount:quorumAssessment.counts.boardMembers||0,presentCount:quorumAssessment.counts.boardMembersPresent||0,quorumMet:!quorumAssessment.boardMeeting||quorumAssessment.quorumMet,policy:policy.voting});
+const outcome=calculateVotingOutcome({forCount,againstCount,abstainCount,eligibleCount:quorumAssessment.counts.boardMembers||0,presentCount:quorumAssessment.counts.boardMembersPresent||0,quorumMet:!quorumAssessment.boardMeeting||quorumAssessment.quorumMet,policy});
 if(["NOT_CONFIGURED","INVALID_QUORUM","NO_VALID_DENOMINATOR","CHAIR_DECISION_REQUIRED"].includes(outcome.result))return fail(ctx,request,"The configured voting policy does not permit a final result: "+outcome.result+".",409);
 const resultValue=outcome.result;
 const now=new Date(),base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/",writes=[];
