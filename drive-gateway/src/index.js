@@ -163,6 +163,10 @@ const administratorCleanupRouter = createAdministratorCleanupRouter({
   firestoreDocumentToPlain,
   getFirebaseAuthAdminAccessToken,
   listFirebaseAuthUsers,
+  getFirebaseProjectId,
+  getDriveAccessToken,
+  findOrCreateFolder,
+  driveFetch,
   json,
   corsHeaders
 });
