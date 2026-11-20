@@ -12,6 +12,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 const NEUTRAL="This signing link is unavailable. Contact the document owner for a new invitation.";
 const inputStyle={width:"100%",boxSizing:"border-box",padding:10,border:"1px solid #9ca3af",borderRadius:7,fontSize:15};
 const buttonStyle={padding:"10px 14px",border:0,borderRadius:7,background:"#174a78",color:"#fff",fontWeight:600,cursor:"pointer"};
+const stageError=(error,fallback)=>{const message=error?.message||fallback;const code=error?.code;return code&&!message.includes("("+code+")")?message+" ("+code+")":message;};
+const formatExpiryEAT=value=>{const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).format(date)+" EAT":"expiry unavailable";};
 const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Title:"#1d4ed8",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
 
 export default function EmailSigningReadOnlyPage({token}){
@@ -36,7 +38,7 @@ export default function EmailSigningReadOnlyPage({token}){
     const gateway=getGoogleDriveGatewayUrl();if(!gateway)throw new Error(NEUTRAL);
     const opened=await fetch(gateway+"/api/sign/email/open",{headers:{"x-signing-token":activeToken,Accept:"application/json"},cache:"no-store",credentials:"omit"});
     const metadata=await opened.json().catch(()=>({}));
-    if(!opened.ok||metadata.ok!==true)throw new Error(NEUTRAL);
+    if(!opened.ok||metadata.ok!==true)throw Object.assign(new Error(metadata.error||NEUTRAL),{code:metadata.code||"TOKEN_LOOKUP"});
     if(cancelled)return;
     const invitedEmail=String(metadata.signer?.email||"").trim().toLowerCase();
     await auth.authStateReady?.();
@@ -53,7 +55,7 @@ export default function EmailSigningReadOnlyPage({token}){
     const initialFieldValues={};for(const field of fields){if(field.type==="Name")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"";else if(field.type==="Title")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.title||metadata.signer?.title||"";}setFieldValues(initialFieldValues);
     const firstAssignedField=fields.find(field=>["Signature","Initials"].includes(field.type))||fields.find(field=>Number(field.roleAssignmentIndex||0)===0)||fields[0];setActiveRoleAssignmentIndex(Number(firstAssignedField?.roleAssignmentIndex||0));setSelectedFieldId(firstAssignedField?.fieldId||"");
     const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":activeToken},cache:"no-store",credentials:"omit"});
-    if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
+    if(!response.ok){const failure=await response.json().catch(()=>({}));throw Object.assign(new Error(failure.error||"The controlled PDF could not be retrieved. Do not sign a document you cannot inspect."),{code:failure.code||"PDF_PREVIEW"});}
     if(!String(response.headers.get("content-type")||"").toLowerCase().includes("application/pdf"))throw new Error("The signing service did not return a PDF. Signing has been stopped.");
     const bytes=new Uint8Array(await response.arrayBuffer());
     if(cancelled)return;
@@ -61,7 +63,7 @@ export default function EmailSigningReadOnlyPage({token}){
     loadedPdf=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
     if(cancelled){await loadedPdf.destroy();return;}
     setPdfDocument(loadedPdf);setPageCount(loadedPdf.numPages);setPageNum(Number(firstAssignedField?.page||1));
-   }catch(e){if(!cancelled)setError(e?.message||NEUTRAL);}
+   }catch(e){if(!cancelled)setError(stageError(e,NEUTRAL));}
    finally{if(!cancelled)setLoading(false);}
   })();
   return()=>{cancelled=true;if(loadedPdf)loadedPdf.destroy().catch(()=>{});};
@@ -137,6 +139,9 @@ export default function EmailSigningReadOnlyPage({token}){
    if(!value||value.length<100){setError("Draw your mark before applying it.");return;}
    setSignatureMarks(current=>({...current,[selectedField.fieldId]:value}));
    setFieldApplications(current=>[...current.filter(item=>item.fieldId!==selectedField.fieldId),{fieldId:selectedField.fieldId,page:selectedField.page,x:selectedField.x,y:selectedField.y,width:selectedField.width,height:selectedField.height,coordinateSpace:selectedField.coordinateSpace,confirmed:true,value}]);
+  }else if(selectedField.type==="Date"){
+   setFieldValues(current=>({...current,[selectedField.fieldId]:"SERVER_TIMESTAMP_PENDING"}));
+   setSuccess("The Gateway will stamp the signing date and time automatically in EAT when you submit.");
   }else if(fieldValues[selectedField.fieldId]===undefined||String(fieldValues[selectedField.fieldId]).trim()===""){setError("Complete this assigned field before confirming it.");return;}
   setError("");
   const nextInAssignment=assignmentFields.find(field=>field.fieldId!==selectedField.fieldId&&!complete(field));
@@ -162,7 +167,7 @@ export default function EmailSigningReadOnlyPage({token}){
    if(!response.ok||result.ok!==true||!result.sessionToken)throw Object.assign(new Error(result.error||"Signing session could not be opened. (SESSION_CREATE)"),{code:result.code||"SESSION_CREATE"});
    setSigningToken(result.sessionToken);setSessionActive(true);
    setShowSigningPane(true);setSuccess("Signing session opened. Complete the assigned fields and review before submitting.");
-  }catch(error){setError(error?.message||"Signing session could not be opened. (SESSION_CREATE)");}
+  }catch(error){setError(stageError(error,"Signing session could not be opened."));}
   finally{setSessionOpening(false);}
  }
  async function submit(){
@@ -180,7 +185,7 @@ export default function EmailSigningReadOnlyPage({token}){
   try{
    const response=await fetch(gateway+"/api/sign/submit",{method:"POST",headers:{"content-type":"application/json","x-signing-token":activeToken},credentials:"omit",cache:"no-store",body:JSON.stringify({token:activeToken,signature,fieldValues,fieldApplications,signatureConfirmed:true,declarations,consent:true})});
    const result=await response.json().catch(()=>({}));
-   if(!response.ok||result.ok===false)throw new Error(result.error||"The signing action could not be completed.");
+   if(!response.ok||result.ok===false)throw Object.assign(new Error(result.error||"The signing action could not be completed."),{code:result.code||"SUBMIT"});
    setSigningClosed(true);
    if(result.status==="CompletionFailed"){setFinalizationFailed(true);setSuccess("Your signature was recorded, but final PDF completion failed. The envelope is marked CompletionFailed. Do not submit again; contact the document owner for controlled recovery.");return;}
    if(result.completed===true){
@@ -195,7 +200,7 @@ export default function EmailSigningReadOnlyPage({token}){
      setSuccess("Submission completed. The final signed PDF is displayed below.");
     }catch{setSuccess("Your signature was recorded and the envelope was completed. Contact the document owner for the completed PDF.");}
    }else setSuccess("Your assigned action was submitted and recorded. The signing workflow will continue in its configured order.");
-  }catch(e){setError(e?.message||"The signing action could not be completed.");}
+  }catch(e){setError(stageError(e,"The signing action could not be completed."));}
   finally{setSubmitting(false);}
  }
  function leaveSigningSession(){
@@ -229,7 +234,7 @@ export default function EmailSigningReadOnlyPage({token}){
    {success&&<p role="status" style={{color:revoked||finalizationFailed?"#7f1d1d":"#14532d",background:revoked||finalizationFailed?"#fee2e2":"#dcfce7",padding:10,borderRadius:7}}>{success}</p>}
    {record&&!error&&<>
     <h2 style={{fontSize:17,margin:"8px 0"}}>{record.title}</h2><p style={{fontSize:13,margin:"4px 0"}}>Invited by: {record.ownerName}</p>
-    <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?new Date(record.expiresAt).toLocaleString():"As stated in your invitation"}</p>
+    <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?formatExpiryEAT(record.expiresAt):"As stated in your invitation"}</p>
     <section style={{border:"1px solid #9ca3af",borderRadius:8,padding:12,marginTop:12}}>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><div><h2 style={{fontSize:18,margin:"0 0 4px"}}>Complete document review</h2><p style={{fontSize:13,color:"#4b5563",margin:0}}>Read every page before deciding. Assigned signature and initials locations are marked directly on the document.</p></div><strong>Page {pageNum} of {pageCount||"…"}</strong></div>
      <div style={{display:"flex",gap:8,justifyContent:"center",margin:"12px 0",flexWrap:"wrap"}}>
@@ -268,7 +273,7 @@ export default function EmailSigningReadOnlyPage({token}){
      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{assignmentFields.map(field=><button key={field.fieldId} type="button" disabled={signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);const targetPage=Number(field.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:signingClosed?0.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
      {selectedField&&<div style={{marginTop:14,padding:12,border:"1px solid #9ca3af",borderRadius:8}}>
       <h3 style={{fontSize:16,marginTop:0}}>Complete: {selectedField.placeholder||selectedField.type} · Page {selectedField.page}</h3>
-      {["Signature","Initials"].includes(selectedField.type)?<SignatureFieldConfirmationPad key={(signaturePadField||selectedField).fieldId} field={signaturePadField||selectedField} savedSignatureUrl={savedProfile?.signatureUrl||""} savedInitialsUrl={savedProfile?.initialsUrl||""} allowTyped={false} onCancel={()=>{setSignaturePadField(null);setSelectedFieldId("");}} onConfirm={async value=>{const field=signaturePadField||selectedField;if(!field?.fieldId)throw new Error("The assigned signature field is no longer available.");const application={fieldId:field.fieldId,page:Number(field.page||1),x:Number(field.x??0),y:Number(field.y??0),width:Number(field.width??24),height:Number(field.height??9),confirmed:true,value};setSignatureMarks(current=>({...current,[field.fieldId]:value}));setFieldApplications(current=>[...current.filter(item=>item.fieldId!==field.fieldId),application]);setSignaturePadField(null);setSelectedFieldId("");setError("");setSuccess(savedProfile?.signatureUrl||savedProfile?.initialsUrl?"Your own saved Signature Profile specimen has been confirmed for this assigned field. It will be stamped only after you review and submit.":"Your hand-drawn specimen has been confirmed for this assigned field. It will be stamped only after you review and submit.");}}/>:<><label style={{display:"block",margin:"8px 0"}}>{selectedField.type}{selectedField.required?" (required)":""}{selectedField.type==="Checkbox"?<input type="checkbox" disabled={signingClosed} checked={fieldValues[selectedField.fieldId]==="true"} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.checked?"true":"false"}))}/>:<input style={inputStyle} disabled={signingClosed} type={selectedField.type==="Date"?"date":"text"} value={fieldValues[selectedField.fieldId]||""} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.value}))} placeholder={selectedField.placeholder||"Enter your response"}/>}</label><button type="button" disabled={signingClosed} onClick={confirmField} style={buttonStyle}>Confirm field value</button></>}
+      {["Signature","Initials"].includes(selectedField.type)?<SignatureFieldConfirmationPad key={(signaturePadField||selectedField).fieldId} field={signaturePadField||selectedField} savedSignatureUrl={savedProfile?.signatureUrl||""} savedInitialsUrl={savedProfile?.initialsUrl||""} allowTyped={false} onCancel={()=>{setSignaturePadField(null);setSelectedFieldId("");}} onConfirm={async value=>{const field=signaturePadField||selectedField;if(!field?.fieldId)throw new Error("The assigned signature field is no longer available.");const application={fieldId:field.fieldId,page:Number(field.page||1),x:Number(field.x??0),y:Number(field.y??0),width:Number(field.width??24),height:Number(field.height??9),confirmed:true,value};setSignatureMarks(current=>({...current,[field.fieldId]:value}));setFieldApplications(current=>[...current.filter(item=>item.fieldId!==field.fieldId),application]);setSignaturePadField(null);setSelectedFieldId("");setError("");setSuccess(savedProfile?.signatureUrl||savedProfile?.initialsUrl?"Your own saved Signature Profile specimen has been confirmed for this assigned field. It will be stamped only after you review and submit.":"Your hand-drawn specimen has been confirmed for this assigned field. It will be stamped only after you review and submit.");}}/>:<><label style={{display:"block",margin:"8px 0"}}>{selectedField.type}{selectedField.required?" (required)":""}{selectedField.type==="Checkbox"?<input type="checkbox" disabled={signingClosed} checked={fieldValues[selectedField.fieldId]==="true"} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.checked?"true":"false"}))}/>:{selectedField.type==="Date"?<div role="status" style={{padding:10,border:"1px solid #9ca3af",borderRadius:7,background:"#f8fafc"}}>The signing date and time will be stamped automatically by the Gateway in East Africa Time (EAT) when you submit.</div>:<input style={inputStyle} disabled={signingClosed} type="text" value={fieldValues[selectedField.fieldId]||""} onChange={e=>setFieldValues(v=>({...v,[selectedField.fieldId]:e.target.value}))} placeholder={selectedField.placeholder||"Enter your response"}/>}}</label><button type="button" disabled={signingClosed} onClick={confirmField} style={buttonStyle}>{selectedField.type==="Date"?"Confirm date & time (EAT)":"Confirm field value"}</button></>}
      </div>}
     </section>}
     {!signatureFields.length&&(savedProfile||showSigningPane)&&<label style={{display:"block",margin:"14px 0"}}>Typed signature<input style={inputStyle} disabled={signingClosed} value={typedSignature} onChange={e=>setTypedSignature(e.target.value)} placeholder="Type your full name as your signature"/></label>}
