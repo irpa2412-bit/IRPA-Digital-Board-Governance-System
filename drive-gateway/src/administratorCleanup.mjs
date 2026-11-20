@@ -156,7 +156,7 @@ export function createAdministratorCleanupRouter(deps) {
             });
           })
           : false;
-        const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle);
+        const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle || data.title || data.position || (Array.isArray(data.roles) ? data.roles.join(", ") : "") || (Array.isArray(data.assignedRoles) ? data.assignedRoles.join(", ") : ""));
         const roleValues = [data.role, data.boardPosition, data.designation, data.jobTitle, data.title, data.position,
           ...(Array.isArray(data.roles) ? data.roles : []), ...(Array.isArray(data.assignedRoles) ? data.assignedRoles : []),
           ...(Array.isArray(data.selectedRoles) ? data.selectedRoles : [])].map(value => clean(value)).filter(Boolean);
