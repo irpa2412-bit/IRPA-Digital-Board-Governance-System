@@ -190,13 +190,29 @@ export async function handleSendInvitationEmail(request, env, deps = {}) {
     return respond(503, { ok:false, error:"Email delivery service is unavailable." });
   }
   let claims;
-  try {
-    claims = await authenticateFirebaseRequest(request, env, { skipActivation:true });
-  } catch {
-    return respond(401, { ok:false, error:"Firebase service authentication is required." });
-  }
-  if (claims?.user_id !== "irpa-email-dispatcher" || claims?.firebaseClaims?.emailDeliveryService !== true) {
-    return respond(403, { ok:false, error:"Authorised email service identity is required." });
+  const authorization = String(request.headers.get("Authorization") || "").trim();
+  if (authorization) {
+    try {
+      claims = await authenticateFirebaseRequest(request, env, { skipActivation:true });
+    } catch {
+      return respond(401, { ok:false, error:"Firebase service authentication is required." });
+    }
+    if (claims?.user_id !== "irpa-email-dispatcher" || claims?.firebaseClaims?.emailDeliveryService !== true) {
+      return respond(403, { ok:false, error:"Authorised email service identity is required." });
+    }
+  } else {
+    // Temporary compatibility bridge: keep existing deployed Functions working
+    // until the Firebase Functions release is confirmed live.
+    const supplied = String(request.headers.get("x-irpa-service-key") || "");
+    const expected = String(env?.INVITE_SERVICE_KEY || "");
+    if (!supplied || !expected) return respond(401, { ok:false, error:"Email service authentication is required." });
+    const left = new TextEncoder().encode(supplied);
+    const right = new TextEncoder().encode(expected);
+    let difference = left.length ^ right.length;
+    const length = Math.max(left.length, right.length);
+    for (let i = 0; i < length; i++) difference |= (left[i] || 0) ^ (right[i] || 0);
+    if (difference !== 0) return respond(401, { ok:false, error:"Email service authentication is required." });
+    claims = { user_id:"legacy-invite-service", firebaseClaims:{ emailDeliveryService:true }, legacy:true };
   }
 
   let body;
