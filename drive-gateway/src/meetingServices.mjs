@@ -606,6 +606,7 @@ const c=await context(ctx,env,token,claims,meetingId);
 if(!c.canManage)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may register participants.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Participants cannot be added to a closed meeting.",409);
 const participantName=clean(incoming.participantName),participantEmail=lower(incoming.participantEmail||incoming.email);
+if(incoming.meetingTimeZone!==EAT_TIME_ZONE||clean(incoming.meetingStartAt)!==clean(c.meeting.startAt)||clean(incoming.meetingEndAt)!==clean(c.meeting.endAt))return fail(ctx,request,"Invitation particulars must use the selected meeting’s verified EAT schedule.",409);
 if(!participantName||!participantEmail||!/^\S+@\S+\.\S+$/.test(participantEmail))return fail(ctx,request,"A participant name and valid email address are required.",400);
 const existing=await listByField(ctx,env,token,"participants","meetingId",meetingId);
 const incomingUid=clean(incoming.participantUid||incoming.uid||incoming.userId),incomingSource=clean(incoming.sourceRecordId||incoming.boardMemberId||incoming.employeeId||incoming.memberId),identityText=value=>clean(value).toLowerCase().replace(/\\s+/g," ");
