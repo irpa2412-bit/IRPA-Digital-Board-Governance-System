@@ -75,9 +75,9 @@
       "openedAt": "2026-11-20T17:08:47Z",
       "closesAt": "2026-11-22T17:08:47Z",
       "durationHours": 48,
-      "rollbackCommit": "dfb35cbb028749536973a616422d9aeb6829c2bf",
-      "rollbackCommitEvidence": "Firebase web build reported by owner as dfb35cb, matching repository main dfb35cbb; production Worker /health confirmation pending.",
-      "rollbackCommitStatus": "provisional-owner-confirmed"
+      "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+      "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; production health gate verified deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+      "rollbackCommitStatus": "verified-production-worker-deploy"
     },
     "prohibitedChanges": [
       "Secrets",
