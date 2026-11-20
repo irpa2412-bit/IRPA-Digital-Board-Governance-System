@@ -172,6 +172,18 @@ export function createAdministratorCleanupRouter(deps) {
           trialData,
           signedTrialDocument: isSignedTrial,
           signedPdfReference: isSignedTrial ? clean(data.signedPdfReference || data.signedFileId || data.driveFileId) || null : null,
+          relationshipRefs: [...new Set([
+            data.meetingId, data.documentId, data.envelopeId, data.signatureEnvelopeId, data.invitationId,
+            data.memberUid, data.employeeUid, data.participantUid, data.subscriberUid, data.ownerUid,
+            data.uid, data.userId, data.memberId, data.employeeId, data.participantId, data.signerUid,
+            data.email, data.ownerEmail, data.signerEmail,
+            ...(Array.isArray(data.participantUids) ? data.participantUids : []),
+            ...(Array.isArray(data.attendeeUids) ? data.attendeeUids : []),
+            ...(Array.isArray(data.memberUids) ? data.memberUids : []),
+            ...(Array.isArray(data.invitedUids) ? data.invitedUids : []),
+            ...(Array.isArray(data.subscriberUids) ? data.subscriberUids : []),
+            ...(Array.isArray(data.signers) ? data.signers.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : [])
+          ].map(value => clean(value).toLowerCase()).filter(Boolean))],
           protected: protectedRecord,
           protectionReason: isAdmin ? "Signed-in administrator cannot be removed." :
             protectedRole ? "Protected governance or administrator role." :
@@ -181,7 +193,29 @@ export function createAdministratorCleanupRouter(deps) {
         });
       }
     }
-    return records;
+    const lookup = new Map();
+    for (const row of records) {
+      for (const identifier of [row.id, row.uid, row.email, row.key].map(value => clean(value).toLowerCase()).filter(Boolean)) {
+        if (!lookup.has(identifier)) lookup.set(identifier, new Set());
+        lookup.get(identifier).add(row.key);
+      }
+    }
+    const reverseLinks = new Map();
+    for (const row of records) {
+      for (const ref of row.relationshipRefs || []) {
+        for (const linkedKey of lookup.get(ref) || []) {
+          if (linkedKey === row.key) continue;
+          if (!reverseLinks.has(linkedKey)) reverseLinks.set(linkedKey, new Set());
+          reverseLinks.get(linkedKey).add(row.key);
+        }
+      }
+    }
+    return records.map(row => {
+      const linked = new Set(reverseLinks.get(row.key) || []);
+      for (const ref of row.relationshipRefs || []) for (const key of lookup.get(ref) || []) if (key !== row.key) linked.add(key);
+      const { relationshipRefs, ...safeRow } = row;
+      return { ...safeRow, linkedRecordKeys: [...linked].sort(), dependencyCount: linked.size };
+    });
   }
 
   return async function administratorCleanupRouter(request, env, pathname) {
