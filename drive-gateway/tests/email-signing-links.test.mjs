@@ -206,6 +206,38 @@ test("failed resend preserves the previous active email-link token",async()=>{
 });
 
 
+test("concurrent signer resends are serialized and the delivered token is the persisted active token",async()=>{
+  const originalHash="a".repeat(64),events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
+  let record={_v:1,id:"ENV-RESEND-RACE",createdBy:"owner",status:"Active",title:"Test",ownerName:"Owner",signers:[{id:"S1",email:"signer@example.org",name:"Signer",order:1,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:originalHash,tokenExpiresAt:"2026-11-23T08:00:00.000Z",emailLinkExpiresAt:"2026-11-23T08:00:00.000Z",emailLinkTokenHistory:[],invitation:"Sent"}],events};
+  let releaseSend,markSendStarted;
+  const sendStarted=new Promise(resolve=>{markSendStarted=resolve});
+  const holdSend=new Promise(resolve=>{releaseSend=resolve});
+  const sent=[];
+  const ctx={
+    meta:{
+      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
+      update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
+    },
+    now:()=>NOW,
+    config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7},
+    sendInvitation:async invitation=>{sent.push(invitation);markSendStarted();await holdSend;},
+    logger:{error(){}}
+  };
+  const first=resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S1");
+  await sendStarted;
+  await assert.rejects(()=>resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S1"),/already in progress/i);
+  assert.equal(record.signers[0].tokenHash,originalHash,"old link remains active while delivery is pending");
+  releaseSend();
+  const result=await first;
+  const deliveredToken=new URL(sent[0].link).searchParams.get("emailSignToken");
+  assert.equal(record.signers[0].tokenHash,await sha256Hex(deliveredToken.split(".")[2]));
+  assert.equal(record.signers[0].tokenExpiresAt,result.expiresAt);
+  assert.equal(record.signers[0].emailLinkExpiresAt,result.expiresAt);
+  assert.equal(record.signers[0].emailLinkStatus,"issued");
+  assert.equal(record.signers[0].resendAttempt,undefined);
+  assert.equal(record.signers[0].emailLinkTokenHistory.at(-1).tokenHash,originalHash);
+});
+
 test("every SMTP and email-link failure stage returns only its sanitized stage code",async()=>{
   for(const stage of EMAIL_LINK_STAGE_CODES){
     const events=[];
@@ -269,4 +301,30 @@ test("createEnvelope sends three distinct email-link invitations to three signer
   assert.deepEqual(tokens.map(token=>token.split(".")[1]),["S1","S2","S3"]);
   assert.equal(new Set(tokens).size,3);
   assert.ok(sent.every(invitation=>invitation.to==="shared@example.org"&&invitation.emailLink===true));
+});
+
+
+test("parallel-mode signer can receive a resend without waiting for earlier signer positions",async()=>{
+  const events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
+  let record={_v:1,id:"ENV-PARALLEL-RESEND",createdBy:"owner",status:"Active",signingMode:"Parallel",title:"Parallel Test",ownerName:"Owner",signers:[
+    {id:"S1",email:"first@example.org",name:"First",order:1,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:"a".repeat(64),invitation:"Sent"},
+    {id:"S2",email:"second@example.org",name:"Second",order:2,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:"b".repeat(64),invitation:"Sent"}
+  ],events};
+  const sent=[];
+  const ctx={
+    meta:{
+      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
+      update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
+    },
+    now:()=>NOW,
+    config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7},
+    sendInvitation:async invitation=>{sent.push(invitation);},
+    logger:{error(){}}
+  };
+  const result=await resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S2");
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,"second@example.org");
+  assert.equal(record.signers[1].invitation,"Sent");
+  assert.equal(record.signers[1].tokenHash,await sha256Hex(new URL(sent[0].link).searchParams.get("emailSignToken").split(".")[2]));
+  assert.equal(result.signerId,"S2");
 });
