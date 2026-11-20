@@ -17,7 +17,6 @@ export async function registerMeetingWorkingDocument(payload){return callMeeting
 export async function listMeetingWorkingDocuments(meetingId){return (await callMeetingService("/api/meeting-working-documents/list",{meetingId})).documents||[];}
 export async function submitMeetingDocumentReview(payload){return callMeetingService("/api/meeting-working-documents/review",payload);}
 
-export async function signMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/sign",payload);}
 export async function markMeetingAttendance(payload){return callMeetingService("/api/meeting-attendance/mark",payload);}
 export async function getMeetingAttendanceRegister(meetingId){return callMeetingService("/api/meeting-attendance/register",{meetingId});}
 
