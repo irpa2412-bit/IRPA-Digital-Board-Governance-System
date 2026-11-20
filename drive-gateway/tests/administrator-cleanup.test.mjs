@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createAdministratorCleanupRouter } from "../src/administratorCleanup.mjs";
 
 function response(body,status=200){return new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json"}});}
-function harness({email="irpa2412@gmail.com",active=true,collections={}}={}) {
+function harness({email="irpa2412@gmail.com",active=true,collections={},version="v1",failBackup=false}={}) {
   const kv = new Map();
   const env = { DRIVE_KV: {
     put: async (key,value) => kv.set(key,value),
@@ -18,9 +18,24 @@ function harness({email="irpa2412@gmail.com",active=true,collections={}}={}) {
       if(doc.fields && Object.keys(doc.fields).length) return doc.fields;
       return doc.data || {};
     },
-    getFirestoreCollectionDocuments: async (_env,name) => (collections[name] || []).map(row => ({name:"projects/p/databases/(default)/documents/"+name+"/"+row.id,data:row.data})),
+    getFirestoreCollectionDocuments: async (_env,name) => (collections[name] || []).map(row => ({name:"projects/p/databases/(default)/documents/"+name+"/"+row.id,updateTime:row.updateTime||version,data:row.data})),
     getFirebaseAuthAdminAccessToken: async () => "auth-token",
-    listFirebaseAuthUsers: async () => [{localId:"admin-uid",email:"irpa2412@gmail.com"}],
+    listFirebaseAuthUsers: async () => [{localId:"admin-uid",email:"irpa2412@gmail.com"},...(collections.members||[]).filter(row=>row.data.uid).map(row=>({localId:row.data.uid,email:row.data.email}))],
+    getFirebaseProjectId: () => "test-project",
+    getDriveAccessToken: async () => "drive-token",
+    findOrCreateFolder: async () => "backup-folder",
+    driveFetch: async (_env,_token,url) => ({id:"copied-drive-file",name:"copied-file",webViewLink:"https://drive.google.com/file/d/copied-drive-file/view"}),
+    fetch: async (url,options={}) => {
+      const target=String(url);
+      if(target.includes(":listCollectionIds")) return response({collectionIds:[]});
+      if(target.includes("upload/drive/v3/files?uploadType=multipart")) return failBackup ? response({error:"backup unavailable"},500) : response({id:"backup-json-file",webViewLink:"https://drive.google.com/file/d/backup-json-file/view"});
+      if(target.includes("upload/drive/v3/files/") && options.method==="PATCH") return response({});
+      if(target.includes("/accounts:delete")) return response({});
+      if(target.includes("/adminCleanupAudit?documentId=")) return response({});
+      if(target.includes("/documents/members/m1") && options.method==="GET") return response({updateTime:version,fields:{uid:{stringValue:"member-1"}}});
+      if(target.includes("/documents/members/m1") && options.method==="DELETE") return response({});
+      throw new Error("Unexpected cleanup fetch: "+target+" "+String(options.method||"GET"));
+    },
     json: response,
     corsHeaders: () => ({})
   };
@@ -54,14 +69,28 @@ test("explicit GOES selection is limited to inventory rows and protected records
   assert.equal(plan.records.find(row=>row.key==="members/m1").decision,"GOES");
   assert.equal(plan.records.find(row=>row.key==="members/m2").decision,"STAYS");
 });
-test("execution stays locked even after typed confirmation until destructive acceptance gates pass", async () => {
-  const {route,env}=harness();
+test("execution creates a durable backup before deleting the selected member and Auth account", async () => {
+  const {route,env}=harness({collections:{members:[{id:"m1",data:{fullName:"Test Member",uid:"member-1",email:"member@example.test"}}]}});
   const inv=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
-  const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inv.inventoryId,selections:[]})}),env,"/api/admin/cleanup/plan")).json();
+  const planResponse=await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inv.inventoryId,selections:[{key:"members/m1",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan");
+  const plan=await planResponse.json();
+  assert.equal(plan.summary.goes,1);
+  assert.ok(plan.executionOperations.some(operation=>operation.type==="auth-delete"));
   const res=await route(new Request("https://gateway.test/api/admin/cleanup/execute",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({planId:plan.planId,confirmation:"DELETE"})}),env,"/api/admin/cleanup/execute");
   const body=await res.json();
-  assert.equal(res.status,423);
-  assert.equal(body.code,"EXECUTOR_NOT_READY");
+  assert.equal(res.status,200);
+  assert.equal(body.status,"COMPLETE");
+  assert.equal(body.backupDriveFileId,"backup-json-file");
+  assert.equal(body.operationOutcomes.length,2);
+});
+
+test("backup failure prevents every destructive operation", async () => {
+  const {route,env}=harness({collections:{members:[{id:"m1",data:{fullName:"Test Member",uid:"member-1",email:"member@example.test"}}]},failBackup:true});
+  const inv=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inv.inventoryId,selections:[{key:"members/m1",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan")).json();
+  const res=await route(new Request("https://gateway.test/api/admin/cleanup/execute",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({planId:plan.planId,confirmation:"DELETE"})}),env,"/api/admin/cleanup/execute");
+  assert.equal(res.status,502);
+  assert.equal((await res.json()).code,"CLEANUP_EXECUTION_BLOCKED");
 });
 test("non-primary identity is refused", async () => {
   const {route,env}=harness({email:"other@example.test"});
