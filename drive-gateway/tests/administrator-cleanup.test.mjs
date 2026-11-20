@@ -85,3 +85,25 @@ test("verified email and current Firebase admin claim are mandatory", async () =
   const res=await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory");
   assert.equal(res.status,403);
 });
+
+test("immutable audit history is inventory-only and always protected", async () => {
+  const {route,env}=harness({collections:{audit:[{id:"a1",data:{action:"SIGNATURE_COMPLETED",recordId:"doc-1"}}]}});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const row=inventory.records.find(item=>item.key==="audit/a1");
+  assert.equal(row.protected,true);
+  assert.match(row.protectionReason,/immutable audit/i);
+});
+
+test("signed trial envelope is identified from TRIAL origin and its signer is protected by email", async () => {
+  const {route,env}=harness({collections:{
+    members:[{id:"member-1",data:{name:"Trial Signer",email:"signer@example.test",role:"Member"}}],
+    signatureEnvelopes:[{id:"env-1",data:{recordOrigin:"TRIAL",status:"Completed",signedPdfReference:"drive-file-1",signers:[{email:"signer@example.test",status:"Signed"}]}}]
+  }});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const member=inventory.records.find(item=>item.key==="members/member-1");
+  const envelope=inventory.records.find(item=>item.key==="signatureEnvelopes/env-1");
+  assert.equal(member.protected,true);
+  assert.match(member.protectionReason,/signer/i);
+  assert.equal(envelope.signedTrialDocument,true);
+  assert.equal(envelope.signedPdfReference,"drive-file-1");
+});
