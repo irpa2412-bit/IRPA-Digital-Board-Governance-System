@@ -340,6 +340,19 @@ test("active Signature Portal repair permits only the declared shared Meeting Po
   assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,true);
 });
 
+test("active repair requires top-level protected validation to mirror its active evidence",()=>{
+  const fixture=signatureRepairFixture();
+  fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
+  fixture.currentChangeRecord.declaration={affectedPortals:["Signature Portal","Meeting Portal"]};
+  fixture.currentChangeRecord.activeAmendment.affectedPortals=["Signature Portal","Meeting Portal"];
+  const validation={baselineSmoke:"PASS",fullRegression:"PASS",portalSmoke:{"Signature Portal":"PASS","Meeting Portal":"PASS"}};
+  fixture.currentChangeRecord.activeAmendment.validation=validation;
+  fixture.currentChangeRecord.validation=structuredClone(validation);
+  assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,true);
+  fixture.currentChangeRecord.validation.fullRegression="PENDING";
+  assert.equal(evaluateSignatureWindowRepair({...fixture,now:new Date("2026-11-20T18:00:00Z")}).pass,false);
+});
+
 test("active Signature Portal repair rejects unrelated portal additions to the declaration",()=>{
   const fixture=signatureRepairFixture();
   fixture.baselineChangeRecord.declaration={affectedPortals:["Signature Portal"]};
