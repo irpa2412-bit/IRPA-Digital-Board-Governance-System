@@ -88,7 +88,7 @@ test("daily Board quorum uses signed Signature Portal envelope recipients rather
  assert.match(service,/auditChainValid===true/);
  assert.match(index,/getEnvelopeStatus as getGatewayEnvelopeStatus/);
  assert.match(index,/getGatewayEnvelopeStatus: async \(ownerUid/);
- assert.match(service,/dailySignerByUid/);
+ assert.match(service,/dailySignerByParticipant/);
  assert.match(service,/Math\.ceil\(denominator\/3\)/);
  assert.match(records,/\/api\/meeting-attendance\/daily\/dispatch/);
  assert.doesNotMatch(service,/\/api\/meeting-attendance\/sign/);
