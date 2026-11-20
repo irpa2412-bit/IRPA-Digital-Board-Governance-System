@@ -65,7 +65,7 @@ test("Meeting Room presents dispatch, queue and signed-attendance reconciliation
 
 test("Board Register is the authoritative UID-only quorum denominator",()=>{
   assert.match(service,/\/api\/meeting-board-register\/list/);
-  assert.match(service,/SOURCE:ACTIVE_BOARD_MEMBERS_REGISTER_UID_ONLY/);
+  assert.match(service,/source:"ACTIVE_BOARD_MEMBERS_REGISTER_UID_ONLY"/);
   assert.match(service,/uid=clean\(member\.uid\|\|member\.authUid\|\|member\.userUid\)/);
   assert.match(service,/const denominator=boardMembers\.length/);
   assert.match(service,/registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false/);
