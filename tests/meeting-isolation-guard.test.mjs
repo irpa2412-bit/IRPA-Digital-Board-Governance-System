@@ -209,7 +209,9 @@ test("parallel portal window amendment delegates to the executable exact-scope p
   assert.ok(guard.includes('"scripts/portal-repair-window-guard-policy.mjs"'));
   assert.match(guard, /evaluateSignatureWindowClosure/);
   assert.match(guard, /parallelWindowDecision\.pass \|\| signatureWindowClosureDecision\.pass/);
-  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
+  assert.match(guard, /evaluateSignatureWindowReopen/);
+  assert.match(guard, /signatureWindowClosureDecision\.pass \|\| signatureWindowReopenDecision\.pass/);
+  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowReopenDecision\.reason \|\| signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
 });
 
 
@@ -217,6 +219,7 @@ import {
   evaluateSignatureWindowAmendment,
   evaluateSignatureWindowRepair,
   evaluateSignatureWindowClosure,
+  evaluateSignatureWindowReopen,
   SIGNATURE_WINDOW_AMENDMENT_PATHS
 } from "../scripts/portal-repair-window-guard-policy.mjs";
 
@@ -419,4 +422,98 @@ test("isolation guard blocks closure without deployment and smoke evidence", () 
   const fixture = closureFixture();
   delete fixture.currentChangeRecord.activeAmendment.completion;
   assert.equal(evaluateSignatureWindowClosure(fixture).pass, false);
+});
+
+
+const reopenFixture = () => {
+  const baselineSignature = {
+    portal: "Signature Portal", status: "closed",
+    openedAt: "2026-11-20T17:08:47Z", lastActivityAt: "2026-11-20T17:56:30Z",
+    durationHours: 48, closesAt: "2026-11-22T17:08:47Z",
+    rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+    reason: "Owner-authorised full Email Signing rebuild: reusable envelope/signer-bound links, explicit open session, expiry, atomic resend, contract suite and protected cutover.",
+    scope: [
+      "drive-gateway/src/emailSigning/","drive-gateway/src/emailSigningLinks.mjs","drive-gateway/src/signing.mjs",
+      "drive-gateway/src/index.js","src/pages/EmailSigningReadOnlyPage.jsx","src/pages/SignaturePlatform.jsx",
+      "drive-gateway/tests/email-signing-contract.test.mjs","drive-gateway/tests/email-signing-links.test.mjs",
+      "drive-gateway/tests/email-signing-links.integration.test.mjs","tests/email-signing-contract.test.mjs",
+      ".github/workflows/email-signing-contract.yml","scripts/meeting-portal-fixture-isolation-guard.sh",
+      "scripts/portal-repair-window-guard-policy.mjs","tests/meeting-isolation-guard.test.mjs"
+    ],
+    prohibitions: ["secrets","SMTP","Firestore rules","certificate logic","hash logic","archive logic"],
+    activityLog: [
+      { at:"2026-11-20T17:08:47Z", action:"opened" },
+      { at:"2026-11-20T17:20:46Z", action:"rollback-reference-verified" },
+      { at:"2026-11-20T17:47:37Z", action:"scope-amended" },
+      { at:"2026-11-20T17:56:30Z", action:"closed" }
+    ],
+    closureEvidence: { repairPR:817, closurePR:820, mergeCommit:"386b73b02e1ae89696ab0a73fea7ee00dd739d48" }
+  };
+  const baselineRepairWindow = {
+    status:"open",
+    parallelWindows:[
+      { portal:"Meeting Portal", status:"open", baseline:"meeting-baseline-unchanged" },
+      baselineSignature
+    ]
+  };
+  const currentRepairWindow = JSON.parse(JSON.stringify(baselineRepairWindow));
+  const currentSignature = currentRepairWindow.parallelWindows.find(item=>item.portal==="Signature Portal");
+  currentSignature.status="open";
+  delete currentSignature.closedAt;
+  currentSignature.reopenedAt="2026-11-20T18:10:00Z";
+  currentSignature.lastActivityAt=currentSignature.reopenedAt;
+  currentSignature.activityLog.push({at:currentSignature.reopenedAt,action:"reopened"});
+  const baselineAmendment = {
+    status:"closed", affectedPortals:["Signature Portal"],
+    reason:"Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
+    files:baselineSignature.scope,
+    repairWindow:{openedAt:"2026-11-20T17:08:47Z",closesAt:"2026-11-22T17:08:47Z",durationHours:48,rollbackCommit:"fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",rollbackCommitEvidence:"verified"},
+    prohibitedChanges:["Secrets","Environment variables","SMTP credentials and settings (reuse existing wrapper)","Firestore rules","PDF stamping engine","Hash logic","Certificate logic","Archive logic"],
+    ownerInstruction:"Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120.",
+    closedAt:"2026-11-20T17:56:30Z",
+    completion:{mergeCommit:"386b73b02e1ae89696ab0a73fea7ee00dd739d48",productionSmoke:"PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION"}
+  };
+  const baselineChangeRecord = {
+    schemaVersion:1,status:"complete",declaration:{affectedPortals:["Signature Portal"]},
+    baseline:{commit:"main-baseline"},history:[{action:"meeting-history-preserved"}],
+    closure:{closedAt:"",updatedBaselineCommit:""},activeAmendment:baselineAmendment
+  };
+  const currentChangeRecord = JSON.parse(JSON.stringify(baselineChangeRecord));
+  currentChangeRecord.activeAmendment.status="open";
+  currentChangeRecord.activeAmendment.reopenedAt="2026-11-20T18:10:00Z";
+  currentChangeRecord.activeAmendment.reopenReason="PR #820 closed the window before the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120 was completed.";
+  currentChangeRecord.activeAmendment.priorClosure={
+    closedAt:baselineAmendment.closedAt,
+    completion:baselineAmendment.completion,
+    closedByPR:820
+  };
+  return {
+    changedPaths:[...SIGNATURE_WINDOW_AMENDMENT_PATHS],
+    baselineRepairWindow,currentRepairWindow,
+    baselineChangeRecord,currentChangeRecord,
+    now:new Date("2026-11-20T18:15:00Z")
+  };
+};
+
+test("isolation guard reopens only the owner-authorised full Email Signing rebuild and preserves the prior closure",()=>{
+  const fixture=reopenFixture();
+  assert.equal(evaluateSignatureWindowReopen(fixture).pass,true);
+});
+
+test("isolation guard blocks reopening if the Meeting Portal window changes",()=>{
+  const fixture=reopenFixture();
+  fixture.currentRepairWindow.parallelWindows.find(item=>item.portal==="Meeting Portal").status="closed";
+  assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
+});
+
+test("isolation guard blocks reopening without the prior closure evidence",()=>{
+  const fixture=reopenFixture();
+  delete fixture.currentChangeRecord.activeAmendment.priorClosure;
+  assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
+});
+
+test("isolation guard blocks reopening if another portal's Change Record history changes",()=>{
+  const fixture=reopenFixture();
+  fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
+  assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
 });

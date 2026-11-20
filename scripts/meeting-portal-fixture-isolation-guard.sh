@@ -3,7 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
-import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -302,7 +302,14 @@ const signatureWindowClosureDecision = evaluateSignatureWindowClosure({
   baselineChangeRecord,
   currentChangeRecord
 });
-const parallelWindowRecordAmendment = parallelWindowDecision.pass || signatureWindowClosureDecision.pass;
+const signatureWindowReopenDecision = evaluateSignatureWindowReopen({
+  changedPaths: changed,
+  baselineRepairWindow,
+  currentRepairWindow,
+  baselineChangeRecord,
+  currentChangeRecord
+});
+const parallelWindowRecordAmendment = parallelWindowDecision.pass || signatureWindowClosureDecision.pass || signatureWindowReopenDecision.pass;
 const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
   changedPaths: changed,
   repairWindow: currentRepairWindow,
@@ -313,7 +320,7 @@ const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
 const signatureEmailLinkSessionRepair = signatureWindowRepairDecision.pass;
 if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
-  if (!parallelWindowRecordAmendment) throw new Error(signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
+  if (!parallelWindowRecordAmendment) throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
 }
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
