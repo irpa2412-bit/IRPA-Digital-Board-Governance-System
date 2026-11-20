@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T11:56:00Z",
+  "lastActivityAt": "2026-11-20T11:58:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -134,6 +134,11 @@
       "at": "2026-11-20T11:56:00Z",
       "action": "repair",
       "description": "Restricted the dedicated browser workflow to pull requests and manual dispatch; scoped concurrency cancels only stale runs for the same PR, avoiding duplicate push/PR jobs while preserving branch-protection verification."
+    },
+    {
+      "at": "2026-11-20T11:58:00Z",
+      "action": "repair",
+      "description": "Disambiguated the two Resolutions navigation buttons in the browser fixture by selecting the meeting-scoped first entry."
     }
   ],
   "durationHours": 48,
