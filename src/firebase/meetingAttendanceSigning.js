@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { collection, doc } from "firebase/firestore";
 import { auth, db } from "./config";
 import { uploadControlledDocumentRouted, registerControlledDocumentRecord } from "./signatureStorage";
-import { createSignatureEnvelope, startSignatureWorkflow } from "./signaturePlatform";
+import { createSignatureEnvelope, startSignatureWorkflow, getSignatureEnvelope } from "./signaturePlatform";
 import { callMeetingService } from "./meetingGatewayApi";
 
 const PAGE={width:842,height:595,margin:28,top:112,rowHeight:22,rowsPerPage:20};
@@ -69,6 +69,26 @@ async function buildDailyAttendancePdf({meeting,date,records}){
  }
  return {bytes:await pdf.save(),fields,present};
 }
+
+export async function resumeDailyAttendanceSigning({meeting,date,dispatch}={}){
+ const owner=auth.currentUser;
+ if(!owner?.uid||!owner?.email)throw new Error("The meeting host must be signed in with an authenticated email account.");
+ const meetingHostUid=clean(meeting?.meetingHostUid||meeting?.hostUid||meeting?.organizerUid||meeting?.organiserUid||meeting?.initiatorUid||meeting?.createdByUid||meeting?.ownerUid||meeting?.chairpersonUid);
+ if(!meetingHostUid||meetingHostUid!==owner.uid)throw new Error("Only the recorded meeting host may resume this attendance signing request.");
+ if(dispatch?.status!=="PREPARING"||!dispatch?.envelopeId||!dispatch?.documentId)throw new Error("There is no prepared daily attendance signing request to resume.");
+ const envelope=await getSignatureEnvelope(dispatch.envelopeId);
+ let started;
+ try{
+  started=await startSignatureWorkflow(envelope);
+ }catch(error){
+  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"FAILED",envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:owner.uid,error:String(error?.message||"Email-link dispatch failed").slice(0,500)}).catch(()=>null);
+  throw error;
+ }
+ await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:owner.uid,gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
+ if(started.ownerSigningToken)window.location.assign("/?emailSignToken="+encodeURIComponent(started.ownerSigningToken));
+ return {envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,signerCount:(dispatch.gatewaySignerMap||[]).length,status:started.gatewayInvitationStatus||"Sent"};
+}
+
 export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  const owner=auth.currentUser;
  if(!owner?.uid||!owner?.email)throw new Error("The meeting host must be signed in with an authenticated email account.");
