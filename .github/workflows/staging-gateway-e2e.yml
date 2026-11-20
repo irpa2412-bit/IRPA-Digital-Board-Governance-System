@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025' || github.event.pull_request.head.ref == 'fix/email-link-positioned-invitations-20261118' || github.event.pull_request.head.ref == 'fix/signature-email-link-identity-isolation-20261119'))
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025' || github.event.pull_request.head.ref == 'fix/email-link-positioned-invitations-20261118' || github.event.pull_request.head.ref == 'fix/signature-email-link-identity-isolation-20261119' || github.event.pull_request.head.ref == 'feat/admin-controlled-cleanup-20261120'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -109,7 +109,7 @@ jobs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
     # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
 # dispatch isolated runtime acceptance is an explicit staging-only opt-in; production is not targeted.
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/admin-controlled-cleanup-20261120' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     # Configure staging-repair Environment with required independent reviewers before use.
     environment: staging-repair
