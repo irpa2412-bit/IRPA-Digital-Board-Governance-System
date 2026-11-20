@@ -210,6 +210,8 @@ export function createAdministratorCleanupRouter(deps) {
           relationshipRefs: [...new Set([
             data.meetingId, data.documentId, data.envelopeId, data.gatewayEnvelopeId, data.signatureEnvelopeId, data.invitationId,
             data.memberUid, data.employeeUid, data.participantUid, data.subscriberUid, data.ownerUid,
+            data.targetUid, data.requestedByUid, data.createdByUid, data.updatedByUid, data.uploadedByUid,
+            data.approvedByUid, data.rejectedByUid, data.assignedToUid, data.designatedRecipientUid, data.recipientUid,
             data.uid, data.userId, data.memberId, data.employeeId, data.participantId, data.signerUid,
             data.email, data.ownerEmail, data.signerEmail,
             ...(Array.isArray(data.participantUids) ? data.participantUids : []),
@@ -217,6 +219,9 @@ export function createAdministratorCleanupRouter(deps) {
             ...(Array.isArray(data.memberUids) ? data.memberUids : []),
             ...(Array.isArray(data.invitedUids) ? data.invitedUids : []),
             ...(Array.isArray(data.subscriberUids) ? data.subscriberUids : []),
+            ...(Array.isArray(data.recipientUids) ? data.recipientUids : []),
+            ...(Array.isArray(data.assigneeUids) ? data.assigneeUids : []),
+            ...(Array.isArray(data.ownerUids) ? data.ownerUids : []),
             ...(Array.isArray(data.actionUids) ? data.actionUids : []),
             ...(Array.isArray(data.participantEmails) ? data.participantEmails : []),
             ...(Array.isArray(data.signers) ? data.signers.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : []),
