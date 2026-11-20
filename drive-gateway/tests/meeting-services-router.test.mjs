@@ -72,4 +72,6 @@ test("meeting register, decision, and voting control routes require authenticate
   }
 });
 
-test("direct attendance signature endpoint is retired in favour of Signature Portal email-link envelopes", async () => {\n  assert.equal(await post(createMeetingServicesRouter(ctx), "/api/meeting-attendance/sign", { meetingId: "test-meeting" }), null);\n});\n
+test("direct attendance signature endpoint is retired in favour of Signature Portal email-link envelopes", async () => {
+  assert.equal(await post(createMeetingServicesRouter(ctx), "/api/meeting-attendance/sign", { meetingId: "test-meeting" }), null);
+});
