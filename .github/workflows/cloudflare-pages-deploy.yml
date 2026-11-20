@@ -74,6 +74,13 @@ jobs:
             exit 1
           fi
           echo "Production bundle references the canonical Cloudflare Google Drive Gateway."
+      - name: Upload immutable production frontend artifact for browser verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-frontend-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify Cloudflare credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
