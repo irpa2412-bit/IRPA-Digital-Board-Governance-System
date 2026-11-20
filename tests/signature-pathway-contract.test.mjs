@@ -71,6 +71,20 @@ test("actual-data gate Worker route enforces admin role, exact attestation, writ
   assert.match(route, /step,error:/);
 });
 
+test("actual-data gate status is readable by every authenticated user while writes remain administrator-only", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("function signatureDraftFirestoreValue"));
+  const statusRead = route.indexOf("if (request.method === 'GET')");
+  const administratorCheck = route.indexOf("if (!adminAllowed)");
+  const bodyRead = route.indexOf("const body = await request.json()");
+  assert.ok(statusRead >= 0, "authenticated GET must return the global gate state");
+  assert.ok(administratorCheck > statusRead, "administrator authorization must apply after the read-only GET branch");
+  assert.ok(bodyRead > administratorCheck, "only an administrator may reach POST request parsing and mutation");
+  assert.match(route, /enabled:fields\.enabled\?\.booleanValue===true/);
+  assert.match(route, /status:fields\.status\?\.stringValue \|\| 'CLOSED'/);
+  assert.match(route, /Only an active IRPA Administrator may change actual-data access/);
+});
+
 test("actual-data gate rejects non-administrators and wrong attestation before changing the setting", async () => {
   const worker = await read("../drive-gateway/src/index.js");
   const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("async function reconcileSignatureDocumentIds"));
