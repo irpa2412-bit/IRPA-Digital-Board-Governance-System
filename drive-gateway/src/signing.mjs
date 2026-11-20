@@ -391,8 +391,12 @@ export async function resendInvitation(ctx,user,id,signerId){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
     await mutate(ctx,id,async current=>{
       const signer=current.signers.find(s=>s.id===signerId);
-      if(signer?.resendAttempt?.id!==attemptId)return{patch:null};
-      delete signer.resendAttempt;
+      const attemptActive=current.emailSigningModule==="v2"
+        ?Array.isArray(signer?.resendAttempts)&&signer.resendAttempts.some(item=>item?.id===attemptId)
+        :signer?.resendAttempt?.id===attemptId;
+      if(!attemptActive)return{patch:null};
+      if(current.emailSigningModule==="v2")Object.assign(signer,rollbackEmailSigningResend(signer,attemptId));
+      else delete signer.resendAttempt;
       return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:now.toISOString()})}};
     });
     const failure=new HttpError(502,"The signing invitation could not be delivered. The previous link remains valid; retry after resolving the delivery error.");failure.code=EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT";throw failure;
@@ -400,7 +404,7 @@ export async function resendInvitation(ctx,user,id,signerId){
   await mutate(ctx,id,async current=>{
     if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(current.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
     const signer=current.signers.find(s=>s.id===signerId);
-    if(!signer||signer.status==="Signed"||signer.resendAttempt?.id!==attemptId)throw new HttpError(409,"The invitation was sent but its signer reservation changed; refresh delivery status before another resend.");
+    if(!signer||signer.status==="Signed"||(current.emailSigningModule==="v2"?!(Array.isArray(signer.resendAttempts)&&signer.resendAttempts.some(item=>item?.id===attemptId)):signer.resendAttempt?.id!==attemptId))throw new HttpError(409,"The invitation was sent but its signer reservation changed; refresh delivery status before another resend.");
     if(current.emailSigningModule!=="v2"&&(current.signingMode||"Sequential")==="Sequential"&&current.signers.some(s=>s.order<signer.order&&s.status!=="Signed"))throw new HttpError(409,"This signer is not yet at the current signing position.");
     signer.tokenHistory=[...(signer.tokenHistory||[]),{tokenHash:signer.tokenHash,status:"replaced",replacedAt:now.toISOString()}].slice(-20);
     if(signer.identityType==="email-link"){
