@@ -187,3 +187,7 @@ test("workflow delegates its source-isolation gate to the extracted guard script
   assert.match(workflow, /run: bash scripts\/meeting-portal-fixture-isolation-guard\.sh/);
   assert.ok(guard.includes('"scripts/meeting-portal-fixture-isolation-guard.sh"'));
 });
+
+test("fixture runs are not cancelled by concurrent push and pull-request events", () => {
+  assert.doesNotMatch(workflow, /cancel-in-progress:\\s*true/);
+});
