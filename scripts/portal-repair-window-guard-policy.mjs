@@ -37,7 +37,7 @@ export function evaluateSignatureWindowAmendment({
   if (JSON.stringify(strip(baselineChangeRecord)) !== JSON.stringify(strip(currentChangeRecord))) {
     return { pass: false, reason: "Another portal's window or existing Change Record history was altered." };
   }
-  const expectedRollback = "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8";
+  const expectedRollback = "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd";
   if (signatureWindow.rollbackCommit !== expectedRollback ||
       amendment.repairWindow?.rollbackCommit !== expectedRollback) {
     return { pass: false, reason: "Signature Portal rollback reference does not match the latest successful production Worker deploy." };
@@ -75,16 +75,23 @@ export function evaluateSignatureWindowRepair({
   if (!Number.isFinite(expiry) || now.getTime() >= expiry) {
     return { pass: false, reason: "The Signature Portal repair window has expired." };
   }
-  const required = [
-    "drive-gateway/src/signing.mjs",
-    "drive-gateway/src/emailSigningLinks.mjs",
-    "drive-gateway/src/index.js",
-    "src/pages/EmailSigningReadOnlyPage.jsx",
-    "src/pages/SignaturePlatform.jsx",
+  const rollbackMode = amendment.operation === "restore-pre-11-eat-baseline";
+  const required = rollbackMode ? [
+    "drive-gateway/src/signing.mjs", "drive-gateway/src/router.mjs", "drive-gateway/src/index.js",
+    "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
+    "drive-gateway/src/emailSigning/index.mjs", "drive-gateway/tests/email-signing-contract.test.mjs",
+    ".github/workflows/email-signing-contract.yml", "drive-gateway/tests/email-signing-links.integration.test.mjs"
+  ] : [
+    "drive-gateway/src/signing.mjs", "drive-gateway/src/emailSigningLinks.mjs", "drive-gateway/src/index.js",
+    "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
     "drive-gateway/tests/email-signing-contract.test.mjs"
   ];
-  if (!required.every(path => changed.includes(path)) || !changed.some(path => path.startsWith("drive-gateway/src/emailSigning/"))) {
+  if (!required.every(path => changed.includes(path)) ||
+      (!rollbackMode && !changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")))) {
     return { pass: false, reason: "The repair is missing its scoped implementation or end-to-end regression test." };
+  }
+  if (amendment.repairWindow?.rollbackCommit !== window.rollbackCommit) {
+    return { pass: false, reason: "The active Change Record rollback target does not match the verified Signature Portal window baseline." };
   }
   const maintenance = new Set([
     "scripts/meeting-portal-fixture-isolation-guard.sh",

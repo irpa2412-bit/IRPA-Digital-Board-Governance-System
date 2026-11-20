@@ -193,11 +193,11 @@
       "portal": "Signature Portal",
       "status": "open",
       "openedAt": "2026-11-20T17:08:47Z",
-      "lastActivityAt": "2026-11-20T18:10:00Z",
+      "lastActivityAt": "2026-11-20T20:00:00Z",
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
-      "reason": "Owner-authorised full Email Signing rebuild: reusable envelope/signer-bound links, explicit open session, expiry, atomic resend, contract suite and protected cutover.",
-      "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+      "reason": "Owner-authorised restoration of the Email-link E-signature system to its verified production state before 11:00 EAT on 20 Nov 2026. Preserve Meeting Portal functionality and all existing signing records.",
+      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
         "drive-gateway/src/emailSigning/",
         "drive-gateway/src/emailSigningLinks.mjs",
@@ -252,9 +252,14 @@
           "at": "2026-11-20T18:10:00Z",
           "action": "reopened",
           "description": "Reopened to complete the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120. The previous closure record and deployment evidence remain in history; the Meeting Portal window and baseline remain unchanged."
+        },
+        {
+          "at": "2026-11-20T20:00:00Z",
+          "action": "rollback-target-updated",
+          "description": "Owner requested restoration of Email-link E-signature to its pre-11:00 EAT production state. Verified production Worker baseline is eb04405 (09:49:57 EAT); signature source files in 8bfa67 are byte-identical. Preserve Meeting Portal and all existing signing data."
         }
       ],
-      "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; its live production health gate verified the exact deployed target commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+      "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.",
       "rollbackCommitStatus": "verified-production-worker-deploy",
       "closureEvidence": {
         "repairPR": 817,
@@ -269,7 +274,8 @@
         "smokeResult": "PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION",
         "limitation": "Production browser run passed public frontend endpoints, all six viewport widths, all built JavaScript asset HTTP 200 checks, DocumentLifecycleModule SHA-256 against the exact deployed Cloudflare artifact, and no page errors. It detected a signed-out browser and therefore did not exercise the authenticated Documents → Signing workspace."
       },
-      "reopenedAt": "2026-11-20T18:10:00Z"
+      "reopenedAt": "2026-11-20T18:10:00Z",
+      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8"
     }
   ]
 }
