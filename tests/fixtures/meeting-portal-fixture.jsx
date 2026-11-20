@@ -38,7 +38,7 @@ function FixtureApp() {
         <button type="button" onClick={() => { setFixtureActor("outsider"); setActorVersion(v => v + 1); }}>TEST: switch to outsider</button>
         <span data-testid="fixture-actor-version">{actorVersion}</span>
       </div>
-      <MeetingRoom onNavigate={onNavigate}/>
+      <MeetingRoom key={actorVersion} onNavigate={onNavigate}/>
     </> : <Meetings onNavigate={onNavigate}/>}
     {navigation && <output data-testid="fixture-last-navigation" data-module={navigation.module}>{navigation.module}</output>}
   </main>;
