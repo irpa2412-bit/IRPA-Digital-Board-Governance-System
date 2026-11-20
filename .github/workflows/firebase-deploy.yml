@@ -111,7 +111,7 @@ jobs:
 
       - name: Independent production readability verification
         run: npm run verify:production-readability
-
+\n      - name: Upload immutable Firebase production frontend artifact\n        uses: actions/upload-artifact@v4\n        with:\n          name: firebase-frontend-${{ github.sha }}\n          path: dist/\n          if-no-files-found: error\n          retention-days: 14\n
       - name: Bootstrap primary administrator authorization
         if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_data_migration == 'yes'
         env:
