@@ -90,7 +90,10 @@
         "src/firebase/meetingAttendanceSigning.js",
         "src/firebase/meetingRecords.js",
         "drive-gateway/src/meetingPortal.mjs",
-        "drive-gateway/src/meetingServices.mjs"
+        "drive-gateway/src/meetingServices.mjs",
+        "src/utils/meetingTimeEAT.mjs",
+        "src/utils/meetingGovernancePolicy.mjs",
+        "drive-gateway/src/invitationEmail.mjs"
       ],
       "sharedDependencies": [
         "src/App.jsx",
@@ -138,7 +141,10 @@
         ]
       },
       "tests": [
-        "tests/meeting-portal-protection.test.mjs"
+        "tests/meeting-portal-protection.test.mjs",
+        "tests/meeting-time-eat.test.mjs",
+        "tests/meeting-configurable-quorum.test.mjs",
+        "tests/meeting-registration-connectivity.test.mjs"
       ]
     }
   },
