@@ -177,9 +177,14 @@ export function createAdministratorCleanupRouter(deps) {
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
           registerType: collection === "members" ? "Member Register" : collection === "employees" ? "Employee Register" :
             collection === "auditorProfiles" ? "External Profile" : collection === "signatureProfiles" ? "Signature Profile" : collection,
-          role, createdAt: data.createdAt || data.createdDate || data.timestamp || null,
-          status: clean(data.status || data.registrationStatus || data.employmentStatus),
+          role, createdAt: data.createdAt || data.createdDate || data.timestamp || doc.createTime || null,
+          status: clean(data.status || data.registrationStatus || data.employmentStatus) ||
+            (trialData ? "Trial/test" : authUser ? (authUser.disabled ? "Disabled" : "Active") : collection === "invitations" ? "Invited" : ""),
           authAccountPresent: Boolean(authUser),
+          authCreatedAt: authUser?.createdAt || null,
+          authDisplayName: authUser?.displayName || null,
+          authDisabled: authUser?.disabled === true,
+          authEmailVerified: authUser?.emailVerified === true,
           recordOrigin: clean(data.recordOrigin || data.source || ""),
           trialData,
           signedTrialDocument: isSignedTrial,
