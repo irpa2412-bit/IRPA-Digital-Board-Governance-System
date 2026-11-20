@@ -48,7 +48,14 @@ test("standalone Signature Portal email-link workflow remains present and unchan
  assert.ok(signatureWorker.includes("SMTP_CONNECT"));
 });
 
-test("legacy attendance dispatch records and signed quorum reconciliation remain available for existing records",()=>{
+test("new attendance dispatch is disabled while legacy dispatch records and signed quorum reconciliation remain readable",()=>{
+ const dispatchStart=service.indexOf('if(pathname==="/api/meeting-attendance/daily/dispatch"){');
+ const dispatchEnd=service.indexOf('if(pathname==="/api/meeting-attendance/mark"){',dispatchStart);
+ const dispatchRoute=service.slice(dispatchStart,dispatchEnd);
+ assert.ok(dispatchRoute.includes("temporarily disconnected"));
+ assert.ok(dispatchRoute.includes(",410)"));
+ assert.ok(!dispatchRoute.includes("patchDoc("));
+ assert.ok(!dispatchRoute.includes("writeDoc("));
  assert.ok(service.includes("meetingAttendanceDispatches"));
  assert.ok(service.includes("getGatewayEnvelopeStatus"));
  assert.ok(service.includes("auditChainValid===true"));
