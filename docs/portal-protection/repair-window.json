@@ -217,7 +217,8 @@
         "tests/signature-email-link-unification.test.mjs",
         "tests/signature-workflow-policy.test.mjs",
         "drive-gateway/src/invitationEmail.mjs",
-        "drive-gateway/tests/e2e.test.mjs"
+        "drive-gateway/tests/e2e.test.mjs",
+        "scripts/portal-protection-check.mjs"
       ],
       "prohibitions": [
         "secrets",
