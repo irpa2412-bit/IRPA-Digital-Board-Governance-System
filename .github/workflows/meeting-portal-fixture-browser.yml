@@ -3,7 +3,6 @@ name: Meeting Portal Isolated Browser Regression
 # Isolated fixture-only browser checks; no production credentials or live meeting sessions.
 on:
   push:
-    branches: ["**"]
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
