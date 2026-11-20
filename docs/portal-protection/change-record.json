@@ -61,15 +61,22 @@
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Confirmed cause (d): openEmailSigning() consumes the invitation on the first GET, so link previews kill resent links; error messages are masked.",
+    "reason": "Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
     "files": [
-      "drive-gateway/src/signing.mjs",
+      "drive-gateway/src/emailSigning/",
       "drive-gateway/src/emailSigningLinks.mjs",
+      "drive-gateway/src/signing.mjs",
       "drive-gateway/src/index.js",
-      "drive-gateway/src/router.mjs",
       "src/pages/EmailSigningReadOnlyPage.jsx",
-      "drive-gateway/tests/",
-      "tests/"
+      "src/pages/SignaturePlatform.jsx",
+      "drive-gateway/tests/email-signing-contract.test.mjs",
+      "drive-gateway/tests/email-signing-links.test.mjs",
+      "drive-gateway/tests/email-signing-links.integration.test.mjs",
+      "tests/email-signing-contract.test.mjs",
+      ".github/workflows/email-signing-contract.yml",
+      "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "scripts/portal-repair-window-guard-policy.mjs",
+      "tests/meeting-isolation-guard.test.mjs"
     ],
     "repairWindow": {
       "openedAt": "2026-11-20T17:08:47Z",
@@ -81,12 +88,14 @@
     },
     "prohibitedChanges": [
       "Secrets",
-      "SMTP settings",
+      "Environment variables",
+      "SMTP credentials and settings (reuse existing wrapper)",
       "Firestore rules",
-      "Certificate logic",
+      "PDF stamping engine",
       "Hash logic",
+      "Certificate logic",
       "Archive logic"
     ],
-    "ownerInstruction": "Open a separate Signature Portal window; preserve the independent Meeting Portal window."
+    "ownerInstruction": "Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120. Preserve the independent Meeting Portal window and baseline. Do not change secrets, environment variables, SMTP credentials/settings, Firestore rules, PDF stamping engine, hash, certificate, or archive logic."
   }
 }
