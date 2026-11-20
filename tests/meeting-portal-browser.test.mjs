@@ -33,6 +33,7 @@ try {
       await page.locator('input[name="date"]').fill("2027-02-18");
       await page.locator('input[name="startTime"]').fill("10:00");
       await page.locator('input[name="endTime"]').fill("11:00");
+      await page.locator('select[name="meetingPlatform"]').selectOption({ label: "Physical Venue" });
       await page.locator('input[name="venue"]').fill("TEST Longido Meeting Room");
       await page.locator('input[name="chairperson"]').fill("TEST Fixture Chairperson");
       await page.locator('textarea[name="agenda"]').fill("1. Confirm the agenda\n2. Review the work plan");
