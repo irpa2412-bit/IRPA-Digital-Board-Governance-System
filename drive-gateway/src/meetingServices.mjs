@@ -29,54 +29,88 @@ const participantCategory = participant => {
 };
 async function buildQuorumAssessment(ctx,env,token,meeting){
  const meetingId=clean(meeting.id);
- const [participants,passes,queue,signatures]=await Promise.all([
+ const [participants,passes,queue,signatures,memberRecords]=await Promise.all([
   listByField(ctx,env,token,"participants","meetingId",meetingId),
   listByField(ctx,env,token,"meetingAccessTokens","meetingId",meetingId),
   listByField(ctx,env,token,"meetingEntryRequests","meetingId",meetingId),
-  listByField(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId)
+  listByField(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId),
+  listCollection(ctx,env,token,"members")
  ]);
  const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
+ const activeBoardRecords=memberRecords.filter(m=>{
+  const statuses=[m.status,m.employmentStatus,m.registrationStatus].map(lower).filter(Boolean);
+  const activeStatus=statuses.some(v=>["active","activated"].includes(v));
+  const isBoard=m.boardMember===true||lower(m.role)==="board member"||Boolean(clean(m.boardPosition))||clean(m.department)==="Board of Directors";
+  return activeStatus&&isBoard;
+ });
+ const missingRegisterUid=activeBoardRecords.filter(m=>!clean(m.uid||m.authUid||m.userUid)).length;
+ const registerByUid=new Map(),duplicateRegisterUids=new Set();
+ for(const member of activeBoardRecords){
+  const uid=clean(member.uid||member.authUid||member.userUid);
+  if(!uid)continue;
+  if(registerByUid.has(uid)){duplicateRegisterUids.add(uid);continue;}
+  registerByUid.set(uid,{uid,id:clean(member.id),name:clean(member.name||member.fullName||member.memberName||member.displayName)||"Board Member",email:lower(member.email||member.emailAddress||member.contactEmail),memberNumber:clean(member.memberNumber||member.registrationNumber),boardPosition:clean(member.boardPosition)});
+ }
+ const boardMembers=[...registerByUid.values()];
  const signatureByParticipant=new Map(signatures.map(s=>[clean(s.participantId),s]));
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
  for(const p of passes){const key=clean(p.participantId);if(key){const previous=passByParticipant.get(key);if(!previous||new Date(p.createdAt||0)>new Date(previous.createdAt||0))passByParticipant.set(key,p);}}
+ const uidOf=p=>clean(p.participantUid||p.uid||p.userId);
  const rows=active.map(p=>{
   const id=clean(p.id),signature=signatureByParticipant.get(id),entry=queueByParticipant.get(id),pass=passByParticipant.get(id);
-  const category=participantCategory(p);
-  const attendanceStatus=clean(p.attendanceStatus||p.status)||"Unmarked";
-  const signed=Boolean(signature&&signature.signatureMethod&&signature.signedAt);
+  const uid=uidOf(p),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
+  const explicitCommittee=lower(p.participantRole||p.role)==="board committee member"||lower(p.participantType).includes("board committee");
+  const category=explicitCommittee?"BOARD_COMMITTEE_MEMBER":registerMatch?"BOARD_MEMBER":boardMemberRole(p)?"UNMATCHED_BOARD_REGISTRATION":participantCategory(p);
+  const attendanceStatus=clean(p.attendanceStatus)||"Unmarked";
+  const signed=Boolean(signature&&clean(signature.signatureMethod)&&signature.signedAt);
   const invitationDispatched=p.meetingAccessDispatched===true||["sent","accepted","confirmed","dispatched"].includes(lower(p.meetingAccessDispatchStatus));
   const accessPassStatus=clean(pass?.status)||"Not issued";
   const queueStatus=clean(entry?.status)||"Not queued";
   const present=lower(attendanceStatus)==="present"&&signed;
-  return {participantId:id,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,accessPassStatus,accessPassExpiresAt:iso(pass?.expiresAt),invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
+  return {participantId:id,participantUid:uid||null,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,meetingParticipantRegistered:true,invitationDispatched,accessPassStatus,accessPassExpiresAt:iso(pass?.expiresAt),invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
  });
- const participantById=new Map(active.map(p=>[clean(p.id),p]));
- const seenBoardIdentities=new Set(),boardRows=[];
- for(const row of rows.filter(r=>r.registrationCategory==="BOARD_MEMBER")){
-  const participant=participantById.get(row.participantId)||{};
-  const identity=clean(participant.boardMemberId||(lower(participant.sourceType)==="board member register"?participant.sourceRecordId:"")||participant.participantUid||participant.uid||participant.userId||lower(participant.participantEmail||participant.email)||participant.id);
-  if(seenBoardIdentities.has(identity)){row.duplicateBoardMemberRegistration=true;row.countsTowardQuorum=false;}
-  else{seenBoardIdentities.add(identity);boardRows.push(row);}
+ const boardRows=[];
+ for(const member of boardMembers){
+  const matches=rows.filter(row=>row.registrationCategory==="BOARD_MEMBER"&&row.participantUid===member.uid);
+  if(matches.length===1){
+   const row=matches[0];
+   row.boardRegisterUid=member.uid;
+   row.boardRegisterRecordId=member.id;
+   row.boardMemberName=member.name;
+   row.countsTowardQuorum=lower(row.attendanceStatus)==="present"&&row.signed;
+   boardRows.push(row);
+  }else{
+   for(const row of matches){row.duplicateBoardMemberRegistration=true;row.countsTowardQuorum=false;}
+   const row={participantId:null,participantUid:member.uid,boardRegisterUid:member.uid,boardRegisterRecordId:member.id,name:member.name,role:member.boardPosition||"Board Member",registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false,invitationDispatched:false,invitationStatus:"Not registered for this meeting",accessPassStatus:"Not issued",queueStatus:"Not queued",attendanceStatus:"Unmarked",signed:false,signedAt:null,countsTowardQuorum:false,...(matches.length>1?{duplicateBoardMemberRegistration:true,duplicateParticipantCount:matches.length}:{})};
+   boardRows.push(row);
+  }
  }
- const boardPresent=boardRows.filter(r=>r.countsTowardQuorum).length;
+ const registeredBoardRows=rows.filter(r=>r.registrationCategory==="BOARD_MEMBER");
+ const unmatchedBoardRows=rows.filter(r=>r.registrationCategory==="UNMATCHED_BOARD_REGISTRATION");
+ const boardPresent=boardRows.filter(r=>r.meetingParticipantRegistered&&r.countsTowardQuorum&&!r.duplicateBoardMemberRegistration).length;
  const boardMeeting=isBoardMeeting(meeting);
- const required=boardMeeting?(boardRows.length?Math.ceil(boardRows.length/3):null):0;
+ const denominator=boardMembers.length;
+ const required=boardMeeting?(denominator?Math.ceil(denominator/3):null):0;
  const quorumMet=boardMeeting?Boolean(required&&boardPresent>=required):false;
+ const displayRows=[...rows,...boardRows.filter(r=>!r.meetingParticipantRegistered)];
  const counts={
-  registered:rows.length,boardMembers:boardRows.length,boardCommitteeMembers:rows.filter(r=>r.registrationCategory==="BOARD_COMMITTEE_MEMBER").length,
+  registered:rows.length,boardRegisterMembers:denominator,boardMembers:denominator,registeredBoardMembers:boardRows.filter(r=>r.meetingParticipantRegistered).length,
+  boardMembersNotRegistered:boardRows.filter(r=>!r.meetingParticipantRegistered).length,boardRegisterRecordsMissingUid:missingRegisterUid,
+  duplicateBoardRegisterUids:duplicateRegisterUids.size,unmatchedBoardRegistrations:unmatchedBoardRows.length,
+  duplicateBoardMemberRegistrations:rows.filter(r=>r.duplicateBoardMemberRegistration).length+boardRows.filter(r=>r.duplicateParticipantCount).length,
+  boardCommitteeMembers:rows.filter(r=>r.registrationCategory==="BOARD_COMMITTEE_MEMBER").length,
   management:rows.filter(r=>r.registrationCategory==="MANAGEMENT").length,staff:rows.filter(r=>r.registrationCategory==="STAFF").length,
   irpaMembers:rows.filter(r=>r.registrationCategory==="IRPA_MEMBER").length,externalInvitees:rows.filter(r=>r.registrationCategory==="EXTERNAL_INVITEE").length,
-  other:rows.filter(r=>r.registrationCategory==="OTHER").length,duplicateBoardMemberRegistrations:rows.filter(r=>r.duplicateBoardMemberRegistration).length,
-  invitationsDispatched:rows.filter(r=>r.invitationDispatched).length,activeAccessPasses:rows.filter(r=>lower(r.accessPassStatus)==="active").length,
-  queued:rows.filter(r=>lower(r.queueStatus)==="pending").length,
-  admitted:rows.filter(r=>lower(r.queueStatus)==="admitted").length,
-  signedAttendance:rows.filter(r=>r.signed).length,
-  present:rows.filter(r=>lower(r.attendanceStatus)==="present").length,
+  other:rows.filter(r=>r.registrationCategory==="OTHER").length,
+  invitationsDispatched:displayRows.filter(r=>r.invitationDispatched).length,activeAccessPasses:displayRows.filter(r=>lower(r.accessPassStatus)==="active").length,
+  queued:displayRows.filter(r=>lower(r.queueStatus)==="pending").length,admitted:displayRows.filter(r=>lower(r.queueStatus)==="admitted").length,
+  signedAttendance:displayRows.filter(r=>r.signed).length,present:displayRows.filter(r=>lower(r.attendanceStatus)==="present").length,
   boardMembersPresent:boardPresent
  };
- return {meetingId,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?"One-third of registered Board members (rounded up)":"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!required?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",counts,rows,assessedAt:new Date().toISOString(),sources:{participants:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:"meetingAttendanceSignatures"}};
+ const registerUsable=denominator>0;
+ return {meetingId,meetingCategory:clean(meeting.meetingCategory||meeting.category||meeting.meetingType),meetingType:clean(meeting.meetingType||meeting.title),boardMeeting,rule:boardMeeting?"One-third of the active UID-verified Board Members Register (rounded up)":"No Board quorum requirement",required,present:boardPresent,quorumMet,status:!boardMeeting?"NOT_REQUIRED":!registerUsable?"NOT_ASSESSABLE":quorumMet?"MET":"NOT_MET",counts,rows:displayRows,assessedAt:new Date().toISOString(),sources:{boardRegister:"active members collection; UID-only; deduplicated by UID",participantRegistration:"participants",invitations:"meetingAccessTokens + participant dispatch status",entryQueue:"meetingEntryRequests",attendance:"meetingAttendanceSignatures"},reconciliation:{boardRegisterMembers:denominator,meetingParticipantRegistrations:registeredBoardRows.length,boardMembersNotRegistered:counts.boardMembersNotRegistered,unmatchedBoardRegistrations:unmatchedBoardRows.length,missingRegisterUid,duplicateRegisterUids:[...duplicateRegisterUids]}};
 };
 const recordLabel = type => ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",MEETING_REPORT:"Compiled Meeting Report",OTHER:"Other Meeting Record"})[type]||"Meeting Record";
 function toFs(v) { if(v===null||v===undefined)return {nullValue:null}; if(v instanceof Date)return {timestampValue:v.toISOString()}; if(typeof v==="boolean")return {booleanValue:v}; if(typeof v==="number")return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v}; if(Array.isArray(v))return {arrayValue:{values:v.map(toFs)}}; if(typeof v==="object")return {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,toFs(x)]))}}; return {stringValue:String(v)}; }
@@ -88,6 +122,7 @@ function response(ctx,request,payload,status=200){return ctx.json(payload,status
 function fail(ctx,request,error,status=400){return response(ctx,request,{ok:false,error},status);}
 async function requestFs(ctx,env,token,path,init={}) { const suffix=path.startsWith(":")?`/documents${path}`:`/documents/${path}`; const url=`https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)${suffix}`; const r=await fetch(url,{...init,headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json",...(init.headers||{})}}); const data=await r.json().catch(()=>({})); if(!r.ok){const e=new Error(`Firestore request failed (${r.status}).`);e.status=r.status;throw e;} return data; }
 async function getDoc(ctx,env,token,col,id){try{return plain(await requestFs(ctx,env,token,`${col}/${encodeURIComponent(id)}`));}catch(e){if(e.status===404)return null;throw e;}}
+async function listCollection(ctx,env,token,col){const r=await requestFs(ctx,env,token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:col}]}})});return (Array.isArray(r)?r:[]).filter(x=>x.document).map(x=>plain(x.document));}
 async function listByField(ctx,env,token,col,field,value){const r=await requestFs(ctx,env,token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:col}],where:{fieldFilter:{field:{fieldPath:field},op:"EQUAL",value:toFs(value)}}}})});return (Array.isArray(r)?r:[]).filter(x=>x.document).map(x=>plain(x.document));}
 async function writeDoc(ctx,env,token,col,id,data,merge=true){const query=id?`?documentId=${encodeURIComponent(id)}`:"";const url=`https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/${col}${query}`;const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({fields:fields(data)})});const b=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(`Firestore create failed (${r.status}).`);e.status=r.status;throw e;}return plain(b);}
 async function commitWrites(ctx,env,token,writes){const url=`https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents:commit`;const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({writes})});const b=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(`Firestore atomic commit failed (${r.status}).`);e.status=r.status;throw e;}return b;}
@@ -137,7 +172,41 @@ export function createR2RecordingOutput(env, filepath, meeting = {}) {
   };
 }
 async function liveKitRequest(env,endpoint,body,method="POST"){const host=clean(env.LIVEKIT_URL).replace(/^wss:/i,"https:").replace(/^ws:/i,"http:").replace(/\/$/,""),key=clean(env.LIVEKIT_API_KEY),secret=clean(env.LIVEKIT_API_SECRET);if(!host||!key||!secret)throw Object.assign(new Error("Live meeting infrastructure is not configured in Cloudflare secrets."),{status:503});const now=Math.floor(Date.now()/1000),auth=await signedJwt(key,secret,{iss:key,sub:key,nbf:now-5,exp:now+60,video:{roomRecord:true,roomAdmin:true,roomCreate:true}});const r=await fetch(host+endpoint,{method,headers:{Authorization:"Bearer "+auth,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});const result=await r.json().catch(()=>({}));if(!r.ok){const e=new Error("LiveKit request failed ("+r.status+").");e.status=r.status;throw e;}return result;}
-export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/sign","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-quorum/assess","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/sign","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+if(pathname==="/api/meeting-invitee-directory/list"){
+ const [memberRecords,employeeRecords]=await Promise.all([listCollection(ctx,env,token,"members"),listCollection(ctx,env,token,"employees")]);
+ const activeRecord=row=>[row.status,row.employmentStatus,row.registrationStatus].map(lower).some(v=>["active","activated"].includes(v));
+ const isBoard=row=>row.boardMember===true||lower(row.role)==="board member"||Boolean(clean(row.boardPosition))||clean(row.department)==="Board of Directors";
+ const project=(row,kind)=>({id:clean(row.id),uid:clean(row.uid||row.authUid||row.userUid),name:clean(row.name||row.fullName||row.memberName||row.employeeName||row.displayName),email:lower(row.email||row.emailAddress||row.contactEmail),memberNumber:clean(row.memberNumber||row.registrationNumber),employeeNumber:clean(row.employeeNumber),role:clean(row.role||kind),roles:Array.isArray(row.roles)?row.roles:[],memberType:clean(row.memberType||row.employeeType||kind),department:clean(row.department),status:clean(row.status||row.employmentStatus||row.registrationStatus),boardMember:row.boardMember===true,boardPosition:clean(row.boardPosition),title:clean(row.title),position:clean(row.position),departmentalRole:clean(row.departmentalRole)});
+ const activeMembers=memberRecords.filter(activeRecord),activeEmployees=employeeRecords.filter(activeRecord);
+ const boardByUid=new Map(),duplicateUids=new Set();let missingUid=0;
+ for(const row of activeMembers.filter(isBoard)){
+  const uid=clean(row.uid||row.authUid||row.userUid);
+  if(!uid){missingUid++;continue;}
+  if(boardByUid.has(uid)){duplicateUids.add(uid);continue;}
+  boardByUid.set(uid,{...project(row,"Member"),uid});
+ }
+ const members=activeMembers.filter(row=>!isBoard(row)).map(row=>project(row,"Member"));
+ const employees=activeEmployees.map(row=>project(row,"Employee"));
+ return response(ctx,request,{ok:true,boardMembers:[...boardByUid.values()],members,employees,source:"ACTIVE_REGISTERS_BOARD_UID_ONLY",counts:{boardMembers:boardByUid.size,members:members.length,employees:employees.length,boardRecordsMissingUid:missingUid,duplicateBoardUids:duplicateUids.size},duplicateBoardUids:[...duplicateUids]});
+}
+if(pathname==="/api/meeting-board-register/list"){
+ const records=await listCollection(ctx,env,token,"members");
+ const active=records.filter(m=>{
+  const statuses=[m.status,m.employmentStatus,m.registrationStatus].map(lower).filter(Boolean);
+  const isActive=statuses.some(v=>["active","activated"].includes(v));
+  const isBoard=m.boardMember===true||lower(m.role)==="board member"||Boolean(clean(m.boardPosition))||clean(m.department)==="Board of Directors";
+  return isActive&&isBoard;
+ });
+ const byUid=new Map(),duplicateUids=new Set();let missingUid=0;
+ for(const member of active){
+  const uid=clean(member.uid||member.authUid||member.userUid);
+  if(!uid){missingUid++;continue;}
+  if(byUid.has(uid)){duplicateUids.add(uid);continue;}
+  byUid.set(uid,{id:clean(member.id),uid,name:clean(member.name||member.fullName||member.memberName||member.displayName)||"Board Member",email:lower(member.email||member.emailAddress||member.contactEmail),memberNumber:clean(member.memberNumber||member.registrationNumber),role:clean(member.role),boardPosition:clean(member.boardPosition),department:clean(member.department),status:"Active"});
+ }
+ return response(ctx,request,{ok:true,boardMembers:[...byUid.values()],source:"ACTIVE_BOARD_MEMBERS_REGISTER_UID_ONLY",counts:{activeBoardRegisterRecords:active.length,eligibleUniqueUids:byUid.size,missingUid,duplicateUids:duplicateUids.size},duplicateUids:[...duplicateUids]});
+}
 if(pathname==="/api/meeting-quorum/assess"){
  const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
  const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
