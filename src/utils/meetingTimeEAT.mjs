@@ -23,7 +23,7 @@ export function formatMeetingDateTimeEAT(value){
  return new Intl.DateTimeFormat("en-GB",{timeZone:EAT_TIME_ZONE,dateStyle:"medium",timeStyle:"short"}).format(date)+" EAT";
 }
 export function meetingSchedulePayload({date,startTime,endTime,...meeting}={}){
- const startAt=meetingDateTimeToIso(date,startTime),endAt=meetingDateTimeToIso(date,endTime);
- if(new Date(endAt)<=new Date(startAt))throw new Error("Meeting end time must be later than its start time in EAT.");
+ const startAt=meetingDateTimeToIso(date,startTime),endAt=endTime?meetingDateTimeToIso(date,endTime):null;
+ if(endAt&&new Date(endAt)<=new Date(startAt))throw new Error("Meeting end time must be later than its start time in EAT.");
  return {...meeting,date,startTime,endTime,startAt,endAt,timeZone:EAT_TIME_ZONE};
 }
