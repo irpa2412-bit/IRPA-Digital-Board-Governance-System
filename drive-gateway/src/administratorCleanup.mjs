@@ -399,10 +399,14 @@ export function createAdministratorCleanupRouter(deps) {
         if (!fileId) { blockers.push(row.key + ": signed trial PDF reference is missing"); continue; }
         const envelopeData = dataOf(row);
         const envelopeDocumentId = clean(envelopeData.documentId);
-        const portalRows = (row.linkedRecordKeys || []).map(key => byKey.get(key)).filter(candidate =>
-          candidate && (candidate.collection === "signatures" ||
-            (["documents","controlledDocuments"].includes(candidate.collection) &&
-              (candidate.id === envelopeDocumentId || candidate.trialData || isTrialRecord(dataOf(candidate))))));
+        const portalRows = (row.linkedRecordKeys || []).map(key => byKey.get(key)).filter(candidate => {
+          if (!candidate) return false;
+          if (candidate.collection === "signatures") return true;
+          if (!["documents","controlledDocuments"].includes(candidate.collection)) return false;
+          const candidateData = dataOf(candidate);
+          const linkedEnvelope = clean(candidateData.signatureEnvelopeId || candidateData.envelopeId || candidateData.gatewayEnvelopeId) === row.id;
+          return candidate.id === envelopeDocumentId || linkedEnvelope || candidate.trialData || isTrialRecord(candidateData);
+        });
         if (!portalRows.length) { blockers.push(row.key + ": associated trial-document portal record was not found"); continue; }
         add({type:"drive-delete",key:row.key,fileId,reason:"Delete explicitly selected signed trial PDF"});
         add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Delete explicitly selected signed trial envelope"});
