@@ -161,7 +161,7 @@ export function createAdministratorCleanupRouter(deps) {
         const immutableHistory = collection === "audit" || collection === "signatureEvents";
         const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory;
         records.push({
-          key: collection + "/" + id, collection, id, uid: uid || null,
+          key: collection + "/" + id, collection, id, version: clean(doc.updateTime || doc.createTime), uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
           registerType: collection === "members" ? "Member Register" : collection === "employees" ? "Employee Register" :
             collection === "auditorProfiles" ? "External Profile" : collection === "signatureProfiles" ? "Signature Profile" : collection,
@@ -194,7 +194,11 @@ export function createAdministratorCleanupRouter(deps) {
         const inventoryId = crypto.randomUUID();
         const snapshot = { inventoryId, createdAt: new Date().toISOString(), administratorUid: auth.uid,
           administratorEmail: auth.email, records, status: "INVENTORY_READY", mandatoryBeforeReset: true };
-        await env.DRIVE_KV.put("admin-cleanup:inventory:" + inventoryId, JSON.stringify(snapshot), { expirationTtl: TTL_SECONDS });
+        const serializedSnapshot = JSON.stringify(snapshot);
+        if (new TextEncoder().encode(serializedSnapshot).byteLength > 20 * 1024 * 1024) {
+          return json({ok:false,code:"INVENTORY_TOO_LARGE",error:"The complete inventory exceeds the safe single-snapshot storage limit. No cleanup plan was created; inventory must be safely partitioned before proceeding."},413,corsHeaders(request));
+        }
+        await env.DRIVE_KV.put("admin-cleanup:inventory:" + inventoryId, serializedSnapshot, { expirationTtl: TTL_SECONDS });
         return json({ ok: true, ...snapshot, summary: { total: records.length, stays: records.length, goes: 0,
           protected: records.filter(row => row.protected).length } }, 200, corsHeaders(request));
       }
@@ -207,6 +211,13 @@ export function createAdministratorCleanupRouter(deps) {
         const inventory = JSON.parse(raw);
         if (inventory.administratorUid !== auth.uid) return json({ok:false,error:"Inventory belongs to a different administrator session."},403,corsHeaders(request));
         const selections = Array.isArray(body.selections) ? body.selections : [];
+        const selectionKeys = selections.map(item => clean(item?.key));
+        if (selectionKeys.some(key => !key) || new Set(selectionKeys).size !== selectionKeys.length) {
+          return json({ok:false,error:"Every inventory row may be selected only once; duplicate or empty selection keys are rejected."},400,corsHeaders(request));
+        }
+        if (selections.some(item => !["STAYS","GOES"].includes(clean(item?.decision).toUpperCase()))) {
+          return json({ok:false,error:"Each selected record must have an explicit STAYS or GOES decision."},400,corsHeaders(request));
+        }
         const byKey = new Map(selections.map(item => [clean(item.key), clean(item.decision).toUpperCase()]));
         const records = inventory.records.map(row => {
           const requested = byKey.get(row.key);
