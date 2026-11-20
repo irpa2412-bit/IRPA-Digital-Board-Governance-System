@@ -27,6 +27,11 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/listByField\(ctx,env,token,"meetingAccessTokens","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingEntryRequests","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId\)/);
+  assert.match(service,/listByField\(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId\)/);
+  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId\)/);
+  assert.match(service,/getGatewayEnvelopeStatus/);
+  assert.match(service,/auditChainValid===true/);
+  assert.match(service,/dailySignerByUid/);
   assert.match(service,/Math\.ceil\(denominator\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
@@ -63,7 +68,9 @@ test("Meeting Room presents dispatch, queue and signed-attendance reconciliation
   assert.match(room,/Entry Queue/);
   assert.match(room,/Signed Attendance/);
   assert.match(room,/quorumAssessment\.rows\.map/);
-  assert.match(room,/assessMeetingQuorum\(\{meetingId:selected\.id,save\}\)/);
+  assert.match(room,/assessMeetingQuorum\(\{meetingId:selected\.id,save,date:dailyAttendanceDate\}\)/);
+  assert.match(room,/Dispatch Signing Requests/);
+  assert.match(room,/N\/A — Not Attended/);
 });
 
 test("Board Register is the authoritative UID-only quorum denominator",()=>{

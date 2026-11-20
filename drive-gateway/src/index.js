@@ -40,6 +40,7 @@ import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { createReleaseReadinessRoute } from "./releaseReadinessRoutes.mjs";
 import { createEmergencyStorageDiscoveryRoute } from "./emergencyStorageDiscovery.mjs";
 import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
+import { getEnvelopeStatus as getGatewayEnvelopeStatus } from "./signing.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
 import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summarizeIdentityReconciliation } from "./registeredIdentityReconciliation.mjs";
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
@@ -104,6 +105,10 @@ const meetingServicesRouter = createMeetingServicesRouter({
   getFirebaseProjectId,
   getFirestoreAdminAccessToken,
   sendEmail: (env, message) => smtpSend(env, message),
+  getGatewayEnvelopeStatus: async (ownerUid, env, envelopeId) => {
+    const esignContext=buildEsignContext({env,verifyUser:async()=>null,sendInvitation:async()=>{},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
+    return getGatewayEnvelopeStatus(esignContext,{uid:String(ownerUid||""),isAdmin:false},envelopeId);
+  },
   json,
   corsHeaders
 });

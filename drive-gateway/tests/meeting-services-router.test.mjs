@@ -57,9 +57,11 @@ test("meeting register, decision, and voting control routes require authenticate
     "/api/meeting-subscriptions/mine",
     "/api/meeting-entry-requests/list",
     "/api/meeting-entry-requests/resolve",
-    "/api/meeting-attendance/sign",
     "/api/meeting-attendance/register",
     "/api/meeting-attendance/mark",
+    "/api/meeting-attendance/daily/register",
+    "/api/meeting-attendance/daily/mark",
+    "/api/meeting-attendance/daily/dispatch",
     "/api/meeting-working-documents/register",
     "/api/meeting-working-documents/list",
     "/api/meeting-working-documents/review"
@@ -68,4 +70,8 @@ test("meeting register, decision, and voting control routes require authenticate
     assert.equal(response.status, 401, path);
     assert.match((await response.json()).error, /sign-in/i, path);
   }
+});
+
+test("direct attendance signature endpoint is retired in favour of Signature Portal email-link envelopes", async () => {
+  assert.equal(await post(createMeetingServicesRouter(ctx), "/api/meeting-attendance/sign", { meetingId: "test-meeting" }), null);
 });
