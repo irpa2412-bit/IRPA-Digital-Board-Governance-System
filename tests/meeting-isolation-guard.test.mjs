@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
+const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 
 test("isolation baseline compares against the fetched current main snapshot", () => {
   assert.match(guard, /git fetch origin main:refs\/remotes\/origin\/main/);
@@ -318,4 +319,14 @@ test("active Signature Portal repair guard blocks changes to another portal's wi
   const fixture = signatureRepairFixture();
   fixture.currentChangeRecord.repairWindow.status = "closed";
   assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
+});
+
+
+test("email-signing rebuild is explicitly protected by the active Signature Portal window", () => {
+  assert.ok(guard.includes("const emailSigningRebuildIntegration ="));
+  assert.ok(guard.includes('path.startsWith("drive-gateway/src/emailSigning/")'));
+  assert.ok(guard.includes('"src/pages/SignaturePlatform.jsx"'));
+  assert.ok(guard.includes("email-signing-contract.test.mjs"));
+  assert.ok(policy.includes('path.startsWith("drive-gateway/src/emailSigning/")'));
+  assert.ok(policy.includes('"src/pages/SignaturePlatform.jsx"'));
 });
