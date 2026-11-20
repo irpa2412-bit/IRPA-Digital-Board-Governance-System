@@ -42,6 +42,8 @@ test("daily PDF places signature fields in the final column only for Present par
  assert.match(helper,/GOVERNANCE_FIELD_TYPES/);
  assert.match(helper,/Email address/);
  assert.match(helper,/Occupation \/ position/);
+ assert.match(helper,/clean\(row\.department\)/);
+ assert.match(helper,/clean\(row\.institution\)/);
  assert.match(helper,/roleAssignmentIndex:0/);
  assert.match(helper,/roleAssignments:\[\{role,title,capacity,occupation\}\]/);
  assert.match(helper,/ownerSigningEnabled/);
