@@ -284,7 +284,7 @@ const [participants,memberRecords,dailyRows,dispatchRows]=await Promise.all([
  listByField(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId)
 ]);
 const boardUids=new Set(memberRecords.filter(m=>{
- const active=["active","activated"].includes(lower(m.status||m.registrationStatus));
+ const active=[m.status,m.employmentStatus,m.registrationStatus].map(lower).some(value=>["active","activated"].includes(value));
  const isBoard=m.boardMember===true||lower(m.role)==="board member"||Boolean(clean(m.boardPosition))||clean(m.department)==="Board of Directors";
  return active&&isBoard;
 }).map(m=>clean(m.uid||m.authUid||m.userUid)).filter(Boolean));
@@ -301,7 +301,7 @@ const rows=active.map(p=>{
 const registeredBoardUids=new Set(rows.filter(r=>r.registrationCategory==="BOARD_MEMBER"&&r.participantUid).map(r=>r.participantUid));
 const representedBoardUids=new Set();
 for(const member of memberRecords){
- const activeMember=["active","activated"].includes(lower(member.status||member.registrationStatus));
+ const activeMember=[member.status,member.employmentStatus,member.registrationStatus].map(lower).some(value=>["active","activated"].includes(value));
  const isBoard=member.boardMember===true||lower(member.role)==="board member"||Boolean(clean(member.boardPosition))||clean(member.department)==="Board of Directors";
  const memberUid=clean(member.uid||member.authUid||member.userUid);
  if(!activeMember||!isBoard||!memberUid||registeredBoardUids.has(memberUid)||representedBoardUids.has(memberUid))continue;
