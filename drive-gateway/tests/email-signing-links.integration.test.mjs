@@ -178,6 +178,26 @@ test("email link remains valid after opening without signing and reopens from th
   assert.equal(reopenedEnvelope.signers[0].emailLinkOpenCount,2);
 });
 
+test("a previously opened but unsigned legacy invitation remains reusable from its original email URL",async()=>{
+  const f=await fixture();
+  const originalHash=await sha256Hex(f.token.split(".")[2]);
+  const legacySessionSecret="b".repeat(64);
+  const legacySessionHash=await sha256Hex(legacySessionSecret);
+  const legacy=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  legacy.signers[0].tokenHash=legacySessionHash;
+  legacy.signers[0].emailLinkStatus="opened";
+  legacy.signers[0].emailLinkTokenHistory=[{tokenHash:originalHash,status:"used",usedAt:"2026-11-16T08:00:00.000Z"}];
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:legacy.signers});
+  f.now(new Date("2027-11-16T08:00:00.000Z"));
+  const reopened=await openEmailSigning(f.ctx,f.token,"198.51.100.20");
+  assert.equal(reopened.ok,true,"a previously opened invitation must remain usable when its signer has not signed");
+  assert.equal(reopened.sessionToken,f.token);
+  const saved=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(saved.signers[0].tokenHash,legacySessionHash,"the existing session hash is not rewritten");
+  assert.equal(saved.signers[0].emailLinkTokenHistory[0].status,"used");
+  assert.equal((await getSigningPdf(f.ctx,f.token,null)).fileName,"email-link.pdf");
+});
+
 test("tampered and unknown links return the same neutral response",async()=>{
   const f=await fixture();
   const wrong=f.token.slice(0,-1)+(f.token.endsWith("0")?"1":"0");
