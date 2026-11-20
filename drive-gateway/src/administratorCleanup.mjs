@@ -612,8 +612,12 @@ export function createAdministratorCleanupRouter(deps) {
       return "DELETED";
     }
     if (operation.type === "auth-delete") {
-      const currentUsers = await listFirebaseAuthUsers(env,authToken);
-      const currentAccount = currentUsers.find(user=>clean(user.localId || user.uid)===operation.uid);
+      const lookupUrl = "https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/accounts:lookup";
+      const lookupResponse = await fetchImpl(lookupUrl,{method:"POST",headers:{Authorization:"Bearer "+authToken,"Content-Type":"application/json"},body:JSON.stringify({localId:[operation.uid]})});
+      const lookupBody = await lookupResponse.json().catch(()=>({}));
+      if (lookupResponse.status === 404 || /USER_NOT_FOUND|NOT_FOUND/i.test(String(lookupBody.error?.message||""))) return "ALREADY_DELETED";
+      if (!lookupResponse.ok) throw new Error("Firebase Auth account could not be revalidated immediately before deletion (HTTP " + lookupResponse.status + ").");
+      const currentAccount = (lookupBody.users||[]).find(user=>clean(user.localId || user.uid)===operation.uid);
       if (!currentAccount) return "ALREADY_DELETED";
       if (operation.email && clean(currentAccount.email).toLowerCase()!==operation.email) throw new Error("Firebase Auth UID/email binding changed immediately before deletion.");
       const url = "https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(projectIdFor(env))+"/accounts:delete";
