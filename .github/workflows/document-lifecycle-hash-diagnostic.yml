@@ -17,12 +17,12 @@ jobs:
       - name: Checkout exact release commit into build one
         uses: actions/checkout@v4
         with:
-          ref: 17bba848
+          ref: 17bba84842e2eff1f671e1bc9344c94828bb07ef
           path: build-one
       - name: Checkout exact release commit into build two
         uses: actions/checkout@v4
         with:
-          ref: 17bba848
+          ref: 17bba84842e2eff1f671e1bc9344c94828bb07ef
           path: build-two
       - name: Set up Node
         uses: actions/setup-node@v4
