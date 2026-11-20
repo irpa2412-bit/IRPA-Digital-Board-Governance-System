@@ -6,6 +6,7 @@ const service=readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
 const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const helper=readFileSync("src/firebase/meetingAttendanceSigning.js","utf8");
 const records=readFileSync("src/firebase/meetingRecords.js","utf8");
+const index=readFileSync("drive-gateway/src/index.js","utf8");
 
 test("Meeting Portal compiles daily categorical attendance and defaults missing attendance to N/A",()=>{
  assert.match(room,/getDailyMeetingAttendance/);
@@ -34,6 +35,8 @@ test("daily PDF places signature fields in the final column only for Present par
  assert.match(helper,/status==="Present"/);
  assert.match(helper,/type:"Signature"/);
  assert.match(helper,/signerUid:uid/);
+ assert.match(helper,/gatewaySignerMap/);
+ assert.match(service,/gatewaySignerMap/);
  assert.match(helper,/attendanceStatus/);
 });
 
@@ -55,6 +58,8 @@ test("daily Board quorum uses signed Signature Portal envelope recipients rather
  assert.match(service,/meetingAttendanceDispatches/);
  assert.match(service,/getGatewayEnvelopeStatus/);
  assert.match(service,/auditChainValid===true/);
+ assert.match(index,/getEnvelopeStatus as getGatewayEnvelopeStatus/);
+ assert.match(index,/getGatewayEnvelopeStatus: async \(ownerUid/);
  assert.match(service,/dailySignerByUid/);
  assert.match(service,/Math\.ceil\(denominator\/3\)/);
  assert.match(records,/\/api\/meeting-attendance\/daily\/dispatch/);
