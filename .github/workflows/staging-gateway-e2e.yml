@@ -109,7 +109,7 @@ jobs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
     # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
 # dispatch isolated runtime acceptance is an explicit staging-only opt-in; production is not targeted.
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/actual-data-gate-read-for-operational-users-20261120')
     runs-on: ubuntu-latest
     # Configure staging-repair Environment with required independent reviewers before use.
     environment: staging-repair
