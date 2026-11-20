@@ -503,12 +503,16 @@ export function createAdministratorCleanupRouter(deps) {
       schemaVersion:1,createdAt:new Date().toISOString(),planId:plan.planId,inventoryId:plan.inventoryId,
       administrator:{uid:auth.uid,email:auth.email},scope:{collections:COLLECTIONS,selected:plan.records.filter(row=>row.decision==="GOES").map(row=>row.key)},
       records:inventory.records.map(row=>({key:row.key,collection:row.collection,id:row.id,version:row.version,
+        name:row.name,email:row.email,authEmail:row.authEmail,role:row.role,registerType:row.registerType,
+        createdAt:row.createdAt,status:row.status,sourceStatus:row.sourceStatus,recordOrigin:row.recordOrigin,
+        trialData:row.trialData,signedTrialDocument:row.signedTrialDocument,signedPdfReference:row.signedPdfReference,
+        authAccountPresent:row.authAccountPresent,authDisabled:row.authDisabled,authEmailVerified:row.authEmailVerified,
         decision:plan.records.find(item=>item.key===row.key)?.decision || "STAYS",
         decisionSource:plan.records.find(item=>item.key===row.key)?.decisionSource || "DEFAULT",
         protected:row.protected,protectionReason:row.protectionReason,linkedRecordKeys:row.linkedRecordKeys,
-        document:scrubBackup(row.sourceDocument),authAccount:scrubBackup(row.sourceAuthUser)})),
+        dependencyCount:row.dependencyCount,document:scrubBackup(row.sourceDocument),authAccount:scrubBackup(row.sourceAuthUser)})),
       operations:plan.executionOperations,operationOutcomes:plan.operationOutcomes || [],
-      auditRefs:inventory.records.filter(row=>["audit","signatureEvents","adminCleanupAudit"].includes(row.collection)).map(row=>row.key),
+      auditRefs:plan.auditRefs || [],
       driveFileCopies
     };
     const archiveText = JSON.stringify(archive);
@@ -712,7 +716,7 @@ export function createAdministratorCleanupRouter(deps) {
         const planId = crypto.randomUUID();
         const plan = { planId, inventoryId, createdAt: new Date().toISOString(), administratorUid: auth.uid,
           administratorEmail: auth.email, records:built.records, executionOperations:built.operations, operationOutcomes:[],
-          auditRefs:[], backupDriveFileId:null, backupUrl:null, typedConfirmationRequired: "DELETE", status: "AWAITING_REVIEW",
+          auditRefs:inventory.records.filter(row=>["audit","signatureEvents","adminCleanupAudit","communicationOperationsAudit","grantCrawlerRuns"].includes(row.collection)).map(row=>row.key), backupDriveFileId:null, backupUrl:null, typedConfirmationRequired: "DELETE", status: "AWAITING_REVIEW",
           mandatoryInventoryComplete: true, backupRequiredBeforeExecution:true, batchSize:10 };
         const auditRef = await writeAuditEvent(env,auth.token,{eventType:"PLAN_PREPARED",planId,inventoryId,actorUid:auth.uid,actorEmail:auth.email,
           createdAt:plan.createdAt,goesCount:plan.records.filter(row=>row.decision==="GOES").length,
