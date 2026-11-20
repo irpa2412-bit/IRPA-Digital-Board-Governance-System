@@ -227,7 +227,7 @@ const isolatedWindowFixture = () => {
   const activeAmendment = {
     status: "open",
     files: ["drive-gateway/src/signing.mjs", "drive-gateway/src/emailSigningLinks.mjs"],
-    repairWindow: { rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8" }
+    repairWindow: { rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd" }
   };
   const baselineChangeRecord = { status: "complete", repairWindow: { status: "open", portal: "Meeting Portal" }, history: [{ action: "meeting-window-opened" }] };
   const currentChangeRecord = { ...structuredClone(baselineChangeRecord), activeAmendment };
@@ -236,7 +236,7 @@ const isolatedWindowFixture = () => {
       portal: "Signature Portal",
       status: "open",
       closesAt: "2026-11-22T17:08:47Z",
-      rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8"
+      rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
     }]
   };
   return { changedPaths: [...SIGNATURE_WINDOW_AMENDMENT_PATHS], repairWindow, changeRecord: { activeAmendment }, baselineChangeRecord, currentChangeRecord };
@@ -273,35 +273,38 @@ test("isolation guard permits only the separate unexpired Signature Portal windo
 
 const signatureRepairFixture = () => {
   const changedPaths = [
-    "drive-gateway/src/emailSigning/index.mjs",
-    "drive-gateway/src/emailSigningLinks.mjs",
-    "drive-gateway/src/signing.mjs",
-    "drive-gateway/src/index.js",
-    "src/pages/EmailSigningReadOnlyPage.jsx",
-    "src/pages/SignaturePlatform.jsx",
-    "drive-gateway/tests/email-signing-contract.test.mjs",
-    "scripts/meeting-portal-fixture-isolation-guard.sh",
-    "scripts/portal-repair-window-guard-policy.mjs",
-    "tests/meeting-isolation-guard.test.mjs"
+    "drive-gateway/src/emailSigning/index.mjs", "drive-gateway/src/signing.mjs",
+    "drive-gateway/src/router.mjs", "drive-gateway/src/index.js",
+    "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
+    "drive-gateway/tests/email-signing-contract.test.mjs", ".github/workflows/email-signing-contract.yml",
+    "drive-gateway/tests/email-signing-links.integration.test.mjs",
+    "drive-gateway/tests/email-signing-links.release-contract.test.mjs",
+    "drive-gateway/tests/email-signing-links.test.mjs",
+    "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+    "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+    "drive-gateway/tests/signing-invitation.test.mjs",
+    "tests/signature-email-link-unification.test.mjs", "tests/signature-workflow-policy.test.mjs"
   ];
   const baselineChangeRecord = { status: "complete", repairWindow: { portal: "Meeting Portal", status: "open" }, history: [{ action: "meeting-baseline" }] };
   const currentChangeRecord = {
     ...structuredClone(baselineChangeRecord),
     activeAmendment: {
       status: "open",
+      operation: "restore-pre-11-eat-baseline",
       files: [
-        "drive-gateway/src/emailSigning/",
-        "drive-gateway/src/emailSigningLinks.mjs",
-        "drive-gateway/src/signing.mjs",
-        "drive-gateway/src/index.js",
-        "src/pages/EmailSigningReadOnlyPage.jsx",
-        "src/pages/SignaturePlatform.jsx",
-        "drive-gateway/tests/email-signing-contract.test.mjs",
-        "drive-gateway/tests/email-signing-links.test.mjs",
+        "drive-gateway/src/emailSigning/index.mjs", "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/router.mjs", "drive-gateway/src/index.js",
+        "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/tests/email-signing-contract.test.mjs", ".github/workflows/email-signing-contract.yml",
         "drive-gateway/tests/email-signing-links.integration.test.mjs",
-        "tests/email-signing-contract.test.mjs",
-        ".github/workflows/email-signing-contract.yml"
-      ]
+        "drive-gateway/tests/email-signing-links.release-contract.test.mjs",
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+        "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+        "drive-gateway/tests/signing-invitation.test.mjs",
+        "tests/signature-email-link-unification.test.mjs", "tests/signature-workflow-policy.test.mjs"
+      ],
+      repairWindow: { rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd" }
     }
   };
   const repairWindow = { parallelWindows: [{ portal: "Signature Portal", status: "open", closesAt: "2026-11-22T17:08:47Z" }] };
@@ -352,7 +355,7 @@ const closureFixture = () => {
     portal: "Signature Portal", status: "open",
     openedAt: "2026-11-20T17:08:47Z", lastActivityAt: "2026-11-20T17:20:46Z",
     durationHours: 48, closesAt: "2026-11-22T17:08:47Z",
-    rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+    rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
     scope: ["drive-gateway/src/signing.mjs", "drive-gateway/src/router.mjs", "src/pages/EmailSigningReadOnlyPage.jsx", "drive-gateway/tests/", "tests/"],
     prohibitions: ["secrets", "SMTP", "Firestore rules", "certificate logic", "hash logic", "archive logic"],
     activityLog: [{ at: "2026-11-20T17:08:47Z", action: "opened" }]
@@ -376,7 +379,7 @@ const closureFixture = () => {
     status: "open", affectedPortals: ["Signature Portal"],
     reason: "GET consumed invitation tokens before explicit signing.",
     files: ["drive-gateway/src/signing.mjs", "drive-gateway/src/router.mjs", "src/pages/EmailSigningReadOnlyPage.jsx", "drive-gateway/tests/", "tests/"],
-    repairWindow: { openedAt: "2026-11-20T17:08:47Z", rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8" }
+    repairWindow: { openedAt: "2026-11-20T17:08:47Z", rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd" }
   };
   const baselineChangeRecord = {
     schemaVersion: 1, status: "complete",
@@ -430,7 +433,7 @@ const reopenFixture = () => {
     portal: "Signature Portal", status: "closed",
     openedAt: "2026-11-20T17:08:47Z", lastActivityAt: "2026-11-20T17:56:30Z",
     durationHours: 48, closesAt: "2026-11-22T17:08:47Z",
-    rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+    rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
     reason: "Owner-authorised full Email Signing rebuild: reusable envelope/signer-bound links, explicit open session, expiry, atomic resend, contract suite and protected cutover.",
     scope: [
       "drive-gateway/src/emailSigning/","drive-gateway/src/emailSigningLinks.mjs","drive-gateway/src/signing.mjs",
@@ -467,7 +470,7 @@ const reopenFixture = () => {
     status:"closed", affectedPortals:["Signature Portal"],
     reason:"Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
     files:baselineSignature.scope,
-    repairWindow:{openedAt:"2026-11-20T17:08:47Z",closesAt:"2026-11-22T17:08:47Z",durationHours:48,rollbackCommit:"fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",rollbackCommitEvidence:"verified"},
+    repairWindow:{openedAt:"2026-11-20T17:08:47Z",closesAt:"2026-11-22T17:08:47Z",durationHours:48,rollbackCommit:"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",rollbackCommitEvidence:"verified"},
     prohibitedChanges:["Secrets","Environment variables","SMTP credentials and settings (reuse existing wrapper)","Firestore rules","PDF stamping engine","Hash logic","Certificate logic","Archive logic"],
     ownerInstruction:"Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120.",
     closedAt:"2026-11-20T17:56:30Z",
