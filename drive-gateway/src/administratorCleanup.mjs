@@ -170,10 +170,11 @@ export function createAdministratorCleanupRouter(deps) {
             return matchingAssignment || (protectedEnvelopeStatus && (participant || participantEmail));
           })
           : false;
-        const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle || data.title || data.position || (Array.isArray(data.roles) ? data.roles.join(", ") : "") || (Array.isArray(data.assignedRoles) ? data.assignedRoles.join(", ") : "") || (Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title).filter(Boolean).join(", ") : ""));
+        const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle || data.title || data.position || (Array.isArray(data.roles) ? data.roles.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title).filter(Boolean).join(", ") : "") || (Array.isArray(data.assignedRoles) ? data.assignedRoles.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title).filter(Boolean).join(", ") : "") || (Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title).filter(Boolean).join(", ") : ""));
         const roleValues = [data.role, data.boardPosition, data.designation, data.jobTitle, data.title, data.position,
-          ...(Array.isArray(data.roles) ? data.roles : []), ...(Array.isArray(data.assignedRoles) ? data.assignedRoles : []),
-          ...(Array.isArray(data.selectedRoles) ? data.selectedRoles : []), ...(Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : [])].map(value => clean(value)).filter(Boolean);
+          ...(Array.isArray(data.roles) ? data.roles.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : []),
+          ...(Array.isArray(data.assignedRoles) ? data.assignedRoles.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : []),
+          ...(Array.isArray(data.selectedRoles) ? data.selectedRoles.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : []), ...(Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title) : [])].map(value => clean(value)).filter(Boolean);
         const protectedRole = roleValues.some(value => /administrator|executive director|board chair|chairperson|board secretary/i.test(value));
         const isAdmin = uid === auth.uid || email === PRIMARY_ADMIN_EMAIL;
         const trialData = isTrialRecord(data);
