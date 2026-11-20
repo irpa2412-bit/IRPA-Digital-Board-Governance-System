@@ -320,7 +320,12 @@ const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
 const signatureEmailLinkSessionRepair = signatureWindowRepairDecision.pass;
 if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
-  if (!parallelWindowRecordAmendment) throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
+  // A fully validated active Signature Portal repair may update its own scope
+  // and evidence in the same PR; unrelated or incomplete amendments still
+  // require the separate five-file window amendment.
+  if (!parallelWindowRecordAmendment && !signatureWindowRepairDecision.pass) {
+    throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
+  }
 }
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&

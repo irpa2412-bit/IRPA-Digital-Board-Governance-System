@@ -5,6 +5,26 @@ import { readFileSync } from "node:fs";
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
+const portalProtection = readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
+const isolationGuard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
+const changeRecord = JSON.parse(readFileSync(new URL("../docs/portal-protection/change-record.json", import.meta.url), "utf8"));
+const repairWindow = JSON.parse(readFileSync(new URL("../docs/portal-protection/repair-window.json", import.meta.url), "utf8"));
+
+
+test("portal protection uses the active email-signing amendment without rewriting historical declaration",()=>{
+  const active=changeRecord.activeAmendment;
+  const window=repairWindow.parallelWindows.find(item=>item.portal==="Signature Portal");
+  assert.deepEqual(changeRecord.declaration.affectedPortals,["Signature Portal"]);
+  assert.equal(changeRecord.baseline.rollbackCommit,changeRecord.baseline.commit,"the historical baseline record remains immutable");
+  assert.equal(active.repairWindow.rollbackCommit,"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd");
+  assert.deepEqual(active.affectedPortals,["Signature Portal","Meeting Portal"]);
+  assert.ok(active.files.includes("scripts/portal-protection-check.mjs"));
+  assert.ok(window.scope.includes("scripts/portal-protection-check.mjs"));
+  assert.match(portalProtection,/const activeAmendment = record\.activeAmendment\?\.status === "open" \? record\.activeAmendment : null/);
+  assert.match(portalProtection,/const declaration = activeAmendment \?\? record\.declaration/);
+  assert.match(portalProtection,/const validation = activeAmendment\?\.validation \?\? record\.validation/);
+  assert.match(isolationGuard,/!parallelWindowRecordAmendment && !signatureWindowRepairDecision\.pass/);
+});
 
 test("isolation baseline compares against the fetched current main snapshot", () => {
   assert.match(guard, /git fetch origin main:refs\/remotes\/origin\/main/);
@@ -211,7 +231,7 @@ test("parallel portal window amendment delegates to the executable exact-scope p
   assert.match(guard, /parallelWindowDecision\.pass \|\| signatureWindowClosureDecision\.pass/);
   assert.match(guard, /evaluateSignatureWindowReopen/);
   assert.match(guard, /signatureWindowClosureDecision\.pass \|\| signatureWindowReopenDecision\.pass/);
-  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowReopenDecision\.reason \|\| signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
+  assert.match(guard, /if \(!parallelWindowRecordAmendment && !signatureWindowRepairDecision\.pass\)/);
 });
 
 

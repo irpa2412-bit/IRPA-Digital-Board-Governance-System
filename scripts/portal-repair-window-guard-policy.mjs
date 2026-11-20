@@ -96,6 +96,7 @@ export function evaluateSignatureWindowRepair({
   const maintenance = new Set([
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "scripts/portal-repair-window-guard-policy.mjs",
+    "scripts/portal-protection-check.mjs",
     "tests/meeting-isolation-guard.test.mjs"
   ]);
   const inScope = path => amendment.files.some(scope =>

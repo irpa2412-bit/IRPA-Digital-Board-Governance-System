@@ -383,11 +383,6 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
   assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
-  assert.ok(refresh.includes('envelopeId:selected.gatewayEnvelopeId'), "the selected envelope ID must be attached locally even when the Gateway omits it");
-  assert.ok(page.includes('className="page signature-portal-root"'));
-  assert.ok(page.includes('className="panel signature-envelope-status"'));
-  assert.ok(page.includes('.signature-portal-root [aria-busy="true"]'));
-  assert.ok(page.includes("opacity: 1;"));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
 

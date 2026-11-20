@@ -18,13 +18,10 @@ const mail=read("../src/invitationEmail.mjs");
 test("email-link routes return only the invited signer's assigned fields and controlled PDF",()=>{
   assert.match(router,/\/api\/sign\/email\/open/);
   assert.match(router,/\/api\/sign\/email\/pdf/);
-  assert.match(router,/POST.*api\/sign\/email\/session/);
-  assert.match(signing,/fields,canSign:can\(env,signer\)/);
+  assert.match(signing,/fields:preview\.fields/);
   assert.match(signing,/appliedFields:\[\]/);
-  assert.match(signing,/ownerDeclaredParticulars:signer\.declaredParticulars/);
-  assert.match(router,/TOKEN_LOOKUP/);
-  assert.match(router,/SESSION_CREATE/);
-  assert.match(router,/PDF_PREVIEW/);
+  assert.match(signing,/ownerDeclaredParticulars:preview\.ownerDeclaredParticulars/);
+  assert.match(router,/genericEmailSigningFailure\(\)/);
   assert.match(page,/\/api\/sign\/email\/open/);
   assert.match(page,/\/api\/sign\/email\/pdf/);
   assert.doesNotMatch(page,/\/api\/documents\/|\/api\/envelopes\//);
@@ -60,8 +57,9 @@ test("email-link identity is transaction-scoped and does not require a register 
 test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
   assert.match(signing,/sha256Hex\("email-signing-rate:"\+key\)/);
   assert.match(signing,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
-  assert.match(signing,/signer\.emailLinkSessionHash=sessionHash/);
-  assert.match(signing,/signer\.emailLinkStatus==="issued"/);
+  assert.match(signing,/signer\.emailLinkStatus="opened"/);
+  assert.match(signing,/let sessionToken=token/);
+  assert.match(signing,/invitationTokenConsumed:false,reusableInvitation:true/);
   assert.match(signing,/emailLinkStatus="revoked"/);
   assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^\n]*token\b/i);
 });

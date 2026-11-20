@@ -15,7 +15,7 @@ const buttonStyle={padding:"10px 14px",border:0,borderRadius:7,background:"#174a
 const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Title:"#1d4ed8",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
 
 export default function EmailSigningReadOnlyPage({token}){
- const [record,setRecord]=useState(null),[signingToken,setSigningToken]=useState(""),[sessionActive,setSessionActive]=useState(false),[sessionOpening,setSessionOpening]=useState(false),[activeRoleAssignmentIndex,setActiveRoleAssignmentIndex]=useState(0);
+ const [record,setRecord]=useState(null),[signingToken,setSigningToken]=useState(""),[activeRoleAssignmentIndex,setActiveRoleAssignmentIndex]=useState(0);
  const [pdfDocument,setPdfDocument]=useState(null),[pageCount,setPageCount]=useState(0),[pageNum,setPageNum]=useState(1);
  const [pageSize,setPageSize]=useState({width:760,height:980}),[viewerWidth,setViewerWidth]=useState(760),[pageRendered,setPageRendered]=useState(false);
  const [error,setError]=useState(""),[pageError,setPageError]=useState(""),[loading,setLoading]=useState(true);
@@ -30,7 +30,9 @@ export default function EmailSigningReadOnlyPage({token}){
  useEffect(()=>{
   let cancelled=false,loadedPdf=null;
   if(!token){setError(NEUTRAL);setLoading(false);return;}
-  const activeToken=token;
+  const parts=String(token).split("."),sessionKey=parts.length===3?"irpaEmailSigningSession:"+parts[0]+"."+parts[1]:"";
+  let activeToken=token;
+  try{const saved=sessionKey?window.sessionStorage.getItem(sessionKey):"";if(saved)activeToken=saved;}catch{}
   (async()=>{
    try{
     const gateway=getGoogleDriveGatewayUrl();if(!gateway)throw new Error(NEUTRAL);
@@ -46,13 +48,14 @@ export default function EmailSigningReadOnlyPage({token}){
      const candidate=await getMySignatureProfile().catch(()=>null);
      if(candidate?.uid===currentUser.uid&&String(candidate.email||"").trim().toLowerCase()===invitedEmail&&candidate.status==="Active")matchedProfile=candidate;
     }
-    setSigningToken("");setSessionActive(false);
+    const session=String(metadata.sessionToken||activeToken);setSigningToken(session);
+    try{if(sessionKey)window.sessionStorage.setItem(sessionKey,session);}catch{}
     const fields=Array.isArray(metadata.fields)?metadata.fields:[];
     setSavedProfile(matchedProfile);setRecord({title:metadata.title||"Controlled document",ownerName:metadata.ownerName||"Document owner",expiresAt:metadata.linkExpiresAt||"",fields,canSign:metadata.canSign===true,ownerDeclaredParticulars:metadata.ownerDeclaredParticulars||{},signer:metadata.signer||{}});
     setDeclarations({name:metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"",occupation:"",capacity:""});
     const initialFieldValues={};for(const field of fields){if(field.type==="Name")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.name||metadata.signer?.name||"";else if(field.type==="Title")initialFieldValues[field.fieldId]=metadata.ownerDeclaredParticulars?.title||metadata.signer?.title||"";}setFieldValues(initialFieldValues);
     const firstAssignedField=fields.find(field=>["Signature","Initials"].includes(field.type))||fields.find(field=>Number(field.roleAssignmentIndex||0)===0)||fields[0];setActiveRoleAssignmentIndex(Number(firstAssignedField?.roleAssignmentIndex||0));setSelectedFieldId(firstAssignedField?.fieldId||"");
-    const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":activeToken},cache:"no-store",credentials:"omit"});
+    const response=await fetch(gateway+"/api/sign/email/pdf",{headers:{"x-signing-token":session},cache:"no-store",credentials:"omit"});
     if(!response.ok)throw new Error("The controlled PDF could not be retrieved. Do not sign a document you cannot inspect.");
     if(!String(response.headers.get("content-type")||"").toLowerCase().includes("application/pdf"))throw new Error("The signing service did not return a PDF. Signing has been stopped.");
     const bytes=new Uint8Array(await response.arrayBuffer());
@@ -152,21 +155,7 @@ export default function EmailSigningReadOnlyPage({token}){
   if(incomplete.length){setError("Complete every responsibility and its assigned fields before final review. "+incomplete.length+" field(s) remain.");return;}
   setError("");setReviewMode(true);if(pageNum!==1){setPageRendered(false);setPageNum(1);}
  }
- async function openDocumentToSign(){
-  if(!record||sessionActive||sessionOpening)return;
-  setSessionOpening(true);setError("");setSuccess("");
-  try{
-   const gateway=getGoogleDriveGatewayUrl();
-   const response=await fetch(gateway+"/api/sign/email/session",{method:"POST",headers:{"x-signing-token":token,Accept:"application/json"},credentials:"omit",cache:"no-store"});
-   const result=await response.json().catch(()=>({}));
-   if(!response.ok||result.ok!==true||!result.sessionToken)throw Object.assign(new Error(result.error||"Signing session could not be opened. (SESSION_CREATE)"),{code:result.code||"SESSION_CREATE"});
-   setSigningToken(result.sessionToken);setSessionActive(true);
-   setShowSigningPane(true);setSuccess("Signing session opened. Complete the assigned fields and review before submitting.");
-  }catch(error){setError(error?.message||"Signing session could not be opened. (SESSION_CREATE)");}
-  finally{setSessionOpening(false);}
- }
  async function submit(){
-  if(!sessionActive||!signingToken){setError("Open the document to sign before submitting. (SESSION_REQUIRED)");return;}
   if(!reviewMode){setError("Review the complete document and signature placement before submitting.");return;}
   if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
   if(!record?.canSign){setError("This assignment is not yet available for signing.");return;}
@@ -229,7 +218,7 @@ export default function EmailSigningReadOnlyPage({token}){
    {success&&<p role="status" style={{color:revoked||finalizationFailed?"#7f1d1d":"#14532d",background:revoked||finalizationFailed?"#fee2e2":"#dcfce7",padding:10,borderRadius:7}}>{success}</p>}
    {record&&!error&&<>
     <h2 style={{fontSize:17,margin:"8px 0"}}>{record.title}</h2><p style={{fontSize:13,margin:"4px 0"}}>Invited by: {record.ownerName}</p>
-    <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?new Date(record.expiresAt).toLocaleString():"As stated in your invitation"}</p>
+    <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?new Date(record.expiresAt).toLocaleString():"No time-based expiry; reopen before signing and access the signed PDF afterward"}</p>
     <section style={{border:"1px solid #9ca3af",borderRadius:8,padding:12,marginTop:12}}>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><div><h2 style={{fontSize:18,margin:"0 0 4px"}}>Complete document review</h2><p style={{fontSize:13,color:"#4b5563",margin:0}}>Read every page before deciding. Assigned signature and initials locations are marked directly on the document.</p></div><strong>Page {pageNum} of {pageCount||"…"}</strong></div>
      <div style={{display:"flex",gap:8,justifyContent:"center",margin:"12px 0",flexWrap:"wrap"}}>
@@ -261,9 +250,8 @@ export default function EmailSigningReadOnlyPage({token}){
      <label style={{display:"block",margin:"10px 0"}}>Title (optional)<input style={inputStyle} value={declarations.occupation} disabled={signingClosed} onChange={e=>setDeclaration("occupation",e.target.value)} placeholder="Enter your title (optional)"/></label>
      <label style={{display:"block",margin:"10px 0"}}>Additional details (optional)<input style={inputStyle} value={declarations.capacity} disabled={signingClosed} onChange={e=>setDeclaration("capacity",e.target.value)} placeholder="Additional official particulars"/></label>
     </section>
-    {!sessionActive&&<div style={{marginTop:18,textAlign:"center"}}><p>Previewing this invitation does not consume it or create a signing session.</p><button type="button" disabled={signingClosed||sessionOpening||loading||!pdfDocument} onClick={openDocumentToSign} style={buttonStyle}>{sessionOpening?"Opening signing session…":"Open document to sign"}</button></div>}
-    {sessionActive&&!savedProfile&&!showSigningPane&&<div style={{marginTop:18,textAlign:"center"}}><button type="button" disabled={signingClosed} onClick={()=>setShowSigningPane(true)} style={buttonStyle}>Continue to signature fields</button></div>}
-    {sessionActive&&!!fields.length&&(savedProfile||showSigningPane)&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
+    {!savedProfile&&!showSigningPane&&<div style={{marginTop:18,textAlign:"center"}}><button type="button" disabled={signingClosed} onClick={()=>setShowSigningPane(true)} style={buttonStyle}>TO SIGN CLICK HERE</button></div>}
+    {!!fields.length&&(savedProfile||showSigningPane)&&<section style={{marginTop:18,borderTop:"1px solid #d1d5db",paddingTop:14}}>
      <h2 style={{fontSize:18}}>Fields for this responsibility</h2><p style={{fontSize:13,color:"#4b5563"}}>When you tap your assigned Signature or Initials field, IRPA checks for an active Signature Profile belonging to the same signed-in email address as this invitation. If found, your saved specimen is selected for your review; confirm it to place the stamp. If no matching profile is available, draw your signature in the drawing pane. Your signature is never applied without your confirmation and final submission.</p>
      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{assignmentFields.map(field=><button key={field.fieldId} type="button" disabled={signingClosed} onClick={()=>{setSelectedFieldId(field.fieldId);const targetPage=Number(field.page||1);if(targetPage!==pageNum){setPageRendered(false);setPageNum(targetPage);}setError("");}} style={{...buttonStyle,background:selectedFieldId===field.fieldId?"#174a78":"#4b5563",opacity:signingClosed?0.7:1}}>{field.type} · Page {field.page}{complete(field)?" ✓":""}</button>)}</div>
      {selectedField&&<div style={{marginTop:14,padding:12,border:"1px solid #9ca3af",borderRadius:8}}>

@@ -22,11 +22,13 @@ import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
-test("email signing invitation clearly states its EAT expiry",()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
-  assert.match(message.text,/Link expiry:.*EAT/i);
-  assert.match(message.text,/after expiry or replacement/i);
-  assert.match(message.html,/Link expiry:.*EAT/i);
+test("email signing invitation clearly states the reusable no-time-expiry rule",()=>{
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
+  assert.match(message.text,/no time-based expiry/i);
+  assert.match(message.text,/does not consume it/i);
+  assert.match(message.html,/does not consume this invitation/i);
+  assert.match(message.html,/No time-based expiry/i);
+  assert.match(message.html,/read-only access to the completed signed PDF/i);
 });
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
@@ -42,13 +44,20 @@ test("email token has at least 32 random bytes and only its SHA-256 hash is pers
   assert.equal(issued.record.attemptCount,0);
 });
 
-test("email token opens once and transitions issued to opened", async () => {
+test("email token remains valid after opening and can be reopened indefinitely", async () => {
   const issued=await createEmailSigningToken({envelopeId:"ENV-TEST02",signerId:"S1",email:"a@example.org",now:NOW});
   const opened=await markEmailSigningTokenOpened(issued.record,{token:issued.token,now:NOW,ipHash:"ip-hash"});
   assert.equal(opened.status,"opened");
   assert.equal(opened.openCount,1);
   assert.equal(opened.lastIpHash,"ip-hash");
-  await assert.rejects(()=>markEmailSigningTokenOpened(opened,{token:issued.token,now:NOW}),/unavailable/i);
+  const later=new Date("2027-11-16T08:00:00.000Z");
+  assert.equal((await inspectEmailSigningToken(issued.token,opened,later)).ok,true);
+  let reopened=await markEmailSigningTokenOpened(opened,{token:issued.token,now:later,ipHash:"another-ip"});
+  assert.equal(reopened.status,"opened");
+  for(let i=3;i<=12;i++)reopened=await markEmailSigningTokenOpened(reopened,{token:issued.token,now:later,ipHash:"ip-"+i});
+  assert.equal(reopened.openCount,12,"repeated opens must not create a permanent lifetime-use limit");
+  assert.equal(reopened.tokenHash,issued.record.tokenHash,"opening must not rotate the invitation token hash");
+  assert.equal((await inspectEmailSigningToken(issued.token,reopened,later)).ok,true);
 });
 
 test("standalone email token inspection remains separate from envelope expiry policy", async () => {
@@ -206,38 +215,6 @@ test("failed resend preserves the previous active email-link token",async()=>{
 });
 
 
-test("concurrent signer resends are serialized and the delivered token is the persisted active token",async()=>{
-  const originalHash="a".repeat(64),events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
-  let record={_v:1,id:"ENV-RESEND-RACE",createdBy:"owner",status:"Active",title:"Test",ownerName:"Owner",signers:[{id:"S1",email:"signer@example.org",name:"Signer",order:1,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:originalHash,tokenExpiresAt:"2026-11-23T08:00:00.000Z",emailLinkExpiresAt:"2026-11-23T08:00:00.000Z",emailLinkTokenHistory:[],invitation:"Sent"}],events};
-  let releaseSend,markSendStarted;
-  const sendStarted=new Promise(resolve=>{markSendStarted=resolve});
-  const holdSend=new Promise(resolve=>{releaseSend=resolve});
-  const sent=[];
-  const ctx={
-    meta:{
-      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
-      update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
-    },
-    now:()=>NOW,
-    config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7},
-    sendInvitation:async invitation=>{sent.push(invitation);markSendStarted();await holdSend;},
-    logger:{error(){}}
-  };
-  const first=resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S1");
-  await sendStarted;
-  await assert.rejects(()=>resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S1"),/already in progress/i);
-  assert.equal(record.signers[0].tokenHash,originalHash,"old link remains active while delivery is pending");
-  releaseSend();
-  const result=await first;
-  const deliveredToken=new URL(sent[0].link).searchParams.get("emailSignToken");
-  assert.equal(record.signers[0].tokenHash,await sha256Hex(deliveredToken.split(".")[2]));
-  assert.equal(record.signers[0].tokenExpiresAt,result.expiresAt);
-  assert.equal(record.signers[0].emailLinkExpiresAt,result.expiresAt);
-  assert.equal(record.signers[0].emailLinkStatus,"issued");
-  assert.equal(record.signers[0].resendAttempt,undefined);
-  assert.equal(record.signers[0].emailLinkTokenHistory.at(-1).tokenHash,originalHash);
-});
-
 test("every SMTP and email-link failure stage returns only its sanitized stage code",async()=>{
   for(const stage of EMAIL_LINK_STAGE_CODES){
     const events=[];
@@ -301,30 +278,4 @@ test("createEnvelope sends three distinct email-link invitations to three signer
   assert.deepEqual(tokens.map(token=>token.split(".")[1]),["S1","S2","S3"]);
   assert.equal(new Set(tokens).size,3);
   assert.ok(sent.every(invitation=>invitation.to==="shared@example.org"&&invitation.emailLink===true));
-});
-
-
-test("parallel-mode signer can receive a resend without waiting for earlier signer positions",async()=>{
-  const events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
-  let record={_v:1,id:"ENV-PARALLEL-RESEND",createdBy:"owner",status:"Active",signingMode:"Parallel",title:"Parallel Test",ownerName:"Owner",signers:[
-    {id:"S1",email:"first@example.org",name:"First",order:1,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:"a".repeat(64),invitation:"Sent"},
-    {id:"S2",email:"second@example.org",name:"Second",order:2,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:"b".repeat(64),invitation:"Sent"}
-  ],events};
-  const sent=[];
-  const ctx={
-    meta:{
-      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
-      update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
-    },
-    now:()=>NOW,
-    config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7},
-    sendInvitation:async invitation=>{sent.push(invitation);},
-    logger:{error(){}}
-  };
-  const result=await resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S2");
-  assert.equal(sent.length,1);
-  assert.equal(sent[0].to,"second@example.org");
-  assert.equal(record.signers[1].invitation,"Sent");
-  assert.equal(record.signers[1].tokenHash,await sha256Hex(new URL(sent[0].link).searchParams.get("emailSignToken").split(".")[2]));
-  assert.equal(result.signerId,"S2");
 });

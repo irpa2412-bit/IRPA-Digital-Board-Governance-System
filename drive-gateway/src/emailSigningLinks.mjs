@@ -37,7 +37,7 @@ export async function createEmailSigningToken({envelopeId,signerId,email,now=new
 
 export async function inspectEmailSigningToken(token,record,now=new Date()){
   const hash=await sha256Hex(String(token||""));
-  const valid=Boolean(record&&record.status==="issued"&&record.tokenHash&&safeEqual(hash,record.tokenHash));
+  const valid=Boolean(record&&["issued","opened"].includes(record.status)&&record.tokenHash&&safeEqual(hash,record.tokenHash));
   return valid?{ok:true,record}:{ok:false,error:genericEmailSigningFailure()};
 }
 
@@ -53,7 +53,7 @@ export async function markEmailSigningTokenOpened(record,{token,now=new Date(),i
   }
   const key=String(ipHash||"unknown");
   const attempts=ipAttempts[key]||[];
-  if(Number(record.attemptCount||0)>=maxAttempts||attempts.length>=maxAttempts)throw new Error(genericEmailSigningFailure());
+  if(attempts.length>=maxAttempts)throw new Error(genericEmailSigningFailure());
   attempts.push(new Date(now).getTime());
   ipAttempts[key]=attempts;
   return {...record,status:"opened",openCount:Number(record.openCount||0)+1,attemptCount:Number(record.attemptCount||0)+1,ipAttempts,lastIpHash:ipHash||null,openedAt:new Date(now).toISOString()};

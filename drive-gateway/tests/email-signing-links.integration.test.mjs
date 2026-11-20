@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
-import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,getEnvelopeStatus} from "../src/signing.mjs";
+import {createEnvelope,openEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,getEnvelopeStatus} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
@@ -121,14 +121,15 @@ test("two distinct participants may share one delivery email and retain isolated
   assert.equal(f.sent.length,2,"sequential routing sends the first invitation and keeps the second signer pending");
 });
 
-test("email-link signer is stored with token hash, email hash and configured expiry; mail is sent once",async()=>{
+test("email-link signer is stored without time-based expiry; mail is sent once",async()=>{
   const f=await fixture();
   const signer=f.envelope.signers[0];
   assert.equal(signer.identityType,"email-link");
   assert.equal(signer.emailLinkStatus,"issued");
   assert.equal(signer.emailLinkAttemptCount,0);
   assert.equal(signer.emailLinkOpenCount,0);
-  assert.equal(signer.emailLinkExpiresAt,new Date(NOW.getTime()+7*86400000).toISOString(),"email-link expiry follows the configured seven-day lifetime");
+  assert.equal(signer.emailLinkExpiresAt,undefined,"email-link invitations must not expire with time");
+  assert.equal(signer.tokenExpiresAt,undefined,"email-link token must not inherit the envelope expiry");
   assert.equal(signer.tokenHash,await sha256Hex(f.token.split(".")[2]));
   assert.equal(signer.emailHash,await sha256Hex("board.secretary@example.org"));
   assert.equal(JSON.stringify(signer).includes(f.token.split(".")[2]),false);
@@ -136,11 +137,12 @@ test("email-link signer is stored with token hash, email hash and configured exp
   assert.equal(signer.name,"Client supplied name");
   assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",title:"",occupation:"",capacity:""});
   assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].expiresAt,undefined,"the dispatched signer invitation carries no time-based expiry");
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
 });
 
-test("email signing links expire after their configured lifetime and become unusable after use or revocation",async()=>{
+test("email signing links have no time expiry but become unusable after use or revocation",async()=>{
   const issuedAt=new Date("2026-11-16T08:00:00.000Z");
   const issued=await createEmailSigningToken({envelopeId:"ENV-LONG-LIVED",signerId:"S1",email:"signer@example.org",now:issuedAt,randomBytes:new Uint8Array(32).fill(7)});
   assert.equal(issued.record.expiresAt,undefined);
@@ -155,48 +157,45 @@ test("email signing links expire after their configured lifetime and become unus
   assert.equal((await inspectEmailSigningToken(issued.token,revoked,oneYearLater)).ok,false);
 });
 
-test("GET preview and PDF are read-only; explicit Open document to sign creates a separate session",async()=>{
+test("email link remains valid after opening without signing and reopens from the same URL",async()=>{
   const f=await fixture();
-  const before=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  const preview=await previewEmailSigning(f.ctx,f.token);
-  assert.equal(preview.ok,true);
-  assert.equal(preview.signer.email,"board.secretary@example.org");
-  const pdfPreview=await getSigningPdf(f.ctx,f.token,null);
-  assert.equal(pdfPreview.fileName,"email-link.pdf");
-  const afterPreview=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.deepEqual(afterPreview,before,"GET preview and PDF retrieval must not mutate envelope state or audit history");
-  assert.equal(await f.ctx.meta.get("emailLinkRateLimits","token:"+await sha256Hex(f.token.split(".")[2])),null);
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
   assert.equal(opened.ok,true);
-  assert.notEqual(opened.sessionToken,f.token);
+  assert.equal(opened.title,"Email Link Governance Instrument");
+  assert.equal(opened.ownerName,"Document Owner");
+  assert.equal(opened.sessionToken,f.token,"opening must not rotate or consume the email invitation");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(stored.signers[0].emailLinkStatus,"issued","session creation must not consume the invitation token");
-  assert.equal(stored.signers[0].tokenHash,before.signers[0].tokenHash,"invitation token hash remains authoritative until signing completes");
-  assert.equal(stored.signers[0].emailLinkSessionStatus,"active");
-  assert.equal(stored.signers[0].emailLinkSessionHash,await sha256Hex(opened.sessionToken.split(".")[2]));
-  const sessionPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
-  assert.equal(sessionPdf.fileName,"email-link.pdf");
-  const resumed=await openEmailSigning(f.ctx,opened.sessionToken,"198.51.100.8");
-  assert.equal(resumed.sessionToken,opened.sessionToken);
-  const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(resumedEnvelope.signers[0].emailLinkStatus,"issued");
-  assert.equal(resumedEnvelope.signers[0].emailLinkSessionStatus,"active");
-  assert.equal(resumedEnvelope.events.filter(event=>event.type==="email_link.session_created").length,1);
+  assert.equal(stored.signers[0].emailLinkStatus,"opened");
+  assert.equal(stored.signers[0].emailLinkOpenCount,1);
+  assert.equal(stored.signers[0].tokenHash,await sha256Hex(f.token.split(".")[2]));
+  const pdf=await getSigningPdf(f.ctx,f.token,null);
+  assert.equal(pdf.fileName,"email-link.pdf");
+  f.now(new Date("2027-11-16T08:00:00.000Z"));
+  const reopened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  assert.equal(reopened.ok,true,"the same opened-but-unused email link remains valid after one year");
+  assert.equal(reopened.sessionToken,f.token);
+  const reopenedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(reopenedEnvelope.signers[0].emailLinkOpenCount,2);
 });
 
-test("completed email-link signing consumes the invitation and session exactly once",async()=>{
+test("a previously opened but unsigned legacy invitation remains reusable from its original email URL",async()=>{
   const f=await fixture();
-  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
-  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary",occupation:"Secretary"},consent:true,user:null});
-  assert.ok(["InProgress","Completed","CompletionFailed"].includes(result.status));
-  const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(stored.signers[0].status,"Signed");
-  assert.equal(stored.signers[0].emailLinkStatus,"used");
-  assert.equal(stored.signers[0].emailLinkSessionStatus,"used");
-  assert.ok(stored.signers[0].emailLinkSessionHash,"the consumed session hash remains only to authorize read-only retrieval of the completed PDF");
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"));
-  await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary"},consent:true,user:null}));
-  if(result.completed===true){const finalPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);assert.match(finalPdf.fileName,/signed-/);}
+  const originalHash=await sha256Hex(f.token.split(".")[2]);
+  const legacySessionSecret="b".repeat(64);
+  const legacySessionHash=await sha256Hex(legacySessionSecret);
+  const legacy=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  legacy.signers[0].tokenHash=legacySessionHash;
+  legacy.signers[0].emailLinkStatus="opened";
+  legacy.signers[0].emailLinkTokenHistory=[{tokenHash:originalHash,status:"used",usedAt:"2026-11-16T08:00:00.000Z"}];
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:legacy.signers});
+  f.now(new Date("2027-11-16T08:00:00.000Z"));
+  const reopened=await openEmailSigning(f.ctx,f.token,"198.51.100.20");
+  assert.equal(reopened.ok,true,"a previously opened invitation must remain usable when its signer has not signed");
+  assert.equal(reopened.sessionToken,f.token);
+  const saved=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(saved.signers[0].tokenHash,legacySessionHash,"the existing session hash is not rewritten");
+  assert.equal(saved.signers[0].emailLinkTokenHistory[0].status,"used");
+  assert.equal((await getSigningPdf(f.ctx,f.token,null)).fileName,"email-link.pdf");
 });
 
 test("tampered and unknown links return the same neutral response",async()=>{
@@ -206,13 +205,25 @@ test("tampered and unknown links return the same neutral response",async()=>{
   await assert.rejects(()=>openEmailSigning(f.ctx,"ENV-UNKNOWN.S1."+"a".repeat(64),"198.51.100.9"),new RegExp(genericEmailSigningFailure().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
-test("an unused email signing link is no longer redeemable after its configured expiry",async()=>{
+test("an unused email signing link remains valid indefinitely before and after opening despite legacy expiry fields",async()=>{
   const f=await fixture();
-  f.now(new Date("2026-11-24T08:00:00.000Z"));
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.status===410&&error.code==="TOKEN_LOOKUP");
+  const legacy=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  legacy.signers[0].emailLinkExpiresAt="2026-11-23T08:00:00.000Z";
+  legacy.signers[0].tokenExpiresAt="2026-11-23T08:00:00.000Z";
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:legacy.signers});
+  f.now(new Date("2027-11-24T08:00:00.000Z"));
+  const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.19");
+  assert.equal(opened.ok,true,"the invitation remains valid more than one year after issue and ignores legacy expiry fields");
+  assert.equal(opened.linkExpiresAt,null,"the signer invitation has no time-based expiry");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(stored.signers[0].emailLinkStatus,"expired");
-  assert.ok(Date.parse(stored.signers[0].emailLinkExpiresAt)<f.ctx.now().getTime());
+  assert.equal(stored.signers[0].emailLinkStatus,"opened");
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
+  assert.equal(status.signers[0].linkExpiresAt,null);
+  assert.equal(status.signers[0].linkExpired,false);
+  f.now(new Date("2028-11-24T08:00:00.000Z"));
+  const reopened=await openEmailSigning(f.ctx,f.token,"198.51.100.19");
+  assert.equal(reopened.ok,true,"opening without signing does not expire the same email invitation");
+  assert.equal(reopened.sessionToken,f.token);
 });
 
 test("owner revoke invalidates a guest link; resend rotates token and marks the previous hash replaced",async()=>{
@@ -227,6 +238,8 @@ test("owner revoke invalidates a guest link; resend rotates token and marks the 
   await assert.rejects(()=>getSigningPdf(f.ctx,oldSession,null));
   const resent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   assert.equal(resent.deliveryStatus,"Sent");
+  assert.equal(resent.linkExpiresAt,null,"resent email-link invitations remain non-expiring");
+  assert.equal(f.sent[1].expiresAt,undefined,"resend must not add an expiry date");
   const newToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
   assert.notEqual(newToken,oldToken);
   assert.notEqual(newToken,oldSession);
@@ -235,39 +248,6 @@ test("owner revoke invalidates a guest link; resend rotates token and marks the 
   assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"replaced");
 });
 
-
-test("an expired session is closed without consuming the still-valid invitation",async()=>{
-  const f=await fixture();
-  const first=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
-  f.now(new Date(NOW.getTime()+31*60*1000));
-  await assert.rejects(()=>openEmailSigning(f.ctx,first.sessionToken,"198.51.100.27"),error=>error.status===410);
-  const afterExpiry=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(afterExpiry.signers[0].emailLinkSessionStatus,"expired");
-  assert.equal(afterExpiry.signers[0].emailLinkStatus,"issued");
-  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
-  assert.ok(second.sessionToken);
-  assert.notEqual(second.sessionToken,first.sessionToken);
-});
-
-test("owner Send new link replaces a legacy burned invitation and invalidates its old session",async()=>{
-  const f=await fixture();
-  const legacySession=await openEmailSigning(f.ctx,f.token,"198.51.100.28");
-  const envelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  envelope.signers[0].emailLinkStatus="opened";
-  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:envelope.signers,events:envelope.events},{ifVersion:envelope._v});
-  const resent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
-  assert.equal(resent.deliveryStatus,"Sent");
-  const newToken=new URL(f.sent.at(-1).link).searchParams.get("emailSignToken");
-  assert.ok(newToken);
-  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(current.signers[0].emailLinkStatus,"issued");
-  assert.equal(current.signers[0].emailLinkSessionStatus,"revoked");
-  assert.equal(current.signers[0].emailLinkSessionHash,null);
-  assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"replaced");
-  await assert.rejects(()=>getSigningPdf(f.ctx,legacySession.sessionToken,null));
-  const preview=await previewEmailSigning(f.ctx,newToken);
-  assert.equal(preview.ok,true);
-});
 
 test("external email-link signer can declare and sign without a Firebase UID or authority-register match",async()=>{
   const f=await fixture({authority:false});
@@ -289,8 +269,17 @@ test("external email-link signer can declare and sign without a Firebase UID or 
   assert.equal(completed.signers[0].signerDeclarations.occupation,"External Consultant");
   assert.equal(completed.signers[0].declarationDiscrepancy.detected,true);
   assert.deepEqual(completed.signers[0].declarationDiscrepancy.fields,["name"]);
-  const pdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
+  assert.equal(completed.signers[0].emailLinkStatus,"used","successful signing, not opening, consumes the signing capability");
+  assert.equal(completed.signers[0].emailLinkTokenHistory.at(-1).status,"used");
+  const readOnly=await openEmailSigning(f.ctx,f.token,"198.51.100.22");
+  assert.equal(readOnly.ok,true,"the same non-expiring URL remains available for completed-PDF retrieval");
+  assert.equal(readOnly.sessionToken,f.token);
+  assert.equal(readOnly.canSign,false,"a completed signer cannot submit another signature");
+  const pdf=await getSigningPdf(f.ctx,f.token,null);
   assert.equal(pdf.fileName.includes("-signed-"),true);
+  const finalPdf=await f.ctx.storage.get(completed.completion.primaryStorageId);
+  assert.ok(finalPdf,"the completed PDF remains stored and distributed independently of the invitation link");
+  assert.equal(await sha256Hex(finalPdf),completed.completion.finalHash);
 });
 
 test("email-link invitations do not require register, authority-matrix or Firebase UID matches",async()=>{
@@ -375,37 +364,4 @@ test("Title assignment is accepted, completed by the signer, and included in liv
   assert.equal(status.status,"Completed");
   assert.equal(status.lastEvent.type,"envelope.completed");
   assert.equal(status.signers[0].title,"Board Secretary");
-});
-
-
-test("v2 reusable invitation is read-only on preview, creates fresh sessions, and expires with the exact signed message",async()=>{
-  const f=await fixture();
-  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  await f.ctx.meta.update("envelopes",f.created.envelopeId,{emailSigningModule:"v2"},{ifVersion:current._v});
-  const before=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  const preview=await previewEmailSigning(f.ctx,f.token);
-  assert.equal(preview.ok,true);
-  const afterPreview=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.deepEqual(afterPreview,before,"GET preview and link previews must not change state or audit history");
-  const first=await openEmailSigning(f.ctx,f.token,"198.51.100.81");
-  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.82");
-  assert.notEqual(first.sessionToken,second.sessionToken,"each explicit open creates a fresh isolated session");
-  const reopened=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(reopened.signers[0].emailLinkStatus,"issued","opening never consumes the invitation link");
-  assert.equal(reopened.signers[0].emailLinkSessionStatus,"active");
-  assert.notEqual(reopened.signers[0].emailLinkSessionHash,await sha256Hex(first.sessionToken.split(".")[2]));
-  const signer=reopened.signers[0];
-  signer.status="Signed";
-  signer.emailLinkStatus="used";
-  signer.emailLinkSessionStatus="used";
-  signer.signedAt=NOW.toISOString();
-  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:reopened.signers},{ifVersion:reopened._v});
-  await assert.rejects(
-    ()=>previewEmailSigning(f.ctx,f.token),
-    error=>error.status===410&&error.message==="This document is already signed."
-  );
-  await assert.rejects(
-    ()=>openEmailSigning(f.ctx,f.token,"198.51.100.82"),
-    error=>error.status===410&&error.message==="This document is already signed."
-  );
 });
