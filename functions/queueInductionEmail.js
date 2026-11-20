@@ -1,5 +1,6 @@
 // functions/queueInductionEmail.js
 // CommonJS bridge for the existing functions/index.js runtime.
+const { createEmailDeliveryIdToken } = require("./emailServiceAuth");
 async function retry(fn, { attempts = 3, delayMs = 300, logger = console, shouldRetry = () => true, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   let lastErr;
   for (let i = 1; i <= attempts; i++) {
@@ -15,7 +16,7 @@ async function queueInductionEmail(inputOrEmail, subjectOrOptions, text, html, o
   const legacy = typeof inputOrEmail === "string";
   if (!legacy && subjectOrOptions && typeof subjectOrOptions === "object") options = subjectOrOptions;
   const input = legacy ? { recipientEmail: inputOrEmail, subject: subjectOrOptions, text, html, invitedByUid:null } : (inputOrEmail || {});
-  const { db, invitationId, recipientEmail, recipientName, invitedByUid, logger=console, fetchFn=fetch, env=process.env, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) } = options;
+  const { db, invitationId, recipientEmail, recipientName, invitedByUid, logger=console, fetchFn=fetch, env=process.env, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)), getServiceIdToken=createEmailDeliveryIdToken } = options;
   const firestore = db || input.db || require("firebase-admin/firestore").getFirestore();
   if (!recipientEmail && input.recipientEmail) Object.assign(input,{recipientEmail:input.recipientEmail});
   const to=input.recipientEmail || recipientEmail; if(!to) throw new Error("recipientEmail is required");
@@ -25,7 +26,10 @@ async function queueInductionEmail(inputOrEmail, subjectOrOptions, text, html, o
   try {
     const result=await retry(async()=>{
       const payload={to,name:input.recipientName||recipientName||"Member",subject:input.subject||"",text:input.text||"",html:input.html||"",invitationId:input.invitationId||null};
-      const res=await fetchFn(env.GATEWAY_URL+"/api/send-invitation-email",{method:"POST",headers:{"content-type":"application/json","x-irpa-service-key":env.INVITE_SERVICE_KEY},body:JSON.stringify(payload)});
+      const gateway=String(env.GATEWAY_URL||env.INVITATION_GATEWAY_URL||"").replace(/\/+$/, "")
+      if(!gateway) throw new Error("Invitation email gateway is not configured.");
+      const serviceToken=await getServiceIdToken({env,fetchFn});
+      const res=await fetchFn(gateway+"/api/send-invitation-email",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+serviceToken},body:JSON.stringify(payload)});
       if(!res.ok){const err=new Error("Gateway responded "+res.status);err.status=res.status;throw err;} return res.json();
     },{logger,sleep,shouldRetry:(e)=>!(e?.status>=400&&e?.status<500)});
     await queueRef.update({status:"Sent",sentAt:new Date().toISOString(),messageId:result?.messageId||null});

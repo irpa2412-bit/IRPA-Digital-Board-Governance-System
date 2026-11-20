@@ -2,9 +2,7 @@ const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const {getFirestore,FieldValue}=require("firebase-admin/firestore");
 const crypto=require("crypto");
 const {getApp}=require("firebase-admin/app");
-const {defineSecret}=require("firebase-functions/params");
 const {queueInductionEmail}=require("./queueInductionEmail");
-const INVITE_SERVICE_KEY=defineSecret("INVITE_SERVICE_KEY");
 const db=getFirestore();
 const text=v=>String(v??"").trim();
 const hash=v=>crypto.createHash("sha256").update(String(v),"utf8").digest("hex");
@@ -211,7 +209,7 @@ function reportLines(rows,fields){
  return rows.length?rows.map((row,index)=>(index+1)+". "+(fields.map(field=>text(row[field])).filter(Boolean).join(" — ")||text(row.title||row.name||row.description)||"Recorded item")).join("\n"):"No entries recorded in the register at compilation time.";
 }
 exports.compileAndEmailMeetingReport=onCall({
- region:"us-central1",timeoutSeconds:120,secrets:[INVITE_SERVICE_KEY]
+ region:"us-central1",timeoutSeconds:120
 },async request=>{
  const uid=request.auth?.uid,email=text(request.auth?.token?.email).toLowerCase();
  if(!uid)throw new HttpsError("unauthenticated","Sign in to compile and distribute a meeting report.");
@@ -310,9 +308,8 @@ exports.compileAndEmailMeetingReport=onCall({
  const reportHash=hash(report.replace(/Report generated \(UTC\): .+\n/,""));
  const dispatchId=hash(meetingId+":"+reportHash).slice(0,40);
  const dispatchRef=db.collection("meetingReportDispatches").doc(dispatchId);
- const secret=String(INVITE_SERVICE_KEY.value()||"");
  const gateway=String(process.env.GATEWAY_URL||process.env.INVITATION_GATEWAY_URL||"").replace(/\/$/,"");
- if(!secret||!gateway)throw new HttpsError("failed-precondition","The invitation email gateway is not fully configured on the server. The report was compiled but email delivery could not start.");
+ if(!gateway)throw new HttpsError("failed-precondition","The invitation email gateway is not configured on the server. The report was compiled but email delivery could not start.");
  const prior=await dispatchRef.get();
  if(prior.exists&&prior.data()?.status==="Sent")return{ok:true,alreadySent:true,reportHash,recipientCount:Number(prior.data()?.recipientCount||0),sentCount:Number(prior.data()?.sentCount||0),failedCount:0,dispatchId};
  if(prior.exists&&prior.data()?.status==="In Progress")throw new HttpsError("aborted","This report is already being distributed. Check the report dispatch register before retrying.");
@@ -326,7 +323,7 @@ exports.compileAndEmailMeetingReport=onCall({
   const old=statusByEmail.get(recipient.recipientEmail);
   if(old?.status==="Sent"){results.push(old);continue;}
   try{
-   const delivery=await queueInductionEmail({recipientEmail:recipient.recipientEmail,recipientName:recipient.recipientName,subject,text:report,html,invitedByUid:uid},{db,env:{...process.env,GATEWAY_URL:gateway,INVITE_SERVICE_KEY:secret}});
+   const delivery=await queueInductionEmail({recipientEmail:recipient.recipientEmail,recipientName:recipient.recipientName,subject,text:report,html,invitedByUid:uid},{db,env:{...process.env,GATEWAY_URL:gateway}});
    const row={email:recipient.recipientEmail,name:recipient.recipientName,status:delivery.status||"Failed",messageId:delivery.messageId||null,error:delivery.error||null};
    results.push(row);
    await dispatchRef.set({recipients:results,updatedAt:FieldValue.serverTimestamp()},{merge:true});

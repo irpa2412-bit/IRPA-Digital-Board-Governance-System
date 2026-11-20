@@ -12,7 +12,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
@@ -1618,7 +1618,7 @@ async function uploadControlledDocument(request, env) {
   const contentType = String(data.contentType || "application/pdf").toLowerCase();
   const fileSize = Number(data.fileSize || 0);
   const base64 = String(data.base64 || "");
-  const title = cleanName(data.title || fileName.replace(/\\.pdf$/i, ""));
+  const title = cleanName(data.title || fileName.replace(/\.pdf$/i, ""));
   const reference = cleanName(data.reference || "");
   const documentId = cleanId(data.documentId || "");
   if (!documentId) return json({ok:false,error:"STEP upload-controlled-document: the final Firestore document ID is required before Drive upload."},400,corsHeaders(request));
@@ -2729,26 +2729,14 @@ info@irpa.or.tz`;
 }
 
 async function sendGatewayInvitationEmail(request, env) {
-  const supplied=String(request.headers.get("x-irpa-service-key")||"");
-  const expected=String(env.INVITE_SERVICE_KEY||"");
-  if(!supplied||!expected) return json({ok:false,error:"Unauthorized"},401,corsHeaders(request));
-  const a=new TextEncoder().encode(supplied), b=new TextEncoder().encode(expected);
-  let diff=a.length^b.length; const n=Math.max(a.length,b.length);
-  for(let j=0;j<n;j++) diff|=(a[j%Math.max(1,a.length)]||0)^(b[j%Math.max(1,b.length)]||0);
-  if(diff!==0) return json({ok:false,error:"Unauthorized"},401,corsHeaders(request));
-  let data; try{data=await request.json();}catch{return json({ok:false,error:"Invalid JSON"},400,corsHeaders(request));}
-  const to=validateRecipient(data?.to);
-  if(!to) return json({ok:false,error:"Invalid recipient"},400,corsHeaders(request));
-  const subject=validateMailHeader(String(data?.subject||""),"Subject");
-  if(!subject) return json({ok:false,error:"Invalid subject"},400,corsHeaders(request));
-  if(typeof data?.text!=="string"||typeof data?.html!=="string") return json({ok:false,error:"Invalid message body"},400,corsHeaders(request));
-  try{
-    const messageId=await sendWithRetry(()=>smtpSend(env,{to,subject,text:data.text,html:data.html}),{onFailure:async(error,attempt)=>console.error("IRPA invitation gateway SMTP failure",{recipientDomain:recipientDomain(to),attempt,error:safeMailError(error)})});
-    return json({ok:true,messageId:String(messageId||"")},200,corsHeaders(request));
-  }catch(error){
-    console.error("INVITATION_GATEWAY_PROVIDER_FAILED",{recipientDomain:recipientDomain(to),error:safeMailError(error)});
-    return json({ok:false,error:"EMAIL_PROVIDER_FAILED"},502,corsHeaders(request));
-  }
+  return handleSendInvitationEmail(request, env, {
+    authenticateFirebaseRequest,
+    enforceRateLimit: (runtimeEnv, recipient) => enforceServiceMailRateLimit(runtimeEnv, recipient),
+    smtpSend: (runtimeEnv, message) => smtpSend(runtimeEnv, message),
+    logger: console,
+    json,
+    corsHeaders
+  });
 }
 
 async function notifyInvitationAdministrator(request, env, reason) {
@@ -2914,6 +2902,28 @@ async function enforceMailRateLimit(env, uid) {
   const current = Number(await env.DRIVE_KV.get(key) || 0);
   if (current >= 10) throw new Error("Mail invitation rate limit reached. Please wait before sending more invitations.");
   await env.DRIVE_KV.put(key, String(current + 1), { expirationTtl: 3700 });
+}
+
+async function enforceServiceMailRateLimit(env, recipient) {
+  if (!env?.DRIVE_KV) throw new Error("Email rate-limit storage is unavailable.");
+  const address = String(recipient || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) throw new Error("Invalid recipient.");
+  const hour = Math.floor(Date.now() / 3600000);
+  const recipientHash = await sha256Hex(address);
+  const limits = [
+    { key: "server-mail-recipient:" + recipientHash + ":" + hour, maximum: 10 },
+    { key: "server-mail-global:" + hour, maximum: 200 }
+  ];
+  for (const limit of limits) {
+    const count = Number(await env.DRIVE_KV.get(limit.key) || 0);
+    if (!Number.isFinite(count) || count >= limit.maximum) {
+      throw Object.assign(new Error("Server email rate limit reached."), { status:429 });
+    }
+  }
+  for (const limit of limits) {
+    const count = Number(await env.DRIVE_KV.get(limit.key) || 0);
+    await env.DRIVE_KV.put(limit.key, String(count + 1), { expirationTtl: 3700 });
+  }
 }
 
 
@@ -3370,7 +3380,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
       admin: payload.admin === true,
       irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
       name: payload.name || "",
-      phoneNumber: payload.phone_number || ""
+      phoneNumber: payload.phone_number || "",
+      emailDeliveryService: payload.irpaEmailDeliveryService === true
     }
   };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);

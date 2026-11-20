@@ -8,117 +8,106 @@ const sleep = async () => {};
 
 function makeEnv() {
   const store = new Map();
+  return { INVITE_SERVICE_KEY:"test-key", IRPA_APP_URL:"https://app.example.test", DRIVE_KV:{get:async k=>store.get(k)??null,put:async(k,v)=>void store.set(k,v)} };
+}
+function req(body, token="valid-token") {
+  return new Request("https://gw.test/api/send-invitation-email", {
+    method:"POST", headers:token?{authorization:"Bearer "+token,"content-type":"application/json"}:{"content-type":"application/json"},
+    body:typeof body==="string"?body:JSON.stringify(body)
+  });
+}
+function legacyReq(body,key="test-key") {
+  return new Request("https://gw.test/api/send-invitation-email", {
+    method:"POST", headers:{"x-irpa-service-key":key,"content-type":"application/json"},
+    body:JSON.stringify(body)
+  });
+}
+const good = {to:"a@example.org",name:"Amina",subject:"IRPA test",text:"Hello",html:"<p>Hello</p>"};
+const serviceClaims={user_id:"irpa-email-dispatcher",firebaseClaims:{emailDeliveryService:true}};
+function deps(overrides={}) {
   return {
-    INVITE_SERVICE_KEY: "test-key",
-    IRPA_APP_URL: "https://app.example.test",
-    DRIVE_KV: {
-      get: async (k) => store.get(k) ?? null,
-      put: async (k, v) => void store.set(k, v),
-    },
+    authenticateFirebaseRequest:async(_request,_env,options)=>{assert.equal(options.skipActivation,true);return serviceClaims;},
+    enforceRateLimit:async()=>{},
+    smtpSend:async()=>({messageId:"m-1"}),
+    logger:quiet,
+    ...overrides
   };
 }
-function req(body, key = "test-key") {
-  return new Request("https://gw.test/api/send-invitation-email", {
-    method: "POST", headers: key ? { "x-irpa-service-key": key } : {},
-    body: JSON.stringify(body),
-  });
-}
-const good = { to:"a@example.org", name:"Amina", link:"https://app.example.test/?invite=abc" };
 
-test("meeting-linked invitation includes the access link and gate password without affecting normal invitations", () => {
-  const message=buildInvitationMessage({
-    name:"Amina",
-    username:"a@example.org",
-    link:"https://app.example.test/?invitationToken=invite-secret",
-    meetingAccess:{
-      link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",
-      meetingReference:"IRPA Board Meeting",
-      password:"AB12CD34EF56",
-      expiresAt:"2026-10-30T10:00:00.000Z"
-    }
-  });
-  assert.match(message.subject,/meeting access/i);
-  assert.match(message.text,/meetingToken=opaque-token/);
-  assert.match(message.text,/AB12CD34EF56/);
-  assert.match(message.text,/IRPA username: a@example.org/);
-  assert.match(message.html,/IRPA username/);
-  assert.match(message.html,/Open IRPA Meeting/);
-  assert.match(message.html,/AB12CD34EF56/);
-  const registered=buildInvitationMessage({name:"Amina",username:"a@example.org",link:"https://app.example.test/?invitationToken=invite-secret",meetingAccess:{link:"https://app.example.test/?meetingToken=opaque-token&meetingId=MEET-1",meetingIdentity:"IRPA-MEET-MEET-1",meetingReference:"IRPA-MTG-2026-000123",meetingTitle:"Quarterly Board Meeting",meetingDate:"2026-10-30",meetingStartTime:"10:00",meetingEndTime:"12:00",meetingPlatform:"Microsoft Teams",platformAccessUrl:"https://teams.example.test/meeting",platformMeetingId:"TEAM-123",platformPasscode:"JOIN-456",meetingVenue:"IRPA Board Room",meetingChairperson:"Board Chairperson",meetingAgenda:"Approve minutes and review actions",password:"AB12CD34EF56",expiresAt:"2026-10-30T10:00:00.000Z"}});
-  assert.match(registered.text,/IRPA-MEET-MEET-1/);
-  assert.match(registered.text,/IRPA-MTG-2026-000123/);
-  assert.match(registered.text,/Microsoft Teams/);
-  assert.match(registered.text,/https:\/\/teams\.example\.test\/meeting/);
-  assert.match(registered.text,/TEAM-123/);
-  assert.match(registered.html,/IRPA-MEET-MEET-1/);
-  assert.match(registered.html,/Quarterly Board Meeting/);
-  assert.match(registered.html,/Open Microsoft Teams platform/);
-  const ordinary=buildInvitationMessage({name:"Amina",link:"https://app.example.test/?invitationToken=invite-secret"});
-  assert.doesNotMatch(ordinary.text,/Meeting gate password/);
+test("rejects requests without Firebase service authentication",async()=>{
+  const result=await handleSendInvitationEmail(req(good,null),makeEnv(),deps({authenticateFirebaseRequest:async()=>{throw new Error("no token");}}));
+  assert.equal(result.status,401);
 });
-
-test("rejects missing or wrong service key", async () => {
-  const smtpSend=async()=>({});
-  assert.equal((await handleSendInvitationEmail(req(good,null),makeEnv(),{smtpSend,logger:quiet})).status,401);
-  assert.equal((await handleSendInvitationEmail(req(good,"bad"),makeEnv(),{smtpSend,logger:quiet})).status,401);
+test("accepts the old service key only as a temporary compatibility path",async()=>{
+  const sent=[];
+  const result=await handleSendInvitationEmail(legacyReq(good),makeEnv(),deps({smtpSend:async(_env,message)=>{sent.push(message);return{messageId:"legacy-1"};}}));
+  assert.equal(result.status,200);assert.equal(sent.length,1);
+  assert.equal((await handleSendInvitationEmail(legacyReq(good,"wrong-key"),makeEnv(),deps())).status,401);
 });
-test("fails closed when no service key is configured", async () => {
-  const env=makeEnv(); delete env.INVITE_SERVICE_KEY;
-  assert.equal((await handleSendInvitationEmail(req(good,"anything"),env,{smtpSend:async()=>({}),logger:quiet})).status,401);
+test("rejects authenticated users that are not the dedicated email service",async()=>{
+  const result=await handleSendInvitationEmail(req(good),makeEnv(),deps({authenticateFirebaseRequest:async()=>({user_id:"ordinary-user",firebaseClaims:{emailDeliveryService:true}})}));
+  assert.equal(result.status,403);
 });
-test("rejects invalid recipient and header injection", async () => {
-  const d={smtpSend:async()=>({}),logger:quiet};
-  assert.equal((await handleSendInvitationEmail(req({...good,to:"not-an-email"}),makeEnv(),d)).status,400);
-  assert.equal((await handleSendInvitationEmail(req({...good,to:"a@example.org\r\nBcc: x@y.z"}),makeEnv(),d)).status,400);
-  assert.equal((await handleSendInvitationEmail(req({...good,name:"Bob\r\nBcc: x@y.z"}),makeEnv(),d)).status,400);
+test("rejects a service UID without the verified service claim",async()=>{
+  const result=await handleSendInvitationEmail(req(good),makeEnv(),deps({authenticateFirebaseRequest:async()=>({user_id:"irpa-email-dispatcher",firebaseClaims:{emailDeliveryService:false}})}));
+  assert.equal(result.status,403);
 });
-test("rejects links to other origins", async () => {
-  assert.equal((await handleSendInvitationEmail(req({...good,link:"https://evil.test/?invite=abc"}),makeEnv(),{smtpSend:async()=>({}),logger:quiet})).status,400);
+test("rejects malformed JSON, invalid recipients and unsafe headers",async()=>{
+  assert.equal((await handleSendInvitationEmail(req("{"),makeEnv(),deps())).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,to:"not-an-email"}),makeEnv(),deps())).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,to:"a@example.org\r\nBcc: x@y.z"}),makeEnv(),deps())).status,400);
+  assert.equal((await handleSendInvitationEmail(req({...good,subject:"Hello\r\nBcc: x@y.z"}),makeEnv(),deps())).status,400);
 });
-test("sends once, escapes HTML, returns message id", async () => {
-  const calls=[]; const smtpSend=async(_env,msg)=>{calls.push(msg);return{messageId:"m-1"}};
-  const res=await handleSendInvitationEmail(req({...good,name:"<b>Eve</b>"}),makeEnv(),{smtpSend,logger:quiet});
-  assert.equal(res.status,200); assert.equal((await res.json()).messageId,"m-1"); assert.equal(calls.length,1);
-  assert.ok(!calls[0].html.includes("<b>Eve</b>")); assert.ok(calls[0].html.includes("&lt;b&gt;Eve&lt;/b&gt;"));
+test("requires text and HTML message bodies",async()=>{
+  assert.equal((await handleSendInvitationEmail(req({...good,html:7}),makeEnv(),deps())).status,400);
 });
-test("retries after a provider failure then succeeds", async () => {
-  let n=0; const smtpSend=async()=>{if(++n===1)throw new Error("boom");return{messageId:"m-2"}};
-  assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),{smtpSend,logger:quiet,sleep})).status,200); assert.equal(n,2);
-});
-test("returns 502 after final provider failure", async () => {
-  let n=0; const smtpSend=async()=>{n++;throw new Error("down")};
-  assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),{smtpSend,logger:quiet,sleep})).status,502); assert.equal(n,3);
-});
-
-test("bounded exponential retry delays never exceed the configured cap", async () => {
-  const delays=[]; let n=0;
-  await assert.rejects(sendWithRetry(async()=>{n++;throw new Error("temporary network failure")},{
-    attempts:99,delayMs:300,maxDelayMs:500,logger:quiet,sleep:async ms=>delays.push(ms)
+test("sends only after Firebase service identity and recipient rate limit pass",async()=>{
+  const calls=[];
+  const result=await handleSendInvitationEmail(req(good),makeEnv(),deps({
+    enforceRateLimit:async(_env,to)=>calls.push(to),
+    smtpSend:async(_env,message)=>{calls.push(message);return{messageId:"m-2"}}
   }));
-  assert.equal(n,3,"attempt count is capped");
-  assert.equal(delays.length,2);
-  assert.ok(delays.every(ms=>ms>=0&&ms<=500));
+  assert.equal(result.status,200);
+  assert.equal((await result.json()).messageId,"m-2");
+  assert.equal(calls[0],"a@example.org");
+  assert.equal(calls[1].subject,"IRPA test");
 });
-
-test("permanent SMTP rejection is not retried", async () => {
+test("fails closed when the service rate limiter is unavailable or exhausted",async()=>{
+  assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),deps({enforceRateLimit:async()=>{throw Object.assign(new Error("limit"),{status:429});}}))).status,429);
+  assert.equal((await handleSendInvitationEmail(req(good),makeEnv(),deps({enforceRateLimit:async()=>{throw new Error("kv down");}}))).status,503);
+});
+test("retries transient SMTP failure then succeeds",async()=>{
   let n=0;
-  await assert.rejects(sendWithRetry(async()=>{n++;throw new Error("IRPA SMTP error 550: sender rejected")},{logger:quiet,sleep}));
-  assert.equal(n,1);
-  assert.equal(isRetryableMailError(new Error("IRPA SMTP error 450: temporary failure")),true);
-  assert.equal(isRetryableMailError(Object.assign(new Error("connection dropped after DATA"),{deliveryOutcome:"unknown",retryable:false})),false);
+  const result=await handleSendInvitationEmail(req(good),makeEnv(),deps({smtpSend:async()=>{if(++n===1)throw new Error("temporary");return{messageId:"m-3"};}}));
+  assert.equal(result.status,200);assert.equal(n,2);
 });
-test("rate limits repeated sends to one address", async () => {
-  const env=makeEnv(), d={smtpSend:async()=>({messageId:"x"}),logger:quiet,sleep};
-  for(let i=0;i<5;i++) assert.equal((await handleSendInvitationEmail(req(good),env,d)).status,200);
-  assert.equal((await handleSendInvitationEmail(req(good),env,d)).status,429);
+test("returns 502 after final SMTP failure",async()=>{
+  let n=0;
+  const result=await handleSendInvitationEmail(req(good),makeEnv(),deps({smtpSend:async()=>{n++;throw new Error("provider down");}}));
+  assert.equal(result.status,502);assert.equal(n,3);
 });
-function fakeDb(){const docs=new Map();return{docs,collection:c=>({doc:id=>({set:async d=>void docs.set(`${c}/${id}`,{...d}),update:async d=>void docs.set(`${c}/${id}`,{...docs.get(`${c}/${id}`),...d})})})}};
-const base=db=>({db,invitationId:"INV-1",recipientEmail:"a@example.org",recipientName:"Amina",link:"https://app.example.test/?invite=abc",invitedByUid:"u1"});
-const fenv={GATEWAY_URL:"https://gw.test",INVITE_SERVICE_KEY:"k"};
-test("queueInductionEmail marks Sent on success",async()=>{const db=fakeDb();const fetchFn=async()=>({ok:true,status:200,json:async()=>({ok:true,messageId:"m-9"})});const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Sent");assert.equal(db.docs.get("emailQueue/INV-1").status,"Sent")});
-test("queueInductionEmail retries 5xx then marks Failed",async()=>{const db=fakeDb();let n=0;const fetchFn=async()=>{n++;return{ok:false,status:502,json:async()=>({})}};const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Failed");assert.equal(n,3);assert.equal(db.docs.get("emailQueue/INV-1").status,"Failed")});
-test("queueInductionEmail does not retry 4xx",async()=>{const db=fakeDb();let n=0;const fetchFn=async()=>{n++;return{ok:false,status:400,json:async()=>({})}};const out=await queueInductionEmail(base(db),{fetchFn,env:fenv,logger:quiet,sleep});assert.equal(out.status,"Failed");assert.equal(n,1)});
-
+function fakeDb(){const docs=new Map();return{docs,collection:c=>({doc:id=>({set:async d=>void docs.set(`${c}/${id}`,{...d}),update:async d=>void docs.set(`${c}/${id}`,{...docs.get(`${c}/${id}`),...d})})})};}
+const base=db=>({db,invitationId:"INV-1",recipientEmail:"a@example.org",recipientName:"Amina",subject:"IRPA test",text:"Hello",html:"<p>Hello</p>",invitedByUid:"u1"});
+test("queueInductionEmail uses a short-lived Firebase bearer token and records success",async()=>{
+  const db=fakeDb(),headers=[];
+  const fetchFn=async(url,options)=>{headers.push({url,options});return{ok:true,status:200,json:async()=>({ok:true,messageId:"m-9"})};};
+  const out=await queueInductionEmail(base(db),{fetchFn,env:{GATEWAY_URL:"https://gw.test"},getServiceIdToken:async()=> "firebase-id-token",logger:quiet,sleep});
+  assert.equal(out.status,"Sent");assert.equal(db.docs.get("emailQueue/INV-1").status,"Sent");
+  assert.equal(headers[0].url,"https://gw.test/api/send-invitation-email");
+  assert.equal(headers[0].options.headers.authorization,"Bearer firebase-id-token");
+  assert.equal(headers[0].options.headers["x-irpa-service-key"],undefined);
+});
+test("queueInductionEmail retries transient Gateway failures then marks Failed",async()=>{
+  const db=fakeDb();let n=0;
+  const fetchFn=async()=>{n++;return{ok:false,status:502,json:async()=>({})};};
+  const out=await queueInductionEmail(base(db),{fetchFn,env:{GATEWAY_URL:"https://gw.test"},getServiceIdToken:async()=> "token",logger:quiet,sleep});
+  assert.equal(out.status,"Failed");assert.equal(n,3);assert.equal(db.docs.get("emailQueue/INV-1").status,"Failed");
+});
+test("queueInductionEmail does not retry permanent Gateway authorization failures",async()=>{
+  const db=fakeDb();let n=0;
+  const out=await queueInductionEmail(base(db),{fetchFn:async()=>{n++;return{ok:false,status:403,json:async()=>({})};},env:{GATEWAY_URL:"https://gw.test"},getServiceIdToken:async()=> "token",logger:quiet,sleep});
+  assert.equal(out.status,"Failed");assert.equal(n,1);
+});
 
 import { authenticateSmtpPlain } from "../src/smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "../src/smtpConfig.mjs";

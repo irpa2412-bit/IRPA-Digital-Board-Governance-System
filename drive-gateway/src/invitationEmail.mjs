@@ -181,50 +181,69 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
 }
 
 export async function handleSendInvitationEmail(request, env, deps = {}) {
-  const { smtpSend, logger = console, sleep } = deps;
-  const json = (status, body) => new Response(JSON.stringify(body), {
-    status, headers: { "content-type": "application/json" }
-  });
-  const supplied = request.headers.get("x-irpa-service-key");
-  const expected = env?.INVITE_SERVICE_KEY;
-  if (!supplied || !expected || supplied !== expected) return json(401, { ok:false, error:"Unauthorized" });
+  const { authenticateFirebaseRequest, smtpSend, enforceRateLimit, logger = console, sleep, json, corsHeaders } = deps;
+  const respond = (status, body) => typeof json === "function"
+    ? json(body, status, typeof corsHeaders === "function" ? corsHeaders(request) : {})
+    : new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-  let body;
-  try { body = await request.json(); } catch { return json(400, { ok:false, error:"Invalid JSON" }); }
-
-  const to = validateRecipient(body?.to);
-  if (!to) return json(400, { ok:false, error:"Invalid recipient" });
-  const name = validateName(body?.name);
-  if (!name) return json(400, { ok:false, error:"Invalid name" });
-
-  let link;
-  try {
-    const u = new URL(body?.link);
-    const allowed = new URL(env.IRPA_APP_URL);
-    if (u.protocol !== "https:" || u.origin !== allowed.origin) throw new Error("origin");
-    link = u.toString();
-  } catch { return json(400, { ok:false, error:"Invalid link" }); }
-
-  const store = env.DRIVE_KV;
-  if (store) {
-    const key = "invite-rate:" + to.toLowerCase();
-    const count = Number((await store.get(key)) || 0);
-    if (count >= 5) return json(429, { ok:false, error:"Too many invitations to this address" });
-    await store.put(key, String(count + 1), { expirationTtl: 3600 });
+  if (typeof authenticateFirebaseRequest !== "function" || typeof smtpSend !== "function") {
+    return respond(503, { ok:false, error:"Email delivery service is unavailable." });
+  }
+  let claims;
+  const authorization = String(request.headers.get("Authorization") || "").trim();
+  if (authorization) {
+    try {
+      claims = await authenticateFirebaseRequest(request, env, { skipActivation:true });
+    } catch {
+      return respond(401, { ok:false, error:"Firebase service authentication is required." });
+    }
+    if (claims?.user_id !== "irpa-email-dispatcher" || claims?.firebaseClaims?.emailDeliveryService !== true) {
+      return respond(403, { ok:false, error:"Authorised email service identity is required." });
+    }
+  } else {
+    // Temporary compatibility bridge: keep existing deployed Functions working
+    // until the Firebase Functions release is confirmed live.
+    const supplied = String(request.headers.get("x-irpa-service-key") || "");
+    const expected = String(env?.INVITE_SERVICE_KEY || "");
+    if (!supplied || !expected) return respond(401, { ok:false, error:"Email service authentication is required." });
+    const left = new TextEncoder().encode(supplied);
+    const right = new TextEncoder().encode(expected);
+    let difference = left.length ^ right.length;
+    const length = Math.max(left.length, right.length);
+    for (let i = 0; i < length; i++) difference |= (left[i] || 0) ^ (right[i] || 0);
+    if (difference !== 0) return respond(401, { ok:false, error:"Email service authentication is required." });
+    claims = { user_id:"legacy-invite-service", firebaseClaims:{ emailDeliveryService:true }, legacy:true };
   }
 
-  const message = buildInvitationMessage({ name, link });
+  let body;
+  try { body = await request.json(); } catch { return respond(400, { ok:false, error:"Invalid JSON" }); }
+  const to = validateRecipient(body?.to);
+  if (!to) return respond(400, { ok:false, error:"Invalid recipient" });
+  const subject = typeof body?.subject === "string" ? body.subject.trim() : "";
+  if (!subject || subject.length > 200 || CRLF_RE.test(subject)) return respond(400, { ok:false, error:"Invalid subject" });
+  if (typeof body?.text !== "string" || typeof body?.html !== "string" ||
+      body.text.length > 100000 || body.html.length > 100000) {
+    return respond(400, { ok:false, error:"Invalid message body" });
+  }
+  if (typeof enforceRateLimit === "function") {
+    try { await enforceRateLimit(env, to, claims); }
+    catch (error) {
+      const status = Number(error?.status) === 429 ? 429 : 503;
+      return respond(status, { ok:false, error:status === 429 ? "Too many messages to this address." : "Email rate-limit service is unavailable." });
+    }
+  }
+
   try {
     const result = await sendWithRetry(
-      () => smtpSend(env, { to, ...message }),
+      () => smtpSend(env, { to, subject, text:body.text, html:body.html }),
       { logger, sleep }
     );
-    return json(200, { ok:true, messageId:result?.messageId || result || null });
+    return respond(200, { ok:true, messageId:result?.messageId || result || null });
   } catch (error) {
-    logger.error("SIGNATURE_INVITATION_PROVIDER_FAILED", {
+    logger.error("SERVER_EMAIL_PROVIDER_FAILED", {
       recipientDomain: to.split("@")[1] || "unknown",
-      message: String(error?.message || error).slice(0, 200)
+      message: String(error?.message || error).replace(/[\r\n]/g, " ").slice(0, 200)
     });
-    return json(502, { ok:false, error:"EMAIL_PROVIDER_FAILED" });
+    return respond(502, { ok:false, error:"EMAIL_PROVIDER_FAILED" });
   }
 }

@@ -7,6 +7,12 @@ on:
     paths:
       - "src/styles/portal-readability-standard.css"
       - "drive-gateway/**"
+      - "functions/emailServiceAuth.js"
+      - "functions/emailServiceAuth.test.cjs"
+      - "functions/queueInductionEmail.js"
+      - "functions/meetingRecords.js"
+      - "functions/index.js"
+      - "tests/workflow-production-deploy-policy.test.mjs"
       - "src/firebase/signaturePlatform.js"
       - "src/firebase/auth.js"
       - ".github/workflows/mail-invitation-tests.yml"
@@ -28,6 +34,10 @@ jobs:
       - name: Run mocked SMTP invitation tests
         working-directory: drive-gateway
         run: node tests/mail-invitation.unit.mjs
+      - name: Run Firebase email service identity tests
+        run: node --test functions/emailServiceAuth.test.cjs
+      - name: Verify Gateway production deployment policy
+        run: node --test tests/workflow-production-deploy-policy.test.mjs
       - name: Run invitation redemption tests
         working-directory: drive-gateway
         run: node --test tests/invitation-redemption.test.mjs
