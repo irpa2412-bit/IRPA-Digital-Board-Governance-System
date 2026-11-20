@@ -392,7 +392,7 @@ test("G5-08 — partial completion rollback", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
 
@@ -428,7 +428,7 @@ test("G5-09 — retry persistence", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
 
