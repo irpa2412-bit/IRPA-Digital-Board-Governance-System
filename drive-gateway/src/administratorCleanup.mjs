@@ -98,7 +98,8 @@ const TTL_SECONDS = 60 * 60 * 24;
 const clean = value => String(value ?? "").trim();
 const idOf = doc => clean(doc?.name).split("/").pop();
 const plain = doc => doc?.data || {};
-const recordLabel = data => clean(data.fullName || data.displayName || data.name || data.title || data.documentTitle || data.email || data.uid);
+const recordLabel = data => clean(data.fullName || data.displayName || data.name || data.title || data.documentTitle || data.email || data.uid); 
+const isTrialRecord = data => data?.trialData === true || data?.isTrial === true || clean(data?.recordOrigin).toUpperCase() === "TRIAL";
 
 export function createAdministratorCleanupRouter(deps) {
   const { authenticateFirebaseRequest, getFirestoreAdminAccessToken, getFirestoreDocument,
@@ -122,13 +123,16 @@ export function createAdministratorCleanupRouter(deps) {
   }
 
   async function loadInventory(env, auth) {
-    const [collectionResults, authToken, authUsers] = await Promise.all([
-      Promise.all(COLLECTIONS.map(async collection => [collection, await getFirestoreCollectionDocuments(env, collection, auth.token)])),
-      getFirebaseAuthAdminAccessToken(env),
-      Promise.resolve(null)
-    ]);
+    const authToken = await getFirebaseAuthAdminAccessToken(env);
     const users = await listFirebaseAuthUsers(env, authToken);
     const authByUid = new Map(users.map(user => [clean(user.localId || user.uid), user]));
+    const authByEmail = new Map(users.map(user => [clean(user.email).toLowerCase(), user]).filter(([email]) => email));
+    const collectionResults = [];
+    for (let offset = 0; offset < COLLECTIONS.length; offset += 8) {
+      const batch = COLLECTIONS.slice(offset, offset + 8);
+      const results = await Promise.all(batch.map(async collection => [collection, await getFirestoreCollectionDocuments(env, collection, auth.token)]));
+      collectionResults.push(...results);
+    }
     const envelopes = new Map(collectionResults.find(([name]) => name === "signatureEnvelopes")[1]
       .map(doc => [idOf(doc), firestoreDocumentToPlain(doc) || {}]));
     const records = [];
@@ -136,11 +140,14 @@ export function createAdministratorCleanupRouter(deps) {
       for (const doc of docs) {
         const data = firestoreDocumentToPlain(doc) || {};
         const id = idOf(doc);
-        const uid = clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid);
-        const authUser = authByUid.get(uid);
+        const email = clean(data.email || data.ownerEmail || data.signerEmail).toLowerCase();
+        const authUser = authByUid.get(clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid)) || authByEmail.get(email);
+        const uid = clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid || authUser?.localId || authUser?.uid);
         const signerInProtectedEnvelope = collection === "members" || collection === "employees" || collection === "signatureProfiles" || collection === "signerIdentities"
           ? [...envelopes.values()].some(envelope => ["signed","completed","in progress","inprogress","signing"].includes(clean(envelope.status).toLowerCase()) &&
-            (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer => clean(signer.uid || signer.profileUid) === uid))
+            (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer =>
+              (uid && clean(signer.uid || signer.profileUid) === uid) ||
+              (email && clean(signer.email).toLowerCase() === email)))
           : false;
         const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle);
         const roleValues = [data.role, data.boardPosition, data.designation, data.jobTitle, data.title, data.position,
@@ -148,18 +155,21 @@ export function createAdministratorCleanupRouter(deps) {
           ...(Array.isArray(data.selectedRoles) ? data.selectedRoles : [])].map(value => clean(value)).filter(Boolean);
         const protectedRole = roleValues.some(value => /administrator|executive director|board chair|chairperson|board secretary/i.test(value));
         const isAdmin = uid === auth.uid;
-        const isSignedTrial = collection === "signatureEnvelopes" && data.trialData === true &&
-          ["Completed","Signed"].includes(clean(data.status));
+        const trialData = isTrialRecord(data);
+        const isSignedTrial = collection === "signatureEnvelopes" && trialData &&
+          ["completed","signed"].includes(clean(data.status).toLowerCase());
         const immutableHistory = collection === "audit" || collection === "signatureEvents";
         const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory;
         records.push({
           key: collection + "/" + id, collection, id, uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
+          registerType: collection === "members" ? "Member Register" : collection === "employees" ? "Employee Register" :
+            collection === "auditorProfiles" ? "External Profile" : collection === "signatureProfiles" ? "Signature Profile" : collection,
           role, createdAt: data.createdAt || data.createdDate || data.timestamp || null,
           status: clean(data.status || data.registrationStatus || data.employmentStatus),
           authAccountPresent: Boolean(authUser),
           recordOrigin: clean(data.recordOrigin || data.source || ""),
-          trialData: data.trialData === true,
+          trialData,
           signedTrialDocument: isSignedTrial,
           signedPdfReference: isSignedTrial ? clean(data.signedPdfReference || data.signedFileId || data.driveFileId) || null : null,
           protected: protectedRecord,
