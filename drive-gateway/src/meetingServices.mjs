@@ -27,7 +27,7 @@ const participantCategory = participant => {
  if(/external|guest|partner|donor|consultant|technical expert|government representative|observer/.test(role)||type.includes("external"))return "EXTERNAL_INVITEE";
  return "OTHER";
 };
-async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null){
+async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,claims=null){
  const meetingId=clean(meeting.id);
  const [participants,passes,queue,signatures,memberRecords,dailyRows,dispatchRows]=await Promise.all([
   listByField(ctx,env,token,"participants","meetingId",meetingId),
@@ -57,8 +57,10 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null){
  const signatureByParticipant=new Map(signatures.map(s=>[clean(s.participantId),s]));
  const dailyByParticipant=new Map(dailyRows.filter(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate).map(r=>[clean(r.participantId),r]));
  const dailyDispatch=dispatchRows.find(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate);
- const dailyEnvelope=dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.envelopeId?await getDoc(ctx,env,token,"signatureEnvelopes",clean(dailyDispatch.envelopeId)):null;
- const dailySignerByUid=new Map((Array.isArray(dailyEnvelope?.recipients)?dailyEnvelope.recipients:[]).filter(r=>clean(r.uid)&&clean(r.status)==="Signed").map(r=>[clean(r.uid),r]));
+ let dailyGatewayStatus=null;
+ if(dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.gatewayEnvelopeId&&dailyDispatch?.ownerUid===clean(claims?.user_id)&&typeof ctx.getGatewayEnvelopeStatus==="function")dailyGatewayStatus=await ctx.getGatewayEnvelopeStatus(claims,env,clean(dailyDispatch.gatewayEnvelopeId)).catch(()=>null);
+ const gatewaySignersById=new Map((Array.isArray(dailyGatewayStatus?.signers)?dailyGatewayStatus.signers:[]).map(s=>[clean(s.id),s]));
+ const dailySignerByUid=new Map((Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([uid,signer])=>uid&&signer?.status==="Signed"));
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
@@ -216,7 +218,7 @@ if(pathname==="/api/meeting-board-register/list"){
 if(pathname==="/api/meeting-quorum/assess"){
  const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
  const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
- const attendanceDate=clean(data.date)||null;if(attendanceDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(attendanceDate))return fail(ctx,request,"A valid attendance date is required.",400);const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting,attendanceDate);
+ const attendanceDate=clean(data.date)||null;if(attendanceDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(attendanceDate))return fail(ctx,request,"A valid attendance date is required.",400);const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting,attendanceDate,claims);
  if(data.save===true){
   if(!c.canManage)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may save a quorum assessment.",403);
   const snapshot={...assessment,rows:assessment.rows.map(r=>({...r,email:undefined}))};
@@ -307,7 +309,7 @@ for(const member of memberRecords){
 }
 const dispatch=dispatchRows.find(r=>clean(r.attendanceDate)===date)||null;
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
-return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null}:null});
+return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null,gatewayEnvelopeId:dispatch.gatewayEnvelopeId||null,gatewaySignerMap:Array.isArray(dispatch.gatewaySignerMap)?dispatch.gatewaySignerMap:[]}:null});
 }
 if(pathname==="/api/meeting-attendance/daily/mark"){
 const meetingId=clean(data.meetingId),date=clean(data.date),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
@@ -337,8 +339,11 @@ if(phase==="PREPARE"){
  const dayRows=dailyRows.filter(r=>clean(r.attendanceDate)===date&&clean(r.attendanceStatus)==="Present");
  const presentUids=new Set(dayRows.map(r=>clean(r.participantUid)).filter(Boolean));
  const supplied=new Set(Array.isArray(data.signerUids)?data.signerUids.map(clean):[]);
- if(!presentUids.size||presentUids.size!==supplied.size||[...presentUids].some(value=>!supplied.has(value)))return fail(ctx,request,"The email-link signer list must exactly match the UID-identified participants marked Present for this date.",409);
- const record={meetingId,attendanceDate:date,status:"PREPARING",envelopeId,documentId,ownerUid:uid,signerUids:[...presentUids],preparedAt:now,updatedAt:now};
+ const gatewaySignerMap=Array.isArray(data.gatewaySignerMap)?data.gatewaySignerMap:[];
+ const mappedUids=new Set(gatewaySignerMap.map(item=>clean(item.participantUid)).filter(Boolean));
+ const signerIds=new Set(gatewaySignerMap.map(item=>clean(item.signerId)).filter(Boolean));
+ if(!presentUids.size||presentUids.size!==supplied.size||[...presentUids].some(value=>!supplied.has(value))||mappedUids.size!==presentUids.size||[...presentUids].some(value=>!mappedUids.has(value))||signerIds.size!==gatewaySignerMap.length||gatewaySignerMap.length!==presentUids.size)return fail(ctx,request,"The email-link signer mapping must exactly and uniquely bind every UID-identified participant marked Present.",409);
+ const record={meetingId,attendanceDate:date,status:"PREPARING",envelopeId,documentId,ownerUid:uid,signerUids:[...presentUids],gatewaySignerMap,preparedAt:now,updatedAt:now};
  if(existing)await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,record);else await writeDoc(ctx,env,token,"meetingAttendanceDispatches",id,{...record,createdAt:now},false);
 }else{
  if(!existing||clean(existing.envelopeId)!==envelopeId||clean(existing.ownerUid)!==uid)return fail(ctx,request,"No matching host-owned prepared signing request exists for this date.",409);
