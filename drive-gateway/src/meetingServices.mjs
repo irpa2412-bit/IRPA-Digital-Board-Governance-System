@@ -61,7 +61,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  if(dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.gatewayEnvelopeId&&dailyDispatch?.ownerUid&&typeof ctx.getGatewayEnvelopeStatus==="function")dailyGatewayStatus=await ctx.getGatewayEnvelopeStatus(clean(dailyDispatch.ownerUid),env,clean(dailyDispatch.gatewayEnvelopeId)).catch(()=>null);
  const verifiedGatewaySigners=dailyDispatch?.gatewayAuditChainValid===true&&dailyGatewayStatus?.auditChainValid===true&&clean(dailyGatewayStatus?.envelopeId)===clean(dailyDispatch?.gatewayEnvelopeId)?dailyGatewayStatus.signers:[];
  const gatewaySignersById=new Map((Array.isArray(verifiedGatewaySigners)?verifiedGatewaySigners:[]).map(s=>[clean(s.id),s]));
- const dailySignerByUid=new Map((Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([uid,signer])=>uid&&signer?.status==="Signed"));
+ const dailySignerByParticipant=new Map((Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantId),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantId,signer])=>participantId&&signer?.status==="Signed"));
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
@@ -69,7 +69,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  const uidOf=p=>clean(p.participantUid||p.uid||p.userId);
  const rows=active.map(p=>{
   const id=clean(p.id),signature=signatureByParticipant.get(id),entry=queueByParticipant.get(id),pass=passByParticipant.get(id);
-  const uid=uidOf(p),daily=dailyByParticipant.get(id),dailySigner=dailySignerByUid.get(uid),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
+  const uid=uidOf(p),daily=dailyByParticipant.get(id),dailySigner=dailySignerByParticipant.get(id),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
   const explicitCommittee=lower(p.participantRole||p.role)==="board committee member"||lower(p.participantType).includes("board committee");
   const category=explicitCommittee?"BOARD_COMMITTEE_MEMBER":registerMatch?"BOARD_MEMBER":boardMemberRole(p)?"UNMATCHED_BOARD_REGISTRATION":participantCategory(p);
   const attendanceStatus=attendanceDate?(clean(daily?.attendanceStatus)||"N/A"):clean(p.attendanceStatus)||"Unmarked";
@@ -344,7 +344,7 @@ return response(ctx,request,{ok:true,attendanceDate:date,participantId,attendanc
 }
 if(pathname==="/api/meeting-attendance/daily/dispatch"){
 const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
-if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
+if(!meetingId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
 if(!c.canManage||!hostUid||ownerUid!==uid||hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
@@ -352,14 +352,18 @@ const id=await hash(meetingId+"\\0"+date),existing=await getDoc(ctx,env,token,"m
 if(phase==="PREPARE"){
  if(existing&&["PREPARING","DISPATCHED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared or dispatched.",409);
  const [participants,dailyRows]=await Promise.all([listByField(ctx,env,token,"participants","meetingId",meetingId),listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId)]);
- const dayRows=dailyRows.filter(r=>clean(r.attendanceDate)===date&&clean(r.attendanceStatus)==="Present");
- const presentUids=new Set(dayRows.map(r=>clean(r.participantUid)).filter(Boolean));
- const supplied=new Set(Array.isArray(data.signerUids)?data.signerUids.map(clean):[]);
+ const participantById=new Map(participants.map(row=>[clean(row.id),row]));
+ const dayRows=dailyRows.filter(row=>clean(row.attendanceDate)===date&&clean(row.attendanceStatus)==="Present");
+ const presentParticipantIds=new Set(dayRows.map(row=>clean(row.participantId)).filter(Boolean));
+ const suppliedIds=new Set(Array.isArray(data.participantIds)?data.participantIds.map(clean):[]);
  const gatewaySignerMap=Array.isArray(data.gatewaySignerMap)?data.gatewaySignerMap:[];
- const mappedUids=new Set(gatewaySignerMap.map(item=>clean(item.participantUid)).filter(Boolean));
+ const mappedIds=new Set(gatewaySignerMap.map(item=>clean(item.participantId)).filter(Boolean));
  const signerIds=new Set(gatewaySignerMap.map(item=>clean(item.signerId)).filter(Boolean));
- if(!presentUids.size||presentUids.size!==supplied.size||[...presentUids].some(value=>!supplied.has(value))||mappedUids.size!==presentUids.size||[...presentUids].some(value=>!mappedUids.has(value))||signerIds.size!==gatewaySignerMap.length||gatewaySignerMap.length!==presentUids.size)return fail(ctx,request,"The email-link signer mapping must exactly and uniquely bind every UID-identified participant marked Present.",409);
- const record={meetingId,attendanceDate:date,status:"PREPARING",envelopeId,documentId,ownerUid:uid,signerUids:[...presentUids],gatewaySignerMap,preparedAt:now,updatedAt:now};
+ const mappingComplete=presentParticipantIds.size>0&&presentParticipantIds.size===suppliedIds.size&&presentParticipantIds.size===mappedIds.size&&presentParticipantIds.size===signerIds.size&&
+  [...presentParticipantIds].every(participantId=>suppliedIds.has(participantId)&&mappedIds.has(participantId)&&participantById.has(participantId))&&
+  gatewaySignerMap.every(item=>clean(item.signerId)&&clean(item.participantId)&&lower(item.participantEmail)&&clean(item.participantName));
+ if(!mappingComplete||signerIds.size!==gatewaySignerMap.length||mappedIds.size!==gatewaySignerMap.length)return fail(ctx,request,"The email-link signer mapping must uniquely bind each Present participant record to its own signer ID, email and name. Shared email addresses are allowed and remain separate signer identities.",409);
+ const record={meetingId,attendanceDate:date,status:"PREPARING",envelopeId,documentId,ownerUid:uid,participantIds:[...presentParticipantIds],signerUids:gatewaySignerMap.map(item=>clean(item.participantUid)).filter(Boolean),gatewaySignerMap,preparedAt:now,updatedAt:now};
  if(existing)await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,record);else await writeDoc(ctx,env,token,"meetingAttendanceDispatches",id,{...record,createdAt:now},false);
 }else{
  if(!existing||clean(existing.envelopeId)!==envelopeId||clean(existing.ownerUid)!==uid)return fail(ctx,request,"No matching host-owned prepared signing request exists for this date.",409);
@@ -369,11 +373,13 @@ if(phase==="PREPARE"){
   const gatewayStatus=await ctx.getGatewayEnvelopeStatus(uid,env,gatewayEnvelopeId).catch(()=>null);
   const actualSigners=new Map((Array.isArray(gatewayStatus?.signers)?gatewayStatus.signers:[]).map(signer=>[clean(signer.id),signer]));
   const expectedMap=Array.isArray(existing.gatewaySignerMap)?existing.gatewaySignerMap:[];
-  const mappingValid=gatewayStatus?.auditChainValid===true&&clean(gatewayStatus?.envelopeId)===gatewayEnvelopeId&&actualSigners.size===expectedMap.length&&expectedMap.length===Number(existing.signerUids?.length||0)&&expectedMap.every(binding=>{
+  const expectedIds=new Set(Array.isArray(existing.participantIds)?existing.participantIds.map(clean):[]);
+  const mappedIds=new Set(expectedMap.map(binding=>clean(binding.participantId)).filter(Boolean));
+  const mappingValid=gatewayStatus?.auditChainValid===true&&clean(gatewayStatus?.envelopeId)===gatewayEnvelopeId&&actualSigners.size===expectedMap.length&&expectedMap.length===expectedIds.size&&mappedIds.size===expectedIds.size&&expectedMap.every(binding=>{
    const signer=actualSigners.get(clean(binding.signerId));
-   return signer&&lower(signer.email)===lower(binding.participantEmail)&&lower(signer.name)===lower(binding.participantName);
+   return expectedIds.has(clean(binding.participantId))&&signer&&lower(signer.email)===lower(binding.participantEmail)&&lower(signer.name)===lower(binding.participantName);
   });
-  if(!mappingValid)return fail(ctx,request,"The Gateway signer identities did not verify against the prepared participant register and audit chain. The request remains pending reconciliation.",409);
+  if(!mappingValid)return fail(ctx,request,"The Gateway signer identities did not verify against each prepared participant record and the audit chain. The request remains pending reconciliation.",409);
   await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"DISPATCHED",dispatchedAt:now,gatewayEnvelopeId,gatewayInvitationStatus:clean(data.gatewayInvitationStatus)||"Sent",gatewayAuditChainValid:true,updatedAt:now});
  }else{
   await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"FAILED",dispatchError:clean(data.error).slice(0,500),failedAt:now,updatedAt:now});
