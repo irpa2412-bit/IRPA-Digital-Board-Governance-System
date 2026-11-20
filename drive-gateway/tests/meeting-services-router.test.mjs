@@ -72,6 +72,23 @@ test("meeting register, decision, and voting control routes require authenticate
   }
 });
 
+
+test("attendance-sheet signing dispatch is disabled without mutating legacy dispatch records", async () => {
+  const authenticatedContext = {
+    ...ctx,
+    authenticateFirebaseRequest: async () => ({ user_id: "test-host" })
+  };
+  const response = await post(createMeetingServicesRouter(authenticatedContext), "/api/meeting-attendance/daily/dispatch", {
+    meetingId: "test-meeting",
+    date: "2026-11-20",
+    phase: "PREPARE",
+    envelopeId: "TEST-ENVELOPE",
+    documentId: "TEST-DOCUMENT"
+  });
+  assert.equal(response.status, 410);
+  assert.match((await response.json()).error, /temporarily disconnected/i);
+});
+
 test("direct attendance signature endpoint is retired in favour of Signature Portal email-link envelopes", async () => {
   assert.equal(await post(createMeetingServicesRouter(ctx), "/api/meeting-attendance/sign", { meetingId: "test-meeting" }), null);
 });
