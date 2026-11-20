@@ -149,6 +149,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  try{
   await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
  }catch(error){
+  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"UNCERTAIN",envelopeId:envelope.id,documentId,ownerUid:owner.uid,gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Unknown",error:String(error?.message||"Gateway dispatch record reconciliation failed").slice(0,500)}).catch(()=>null);
   throw new Error("The Signature Portal workflow started and email invitations may have been sent, but the Meeting Portal dispatch record could not be reconciled. Do not press Dispatch again; ask the host administrator to reconcile envelope "+envelope.id+".");
  }
  if(started.ownerSigningToken&&ownerSigningEnabled)window.location.assign("/?emailSignToken="+encodeURIComponent(started.ownerSigningToken));
