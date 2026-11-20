@@ -22,11 +22,35 @@ test("only explicit Board and Board Meeting types require the one-third quorum",
   }
 });
 
+ort test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { isBoardMeeting, meetingCapabilities } from "../src/firebase/meetingPolicy.js";
+
+const service=readFileSync("drive-gateway/src/meetingServices.mjs","utf8");
+const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
+const api=readFileSync("src/firebase/meetingGatewayApi.js","utf8");
+const meetings=readFileSync("src/pages/Meetings.jsx","utf8");
+
+test("only explicit Board and Board Meeting types require the one-third quorum",()=>{
+  for(const meetingType of ["Board","Board Meeting"]){
+    const meeting={meetingCategory:"GOVERNANCE",meetingType};
+    assert.equal(isBoardMeeting(meeting),true);
+    assert.equal(meetingCapabilities(meeting).quorumRequired,true);
+  }
+  for(const meetingType of ["Board Committee Meeting","Annual General Meeting","Special Meeting","Management Meeting","Staff Meeting","General Meeting"]){
+    const category=["Board Committee Meeting","Annual General Meeting","Special Meeting"].includes(meetingType)?"GOVERNANCE":meetingType==="Staff Meeting"?"STAFF":"GENERAL";
+    const meeting={meetingCategory:category,meetingType};
+    assert.equal(isBoardMeeting(meeting),false,meetingType);
+    assert.equal(meetingCapabilities(meeting).quorumRequired,false,meetingType);
+  }
+});
+
 test("server assessment reconciles participant registration, invitation passes, entry queue and signed attendance",()=>{
   assert.match(service,/listByField\(ctx,env,token,"participants","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingAccessTokens","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingEntryRequests","meetingId",meetingId\)/);
-  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId\)/);
+  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId\)/);\n  assert.match(service,/listByField\(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId\)/);\n  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId\)/);\n  assert.match(service,/signatureEnvelopes/);\n  assert.match(service,/dailySignerByUid/);
   assert.match(service,/Math\.ceil\(denominator\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
@@ -63,7 +87,7 @@ test("Meeting Room presents dispatch, queue and signed-attendance reconciliation
   assert.match(room,/Entry Queue/);
   assert.match(room,/Signed Attendance/);
   assert.match(room,/quorumAssessment\.rows\.map/);
-  assert.match(room,/assessMeetingQuorum\(\{meetingId:selected\.id,save\}\)/);
+  assert.match(room,/assessMeetingQuorum\(\{meetingId:selected\.id,save,date:dailyAttendanceDate\}\)/);\n  assert.match(room,/Dispatch Signing Requests/);\n  assert.match(room,/N\/A — Not Attended/);
 });
 
 test("Board Register is the authoritative UID-only quorum denominator",()=>{
