@@ -175,6 +175,8 @@ export function createAdministratorCleanupRouter(deps) {
         const isSignedTrial = collection === "signatureEnvelopes" && trialData &&
           ["completed","signed"].includes(clean(data.status).toLowerCase());
         const immutableHistory = collection === "audit" || collection === "signatureEvents" || collection === "adminCleanupAudit";
+        const protectedSystemCollection = ["adminProfiles","systemSettings","systemResetPlans","memberCounters","employeeCounters",
+          "financialReferenceCounters","portalDefinitions","systemResetRequests","dataResetRequests"].includes(collection);
         const envelopeStatus = clean(data.status).toLowerCase();
         const signedEnvelope = collection === "signatureEnvelopes" && ["signed","completed"].includes(envelopeStatus);
         const signedProductionEnvelope = signedEnvelope && !trialData;
@@ -184,7 +186,7 @@ export function createAdministratorCleanupRouter(deps) {
         const signedProductionPortalRecord = ["signatures","documents","controlledDocuments"].includes(collection) &&
           linkedEnvelope && signedState(linkedEnvelope.status) && !isTrialRecord(linkedEnvelope);
         const protectedRecord = isAdmin || protectedRole || signerInProtectedEnvelope || immutableHistory ||
-          signedProductionEnvelope || missingTrialPdf || signedProductionPortalRecord;
+          signedProductionEnvelope || missingTrialPdf || signedProductionPortalRecord || protectedSystemCollection;
         records.push({
           key: collection + "/" + id, collection, id, version: clean(doc.updateTime || doc.createTime), uid: uid || null,
           name: recordLabel(data) || id, email: clean(data.email || data.ownerEmail || data.signerEmail),
@@ -224,6 +226,7 @@ export function createAdministratorCleanupRouter(deps) {
             protectedRole ? "Protected governance or administrator role." :
             signerInProtectedEnvelope ? "Signer on a signed or in-progress envelope." :
             immutableHistory ? "Immutable audit/signature history must be retained." :
+            protectedSystemCollection ? "Core administrator, system configuration, counter or reset-plan records are protected." :
             signedProductionEnvelope ? "Completed production signing envelopes must be retained." :
             missingTrialPdf ? "Signed trial PDF reference is missing; safe deletion cannot be verified." :
             signedProductionPortalRecord ? "Portal record belongs to a completed production signing envelope." : "",
