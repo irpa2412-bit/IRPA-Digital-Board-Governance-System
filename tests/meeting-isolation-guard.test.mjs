@@ -6,6 +6,7 @@ const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixtu
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 const portalProtection = readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
+const isolationGuard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const changeRecord = JSON.parse(readFileSync(new URL("../docs/portal-protection/change-record.json", import.meta.url), "utf8"));
 const repairWindow = JSON.parse(readFileSync(new URL("../docs/portal-protection/repair-window.json", import.meta.url), "utf8"));
 
@@ -22,6 +23,7 @@ test("portal protection uses the active email-signing amendment without rewritin
   assert.match(portalProtection,/const activeAmendment = record\.activeAmendment\?\.status === "open" \? record\.activeAmendment : null/);
   assert.match(portalProtection,/const declaration = activeAmendment \?\? record\.declaration/);
   assert.match(portalProtection,/const validation = activeAmendment\?\.validation \?\? record\.validation/);
+  assert.match(isolationGuard,/!parallelWindowRecordAmendment && !signatureWindowRepairDecision\.pass/);
 });
 
 test("isolation baseline compares against the fetched current main snapshot", () => {
