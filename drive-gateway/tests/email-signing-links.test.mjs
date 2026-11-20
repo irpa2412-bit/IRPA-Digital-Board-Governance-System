@@ -23,7 +23,7 @@ import {route as esignRoute,makeContext} from "../src/router.mjs";
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
 test("email signing invitation clearly states its no-time-expiry single-use rule",()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
   assert.match(message.text,/does not expire with time/i);
   assert.match(message.text,/redeemed once/i);
   assert.match(message.html,/No time-based expiry/i);
