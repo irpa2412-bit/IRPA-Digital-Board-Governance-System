@@ -142,7 +142,7 @@ test("email-link signer is stored without time-based expiry; mail is sent once",
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
 });
 
-test("email signing links expire after their configured lifetime and become unusable after use or revocation",async()=>{
+test("email signing links have no time expiry but become unusable after use or revocation",async()=>{
   const issuedAt=new Date("2026-11-16T08:00:00.000Z");
   const issued=await createEmailSigningToken({envelopeId:"ENV-LONG-LIVED",signerId:"S1",email:"signer@example.org",now:issuedAt,randomBytes:new Uint8Array(32).fill(7)});
   assert.equal(issued.record.expiresAt,undefined);
