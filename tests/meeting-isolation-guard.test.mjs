@@ -207,7 +207,9 @@ test("parallel portal window amendments preserve existing meeting and historical
 test("parallel portal window amendment delegates to the executable exact-scope policy", () => {
   assert.match(guard, /evaluateSignatureWindowAmendment/);
   assert.ok(guard.includes('"scripts/portal-repair-window-guard-policy.mjs"'));
-  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(parallelWindowDecision\.reason\)/);
+  assert.match(guard, /evaluateSignatureWindowClosure/);
+  assert.match(guard, /parallelWindowDecision\.pass \|\| signatureWindowClosureDecision\.pass/);
+  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
 });
 
 
