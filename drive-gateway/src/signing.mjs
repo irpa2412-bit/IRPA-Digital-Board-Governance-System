@@ -259,6 +259,7 @@ export async function openEmailSigning(ctx,token,ip=""){
     await recordEmailLinkStage(ctx,loaded.env.id,loaded.signer.id,"SESSION_CREATE","success");
     return {ok:true,sessionToken,sessionExpiresAt};
   }catch(error){
+    if(error?.status===410&&parts?.length===3){try{const expired=await ctx.meta.get("envelopes",parts[0]);if(expired){await mutate(ctx,parts[0],async current=>{const signer=current.signers.find(item=>item.id===parts[1]);if(!signer||signer.emailLinkStatus!=="issued")return{patch:null};const at=now.toISOString();signer.emailLinkStatus="expired";signer.emailLinkSessionStatus="expired";signer.emailLinkSessionHash=null;signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"expired",expiredAt:at}].slice(-20);return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.expired",signerId:signer.id,at})}};});}}catch(auditError){ctx.logger?.error?.("EMAIL_LINK_EXPIRY_AUDIT_FAILED",{stage,errorType:String(auditError?.name||"Error")});}}
     if(parts?.length===3)await recordEmailLinkStage(ctx,parts[0],parts[1],stage,"failure");
     const failure=new HttpError(error?.status===410?410:401,error?.status===410?"This invitation has expired. Ask the document owner to send a new link.":stage==="SESSION_CREATE"?"The signing session could not be opened. Please retry or ask the owner to send a new link.":genericEmailSigningFailure());
     failure.code=stage;
