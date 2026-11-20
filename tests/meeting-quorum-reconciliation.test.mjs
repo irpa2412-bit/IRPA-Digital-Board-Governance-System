@@ -31,7 +31,7 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId\)/);
   assert.match(service,/getGatewayEnvelopeStatus/);
   assert.match(service,/auditChainValid===true/);
-  assert.match(service,/dailySignerByUid/);
+  assert.match(service,/dailySignerByParticipant/);
   assert.match(service,/Math\.ceil\(denominator\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
