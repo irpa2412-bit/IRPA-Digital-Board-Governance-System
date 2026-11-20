@@ -207,3 +207,16 @@ test("unlinked Firebase Auth accounts are inventoried separately and never misla
   assert.ok(plan.executionOperations.some(operation=>operation.type==="auth-delete" && operation.uid==="external-auth-1"));
   assert.equal(plan.executionOperations.some(operation=>operation.type==="firestore-delete"),false);
 });
+
+test("shared member and employee Auth identity cannot be deleted while one register remains STAYS", async () => {
+  const {route,env}=harness({collections:{
+    members:[{id:"member-1",data:{uid:"shared-uid",fullName:"Shared Person",email:"shared@example.test"}}],
+    employees:[{id:"employee-1",data:{uid:"shared-uid",name:"Shared Person",email:"shared@example.test"}}]
+  }});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const res=await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"members/member-1",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan");
+  const body=await res.json();
+  assert.equal(res.status,409);
+  assert.equal(body.code,"CLEANUP_PLAN_BLOCKED");
+  assert.match(body.blockers.join(" "),/employees\/employee-1/);
+});
