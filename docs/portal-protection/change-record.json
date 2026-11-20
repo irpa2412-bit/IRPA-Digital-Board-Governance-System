@@ -3,53 +3,51 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal"
+      "Meeting Portal"
     ],
-    "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
+    "reason": "Owner-authorised selective rollback of the Meeting Portal attendance-to-Email-link signing integration following the reported SMTP_CONNECT invitation failure. The ordinary Meeting Portal invitation path succeeded after the failure; this repair isolates portal coupling without changing SMTP infrastructure.",
     "files": [
-      "src/pages/SignaturePlatform.jsx",
-      "tests/signature-workflow-policy.test.mjs"
+      "src/pages/MeetingRoom.jsx",
+      "drive-gateway/src/meetingServices.mjs"
     ],
-    "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
+    "expectedEffect": "Meeting Portal daily attendance registration and sheet preparation remain available, but no new attendance-driven signing envelope or invitation can be created. The standalone Signature Portal remains independently usable. Existing signing links and historical dispatch records remain valid and readable. New standalone signing requests are not automatically linked to Meeting Portal attendance or quorum during the isolation.",
     "prohibitedChanges": [
-      "Do not change Cloudflare Worker routes or token generation.",
+      "Do not change SMTP DNS, proxy state, cPanel settings, SMTP credentials, Worker secrets or mail transport.",
       "Do not change Firestore rules, indexes, or production records.",
-      "Do not change SMTP credentials, secrets, or deployment configuration.",
-      "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
+      "Do not revoke or mutate existing signing links, envelopes, signer profiles, completed documents, or audit trails.",
+      "Do not remove Meeting Portal attendance registration, marking, export, printing, or historical quorum reconciliation.",
+      "Do not deploy a whole-Gateway rollback or alter unrelated portals."
     ]
   },
   "repairWindow": {
-    "openedAt": "2026-11-20T09:18:00Z",
-    "lastActivityAt": "2026-11-20T09:23:00Z",
-    "emergency": false
+    "portal": "Meeting Portal",
+    "status": "open",
+    "openedAt": "2026-11-20T11:08:48Z",
+    "lastActivityAt": "2026-11-20T17:08:47Z",
+    "durationHours": 48,
+    "closesAt": "2026-11-22T11:08:48Z",
+    "rollbackCommit": "d8b52fd652942e7bcbb206fa52d44abeb2c1382d"
   },
   "baseline": {
-    "commit": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
-    "rollbackCommit": "8bfa67b2a8757519befb2f6be1074c0f34457c99"
+    "commit": "d8b52fd652942e7bcbb206fa52d44abeb2c1382d",
+    "rollbackCommit": "d8b52fd652942e7bcbb206fa52d44abeb2c1382d"
   },
   "validation": {
     "baselineSmoke": "PASS",
+    "fullRegression": "PENDING",
     "portalSmoke": {
-      "Signature Portal": "PASS"
+      "Meeting Portal": "PENDING"
     },
-    "dependentSmoke": {
-      "Signature envelope refresh and delivery regression": "PASS",
-      "Readability CI and token contrast": "PASS",
-      "Production application build": "PASS",
-      "Complete root test suite": "PASS"
-    },
-    "fullRegression": "PASS",
     "behaviourDifferences": [
-      "Signer status responses are now associated with the selected Gateway envelope ID locally for refresh, resend, revoke, and completed-distribution retry.",
-      "The Signature Portal root and signer status panel retain full opacity and readable text during aria-busy refresh state.",
-      "Signer metadata wraps on narrow screens to avoid clipping."
+      "Meeting Room no longer invokes the automatic attendance-to-signing helper or exposes dispatch/resume controls.",
+      "POST /api/meeting-attendance/daily/dispatch returns HTTP 410 and performs no writes; historical dispatch records remain readable.",
+      "New standalone Signature Portal requests are not linked to the Meeting Portal attendance register or quorum reconciliation during this temporary isolation.",
+      "Daily attendance registration, marking, date selection, CSV export, printing, and historical signed-attendance reconciliation remain available."
     ],
     "evidence": [
-      "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
-      "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
-      "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
-      "IRPA Release Build completed successfully on the exact PR head before scope correction.",
-      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
+      "Verified production baseline d8b52fd652942e7bcbb206fa52d44abeb2c1382d deployed through Cloudflare frontend run 44796204605; all build, readability and live endpoint steps passed.",
+      "Production browser smoke run 44796499663 completed successfully against the baseline artifact.",
+      "PR #824 regression evidence is pending; final Change Record PASS values will be written only after the corresponding CI checks pass."
     ]
   },
   "closure": {
@@ -187,6 +185,63 @@
         }
       },
       "closedByPR": 820
+    }
+  },
+  "previousTopLevelRecord": {
+    "declaration": {
+      "affectedPortals": [
+        "Signature Portal"
+      ],
+      "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
+      "files": [
+        "src/pages/SignaturePlatform.jsx",
+        "tests/signature-workflow-policy.test.mjs"
+      ],
+      "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
+      "prohibitedChanges": [
+        "Do not change Cloudflare Worker routes or token generation.",
+        "Do not change Firestore rules, indexes, or production records.",
+        "Do not change SMTP credentials, secrets, or deployment configuration.",
+        "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
+      ]
+    },
+    "baseline": {
+      "commit": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
+      "rollbackCommit": "8bfa67b2a8757519befb2f6be1074c0f34457c99"
+    },
+    "validation": {
+      "baselineSmoke": "PASS",
+      "portalSmoke": {
+        "Signature Portal": "PASS"
+      },
+      "dependentSmoke": {
+        "Signature envelope refresh and delivery regression": "PASS",
+        "Readability CI and token contrast": "PASS",
+        "Production application build": "PASS",
+        "Complete root test suite": "PASS"
+      },
+      "fullRegression": "PASS",
+      "behaviourDifferences": [
+        "Signer status responses are now associated with the selected Gateway envelope ID locally for refresh, resend, revoke, and completed-distribution retry.",
+        "The Signature Portal root and signer status panel retain full opacity and readable text during aria-busy refresh state.",
+        "Signer metadata wraps on narrow screens to avoid clipping."
+      ],
+      "evidence": [
+        "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
+        "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
+        "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
+        "IRPA Release Build completed successfully on the exact PR head before scope correction.",
+        "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
+      ]
+    },
+    "repairWindow": {
+      "openedAt": "2026-11-20T09:18:00Z",
+      "lastActivityAt": "2026-11-20T09:23:00Z",
+      "emergency": false
+    },
+    "closure": {
+      "closedAt": "",
+      "updatedBaselineCommit": ""
     }
   }
 }
