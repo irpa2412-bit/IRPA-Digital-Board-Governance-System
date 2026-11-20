@@ -202,7 +202,7 @@ test("parallel and Meeting Portal Change Record amendments preserve independent 
   assert.match(guard, /evaluateMeetingWindowAmendment/);
   assert.match(policy, /JSON\.stringify\(baselineChangeRecord\.activeAmendment\) !== JSON\.stringify\(currentChangeRecord\.activeAmendment\)/);
   assert.match(policy, /previousTopLevelRecord/);
-  assert.match(policy, /Another portal's window or unrelated Change Record history/);
+  assert.match(policy, /active Signature Portal window or unrelated Change Record history/);
 });
 
 test("parallel portal window amendment delegates to the executable exact-scope policy", () => {
