@@ -26,7 +26,7 @@ async function queueInductionEmail(inputOrEmail, subjectOrOptions, text, html, o
   try {
     const result=await retry(async()=>{
       const payload={to,name:input.recipientName||recipientName||"Member",subject:input.subject||"",text:input.text||"",html:input.html||"",invitationId:input.invitationId||null};
-      const gateway=String(env.GATEWAY_URL||env.INVITATION_GATEWAY_URL||"").replace(/\\/$/,"");
+      const gateway=String(env.GATEWAY_URL||env.INVITATION_GATEWAY_URL||"").replace(/\/+$/, "")
       if(!gateway) throw new Error("Invitation email gateway is not configured.");
       const serviceToken=await getServiceIdToken({env,fetchFn});
       const res=await fetchFn(gateway+"/api/send-invitation-email",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+serviceToken},body:JSON.stringify(payload)});
