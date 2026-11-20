@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   local-e2e:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025' || github.event.pull_request.head.ref == 'fix/email-link-positioned-invitations-20261118' || github.event.pull_request.head.ref == 'fix/signature-email-link-identity-isolation-20261119'))
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/member-signature-invitation-email-20261004' || github.ref == 'refs/heads/fix/signature-gateway-cryptographic-bridge-20261015' || github.ref == 'refs/heads/fix/communications-cloudflare-website-integration' || github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' || github.ref == 'refs/heads/fix/signature-trail-20261024' || github.ref == 'refs/heads/fix/signature-pathway-20261025' || github.ref == 'refs/heads/fix/actual-data-gate-read-for-operational-users-20261120' || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'fix/communications-cloudflare-website-integration' || github.event.pull_request.head.ref == 'fix/communication-media-archive-drive-oauth' || github.event.pull_request.head.ref == 'fix/signature-pathway-20261025' || github.event.pull_request.head.ref == 'fix/email-link-positioned-invitations-20261118' || github.event.pull_request.head.ref == 'fix/signature-email-link-identity-isolation-20261119' || github.event.pull_request.head.ref == 'fix/actual-data-gate-read-for-operational-users-20261120'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -109,7 +109,7 @@ jobs:
       staging_url: ${{ steps.staging-health.outputs.staging_url }}
     # Archive acceptance uses the full deploy-staging runtime job, avoiding a competing partial Worker deployment.
 # dispatch isolated runtime acceptance is an explicit staging-only opt-in; production is not targeted.
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true
+    if: (github.event_name == 'workflow_dispatch' && inputs.deploy_staging == true) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'fix/actual-data-gate-read-for-operational-users-20261120')
     runs-on: ubuntu-latest
     # Configure staging-repair Environment with required independent reviewers before use.
     environment: staging-repair
@@ -1165,6 +1165,8 @@ jobs:
               throw new Error("WordPress staging REST setup route failed (HTTP "+String(routeResponse?.http||"unknown")+", code "+String(provisioned?.code||"invalid_response").slice(0,80)+").");
             const usernameResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_USERNAME","--config","wrangler.staging.generated.json"],{input:provisioned.username,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
             if(usernameResult.status!==0)throw new Error("Could not update the staging Worker username secret.");
+            const baseUrlResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_BASE_URL","--config","wrangler.staging.generated.json"],{input:process.env.WP_BASE,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
+            if(baseUrlResult.status!==0)throw new Error("Could not update the staging Worker WordPress base URL secret.");
             const passwordResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_APPLICATION_PASSWORD","--config","wrangler.staging.generated.json"],{input:provisioned.password,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
             provisioned.password="";
             if(passwordResult.status!==0)throw new Error("Could not update the staging Worker application-password secret.");
@@ -1498,8 +1500,11 @@ jobs:
                 const duplicateSnapshots=(duplicateHistory.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
                   r.title===fixtureTitle&&Date.now()-Date.parse(r.date||"")<24*60*60*1000)
                   .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
-                if(!duplicateSnapshots.length) throw new Error("A marked duplicate staging test page has no recent verified pre-test snapshot; refusing to alter it.");
-                await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
+                const duplicateNative=(duplicateHistory.revisions||[]).filter(r=>r.source==="WordPress revision"&&Number.isSafeInteger(Number(r.revisionId))&&
+                  r.title===fixtureTitle).sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+                if(duplicateSnapshots.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
+                else if(duplicateNative.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),revisionId:duplicateNative[0].revisionId})});
+                else throw new Error("A marked duplicate staging test page has no verified pre-marker WordPress revision; refusing to alter it.");
                 cleanDuplicate=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
               }else{
                 // No unique workflow marker means ownership is unproven: leave this page untouched.
@@ -1523,8 +1528,12 @@ jobs:
               const recent=(history.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
                 !String(r.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_")&&Date.now()-Date.parse(r.date||"")<24*60*60*1000)
                 .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+              const nativeBeforeMarker=(history.revisions||[]).filter(r=>r.source==="WordPress revision"&&Number.isSafeInteger(Number(r.revisionId))&&
+                !String(r.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_"))
+                .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
               if(recent.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId:recent[0].snapshotId})});
-              else throw new Error("A prior timed-out acceptance left a marker, but no recent safe snapshot was available; refusing to overwrite the page.");
+              else if(nativeBeforeMarker.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,revisionId:nativeBeforeMarker[0].revisionId})});
+              else throw new Error("A prior timed-out acceptance left a marker, but no verified pre-marker WordPress revision or safe snapshot was available; refusing to overwrite the page.");
               before=await call("/api/communications/website/content/pages/"+testPageId);
               original=before.item;
               if(!original||original.title.includes("IRPA_STAGING_WEBSITE_CHECK_")||original.content.includes("IRPA_STAGING_WEBSITE_CHECK_"))
