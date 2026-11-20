@@ -114,6 +114,8 @@ try {
       assert.equal(signing.assignments.length, 4, "registered member and three guest positions must each receive a signer");
       assert.equal(signing.sameEmailCount, 3, "three guest positions sharing one email must remain separate signers");
       assert.equal(signing.emailSent, false, "the fixture must never send real email");
+      const allMockActions = await page.evaluate(() => window.__irpaFixtureActions || []);
+      assert.ok(allMockActions.every(action => action.emailSent === false), "no fixture action may send real email");
       assert.equal(new Set(signing.assignments.map(x => x.signerId)).size, 4, "each participant position must have its own signer ID");
 
       await page.getByPlaceholder(/The AI Assistant transcript appears here automatically/).fill("TEST minutes source: the Board reviewed and approved the work plan.");
