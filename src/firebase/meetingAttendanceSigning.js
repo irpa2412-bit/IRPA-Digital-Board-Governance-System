@@ -5,6 +5,7 @@ import { uploadControlledDocumentRouted, registerControlledDocumentRecord } from
 import { createSignatureEnvelope, startSignatureWorkflow, getSignatureEnvelope } from "./signaturePlatform";
 import { callMeetingService } from "./meetingGatewayApi";
 import { GOVERNANCE_FIELD_TYPES } from "../components/GovernanceFieldPalette";
+import { buildDailyAttendanceSignerAssignments } from "../utils/dailyAttendanceSigners.mjs";
 
 const PAGE={width:842,height:595,margin:28,top:112,rowHeight:22,rowsPerPage:20};
 const clean=value=>String(value??"").trim();
@@ -25,7 +26,7 @@ function attendanceStatus(row){
 
 async function buildDailyAttendancePdf({meeting,date,records}){
  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
- const fields=[],present=records.filter(row=>attendanceStatus(row)==="Present");
+ const fields=[],present=buildDailyAttendanceSignerAssignments(records.filter(row=>attendanceStatus(row)==="Present"),date);
  const unresolved=present.filter(row=>!clean(row.name||row.participantName||row.fullName)||String(row.name||"").startsWith("NAME NOT FOUND"));
  if(unresolved.length)throw new Error("Cannot dispatch signed attendance: resolve the registered full name for "+unresolved.map(row=>clean(row.email||row.participantEmail||row.participantUid||row.participantId)).join(", ")+" in the Members or Employees register first.");
  if(!GOVERNANCE_FIELD_TYPES.includes("Signature"))throw new Error("The shared Governance Field Palette does not expose a Signature field.");
@@ -60,10 +61,10 @@ async function buildDailyAttendancePdf({meeting,date,records}){
     page.drawText(categoryLabel(group.category).slice(0,15),{x:cols[4],y,size:6.5,font});
     page.drawText(status,{x:cols[5],y,size:7,font:status==="Present"?bold:font,color:status==="Present"?rgb(.05,.35,.16):rgb(.35,.35,.35)});
     if(status==="Present"){
-     const uid=clean(row.participantUid||row.uid||row.userId),participantId=clean(row.participantId||row.id);
-     if(!uid||!email)throw new Error("Cannot dispatch: "+name+" is marked Present but does not have both a registered account UID and email address.");
+     const uid=clean(row.signerUid||row.participantUid||row.uid||row.userId),participantId=clean(row.participantId||row.id),signerId=clean(row.signerId);
+     if(!uid||!signerId||!email)throw new Error("Cannot dispatch: "+name+" is marked Present but has no valid per-person signer identity and email address.");
      const fieldId="ATT-"+String(date)+"-"+participantId.replace(/[^A-Za-z0-9_-]/g,"-");
-     fields.push({fieldId,type:"Signature",page:pageNumber,x:(cols[6]-4)/PAGE.width*100,y:(top-7)/PAGE.height*100,width:(PAGE.width-PAGE.margin-cols[6]+4)/PAGE.width*100,height:16/PAGE.height*100,required:true,signerUid:uid,roleAssignmentIndex:0,responsibility:"Daily attendance signature"});
+     fields.push({fieldId,type:"Signature",page:pageNumber,x:(cols[6]-4)/PAGE.width*100,y:(top-7)/PAGE.height*100,width:(PAGE.width-PAGE.margin-cols[6]+4)/PAGE.width*100,height:16/PAGE.height*100,required:true,signerUid:uid,signerId,participantId,roleAssignmentIndex:0,responsibility:"Daily attendance signature"});
     }else{
      page.drawText("N/A",{x:cols[6],y,size:8,font,color:rgb(.48,.48,.48)});
     }
@@ -101,12 +102,12 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  if(!meeting?.id||!date||!Array.isArray(records)||!records.length)throw new Error("A meeting, attendance date and compiled participant register are required.");
  const {bytes,fields,present}=await buildDailyAttendancePdf({meeting,date,records});
  if(!present.length)throw new Error("There are no participants marked Present for this day. No signing request was dispatched.");
- const presentUids=present.map(row=>clean(row.participantUid||row.uid||row.userId));
- if(new Set(presentUids).size!==presentUids.length)throw new Error("The daily attendance sheet contains duplicate participant UIDs. Correct the participant register before dispatching signing requests.");
- const recipients=[...new Map(present.map(row=>{
-  const uid=clean(row.participantUid||row.uid||row.userId);
-  const role=clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),title=clean(row.title||row.position||row.boardPosition),occupation=clean(row.occupation||row.capacity||row.profession||title||role),capacity=clean(row.capacity||row.occupation||title||role);return [uid,{uid,email:clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase(),name:clean(row.name||row.participantName||row.fullName),role,institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),roleAssignments:[{role,title,capacity,occupation}]}];
- })).values()];
+ const presentSignerIds=present.map(row=>clean(row.signerId));
+ if(new Set(presentSignerIds).size!==presentSignerIds.length)throw new Error("The daily attendance sheet contains the same signer ID more than once. Correct the duplicate identity before dispatching signing requests.");
+ const recipients=present.map(row=>{
+  const uid=clean(row.signerUid||row.participantUid||row.uid||row.userId);
+  const role=clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),title=clean(row.title||row.position||row.boardPosition),occupation=clean(row.occupation||row.capacity||row.profession||title||role),capacity=clean(row.capacity||row.occupation||title||role);return {uid,signerId:row.signerId,participantId:row.participantId,identityType:row.identityType,accountUid:row.accountUid||null,email:clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase(),name:clean(row.name||row.participantName||row.fullName),role,institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),roleAssignments:[{role,title,capacity,occupation}]};
+ });
  const documentId=doc(collection(db,"documents")).id;
  const reference="IRPA-ATT-"+String(meeting.reference||meeting.id).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+date;
  const title="Daily Attendance — "+clean(meeting.title||meeting.meetingTitle||"Meeting")+" — "+date;
@@ -129,15 +130,15 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   uploadedAt:new Date().toISOString(),recordOrigin:"PRODUCTION"
  };
  await registerControlledDocumentRecord({documentId,documentPayload});
- const ownerSigningEnabled=present.some(row=>clean(row.participantUid||row.uid||row.userId)===owner.uid);
+ const ownerSigningEnabled=present.some(row=>clean(row.accountUid||row.participantUid||row.uid||row.userId)===owner.uid);
  const envelope=await createSignatureEnvelope({
   title,documentId,documentReference:reference,documentUrl:"drive://"+archive.file.fileId,
   documentClassification:documentPayload.classification,documentArchiveCategory:"Governance Documents",
   documentType:"Governance Document",documentUploadedAt:documentPayload.uploadedAt,
   signingMode:"Parallel",recipients,fields,ownerSigningEnabled
  });
- const gatewaySignerMap=(envelope.recipients||[]).filter(r=>r?.uid&&r?.email&&r.actionRequired!==false&&r.optionalSigning!==true&&!r.accessOnly&&!["View Only","Read Only","Information / FYI","Observer"].includes(String(r.role||"").trim())).sort((a,b)=>Number(a.routingOrder||1)-Number(b.routingOrder||1)).map((r,index)=>({signerId:"S"+String(index+1),participantUid:r.uid,participantEmail:clean(r.email).toLowerCase(),participantName:clean(r.name||r.displayName||r.email)}));
- await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewaySignerMap});
+ const gatewaySignerMap=(envelope.recipients||[]).filter(r=>r?.uid&&r?.email&&r.actionRequired!==false&&r.optionalSigning!==true&&!r.accessOnly&&r.participantId&&!["View Only","Read Only","Information / FYI","Observer"].includes(String(r.role||"").trim())).sort((a,b)=>Number(a.routingOrder||1)-Number(b.routingOrder||1)).map((r,index)=>({signerId:"S"+String(index+1),participantId:r.participantId,participantUid:r.accountUid||null,participantEmail:clean(r.email).toLowerCase(),participantName:clean(r.name||r.displayName||r.email)}));
+ await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,participantIds:present.map(r=>r.participantId),signerIds:gatewaySignerMap.map(r=>r.signerId),gatewaySignerMap});
  let started;
  try{
   started=await startSignatureWorkflow(envelope);
