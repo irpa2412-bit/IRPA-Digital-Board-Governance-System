@@ -478,56 +478,16 @@ export default function Settings({ admin = false, section = "settings" }) {
       )}
       {section === "settings" && <section className="panel" style={{ marginBottom: 16 }}><h2>Release Readiness</h2><p className="panel-description">{admin ? "Open the administrator-only release checks." : "Required role: Administrator. Your account does not have this role."}</p><button type="button" onClick={() => { window.location.hash = "release-readiness"; document.getElementById("release-readiness")?.scrollIntoView({ behavior: "smooth" }); }}>Release Readiness</button></section>}{section === "settings" && <div id="release-readiness">{admin ? <ReleaseReadiness admin={admin}/> : <section className="panel" role="status"><h2>Release Readiness unavailable</h2><p>Required role: Administrator. Contact an IRPA Administrator if you need access.</p></section>}</div>}
       {admin && section === "settings" && <ActualDataAccessControl/>}
-      {admin && section === "settings" && <SystemResetControl/>}
-
       {admin && section === "settings" && (
-        <section className="panel" style={{ marginTop: 20 }}>
+        <section className="panel" style={{ marginTop: 20 }} aria-labelledby="cleanup-retired-title">
           <div className="panel-header">
             <div>
               <span className="eyebrow">ADMINISTRATOR CONTROL</span>
-              <h2>Trial Data Resets</h2>
-              <p className="panel-description">Controlled, administrator-only removal of trial records. Each reset requires an exact confirmation phrase and creates an audit entry.</p>
+              <h2 id="cleanup-retired-title">Data Cleanup</h2>
+              <p className="panel-description">The previous broad reset and trial-reset controls have been retired from Settings. The replacement administrator-controlled cleanup service is being implemented with per-record STAYS/GOES selection, dependency review, protected-record checks and server-authorised execution. No cleanup is available through this retired interface.</p>
             </div>
           </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Documents</span>
-            <strong>Controlled Document Trial Data</strong>
-            <small>Permanently removes records explicitly marked as trial documents only. Production controlled documents and all Signature Profiles are preserved.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => selectedReset === "documents" ? runTrialReset("documents") : prepareTrialReset("documents")} disabled={!!resetBusy} aria-busy={resetBusy==="documents"?"true":"false"} aria-pressed={selectedReset === "documents"}>{resetBusy==="documents" ? "Executing Document Reset…" : selectedReset === "documents" ? "Confirm & Execute Document Reset" : "Reset Documents"}</button>
-            </div>
-          </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Employees</span>
-            <strong>Employee Trial Data</strong>
-            <small>Removes Employee records and resets the Employee Number counter.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => selectedReset === "employees" ? runTrialReset("employees") : prepareTrialReset("employees")} disabled={!!resetBusy} aria-busy={resetBusy==="employees"?"true":"false"} aria-pressed={selectedReset === "employees"}>{resetBusy==="employees" ? "Executing Employee Reset…" : selectedReset === "employees" ? "Confirm & Execute Employee Reset" : "Reset Employees"}</button>
-            </div>
-          </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Members</span>
-            <strong>General Member Trial Data</strong>
-            <small>Removes general Members and resets the Member Number counter. Board Members are preserved.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => selectedReset === "members" ? runTrialReset("members") : prepareTrialReset("members")} disabled={!!resetBusy} aria-busy={resetBusy==="members"?"true":"false"} aria-pressed={selectedReset === "members"}>{resetBusy==="members" ? "Executing Member Reset…" : selectedReset === "members" ? "Confirm & Execute Member Reset" : "Reset Members"}</button>
-            </div>
-          </div>
-          <div className="stat-card" style={{ marginBottom: 14 }}>
-            <span>Signature Envelopes</span>
-            <strong>IRPA Trial Envelope Data</strong>
-            <small>Removes Signature Envelopes explicitly marked as trial, together with their linked signature transaction records and envelope events. Production envelopes are preserved.</small>
-            <div className="form-actions" style={{ marginTop: 12 }}>
-              <button type="button" onClick={() => selectedReset === "envelopes" ? runTrialReset("envelopes") : prepareTrialReset("envelopes")} disabled={!!resetBusy} aria-busy={resetBusy==="envelopes"?"true":"false"} aria-pressed={selectedReset === "envelopes"}>{resetBusy==="envelopes" ? "Executing Envelope Reset…" : selectedReset === "envelopes" ? "Confirm & Execute Envelope Reset" : "Reset Trial Envelopes"}</button>
-            </div>
-          </div>
-          <div className="success-message" style={{ marginTop: 8 }}>Enter the exact phrase for the reset you want to perform. Document reset only removes records marked as trial data; it does not remove Signature Profiles.</div><label className="field" style={{ display: "block" }}>
-            <span>Confirmation phrase</span>
-            <input id="trial-reset-confirmation" value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder="Enter the exact phrase shown after selecting a reset" aria-label="Trial reset confirmation phrase" />
-          </label>
-          {selectedReset && <div className="auth-message" style={{ marginTop: 16 }}><strong>Reset armed:</strong> {selectedReset === "documents" ? "Documents" : selectedReset === "employees" ? "Employees" : "Members"}. Enter the exact confirmation phrase above, then tap the same reset button again. The same button now performs the reset action.</div>}
-          {selectedReset && <div className="form-actions" style={{ marginTop: 12 }}><button type="button" className="secondary-button" onClick={() => { setSelectedReset(""); setConfirmation(""); setMessage(""); }} disabled={!!resetBusy}>Cancel Reset</button></div>}
-          {result && <div className="auth-message" style={{ marginTop: 16 }}>Reset completed. {result.type === "envelopes" ? <>Envelopes deleted: {result.envelopesDeleted ?? 0} · Pending signing cleared · Controlled documents deleted: {result.documentsDeleted ?? 0} · Signature transactions deleted: {result.signaturesDeleted ?? 0} · Events deleted: {result.eventsDeleted ?? 0}.</> : <>Records deleted: {result.recordsDeleted ?? 0}{result.boardMembersPreserved ? " · Board Members preserved." : ""}</>}</div>}
+          <div role="status">Legacy cleanup controls disabled. No records were changed.</div>
         </section>
       )}
 
