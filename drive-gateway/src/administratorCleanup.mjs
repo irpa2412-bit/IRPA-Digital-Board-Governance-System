@@ -149,11 +149,20 @@ export function createAdministratorCleanupRouter(deps) {
         const signerInProtectedEnvelope = collection === "members" || collection === "employees" || collection === "signatureProfiles" || collection === "signerIdentities"
           ? [...envelopes.values()].some(envelope => {
             const protectedEnvelopeStatus = ["signed","completed","in progress","inprogress","signing","pending","sent","opened","awaiting signature","awaiting_signature"].includes(clean(envelope.status).toLowerCase());
-            return (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer => {
-              const matches = (uid && clean(signer.uid || signer.profileUid) === uid) ||
-                (email && clean(signer.email).toLowerCase() === email);
+            const assignments = [
+              ...(Array.isArray(envelope.signers) ? envelope.signers : []),
+              ...(Array.isArray(envelope.recipients) ? envelope.recipients : []),
+              ...(Array.isArray(envelope.signerAssignments) ? envelope.signerAssignments : []),
+              ...(Array.isArray(envelope.fields) ? envelope.fields : [])
+            ];
+            const matchingAssignment = assignments.some(signer => {
+              const matches = (uid && [signer.uid,signer.profileUid,signer.userId,signer.signerUid,signer.assignedSignerUid,signer.recipientUid,signer.assignedToUid].some(value=>clean(value)===uid)) ||
+                (email && [signer.email,signer.signerEmail].some(value=>clean(value).toLowerCase()===email));
               return matches && (protectedEnvelopeStatus || clean(signer.status).toLowerCase() === "signed");
             });
+            const participant = uid && [...(Array.isArray(envelope.participantUids)?envelope.participantUids:[]),
+              ...(Array.isArray(envelope.actionUids)?envelope.actionUids:[])].some(value=>clean(value)===uid);
+            return matchingAssignment || (protectedEnvelopeStatus && participant);
           })
           : false;
         const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle || data.title || data.position || (Array.isArray(data.roles) ? data.roles.join(", ") : "") || (Array.isArray(data.assignedRoles) ? data.assignedRoles.join(", ") : "") || (Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title).filter(Boolean).join(", ") : ""));
