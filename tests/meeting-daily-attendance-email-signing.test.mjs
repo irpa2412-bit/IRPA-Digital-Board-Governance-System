@@ -16,6 +16,8 @@ test("Meeting Portal compiles daily categorical attendance and defaults missing 
  assert.match(room,/EMPLOYEES_AND_MANAGEMENT/);
  assert.match(service,/attendanceStatus:"N\/A"/);
  assert.match(service,/registrationCategory:"BOARD_MEMBER"/);
+ assert.match(service,/email:lower\(p\.participantEmail\|\|p\.email\|\|p\.invitedEmail\)/);
+ assert.match(service,/occupation:clean\(p\.occupation\|\|p\.capacity\|\|p\.profession/);
  assert.match(service,/UNMATCHED_BOARD_REGISTRATION/);
  assert.match(service,/Not registered for this meeting/);
 });
@@ -37,6 +39,12 @@ test("daily PDF places signature fields in the final column only for Present par
  assert.match(helper,/status==="Present"/);
  assert.match(helper,/type:"Signature"/);
  assert.match(helper,/signerUid:uid/);
+ assert.match(helper,/GOVERNANCE_FIELD_TYPES/);
+ assert.match(helper,/Email address/);
+ assert.match(helper,/Occupation \/ position/);
+ assert.match(helper,/roleAssignmentIndex:0/);
+ assert.match(helper,/roleAssignments:\[\{role,title,capacity,occupation\}\]/);
+ assert.match(helper,/ownerSigningEnabled/);
  assert.match(helper,/gatewaySignerMap/);
  assert.match(service,/gatewaySignerMap/);
  assert.match(service,/mappingValid/);
