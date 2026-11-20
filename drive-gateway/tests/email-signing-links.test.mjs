@@ -52,9 +52,11 @@ test("email token remains valid after opening and can be reopened indefinitely",
   assert.equal(opened.lastIpHash,"ip-hash");
   const later=new Date("2027-11-16T08:00:00.000Z");
   assert.equal((await inspectEmailSigningToken(issued.token,opened,later)).ok,true);
-  const reopened=await markEmailSigningTokenOpened(opened,{token:issued.token,now:later,ipHash:"another-ip"});
+  let reopened=await markEmailSigningTokenOpened(opened,{token:issued.token,now:later,ipHash:"another-ip"});
   assert.equal(reopened.status,"opened");
-  assert.equal(reopened.openCount,2);
+  for(let i=3;i<=12;i++)reopened=await markEmailSigningTokenOpened(reopened,{token:issued.token,now:later,ipHash:"ip-"+i});
+  assert.equal(reopened.openCount,12,"repeated opens must not create a permanent lifetime-use limit");
+  assert.equal(reopened.tokenHash,issued.record.tokenHash,"opening must not rotate the invitation token hash");
   assert.equal((await inspectEmailSigningToken(issued.token,reopened,later)).ok,true);
 });
 
