@@ -456,7 +456,7 @@ export function createAdministratorCleanupRouter(deps) {
     }
     for (const fileId of fileIds) {
       const original = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"?fields=id,name,mimeType,modifiedTime,trashed");
-      if (!original.id || original.trashed === true) throw new Error("A selected Drive file is missing or already trashed; no records were deleted.");
+      if (!original.id || original.trashed === true || !original.modifiedTime) throw new Error("A selected Drive file is missing, trashed or has no verifiable modification time; no records were deleted.");
       const expectedPdf = plan.records.some(row=>row.decision==="GOES" && row.signedPdfReference===fileId);
       if (expectedPdf && original.mimeType !== "application/pdf") throw new Error("The signed trial PDF reference does not resolve to a PDF; no records were deleted.");
       const copied = await driveFetch(env,driveToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"/copy?fields=id,name,webViewLink",{
@@ -535,6 +535,14 @@ export function createAdministratorCleanupRouter(deps) {
   async function executeOperation(env, auth, operation, driveToken, authToken) {
     if (operation.type === "firestore-delete") return firestoreDelete(env,auth.token,operation.path,operation.version);
     if (operation.type === "drive-delete") {
+      const metadataResponse = await fetchImpl("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(operation.fileId)+"?fields=id,modifiedTime,trashed",{
+        headers:{Authorization:"Bearer "+driveToken}
+      });
+      if (metadataResponse.status === 404) return "ALREADY_DELETED";
+      const metadata = await metadataResponse.json().catch(()=>({}));
+      if (!metadataResponse.ok || !metadata.id) throw new Error("Drive file revalidation failed (HTTP " + metadataResponse.status + ").");
+      if (metadata.trashed === true) return "ALREADY_DELETED";
+      if (!operation.expectedModifiedTime || metadata.modifiedTime !== operation.expectedModifiedTime) throw new Error("Drive file changed after backup; cleanup was stopped.");
       const response = await fetchImpl("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(operation.fileId),{
         method:"DELETE",headers:{Authorization:"Bearer "+driveToken}
       });
@@ -707,7 +715,14 @@ export function createAdministratorCleanupRouter(deps) {
             plan.backupUrl = backup.url;
             plan.backupFolderId = backup.folderId;
             plan.backupDriveFileCopies = backup.driveFileCopies;
+            plan.executionOperations = plan.executionOperations.map(operation => operation.type === "drive-delete"
+              ? {...operation,expectedModifiedTime:backup.driveFileCopies.find(copy=>copy.originalFileId===operation.fileId)?.modifiedTime || ""}
+              : operation);
+            if (plan.executionOperations.some(operation=>operation.type==="drive-delete" && !operation.expectedModifiedTime)) {
+              throw new Error("Drive backup metadata did not include a modification time; no records were deleted.");
+            }
             plan.backupArchive = backup.archive;
+            plan.backupArchive.operations = plan.executionOperations;
             plan.status = "BACKUP_CREATED";
             const auditRef = await writeAuditEvent(env,auth.token,{eventType:"EXECUTION_STARTED",planId:plan.planId,
               inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,backupDriveFileId:plan.backupDriveFileId,
