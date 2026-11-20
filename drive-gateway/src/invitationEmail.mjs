@@ -226,7 +226,7 @@ export async function handleSendInvitationEmail(request, env, deps = {}) {
   } catch (error) {
     logger.error("SERVER_EMAIL_PROVIDER_FAILED", {
       recipientDomain: to.split("@")[1] || "unknown",
-      message: String(error?.message || error).replace(/[\\r\\n]/g, " ").slice(0, 200)
+      message: String(error?.message || error).replace(/[\r\n]/g, " ").slice(0, 200)
     });
     return respond(502, { ok:false, error:"EMAIL_PROVIDER_FAILED" });
   }
