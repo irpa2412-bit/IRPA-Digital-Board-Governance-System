@@ -209,7 +209,7 @@ test("tampered and unknown links return the same neutral response",async()=>{
 test("an unused email signing link is no longer redeemable after its configured expiry",async()=>{
   const f=await fixture();
   f.now(new Date("2026-11-24T08:00:00.000Z"));
-  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.message===genericEmailSigningFailure());
+  await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.19"),error=>error.status===410&&error.code==="TOKEN_LOOKUP");
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(stored.signers[0].emailLinkStatus,"expired");
   assert.ok(Date.parse(stored.signers[0].emailLinkExpiresAt)<f.ctx.now().getTime());
