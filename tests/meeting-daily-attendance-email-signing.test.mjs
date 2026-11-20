@@ -93,3 +93,14 @@ test("daily Board quorum uses signed Signature Portal envelope recipients rather
  assert.match(records,/\/api\/meeting-attendance\/daily\/dispatch/);
  assert.doesNotMatch(service,/\/api\/meeting-attendance\/sign/);
 });
+
+
+test("daily attendance dispatch maps each participant position by signer ID, never by email or UID",()=>{
+ assert.match(helper,/buildDailyAttendanceSignerAssignments/);
+ assert.match(helper,/presentSignerIds/);
+ assert.match(helper,/signerId:r\.signerId/);
+ assert.match(service,/participantIds/);
+ assert.match(service,/signerIds/);
+ assert.match(service,/dailySignerByParticipant/);
+ assert.doesNotMatch(service,/dailySignerByUid/);
+});
