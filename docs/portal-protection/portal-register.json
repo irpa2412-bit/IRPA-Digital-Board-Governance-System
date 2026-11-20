@@ -202,6 +202,48 @@
         "Communication and Media Portal",
         "Meeting Portal"
       ]
+    },
+    {
+      "path": "src/pages/SignaturePlatform.jsx",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/signaturePlatform.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/signatureStorage.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/signatureWorkflowPolicy.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/components/ControlledDocumentUpload.jsx",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
+    },
+    {
+      "path": "src/firebase/meetingAttendanceSigning.js",
+      "portals": [
+        "Signature Portal",
+        "Meeting Portal"
+      ]
     }
   ],
   "exclusions": [
