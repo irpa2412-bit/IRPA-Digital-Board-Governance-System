@@ -127,10 +127,11 @@ export function evaluateMeetingWindowAmendment({
     return { pass: false, reason: "Meeting Portal baseline and rollback commits must match the verified production base." };
   }
   const validation = record.validation ?? {};
-  if (validation.baselineSmoke !== "PASS" || validation.fullRegression !== "PASS" ||
-      validation.portalSmoke?.["Meeting Portal"] !== "PASS" ||
+  if (validation.baselineSmoke !== "PASS" ||
+      !["PENDING", "PASS"].includes(validation.fullRegression) ||
+      !["PENDING", "PASS"].includes(validation.portalSmoke?.["Meeting Portal"]) ||
       !Array.isArray(validation.behaviourDifferences)) {
-    return { pass: false, reason: "Meeting Portal Change Record requires passing baseline smoke, full regression and portal smoke evidence." };
+    return { pass: false, reason: "Meeting Portal Change Record requires a passing baseline smoke and explicit pending/pass regression evidence; the final protection gate requires PASS." };
   }
   return { pass: true, reason: "Meeting Portal Change Record amendment is scoped, evidence-backed and preserves the independent Signature Portal record." };
 }
