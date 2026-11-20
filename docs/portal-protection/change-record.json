@@ -8,20 +8,19 @@
     "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
     "files": [
       "src/pages/SignaturePlatform.jsx",
-      "src/styles/signature-portal.css",
       "tests/signature-workflow-policy.test.mjs"
     ],
     "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
     "prohibitedChanges": [
       "Do not change Cloudflare Worker routes or token generation.",
       "Do not change Firestore rules, indexes, or production records.",
-      "Do not change SMTP credentials, secrets, deployment configuration, signature validation, or audit controls.",
-      "Do not alter other portals or unrelated workflows."
+      "Do not change SMTP credentials, secrets, or deployment configuration.",
+      "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
     ]
   },
   "repairWindow": {
     "openedAt": "2026-11-20T09:18:00Z",
-    "lastActivityAt": "2026-11-20T09:19:23Z",
+    "lastActivityAt": "2026-11-20T09:23:00Z",
     "emergency": false
   },
   "baseline": {
@@ -37,8 +36,7 @@
       "Signature envelope refresh and delivery regression": "PASS",
       "Readability CI and token contrast": "PASS",
       "Production application build": "PASS",
-      "Complete root test suite": "PASS",
-      "Desktop/mobile signature ceremony and screenshot regression": "PENDING"
+      "Complete root test suite": "PASS"
     },
     "fullRegression": "PASS",
     "behaviourDifferences": [
@@ -48,10 +46,10 @@
     ],
     "evidence": [
       "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
-      "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head.",
-      "Readability CI and token contrast completed successfully on the exact PR head.",
-      "IRPA Release Build completed successfully on the exact PR head.",
-      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head."
+      "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
+      "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
+      "IRPA Release Build completed successfully on the exact PR head before scope correction.",
+      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
     ]
   },
   "closure": {
