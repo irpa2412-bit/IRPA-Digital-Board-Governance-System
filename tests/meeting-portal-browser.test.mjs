@@ -122,7 +122,7 @@ try {
       await page.getByPlaceholder(/The AI Assistant transcript appears here automatically/).fill("TEST minutes source: the Board reviewed and approved the work plan.");
       await page.getByRole("button", { name: "Save Transcript Now" }).click();
       await page.getByRole("button", { name: "Capture Draft Minutes" }).click();
-      await page.getByText("TEST Meeting Minutes", { exact: true }).waitFor();
+      await page.getByText(`Draft Minutes — ${createdTitle}`, { exact: true }).waitFor();
       await page.getByRole("button", { name: "Sign a Document" }).click();
       const signingNavigation = await page.evaluate(() => (window.__irpaNavigationCalls || []).findLast(x => x.module === "Signature Platform") || null);
       assert.equal(signingNavigation?.context?.meetingId, created.id, "minutes signing navigation must retain meeting identity");
