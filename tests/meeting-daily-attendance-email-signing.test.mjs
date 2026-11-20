@@ -43,8 +43,8 @@ test("Meeting Portal no longer invokes or resumes automatic Email-link signing",
 test("standalone Signature Portal email-link workflow remains present and unchanged in its service contract",()=>{
  assert.ok(signaturePlatform.includes("export async function createSignatureEnvelope"));
  assert.ok(signaturePlatform.includes("export async function startSignatureWorkflow"));
- assert.ok(signaturePage.includes("Signature Platform"));
- assert.ok(signatureWorker.includes("sendSignatureInvitation"));
+ assert.ok(signaturePage.includes("startSignatureWorkflow"));
+ assert.ok(signatureWorker.includes("smtpSend"));
  assert.ok(signatureWorker.includes("SMTP_CONNECT"));
 });
 
