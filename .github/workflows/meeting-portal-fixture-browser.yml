@@ -1,34 +1,5 @@
 name: Meeting Portal Isolated Browser Regression
 on:
-  push:
-    paths:
-      - "src/pages/Meetings.jsx"
-      - "docs/portal-protection/repair-window.json"
-      - "src/pages/MeetingRoom.jsx"
-      - "src/pages/OperationalGatewaysParticipants.jsx"
-      - "src/firebase/meetingPolicy.js"
-      - "src/firebase/meetingGatewayApi.js"
-      - "src/firebase/meetingRecords.js"
-      - "src/firebase/meetingAttendanceSigning.js"
-      - "src/firebase/meetingAttendanceSignerIdentity.js"
-      - "drive-gateway/src/meetingPortal.mjs"
-      - "drive-gateway/src/meetingServices.mjs"
-      - "drive-gateway/tests/meeting-portal-router.test.mjs"
-      - "drive-gateway/tests/meeting-services-router.test.mjs"
-      - "tests/meeting-portal-browser.test.mjs"
-      - "tests/meeting-portal-protection.test.mjs"
-      - "tests/meeting-daily-attendance-email-signing.test.mjs"
-      - "tests/meeting-quorum-reconciliation.test.mjs"
-      - "tests/meeting-attendance-guest-identity.test.mjs"
-      - "tests/meeting-time-eat.test.mjs"
-      - "tests/meeting-registration-connectivity.test.mjs"
-      - "tests/meeting-configurable-quorum.test.mjs"
-      - "tests/meeting-category-policy.test.mjs"
-      - "tests/meeting-isolation-guard.test.mjs"
-      - "tests/fixtures/**"
-      - "vite.meeting-fixture.config.js"
-      - "scripts/meeting-portal-fixture-isolation-guard.sh"
-      - ".github/workflows/meeting-portal-fixture-browser.yml"
   pull_request:
     branches: [main]
     paths:
@@ -60,6 +31,9 @@ on:
       - "scripts/meeting-portal-fixture-isolation-guard.sh"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   workflow_dispatch: {}
+concurrency:
+  group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
