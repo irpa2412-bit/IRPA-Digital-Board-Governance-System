@@ -528,7 +528,7 @@ export function createAdministratorCleanupRouter(deps) {
     });
     if (!response.ok) throw new Error("Cleanup backup outcome update failed (HTTP " + response.status + ").");
   }
-  async function revalidatePlan(env, auth, plan, inventory) {
+  async function revalidatePlan(env, auth, plan, inventory, operationsToInspect=[]) {
     const freshRecords = await loadInventory(env,auth);
     const freshByKey = new Map(freshRecords.map(row=>[row.key,row]));
     const successfulStatuses = new Set(["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"]);
@@ -586,11 +586,11 @@ export function createAdministratorCleanupRouter(deps) {
     }
 
     const checked = new Set();
-    for (const operation of pendingRecordOperations.filter(item=>item.type==="firestore-delete")) {
+    for (const operation of operationsToInspect.filter(item=>item.type==="firestore-delete")) {
       if (checked.has(operation.path)) continue;
       checked.add(operation.path);
       const nested = await listSubcollections(env,auth.token,operation.path);
-      if (nested.length) throw Object.assign(new Error("Nested Firestore collections exist under " + operation.path + ": " + nested.join(", ") + ". Child documents are not yet part of the inventory; cleanup is blocked until they are inventoried. No records were deleted."),{status:409});
+      if (nested.length) throw Object.assign(new Error("Nested Firestore collections exist under " + operation.path + ": " + nested.join(", ") + ". Child documents are not yet part of the inventory; cleanup is blocked before this batch proceeds."),{status:409});
     }
   }
   async function executeOperation(env, auth, operation, driveToken, authToken) {
@@ -846,8 +846,8 @@ export function createAdministratorCleanupRouter(deps) {
             await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
             return json({ok:true,planId,status:plan.status,backupUrl:plan.backupUrl,operationOutcomes:plan.operationOutcomes},200,corsHeaders(request));
           }
-          await revalidatePlan(env,auth,plan,inventory);
           const batch = pending.slice(0,Math.min(10,Number(plan.batchSize)||10));
+          await revalidatePlan(env,auth,plan,inventory,batch);
           const batchAuditRef = await writeAuditEvent(env,auth.token,{eventType:"BATCH_STARTED",planId:plan.planId,
             inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,startedAt:new Date().toISOString(),
             operationIds:batch.map(operation=>operation.operationId)});
