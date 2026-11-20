@@ -71,9 +71,21 @@ try {
       await resolutionRow.waitFor();
       // The register is intentionally horizontally scrollable on phones; reveal its Voting column
       // before clicking, rather than treating an off-screen table cell as a broken control.
-      const resolutionTable = resolutionRow.locator("xpath=ancestor::div[contains(@class,'table-wrapper')]");
-      await resolutionTable.evaluate(element => { element.scrollLeft = element.scrollWidth; });
-      await resolutionRow.getByRole("button", { name: "Open Anonymous Voting" }).click();
+      const votingButton = resolutionRow.getByRole("button", { name: "Open Anonymous Voting" });
+      await votingButton.evaluate(button => {
+        button.scrollIntoView({ block: "center", inline: "center" });
+        let parent = button.parentElement;
+        while (parent) {
+          if (parent.scrollWidth > parent.clientWidth) {
+            const buttonRect = button.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
+            if (buttonRect.right > parentRect.right) parent.scrollLeft += buttonRect.right - parentRect.right;
+            if (buttonRect.left < parentRect.left) parent.scrollLeft -= parentRect.left - buttonRect.left;
+          }
+          parent = parent.parentElement;
+        }
+      });
+      await votingButton.click({ force: true });
       await resolutionRow.locator("span.status-badge").filter({ hasText: "Voting Open" }).waitFor();
       const resolutionState = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
       assert.equal(resolutionState.resolutions.length, 1, "resolution should be saved against the created meeting");
@@ -89,9 +101,9 @@ try {
 
       const meetingPicker = page.locator("select").first();
       await meetingPicker.selectOption(created.id);
-      await page.getByText("TEST Guest — Position 1", { exact: true }).waitFor();
-      await page.getByText("TEST Guest — Position 2", { exact: true }).waitFor();
-      await page.getByText("TEST Guest — Position 3", { exact: true }).waitFor();
+      await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 1", { exact: true }).waitFor();
+      await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 2", { exact: true }).waitFor();
+      await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 3", { exact: true }).waitFor();
       await page.getByText("TEST Active Board Member", { exact: true }).waitFor();
       await page.getByText("4/4 Present", { exact: true }).waitFor();
       await page.waitForFunction(id => (window.__irpaFixtureActions || []).some(action => action.type === "quorum-assess" && action.meetingId === id), created.id);
