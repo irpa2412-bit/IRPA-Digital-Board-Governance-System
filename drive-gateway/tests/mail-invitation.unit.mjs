@@ -21,7 +21,8 @@ function legacyReq(body,key="test-key") {
     method:"POST", headers:{"x-irpa-service-key":key,"content-type":"application/json"},
     body:JSON.stringify(body)
   });
-}const good = {to:"a@example.org",name:"Amina",subject:"IRPA test",text:"Hello",html:"<p>Hello</p>"};
+}
+const good = {to:"a@example.org",name:"Amina",subject:"IRPA test",text:"Hello",html:"<p>Hello</p>"};
 const serviceClaims={user_id:"irpa-email-dispatcher",firebaseClaims:{emailDeliveryService:true}};
 function deps(overrides={}) {
   return {
