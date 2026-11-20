@@ -30,6 +30,7 @@ function harness({email="irpa2412@gmail.com",active=true,collections={},version=
       if(target.includes(":listCollectionIds")) return response({collectionIds:[]});
       if(target.includes("upload/drive/v3/files?uploadType=multipart")) return failBackup ? response({error:"backup unavailable"},500) : response({id:"backup-json-file",webViewLink:"https://drive.google.com/file/d/backup-json-file/view"});
       if(target.includes("upload/drive/v3/files/") && options.method==="PATCH") return response({});
+      if(target.includes("/accounts:lookup")) return response({users:[{localId:"member-1",email:"member@example.test"}]});
       if(target.includes("/accounts:delete")) return response({});
       if(target.includes("/adminCleanupAudit?documentId=")) return response({});
       if(target.includes("/documents/members/m1") && (!options.method || options.method==="GET")) return response({updateTime:version,fields:{uid:{stringValue:"member-1"}}});
