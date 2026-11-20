@@ -85,7 +85,7 @@ try {
           parent = parent.parentElement;
         }
       });
-      await votingButton.click({ force: true });
+      await votingButton.evaluate(button => button.click());
       await resolutionRow.locator("span.status-badge").filter({ hasText: "Voting Open" }).waitFor();
       const resolutionState = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
       assert.equal(resolutionState.resolutions.length, 1, "resolution should be saved against the created meeting");
@@ -104,7 +104,7 @@ try {
       await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 1", { exact: true }).waitFor();
       await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 2", { exact: true }).waitFor();
       await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 3", { exact: true }).waitFor();
-      await page.getByText("TEST Active Board Member", { exact: true }).waitFor();
+      await page.locator("#irpa-meeting-quorum").getByText("TEST Active Board Member", { exact: true }).waitFor();
       await page.getByText("4/4 Present", { exact: true }).waitFor();
       await page.waitForFunction(id => (window.__irpaFixtureActions || []).some(action => action.type === "quorum-assess" && action.meetingId === id), created.id);
 
