@@ -22,7 +22,7 @@ test("only the meeting host owns the attendance document and dispatches signing"
  assert.match(room,/isMeetingHost/);
  assert.match(room,/disabled=!isMeetingHost/);
  assert.match(service,/ownerUid!==uid/);
- assert.match(service,/hostUid&&hostUid!==uid/);
+ assert.match(service,/!hostUid\|\|hostUid!==uid/);
  assert.match(service,/meetingHostUid/);
 });
 
