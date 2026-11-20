@@ -359,9 +359,16 @@ if(phase==="PREPARE"){
  const gatewaySignerMap=Array.isArray(data.gatewaySignerMap)?data.gatewaySignerMap:[];
  const mappedIds=new Set(gatewaySignerMap.map(item=>clean(item.participantId)).filter(Boolean));
  const signerIds=new Set(gatewaySignerMap.map(item=>clean(item.signerId)).filter(Boolean));
+ const bindingMatchesParticipant=item=>{
+  const participant=participantById.get(clean(item.participantId));
+  if(!participant)return false;
+  const registeredEmail=lower(participant.participantEmail||participant.email||participant.invitedEmail||participant.subscriberEmail);
+  const registeredName=clean(participant.participantName||participant.name||participant.fullName||participant.displayName);
+  return /^S\\d+$/.test(clean(item.signerId))&&clean(item.participantId)&&lower(item.participantEmail)&&clean(item.participantName)&&
+   (!registeredEmail||registeredEmail===lower(item.participantEmail))&&(!registeredName||registeredName===clean(item.participantName));
+ };
  const mappingComplete=presentParticipantIds.size>0&&presentParticipantIds.size===suppliedIds.size&&presentParticipantIds.size===mappedIds.size&&presentParticipantIds.size===signerIds.size&&
-  [...presentParticipantIds].every(participantId=>suppliedIds.has(participantId)&&mappedIds.has(participantId)&&participantById.has(participantId))&&
-  gatewaySignerMap.every(item=>clean(item.signerId)&&clean(item.participantId)&&lower(item.participantEmail)&&clean(item.participantName));
+  [...presentParticipantIds].every(participantId=>suppliedIds.has(participantId)&&mappedIds.has(participantId)&&participantById.has(participantId))&&gatewaySignerMap.every(bindingMatchesParticipant);
  if(!mappingComplete||signerIds.size!==gatewaySignerMap.length||mappedIds.size!==gatewaySignerMap.length)return fail(ctx,request,"The email-link signer mapping must uniquely bind each Present participant record to its own signer ID, email and name. Shared email addresses are allowed and remain separate signer identities.",409);
  const record={meetingId,attendanceDate:date,status:"PREPARING",envelopeId,documentId,ownerUid:uid,participantIds:[...presentParticipantIds],signerUids:gatewaySignerMap.map(item=>clean(item.participantUid)).filter(Boolean),gatewaySignerMap,preparedAt:now,updatedAt:now};
  if(existing)await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,record);else await writeDoc(ctx,env,token,"meetingAttendanceDispatches",id,{...record,createdAt:now},false);
