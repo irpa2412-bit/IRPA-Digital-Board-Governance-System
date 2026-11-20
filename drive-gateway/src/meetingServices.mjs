@@ -295,6 +295,16 @@ const rows=active.map(p=>{
  const day=dayByParticipant.get(p.id);
  return {participantId:p.id,participantUid:uid||null,name:clean(p.participantName||p.name||p.fullName||p.displayName),email:lower(p.participantEmail||p.email||p.invitedEmail||p.subscriberEmail),role,sourceType:clean(p.sourceType)||null,registrationCategory,dailyAttendanceStatus:clean(day?.attendanceStatus)||"N/A",attendanceStatus:clean(day?.attendanceStatus)||"N/A",dailyAttendanceRecordedAt:iso(day?.recordedAt),signed:false};
 });
+const registeredBoardUids=new Set(rows.filter(r=>r.registrationCategory==="BOARD_MEMBER"&&r.participantUid).map(r=>r.participantUid));
+const representedBoardUids=new Set();
+for(const member of memberRecords){
+ const activeMember=["active","activated"].includes(lower(member.status||member.registrationStatus));
+ const isBoard=member.boardMember===true||lower(member.role)==="board member"||Boolean(clean(member.boardPosition))||clean(member.department)==="Board of Directors";
+ const memberUid=clean(member.uid||member.authUid||member.userUid);
+ if(!activeMember||!isBoard||!memberUid||registeredBoardUids.has(memberUid)||representedBoardUids.has(memberUid))continue;
+ representedBoardUids.add(memberUid);
+ rows.push({participantId:null,participantUid:memberUid,name:clean(member.name||member.fullName||member.memberName||member.displayName)||"Board Member",email:lower(member.email||member.emailAddress||member.contactEmail),role:clean(member.boardPosition)||"Board Member",registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false,dailyAttendanceStatus:"N/A",attendanceStatus:"N/A",dailyAttendanceRecordedAt:null,signed:false,registrationNote:"Not registered for this meeting"});
+}
 const dispatch=dispatchRows.find(r=>clean(r.attendanceDate)===date)||null;
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
 return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null}:null});
