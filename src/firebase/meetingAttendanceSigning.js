@@ -81,7 +81,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  const title="Daily Attendance — "+clean(meeting.title||meeting.meetingTitle||"Meeting")+" — "+date;
  const file=new File([bytes],reference+".pdf",{type:"application/pdf"});
  const uploaded=await uploadControlledDocumentRouted({
-  documentId,title,reference,documentType:"Governance Document",archiveCategory:"Meeting Records",
+  documentId,title,reference,documentType:"Governance Document",archiveCategory:"Governance Documents",
   classification:String(meeting.meetingCategory||meeting.category||"").toUpperCase().includes("BOARD")?"Restricted":"Internal",
   uploadedAt:new Date().toISOString(),file,contentType:"application/pdf"
  });
@@ -89,7 +89,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  if(!archive?.file?.fileId)throw new Error("The controlled attendance PDF upload did not return a primary archive file ID.");
  const documentPayload={
   title,reference,documentReference:reference,documentType:"Governance Document",documentTypeSelectedAt:new Date().toISOString(),
-  documentUid:documentId,archiveCategory:"Meeting Records",classification:String(meeting.meetingCategory||meeting.category||"").toUpperCase().includes("BOARD")?"Restricted":"Internal",
+  documentUid:documentId,archiveCategory:"Governance Documents",classification:String(meeting.meetingCategory||meeting.category||"").toUpperCase().includes("BOARD")?"Restricted":"Internal",
   archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archivePath:archive.archivePath,archiveAccess:archive.archiveAccess||"Restricted",
   archiveFileId:archive.file.fileId,archiveFileWebViewLink:archive.file.webViewLink||null,fileId:archive.file.fileId,
   fileUrl:"drive://"+archive.file.fileId,webViewLink:archive.file.webViewLink||null,fileName:reference+".pdf",
@@ -101,7 +101,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  const ownerSigningEnabled=present.some(row=>clean(row.participantUid||row.uid||row.userId)===owner.uid);
  const envelope=await createSignatureEnvelope({
   title,documentId,documentReference:reference,documentUrl:"drive://"+archive.file.fileId,
-  documentClassification:documentPayload.classification,documentArchiveCategory:"Meeting Records",
+  documentClassification:documentPayload.classification,documentArchiveCategory:"Governance Documents",
   documentType:"Governance Document",documentUploadedAt:documentPayload.uploadedAt,
   signingMode:"Parallel",recipients,fields,ownerSigningEnabled
  });
