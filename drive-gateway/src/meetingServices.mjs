@@ -61,7 +61,10 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  if(dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.gatewayEnvelopeId&&dailyDispatch?.ownerUid&&typeof ctx.getGatewayEnvelopeStatus==="function")dailyGatewayStatus=await ctx.getGatewayEnvelopeStatus(clean(dailyDispatch.ownerUid),env,clean(dailyDispatch.gatewayEnvelopeId)).catch(()=>null);
  const verifiedGatewaySigners=dailyDispatch?.gatewayAuditChainValid===true&&dailyGatewayStatus?.auditChainValid===true&&clean(dailyGatewayStatus?.envelopeId)===clean(dailyDispatch?.gatewayEnvelopeId)?dailyGatewayStatus.signers:[];
  const gatewaySignersById=new Map((Array.isArray(verifiedGatewaySigners)?verifiedGatewaySigners:[]).map(s=>[clean(s.id),s]));
- const dailySignerByParticipant=new Map((Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantId),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantId,signer])=>participantId&&signer?.status==="Signed"));
+ const gatewaySignerBindings=Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[];
+ const dailySignerByParticipant=new Map(gatewaySignerBindings.map(binding=>[clean(binding.participantId),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantId,signer])=>participantId&&signer?.status==="Signed"));
+ const dailySignerByLegacyUid=new Map(gatewaySignerBindings.filter(binding=>!clean(binding.participantId)).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantUid,signer])=>participantUid&&signer?.status==="Signed"));
+ const participantCountByUid=new Map();for(const participant of active){const participantUid=uidOf(participant);if(participantUid)participantCountByUid.set(participantUid,(participantCountByUid.get(participantUid)||0)+1);}
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
  const passByParticipant=new Map();
@@ -69,7 +72,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  const uidOf=p=>clean(p.participantUid||p.uid||p.userId);
  const rows=active.map(p=>{
   const id=clean(p.id),signature=signatureByParticipant.get(id),entry=queueByParticipant.get(id),pass=passByParticipant.get(id);
-  const uid=uidOf(p),daily=dailyByParticipant.get(id),dailySigner=dailySignerByParticipant.get(id),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
+  const uid=uidOf(p),daily=dailyByParticipant.get(id),dailySigner=dailySignerByParticipant.get(id)||(participantCountByUid.get(uid)===1?dailySignerByLegacyUid.get(uid):null),registerMatch=Boolean(uid&&registerByUid.has(uid)&&lower(p.sourceType)!=="manual invitee");
   const explicitCommittee=lower(p.participantRole||p.role)==="board committee member"||lower(p.participantType).includes("board committee");
   const category=explicitCommittee?"BOARD_COMMITTEE_MEMBER":registerMatch?"BOARD_MEMBER":boardMemberRole(p)?"UNMATCHED_BOARD_REGISTRATION":participantCategory(p);
   const attendanceStatus=attendanceDate?(clean(daily?.attendanceStatus)||"N/A"):clean(p.attendanceStatus)||"Unmarked";
