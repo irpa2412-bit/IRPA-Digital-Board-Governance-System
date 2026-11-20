@@ -3380,7 +3380,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
       admin: payload.admin === true,
       irpaRoles: Array.isArray(payload.irpaRoles) ? payload.irpaRoles : [],
       name: payload.name || "",
-      phoneNumber: payload.phone_number || ""
+      phoneNumber: payload.phone_number || "",
+      emailDeliveryService: payload.irpaEmailDeliveryService === true
     }
   };
   if (options.skipActivation !== true) await assertActivatedPortalUser(claims, env);
