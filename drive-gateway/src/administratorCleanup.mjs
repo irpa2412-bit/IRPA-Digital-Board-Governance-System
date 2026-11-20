@@ -165,7 +165,9 @@ export function createAdministratorCleanupRouter(deps) {
             });
             const participant = uid && [...(Array.isArray(envelope.participantUids)?envelope.participantUids:[]),
               ...(Array.isArray(envelope.actionUids)?envelope.actionUids:[])].some(value=>clean(value)===uid);
-            return matchingAssignment || (protectedEnvelopeStatus && participant);
+            const participantEmail = email && [...(Array.isArray(envelope.participantEmails)?envelope.participantEmails:[]),
+              ...(Array.isArray(envelope.recipientEmails)?envelope.recipientEmails:[])].some(value=>clean(value).toLowerCase()===email);
+            return matchingAssignment || (protectedEnvelopeStatus && (participant || participantEmail));
           })
           : false;
         const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle || data.title || data.position || (Array.isArray(data.roles) ? data.roles.join(", ") : "") || (Array.isArray(data.assignedRoles) ? data.assignedRoles.join(", ") : "") || (Array.isArray(data.roleAssignments) ? data.roleAssignments.map(item => typeof item === "string" ? item : item?.role || item?.name || item?.title).filter(Boolean).join(", ") : ""));
@@ -225,6 +227,7 @@ export function createAdministratorCleanupRouter(deps) {
             ...(Array.isArray(data.ownerUids) ? data.ownerUids : []),
             ...(Array.isArray(data.actionUids) ? data.actionUids : []),
             ...(Array.isArray(data.participantEmails) ? data.participantEmails : []),
+            ...(Array.isArray(data.recipientEmails) ? data.recipientEmails : []),
             ...(Array.isArray(data.signers) ? data.signers.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : []),
             ...(Array.isArray(data.recipients) ? data.recipients.flatMap(recipient => [recipient.uid, recipient.userId, recipient.profileUid, recipient.email]) : []),
             ...(Array.isArray(data.signerAssignments) ? data.signerAssignments.flatMap(signer => [signer.uid, signer.profileUid, signer.email]) : []),
@@ -389,7 +392,9 @@ export function createAdministratorCleanupRouter(deps) {
               (email && [signer.email,signer.signerEmail].some(value=>clean(value).toLowerCase()===email));
             return matches && clean(signer.status).toLowerCase() !== "signed";
           }) || (uid && [...(Array.isArray(envelopeData.participantUids)?envelopeData.participantUids:[]),
-            ...(Array.isArray(envelopeData.actionUids)?envelopeData.actionUids:[])].some(value=>clean(value)===uid));
+            ...(Array.isArray(envelopeData.actionUids)?envelopeData.actionUids:[])].some(value=>clean(value)===uid)) ||
+            (email && [...(Array.isArray(envelopeData.participantEmails)?envelopeData.participantEmails:[]),
+            ...(Array.isArray(envelopeData.recipientEmails)?envelopeData.recipientEmails:[])].some(value=>clean(value).toLowerCase()===email));
           if (hasUnsentAssignment) add({type:"update-signers",key:envelope.key,path:firestorePath(envelope.collection,envelope.id),
             version:envelope.version,uid,email,reason:"Remove unsent signing assignment for deleted member"});
         }
@@ -611,9 +616,11 @@ export function createAdministratorCleanupRouter(deps) {
           if (retained.length !== plain[field].length) changed[field] = retained;
         }
       }
-      if (Array.isArray(plain.participantEmails) && operation.email) {
-        const retained = plain.participantEmails.filter(value=>clean(value).toLowerCase()!==operation.email);
-        if (retained.length !== plain.participantEmails.length) changed.participantEmails = retained;
+      for (const field of ["participantEmails","recipientEmails"]) {
+        if (Array.isArray(plain[field]) && operation.email) {
+          const retained = plain[field].filter(value=>clean(value).toLowerCase()!==operation.email);
+          if (retained.length !== plain[field].length) changed[field] = retained;
+        }
       }
       const changedFields = Object.keys(changed);
       if (!changedFields.length) return "ALREADY_REMOVED";
