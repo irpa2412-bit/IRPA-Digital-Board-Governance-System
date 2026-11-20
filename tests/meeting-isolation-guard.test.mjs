@@ -195,3 +195,69 @@ test("only stale runs for the same pull request are cancelled", () => {
   assert.ok(workflow.includes("cancel-in-progress: true"));
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
+
+test("parallel portal window amendments preserve existing meeting and historical change records", () => {
+  assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
+  assert.match(guard, /delete baselineRecord\.activeAmendment/);
+  assert.match(guard, /delete currentRecord\.activeAmendment/);
+  assert.match(guard, /Parallel repair-window amendment changed existing change-record history or another portal's record/);
+});
+
+test("parallel portal window amendment delegates to the executable exact-scope policy", () => {
+  assert.match(guard, /evaluateSignatureWindowAmendment/);
+  assert.ok(guard.includes('"scripts/portal-repair-window-guard-policy.mjs"'));
+  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(parallelWindowDecision\.reason\)/);
+});
+
+
+import {
+  evaluateSignatureWindowAmendment,
+  SIGNATURE_WINDOW_AMENDMENT_PATHS
+} from "../scripts/portal-repair-window-guard-policy.mjs";
+
+const isolatedWindowFixture = () => {
+  const activeAmendment = {
+    status: "open",
+    files: ["drive-gateway/src/signing.mjs", "drive-gateway/src/emailSigningLinks.mjs"],
+    repairWindow: { rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8" }
+  };
+  const baselineChangeRecord = { status: "complete", repairWindow: { status: "open", portal: "Meeting Portal" }, history: [{ action: "meeting-window-opened" }] };
+  const currentChangeRecord = { ...structuredClone(baselineChangeRecord), activeAmendment };
+  const repairWindow = {
+    parallelWindows: [{
+      portal: "Signature Portal",
+      status: "open",
+      closesAt: "2026-11-22T17:08:47Z",
+      rollbackCommit: "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8"
+    }]
+  };
+  return { changedPaths: [...SIGNATURE_WINDOW_AMENDMENT_PATHS], repairWindow, changeRecord: { activeAmendment }, baselineChangeRecord, currentChangeRecord };
+};
+
+test("isolation guard blocks a change outside the Signature Portal window files", () => {
+  const fixture = isolatedWindowFixture();
+  fixture.changedPaths.push("src/pages/Meetings.jsx");
+  assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
+});
+
+test("isolation guard blocks an expired Signature Portal repair window", () => {
+  const fixture = isolatedWindowFixture();
+  assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-23T00:00:00Z") }).pass, false);
+});
+
+test("isolation guard blocks protected-file changes when no active Change Record exists", () => {
+  const fixture = isolatedWindowFixture();
+  fixture.changeRecord = {};
+  assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
+});
+
+test("isolation guard blocks edits to another portal window or existing history", () => {
+  const fixture = isolatedWindowFixture();
+  fixture.currentChangeRecord.repairWindow.status = "closed";
+  assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
+});
+
+test("isolation guard permits only the separate unexpired Signature Portal window amendment", () => {
+  const fixture = isolatedWindowFixture();
+  assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
+});

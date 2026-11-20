@@ -3,6 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
+import { evaluateSignatureWindowAmendment } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -15,7 +16,9 @@ const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
   "docs/portal-protection/repair-window.json",
+  "docs/portal-protection/change-record.json",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "scripts/portal-repair-window-guard-policy.mjs",
   ".github/workflows/finance-production-reset.yml",
   "docs/ACTUAL_DATA_ACCESS_GATE.md",
   "scripts/reset-finance-production.js",
@@ -269,6 +272,33 @@ const communicationMediaArchiveIntegration =
   !changed.includes("src/pages/Meetings.jsx") &&
   !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
   changed.every(path => allowed.has(path) || communicationMediaArchivePaths.has(path));
+// A parallel portal-window amendment may update only activeAmendment in the
+// shared change record. All existing Meeting Portal and historical records
+// must remain byte-equivalent after removing that one scoped property.
+if (changed.includes("docs/portal-protection/change-record.json")) {
+  const baselineRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
+  const currentRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
+  delete baselineRecord.activeAmendment;
+  delete currentRecord.activeAmendment;
+  if (JSON.stringify(baselineRecord) !== JSON.stringify(currentRecord)) {
+    throw new Error("Parallel repair-window amendment changed existing change-record history or another portal's record.");
+  }
+}
+const baselineChangeRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
+const currentChangeRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
+const currentRepairWindow = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/repair-window.json"], { encoding: "utf8" }));
+const parallelWindowDecision = evaluateSignatureWindowAmendment({
+  changedPaths: changed,
+  repairWindow: currentRepairWindow,
+  changeRecord: currentChangeRecord,
+  baselineChangeRecord,
+  currentChangeRecord
+});
+const parallelWindowRecordAmendment = parallelWindowDecision.pass;
+if (changed.includes("docs/portal-protection/repair-window.json") ||
+    changed.includes("docs/portal-protection/change-record.json")) {
+  if (!parallelWindowRecordAmendment) throw new Error(parallelWindowDecision.reason);
+}
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
@@ -406,7 +436,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

@@ -55,5 +55,38 @@
   "closure": {
     "closedAt": "",
     "updatedBaselineCommit": ""
+  },
+  "activeAmendment": {
+    "status": "open",
+    "affectedPortals": [
+      "Signature Portal"
+    ],
+    "reason": "Confirmed cause (d): openEmailSigning() consumes the invitation on the first GET, so link previews kill resent links; error messages are masked.",
+    "files": [
+      "drive-gateway/src/signing.mjs",
+      "drive-gateway/src/emailSigningLinks.mjs",
+      "drive-gateway/src/index.js",
+      "drive-gateway/src/router.mjs",
+      "src/pages/EmailSigningReadOnlyPage.jsx",
+      "drive-gateway/tests/",
+      "tests/"
+    ],
+    "repairWindow": {
+      "openedAt": "2026-11-20T17:08:47Z",
+      "closesAt": "2026-11-22T17:08:47Z",
+      "durationHours": 48,
+      "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+      "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; production health gate verified deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+      "rollbackCommitStatus": "verified-production-worker-deploy"
+    },
+    "prohibitedChanges": [
+      "Secrets",
+      "SMTP settings",
+      "Firestore rules",
+      "Certificate logic",
+      "Hash logic",
+      "Archive logic"
+    ],
+    "ownerInstruction": "Open a separate Signature Portal window; preserve the independent Meeting Portal window."
   }
 }

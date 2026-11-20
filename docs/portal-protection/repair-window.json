@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T12:09:00Z",
+  "lastActivityAt": "2026-11-20T17:08:47Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -187,5 +187,53 @@
     }
   ],
   "durationHours": 48,
-  "closesAt": "2026-11-22T11:08:48Z"
+  "closesAt": "2026-11-22T11:08:48Z",
+  "parallelWindows": [
+    {
+      "portal": "Signature Portal",
+      "status": "open",
+      "openedAt": "2026-11-20T17:08:47Z",
+      "lastActivityAt": "2026-11-20T17:08:47Z",
+      "durationHours": 48,
+      "closesAt": "2026-11-22T17:08:47Z",
+      "reason": "Confirmed cause (d): openEmailSigning() consumes the invitation on the first GET, so link previews kill resent links; error messages are masked.",
+      "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+      "scope": [
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/emailSigningLinks.mjs",
+        "drive-gateway/src/index.js",
+        "drive-gateway/src/router.mjs",
+        "src/pages/EmailSigningReadOnlyPage.jsx",
+        "drive-gateway/tests/",
+        "tests/"
+      ],
+      "prohibitions": [
+        "secrets",
+        "SMTP",
+        "Firestore rules",
+        "certificate logic",
+        "hash logic",
+        "archive logic"
+      ],
+      "activityLog": [
+        {
+          "at": "2026-11-20T17:08:47Z",
+          "action": "opened",
+          "description": "Owner-authorised 48-hour Signature Portal repair window. Rollback commit recorded from the repository's verified production rollback baseline: 433727282012c75cdaebca21dcdadcb28dba59fb. Existing Meeting Portal window remains unchanged and independently open."
+        },
+        {
+          "at": "2026-11-20T17:15:33Z",
+          "action": "rollback-reference-corrected",
+          "description": "Corrected Signature Portal rollback reference to dfb35cbb as directed; awaiting independent Worker /health confirmation. Meeting Portal baseline unchanged."
+        },
+        {
+          "at": "2026-11-20T17:20:46Z",
+          "action": "rollback-reference-verified",
+          "description": "Read successful production Worker no-secret-sync deployment run 44737326668; its production health gate confirms deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8. Signature Portal rollback reference corrected. Meeting Portal window and baseline remain unchanged."
+        }
+      ],
+      "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; its live production health gate verified the exact deployed target commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+      "rollbackCommitStatus": "verified-production-worker-deploy"
+    }
+  ]
 }
