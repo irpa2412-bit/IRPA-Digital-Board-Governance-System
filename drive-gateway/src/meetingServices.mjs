@@ -11,9 +11,10 @@ const isBoardMeeting = meeting => {
 };
 const boardMemberRole = participant => {
  const role=lower(participant.participantRole||participant.role||participant.boardPosition);
- return ["board member","board chairperson","board treasurer","board vice chairperson"].includes(role)
+ const authoritativeBoardRecord=lower(participant.sourceType)==="board member register"&&Boolean(clean(participant.boardMemberId||participant.sourceRecordId));
+ return (["board member","board chairperson","board treasurer","board vice chairperson","chairperson","vice chairperson","treasurer"].includes(role)||authoritativeBoardRecord)
    && lower(participant.sourceType)!=="manual invitee"
-   && !/external|guest|observer|non.?voting|committee/.test(lower(participant.participantType||""));
+   && !/external|guest|observer|non.?voting|committee|secretary/.test(role+" "+lower(participant.participantType||""));
 };
 const participantCategory = participant => {
  const role=lower(participant.participantRole||participant.role||"");
