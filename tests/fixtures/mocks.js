@@ -153,6 +153,11 @@ export async function listMeetingInviteeDirectory() {
 export async function callMeetingService(path, payload = {}) {
   const store = readStore();
   const meetingId = payload.meetingId || payload.data?.meetingId;
+  if (path === "/api/meeting-register/create") {
+    const id = await createRecord("meetings", payload.data || {});
+    recordAction({ type: "meeting-register-create", meetingId: id });
+    return { id, testOnly: true };
+  }
   if (path === "/api/meeting-register/update") {
     store.meetings = store.meetings.map(m => m.id === meetingId ? { ...m, ...(payload.data || {}) } : m);
     writeStore(store); recordAction({ type: "meeting-update", meetingId, keys: Object.keys(payload.data || {}) });
