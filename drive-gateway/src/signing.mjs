@@ -27,7 +27,7 @@ function invitationFailureDiagnostics(error){
   return{errorType:String(error?.name||"Error").slice(0,60),errorCode,smtpResponseCode,failureClass,deliveryOutcome:error?.deliveryOutcome==="unknown"?"unknown":"not-confirmed",retryable:error?.retryable===false?false:(smtpResponseCode!==null?smtpResponseCode>=400&&smtpResponseCode<500:true)};
 }
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d+$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
-async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");const suppliedHash=await sha256Hex(secret);if(!safeEqual(suppliedHash,s.tokenHash)){const replaced=[...(s.tokenHistory||[]),...(s.emailLinkTokenHistory||[])].some(item=>item?.status==="replaced"&&safeEqual(suppliedHash,String(item.tokenHash||"")));if(replaced)throw new HttpError(410,"This link was replaced. Please use the newest email.");throw new HttpError(403,"This signing link is not valid.");}const expiry=s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt;if(s.identityType!=="email-link"){const expiryMs=Date.parse(String(expiry||""));if(Number.isFinite(expiryMs)&&ctx.now().getTime()>expiryMs)throw new HttpError(410,"This signing link has expired. Contact the document owner for a new invitation.");}if(s.identityType==="email-link"&&(!["issued","opened"].includes(s.emailLinkStatus)))throw new HttpError(401,genericEmailSigningFailure());return{env:e,signer:s}}
+async function load(ctx,t){const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),s=e?.signers.find(x=>x.id===sid);if(!e||!s)throw new HttpError(401,"Invalid signing link.");const suppliedHash=await sha256Hex(secret),currentTokenMatch=safeEqual(suppliedHash,String(s.tokenHash||"")),reopenedInvitationMatch=s.identityType==="email-link"&&s.status!=="Signed"&&s.emailLinkStatus==="opened"&&(s.emailLinkTokenHistory||[]).some(item=>item?.status==="used"&&safeEqual(suppliedHash,String(item.tokenHash||"")));if(!currentTokenMatch&&!reopenedInvitationMatch){const replaced=[...(s.tokenHistory||[]),...(s.emailLinkTokenHistory||[])].some(item=>item?.status==="replaced"&&safeEqual(suppliedHash,String(item.tokenHash||"")));if(replaced)throw new HttpError(410,"This link was replaced. Please use the newest email.");throw new HttpError(403,"This signing link is not valid.");}const expiry=s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt;if(s.identityType!=="email-link"){const expiryMs=Date.parse(String(expiry||""));if(Number.isFinite(expiryMs)&&ctx.now().getTime()>expiryMs)throw new HttpError(410,"This signing link has expired. Contact the document owner for a new invitation.");}if(s.identityType==="email-link"&&(!["issued","opened"].includes(s.emailLinkStatus)))throw new HttpError(401,genericEmailSigningFailure());return{env:e,signer:s}}
 function active(ctx,e,s=null){if(["Voided","Declined","Cancelled","Canceled"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");if(s?.identityType!=="email-link"){const expiry=s?.tokenExpiresAt||s?.emailLinkExpiresAt||e.expiresAt;if(expiry&&ctx.now().getTime()>new Date(expiry).getTime())throw new HttpError(403,"This signing link has expired.")}}
 const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
@@ -235,29 +235,23 @@ export async function openEmailSigning(ctx,token,ip=""){
     if(loaded.signer.identityType!=="email-link"||!["issued","opened"].includes(loaded.signer.emailLinkStatus))throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env,loaded.signer);
     let sessionToken=token;
-    if(loaded.signer.emailLinkStatus==="issued"){
-      sessionCreationAttempted=true;
-      const sessionSecret=randomHex(32);
-      sessionToken=loaded.env.id+"."+loaded.signer.id+"."+sessionSecret;
-      const sessionHash=await sha256Hex(sessionSecret);
-      await mutate(ctx,loaded.env.id,async current=>{
-        const signer=current.signers.find(item=>item.id===loaded.signer.id);
-        if(!signer||signer.identityType!=="email-link"||signer.emailLinkStatus!=="issued")throw new HttpError(401,genericEmailSigningFailure());
-        const opened=await markEmailSigningTokenOpened({tokenHash:signer.tokenHash,status:signer.emailLinkStatus,attemptCount:signer.emailLinkAttemptCount,openCount:signer.emailLinkOpenCount,ipAttempts:signer.emailLinkIpAttempts},{token:parts[2],now,ipHash,maxAttempts:8});
-        signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"used",usedAt:now.toISOString()}].slice(-10);
-        signer.tokenHash=sessionHash;
-        signer.emailLinkStatus=opened.status;
-        signer.emailLinkOpenCount=opened.openCount;
-        signer.emailLinkAttemptCount=opened.attemptCount;
-        signer.emailLinkIpAttempts=opened.ipAttempts;
-        signer.emailLinkLastIpHash=opened.lastIpHash;
-        signer.emailLinkOpenedAt=opened.openedAt;
-        let events=await chainEvents(current.events,{type:"email_link.stage",stage:"SESSION_CREATE",outcome:"success",signerId:signer.id,at:now.toISOString()});
-        events=await chainEvents(events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash,sessionTokenHash:sessionHash,invitationTokenConsumed:true});
-        return {patch:{signers:current.signers,events}};
-      });
-      sessionCreationSucceeded=true;
-    }
+    sessionCreationAttempted=true;
+    const suppliedTokenHash=await sha256Hex(parts[2]);
+    await mutate(ctx,loaded.env.id,async current=>{
+      const signer=current.signers.find(item=>item.id===loaded.signer.id);
+      if(!signer||signer.identityType!=="email-link"||!["issued","opened"].includes(signer.emailLinkStatus))throw new HttpError(401,genericEmailSigningFailure());
+      const opened=await markEmailSigningTokenOpened({tokenHash:suppliedTokenHash,status:signer.emailLinkStatus,attemptCount:signer.emailLinkAttemptCount,openCount:signer.emailLinkOpenCount,ipAttempts:signer.emailLinkIpAttempts},{token:parts[2],now,ipHash,maxAttempts:8});
+      signer.emailLinkStatus="opened";
+      signer.emailLinkOpenCount=opened.openCount;
+      signer.emailLinkAttemptCount=opened.attemptCount;
+      signer.emailLinkIpAttempts=opened.ipAttempts;
+      signer.emailLinkLastIpHash=opened.lastIpHash;
+      signer.emailLinkOpenedAt=signer.emailLinkOpenedAt||opened.openedAt;
+      let events=await chainEvents(current.events,{type:"email_link.stage",stage:"SESSION_CREATE",outcome:"success",signerId:signer.id,at:now.toISOString()});
+      events=await chainEvents(events,{type:"email_link.opened",signerId:signer.id,at:now.toISOString(),ipHash,invitationTokenConsumed:false,reusableInvitation:true});
+      return {patch:{signers:current.signers,events}};
+    });
+    sessionCreationSucceeded=true;
     const preview=await openSigning(ctx,sessionToken,null);
     return {ok:true,title:preview.title,ownerName:preview.ownerName,linkExpiresAt:loaded.signer.identityType==="email-link"?null:(loaded.signer.tokenExpiresAt||loaded.signer.emailLinkExpiresAt||loaded.env.expiresAt),envelopeId:preview.envelopeId,signer:preview.signer,fields:preview.fields,canSign:preview.canSign,ownerDeclaredParticulars:preview.ownerDeclaredParticulars,sessionToken};
   }catch(error){
