@@ -264,7 +264,7 @@ export function createAdministratorCleanupRouter(deps) {
     const operationIds = new Set();
     const blockers = [];
     const add = operation => {
-      const id = operation.type + ":" + (operation.key || operation.uid || operation.fileId || "");
+      const id = operation.type + ":" + (operation.type === "update-signers" ? (operation.key + ":" + (operation.uid || operation.email || "")) : (operation.key || operation.uid || operation.fileId || ""));
       if (operationIds.has(id)) return;
       operationIds.add(id);
       operations.push({operationId:id,...operation});
@@ -508,20 +508,23 @@ export function createAdministratorCleanupRouter(deps) {
           return json({ok:false,error:"Each selected record must have an explicit STAYS or GOES decision."},400,corsHeaders(request));
         }
         const byKey = new Map(selections.map(item => [clean(item.key), clean(item.decision).toUpperCase()]));
-        const records = inventory.records.map(row => {
-          const requested = byKey.get(row.key);
-          const decision = requested === "GOES" && !row.protected ? "GOES" : "STAYS";
-          return { ...row, decision };
-        });
         const unknown = [...byKey.keys()].filter(key => !inventory.records.some(row => row.key === key));
         if (unknown.length) return json({ok:false,error:"Selection contains records outside the inventory.",unknown},400,corsHeaders(request));
+        const built = buildOperations(inventory, selections);
+        if (built.blockers.length) return json({ok:false,code:"CLEANUP_PLAN_BLOCKED",error:"The selected records cannot be safely deleted with the available verified relationships.",blockers:built.blockers},409,corsHeaders(request));
         const planId = crypto.randomUUID();
         const plan = { planId, inventoryId, createdAt: new Date().toISOString(), administratorUid: auth.uid,
-          administratorEmail: auth.email, records, typedConfirmationRequired: "DELETE", status: "AWAITING_REVIEW",
-          mandatoryInventoryComplete: true };
+          administratorEmail: auth.email, records:built.records, executionOperations:built.operations, operationOutcomes:[],
+          auditRefs:[], backupDriveFileId:null, backupUrl:null, typedConfirmationRequired: "DELETE", status: "AWAITING_REVIEW",
+          mandatoryInventoryComplete: true, backupRequiredBeforeExecution:true, batchSize:10 };
+        const auditRef = await writeAuditEvent(env,auth.token,{eventType:"PLAN_PREPARED",planId,inventoryId,actorUid:auth.uid,actorEmail:auth.email,
+          createdAt:plan.createdAt,selectedGoes:plan.records.filter(row=>row.decision==="GOES").map(row=>row.key),
+          cascadeOperations:plan.executionOperations.filter(operation=>operation.reason==="Approved related-record cleanup" || operation.reason==="Approved member-account cascade" || operation.reason==="Remove unsent signing assignment for deleted member")});
+        plan.auditRefs.push(auditRef);
         await env.DRIVE_KV.put("admin-cleanup:plan:" + planId, JSON.stringify(plan), {expirationTtl:TTL_SECONDS});
-        return json({ok:true,...plan,summary:{total:records.length,stays:records.filter(r=>r.decision==="STAYS").length,
-          goes:records.filter(r=>r.decision==="GOES").length,blocked:records.filter(r=>r.protected).length}},200,corsHeaders(request));
+        return json({ok:true,...plan,summary:{total:plan.records.length,stays:plan.records.filter(r=>r.decision==="STAYS").length,
+          goes:plan.records.filter(r=>r.decision==="GOES").length,blocked:plan.records.filter(r=>r.protected).length,
+          operations:plan.executionOperations.length,cascades:plan.executionOperations.filter(operation=>operation.reason!=="Administrator-selected record" && operation.reason!=="Administrator-selected register record" && operation.reason!=="Delete explicitly selected signed trial PDF" && operation.reason!=="Delete explicitly selected signed trial envelope").length}},200,corsHeaders(request));
       }
       const planMatch = pathname.match(/^\/api\/admin\/cleanup\/plan\/([A-Za-z0-9-]+)$/);
       if (planMatch && request.method === "GET") {
