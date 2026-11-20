@@ -8,7 +8,7 @@ import { callMeetingService } from "./meetingGatewayApi";
 const PAGE={width:842,height:595,margin:28,top:112,rowHeight:22,rowsPerPage:20};
 const clean=value=>String(value??"").trim();
 const categoryLabel=value=>({
- BOARD_MEMBER:"Board Member",BOARD_COMMITTEE_MEMBER:"Board Committee",
+ BOARD_MEMBER:"Board Member",UNMATCHED_BOARD_REGISTRATION:"Unverified Board Role",BOARD_COMMITTEE_MEMBER:"Board Committee",
  MANAGEMENT:"Management",STAFF:"Employees / Staff",IRPA_MEMBER:"IRPA Member",
  EXTERNAL_INVITEE:"External Participant",OTHER:"Other Participant"
 })[String(value||"").toUpperCase()]||"Other Participant";
@@ -25,7 +25,7 @@ function attendanceStatus(row){
 async function buildDailyAttendancePdf({meeting,date,records}){
  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const fields=[],present=records.filter(row=>attendanceStatus(row)==="Present");
- const categories=["BOARD_MEMBER","BOARD_COMMITTEE_MEMBER","MANAGEMENT","STAFF","IRPA_MEMBER","EXTERNAL_INVITEE","OTHER"];
+ const categories=["BOARD_MEMBER","BOARD_COMMITTEE_MEMBER","UNMATCHED_BOARD_REGISTRATION","MANAGEMENT","STAFF","IRPA_MEMBER","EXTERNAL_INVITEE","OTHER"];
  const grouped=categories.map(category=>({category,rows:records.filter(row=>String(row.registrationCategory||"OTHER").toUpperCase()===category)})).filter(group=>group.rows.length);
  let pageNumber=0;
  for(const group of grouped){
