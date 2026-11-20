@@ -107,3 +107,12 @@ test("signed trial envelope is identified from TRIAL origin and its signer is pr
   assert.equal(envelope.signedTrialDocument,true);
   assert.equal(envelope.signedPdfReference,"drive-file-1");
 });
+
+test("cleanup plan rejects duplicate keys and invalid decisions", async () => {
+  const {route,env}=harness({collections:{members:[{id:"m1",data:{name:"Member",email:"m@example.test"}}]}});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const duplicate=await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"members/m1",decision:"GOES"},{key:"members/m1",decision:"STAYS"}]})}),env,"/api/admin/cleanup/plan");
+  assert.equal(duplicate.status,400);
+  const invalid=await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"members/m1",decision:"DELETE"}]})}),env,"/api/admin/cleanup/plan");
+  assert.equal(invalid.status,400);
+});
