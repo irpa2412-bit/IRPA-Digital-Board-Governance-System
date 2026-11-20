@@ -25,10 +25,10 @@ const NOW = new Date("2026-11-16T08:00:00.000Z");
 test("email signing invitation clearly states the reusable no-time-expiry rule",()=>{
   const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
   assert.match(message.text,/no time-based expiry/i);
-  assert.match(message.text,/remains valid after opening/i);
-  assert.match(message.text,/does not consume the invitation/i);
+  assert.match(message.text,/does not consume it/i);
+  assert.match(message.html,/does not consume this invitation/i);
   assert.match(message.html,/No time-based expiry/i);
-  assert.match(message.html,/remains valid after opening/i);
+  assert.match(message.html,/read-only access to the completed signed PDF/i);
 });
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
