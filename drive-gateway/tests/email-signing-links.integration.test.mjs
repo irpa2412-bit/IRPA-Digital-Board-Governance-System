@@ -337,7 +337,7 @@ test("Meeting Portal draft minutes can be completed through a Signature Portal e
     token:opened.sessionToken,signature:{type:"typed",value:"TEST Meeting Secretary"},
     fieldApplications:[{fieldId:"MINUTES-SIGNATURE",confirmed:true,page:1,x:0.12,y:0.72,width:0.28,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:"TEST Meeting Secretary"}],
     declarations:{name:"TEST Meeting Secretary",occupation:"Meeting Secretary",capacity:"Minutes approval"},
-    consent:true,user:null
+    signatureConfirmed:true,consent:true,user:null
   });
   assert.equal(signed.completed,true);
   assert.equal(signed.status,"Completed");
