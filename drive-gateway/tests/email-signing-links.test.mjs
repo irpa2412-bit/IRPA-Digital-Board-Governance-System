@@ -302,3 +302,29 @@ test("createEnvelope sends three distinct email-link invitations to three signer
   assert.equal(new Set(tokens).size,3);
   assert.ok(sent.every(invitation=>invitation.to==="shared@example.org"&&invitation.emailLink===true));
 });
+
+
+test("parallel-mode signer can receive a resend without waiting for earlier signer positions",async()=>{
+  const events=await chainEvents([],{type:"envelope.created",at:NOW.toISOString(),actor:"owner"});
+  let record={_v:1,id:"ENV-PARALLEL-RESEND",createdBy:"owner",status:"Active",signingMode:"Parallel",title:"Parallel Test",ownerName:"Owner",signers:[
+    {id:"S1",email:"first@example.org",name:"First",order:1,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:"a".repeat(64),invitation:"Sent"},
+    {id:"S2",email:"second@example.org",name:"Second",order:2,status:"Pending",identityType:"email-link",emailLinkStatus:"issued",tokenHash:"b".repeat(64),invitation:"Sent"}
+  ],events};
+  const sent=[];
+  const ctx={
+    meta:{
+      get:async(collection,id)=>collection==="envelopes"&&id===record.id?structuredClone(record):null,
+      update:async(collection,id,patch,{ifVersion})=>{assert.equal(ifVersion,record._v);record={...record,...structuredClone(patch),_v:record._v+1};}
+    },
+    now:()=>NOW,
+    config:{appUrl:"https://irpa.example.org",emailLinkTtlDays:7},
+    sendInvitation:async invitation=>{sent.push(invitation);},
+    logger:{error(){}}
+  };
+  const result=await resendInvitation(ctx,{uid:"owner",email:"owner@example.org"},record.id,"S2");
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,"second@example.org");
+  assert.equal(record.signers[1].invitation,"Sent");
+  assert.equal(record.signers[1].tokenHash,await sha256Hex(new URL(sent[0].link).searchParams.get("emailSignToken").split(".")[2]));
+  assert.equal(result.signerId,"S2");
+});
