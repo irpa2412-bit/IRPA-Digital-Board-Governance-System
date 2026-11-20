@@ -22,7 +22,9 @@ test("email-link routes return only the invited signer's assigned fields and con
   assert.match(signing,/fields,canSign:can\(env,signer\)/);
   assert.match(signing,/appliedFields:\[\]/);
   assert.match(signing,/ownerDeclaredParticulars:signer\.declaredParticulars/);
-  assert.match(router,/genericEmailSigningFailure\(\)/);
+  assert.match(router,/TOKEN_LOOKUP/);
+  assert.match(router,/SESSION_CREATE/);
+  assert.match(router,/PDF_PREVIEW/);
   assert.match(page,/\/api\/sign\/email\/open/);
   assert.match(page,/\/api\/sign\/email\/pdf/);
   assert.doesNotMatch(page,/\/api\/documents\/|\/api\/envelopes\//);
