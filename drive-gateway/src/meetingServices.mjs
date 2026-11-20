@@ -29,7 +29,7 @@ const participantCategory = participant => {
 };
 async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null){
  const meetingId=clean(meeting.id);
- const [participants,passes,queue,signatures,memberRecords]=await Promise.all([
+ const [participants,passes,queue,signatures,memberRecords,dailyRows,dispatchRows]=await Promise.all([
   listByField(ctx,env,token,"participants","meetingId",meetingId),
   listByField(ctx,env,token,"meetingAccessTokens","meetingId",meetingId),
   listByField(ctx,env,token,"meetingEntryRequests","meetingId",meetingId),
@@ -287,6 +287,7 @@ const boardUids=new Set(memberRecords.filter(m=>{
 }).map(m=>clean(m.uid||m.authUid||m.userUid)).filter(Boolean));
 const dayByParticipant=new Map(dailyRows.filter(r=>clean(r.attendanceDate)===date).map(r=>[clean(r.participantId),r]));
 const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
+for(const participant of active){if(dayByParticipant.has(clean(participant.id)))continue;const participantId=clean(participant.id),entryId=await hash(meetingId+"\\0"+date+"\\0"+participantId),now=new Date(),entry={meetingId,attendanceDate:date,participantId,participantUid:clean(participant.participantUid||participant.uid||participant.userId)||null,attendanceStatus:"N/A",recordedByUid:null,recordedAt:null,createdAt:now,updatedAt:now};await writeDoc(ctx,env,token,"meetingDailyAttendance",entryId,entry,false);dayByParticipant.set(participantId,entry);}
 const rows=active.map(p=>{
  const role=clean(p.participantRole||p.role||p.participantType),uid=clean(p.participantUid||p.uid||p.userId);
  const committee=lower(role)==="board committee member"||lower(p.participantType).includes("board committee");
