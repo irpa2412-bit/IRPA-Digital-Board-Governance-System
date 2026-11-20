@@ -77,6 +77,8 @@ export function normalizeMeetingForV3(meeting={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.category||meeting.meetingType);
   return {
     ...meeting,
+    meetingTimeZone:meeting.meetingTimeZone||"Africa/Nairobi",
+    meetingTimeLabel:"EAT (UTC+3)",
     meetingCategory:policy.id,
     meetingPolicyId:meeting.meetingPolicyId||policy.id,
     meetingCategoryLabel:policy.label,
