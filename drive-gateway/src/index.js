@@ -614,31 +614,32 @@ export default {
               return new Response(pdf.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf","content-disposition":"inline","x-document-sha256":pdf.hash,"cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; sandbox"}});
             }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Document preview unavailable."),code:error?.code||"PDF_PREVIEW"},Number(error?.status||404));}
           }
-          let emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/(S\\d+)\\/resend$/);
-          if(request.method==="POST"&&emailMatch){
+          const emailPathParts=emailRouteUrl.pathname.split("/");
+          const validEnvelopeId=value=>/^[A-Za-z0-9_-]{3,64}$/.test(String(value||""));
+          const validSignerId=value=>/^S\\d+$/.test(String(value||""));
+          if(request.method==="POST"&&emailPathParts.length===7&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&validSignerId(emailPathParts[5])&&emailPathParts[6]==="resend"){
             const user=await ctx.verifyUser(request).catch(()=>null);
             if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
             try{
-              const result=await resendGatewayInvitation(ctx,user,emailMatch[1],emailMatch[2]);
-              const current=await ctx.meta.get("envelopes",emailMatch[1]);
-              const signer=current?.signers?.find(item=>item.id===emailMatch[2]);
-              return emailRouteJson({...result,maskedRecipient:signer?.email?maskEmailForConfirmation(signer.email):"recipient",confirmationText:"New link sent to "+(signer?.email?maskEmailForConfirmation(signer.email):"recipient")+"...",expiresAtEAT:result.expiresAt?formatEmailLinkExpiryEAT(result.expiresAt):null},200);
+              const result=await resendGatewayInvitation(ctx,user,emailPathParts[3],emailPathParts[5]);
+              const current=await ctx.meta.get("envelopes",emailPathParts[3]);
+              const signer=current?.signers?.find(item=>item.id===emailPathParts[5]);
+              const masked=signer?.email?maskEmailForConfirmation(signer.email):"recipient";
+              return emailRouteJson({...result,maskedRecipient:masked,confirmationText:"New link sent to "+masked+"...",expiresAtEAT:result.expiresAt?formatEmailLinkExpiryEAT(result.expiresAt):null},200);
             }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
           }
-          emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/resend-all$/);
-          if(request.method==="POST"&&emailMatch){
+          if(request.method==="POST"&&emailPathParts.length===6&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&emailPathParts[5]==="resend-all"){
             const user=await ctx.verifyUser(request).catch(()=>null);
             if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
-            try{return emailRouteJson(await resendAllGatewayUnsignedInvitations(ctx,user,emailMatch[1]),200);}
+            try{return emailRouteJson(await resendAllGatewayUnsignedInvitations(ctx,user,emailPathParts[3]),200);}
             catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Bulk resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
           }
-          emailMatch=emailRouteUrl.pathname.match(/^\\/api\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/invitations\\/(S\\d+)\\/contact$/);
-          if(request.method==="PATCH"&&emailMatch){
+          if(request.method==="PATCH"&&emailPathParts.length===7&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&validSignerId(emailPathParts[5])&&emailPathParts[6]==="contact"){
             const user=await ctx.verifyUser(request).catch(()=>null);
             if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
             try{
               const body=await request.json();
-              return emailRouteJson(await updateGatewaySignerContact(ctx,user,emailMatch[1],emailMatch[2],body),200);
+              return emailRouteJson(await updateGatewaySignerContact(ctx,user,emailPathParts[3],emailPathParts[5],body),200);
             }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Signer contact update failed."),code:error?.code||"CONTACT_UPDATE"},Number(error?.status||400));}
           }
           const response = await esignRoute(request,ctx);
