@@ -146,7 +146,7 @@ export async function createEnvelope(ctx,user,body){
   for(let i=0;i<input.length;i++){
     const s=input[i],email=validateEmail(s?.email).trim().toLowerCase(),uid=s?.uid?cleanSegment(s.uid,128):null;
     // Delivery email may be shared. Signers remain isolated by signerId and token hash.
-    if(uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
+    if(emailSigningModule!=="v2"&&uid&&seenUids.has(uid))throw new HttpError(400,"Duplicate signer UID.");
     if(uid)seenUids.add(uid);
     const signerId=`S${i+1}`,secret=randomHex(32),emailLink=s?.identityType==="email-link",authority=null;
     const profileUid=emailLink?await resolveOptionalEmailLinkProfileUid(ctx.resolveEmailLinkProfileUid,email,s?.name,3000):null;
