@@ -60,10 +60,10 @@ async function buildDailyAttendancePdf({meeting,date,records}){
     page.drawText(categoryLabel(group.category).slice(0,15),{x:cols[4],y,size:6.5,font});
     page.drawText(status,{x:cols[5],y,size:7,font:status==="Present"?bold:font,color:status==="Present"?rgb(.05,.35,.16):rgb(.35,.35,.35)});
     if(status==="Present"){
-     const uid=clean(row.participantUid||row.uid||row.userId),participantId=clean(row.participantId||row.id);
-     if(!uid||!email)throw new Error("Cannot dispatch: "+name+" is marked Present but does not have both a registered account UID and email address.");
+     const participantId=clean(row.participantId||row.id);
+     if(!participantId||!email)throw new Error("Cannot dispatch: "+name+" is marked Present but does not have a unique participant record ID and email address.");
      const fieldId="ATT-"+String(date)+"-"+participantId.replace(/[^A-Za-z0-9_-]/g,"-");
-     fields.push({fieldId,type:"Signature",page:pageNumber,x:(cols[6]-4)/PAGE.width*100,y:(top-7)/PAGE.height*100,width:(PAGE.width-PAGE.margin-cols[6]+4)/PAGE.width*100,height:16/PAGE.height*100,required:true,signerUid:uid,roleAssignmentIndex:0,responsibility:"Daily attendance signature"});
+     fields.push({fieldId,type:"Signature",page:pageNumber,x:(cols[6]-4)/PAGE.width*100,y:(top-7)/PAGE.height*100,width:(PAGE.width-PAGE.margin-cols[6]+4)/PAGE.width*100,height:16/PAGE.height*100,required:true,signerId:participantId,roleAssignmentIndex:0,responsibility:"Daily attendance signature"});
     }else{
      page.drawText("N/A",{x:cols[6],y,size:8,font,color:rgb(.48,.48,.48)});
     }
@@ -101,12 +101,14 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  if(!meeting?.id||!date||!Array.isArray(records)||!records.length)throw new Error("A meeting, attendance date and compiled participant register are required.");
  const {bytes,fields,present}=await buildDailyAttendancePdf({meeting,date,records});
  if(!present.length)throw new Error("There are no participants marked Present for this day. No signing request was dispatched.");
- const presentUids=present.map(row=>clean(row.participantUid||row.uid||row.userId));
- if(new Set(presentUids).size!==presentUids.length)throw new Error("The daily attendance sheet contains duplicate participant UIDs. Correct the participant register before dispatching signing requests.");
- const recipients=[...new Map(present.map(row=>{
-  const uid=clean(row.participantUid||row.uid||row.userId);
-  const role=clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),title=clean(row.title||row.position||row.boardPosition),occupation=clean(row.occupation||row.capacity||row.profession||title||role),capacity=clean(row.capacity||row.occupation||title||role);return [uid,{uid,email:clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase(),name:clean(row.name||row.participantName||row.fullName),role,institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),roleAssignments:[{role,title,capacity,occupation}]}];
- })).values()];
+ const participantIds=present.map(row=>clean(row.participantId||row.id));
+ if(participantIds.some(id=>!id)||new Set(participantIds).size!==participantIds.length)throw new Error("The daily attendance sheet must contain one unique participant record ID for every person marked Present.");
+ const recipients=present.map(row=>{
+  const participantId=clean(row.participantId||row.id),email=clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase();
+  const role=clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),title=clean(row.title||row.position||row.boardPosition),occupation=clean(row.occupation||row.capacity||row.profession||title||role),capacity=clean(row.capacity||row.occupation||title||role);
+  if(!email)throw new Error("Cannot dispatch attendance signing for "+clean(row.name||row.participantName||"this participant")+": a valid email address is required for the individual signing link.");
+  return {id:participantId,signerId:participantId,identityType:"email-link",email,name:clean(row.name||row.participantName||row.fullName),role,institutionalRole:role,title,occupation,capacity,department:clean(row.department),institution:clean(row.institution),participantCategory:categoryLabel(row.registrationCategory),participantUid:clean(row.participantUid||row.uid||row.userId)||null,roleAssignments:[{role,title,capacity,occupation}]};
+ });
  const documentId=doc(collection(db,"documents")).id;
  const reference="IRPA-ATT-"+String(meeting.reference||meeting.id).replace(/[^A-Za-z0-9_-]/g,"-")+"-"+date;
  const title="Daily Attendance — "+clean(meeting.title||meeting.meetingTitle||"Meeting")+" — "+date;
@@ -129,15 +131,15 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   uploadedAt:new Date().toISOString(),recordOrigin:"PRODUCTION"
  };
  await registerControlledDocumentRecord({documentId,documentPayload});
- const ownerSigningEnabled=present.some(row=>clean(row.participantUid||row.uid||row.userId)===owner.uid);
+ const ownerSigningEnabled=false;
  const envelope=await createSignatureEnvelope({
   title,documentId,documentReference:reference,documentUrl:"drive://"+archive.file.fileId,
   documentClassification:documentPayload.classification,documentArchiveCategory:"Governance Documents",
   documentType:"Governance Document",documentUploadedAt:documentPayload.uploadedAt,
   signingMode:"Parallel",recipients,fields,ownerSigningEnabled
  });
- const gatewaySignerMap=(envelope.recipients||[]).filter(r=>r?.uid&&r?.email&&r.actionRequired!==false&&r.optionalSigning!==true&&!r.accessOnly&&!["View Only","Read Only","Information / FYI","Observer"].includes(String(r.role||"").trim())).sort((a,b)=>Number(a.routingOrder||1)-Number(b.routingOrder||1)).map((r,index)=>({signerId:"S"+String(index+1),participantUid:r.uid,participantEmail:clean(r.email).toLowerCase(),participantName:clean(r.name||r.displayName||r.email)}));
- await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewaySignerMap});
+ const gatewaySignerMap=(envelope.recipients||[]).filter(r=>r?.identityType==="email-link"&&r?.id&&r?.email&&r.actionRequired!==false&&r.optionalSigning!==true&&!r.accessOnly&&!["View Only","Read Only","Information / FYI","Observer"].includes(String(r.role||"").trim())).sort((a,b)=>Number(a.routingOrder||1)-Number(b.routingOrder||1)).map((r,index)=>({signerId:r.gatewaySignerId||("S"+String(index+1)),participantId:String(r.id),participantUid:clean(r.participantUid||r.uid)||null,participantEmail:clean(r.email).toLowerCase(),participantName:clean(r.name||r.displayName||r.email)}));
+ await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,participantIds:recipients.map(r=>r.id),gatewaySignerMap});
  let started;
  try{
   started=await startSignatureWorkflow(envelope);
@@ -146,7 +148,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   throw error;
  }
  try{
-  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
+  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:envelope.id,documentId,ownerUid:owner.uid,participantIds:recipients.map(r=>r.id),gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
  }catch(error){
   throw new Error("The Signature Portal workflow started and email invitations may have been sent, but the Meeting Portal dispatch record could not be reconciled. Do not press Dispatch again; ask the host administrator to reconcile envelope "+envelope.id+".");
  }
