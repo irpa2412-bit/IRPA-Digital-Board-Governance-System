@@ -191,9 +191,9 @@
   "parallelWindows": [
     {
       "portal": "Signature Portal",
-      "status": "open",
+      "status": "closed",
       "openedAt": "2026-11-20T17:08:47Z",
-      "lastActivityAt": "2026-11-20T17:47:37Z",
+      "lastActivityAt": "2026-11-20T17:56:30Z",
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
       "reason": "Owner-authorised full Email Signing rebuild: reusable envelope/signer-bound links, explicit open session, expiry, atomic resend, contract suite and protected cutover.",
@@ -242,10 +242,29 @@
           "at": "2026-11-20T17:47:37Z",
           "action": "scope-amended",
           "description": "Expanded the Signature Portal repair window to the owner-authorised full Email Signing rebuild scope. Meeting Portal window and baseline remain unchanged."
+        },
+        {
+          "at": "2026-11-20T17:56:30Z",
+          "action": "closed",
+          "description": "Signature Portal email-link repair merged in PR #817 (386b73b), deployed through the no-secret-sync Worker workflow and Firebase Hosting, with seven-portal and Meeting Portal regression evidence recorded. Production browser smoke passed public endpoints/assets and responsive checks; authenticated Documents workspace was not exercised because the runner had no signed-in production test session. Meeting Portal window and history preserved unchanged."
         }
       ],
       "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; its live production health gate verified the exact deployed target commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
-      "rollbackCommitStatus": "verified-production-worker-deploy"
+      "rollbackCommitStatus": "verified-production-worker-deploy",
+      "closedAt": "2026-11-20T17:56:30Z",
+      "closureEvidence": {
+        "repairPR": 817,
+        "mergeCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+        "productionWorkerCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+        "noSecretSyncWorkerDeployRun": 44787425215,
+        "firebaseHostingDeployRun": 44787424924,
+        "cloudflareFrontendDeployRun": 44787425010,
+        "productionBrowserSmokeRun": 44787661874,
+        "sevenPortalsSmokeRun": 44787425122,
+        "meetingPortalBrowserRegressionRun": 44786918920,
+        "smokeResult": "PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION",
+        "limitation": "Production browser run passed public frontend endpoints, all six viewport widths, all built JavaScript asset HTTP 200 checks, DocumentLifecycleModule SHA-256 against the exact deployed Cloudflare artifact, and no page errors. It detected a signed-out browser and therefore did not exercise the authenticated Documents → Signing workspace."
+      }
     }
   ]
 }

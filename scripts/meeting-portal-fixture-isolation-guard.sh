@@ -3,7 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
-import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -286,6 +286,7 @@ if (changed.includes("docs/portal-protection/change-record.json")) {
 }
 const baselineChangeRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
 const currentChangeRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
+const baselineRepairWindow = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/repair-window.json`], { encoding: "utf8" }));
 const currentRepairWindow = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/repair-window.json"], { encoding: "utf8" }));
 const parallelWindowDecision = evaluateSignatureWindowAmendment({
   changedPaths: changed,
@@ -294,7 +295,14 @@ const parallelWindowDecision = evaluateSignatureWindowAmendment({
   baselineChangeRecord,
   currentChangeRecord
 });
-const parallelWindowRecordAmendment = parallelWindowDecision.pass;
+const signatureWindowClosureDecision = evaluateSignatureWindowClosure({
+  changedPaths: changed,
+  baselineRepairWindow,
+  currentRepairWindow,
+  baselineChangeRecord,
+  currentChangeRecord
+});
+const parallelWindowRecordAmendment = parallelWindowDecision.pass || signatureWindowClosureDecision.pass;
 const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
   changedPaths: changed,
   repairWindow: currentRepairWindow,
@@ -305,7 +313,7 @@ const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
 const signatureEmailLinkSessionRepair = signatureWindowRepairDecision.pass;
 if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
-  if (!parallelWindowRecordAmendment) throw new Error(parallelWindowDecision.reason);
+  if (!parallelWindowRecordAmendment) throw new Error(signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
 }
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
