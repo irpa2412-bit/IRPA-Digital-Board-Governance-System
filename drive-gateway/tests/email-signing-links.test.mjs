@@ -22,11 +22,13 @@ import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
-test("email signing invitation clearly states its no-time-expiry single-use rule",()=>{
+test("email signing invitation clearly states the reusable no-time-expiry rule",()=>{
   const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
   assert.match(message.text,/does not expire with time/i);
-  assert.match(message.text,/redeemed once/i);
+  assert.match(message.text,/remains valid after opening/i);
+  assert.match(message.text,/does not consume the invitation/i);
   assert.match(message.html,/No time-based expiry/i);
+  assert.match(message.html,/remains valid after opening/i);
 });
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
@@ -42,13 +44,18 @@ test("email token has at least 32 random bytes and only its SHA-256 hash is pers
   assert.equal(issued.record.attemptCount,0);
 });
 
-test("email token opens once and transitions issued to opened", async () => {
+test("email token remains valid after opening and can be reopened indefinitely", async () => {
   const issued=await createEmailSigningToken({envelopeId:"ENV-TEST02",signerId:"S1",email:"a@example.org",now:NOW});
   const opened=await markEmailSigningTokenOpened(issued.record,{token:issued.token,now:NOW,ipHash:"ip-hash"});
   assert.equal(opened.status,"opened");
   assert.equal(opened.openCount,1);
   assert.equal(opened.lastIpHash,"ip-hash");
-  await assert.rejects(()=>markEmailSigningTokenOpened(opened,{token:issued.token,now:NOW}),/unavailable/i);
+  const later=new Date("2027-11-16T08:00:00.000Z");
+  assert.equal((await inspectEmailSigningToken(issued.token,opened,later)).ok,true);
+  const reopened=await markEmailSigningTokenOpened(opened,{token:issued.token,now:later,ipHash:"another-ip"});
+  assert.equal(reopened.status,"opened");
+  assert.equal(reopened.openCount,2);
+  assert.equal((await inspectEmailSigningToken(issued.token,reopened,later)).ok,true);
 });
 
 test("standalone email token inspection remains separate from envelope expiry policy", async () => {
