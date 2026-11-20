@@ -364,7 +364,7 @@ if(phase==="PREPARE"){
   if(!participant)return false;
   const registeredEmail=lower(participant.participantEmail||participant.email||participant.invitedEmail||participant.subscriberEmail);
   const registeredName=clean(participant.participantName||participant.name||participant.fullName||participant.displayName);
-  return /^S\\d+$/.test(clean(item.signerId))&&clean(item.participantId)&&lower(item.participantEmail)&&clean(item.participantName)&&
+  return /^S\d+$/.test(clean(item.signerId))&&clean(item.participantId)&&lower(item.participantEmail)&&clean(item.participantName)&&
    (!registeredEmail||registeredEmail===lower(item.participantEmail))&&(!registeredName||registeredName===clean(item.participantName));
  };
  const mappingComplete=presentParticipantIds.size>0&&presentParticipantIds.size===suppliedIds.size&&presentParticipantIds.size===mappedIds.size&&presentParticipantIds.size===signerIds.size&&
