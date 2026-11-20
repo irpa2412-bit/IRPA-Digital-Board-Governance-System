@@ -51,10 +51,11 @@ export function protectedSignatureChangeHasRecord({ changedPaths, changeRecord }
     "drive-gateway/src/emailSigningLinks.mjs",
     "drive-gateway/src/index.js",
     "drive-gateway/src/router.mjs",
-    "src/pages/EmailSigningReadOnlyPage.jsx"
+    "src/pages/EmailSigningReadOnlyPage.jsx",
+    "src/pages/SignaturePlatform.jsx"
   ];
   const touchesProtected = changedPaths.some(path => protectedPaths.includes(path) ||
-    path.startsWith("drive-gateway/tests/") || path.startsWith("tests/"));
+    path.startsWith("drive-gateway/src/emailSigning/") || path.startsWith("drive-gateway/tests/") || path.startsWith("tests/"));
   return !touchesProtected || Boolean(changeRecord?.activeAmendment?.status === "open");
 }
 
@@ -76,11 +77,13 @@ export function evaluateSignatureWindowRepair({
   }
   const required = [
     "drive-gateway/src/signing.mjs",
-    "drive-gateway/src/router.mjs",
+    "drive-gateway/src/emailSigningLinks.mjs",
+    "drive-gateway/src/index.js",
     "src/pages/EmailSigningReadOnlyPage.jsx",
-    "drive-gateway/tests/email-signing-links.integration.test.mjs"
+    "src/pages/SignaturePlatform.jsx",
+    "drive-gateway/tests/email-signing-contract.test.mjs"
   ];
-  if (!required.every(path => changed.includes(path))) {
+  if (!required.every(path => changed.includes(path)) || !changed.some(path => path.startsWith("drive-gateway/src/emailSigning/"))) {
     return { pass: false, reason: "The repair is missing its scoped implementation or end-to-end regression test." };
   }
   const maintenance = new Set([
