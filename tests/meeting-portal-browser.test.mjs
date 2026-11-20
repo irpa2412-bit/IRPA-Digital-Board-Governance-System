@@ -56,7 +56,7 @@ try {
       await page.getByText(createdTitle, { exact: true }).waitFor();
       let createdRow = page.locator("tr").filter({ hasText: createdTitle });
       await createdRow.getByRole("button", { name: "Open Workspace" }).click();
-      await page.getByRole("button", { name: "Resolutions", exact: true }).click();
+      await page.getByRole("button", { name: "Resolutions", exact: true }).first().click();
       await page.getByRole("heading", { name: "Resolutions" }).waitFor();
       await page.getByRole("button", { name: "+ New Resolution" }).click();
       await page.locator('select[name="meetingId"]').selectOption(created.id);
