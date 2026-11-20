@@ -46,6 +46,7 @@ import { authorizeIdentityReconciliation, classifyRegisteredIdentityRecord, summ
 import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs";
 import { createLoginContextRoute } from "./loginContext.mjs";
 import { createBootstrapPrimaryAdministratorRoute } from "./adminIdentity.mjs";
+import { createAdministratorCleanupRouter } from "./administratorCleanup.mjs";
 import { createPasswordRecoveryRouter } from "./passwordRecovery.mjs";
 
 function getFirebaseProjectId(env) {
@@ -154,6 +155,18 @@ const smtpSelfcheckRoute = createSmtpSelfcheckRoute({
   authenticateFirebaseRequest, getFirestoreDocument, smtpSend,
   writeAudit: writeSmtpSelfcheckAudit, json, corsHeaders
 });
+const administratorCleanupRouter = createAdministratorCleanupRouter({
+  authenticateFirebaseRequest,
+  getFirestoreAdminAccessToken,
+  getFirestoreDocument,
+  getFirestoreCollectionDocuments,
+  firestoreDocumentToPlain,
+  getFirebaseAuthAdminAccessToken,
+  listFirebaseAuthUsers,
+  json,
+  corsHeaders
+});
+
 const passwordRecoveryRouter = createPasswordRecoveryRouter({
   authenticateFirebaseRequest,
   getFirebaseAuthAdminAccessToken,
@@ -319,6 +332,9 @@ export default {
 
       // Normalize trailing slashes so portal upload/archive actions cannot be blocked by URL formatting.
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+      const cleanupResponse = await administratorCleanupRouter(request, env, pathname);
+      if (cleanupResponse) return cleanupResponse;
 
       if (pathname === "/api/system/smtp-selfcheck" && request.method === "POST") return await smtpSelfcheckRoute(request, env);
       if (pathname === "/api/auth/password-reset/prepare" || pathname === "/api/auth/password-reset/clear") return await passwordRecoveryRouter(request, env, pathname);
@@ -498,11 +514,7 @@ export default {
 
       if (env.ESIGN_MODULE_ENABLED === "true") {
         if (pathname === "/api/esign/cleanup" && request.method === "POST") {
-          const claims = await authenticateFirebaseRequest(request, env);
-          const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
-          if (!admin?.fields?.active?.booleanValue) return json({ok:false,error:"Administrator authorization is required."},403,corsHeaders(request));
-          const ctx = buildEsignContext({env,verifyUser:async()=>({uid:claims.user_id,isAdmin:true}),sendInvitation:async()=>{throw new Error("Cleanup context does not send invitations.");},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
-          return json(await runCleanup(ctx),200,corsHeaders(request));
+          return json({ok:false,code:"REPLACED_BY_ADMIN_CLEANUP",error:"The legacy cleanup executor is disabled. Take a mandatory administrator inventory and prepare a reviewed cleanup plan through /api/admin/cleanup before any reset."},410,corsHeaders(request));
         }
         const isEsignPath =
           pathname === "/api/documents/next-reference" ||
