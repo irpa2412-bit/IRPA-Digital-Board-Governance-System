@@ -75,7 +75,9 @@
       "openedAt": "2026-11-20T17:08:47Z",
       "closesAt": "2026-11-22T17:08:47Z",
       "durationHours": 48,
-      "rollbackCommit": "433727282012c75cdaebca21dcdadcb28dba59fb"
+      "rollbackCommit": "dfb35cbb028749536973a616422d9aeb6829c2bf",
+      "rollbackCommitEvidence": "Firebase web build reported by owner as dfb35cb, matching repository main dfb35cbb; production Worker /health confirmation pending.",
+      "rollbackCommitStatus": "provisional-owner-confirmed"
     },
     "prohibitedChanges": [
       "Secrets",
