@@ -371,7 +371,6 @@ test("email-link signers may confirm only their own active saved profile specime
 
 
 test("envelope refresh keeps signer rows readable and separates invitation delivery from link redemption", () => {
-  const css = fs.readFileSync(new URL("../src/styles/signature-portal.css", import.meta.url), "utf8");
   const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
   const refreshStart=page.indexOf(" async function refreshGatewayEmailStatus(){");
   const refreshEnd=page.indexOf(" async function resendEmailLink",refreshStart);
@@ -387,8 +386,8 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
   assert.ok(refresh.includes('envelopeId:selected.gatewayEnvelopeId'), "the selected envelope ID must be attached locally even when the Gateway omits it");
   assert.ok(page.includes('className="page signature-portal-root"'));
   assert.ok(page.includes('className="panel signature-envelope-status"'));
-  assert.ok(css.includes('.signature-portal-root [aria-busy="true"]'));
-  assert.ok(css.includes("opacity: 1;"));
+  assert.ok(page.includes('.signature-portal-root [aria-busy="true"]'));
+  assert.ok(page.includes("opacity: 1;"));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
 
