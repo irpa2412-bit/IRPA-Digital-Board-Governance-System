@@ -4,6 +4,7 @@ import { auth, db } from "./config";
 import { uploadControlledDocumentRouted, registerControlledDocumentRecord } from "./signatureStorage";
 import { createSignatureEnvelope, startSignatureWorkflow, getSignatureEnvelope } from "./signaturePlatform";
 import { callMeetingService } from "./meetingGatewayApi";
+import { GOVERNANCE_FIELD_TYPES } from "../components/GovernanceFieldPalette";
 
 const PAGE={width:842,height:595,margin:28,top:112,rowHeight:22,rowsPerPage:20};
 const clean=value=>String(value??"").trim();
@@ -25,9 +26,11 @@ function attendanceStatus(row){
 async function buildDailyAttendancePdf({meeting,date,records}){
  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const fields=[],present=records.filter(row=>attendanceStatus(row)==="Present");
+ if(!GOVERNANCE_FIELD_TYPES.includes("Signature"))throw new Error("The shared Governance Field Palette does not expose a Signature field.");
  const categories=["BOARD_MEMBER","BOARD_COMMITTEE_MEMBER","UNMATCHED_BOARD_REGISTRATION","MANAGEMENT","STAFF","IRPA_MEMBER","EXTERNAL_INVITEE","OTHER"];
  const grouped=categories.map(category=>({category,rows:records.filter(row=>String(row.registrationCategory||"OTHER").toUpperCase()===category)})).filter(group=>group.rows.length);
  let pageNumber=0;
+ const totalPages=grouped.reduce((total,group)=>total+Math.max(1,Math.ceil(group.rows.length/PAGE.rowsPerPage)),0);
  for(const group of grouped){
   const pages=Math.max(1,Math.ceil(group.rows.length/PAGE.rowsPerPage));
   for(let pageIndex=0;pageIndex<pages;pageIndex++){
@@ -38,38 +41,36 @@ async function buildDailyAttendancePdf({meeting,date,records}){
    page.drawText(clean(meeting.title||meeting.meetingTitle||"Meeting"),{x:PAGE.margin,y:PAGE.height-52,size:10,font,color:rgb(.15,.18,.22)});
    page.drawText("Reference: "+clean(meeting.reference||meeting.meetingReference||meeting.id)+"   Date: "+date,{x:PAGE.margin,y:PAGE.height-68,size:9,font,color:rgb(.2,.2,.2)});
    page.drawText("CATEGORY SHEET: "+categoryLabel(group.category),{x:PAGE.margin,y:PAGE.height-82,size:9,font:bold,color:rgb(.12,.2,.32)});
-   const cols=[PAGE.margin,62,285,420,575,690];
-   const headers=["No.","Participant","Category / Role","Attendance","Signature placement"];
+   const cols=[28,48,185,350,470,550,635];
+   const headers=["No.","Participant name","Email address","Occupation / position","Category","Attendance","Signature placement"];
    const y0=PAGE.height-99;
    page.drawLine({start:{x:PAGE.margin,y:y0-5},end:{x:PAGE.width-PAGE.margin,y:y0-5},thickness:1,color:rgb(.25,.3,.4)});
-   headers.forEach((label,i)=>page.drawText(label,{x:cols[i],y:y0,size:8,font:bold,color:rgb(.08,.12,.2)}));
+   headers.forEach((label,i)=>page.drawText(label,{x:cols[i],y:y0,size:7,font:bold,color:rgb(.08,.12,.2)}));
    rows.forEach((row,index)=>{
-    const globalIndex=group.rows.indexOf(row);
-    const top=PAGE.top+index*PAGE.rowHeight;
-    const y=PAGE.height-top;
-    const status=attendanceStatus(row);
-    const name=clean(row.name||row.participantName||row.fullName||"Unnamed participant").slice(0,38);
-    const role=clean(row.role||row.participantRole).slice(0,24);
-    page.drawText(String(globalIndex+1),{x:cols[0],y,size:8,font});
-    page.drawText(name,{x:cols[1],y,size:8,font});
-    page.drawText((categoryLabel(group.category)+" / "+role).slice(0,30),{x:cols[2],y,size:7,font});
-    page.drawText(status,{x:cols[3],y,size:8,font:status==="Present"?bold:font,color:status==="Present"?rgb(.05,.35,.16):rgb(.35,.35,.35)});
-    page.drawLine({start:{x:cols[4],y:y-2},end:{x:PAGE.width-PAGE.margin,y:y-2},thickness:.5,color:rgb(.65,.68,.72)});
+    const globalIndex=group.rows.indexOf(row),top=PAGE.top+index*PAGE.rowHeight,y=PAGE.height-top,status=attendanceStatus(row);
+    const name=clean(row.name||row.participantName||row.fullName||"Unnamed participant").slice(0,25);
+    const email=clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase().slice(0,31);
+    const occupation=clean(row.occupation||row.capacity||row.title||row.role||row.participantRole||"—").slice(0,23);
+    page.drawText(String(globalIndex+1),{x:cols[0],y,size:7,font});
+    page.drawText(name,{x:cols[1],y,size:7,font});
+    page.drawText(email||"—",{x:cols[2],y,size:6.5,font});
+    page.drawText(occupation||"—",{x:cols[3],y,size:6.5,font});
+    page.drawText(categoryLabel(group.category).slice(0,15),{x:cols[4],y,size:6.5,font});
+    page.drawText(status,{x:cols[5],y,size:7,font:status==="Present"?bold:font,color:status==="Present"?rgb(.05,.35,.16):rgb(.35,.35,.35)});
     if(status==="Present"){
-     const uid=clean(row.participantUid||row.uid||row.userId);
-     const email=clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase();
+     const uid=clean(row.participantUid||row.uid||row.userId),participantId=clean(row.participantId||row.id);
      if(!uid||!email)throw new Error("Cannot dispatch: "+name+" is marked Present but does not have both a registered account UID and email address.");
-     fields.push({fieldId:"ATT-"+date+"-"+clean(row.participantId||row.id),type:"Signature",page:pageNumber,x:(cols[4]-4)/PAGE.width*100,y:(top-7)/PAGE.height*100,width:(PAGE.width-PAGE.margin-cols[4]+4)/PAGE.width*100,height:16/PAGE.height*100,required:true,signerUid:uid,responsibility:"Daily attendance signature"});
+     const fieldId="ATT-"+String(date)+"-"+participantId.replace(/[^A-Za-z0-9_-]/g,"-");
+     fields.push({fieldId,type:"Signature",page:pageNumber,x:(cols[6]-4)/PAGE.width*100,y:(top-7)/PAGE.height*100,width:(PAGE.width-PAGE.margin-cols[6]+4)/PAGE.width*100,height:16/PAGE.height*100,required:true,signerUid:uid,roleAssignmentIndex:0,responsibility:"Daily attendance signature"});
     }else{
-     page.drawText("N/A",{x:cols[4],y,size:8,font,color:rgb(.48,.48,.48)});
+     page.drawText("N/A",{x:cols[6],y,size:8,font,color:rgb(.48,.48,.48)});
     }
    });
-   page.drawText("Page "+pageNumber+" of "+categories.reduce((total,category)=>total+Math.ceil(records.filter(row=>String(row.registrationCategory||"OTHER").toUpperCase()===category).length/PAGE.rowsPerPage),0),{x:PAGE.width-90,y:18,size:8,font,color:rgb(.4,.4,.4)});
+   page.drawText("Page "+pageNumber+" of "+totalPages,{x:PAGE.width-90,y:18,size:8,font,color:rgb(.4,.4,.4)});
   }
  }
  return {bytes:await pdf.save(),fields,present};
 }
-
 export async function resumeDailyAttendanceSigning({meeting,date,dispatch}={}){
  const owner=auth.currentUser;
  if(!owner?.uid||!owner?.email)throw new Error("The meeting host must be signed in with an authenticated email account.");
