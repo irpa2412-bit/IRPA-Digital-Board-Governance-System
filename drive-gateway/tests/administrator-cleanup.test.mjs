@@ -32,7 +32,7 @@ function harness({email="irpa2412@gmail.com",active=true,collections={},version=
       if(target.includes("upload/drive/v3/files/") && options.method==="PATCH") return response({});
       if(target.includes("/accounts:delete")) return response({});
       if(target.includes("/adminCleanupAudit?documentId=")) return response({});
-      if(target.includes("/documents/members/m1") && options.method==="GET") return response({updateTime:version,fields:{uid:{stringValue:"member-1"}}});
+      if(target.includes("/documents/members/m1") && (!options.method || options.method==="GET")) return response({updateTime:version,fields:{uid:{stringValue:"member-1"}}});
       if(target.includes("/documents/members/m1") && options.method==="DELETE") return response({});
       throw new Error("Unexpected cleanup fetch: "+target+" "+String(options.method||"GET"));
     },
