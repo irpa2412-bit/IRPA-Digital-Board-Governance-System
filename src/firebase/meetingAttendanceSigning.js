@@ -77,7 +77,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  if(!meeting?.id||!date||!Array.isArray(records)||!records.length)throw new Error("A meeting, attendance date and compiled participant register are required.");
  const {bytes,fields,present}=await buildDailyAttendancePdf({meeting,date,records});
  if(!present.length)throw new Error("There are no participants marked Present for this day. No signing request was dispatched.");
- const recipients=[...new Map(present.map(row=>{
+ const presentUids=present.map(row=>clean(row.participantUid||row.uid||row.userId));\n if(new Set(presentUids).size!==presentUids.length)throw new Error("The daily attendance sheet contains duplicate participant UIDs. Correct the participant register before dispatching signing requests.");\n const recipients=[...new Map(present.map(row=>{
   const uid=clean(row.participantUid||row.uid||row.userId);
   return [uid,{uid,email:clean(row.email||row.participantEmail||row.invitedEmail).toLowerCase(),name:clean(row.name||row.participantName||row.fullName),role:clean(row.role||row.participantRole)||categoryLabel(row.registrationCategory),institutionalRole:clean(row.role||row.participantRole)}];
  })).values()];
