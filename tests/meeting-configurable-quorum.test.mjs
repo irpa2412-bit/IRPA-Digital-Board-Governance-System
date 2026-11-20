@@ -38,6 +38,6 @@ const data=fs.readFileSync("src/firebase/data.js","utf8");
  assert.match(service,/governancePolicySnapshot/);assert.match(service,/tally:outcome/);
  assert.doesNotMatch(service,/Math\.ceil\(denominator\/3\)/);
  assert.match(service,/Voting is blocked until an authorised quorum and voting policy is configured/);
- assert.match(data,/callMeetingService\("\\/api\\/meeting-voting\\/open"/);
- assert.match(data,/callMeetingService\("\\/api\\/meeting-voting\\/close"/);
+ assert.ok(data.includes('callMeetingService("/api/meeting-voting/open"'));
+ assert.ok(data.includes('callMeetingService("/api/meeting-voting/close"'));
 });
