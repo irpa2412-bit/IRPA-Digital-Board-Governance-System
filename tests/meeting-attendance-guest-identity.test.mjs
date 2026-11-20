@@ -22,4 +22,7 @@ test("same signer ID twice is rejected; email equality alone is not a duplicate"
 test("a guest without a participant identity is rejected",()=>{
  assert.throws(()=>buildDailyAttendanceSignerAssignments([{name:"Guest",email:"x@example.test"}],"2026-11-20"),/participant ID/);
 });
-\ntest("a signer ID bound to a different participant identity is rejected",()=>{\n assert.throws(()=>buildDailyAttendanceSignerAssignments([{participantId:"guest-a",signerId:"ATT-2026-11-20-guest-b",name:"Guest A",email:"shared@example.test"}],"2026-11-20"),/does not match this participant identity/);\n});\n
+
+test("a signer ID bound to a different participant identity is rejected",()=>{
+ assert.throws(()=>buildDailyAttendanceSignerAssignments([{participantId:"guest-a",signerId:"ATT-2026-11-20-guest-b",name:"Guest A",email:"shared@example.test"}],"2026-11-20"),/does not match this participant identity/);
+});
