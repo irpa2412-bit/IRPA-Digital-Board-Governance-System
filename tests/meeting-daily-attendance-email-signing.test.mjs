@@ -43,6 +43,8 @@ test("only the meeting host owns the attendance document and dispatches signing"
 });
 
 test("daily PDF places signature fields in the final column only for Present participants",()=>{
+ assert.match(helper,/resolve the registered full name/);
+ assert.match(helper,/NAME NOT FOUND/);
  assert.match(helper,/Signature placement/);
  assert.match(helper,/CATEGORY SHEET:/);
  assert.match(helper,/BOARD_MEMBER/);
