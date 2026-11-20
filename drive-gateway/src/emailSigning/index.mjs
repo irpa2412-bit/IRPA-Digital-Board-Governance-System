@@ -1,6 +1,6 @@
 import { HttpError, randomHex, safeEqual, sha256Hex } from "../util.mjs";
 
-export const EMAIL_SIGNING_REBUILD_ENABLED = true;
+export const EMAIL_SIGNING_REBUILD_ENABLED = false;
 export const EMAIL_SIGNING_ALREADY_SIGNED = "This document is already signed.";
 export const EMAIL_SIGNING_RESEND_STATUSES = Object.freeze([
   "invited", "opened", "expired", "replaced", "revoked", "send failed", "signing interrupted"
