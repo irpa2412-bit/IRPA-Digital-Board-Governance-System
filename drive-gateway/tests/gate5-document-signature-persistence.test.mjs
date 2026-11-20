@@ -285,7 +285,7 @@ test("G5-03 — original document preservation", async () => {
   );
   assert.equal(envelopeIdResponse.status, 201);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
   assert.equal(
