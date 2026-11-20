@@ -371,7 +371,7 @@ if(phase==="PREPARE"){
   const gatewayStatus=await ctx.getGatewayEnvelopeStatus(uid,env,gatewayEnvelopeId).catch(()=>null);
   const actualSigners=new Map((Array.isArray(gatewayStatus?.signers)?gatewayStatus.signers:[]).map(signer=>[clean(signer.id),signer]));
   const expectedMap=Array.isArray(existing.gatewaySignerMap)?existing.gatewaySignerMap:[];
-  const mappingValid=gatewayStatus?.auditChainValid===true&&clean(gatewayStatus?.envelopeId)===gatewayEnvelopeId&&actualSigners.size===expectedMap.length&&expectedMap.length===Number(existing.signerUids?.length||0)&&expectedMap.every(binding=>{
+  const mappingValid=gatewayStatus?.auditChainValid===true&&clean(gatewayStatus?.envelopeId)===gatewayEnvelopeId&&actualSigners.size===expectedMap.length&&expectedMap.length===Number(existing.signerIds?.length||0)&&expectedMap.every(binding=>{
    const signer=actualSigners.get(clean(binding.signerId));
    return signer&&lower(signer.email)===lower(binding.participantEmail)&&lower(signer.name)===lower(binding.participantName);
   });
