@@ -241,7 +241,7 @@ export async function openEmailSigning(ctx,token,ip=""){
     const loaded=await load(ctx,token);
     if(loaded.signer.identityType!=="email-link")throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env,loaded.signer);
-    if(loaded.tokenKind==="session")return {ok:true,sessionToken:token,sessionExpiresAt:loaded.signer.emailLinkSessionExpiresAt};
+    if(loaded.tokenKind==="session"){const preview=await openSigning(ctx,token,null);return {...preview,sessionToken:token,sessionExpiresAt:loaded.signer.emailLinkSessionExpiresAt||loaded.signer.emailLinkExpiresAt};}
     stage="SESSION_CREATE";
     const sessionSecret=randomHex(32),sessionToken=loaded.env.id+"."+loaded.signer.id+"."+sessionSecret;
     const sessionHash=await sha256Hex(sessionSecret);
@@ -257,7 +257,8 @@ export async function openEmailSigning(ctx,token,ip=""){
       return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.session_created",signerId:signer.id,at:now.toISOString(),ipHash,sessionTokenHash:sessionHash,invitationTokenConsumed:false})}};
     });
     await recordEmailLinkStage(ctx,loaded.env.id,loaded.signer.id,"SESSION_CREATE","success");
-    return {ok:true,sessionToken,sessionExpiresAt};
+    const preview=await openSigning(ctx,sessionToken,null);
+    return {...preview,sessionToken,sessionExpiresAt};
   }catch(error){
     if(error?.status===410&&parts?.length===3){try{const snapshot=await ctx.meta.get("envelopes",parts[0]),suppliedHash=await sha256Hex(parts[2]);if(snapshot){const sessionExpired=Boolean(snapshot.signers.find(item=>item.id===parts[1])?.emailLinkSessionHash)&&safeEqual(suppliedHash,String(snapshot.signers.find(item=>item.id===parts[1])?.emailLinkSessionHash||""));await mutate(ctx,parts[0],async current=>{const signer=current.signers.find(item=>item.id===parts[1]);if(!signer)return{patch:null};const at=now.toISOString();if(sessionExpired){signer.emailLinkSessionStatus="expired";signer.emailLinkSessionHash=null;return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.session_expired",signerId:signer.id,at})}};}if(signer.emailLinkStatus!=="issued")return{patch:null};signer.emailLinkStatus="expired";signer.emailLinkSessionStatus="expired";signer.emailLinkSessionHash=null;signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"expired",expiredAt:at}].slice(-20);return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.expired",signerId:signer.id,at})}};});}}catch(auditError){ctx.logger?.error?.("EMAIL_LINK_EXPIRY_AUDIT_FAILED",{stage,errorType:String(auditError?.name||"Error")});}}
     if(parts?.length===3)await recordEmailLinkStage(ctx,parts[0],parts[1],stage,"failure");
