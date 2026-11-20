@@ -580,6 +580,15 @@ export async function resendGatewayEmailInvitation(envelopeId,signerId) {
   return data;
 }
 
+
+export async function resendAllGatewayEmailInvitations(envelopeId) {
+  if(!envelopeId)throw new Error("A Gateway envelope is required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/resend-all",{method:"POST",body:JSON.stringify({})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false){const error=new Error(data.error||"Unable to resend invitations to unsigned signers.");if(data.code)error.code=String(data.code);throw error;}
+  return data;
+}
+
 export async function revokeGatewayEmailInvitation(envelopeId,signerId) {
   if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
   const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/revoke",{method:"POST",body:JSON.stringify({})});
