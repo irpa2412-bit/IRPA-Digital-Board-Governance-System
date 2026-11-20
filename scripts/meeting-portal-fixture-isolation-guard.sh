@@ -3,7 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
-import { evaluateSignatureWindowAmendment } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -295,6 +295,14 @@ const parallelWindowDecision = evaluateSignatureWindowAmendment({
   currentChangeRecord
 });
 const parallelWindowRecordAmendment = parallelWindowDecision.pass;
+const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
+  changedPaths: changed,
+  repairWindow: currentRepairWindow,
+  changeRecord: currentChangeRecord,
+  baselineChangeRecord,
+  currentChangeRecord
+});
+const signatureEmailLinkSessionRepair = signatureWindowRepairDecision.pass;
 if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
   if (!parallelWindowRecordAmendment) throw new Error(parallelWindowDecision.reason);
@@ -304,7 +312,8 @@ const unexpected = changed.filter(path =>
   !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
   !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
   !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
-  !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path))
+  !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
+  !(signatureEmailLinkSessionRepair && changed.includes(path))
 );
 if (unexpected.length) {
   console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
@@ -436,7 +445,7 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

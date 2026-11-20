@@ -212,6 +212,7 @@ test("parallel portal window amendment delegates to the executable exact-scope p
 
 import {
   evaluateSignatureWindowAmendment,
+  evaluateSignatureWindowRepair,
   SIGNATURE_WINDOW_AMENDMENT_PATHS
 } from "../scripts/portal-repair-window-guard-policy.mjs";
 
@@ -260,4 +261,61 @@ test("isolation guard blocks edits to another portal window or existing history"
 test("isolation guard permits only the separate unexpired Signature Portal window amendment", () => {
   const fixture = isolatedWindowFixture();
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
+});
+
+
+const signatureRepairFixture = () => {
+  const changedPaths = [
+    "drive-gateway/src/signing.mjs",
+    "drive-gateway/src/router.mjs",
+    "src/pages/EmailSigningReadOnlyPage.jsx",
+    "drive-gateway/tests/email-signing-links.integration.test.mjs",
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "scripts/portal-repair-window-guard-policy.mjs",
+    "tests/meeting-isolation-guard.test.mjs"
+  ];
+  const baselineChangeRecord = { status: "complete", repairWindow: { portal: "Meeting Portal", status: "open" }, history: [{ action: "meeting-baseline" }] };
+  const currentChangeRecord = {
+    ...structuredClone(baselineChangeRecord),
+    activeAmendment: {
+      status: "open",
+      files: [
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/router.mjs",
+        "src/pages/EmailSigningReadOnlyPage.jsx",
+        "drive-gateway/tests/",
+        "tests/"
+      ]
+    }
+  };
+  const repairWindow = { parallelWindows: [{ portal: "Signature Portal", status: "open", closesAt: "2026-11-22T17:08:47Z" }] };
+  return { changedPaths, repairWindow, changeRecord: currentChangeRecord, baselineChangeRecord, currentChangeRecord };
+};
+
+test("active Signature Portal repair guard permits only declared repair files plus guard-maintenance tests", () => {
+  const fixture = signatureRepairFixture();
+  assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
+});
+
+test("active Signature Portal repair guard blocks files outside the declared window", () => {
+  const fixture = signatureRepairFixture();
+  fixture.changedPaths.push("src/pages/Meetings.jsx");
+  assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
+});
+
+test("active Signature Portal repair guard blocks an expired window", () => {
+  const fixture = signatureRepairFixture();
+  assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-23T00:00:00Z") }).pass, false);
+});
+
+test("active Signature Portal repair guard blocks protected files without a Change Record", () => {
+  const fixture = signatureRepairFixture();
+  fixture.changeRecord = {};
+  assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
+});
+
+test("active Signature Portal repair guard blocks changes to another portal's window or history", () => {
+  const fixture = signatureRepairFixture();
+  fixture.currentChangeRecord.repairWindow.status = "closed";
+  assert.equal(evaluateSignatureWindowRepair({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, false);
 });

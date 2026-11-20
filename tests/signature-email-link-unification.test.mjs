@@ -35,7 +35,8 @@ test("all workflow recipients become email-link identities and assigned PDF fiel
 });
 
 test("Gateway email-link signing is independent of Firebase UID authentication",()=>{
-  assert.match(gateway,/if\(s0\.identityType==="email-link"\)\{if\(s0\.emailLinkStatus!=="opened"\)/);
+  assert.match(gateway,/emailLinkSessionStatus==="active"/);
+  assert.match(gateway,/SESSION_REQUIRED/);
   assert.match(gateway,/emailSignToken=/);
   assert.match(invitation,/single-use link/);
   assert.match(invitation,/signer-specific session/);
@@ -59,9 +60,11 @@ test("Gateway envelopes cannot be signed through the parallel in-app UID workflo
 
 test("the invitation bearer token is consumed once and the signer session survives a page refresh",()=>{
   assert.match(gateway,/sessionToken/);
-  assert.match(gateway,/invitationTokenConsumed:true/);
-  assert.match(emailPage,/sessionStorage\.getItem\(sessionKey\)/);
-  assert.match(emailPage,/sessionStorage\.setItem\(sessionKey,session\)/);
+  assert.match(gateway,/invitationTokenConsumed:false/);
+  assert.match(gateway,/email_link\.session_created/);
+  assert.match(emailPage,/Open document to sign/);
+  assert.match(emailPage,/api\/sign\/email\/session/);
+  assert.doesNotMatch(emailPage,/sessionStorage\.getItem\(sessionKey\)/);
   assert.match(emailPage,/x-signing-token":activeToken/);
 });
 

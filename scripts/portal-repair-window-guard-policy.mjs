@@ -57,3 +57,50 @@ export function protectedSignatureChangeHasRecord({ changedPaths, changeRecord }
     path.startsWith("drive-gateway/tests/") || path.startsWith("tests/"));
   return !touchesProtected || Boolean(changeRecord?.activeAmendment?.status === "open");
 }
+
+
+export function evaluateSignatureWindowRepair({
+  changedPaths, repairWindow, changeRecord, baselineChangeRecord,
+  currentChangeRecord, now = new Date()
+}) {
+  const changed = [...new Set(changedPaths)];
+  const amendment = changeRecord?.activeAmendment;
+  const window = repairWindow?.parallelWindows?.find(item => item.portal === "Signature Portal");
+  if (!amendment || amendment.status !== "open" || !Array.isArray(amendment.files) ||
+      !window || window.status !== "open") {
+    return { pass: false, reason: "The Signature Portal repair window or its Change Record is not active." };
+  }
+  const expiry = Date.parse(window.closesAt || "");
+  if (!Number.isFinite(expiry) || now.getTime() >= expiry) {
+    return { pass: false, reason: "The Signature Portal repair window has expired." };
+  }
+  const required = [
+    "drive-gateway/src/signing.mjs",
+    "drive-gateway/src/router.mjs",
+    "src/pages/EmailSigningReadOnlyPage.jsx",
+    "drive-gateway/tests/email-signing-links.integration.test.mjs"
+  ];
+  if (!required.every(path => changed.includes(path))) {
+    return { pass: false, reason: "The repair is missing its scoped implementation or end-to-end regression test." };
+  }
+  const maintenance = new Set([
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "scripts/portal-repair-window-guard-policy.mjs",
+    "tests/meeting-isolation-guard.test.mjs"
+  ]);
+  const inScope = path => amendment.files.some(scope =>
+    scope.endsWith("/") ? path.startsWith(scope) : path === scope
+  );
+  if (!changed.every(path => inScope(path) || maintenance.has(path))) {
+    return { pass: false, reason: "The repair changes a file outside the active Signature Portal window." };
+  }
+  const strip = value => {
+    const copy = structuredClone(value);
+    delete copy.activeAmendment;
+    return copy;
+  };
+  if (JSON.stringify(strip(baselineChangeRecord)) !== JSON.stringify(strip(currentChangeRecord))) {
+    return { pass: false, reason: "The repair changed another portal's window or historical Change Record." };
+  }
+  return { pass: true, reason: "Repair is limited to the active Signature Portal window." };
+}

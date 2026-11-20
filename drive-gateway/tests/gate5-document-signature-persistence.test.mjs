@@ -95,6 +95,17 @@ const get = (path, options = {}) =>
     },
   });
 
+async function openSession(s, invitationToken) {
+  const preview = await route(get("/api/sign/email/open", { token: invitationToken }), s.ctx);
+  assert.equal(preview.status, 200, "read-only invitation preview must succeed");
+  const response = await route(new Request("https://gw.test/api/sign/email/session", {
+    method: "POST",
+    headers: { "x-signing-token": invitationToken }
+  }), s.ctx);
+  assert.equal(response.status, 200, "explicit session creation must succeed");
+  return response;
+}
+
 async function upload(s, id = "DOC-G5") {
   const bytes = await pdf(2);
   const response = await route(
@@ -135,7 +146,7 @@ function submit(token, signature) {
 async function completeSingle(s, signature) {
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const sessionToken=(await opened.json()).sessionToken;
   const response = await route(submit(sessionToken, signature), s.ctx);
@@ -274,16 +285,11 @@ test("G5-03 — original document preservation", async () => {
   );
   assert.equal(envelopeIdResponse.status, 201);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
-  assert.equal(
-    (await route(
-      submit(token, { type: "typed", value: "Preservation Signature" }),
-      s.ctx,
-    )).status,
-    200,
-  );
+  const submitted = await route(submit(token, { type: "typed", value: "Preservation Signature" }), s.ctx);
+  assert.equal(submitted.status, 200, JSON.stringify(await submitted.clone().json()));
 
   const after = await s.meta.get("documents", "DOC-G5");
   assert.equal(after.hash, original.hash);
@@ -381,7 +387,7 @@ test("G5-08 — partial completion rollback", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
 
@@ -417,7 +423,7 @@ test("G5-09 — retry persistence", async () => {
   const s = setup();
   const envelopeId = await createEnvelope(s);
   const invitationToken = s.tokenFor("g5.signer@example.org");
-  const opened = await route(get("/api/sign/email/open", { token:invitationToken }), s.ctx);
+  const opened = await openSession(s, invitationToken);
   assert.equal(opened.status, 200);
   const token=(await opened.json()).sessionToken;
 
