@@ -54,6 +54,9 @@ const allowed = new Set([
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
   "src/firebase/meetingAttendanceSigning.js",
+  "src/utils/meetingTimeEAT.mjs",
+  "src/utils/meetingGovernancePolicy.mjs",
+  "docs/portal-protection/portal-register.json",
   "src/firebase/meetingAttendanceSignerIdentity.js",
   "tests/meeting-daily-attendance-email-signing.test.mjs",
   "tests/meeting-attendance-guest-identity.test.mjs",
@@ -313,6 +316,22 @@ const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-brows
   changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
 const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
   changed.includes("tests/meeting-category-policy.test.mjs");
+// The EAT and governance-policy repair is paired across the Meeting Portal,
+// invitee connectivity, Worker policy enforcement and explicit boundary tests.
+const meetingEATGovernanceRepair =
+  changed.includes("src/pages/Meetings.jsx") &&
+  changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
+  changed.includes("src/utils/meetingTimeEAT.mjs") &&
+  changed.includes("src/utils/meetingGovernancePolicy.mjs") &&
+  changed.includes("drive-gateway/src/meetingServices.mjs") &&
+  changed.includes("tests/meeting-time-eat.test.mjs") &&
+  changed.includes("tests/meeting-configurable-quorum.test.mjs") &&
+  changed.includes("tests/meeting-registration-connectivity.test.mjs") &&
+  changed.every(path => allowed.has(path) || [
+    "src/utils/meetingTimeEAT.mjs",
+    "src/utils/meetingGovernancePolicy.mjs",
+    "docs/portal-protection/portal-register.json"
+  ].includes(path));
 // Shared-email signer identity repair is a narrowly scoped Signature Portal/Gateway
 // integration. Keep the browser fixture guard active and require its paired source/tests.
 const signatureEmailLinkIdentityPaths = new Set([

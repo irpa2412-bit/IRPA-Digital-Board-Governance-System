@@ -8,7 +8,7 @@ const room=readFileSync("src/pages/MeetingRoom.jsx","utf8");
 const api=readFileSync("src/firebase/meetingGatewayApi.js","utf8");
 const meetings=readFileSync("src/pages/Meetings.jsx","utf8");
 
-test("only explicit Board and Board Meeting types require the one-third quorum",()=>{
+test("only explicit Board and Board Meeting types require a configured quorum",()=>{
   for(const meetingType of ["Board","Board Meeting"]){
     const meeting={meetingCategory:"GOVERNANCE",meetingType};
     assert.equal(isBoardMeeting(meeting),true);
@@ -32,7 +32,7 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/getGatewayEnvelopeStatus/);
   assert.match(service,/auditChainValid===true/);
   assert.match(service,/dailySignerByUid/);
-  assert.match(service,/Math\.ceil\(denominator\/3\)/);
+  assert.match(service,/calculateRequiredQuorum/);assert.match(service,/governancePolicySnapshot/);assert.doesNotMatch(service,/Math\.ceil\(denominator\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
   assert.match(service,/registerByUid\.has\(uid\)/);
@@ -56,7 +56,7 @@ test("Board quorum excludes Board Committee members and external/manual invitees
 test("Cloudflare Worker prevents a Board meeting from starting without quorum",()=>{
   assert.match(service,/lower\(changed\.status\)==="in progress"&&isBoardMeeting\(current\)/);
   assert.match(service,/if\(!assessment\.quorumMet\)return fail/);
-  assert.match(service,/A Board meeting cannot start without quorum/);
+  assert.match(service,/A Board meeting cannot start without quorum/);assert.match(service,/NOT_CONFIGURED/);
   assert.match(service,/quorumAssessmentStatus/);
   assert.match(meetings,/p\.id==="GOVERNANCE"\?"Board Meeting"/);
 });

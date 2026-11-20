@@ -79,7 +79,7 @@ export function buildInvitationMessage({name,link,meetingAccess=null,username=""
     const meetingIdentity=detail(meetingAccess.meetingIdentity||"System identity not recorded",180);
     const meetingTitle=detail(meetingAccess.meetingTitle||meetingName,180);
     const meetingDate=detail(meetingAccess.meetingDate,80);
-    const meetingTime=detail([meetingAccess.meetingStartTime,meetingAccess.meetingEndTime].filter(Boolean).join(" – "),80);
+    const meetingTime=detail([meetingAccess.meetingStartTime,meetingAccess.meetingEndTime].filter(Boolean).join(" – ")+(meetingAccess.meetingStartTime?" EAT":""),80);
     const meetingPlatform=detail(meetingAccess.meetingPlatform||"Platform details not recorded",120);
     const meetingVenue=detail(meetingAccess.meetingVenue,240);
     const platformMeetingId=detail(meetingAccess.platformMeetingId,120);
