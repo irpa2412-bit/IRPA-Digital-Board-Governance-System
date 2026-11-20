@@ -59,6 +59,10 @@ export const MEETING_CATEGORY_OPTIONS=Object.values(MEETING_CATEGORIES).map(p=>(
 export const MEETING_TYPE_OPTIONS=Object.values(MEETING_CATEGORIES).flatMap(p=>p.meetingTypes);
 export const MEETING_POLICIES=MEETING_CATEGORIES;
 
+export function isBoardMeeting(meeting={}) {
+  const values=[meeting.meetingType,meeting.meetingTitle,meeting.title,meeting.category];
+  return values.some(value=>["board","board meeting"].includes(String(value||"").trim().toLowerCase()));
+}
 function resolveCategory(value){
   const v=String(value||"").trim().toLowerCase();
   if(!v)return MEETING_CATEGORIES.OTHER;
@@ -84,10 +88,11 @@ export function normalizeMeetingForV3(meeting={}){
 
 export function meetingCapabilities(meeting={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
+  const boardMeeting=isBoardMeeting(meeting);
   return {
     policy,
-    quorum:policy.quorumRequired,
-    quorumRequired:policy.quorumRequired,
+    quorum:boardMeeting,
+    quorumRequired:boardMeeting,
     voting:policy.votingEnabled,
     resolutions:policy.resolutionsEnabled,
     boardPapers:policy.id==="GOVERNANCE",
@@ -101,7 +106,7 @@ export function meetingCapabilities(meeting={}){
     minutesApprovalRoles:policy.minutesApprovalRoles,
     facilities:{
       autoRegistration:policy.autoRegistration,
-      quorum:policy.quorumAccess,
+      quorum:boardMeeting,
       attendance:policy.attendanceAccess,
       signature:policy.signatureAccess,
       documents:policy.documentsAccess,
