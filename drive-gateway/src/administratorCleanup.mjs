@@ -365,8 +365,6 @@ export function createAdministratorCleanupRouter(deps) {
           continue;
         }
         add({type:"firestore-delete",key:row.key,path:firestorePath(row.collection,row.id),version:row.version,reason:"Administrator-selected register record"});
-        const uid = clean(row.uid);
-        const email = clean(row.email).toLowerCase();
         for (const invitation of byKey.values()) {
           if (invitation.collection !== "invitations" || !pendingInvitation(invitation)) continue;
           const invite = dataOf(invitation);
