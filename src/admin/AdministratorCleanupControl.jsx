@@ -21,7 +21,7 @@ export default function AdministratorCleanupControl() {
     const matchesQuery = text.includes(query.trim().toLowerCase());
     const status = String(row.status || "").toLowerCase();
     const matchesFilter = filter === "ALL" ||
-      (filter === "TRIAL" && (row.trialData || /trial|test/i.test(row.recordOrigin))) ||
+      (filter === "TRIAL" && (row.trialData || /trial|test/i.test(row.recordOrigin) || /trial|test/i.test(status))) ||
       (filter === "INVITED" && /invited|pending invitation/i.test(status)) ||
       (filter === "ACTIVE" && /active|activated/i.test(status));
     return matchesQuery && matchesFilter;
@@ -103,10 +103,10 @@ export default function AdministratorCleanupControl() {
         <label className="field"><span>Filter</span><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="ALL">All records</option><option value="TRIAL">Trial / test</option><option value="INVITED">Invited</option><option value="ACTIVE">Active</option></select></label>
       </div>
       <div className="table-wrapper" style={{marginTop:16}}>
-        <table><thead><tr><th>Record / Full name</th><th>Email</th><th>Role / Type</th><th>Status</th><th>Linked records</th><th>Protection</th><th>Decision</th></tr></thead>
+        <table><thead><tr><th>Record / Full name</th><th>Email</th><th>Role / Type</th><th>Created</th><th>Status</th><th>Linked records</th><th>Protection</th><th>Decision</th></tr></thead>
           <tbody>{visibleRows.map(row=><tr key={row.key}>
             <td><strong>{row.name || row.id}</strong><small style={{display:"block"}}>{row.collection} · {row.id}</small></td>
-            <td>{row.email || "—"}</td><td>{row.role || row.registerType || row.collection}</td><td>{row.status || "—"}</td>
+            <td>{row.email || "—"}</td><td>{row.role || row.registerType || row.collection}</td><td>{row.createdAt ? (typeof row.createdAt === "string" ? new Date(row.createdAt).toLocaleDateString() : row.createdAt.seconds ? new Date(row.createdAt.seconds * 1000).toLocaleDateString() : "Recorded") : "—"}</td><td>{row.status || "—"}</td>
             <td>{row.dependencyCount || 0}{row.linkedRecordKeys?.length ? <small style={{display:"block"}}>{row.linkedRecordKeys.slice(0,5).join(", ")}{row.linkedRecordKeys.length>5 ? " …" : ""}</small> : null}</td><td>{row.protected ? (row.protectionReason || "Protected") : "—"}</td>
             <td><select aria-label={"Decision for " + (row.name || row.id)} value={decisions[row.key] || "STAYS"} disabled={row.protected} onChange={e=>{setDecisions(old=>({...old,[row.key]:e.target.value}));setPlan(null);}}><option value="STAYS">STAYS</option><option value="GOES">GOES</option></select></td>
           </tr>)}</tbody>
