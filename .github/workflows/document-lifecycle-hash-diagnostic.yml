@@ -35,7 +35,8 @@ jobs:
           curl --fail --silent --show-error --retry 3 -H 'Cache-Control: no-cache' \
             "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/?__irpa_hash_diagnostic=$(date +%s)" \
             -o "$RUNNER_TEMP/live-index.html"
-          node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<meta name="irpa-build-time" content="([^"]+)"/i);if(!m)process.exit(2);process.stdout.write(m[1]);' "$RUNNER_TEMP/live-index.html" >> "$GITHUB_ENV"
+          live_build_time="$(node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<meta name="irpa-build-time" content="([^"]+)"/i);if(!m)process.exit(2);process.stdout.write(m[1]);' "$RUNNER_TEMP/live-index.html")"
+          printf 'VITE_BUILD_TIME=%s\\n' "$live_build_time" >> "$GITHUB_ENV"
       - name: Build two clean copies with identical release inputs
         env:
           VITE_BUILD_COMMIT: 17bba848
