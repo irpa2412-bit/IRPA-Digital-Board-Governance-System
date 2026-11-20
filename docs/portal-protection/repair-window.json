@@ -193,26 +193,30 @@
       "portal": "Signature Portal",
       "status": "open",
       "openedAt": "2026-11-20T17:08:47Z",
-      "lastActivityAt": "2026-11-20T20:00:00Z",
+      "lastActivityAt": "2026-11-20T20:20:00Z",
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
-      "reason": "Owner-authorised restoration of the Email-link E-signature system to its verified production state before 11:00 EAT on 20 Nov 2026. Preserve Meeting Portal functionality and all existing signing records.",
+      "reason": "Owner-authorised restoration of the Email-link E-signature system to its verified production state before 11:00 EAT on 20 Nov 2026. Preserve Meeting Portal functionality and all existing signing records. Shared Signature Platform/Gateway dependencies are included only for restoration; verify Meeting Portal attendance and ordinary invitation behaviour independently.",
       "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
-        "drive-gateway/src/emailSigning/",
-        "drive-gateway/src/emailSigningLinks.mjs",
         "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/router.mjs",
         "drive-gateway/src/index.js",
         "src/pages/EmailSigningReadOnlyPage.jsx",
         "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/src/emailSigning/index.mjs",
         "drive-gateway/tests/email-signing-contract.test.mjs",
-        "drive-gateway/tests/email-signing-links.test.mjs",
-        "drive-gateway/tests/email-signing-links.integration.test.mjs",
-        "tests/email-signing-contract.test.mjs",
         ".github/workflows/email-signing-contract.yml",
-        "scripts/meeting-portal-fixture-isolation-guard.sh",
-        "scripts/portal-repair-window-guard-policy.mjs",
-        "tests/meeting-isolation-guard.test.mjs"
+        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "drive-gateway/tests/email-signing-links.release-contract.test.mjs",
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+        "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+        "drive-gateway/tests/signing-invitation.test.mjs",
+        "tests/signature-email-link-unification.test.mjs",
+        "tests/signature-workflow-policy.test.mjs",
+        "drive-gateway/src/invitationEmail.mjs",
+        "drive-gateway/tests/e2e.test.mjs"
       ],
       "prohibitions": [
         "secrets",
@@ -257,6 +261,11 @@
           "at": "2026-11-20T20:00:00Z",
           "action": "rollback-target-updated",
           "description": "Owner requested restoration of Email-link E-signature to its pre-11:00 EAT production state. Verified production Worker baseline is eb04405 (09:49:57 EAT); signature source files in 8bfa67 are byte-identical. Preserve Meeting Portal and all existing signing data."
+        },
+        {
+          "at": "2026-11-20T20:20:00Z",
+          "action": "scope-and-non-expiry-amended",
+          "description": "Owner authorised restoration and explicitly required no time-based expiry for dispatched signer links. The link remains valid until one-time redemption, revocation or envelope cancellation. Shared Signature Platform/Gateway dependencies require Meeting Portal regression verification; its independent attendance and ordinary invitation behaviour remain preserved."
         }
       ],
       "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.",
