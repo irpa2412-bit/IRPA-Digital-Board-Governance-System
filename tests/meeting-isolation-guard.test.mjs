@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
+const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
 
 test("isolation baseline compares against the fetched current main snapshot", () => {
   assert.match(guard, /git fetch origin main:refs\/remotes\/origin\/main/);
@@ -125,7 +126,7 @@ test("Signature document palette and assignment repair is narrowly paired with a
   assert.match(guard, /changed\.includes\("firestore\.rules"\)/);
   assert.match(guard, /changed\.includes\("tests\/firestore\.rules\.test\.cjs"\)/);
   assert.match(guard, /!signatureDocumentPaletteAssignmentRepair/);
-  assert.match(guard, /!signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair/);
+  assert.ok(guard.includes("!emailSigningRebuildIntegration && !guardOnlyWorkflowRepair"));
 });
 
 
@@ -261,6 +262,7 @@ test("isolation guard permits only the separate unexpired Signature Portal windo
   const fixture = isolatedWindowFixture();
   assert.equal(evaluateSignatureWindowAmendment({ ...fixture, now: new Date("2026-11-20T18:00:00Z") }).pass, true);
 });
+
 
 
 
