@@ -137,6 +137,7 @@ test("email-link signer is stored without time-based expiry; mail is sent once",
   assert.equal(signer.name,"Client supplied name");
   assert.deepEqual(signer.declaredParticulars,{name:"Client supplied name",title:"",occupation:"",capacity:""});
   assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].expiresAt,undefined,"the dispatched signer invitation carries no time-based expiry");
   assert.match(f.sent[0].link,/emailSignToken=/);
   assert.match(f.sent[0].link,/\/\?emailSignToken=/);
 });
@@ -207,6 +208,8 @@ test("owner revoke invalidates a guest link; resend rotates token and marks the 
   await assert.rejects(()=>getSigningPdf(f.ctx,oldSession,null));
   const resent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
   assert.equal(resent.deliveryStatus,"Sent");
+  assert.equal(resent.linkExpiresAt,null,"resent email-link invitations remain non-expiring");
+  assert.equal(f.sent[1].expiresAt,undefined,"resend must not add an expiry date");
   const newToken=new URL(f.sent[1].link).searchParams.get("emailSignToken");
   assert.notEqual(newToken,oldToken);
   assert.notEqual(newToken,oldSession);
