@@ -7,6 +7,27 @@ on:
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "src/firebase/meetingPolicy.js"
+      - "src/firebase/meetingGatewayApi.js"
+      - "src/firebase/meetingRecords.js"
+      - "src/firebase/meetingAttendanceSigning.js"
+      - "src/firebase/meetingAttendanceSignerIdentity.js"
+      - "drive-gateway/src/meetingPortal.mjs"
+      - "drive-gateway/src/meetingServices.mjs"
+      - "drive-gateway/tests/meeting-portal-router.test.mjs"
+      - "drive-gateway/tests/meeting-services-router.test.mjs"
+      - "tests/meeting-portal-browser.test.mjs"
+      - "tests/meeting-portal-protection.test.mjs"
+      - "tests/meeting-daily-attendance-email-signing.test.mjs"
+      - "tests/meeting-quorum-reconciliation.test.mjs"
+      - "tests/meeting-attendance-guest-identity.test.mjs"
+      - "tests/meeting-time-eat.test.mjs"
+      - "tests/meeting-registration-connectivity.test.mjs"
+      - "tests/meeting-configurable-quorum.test.mjs"
+      - "tests/fixtures/**"
+      - "vite.meeting-fixture.config.js"
       - "drive-gateway/src/invitationRedemption.mjs"
       - "drive-gateway/tests/invitation-redemption.test.mjs"
       - "functions/meetingGateway.emulator.test.cjs"
@@ -27,6 +48,27 @@ on:
     paths:
       - "src/styles/portal-readability-standard.css"
       - "src/pages/Meetings.jsx"
+      - "src/pages/MeetingRoom.jsx"
+      - "src/pages/OperationalGatewaysParticipants.jsx"
+      - "src/firebase/meetingPolicy.js"
+      - "src/firebase/meetingGatewayApi.js"
+      - "src/firebase/meetingRecords.js"
+      - "src/firebase/meetingAttendanceSigning.js"
+      - "src/firebase/meetingAttendanceSignerIdentity.js"
+      - "drive-gateway/src/meetingPortal.mjs"
+      - "drive-gateway/src/meetingServices.mjs"
+      - "drive-gateway/tests/meeting-portal-router.test.mjs"
+      - "drive-gateway/tests/meeting-services-router.test.mjs"
+      - "tests/meeting-portal-browser.test.mjs"
+      - "tests/meeting-portal-protection.test.mjs"
+      - "tests/meeting-daily-attendance-email-signing.test.mjs"
+      - "tests/meeting-quorum-reconciliation.test.mjs"
+      - "tests/meeting-attendance-guest-identity.test.mjs"
+      - "tests/meeting-time-eat.test.mjs"
+      - "tests/meeting-registration-connectivity.test.mjs"
+      - "tests/meeting-configurable-quorum.test.mjs"
+      - "tests/fixtures/**"
+      - "vite.meeting-fixture.config.js"
       - "src/firebase/data.js"
       - "src/pages/Invitations.jsx"
       - "functions/index.js"
@@ -138,6 +180,17 @@ jobs:
             "src/pages/GatewaySigningPortal.jsx",
             "drive-gateway/src/index.js",
             "drive-gateway/src/meetingPortal.mjs",
+            "drive-gateway/src/meetingServices.mjs",
+            "src/firebase/meetingAttendanceSigning.js",
+            "src/firebase/meetingAttendanceSignerIdentity.js",
+            "tests/meeting-daily-attendance-email-signing.test.mjs",
+            "tests/meeting-attendance-guest-identity.test.mjs",
+            "tests/meeting-time-eat.test.mjs",
+            "tests/meeting-registration-connectivity.test.mjs",
+            "tests/meeting-configurable-quorum.test.mjs",
+            "tests/meeting-quorum-reconciliation.test.mjs",
+            "tests/meeting-portal-protection.test.mjs",
+            "tests/meeting-portal-browser.test.mjs",
             "drive-gateway/tests/meeting-portal.test.mjs",
             "src/firebase/meetingGatewayApi.js",
             "drive-gateway/src/invitationEmail.mjs",
@@ -187,6 +240,7 @@ jobs:
             "tests/signature-palette-signer-management.test.mjs",
             "tests/fixtures/meeting-portal-fixture.html",
             "tests/fixtures/meeting-portal-fixture.jsx",
+            "tests/fixtures/meeting-portal-fixture.css",
             "tests/fixtures/mocks.js",
             "tests/meeting-portal-browser.test.mjs",
             "tests/meeting-room-authorization-boundary.test.mjs",
