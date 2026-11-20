@@ -187,6 +187,7 @@ test("Meeting Portal fixture runs on every repair branch and all Meeting Portal 
 test("workflow delegates its source-isolation gate to the extracted guard script", () => {
   assert.match(workflow, /run: bash scripts\/meeting-portal-fixture-isolation-guard\.sh/);
   assert.ok(guard.includes('"scripts/meeting-portal-fixture-isolation-guard.sh"'));
+  assert.ok(guard.includes('"docs/portal-protection/repair-window.json"'));
 });
 
 test("fixture runs are not cancelled by concurrent push and pull-request events", () => {
