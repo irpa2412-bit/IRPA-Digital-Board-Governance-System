@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createAdministratorCleanupRouter } from "../src/administratorCleanup.mjs";
 
 function response(body,status=200){return new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json"}});}
-function harness({email="irpa2412@gmail.com",active=true,collections={},version="v1",failBackup=false}={}) {
+function harness({email="irpa2412@gmail.com",active=true,collections={},version="v1",failBackup=false,authUsers=[]}={}) {
   const kv = new Map();
   const env = { DRIVE_KV: {
     put: async (key,value) => kv.set(key,value),
@@ -20,7 +20,7 @@ function harness({email="irpa2412@gmail.com",active=true,collections={},version=
     },
     getFirestoreCollectionDocuments: async (_env,name) => (collections[name] || []).map(row => ({name:"projects/p/databases/(default)/documents/"+name+"/"+row.id,updateTime:row.updateTime||version,data:row.data})),
     getFirebaseAuthAdminAccessToken: async () => "auth-token",
-    listFirebaseAuthUsers: async () => [{localId:"admin-uid",email:"irpa2412@gmail.com"},...(collections.members||[]).filter(row=>row.data.uid).map(row=>({localId:row.data.uid,email:row.data.email}))],
+    listFirebaseAuthUsers: async () => [{localId:"admin-uid",email:"irpa2412@gmail.com"},...(collections.members||[]).filter(row=>row.data.uid).map(row=>({localId:row.data.uid,email:row.data.email})),...authUsers],
     getFirebaseProjectId: () => "test-project",
     getDriveAccessToken: async () => "drive-token",
     findOrCreateFolder: async () => "backup-folder",
@@ -192,4 +192,15 @@ test("completed production envelope cannot be selected for GOES", async () => {
   const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"signatureEnvelopes/prod-env",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan")).json();
   assert.equal(plan.records.find(row=>row.key==="signatureEnvelopes/prod-env").decision,"STAYS");
   assert.equal(plan.records.find(row=>row.key==="signatureEnvelopes/prod-env").protected,true);
+});
+
+test("unlinked Firebase Auth accounts are inventoried separately and never mislabeled as members", async () => {
+  const {route,env}=harness({authUsers:[{localId:"external-auth-1",email:"external@example.test",displayName:"External Signer",createdAt:"2026-01-01T00:00:00Z",emailVerified:true}]});
+  const inventory=await (await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory")).json();
+  const row=inventory.records.find(item=>item.key==="firebaseAuthAccounts/external-auth-1");
+  assert.ok(row);
+  assert.equal(row.name,"External Signer");
+  assert.equal(row.registerType,"Firebase Authentication");
+  assert.equal(row.decision,"STAYS");
+  assert.equal(inventory.records.some(item=>item.collection==="members" && item.email==="external@example.test"),false);
 });
