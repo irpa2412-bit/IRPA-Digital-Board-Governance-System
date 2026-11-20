@@ -1,3 +1,6 @@
+// Compatibility token helpers for envelopes created before the Email Signing v2 cutover.
+// New envelopes are issued and validated by ./emailSigning/index.mjs.
+export const LEGACY_EMAIL_SIGNING_LINKS = true;
 import { sha256Hex, safeEqual } from "./util.mjs";
 import { gatewayAuthorityCandidates, normalizeGatewayAuthority, resolveGatewayAuthorityLabel } from "./signatureAuthority.mjs";
 

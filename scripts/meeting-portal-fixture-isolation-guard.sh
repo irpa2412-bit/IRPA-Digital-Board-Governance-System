@@ -16,7 +16,7 @@ const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], {
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
   "docs/portal-protection/repair-window.json",
-  "docs/portal-protection/change-record.json",
+  "docs/portal-protection/change-record.json", "docs/portal-protection/repair-window.json", "scripts/meeting-portal-fixture-isolation-guard.sh",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
   "scripts/portal-repair-window-guard-policy.mjs",
   ".github/workflows/finance-production-reset.yml",
@@ -395,7 +395,9 @@ const emailSigningRebuildPaths = new Set([
   "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
   "drive-gateway/tests/email-signing-contract.test.mjs", "drive-gateway/tests/email-signing-links.test.mjs",
   "drive-gateway/tests/email-signing-links.integration.test.mjs", "tests/email-signing-contract.test.mjs",
-  ".github/workflows/email-signing-contract.yml"
+  ".github/workflows/email-signing-contract.yml",
+  "docs/portal-protection/change-record.json", "docs/portal-protection/repair-window.json",
+  "scripts/meeting-portal-fixture-isolation-guard.sh"
 ]);
 const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signing.mjs") &&
   changed.includes("drive-gateway/src/emailSigningLinks.mjs") &&

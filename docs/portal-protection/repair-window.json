@@ -193,7 +193,7 @@
       "portal": "Signature Portal",
       "status": "open",
       "openedAt": "2026-11-20T17:08:47Z",
-      "lastActivityAt": "2026-11-20T18:10:00Z",
+      "lastActivityAt": "2026-11-20T18:17:00Z",
       "durationHours": 48,
       "closesAt": "2026-11-22T17:08:47Z",
       "reason": "Owner-authorised full Email Signing rebuild: reusable envelope/signer-bound links, explicit open session, expiry, atomic resend, contract suite and protected cutover.",
@@ -212,7 +212,9 @@
         ".github/workflows/email-signing-contract.yml",
         "scripts/meeting-portal-fixture-isolation-guard.sh",
         "scripts/portal-repair-window-guard-policy.mjs",
-        "tests/meeting-isolation-guard.test.mjs"
+        "tests/meeting-isolation-guard.test.mjs",
+        "docs/portal-protection/change-record.json",
+        "docs/portal-protection/repair-window.json"
       ],
       "prohibitions": [
         "secrets",
@@ -252,6 +254,11 @@
           "at": "2026-11-20T18:10:00Z",
           "action": "reopened",
           "description": "Reopened to complete the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120. The previous closure record and deployment evidence remain in history; the Meeting Portal window and baseline remain unchanged."
+        },
+        {
+          "at": "2026-11-20T18:17:00Z",
+          "action": "shared-dependency-recorded",
+          "description": "Recorded the shared SignaturePlatform dependency as an affected Meeting Portal dependency; no Meeting Portal implementation, repair-window state, or baseline changed."
         }
       ],
       "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; its live production health gate verified the exact deployed target commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",

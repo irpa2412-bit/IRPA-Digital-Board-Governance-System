@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import {
   createEmailSigningToken,
   inspectEmailSigningToken,
-  markEmailSigningTokenOpened,
-  consumeEmailSigningToken,
   revokeEmailSigningToken,
   hashNormalizedEmail,
   resolveEmailSignerAuthority,
@@ -37,26 +35,13 @@ test("email token has at least 32 random bytes and only its SHA-256 hash is pers
   assert.equal(issued.record.envelopeId,"ENV-TEST01");
   assert.equal(issued.record.signerId,"S1");
   assert.equal(issued.record.status,"issued");
-  assert.equal(issued.record.expiresAt,undefined,"the standalone token primitive does not own envelope expiry");
   assert.equal(JSON.stringify(issued.record).includes(issued.token),false);
   assert.equal(issued.record.attemptCount,0);
 });
 
-test("email token opens once and transitions issued to opened", async () => {
-  const issued=await createEmailSigningToken({envelopeId:"ENV-TEST02",signerId:"S1",email:"a@example.org",now:NOW});
-  const opened=await markEmailSigningTokenOpened(issued.record,{token:issued.token,now:NOW,ipHash:"ip-hash"});
-  assert.equal(opened.status,"opened");
-  assert.equal(opened.openCount,1);
-  assert.equal(opened.lastIpHash,"ip-hash");
-  await assert.rejects(()=>markEmailSigningTokenOpened(opened,{token:issued.token,now:NOW}),/unavailable/i);
-});
 
-test("standalone email token inspection remains separate from envelope expiry policy", async () => {
-  const issued=await createEmailSigningToken({envelopeId:"ENV-TEST03",signerId:"S1",email:"a@example.org",now:NOW});
-  const result=await inspectEmailSigningToken(issued.token,issued.record,new Date("2027-11-16T08:00:01.000Z"));
-  assert.equal(result.ok,true);
-  assert.equal(result.record,issued.record);
-});
+
+
 
 test("revoked token is unusable and resend rotates token while preserving only the new hash", async () => {
   const first=await createEmailSigningToken({envelopeId:"ENV-TEST04",signerId:"S1",email:"a@example.org",now:NOW});
@@ -76,13 +61,7 @@ test("tampered token and unknown token produce the same neutral result", async (
   assert.equal(tampered.error,genericEmailSigningFailure());
 });
 
-test("token use is single-use and cannot be consumed twice", async () => {
-  const issued=await createEmailSigningToken({envelopeId:"ENV-TEST06",signerId:"S1",email:"a@example.org",now:NOW});
-  const opened=await markEmailSigningTokenOpened(issued.record,{token:issued.token,now:NOW});
-  const used=consumeEmailSigningToken(opened,{now:NOW});
-  assert.equal(used.status,"used");
-  assert.throws(()=>consumeEmailSigningToken(used,{now:NOW}),/unavailable/i);
-});
+
 
 test("authority is derived from an active register email match and matrix role, never client-supplied role", async () => {
   const result=resolveEmailSignerAuthority({

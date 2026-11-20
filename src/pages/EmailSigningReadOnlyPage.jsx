@@ -12,6 +12,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc=pdfWorker;
 const NEUTRAL="This signing link is unavailable. Contact the document owner for a new invitation.";
 const inputStyle={width:"100%",boxSizing:"border-box",padding:10,border:"1px solid #9ca3af",borderRadius:7,fontSize:15};
 const buttonStyle={padding:"10px 14px",border:0,borderRadius:7,background:"#174a78",color:"#fff",fontWeight:600,cursor:"pointer"};
+const formatExpiryEAT=value=>{const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).format(date)+" EAT":"expiry unavailable";};
 const fieldColors={Signature:"#6d5dfc",Initials:"#7c3aed",Date:"#0891b2",Name:"#2563eb",Title:"#1d4ed8",Text:"#0f766e",Number:"#db2777",Comment:"#0284c7",Remarks:"#ea580c",Checkbox:"#b45309"};
 
 export default function EmailSigningReadOnlyPage({token}){
@@ -229,7 +230,7 @@ export default function EmailSigningReadOnlyPage({token}){
    {success&&<p role="status" style={{color:revoked||finalizationFailed?"#7f1d1d":"#14532d",background:revoked||finalizationFailed?"#fee2e2":"#dcfce7",padding:10,borderRadius:7}}>{success}</p>}
    {record&&!error&&<>
     <h2 style={{fontSize:17,margin:"8px 0"}}>{record.title}</h2><p style={{fontSize:13,margin:"4px 0"}}>Invited by: {record.ownerName}</p>
-    <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?new Date(record.expiresAt).toLocaleString():"As stated in your invitation"}</p>
+    <p style={{fontSize:13,margin:"4px 0 14px"}}>Link expiry: {record.expiresAt?formatExpiryEAT(record.expiresAt):"As stated in your invitation"}</p>
     <section style={{border:"1px solid #9ca3af",borderRadius:8,padding:12,marginTop:12}}>
      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}><div><h2 style={{fontSize:18,margin:"0 0 4px"}}>Complete document review</h2><p style={{fontSize:13,color:"#4b5563",margin:0}}>Read every page before deciding. Assigned signature and initials locations are marked directly on the document.</p></div><strong>Page {pageNum} of {pageCount||"…"}</strong></div>
      <div style={{display:"flex",gap:8,justifyContent:"center",margin:"12px 0",flexWrap:"wrap"}}>
