@@ -3,7 +3,8 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal"
+      "Signature Portal",
+      "Meeting Portal"
     ],
     "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
     "files": [
