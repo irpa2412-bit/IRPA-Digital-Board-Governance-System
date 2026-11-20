@@ -59,7 +59,8 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
  const dailyDispatch=dispatchRows.find(r=>!attendanceDate||clean(r.attendanceDate)===attendanceDate);
  let dailyGatewayStatus=null;
  if(dailyDispatch?.status==="DISPATCHED"&&dailyDispatch?.gatewayEnvelopeId&&dailyDispatch?.ownerUid&&typeof ctx.getGatewayEnvelopeStatus==="function")dailyGatewayStatus=await ctx.getGatewayEnvelopeStatus(clean(dailyDispatch.ownerUid),env,clean(dailyDispatch.gatewayEnvelopeId)).catch(()=>null);
- const gatewaySignersById=new Map((Array.isArray(dailyGatewayStatus?.signers)?dailyGatewayStatus.signers:[]).map(s=>[clean(s.id),s]));
+ const verifiedGatewaySigners=dailyGatewayStatus?.auditChainValid===true&&clean(dailyGatewayStatus?.envelopeId)===clean(dailyDispatch?.gatewayEnvelopeId)?dailyGatewayStatus.signers:[];
+ const gatewaySignersById=new Map((Array.isArray(verifiedGatewaySigners)?verifiedGatewaySigners:[]).map(s=>[clean(s.id),s]));
  const dailySignerByUid=new Map((Array.isArray(dailyDispatch?.gatewaySignerMap)?dailyDispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([uid,signer])=>uid&&signer?.status==="Signed"));
  const queueByParticipant=new Map();
  for(const q of queue){const key=clean(q.participantId),previous=queueByParticipant.get(key);if(key&&(!previous||new Date(q.requestedAt||0)>=new Date(previous.requestedAt||0)))queueByParticipant.set(key,q);}
@@ -309,7 +310,8 @@ for(const member of memberRecords){
 }
 const dispatch=dispatchRows.find(r=>clean(r.attendanceDate)===date)||null;
 let gatewayStatus=null;if(dispatch?.status==="DISPATCHED"&&dispatch?.gatewayEnvelopeId&&dispatch?.ownerUid&&typeof ctx.getGatewayEnvelopeStatus==="function")gatewayStatus=await ctx.getGatewayEnvelopeStatus(clean(dispatch.ownerUid),env,clean(dispatch.gatewayEnvelopeId)).catch(()=>null);
-const gatewaySignersById=new Map((Array.isArray(gatewayStatus?.signers)?gatewayStatus.signers:[]).map(signer=>[clean(signer.id),signer]));
+const verifiedGatewaySigners=gatewayStatus?.auditChainValid===true&&clean(gatewayStatus?.envelopeId)===clean(dispatch?.gatewayEnvelopeId)?gatewayStatus.signers:[];
+const gatewaySignersById=new Map((Array.isArray(verifiedGatewaySigners)?verifiedGatewaySigners:[]).map(signer=>[clean(signer.id),signer]));
 const signedByUid=new Map((Array.isArray(dispatch?.gatewaySignerMap)?dispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantUid,signer])=>participantUid&&signer?.status==="Signed"));
 for(const row of rows){const signer=signedByUid.get(clean(row.participantUid));if(signer){row.signed=true;row.signedAt=iso(signer.signedAt);}}
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid);
