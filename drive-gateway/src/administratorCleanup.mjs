@@ -681,8 +681,9 @@ export function createAdministratorCleanupRouter(deps) {
           auditRefs:[], backupDriveFileId:null, backupUrl:null, typedConfirmationRequired: "DELETE", status: "AWAITING_REVIEW",
           mandatoryInventoryComplete: true, backupRequiredBeforeExecution:true, batchSize:10 };
         const auditRef = await writeAuditEvent(env,auth.token,{eventType:"PLAN_PREPARED",planId,inventoryId,actorUid:auth.uid,actorEmail:auth.email,
-          createdAt:plan.createdAt,selectedGoes:plan.records.filter(row=>row.decision==="GOES").map(row=>row.key),
-          cascadeOperations:plan.executionOperations.filter(operation=>operation.reason==="Approved related-record cleanup" || operation.reason==="Approved member-account cascade" || operation.reason==="Remove unsent signing assignment for deleted member")});
+          createdAt:plan.createdAt,goesCount:plan.records.filter(row=>row.decision==="GOES").length,
+          staysCount:plan.records.filter(row=>row.decision==="STAYS").length,operationCount:plan.executionOperations.length,
+          cascadeOperationCount:plan.executionOperations.filter(operation=>operation.reason==="Approved related-record cleanup" || operation.reason==="Approved member-account cascade" || operation.reason==="Remove unsent signing assignment for deleted member").length});
         plan.auditRefs.push(auditRef);
         await env.DRIVE_KV.put("admin-cleanup:plan:" + planId, JSON.stringify(plan), {expirationTtl:TTL_SECONDS});
         return json({ok:true,...plan,summary:{total:plan.records.length,stays:plan.records.filter(r=>r.decision==="STAYS").length,
