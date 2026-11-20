@@ -31,7 +31,10 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
   assert.match(service,/registerByUid\.has\(uid\)/);
-  assert.match(service,/duplicateBoardMemberRegistrations/);\n  assert.match(service,/listCollection\(ctx,env,token,"members"\)/);\n  assert.match(service,/boardRegisterMembers:denominator/);\n  assert.match(service,/boardMembersNotRegistered/);
+  assert.match(service,/duplicateBoardMemberRegistrations/);
+  assert.match(service,/listCollection\(ctx,env,token,"members"\)/);
+  assert.match(service,/boardRegisterMembers:denominator/);
+  assert.match(service,/boardMembersNotRegistered/);
 });
 
 test("Board quorum excludes Board Committee members and external/manual invitees",()=>{
