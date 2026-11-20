@@ -19,13 +19,18 @@ jobs:
       - name: Require isolated staging configuration
         env:
           STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
-          STAGING_INVITE_SERVICE_KEY: ${{ secrets.STAGING_INVITE_SERVICE_KEY }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           TEST_RECIPIENT: ${{ inputs.recipient }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
         run: |
           set -euo pipefail
           test -n "$STAGING_GATEWAY_URL"
-          test -n "$STAGING_INVITE_SERVICE_KEY"
+          test -n "$STAGING_FIREBASE_SERVICE_ACCOUNT_JSON"
+          test -n "$STAGING_FIREBASE_WEB_API_KEY"
           test -n "$STAGING_FIREBASE_PROJECT_ID"
           test "$STAGING_FIREBASE_PROJECT_ID" != "irpa-digital-board-governance"
           node - <<'NODE'
@@ -51,7 +56,8 @@ jobs:
       - name: Send controlled real-SMTP message and reject mock acceptance
         env:
           STAGING_GATEWAY_URL: ${{ secrets.STAGING_GATEWAY_URL }}
-          STAGING_INVITE_SERVICE_KEY: ${{ secrets.STAGING_INVITE_SERVICE_KEY }}
+          STAGING_FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON }}
+          STAGING_FIREBASE_WEB_API_KEY: ${{ secrets.STAGING_FIREBASE_WEB_API_KEY }}
           TEST_RECIPIENT: ${{ inputs.recipient }}
         run: |
           set -euo pipefail
@@ -74,9 +80,27 @@ jobs:
             "</p><p><strong>IRPA username:</strong> " + username +
             "</p><p><strong>Meeting gate password:</strong> <code>" + password +
             "</code></p><p>Test-only credentials; no meeting access is granted.</p></body></html>";
+          const project=process.env.STAGING_FIREBASE_PROJECT_ID;
+          const serviceAccount=JSON.parse(process.env.STAGING_FIREBASE_SERVICE_ACCOUNT_JSON||"{}");
+          if(serviceAccount.project_id!==project||!serviceAccount.client_email||!serviceAccount.private_key||!serviceAccount.private_key_id) throw new Error("Staging Firebase service account is incomplete or belongs to another project.");
+          if(project==="irpa-digital-board-governance") throw new Error("Production Firebase project is forbidden for this staging test.");
+          const encode=value=>Buffer.from(JSON.stringify(value)).toString("base64url");
+          const now=Math.floor(Date.now()/1000);
+          const unsigned=encode({alg:"RS256",typ:"JWT",kid:serviceAccount.private_key_id})+"."+encode({
+            iss:serviceAccount.client_email,sub:serviceAccount.client_email,
+            aud:"https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+            iat:now,exp:now+3600,uid:"irpa-email-dispatcher",claims:{irpaEmailDeliveryService:true}
+          });
+          const signature=crypto.sign("RSA-SHA256",Buffer.from(unsigned),serviceAccount.private_key).toString("base64url");
+          const customToken=unsigned+"."+signature;
+          const exchange=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key="+encodeURIComponent(process.env.STAGING_FIREBASE_WEB_API_KEY),{
+            method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:customToken,returnSecureToken:true})
+          });
+          const identity=await exchange.json().catch(()=>({}));
+          if(!exchange.ok||identity.localId!=="irpa-email-dispatcher"||!identity.idToken) throw new Error("Staging Firebase email-service identity exchange failed.");
           fetch(base + "/api/send-invitation-email", {
             method: "POST",
-            headers: {"content-type":"application/json","x-irpa-service-key":process.env.STAGING_INVITE_SERVICE_KEY},
+            headers: {"content-type":"application/json","authorization":"Bearer "+identity.idToken},
             body: JSON.stringify({to:recipient,subject:"[IRPA STAGING TEST] Meeting invitation email delivery",text,html})
           }).then(async response => {
             const body = await response.json().catch(() => ({}));
