@@ -3,8 +3,10 @@
 ## Default state
 Actual operational data entry is closed when `systemSettings/actualDataAccess` is absent or `enabled` is not exactly `true`. Do not create this setting manually or enable it through the Firestore client SDK.
 
-## Opening access
-Only an authenticated, active IRPA Administrator can call `setActualDataAccess`. Opening requires the exact attestation `I CONFIRM FINAL SYSTEM TESTS PASSED`. The callable records the actor, timestamp, version, final-test attestation and an audit event. Closing access is always available to the administrator and is audited.
+## Gate-status visibility and administration
+Any authenticated member or employee may read the non-sensitive global gate status through `GET /api/system/actual-data-access`. This read is required so each user's portal entry gate can observe the administrator's OPEN/CLOSED decision. The response exposes only the enabled/status state, final-test attestation flag and version; it does not expose administrator identity or audit details. If status cannot be retrieved, the portal entry gate fails closed.
+
+Only an authenticated, active IRPA Administrator can call `setActualDataAccess` or submit `POST /api/system/actual-data-access`. Opening requires the exact attestation `I CONFIRM FINAL SYSTEM TESTS PASSED`. The callable records the actor, timestamp, version, final-test attestation and an audit event. Closing access is always available to the administrator and is audited.
 
 The Settings control is visible only in the administrator's Settings view. It is not a deployment-time auto-open and it remains closed by default. The attestation is an administrator declaration; it does not replace the final system-test evidence or CI checks.
 
