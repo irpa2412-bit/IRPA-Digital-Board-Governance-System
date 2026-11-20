@@ -147,10 +147,14 @@ export function createAdministratorCleanupRouter(deps) {
         const authUser = authByUid.get(clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid)) || authByEmail.get(email);
         const uid = clean(data.uid || data.userId || data.memberUid || data.ownerUid || data.signerUid || authUser?.localId || authUser?.uid);
         const signerInProtectedEnvelope = collection === "members" || collection === "employees" || collection === "signatureProfiles" || collection === "signerIdentities"
-          ? [...envelopes.values()].some(envelope => ["signed","completed","in progress","inprogress","signing","pending","sent","opened","awaiting signature","awaiting_signature"].includes(clean(envelope.status).toLowerCase()) &&
-            (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer =>
-              (uid && clean(signer.uid || signer.profileUid) === uid) ||
-              (email && clean(signer.email).toLowerCase() === email)))
+          ? [...envelopes.values()].some(envelope => {
+            const protectedEnvelopeStatus = ["signed","completed","in progress","inprogress","signing","pending","sent","opened","awaiting signature","awaiting_signature"].includes(clean(envelope.status).toLowerCase());
+            return (Array.isArray(envelope.signers) ? envelope.signers : []).some(signer => {
+              const matches = (uid && clean(signer.uid || signer.profileUid) === uid) ||
+                (email && clean(signer.email).toLowerCase() === email);
+              return matches && (protectedEnvelopeStatus || clean(signer.status).toLowerCase() === "signed");
+            });
+          })
           : false;
         const role = clean(data.role || data.boardPosition || data.designation || data.jobTitle);
         const roleValues = [data.role, data.boardPosition, data.designation, data.jobTitle, data.title, data.position,
