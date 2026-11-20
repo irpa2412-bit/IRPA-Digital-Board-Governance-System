@@ -1636,6 +1636,7 @@ jobs:
     needs: repair-staging
     if: needs.repair-staging.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/admin-controlled-cleanup-20261120'
     runs-on: ubuntu-latest
+    environment: staging-repair
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
