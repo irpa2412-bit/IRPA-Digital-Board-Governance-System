@@ -50,7 +50,7 @@ test("dispatch button creates the existing Signature Portal email-link envelope 
 test("daily Board quorum uses signed Signature Portal envelope recipients rather than a local signature pad",()=>{
  assert.match(service,/meetingDailyAttendance/);
  assert.match(service,/meetingAttendanceDispatches/);
- assert.match(service,/signatureEnvelopes/);
+ assert.match(service,/getGatewayEnvelopeStatus/);\n assert.match(service,/auditChainValid===true/);
  assert.match(service,/dailySignerByUid/);
  assert.match(service,/Math\.ceil\(denominator\/3\)/);
  assert.match(records,/\/api\/meeting-attendance\/daily\/dispatch/);
