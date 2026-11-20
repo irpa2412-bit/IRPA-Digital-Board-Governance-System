@@ -311,7 +311,7 @@ return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||uid,hostNam
 }
 if(pathname==="/api/meeting-attendance/daily/mark"){
 const meetingId=clean(data.meetingId),date=clean(data.date),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
-if(!meetingId||!participantId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["Present","Absent","Excused"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
+if(!meetingId||!participantId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||!["Present","Absent","Excused","N/A"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may update daily attendance.",403);
 const participant=await getDoc(ctx,env,token,"participants",participantId);
