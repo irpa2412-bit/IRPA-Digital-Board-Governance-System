@@ -102,7 +102,7 @@ const checks=[
  ["Meeting category selector exists",fs.readFileSync("src/pages/Meetings.jsx","utf8").includes('name="meetingCategory"')],
  ["Category controls Meeting Room facilities",room.includes("meetingCapabilities")&&room.includes("capabilities.facilities")],
  ["Governance exposes Governance Documents",policy.includes('documentsLabel:"Governance Documents"')&&room.includes("policy.documentsLabel")],
- ["Governance enables quorum and voting",policy.includes('GOVERNANCE:{')&&policy.includes("quorumAccess:true")&&policy.includes("votingEnabled:true")],
+ ["Board meeting types alone enable quorum while governance voting remains enabled",policy.includes("export function isBoardMeeting")&&policy.includes("quorum:boardMeeting")&&policy.includes("quorumRequired:boardMeeting")&&policy.includes("votingEnabled:true")],
  ["Administrative restricts quorum and voting",policy.includes('ADMINISTRATIVE:{')&&policy.includes("quorumAccess:false")&&policy.includes("votingEnabled:false")],
  ["Staff restricts signature and authorization",policy.includes('STAFF:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
  ["General restricts signature and authorization",policy.includes('GENERAL:{')&&policy.includes("signatureAccess:false")&&policy.includes("authorizationAccess:false")],
@@ -130,7 +130,7 @@ const report={
  checks:checks.map(([name,ok])=>({name,status:ok?"PASS":"FAIL"})),
  summary:{total:checks.length,passed:checks.length-failed.length,failed:failed.length},
  categoryAccessMatrix:{
-  "Governance Meetings":"Auto registration, quorum registration/assessment, attendance, live media, Governance Documents, Authorization & Approvals, Signature Portal, Resolutions & Voting, Decisions & Actions, transcript/proceedings.",
+  "Governance Meetings":"Auto registration, Board-meeting-only one-third quorum assessment, attendance, live media, Governance Documents, Authorization & Approvals, Signature Portal, Resolutions & Voting, Decisions & Actions, transcript/proceedings.",
   "Administrative Meetings":"Auto registration, attendance, live media, Administrative Documents, Authorization & Approvals, Signature Portal, Decisions & Actions and transcript/proceedings; no quorum or formal resolutions/voting by default.",
   "Staff Meetings":"Auto registration, attendance, live media, Staff Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
   "General Meetings":"Auto registration, attendance, live media, General Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
