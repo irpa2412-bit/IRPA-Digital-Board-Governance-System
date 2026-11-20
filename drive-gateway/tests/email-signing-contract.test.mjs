@@ -1,4 +1,5 @@
 import test from "node:test";
+import fs from "node:fs";
 import assert from "node:assert/strict";
 import {
   issueEmailSigningLink, inspectEmailSigningLink, createFreshSigningSession,
@@ -223,4 +224,42 @@ test("actual contact correction retains signer ID and field assignments and appe
   assert.deepEqual(saved.signers[0].fields,before.fields);
   assert.deepEqual(saved.signers[0].roleAssignments,before.roleAssignments);
   assert.equal(saved.events.at(-1).type,"email_link.signer_contact_updated");
+});
+
+
+test("a link cannot be transferred to another envelope or signer ID", async () => {
+  const f = await fixture();
+  await assert.rejects(() => inspectEmailSigningLink({
+    token: `${f.envelope.id}.S2.${f.issued.token}`, envelope: f.envelope, signer: { ...f.signer, id: "S2" }, now: NOW
+  }), /unavailable/i);
+  await assert.rejects(() => inspectEmailSigningLink({
+    token: `ENV-OTHER.S1.${f.issued.token}`, envelope: { ...f.envelope, id: "ENV-OTHER" }, signer: f.signer, now: NOW
+  }), /unavailable/i);
+});
+
+test("owner cancellation immediately invalidates an otherwise unexpired link", async () => {
+  const f = await fixture();
+  for (const status of ["Voided", "Cancelled", "Canceled"]) {
+    await assert.rejects(
+      () => inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${f.issued.token}`, envelope: { ...f.envelope, status }, signer: f.signer, now: NOW }),
+      /no longer active/i
+    );
+  }
+});
+
+test("parallel resend reservations do not block unsigned signers", () => {
+  const f = { id: "S1", status: "Pending" };
+  const one = reserveEmailSigningResend(f, "attempt-one", NOW);
+  const two = reserveEmailSigningResend(one, "attempt-two", new Date(NOW.getTime()+1));
+  assert.deepEqual(two.resendAttempts.map(item => item.id), ["attempt-one", "attempt-two"]);
+  const rollback = rollbackEmailSigningResend(two, "attempt-one");
+  assert.deepEqual(rollback.resendAttempts.map(item => item.id), ["attempt-two"]);
+});
+
+test("owner/admin SMTP self-check remains protected by the existing Worker route", () => {
+  const router = fs.readFileSync(new URL("../src/router.mjs", import.meta.url), "utf8");
+  const diagnostics = fs.readFileSync(new URL("../src/smtpDiagnostics.mjs", import.meta.url), "utf8");
+  assert.ok(router.includes("/api/sign/smtp-selfcheck"));
+  assert.ok(router.includes("user.isAdmin!==true&&user.isOwner!==true"));
+  assert.ok(diagnostics.includes('profile?.fields?.role?.stringValue==="Administrator"'));
 });
