@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-const project = String(process.env.STAGING_FIREBASE_PROJECT_ID || "").trim();
+const project = String(process.env.STAGING_FIREBASE_PROJECT_ID || "").trim(); // staging-only assertion
 const apiKey = String(process.env.STAGING_FIREBASE_WEB_API_KEY || "").trim();
 const adminEmail = String(process.env.STAGING_TEST_EMAIL || "").trim().toLowerCase();
 const adminPassword = String(process.env.STAGING_TEST_PASSWORD || "");
