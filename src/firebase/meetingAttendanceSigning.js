@@ -160,6 +160,6 @@ export async function requestDailyAttendanceSigningClosure({meeting,date}={}){
  if(!owner?.uid)throw new Error("The recorded meeting host must be signed in.");
  const meetingHostUid=clean(meeting?.meetingHostUid||meeting?.hostUid||meeting?.organizerUid||meeting?.organiserUid||meeting?.initiatorUid||meeting?.createdByUid||meeting?.ownerUid||meeting?.chairpersonUid);
  if(!meetingHostUid||meetingHostUid!==owner.uid)throw new Error("Only the recorded meeting host may request attendance signing closure.");
- if(!meeting?.id||!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date||"")))throw new Error("A meeting and valid attendance date are required.");
+ if(!meeting?.id||!/^\d{4}-\d{2}-\d{2}$/.test(String(date||"")))throw new Error("A meeting and valid attendance date are required.");
  return callMeetingService("/api/meeting-attendance/daily/close",{meetingId:meeting.id,date});
 }
