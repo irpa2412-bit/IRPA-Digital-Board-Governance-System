@@ -2,8 +2,6 @@
 
 // Server-to-Worker identity for trusted email dispatch. The resulting ID token
 // is project-signed by Firebase Authentication; no shared Worker secret is used.
-const { getApp } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
 
 const EMAIL_SERVICE_UID = "irpa-email-dispatcher";
 const FIREBASE_WEB_API_KEYS = Object.freeze({
@@ -14,14 +12,17 @@ const FIREBASE_WEB_API_KEYS = Object.freeze({
 async function createEmailDeliveryIdToken({
   env = process.env,
   fetchFn = fetch,
-  auth = getAuth(),
-  projectId = getApp().options.projectId || env.GCLOUD_PROJECT || env.GCP_PROJECT
+  auth,
+  projectId
 } = {}) {
-  const project = String(projectId || "").trim();
+  const adminApp = require("firebase-admin/app");
+  const authSdk = require("firebase-admin/auth");
+  const project = String(projectId || adminApp.getApp().options.projectId || env.GCLOUD_PROJECT || env.GCP_PROJECT || "").trim();
+  const authClient = auth || authSdk.getAuth();
   const apiKey = String(env.FIREBASE_WEB_API_KEY || FIREBASE_WEB_API_KEYS[project] || "").trim();
   if (!project || !apiKey) throw new Error("Firebase email-service authentication is not configured for this project.");
 
-  const customToken = await auth.createCustomToken(EMAIL_SERVICE_UID, {
+  const customToken = await authClient.createCustomToken(EMAIL_SERVICE_UID, {
     irpaEmailDeliveryService: true
   });
   const response = await fetchFn(
