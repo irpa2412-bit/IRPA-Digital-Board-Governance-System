@@ -39,17 +39,17 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
     throw new HttpError(401, "This signing link is unavailable. Contact the document owner for a new invitation.");
   }
   const suppliedHash = await sha256Hex(parts[2].toLowerCase());
+  const currentHash = String(signer?.tokenHash || "");
   const knownHashes = [
-    signer?.tokenHash,
+    currentHash,
     ...(Array.isArray(signer?.emailLinkTokenHistory) ? signer.emailLinkTokenHistory.map(item => item?.tokenHash) : []),
     ...(Array.isArray(signer?.tokenHistory) ? signer.tokenHistory.map(item => item?.tokenHash) : [])
   ].filter(Boolean).map(String);
   const matchesKnown = knownHashes.some(hash => safeEqual(suppliedHash, hash));
-  const matchesCurrent = Boolean(signer?.tokenHash) && safeEqual(suppliedHash, String(signer.tokenHash));
+  const matchesCurrent = Boolean(currentHash) && safeEqual(suppliedHash, currentHash);
   const sessionMatch = Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
 
   if (signer?.status === "Signed" && matchesKnown) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
-  if (CLOSED_ENVELOPES.has(String(envelope?.status || ""))) throw new HttpError(410, "This signing envelope is no longer active.");
   if (!matchesCurrent && !sessionMatch) {
     const replaced = (signer?.emailLinkTokenHistory || []).some(item => item?.status === "replaced" && safeEqual(suppliedHash, String(item.tokenHash || "")));
     if (replaced) throw new HttpError(410, "This link was replaced. Please use the newest email.");
@@ -57,21 +57,26 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   }
   const tokenKind = sessionMatch ? "session" : "invitation";
   const status = String(tokenKind === "session" ? signer.emailLinkSessionStatus : signer.emailLinkStatus || "");
+  const completedSession = tokenKind === "session" && envelope.status === "Completed" && signer.status === "Signed" && status === "used";
+  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession) {
+    throw new HttpError(410, "This signing envelope is no longer active.");
+  }
   const permitted = tokenKind === "session"
-    ? status === "active" || (status === "used" && envelope.status === "Completed" && signer.status === "Signed")
+    ? status === "active" || completedSession
     : ["issued", "opened"].includes(status);
   if (!permitted) {
-    if (signer?.status === "Signed") throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
+    if (signer?.status === "Signed" && tokenKind === "invitation") throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
     throw new HttpError(410, "This signing link has expired or is no longer active.");
   }
   const expiry = tokenKind === "session"
     ? signer.emailLinkSessionExpiresAt
     : signer.emailLinkExpiresAt || signer.tokenExpiresAt || envelope.expiresAt;
   const expiryMs = Date.parse(String(expiry || ""));
-  if (!Number.isFinite(expiryMs) || new Date(now).getTime() > expiryMs) throw new HttpError(410, "This signing link has expired. Contact the document owner for a new invitation.");
-  return { ok: true, tokenKind, suppliedHash, expiry: new Date(expiryMs).toISOString() };
+  if (!completedSession && (!Number.isFinite(expiryMs) || new Date(now).getTime() > expiryMs)) {
+    throw new HttpError(410, "This signing link has expired. Contact the document owner for a new invitation.");
+  }
+  return { ok: true, tokenKind, suppliedHash, expiry: Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null };
 }
-
 export function createFreshSigningSession({ envelopeId, signerId, now = new Date(), linkExpiresAt, durationMinutes = 30 }) {
   const secret = randomHex(32);
   const nowMs = new Date(now).getTime();
