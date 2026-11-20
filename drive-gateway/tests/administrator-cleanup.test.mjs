@@ -203,4 +203,7 @@ test("unlinked Firebase Auth accounts are inventoried separately and never misla
   assert.equal(row.registerType,"Firebase Authentication");
   assert.equal(row.decision,"STAYS");
   assert.equal(inventory.records.some(item=>item.collection==="members" && item.email==="external@example.test"),false);
+  const plan=await (await route(new Request("https://gateway.test/api/admin/cleanup/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({inventoryId:inventory.inventoryId,selections:[{key:"firebaseAuthAccounts/external-auth-1",decision:"GOES"}]})}),env,"/api/admin/cleanup/plan")).json();
+  assert.ok(plan.executionOperations.some(operation=>operation.type==="auth-delete" && operation.uid==="external-auth-1"));
+  assert.equal(plan.executionOperations.some(operation=>operation.type==="firestore-delete"),false);
 });
