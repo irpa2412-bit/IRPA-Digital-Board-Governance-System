@@ -203,12 +203,10 @@ test("parallel portal window amendments preserve existing meeting and historical
   assert.match(guard, /Parallel repair-window amendment changed existing change-record history or another portal's record/);
 });
 
-test("parallel portal window amendment requires both records and semantic isolation guard", () => {
-  assert.match(guard, /const parallelWindowRecordAmendment = changed\.includes\("docs\/portal-protection\/repair-window\.json"\)/);
-  assert.match(guard, /changed\.includes\("docs\/portal-protection\/change-record\.json"\)/);
-  assert.match(guard, /changed\.includes\("scripts\/meeting-portal-fixture-isolation-guard\.sh"\)/);
-  assert.match(guard, /changed\.includes\("tests\/meeting-isolation-guard\.test\.mjs"\)/);
-  assert.match(guard, /!parallelWindowRecordAmendment/);
+test("parallel portal window amendment delegates to the executable exact-scope policy", () => {
+  assert.match(guard, /evaluateSignatureWindowAmendment/);
+  assert.ok(guard.includes('"scripts/portal-repair-window-guard-policy.mjs"'));
+  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(parallelWindowDecision\.reason\)/);
 });
 
 
