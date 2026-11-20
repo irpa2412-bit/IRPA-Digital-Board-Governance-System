@@ -51,7 +51,14 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   const present=lower(attendanceStatus)==="present"&&signed;
   return {participantId:id,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,accessPassStatus,accessPassExpiresAt:iso(pass?.expiresAt),invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
  });
- const boardRows=rows.filter(r=>r.registrationCategory==="BOARD_MEMBER");
+ const participantById=new Map(active.map(p=>[clean(p.id),p]));
+ const seenBoardIdentities=new Set(),boardRows=[];
+ for(const row of rows.filter(r=>r.registrationCategory==="BOARD_MEMBER")){
+  const participant=participantById.get(row.participantId)||{};
+  const identity=clean(participant.boardMemberId||(lower(participant.sourceType)==="board member register"?participant.sourceRecordId:"")||participant.participantUid||participant.uid||participant.userId||lower(participant.participantEmail||participant.email)||participant.id);
+  if(seenBoardIdentities.has(identity)){row.duplicateBoardMemberRegistration=true;row.countsTowardQuorum=false;}
+  else{seenBoardIdentities.add(identity);boardRows.push(row);}
+ }
  const boardPresent=boardRows.filter(r=>r.countsTowardQuorum).length;
  const boardMeeting=isBoardMeeting(meeting);
  const required=boardMeeting?(boardRows.length?Math.ceil(boardRows.length/3):null):0;
@@ -60,7 +67,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   registered:rows.length,boardMembers:boardRows.length,boardCommitteeMembers:rows.filter(r=>r.registrationCategory==="BOARD_COMMITTEE_MEMBER").length,
   management:rows.filter(r=>r.registrationCategory==="MANAGEMENT").length,staff:rows.filter(r=>r.registrationCategory==="STAFF").length,
   irpaMembers:rows.filter(r=>r.registrationCategory==="IRPA_MEMBER").length,externalInvitees:rows.filter(r=>r.registrationCategory==="EXTERNAL_INVITEE").length,
-  other:rows.filter(r=>r.registrationCategory==="OTHER").length,
+  other:rows.filter(r=>r.registrationCategory==="OTHER").length,duplicateBoardMemberRegistrations:rows.filter(r=>r.duplicateBoardMemberRegistration).length,
   invitationsDispatched:rows.filter(r=>r.invitationDispatched).length,activeAccessPasses:rows.filter(r=>lower(r.accessPassStatus)==="active").length,
   queued:rows.filter(r=>lower(r.queueStatus)==="pending").length,
   admitted:rows.filter(r=>lower(r.queueStatus)==="admitted").length,
