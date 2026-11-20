@@ -88,7 +88,7 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
  const documentPayload={
   title,reference,documentReference:reference,documentType:"Governance Document",documentTypeSelectedAt:new Date().toISOString(),
   documentUid:documentId,archiveCategory:"Meeting Records",classification:String(meeting.meetingCategory||meeting.category||"").toUpperCase().includes("BOARD")?"Restricted":"Internal",
-  archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archivePath:archive.archivePath,
+  archiveFolderId:archive.folderId,archiveUidLink:archive.archiveUidLink,archivePath:archive.archivePath,archiveAccess:archive.archiveAccess||"Restricted",
   archiveFileId:archive.file.fileId,archiveFileWebViewLink:archive.file.webViewLink||null,fileId:archive.file.fileId,
   fileUrl:"drive://"+archive.file.fileId,webViewLink:archive.file.webViewLink||null,fileName:reference+".pdf",
   contentType:"application/pdf",fileSize:bytes.length,storageProvider:"Google Drive",purpose:"Daily Meeting Attendance Register",
