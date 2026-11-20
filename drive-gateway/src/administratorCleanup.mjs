@@ -846,6 +846,7 @@ export function createAdministratorCleanupRouter(deps) {
             await env.DRIVE_KV.put("admin-cleanup:plan:" + planId,JSON.stringify(plan),{expirationTtl:TTL_SECONDS});
             return json({ok:true,planId,status:plan.status,backupUrl:plan.backupUrl,operationOutcomes:plan.operationOutcomes},200,corsHeaders(request));
           }
+          await revalidatePlan(env,auth,plan,inventory);
           const batch = pending.slice(0,Math.min(10,Number(plan.batchSize)||10));
           const batchAuditRef = await writeAuditEvent(env,auth.token,{eventType:"BATCH_STARTED",planId:plan.planId,
             inventoryId:plan.inventoryId,actorUid:auth.uid,actorEmail:auth.email,startedAt:new Date().toISOString(),
