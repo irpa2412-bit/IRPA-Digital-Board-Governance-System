@@ -1165,6 +1165,8 @@ jobs:
               throw new Error("WordPress staging REST setup route failed (HTTP "+String(routeResponse?.http||"unknown")+", code "+String(provisioned?.code||"invalid_response").slice(0,80)+").");
             const usernameResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_USERNAME","--config","wrangler.staging.generated.json"],{input:provisioned.username,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
             if(usernameResult.status!==0)throw new Error("Could not update the staging Worker username secret.");
+            const baseUrlResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_BASE_URL","--config","wrangler.staging.generated.json"],{input:process.env.WP_BASE,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
+            if(baseUrlResult.status!==0)throw new Error("Could not update the staging Worker WordPress base URL secret.");
             const passwordResult=spawnSync("npx",["wrangler","secret","put","WORDPRESS_APPLICATION_PASSWORD","--config","wrangler.staging.generated.json"],{input:provisioned.password,encoding:"utf8",stdio:["pipe","ignore","pipe"],env:process.env});
             provisioned.password="";
             if(passwordResult.status!==0)throw new Error("Could not update the staging Worker application-password secret.");
