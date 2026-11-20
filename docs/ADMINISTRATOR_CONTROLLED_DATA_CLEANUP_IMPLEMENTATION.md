@@ -1,6 +1,6 @@
 # Administrator-Controlled Data Cleanup — Implementation Contract
 
-Status: implementation specification; not deployed. The legacy reset executor is not approved for reuse.
+Status: implementation in progress on `feat/admin-controlled-cleanup-20261120`; not merged or deployed. The legacy reset executor is not approved for reuse.
 
 ## Objective
 Replace the broad System Reset / trial-reset pathway with a dedicated Cloudflare Gateway service and Settings interface. The browser may inventory, select, review and confirm records; only the authenticated Worker may authorise and execute mutations.
@@ -8,7 +8,7 @@ Replace the broad System Reset / trial-reset pathway with a dedicated Cloudflare
 ## Authorisation
 - Require a valid Firebase ID token and an active `adminProfiles/{uid}` record.
 - Require the designated primary administrator identity; do not trust client-supplied role, email, UID or administrator flags.
-- Current source designates `irpa2412@gmail.com` as the primary administrator. Before enabling destructive execution, reconcile this account to Daniel Mollel using authoritative Firebase Auth and administrator-profile data. Do not infer identity from the app's single-user description.
+- The application owner has confirmed that Daniel Mollel owns `irpa2412@gmail.com`, the web application, the administrator account, and the associated Gmail/Google Drive identity. Daniel Mollel is the sole web-app user and sole cleanup authority. The configured `PRIMARY_ADMIN_EMAIL` is therefore consistent with the owner-confirmed identity. The Worker must still authenticate the live Firebase UID and require its active `adminProfiles/{uid}` record; email ownership alone is not a substitute for token and role verification.
 - Reject all other users with HTTP 403. Do not permit deletion of the executing administrator, Executive Director, Board Chairperson or Board Secretary.
 
 ## Inventory and selection
