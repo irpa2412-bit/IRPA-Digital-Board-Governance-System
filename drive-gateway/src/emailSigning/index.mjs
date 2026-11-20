@@ -117,7 +117,9 @@ export async function commitEmailSigningResend(signer, { attemptId, tokenHash, e
   }
   const at = new Date(now).toISOString();
   const oldHash = String(signer.tokenHash || "");
-  const history = [...(signer.emailLinkTokenHistory || []), ...(oldHash ? [{ tokenHash: oldHash, status: "replaced", replacedAt: at }] : [])].slice(-20);
+  const priorHistory = signer.emailLinkTokenHistory || [];
+  const alreadyRecorded = oldHash && priorHistory.some(item => item?.tokenHash === oldHash);
+  const history = [...priorHistory, ...(oldHash && !alreadyRecorded ? [{ tokenHash: oldHash, status: "replaced", replacedAt: at }] : [])].slice(-20);
   const next = {
     ...signer,
     tokenHash: String(tokenHash),
