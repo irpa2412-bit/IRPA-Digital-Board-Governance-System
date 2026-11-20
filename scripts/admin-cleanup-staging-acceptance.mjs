@@ -145,10 +145,12 @@ try {
     if ((envelope.fields?.[field]?.arrayValue?.values||[]).length!==0) throw new Error("Unsent signing assignment reference remained in "+field+".");
   }
   if (!await firestoreRead("signatureEvents/"+eventId)) throw new Error("Immutable signature event history was deleted.");
-  const loginCheck = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(apiKey),{
-    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,returnSecureToken:true})
+  const authLookup = await fetch("https://identitytoolkit.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/accounts:lookup",{
+    method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({localId:[uid]})
   });
-  if (loginCheck.ok) throw new Error("Deleted staging fixture Firebase Auth account can still sign in.");
+  const authLookupBody = await authLookup.json().catch(()=>({}));
+  if (authLookup.ok && (authLookupBody.users||[]).some(user=>user.localId===uid)) throw new Error("Staging fixture Firebase Auth account still exists after cleanup.");
+  if (!authLookup.ok && !String(authLookupBody.error?.message||"").includes("USER_NOT_FOUND")) throw new Error("Firebase Auth account deletion could not be independently verified.");
 
   completed = true;
   console.log("STAGING_CLEANUP_INVENTORY_DEFAULT_STAYS_PASS");
