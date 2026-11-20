@@ -76,7 +76,11 @@ export async function getCurrentMemberProfile() {
 export async function getCurrentEmployeeProfile() { return null; }
 export async function getAdminProfile() { return null; }
 export async function getRecords(collection) { return clone(readStore()[collection] || []); }
-export async function getAccessibleMeetingRecords() { return clone(readStore().meetings || []); }
+export async function getAccessibleMeetingRecords() {
+  const meetings = readStore().meetings || [];
+  if (auth.currentUser?.uid === hostUser.uid) return clone(meetings);
+  return clone(meetings.filter(meeting => String(meeting.initiatorUid || meeting.meetingHostUid || meeting.ownerUid || "") === String(auth.currentUser?.uid || "")));
+}
 export async function getRecord(collection, id) { return clone((readStore()[collection] || []).find(record => String(record.id) === String(id)) || null); }
 export async function createRecord(collection, payload) {
   const store = readStore();
