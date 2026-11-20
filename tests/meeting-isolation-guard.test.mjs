@@ -307,7 +307,7 @@ const signatureRepairFixture = () => {
       repairWindow: { rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd" }
     }
   };
-  const repairWindow = { parallelWindows: [{ portal: "Signature Portal", status: "open", closesAt: "2026-11-22T17:08:47Z" }] };
+  const repairWindow = { parallelWindows: [{ portal: "Signature Portal", status: "open", closesAt: "2026-11-22T17:08:47Z", rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd" }] };
   return { changedPaths, repairWindow, changeRecord: currentChangeRecord, baselineChangeRecord, currentChangeRecord };
 };
 
