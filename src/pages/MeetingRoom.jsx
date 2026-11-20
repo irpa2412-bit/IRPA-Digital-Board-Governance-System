@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import{auth,db}from"../firebase/config";
-import{callMeetingService}from"../firebase/meetingGatewayApi";
+import{callMeetingService,assessMeetingQuorum}from"../firebase/meetingGatewayApi";
 import{collection,doc,onSnapshot,query,where}from"firebase/firestore";
 import{translateMeetingPhrase}from"../firebase/liveInterpreter";
 import{MAA_DICTIONARY,MAA_DICTIONARY_SOURCES,searchMaaDictionary}from"../data/maaDictionary";
