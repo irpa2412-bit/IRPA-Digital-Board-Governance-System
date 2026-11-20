@@ -1500,8 +1500,11 @@ jobs:
                 const duplicateSnapshots=(duplicateHistory.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
                   r.title===fixtureTitle&&Date.now()-Date.parse(r.date||"")<24*60*60*1000)
                   .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
-                if(!duplicateSnapshots.length) throw new Error("A marked duplicate staging test page has no recent verified pre-test snapshot; refusing to alter it.");
-                await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
+                const duplicateNative=(duplicateHistory.revisions||[]).filter(r=>r.source==="WordPress revision"&&Number.isSafeInteger(Number(r.revisionId))&&
+                  r.title===fixtureTitle).sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+                if(duplicateSnapshots.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),snapshotId:duplicateSnapshots[0].snapshotId})});
+                else if(duplicateNative.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:Number(duplicate.id),revisionId:duplicateNative[0].revisionId})});
+                else throw new Error("A marked duplicate staging test page has no verified pre-marker WordPress revision; refusing to alter it.");
                 cleanDuplicate=(await call("/api/communications/website/content/pages/"+Number(duplicate.id))).item;
               }else{
                 // No unique workflow marker means ownership is unproven: leave this page untouched.
@@ -1525,8 +1528,12 @@ jobs:
               const recent=(history.revisions||[]).filter(r=>r.source==="IRPA saved snapshot"&&r.snapshotId&&
                 !String(r.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_")&&Date.now()-Date.parse(r.date||"")<24*60*60*1000)
                 .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
+              const nativeBeforeMarker=(history.revisions||[]).filter(r=>r.source==="WordPress revision"&&Number.isSafeInteger(Number(r.revisionId))&&
+                !String(r.title||"").includes("IRPA_STAGING_WEBSITE_CHECK_"))
+                .sort((a,b)=>Date.parse(b.date||"")-Date.parse(a.date||""));
               if(recent.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,snapshotId:recent[0].snapshotId})});
-              else throw new Error("A prior timed-out acceptance left a marker, but no recent safe snapshot was available; refusing to overwrite the page.");
+              else if(nativeBeforeMarker.length) await call("/api/communications/website/restore",{method:"POST",body:JSON.stringify({type:"pages",id:testPageId,revisionId:nativeBeforeMarker[0].revisionId})});
+              else throw new Error("A prior timed-out acceptance left a marker, but no verified pre-marker WordPress revision or safe snapshot was available; refusing to overwrite the page.");
               before=await call("/api/communications/website/content/pages/"+testPageId);
               original=before.item;
               if(!original||original.title.includes("IRPA_STAGING_WEBSITE_CHECK_")||original.content.includes("IRPA_STAGING_WEBSITE_CHECK_"))
