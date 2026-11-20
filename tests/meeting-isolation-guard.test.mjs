@@ -5,6 +5,20 @@ import { readFileSync } from "node:fs";
 const workflow = readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
 const guard = readFileSync(new URL("../scripts/meeting-portal-fixture-isolation-guard.sh", import.meta.url), "utf8");
 const policy = readFileSync(new URL("../scripts/portal-repair-window-guard-policy.mjs", import.meta.url), "utf8");
+const changeRecord = JSON.parse(readFileSync(new URL("../docs/portal-protection/change-record.json", import.meta.url), "utf8"));
+const repairWindow = JSON.parse(readFileSync(new URL("../docs/portal-protection/repair-window.json", import.meta.url), "utf8"));
+
+
+test("email-signing repair record mirrors active evidence and declares both shared portals",()=>{
+  const amendment=changeRecord.activeAmendment;
+  const window=repairWindow.parallelWindows.find(item=>item.portal==="Signature Portal");
+  assert.deepEqual(changeRecord.declaration.affectedPortals,["Signature Portal","Meeting Portal"]);
+  assert.deepEqual(amendment.affectedPortals,changeRecord.declaration.affectedPortals);
+  assert.deepEqual(changeRecord.validation,amendment.validation);
+  assert.equal(changeRecord.validation.baselineSmoke,"PASS");
+  assert.equal(window.rollbackCommit,amendment.repairWindow.rollbackCommit);
+  assert.ok(window.scope.includes("drive-gateway/src/emailSigningLinks.mjs"));
+});
 
 test("isolation baseline compares against the fetched current main snapshot", () => {
   assert.match(guard, /git fetch origin main:refs\/remotes\/origin\/main/);
