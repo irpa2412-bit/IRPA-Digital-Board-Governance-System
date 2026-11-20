@@ -109,7 +109,9 @@ export function createAdministratorCleanupRouter(deps) {
     const claims = await authenticateFirebaseRequest(request, env);
     const uid = clean(claims.user_id || claims.uid);
     const email = clean(claims.email).toLowerCase();
-    if (!uid || email !== PRIMARY_ADMIN_EMAIL) throw Object.assign(new Error("Only the designated primary administrator may access data cleanup."), { status: 403 });
+    if (!uid || email !== PRIMARY_ADMIN_EMAIL || claims.emailVerified !== true || claims.firebaseClaims?.admin !== true) {
+      throw Object.assign(new Error("The designated primary administrator must present a verified email and current Firebase administrator claim."), { status: 403 });
+    }
     const token = await getFirestoreAdminAccessToken(env);
     const profileDoc = await getFirestoreDocument(env, "adminProfiles/" + uid, token);
     const profile = firestoreDocumentToPlain(profileDoc) || {};
