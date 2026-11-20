@@ -230,10 +230,10 @@ test("actual contact correction retains signer ID and field assignments and appe
 test("a link cannot be transferred to another envelope or signer ID", async () => {
   const f = await fixture();
   await assert.rejects(() => inspectEmailSigningLink({
-    token: `${f.envelope.id}.S2.${f.issued.token}`, envelope: f.envelope, signer: { ...f.signer, id: "S2" }, now: NOW
+    token: `${f.envelope.id}.S1.${f.issued.token}`, envelope: f.envelope, signer: { ...f.signer, id: "S2" }, now: NOW
   }), /unavailable/i);
   await assert.rejects(() => inspectEmailSigningLink({
-    token: `ENV-OTHER.S1.${f.issued.token}`, envelope: { ...f.envelope, id: "ENV-OTHER" }, signer: f.signer, now: NOW
+    token: `${f.envelope.id}.S1.${f.issued.token}`, envelope: { ...f.envelope, id: "ENV-OTHER" }, signer: f.signer, now: NOW
   }), /unavailable/i);
 });
 
