@@ -7,8 +7,7 @@ const hash = async value => [...new Uint8Array(await crypto.subtle.digest("SHA-2
 const yearsFrom = (date, years) => { const d = new Date(date); d.setUTCFullYear(d.getUTCFullYear()+years); return d; };
 const categoryOf = m => { const raw=clean(m.meetingCategory||m.meetingPolicyId||m.category||m.meetingType).toUpperCase(); if(["GOVERNANCE","BOARD","BOARD MEETING","BOARD COMMITTEE MEETING","ANNUAL GENERAL MEETING","SPECIAL MEETING"].includes(raw))return "GOVERNANCE"; if(["ADMINISTRATIVE","MANAGEMENT","MANAGEMENT MEETING","ADMINISTRATION MEETING","OPERATIONS MEETING"].includes(raw))return "ADMINISTRATIVE"; if(["STAFF","STAFF MEETING"].includes(raw))return "STAFF"; if(["GENERAL","GENERAL MEETING"].includes(raw))return "GENERAL"; return "OTHER"; };
 const isBoardMeeting = meeting => {
- const type=lower(meeting.meetingType||meeting.title||"");
- return ["board","board meeting"].includes(type);
+ return [meeting.meetingType,meeting.meetingTitle,meeting.title,meeting.category].some(value=>["board","board meeting"].includes(lower(value)));
 };
 const boardMemberRole = participant => {
  const role=lower(participant.participantRole||participant.role||participant.boardPosition);
@@ -22,7 +21,7 @@ const participantCategory = participant => {
  if(boardMemberRole(participant))return "BOARD_MEMBER";
  if(role==="board committee member"||type.includes("board committee"))return "BOARD_COMMITTEE_MEMBER";
  if(/management|executive director|director|manager/.test(role)||type.includes("management"))return "MANAGEMENT";
- if(/staff|employee|personnel/.test(role)||type.includes("staff")||type.includes("personnel"))return "STAFF";
+ if(/staff|employee|personnel|board secretary|secretary to the board|meeting secretary/.test(role)||type.includes("staff")||type.includes("personnel"))return "STAFF";
  if(type.includes("member")||lower(participant.sourceType)==="member register")return "IRPA_MEMBER";
  if(/external|guest|partner|donor|consultant|technical expert|government representative|observer/.test(role)||type.includes("external"))return "EXTERNAL_INVITEE";
  return "OTHER";
@@ -49,7 +48,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   const invitationDispatched=p.meetingAccessDispatched===true||["sent","accepted","dispatched"].includes(lower(p.meetingAccessDispatchStatus));
   const queueStatus=clean(entry?.status)||"Not queued";
   const present=lower(attendanceStatus)==="present"&&signed;
-  return {participantId:id,name:clean(p.participantName||p.name),email:lower(p.participantEmail||p.email),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
+  return {participantId:id,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,invitationDispatched,invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
  });
  const boardRows=rows.filter(r=>r.registrationCategory==="BOARD_MEMBER");
  const boardPresent=boardRows.filter(r=>r.countsTowardQuorum).length;
@@ -62,7 +61,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting){
   irpaMembers:rows.filter(r=>r.registrationCategory==="IRPA_MEMBER").length,externalInvitees:rows.filter(r=>r.registrationCategory==="EXTERNAL_INVITEE").length,
   other:rows.filter(r=>r.registrationCategory==="OTHER").length,
   invitationsDispatched:rows.filter(r=>r.invitationDispatched).length,
-  queued:rows.filter(r=>["pending","admitted"].includes(lower(r.queueStatus))).length,
+  queued:rows.filter(r=>lower(r.queueStatus)==="pending").length,
   admitted:rows.filter(r=>lower(r.queueStatus)==="admitted").length,
   signedAttendance:rows.filter(r=>r.signed).length,
   present:rows.filter(r=>lower(r.attendanceStatus)==="present").length,
