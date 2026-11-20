@@ -47,7 +47,7 @@ async function buildDailyAttendancePdf({meeting,date,records}){
    const role=clean(row.role||row.participantRole).slice(0,24);
    page.drawText(String(globalIndex+1),{x:cols[0],y,size:8,font});
    page.drawText(name,{x:cols[1],y,size:8,font});
-   page.drawText((category+" / "+role).slice(0,42),{x:cols[2],y,size:7,font});
+   page.drawText((category+" / "+role).slice(0,30),{x:cols[2],y,size:7,font});
    page.drawText(status,{x:cols[3],y,size:8,font:status==="Present"?bold:font,color:status==="Present"?rgb(.05,.35,.16):rgb(.35,.35,.35)});
    page.drawLine({start:{x:cols[4],y:y-2},end:{x:PAGE.width-PAGE.margin,y:y-2},thickness:.5,color:rgb(.65,.68,.72)});
    if(status==="Present"){
@@ -103,12 +103,17 @@ export async function dispatchDailyAttendanceSigning({meeting,date,records}={}){
   signingMode:"Parallel",recipients,fields,ownerSigningEnabled:false
  });
  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"PREPARE",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid)});
+ let started;
  try{
-  const started=await startSignatureWorkflow(envelope);
-  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
-  return {envelopeId:envelope.id,documentId,reference,signerCount:recipients.length,status:started.gatewayInvitationStatus||"Sent"};
+  started=await startSignatureWorkflow(envelope);
  }catch(error){
   await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"FAILED",envelopeId:envelope.id,documentId,ownerUid:owner.uid,error:String(error?.message||"Email-link dispatch failed").slice(0,500)}).catch(()=>null);
   throw error;
  }
+ try{
+  await callMeetingService("/api/meeting-attendance/daily/dispatch",{meetingId:meeting.id,date,phase:"SENT",envelopeId:envelope.id,documentId,ownerUid:owner.uid,signerUids:recipients.map(r=>r.uid),gatewayEnvelopeId:started.gatewayEnvelopeId||null,gatewayInvitationStatus:started.gatewayInvitationStatus||"Sent"});
+ }catch(error){
+  throw new Error("The Signature Portal workflow started and email invitations may have been sent, but the Meeting Portal dispatch record could not be reconciled. Do not press Dispatch again; ask the host administrator to reconcile envelope "+envelope.id+".");
+ }
+ return {envelopeId:envelope.id,documentId,reference,signerCount:recipients.length,status:started.gatewayInvitationStatus||"Sent"};
 }
