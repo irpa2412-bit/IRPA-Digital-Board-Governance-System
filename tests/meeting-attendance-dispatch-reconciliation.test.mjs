@@ -27,3 +27,13 @@ test("uncertain dispatches retain a host-audited Meeting Portal reconciliation s
   assert.match(service,/MEETING_DAILY_ATTENDANCE_SIGNING_\+phase/);
   assert.match(service,/dispatchOutcome:phase==="UNCERTAIN"\?"RECONCILIATION_REQUIRED"/);
 });
+
+test("host closure records an audited request without revoking or mutating email-link invitations",()=>{
+  assert.match(helper,/requestDailyAttendanceSigningClosure/);
+  assert.match(helper,/\/api\/meeting-attendance\/daily\/close/);
+  assert.match(service,/\/api\/meeting-attendance\/daily\/close/);
+  assert.match(service,/PENDING_LINK_LIFECYCLE_FINALIZATION/);
+  assert.match(service,/signingLinksRevoked:false/);
+  assert.match(service,/MEETING_DAILY_ATTENDANCE_CLOSURE_REQUESTED/);
+  assert.match(service,/Completed signatures and audit evidence were left untouched/);
+});
