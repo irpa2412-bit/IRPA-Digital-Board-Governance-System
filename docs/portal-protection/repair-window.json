@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T11:16:00Z",
+  "lastActivityAt": "2026-11-20T12:09:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -37,7 +37,10 @@
     "drive-gateway/tests/meeting-portal-router.test.mjs",
     "drive-gateway/tests/meeting-services-router.test.mjs",
     "docs/portal-protection/change-record.json",
-    "package.json"
+    "package.json",
+    "tests/meeting-isolation-guard.test.mjs",
+    "vite.meeting-fixture.config.js",
+    "scripts/meeting-portal-fixture-isolation-guard.sh"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
@@ -56,6 +59,131 @@
       "at": "2026-11-20T11:16:00Z",
       "action": "repair",
       "description": "Connected the seven-portal protected regression runner to the full test:all command; all seven portal entries are executed by the existing portal smoke script."
+    },
+    {
+      "at": "2026-11-20T11:25:00Z",
+      "action": "repair",
+      "description": "Expanded the isolated browser fixture to mount Meeting Room, seed clearly labelled TEST participants, exercise governance controls and signing mocks at 360/412/768/1280px, and trigger the workflow for every repair branch. No real emails or production data."
+    },
+    {
+      "at": "2026-11-20T11:27:00Z",
+      "action": "repair",
+      "description": "Removed the push branch allowlist entirely so every repair branch can trigger the isolated Meeting Portal workflow; extended its path filters and paired isolation-guard assertions."
+    },
+    {
+      "at": "2026-11-20T11:31:00Z",
+      "action": "repair",
+      "description": "Extracted the existing source-isolation gate into a shell script and rebuilt the dedicated fixture workflow as a minimal explicit job; this preserves the path allowlist and avoids the previous zero-job workflow failure."
+    },
+    {
+      "at": "2026-11-20T11:34:00Z",
+      "action": "repair",
+      "description": "Removed the fixture workflow's cancel-in-progress concurrency rule so the PR-triggered verification is not cancelled by concurrent branch push runs. The source-isolation gate remains mandatory."
+    },
+    {
+      "at": "2026-11-20T11:36:00Z",
+      "action": "repair",
+      "description": "Added the repair-window declaration itself to the dedicated fixture workflow path filters, ensuring the latest authorised repair-window revision receives the same browser regression."
+    },
+    {
+      "at": "2026-11-20T11:38:00Z",
+      "action": "repair",
+      "description": "Corrected a malformed regular expression in the extracted workflow-isolation regression test. The first real job now reaches the policy test instead of failing at JavaScript parse time."
+    },
+    {
+      "at": "2026-11-20T11:40:00Z",
+      "action": "repair",
+      "description": "Added the repair-window declaration to the extracted isolation allowlist so the fixture workflow can validate its own authorised repair evidence."
+    },
+    {
+      "at": "2026-11-20T11:42:00Z",
+      "action": "repair",
+      "description": "Aligned two legacy isolation-guard policy assertions with the already-present email-link identity exception; the policy logic itself is unchanged."
+    },
+    {
+      "at": "2026-11-20T11:44:00Z",
+      "action": "repair",
+      "description": "Adjusted Playwright selectors to target the actual Meeting Room form-field structure rather than inaccessible sibling labels. No application UI behavior changed."
+    },
+    {
+      "at": "2026-11-20T11:46:00Z",
+      "action": "repair",
+      "description": "Fixture now explicitly selects Physical Venue before entering the venue, covering the venue branch of meeting scheduling rather than only the default online room."
+    },
+    {
+      "at": "2026-11-20T11:48:00Z",
+      "action": "repair",
+      "description": "Expanded the isolated fixture to mount the real Resolutions register, create a TEST resolution linked to the scheduled meeting, and open its linked vote before exercising Meeting Room voting."
+    },
+    {
+      "at": "2026-11-20T11:49:00Z",
+      "action": "repair",
+      "description": "Corrected the browser selector for Meeting Room's actual unlabeled meeting selector. The test remains browser-driven against the real portal component."
+    },
+    {
+      "at": "2026-11-20T11:51:00Z",
+      "action": "repair",
+      "description": "Added explicit quorum-assessment synchronization and a global assertion that every fixture action records emailSent=false."
+    },
+    {
+      "at": "2026-11-20T11:53:00Z",
+      "action": "repair",
+      "description": "Corrected the fixture to mock the actual Meeting Register create endpoint used by Meetings.jsx, returning a stable TEST meeting ID and seeding only local TEST participants."
+    },
+    {
+      "at": "2026-11-20T11:56:00Z",
+      "action": "repair",
+      "description": "Restricted the dedicated browser workflow to pull requests and manual dispatch; scoped concurrency cancels only stale runs for the same PR, avoiding duplicate push/PR jobs while preserving branch-protection verification."
+    },
+    {
+      "at": "2026-11-20T11:58:00Z",
+      "action": "repair",
+      "description": "Disambiguated the two Resolutions navigation buttons in the browser fixture by selecting the meeting-scoped first entry."
+    },
+    {
+      "at": "2026-11-20T12:00:00Z",
+      "action": "repair",
+      "description": "Replaced an over-escaped concurrency regex in the workflow regression test with literal string assertions; the workflow configuration remains unchanged."
+    },
+    {
+      "at": "2026-11-20T12:01:00Z",
+      "action": "repair",
+      "description": "Disambiguated duplicate Meeting Room navigation buttons in the browser fixture to select the meeting-scoped entry."
+    },
+    {
+      "at": "2026-11-20T12:02:00Z",
+      "action": "repair",
+      "description": "Removed a stale section-ID assumption from the browser test and target Motion, Decision and Action fields by their rendered form-field labels."
+    },
+    {
+      "at": "2026-11-20T12:03:00Z",
+      "action": "repair",
+      "description": "Aligned the minutes-capture mock with MeetingRoom's recordType payload so the fixture records the correct draft-minutes type."
+    },
+    {
+      "at": "2026-11-20T12:04:00Z",
+      "action": "repair",
+      "description": "Aligned the minutes-signing navigation assertion with the actual MeetingRoom context field, which falls back to the meeting title when no legacy reference field exists."
+    },
+    {
+      "at": "2026-11-20T12:05:00Z",
+      "action": "repair",
+      "description": "Updated the minutes assertion to match the authoritative Draft Minutes title actually rendered by the Meeting Records Lifecycle table."
+    },
+    {
+      "at": "2026-11-20T12:06:00Z",
+      "action": "repair",
+      "description": "Added a synchronization assertion for all four Present attendance rows before the TEST signing dispatch."
+    },
+    {
+      "at": "2026-11-20T12:08:00Z",
+      "action": "repair",
+      "description": "The outsider fixture now remounts Meeting Room under an outsider actor and verifies the server-scoped mock returns no meetings, no meeting details, and no governance or attendance-signing controls."
+    },
+    {
+      "at": "2026-11-20T12:09:00Z",
+      "action": "repair",
+      "description": "Raised the isolated fixture banner's mobile font size from 11px to the repository's 12px readability floor after candidate-proof reported the single violation."
     }
   ],
   "durationHours": 48,
