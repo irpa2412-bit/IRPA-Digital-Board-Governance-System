@@ -78,7 +78,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
   const accessPassStatus=clean(pass?.status)||"Not issued";
   const queueStatus=clean(entry?.status)||"Not queued";
   const present=lower(attendanceStatus)==="present"&&signed;
-  return {participantId:id,participantUid:uid||null,name:clean(p.participantName||p.name),role:clean(p.participantRole||p.role),registrationCategory:category,meetingParticipantRegistered:true,invitationDispatched,accessPassStatus,accessPassExpiresAt:iso(pass?.expiresAt),invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(dailySigner?.completedAt||dailySigner?.signedAt||signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
+  return {participantId:id,participantUid:uid||null,name:clean(p.participantName||p.name),email:lower(p.participantEmail||p.email||p.invitedEmail),role:clean(p.participantRole||p.role),title:clean(p.title||p.position||p.jobTitle||p.boardPosition),occupation:clean(p.occupation||p.capacity||p.profession||p.jobTitle||p.position),capacity:clean(p.capacity),department:clean(p.department||p.departmentName||p.unit||p.unitName),institution:clean(p.institution||p.organization||p.organisation),participantType:clean(p.participantType),sourceType:clean(p.sourceType),registrationCategory:category,meetingParticipantRegistered:true,invitationDispatched,accessPassStatus,accessPassExpiresAt:iso(pass?.expiresAt),invitationStatus:clean(p.meetingAccessDispatchStatus||p.invitationStatus)||"Not sent",queueStatus,attendanceStatus,signed,signedAt:iso(dailySigner?.completedAt||dailySigner?.signedAt||signature?.signedAt),countsTowardQuorum:category==="BOARD_MEMBER"&&present};
  });
  const boardRows=[];
  for(const member of boardMembers){
@@ -92,7 +92,7 @@ async function buildQuorumAssessment(ctx,env,token,meeting,attendanceDate=null,c
    boardRows.push(row);
   }else{
    for(const row of matches){row.duplicateBoardMemberRegistration=true;row.countsTowardQuorum=false;}
-   const row={participantId:null,participantUid:member.uid,boardRegisterUid:member.uid,boardRegisterRecordId:member.id,name:member.name,role:member.boardPosition||"Board Member",registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false,invitationDispatched:false,invitationStatus:"Not registered for this meeting",accessPassStatus:"Not issued",queueStatus:"Not queued",attendanceStatus:attendanceDate?"N/A":"Unmarked",signed:false,signedAt:null,countsTowardQuorum:false,...(matches.length>1?{duplicateBoardMemberRegistration:true,duplicateParticipantCount:matches.length}:{})};
+   const row={participantId:null,participantUid:member.uid,boardRegisterUid:member.uid,boardRegisterRecordId:member.id,name:member.name,email:lower(member.email||member.emailAddress),role:member.boardPosition||"Board Member",title:clean(member.title||member.boardPosition),occupation:clean(member.occupation||member.capacity||member.boardPosition),department:clean(member.department||member.unit),institution:clean(member.institution||member.organization),registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false,invitationDispatched:false,invitationStatus:"Not registered for this meeting",accessPassStatus:"Not issued",queueStatus:"Not queued",attendanceStatus:attendanceDate?"N/A":"Unmarked",signed:false,signedAt:null,countsTowardQuorum:false,...(matches.length>1?{duplicateBoardMemberRegistration:true,duplicateParticipantCount:matches.length}:{})};
    boardRows.push(row);
   }
  }
