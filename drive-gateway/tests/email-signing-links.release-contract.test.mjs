@@ -18,9 +18,10 @@ const mail=read("../src/invitationEmail.mjs");
 test("email-link routes return only the invited signer's assigned fields and controlled PDF",()=>{
   assert.match(router,/\/api\/sign\/email\/open/);
   assert.match(router,/\/api\/sign\/email\/pdf/);
-  assert.match(signing,/fields:preview\.fields/);
+  assert.match(router,/POST.*api\/sign\/email\/session/);
+  assert.match(signing,/fields,canSign:can\(env,signer\)/);
   assert.match(signing,/appliedFields:\[\]/);
-  assert.match(signing,/ownerDeclaredParticulars:preview\.ownerDeclaredParticulars/);
+  assert.match(signing,/ownerDeclaredParticulars:signer\.declaredParticulars/);
   assert.match(router,/genericEmailSigningFailure\(\)/);
   assert.match(page,/\/api\/sign\/email\/open/);
   assert.match(page,/\/api\/sign\/email\/pdf/);
