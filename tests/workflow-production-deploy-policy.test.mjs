@@ -129,6 +129,7 @@ test("production Gateway deployment requires SMTP_PASSWORD secret and configures
   assert.match(gateway,/emailDeliveryService: payload\.irpaEmailDeliveryService === true/);
   assert.match(mailRoute,/claims\?\.user_id !== "irpa-email-dispatcher"/);
   assert.match(mailRoute,/claims\?\.firebaseClaims\?\.emailDeliveryService !== true/);
+  assert.match(mailRoute,/x-irpa-service-key/);
   assert.match(source,/SMTP_HOST: "mail\.irpa\.or\.tz"/);
   assert.match(source,/SMTP_PORT: "465"/);
   assert.match(source,/SMTP_FROM: "info@irpa\.or\.tz"/);
