@@ -344,13 +344,13 @@ return response(ctx,request,{ok:true,attendanceDate:date,participantId,attendanc
 }
 if(pathname==="/api/meeting-attendance/daily/dispatch"){
 const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
-if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED","UNCERTAIN"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
 if(!c.canManage||!hostUid||ownerUid!==uid||hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
 const id=await hash(meetingId+"\\0"+date),existing=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id),now=new Date();
 if(phase==="PREPARE"){
- if(existing&&["PREPARING","DISPATCHED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared or dispatched.",409);
+ if(existing&&["PREPARING","DISPATCHED","RECONCILIATION_REQUIRED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared, dispatched or requires reconciliation. Do not create another envelope or resend invitations.",409);
  const [participants,dailyRows]=await Promise.all([listByField(ctx,env,token,"participants","meetingId",meetingId),listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId)]);
  const dayRows=dailyRows.filter(r=>clean(r.attendanceDate)===date&&clean(r.attendanceStatus)==="Present");
  const presentUids=new Set(dayRows.map(r=>clean(r.participantUid)).filter(Boolean));
@@ -375,12 +375,14 @@ if(phase==="PREPARE"){
   });
   if(!mappingValid)return fail(ctx,request,"The Gateway signer identities did not verify against the prepared participant register and audit chain. The request remains pending reconciliation.",409);
   await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"DISPATCHED",dispatchedAt:now,gatewayEnvelopeId,gatewayInvitationStatus:clean(data.gatewayInvitationStatus)||"Sent",gatewayAuditChainValid:true,updatedAt:now});
+ }else if(phase==="UNCERTAIN"){
+  await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"RECONCILIATION_REQUIRED",dispatchError:clean(data.error).slice(0,500),reconciliationRequiredAt:now,updatedAt:now});
  }else{
   await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"FAILED",dispatchError:clean(data.error).slice(0,500),failedAt:now,updatedAt:now});
  }
 }
-await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_SIGNING_"+phase,c.meeting,id,{date,envelopeId,documentId,ownerUid:uid});
-return response(ctx,request,{ok:true,date,status:phase==="PREPARE"?"PREPARING":phase==="SENT"?"DISPATCHED":"FAILED",envelopeId});
+await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_SIGNING_"+phase,c.meeting,id,{date,envelopeId,documentId,ownerUid:uid,dispatchOutcome:phase==="UNCERTAIN"?"RECONCILIATION_REQUIRED":undefined});
+return response(ctx,request,{ok:true,date,status:phase==="PREPARE"?"PREPARING":phase==="SENT"?"DISPATCHED":phase==="UNCERTAIN"?"RECONCILIATION_REQUIRED":"FAILED",envelopeId});
 }
 if(pathname==="/api/meeting-attendance/mark"){
 const meetingId=clean(data.meetingId),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
