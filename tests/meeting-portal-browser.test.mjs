@@ -67,8 +67,14 @@ try {
       await page.locator('input[name="votingRequired"]').check();
       await page.getByRole("button", { name: "Create Resolution" }).click();
       await page.getByText("Resolution created and linked to its originating meeting.", { exact: true }).waitFor();
-      await page.getByRole("button", { name: "Open Anonymous Voting" }).click();
-      await page.getByText("Voting Open", { exact: true }).waitFor();
+      const resolutionRow = page.locator("tr").filter({ hasText: "TEST matter: approval of the annual work plan." });
+      await resolutionRow.waitFor();
+      // The register is intentionally horizontally scrollable on phones; reveal its Voting column
+      // before clicking, rather than treating an off-screen table cell as a broken control.
+      const resolutionTable = resolutionRow.locator("xpath=ancestor::div[contains(@class,'table-wrapper')]");
+      await resolutionTable.evaluate(element => { element.scrollLeft = element.scrollWidth; });
+      await resolutionRow.getByRole("button", { name: "Open Anonymous Voting" }).click();
+      await resolutionRow.locator("span.status-badge").filter({ hasText: "Voting Open" }).waitFor();
       const resolutionState = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
       assert.equal(resolutionState.resolutions.length, 1, "resolution should be saved against the created meeting");
       assert.equal(resolutionState.resolutions[0].meetingId, created.id);
