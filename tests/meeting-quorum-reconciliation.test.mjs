@@ -50,7 +50,8 @@ test("server assessment reconciles participant registration, invitation passes, 
   assert.match(service,/listByField\(ctx,env,token,"participants","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingAccessTokens","meetingId",meetingId\)/);
   assert.match(service,/listByField\(ctx,env,token,"meetingEntryRequests","meetingId",meetingId\)/);
-  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId\)/);\n  assert.match(service,/listByField\(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId\)/);\n  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId\)/);\n  assert.match(service,/getGatewayEnvelopeStatus/);\n  assert.match(service,/auditChainValid===true/);\n  assert.match(service,/dailySignerByUid/);
+  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId\)/);\n  assert.match(service,/listByField\(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId\)/);\n  assert.match(service,/listByField\(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId\)/);\n  assert.match(service,/getGatewayEnvelopeStatus/);
+  assert.match(service,/auditChainValid===true/);\n  assert.match(service,/dailySignerByUid/);
   assert.match(service,/Math\.ceil\(denominator\/3\)/);
   assert.match(service,/lower\(attendanceStatus\)==="present"&&signed/);
   assert.match(service,/category==="BOARD_MEMBER"&&present/);
