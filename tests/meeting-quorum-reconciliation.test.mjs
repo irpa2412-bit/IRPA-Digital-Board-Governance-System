@@ -61,7 +61,7 @@ test("Cloudflare Worker prevents a Board meeting from starting without quorum",(
   assert.match(meetings,/p\.id==="GOVERNANCE"\?"Board Meeting"/);
 });
 
-test("Meeting Room presents dispatch, queue and signed-attendance reconciliation",()=>{
+test("Meeting Room preserves three-source quorum reconciliation while keeping attendance signing independent",()=>{
   assert.match(api,/\/api\/meeting-quorum\/assess/);
   assert.match(room,/Refresh Three-Source Analysis/);
   assert.match(room,/Invitation Dispatch/);
@@ -69,7 +69,9 @@ test("Meeting Room presents dispatch, queue and signed-attendance reconciliation
   assert.match(room,/Signed Attendance/);
   assert.match(room,/quorumAssessment\.rows\.map/);
   assert.match(room,/assessMeetingQuorum\(\{meetingId:selected\.id,save,date:dailyAttendanceDate\}\)/);
-  assert.match(room,/Dispatch Signing Requests/);
+  assert.match(room,/Automatic attendance-sheet signing is temporarily disconnected/);
+  assert.match(room,/Open Signature Portal/);
+  assert.doesNotMatch(room,/Dispatch Signing Requests/);
   assert.match(room,/N\/A — Not Attended/);
 });
 
