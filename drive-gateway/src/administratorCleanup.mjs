@@ -703,6 +703,31 @@ export function createAdministratorCleanupRouter(deps) {
           completed:(plan.operationOutcomes||[]).filter(item=>["DELETED","ALREADY_DELETED","UPDATED","ALREADY_REMOVED"].includes(item.status)).length,
           executionEnabled:true},200,corsHeaders(request));
       }
+      if (pathname.startsWith("/api/admin/cleanup/backup/") && pathname.endsWith("/verify") && request.method === "GET") {
+        const parts = pathname.split("/");
+        const planId = clean(parts[parts.length-2]);
+        const raw = planId ? await env.DRIVE_KV.get("admin-cleanup:plan:" + planId) : null;
+        if (!raw) return json({ok:false,error:"Cleanup plan not found."},404,corsHeaders(request));
+        const plan = JSON.parse(raw);
+        if (plan.administratorUid !== auth.uid) return json({ok:false,error:"Cleanup plan belongs to a different administrator."},403,corsHeaders(request));
+        if (!plan.backupDriveFileId) return json({ok:false,error:"A durable backup has not been created for this plan."},409,corsHeaders(request));
+        const driveToken = await getDriveAccessToken(env);
+        const response = await fetchImpl("https://www.googleapis.com/drive/v3/files/"+encodeURIComponent(plan.backupDriveFileId)+"?alt=media",{
+          headers:{Authorization:"Bearer "+driveToken}
+        });
+        if (!response.ok) return json({ok:false,error:"The durable Drive backup could not be retrieved for verification (HTTP "+response.status+")."},502,corsHeaders(request));
+        const archive = await response.json().catch(()=>null);
+        if (!archive || archive.planId !== planId || !Array.isArray(archive.records) || !Array.isArray(archive.operationOutcomes)) {
+          return json({ok:false,error:"The Drive backup archive failed its integrity checks."},502,corsHeaders(request));
+        }
+        return json({ok:true,backupVerified:true,planId,backupDriveFileId:plan.backupDriveFileId,backupUrl:plan.backupUrl,
+          schemaVersion:archive.schemaVersion,recordCount:archive.records.length,
+          staysCount:archive.records.filter(row=>row.decision==="STAYS").length,
+          goesCount:archive.records.filter(row=>row.decision==="GOES").length,
+          operationOutcomeCount:archive.operationOutcomes.length,auditRefCount:Array.isArray(archive.auditRefs)?archive.auditRefs.length:0,
+          driveFileCopyCount:Array.isArray(archive.driveFileCopies)?archive.driveFileCopies.length:0,
+          executionStatus:archive.executionStatus||plan.status},200,corsHeaders(request));
+      }
       if (pathname.startsWith("/api/admin/cleanup/backup/") && request.method === "GET") {
         const planId = pathname.split("/").pop();
         const raw = await env.DRIVE_KV.get("admin-cleanup:plan:" + planId);
