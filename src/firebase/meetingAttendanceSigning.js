@@ -26,6 +26,8 @@ function attendanceStatus(row){
 async function buildDailyAttendancePdf({meeting,date,records}){
  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const fields=[],present=records.filter(row=>attendanceStatus(row)==="Present");
+ const unresolved=present.filter(row=>!clean(row.name||row.participantName||row.fullName)||String(row.name||"").startsWith("NAME NOT FOUND"));
+ if(unresolved.length)throw new Error("Cannot dispatch signed attendance: resolve the registered full name for "+unresolved.map(row=>clean(row.email||row.participantEmail||row.participantUid||row.participantId)).join(", ")+" in the Members or Employees register first.");
  if(!GOVERNANCE_FIELD_TYPES.includes("Signature"))throw new Error("The shared Governance Field Palette does not expose a Signature field.");
  const categories=["BOARD_MEMBER","BOARD_COMMITTEE_MEMBER","UNMATCHED_BOARD_REGISTRATION","MANAGEMENT","STAFF","IRPA_MEMBER","EXTERNAL_INVITEE","OTHER"];
  const grouped=categories.map(category=>({category,rows:records.filter(row=>String(row.registrationCategory||"OTHER").toUpperCase()===category)})).filter(group=>group.rows.length);

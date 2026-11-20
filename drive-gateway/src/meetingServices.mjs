@@ -277,12 +277,22 @@ const meetingId=clean(data.meetingId),date=clean(data.date),uid=clean(claims.use
 if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(ctx,request,"Meeting ID and a valid attendance date are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may compile daily attendance.",403);
-const [participants,memberRecords,dailyRows,dispatchRows]=await Promise.all([
+const [participants,memberRecords,employeeRecords,dailyRows,dispatchRows]=await Promise.all([
  listByField(ctx,env,token,"participants","meetingId",meetingId),
  listCollection(ctx,env,token,"members"),
+ listCollection(ctx,env,token,"employees"),
  listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId),
  listByField(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId)
 ]);
+const activeRegisterRecord=row=>[row.status,row.employmentStatus,row.registrationStatus].map(lower).some(value=>["active","activated"].includes(value));
+const registerByUid=new Map();
+for(const record of [...memberRecords,...employeeRecords]){
+ const recordUid=clean(record.uid||record.authUid||record.userUid);
+ if(!recordUid||!activeRegisterRecord(record)||registerByUid.has(recordUid))continue;
+ registerByUid.set(recordUid,record);
+}
+const registeredName=record=>clean(record?.name||record?.fullName||record?.memberName||record?.employeeName||record?.displayName);
+const registeredEmail=record=>lower(record?.email||record?.emailAddress||record?.contactEmail);
 const boardUids=new Set(memberRecords.filter(m=>{
  const active=[m.status,m.employmentStatus,m.registrationStatus].map(lower).some(value=>["active","activated"].includes(value));
  const isBoard=m.boardMember===true||lower(m.role)==="board member"||Boolean(clean(m.boardPosition))||clean(m.department)==="Board of Directors";
@@ -292,11 +302,11 @@ const dayByParticipant=new Map(dailyRows.filter(r=>clean(r.attendanceDate)===dat
 const active=participants.filter(p=>!denied.has(lower(p.status||p.registrationStatus)));
 for(const participant of active){if(dayByParticipant.has(clean(participant.id)))continue;const participantId=clean(participant.id),entryId=await hash(meetingId+"\\0"+date+"\\0"+participantId),now=new Date(),entry={meetingId,attendanceDate:date,participantId,participantUid:clean(participant.participantUid||participant.uid||participant.userId)||null,attendanceStatus:"N/A",recordedByUid:null,recordedAt:null,createdAt:now,updatedAt:now};await writeDoc(ctx,env,token,"meetingDailyAttendance",entryId,entry,false);dayByParticipant.set(participantId,entry);}
 const rows=active.map(p=>{
- const role=clean(p.participantRole||p.role||p.participantType),uid=clean(p.participantUid||p.uid||p.userId);
+ const role=clean(p.participantRole||p.role||p.participantType),uid=clean(p.participantUid||p.uid||p.userId),registerRecord=registerByUid.get(uid);
  const committee=lower(role)==="board committee member"||lower(p.participantType).includes("board committee");
  const registrationCategory=committee?"BOARD_COMMITTEE_MEMBER":boardUids.has(uid)&&lower(p.sourceType)!=="manual invitee"?"BOARD_MEMBER":boardMemberRole(p)?"UNMATCHED_BOARD_REGISTRATION":/management|executive director|director|manager/i.test(role)?"MANAGEMENT":/staff|employee|personnel|secretary|secretariat|officer/i.test(role)||lower(p.sourceType)==="employee register"?"STAFF":lower(p.sourceType)==="member register"||lower(p.participantType).includes("member")?"IRPA_MEMBER":/external|guest|partner|donor|consultant|technical expert|government representative|observer/i.test(role)||lower(p.participantType).includes("external")?"EXTERNAL_INVITEE":"OTHER";
- const day=dayByParticipant.get(p.id);
- return {participantId:p.id,participantUid:uid||null,name:clean(p.participantName||p.name||p.fullName||p.displayName),email:lower(p.participantEmail||p.email||p.invitedEmail||p.subscriberEmail),role,sourceType:clean(p.sourceType)||null,registrationCategory,dailyAttendanceStatus:clean(day?.attendanceStatus)||"N/A",attendanceStatus:clean(day?.attendanceStatus)||"N/A",dailyAttendanceRecordedAt:iso(day?.recordedAt),signed:false};
+ const day=dayByParticipant.get(p.id),participantName=clean(p.participantName||p.name||p.fullName||p.displayName),name=participantName||registeredName(registerRecord);
+ return {participantId:p.id,participantUid:uid||null,name:name||"NAME NOT FOUND — VERIFY REGISTER",email:lower(p.participantEmail||p.email||p.invitedEmail||p.subscriberEmail)||registeredEmail(registerRecord),role:role||clean(registerRecord?.role||registerRecord?.boardPosition||registerRecord?.position),title:clean(p.title||p.position||p.jobTitle||p.boardPosition||registerRecord?.title||registerRecord?.position||registerRecord?.boardPosition),occupation:clean(p.occupation||p.capacity||p.profession||p.jobTitle||p.position||registerRecord?.occupation||registerRecord?.capacity||registerRecord?.profession),department:clean(p.department||p.departmentName||p.unit||p.unitName||registerRecord?.department||registerRecord?.unit),institution:clean(p.institution||p.organization||p.organisation||registerRecord?.institution||registerRecord?.organization||registerRecord?.organisation),sourceType:clean(p.sourceType)||null,registrationCategory,dailyAttendanceStatus:clean(day?.attendanceStatus)||"N/A",attendanceStatus:clean(day?.attendanceStatus)||"N/A",dailyAttendanceRecordedAt:iso(day?.recordedAt),signed:false,nameResolved:Boolean(name),nameSource:participantName?"MEETING_PARTICIPANT":registeredName(registerRecord)?"AUTHORITATIVE_REGISTER":"UNRESOLVED"};
 });
 const registeredBoardUids=new Set(rows.filter(r=>r.registrationCategory==="BOARD_MEMBER"&&r.participantUid).map(r=>r.participantUid));
 const representedBoardUids=new Set();
