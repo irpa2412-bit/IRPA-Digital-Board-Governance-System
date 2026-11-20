@@ -51,7 +51,7 @@ jobs:
           set -euo pipefail
           (cd build-one && npm ci && npm run build)
           (cd build-two && npm ci && npm run build)
-      - name: Download live assets and compare SHA-256, sizes, headers and text
+      - name: Resolve and download each host's actual lazy module asset
         shell: bash
         run: |
           set -euo pipefail
@@ -60,14 +60,18 @@ jobs:
           find build-two/dist/assets -type f -name '*DocumentLifecycleModule*.js' -print -quit | xargs -r -I{} cp "{}" diagnostic-output/build-two.js
           test -s diagnostic-output/build-one.js
           test -s diagnostic-output/build-two.js
-          asset="$(basename "$(find build-one/dist/assets -type f -name '*DocumentLifecycleModule*.js' -print -quit)")"
+          local_asset="$(basename "$(find build-one/dist/assets -type f -name '*DocumentLifecycleModule*.js' -print -quit)")"
+          printf 'Local build asset: %s\n' "$local_asset" | tee diagnostic-output/asset-names.txt
           for host in cloudflare firebase; do
             if [ "$host" = cloudflare ]; then base='https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev'; else base='https://irpa-digital-board-governance.web.app'; fi
-            url="$base/assets/$asset?__irpa_hash_diagnostic=$(date +%s%N)"
-            curl --fail --silent --show-error --retry 3 -D "diagnostic-output/$host.headers" "$url" -o "diagnostic-output/$host.js"
-            for header in cache-control age etag date; do
-              grep -i "^$header:" "diagnostic-output/$host.headers" | tail -1 || true
-            done
+            bust="$(date +%s%N)"
+            curl --silent --show-error -D "diagnostic-output/$host-index.headers" "$base/?__irpa_hash_diagnostic=$bust" -o "diagnostic-output/$host-index.html"
+            entry="$(node -e 'const h=require("fs").readFileSync(process.argv[1],"utf8");const m=h.match(/<script[^>]+src="([^"]+\.js)"/i);if(!m)process.exit(2);process.stdout.write(m[1]);' "diagnostic-output/$host-index.html")"
+            curl --silent --show-error -D "diagnostic-output/$host-entry.headers" "$base$entry?__irpa_hash_diagnostic=$bust" -o "diagnostic-output/$host-entry.js"
+            live_asset="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/DocumentLifecycleModule[^"\\x27\\x60\\s]*\\.js/);if(!m)process.exit(3);process.stdout.write(m[0]);' "diagnostic-output/$host-entry.js")"
+            printf '%s live entry: %s; live module: %s\n' "$host" "$entry" "$live_asset" | tee -a diagnostic-output/asset-names.txt
+            status="$(curl --silent --show-error -D "diagnostic-output/$host.headers" -o "diagnostic-output/$host.js" -w '%{http_code}' "$base/assets/$live_asset?__irpa_hash_diagnostic=$bust")"
+            printf '%s HTTP status: %s\n' "$host" "$status" | tee -a diagnostic-output/asset-names.txt
           done
           printf '\n%-12s %-64s %12s\n' 'SOURCE' 'SHA-256' 'SIZE_BYTES'
           for f in diagnostic-output/build-one.js diagnostic-output/build-two.js diagnostic-output/cloudflare.js diagnostic-output/firebase.js; do
@@ -83,7 +87,12 @@ jobs:
             cat "diagnostic-output/build-one-vs-$host.diff"
           done
           printf '\n--- RESPONSE HEADERS ---\n'
-          for host in cloudflare firebase; do echo "[$host]"; grep -i -E '^(HTTP/|cache-control:|age:|etag:|date:)' "diagnostic-output/$host.headers" || true; done
+          for host in cloudflare firebase; do
+            echo "[$host asset]"
+            grep -i -E '^(HTTP/|content-type:|cache-control:|age:|etag:|date:)' "diagnostic-output/$host.headers" || true
+            echo "[$host entry]"
+            grep -i -E '^(HTTP/|content-type:|cache-control:|age:|etag:|date:)' "diagnostic-output/$host-entry.headers" || true
+          done
           cp diagnostic-output/build-one.js diagnostic-output/build-one-asset.js
           cp diagnostic-output/build-two.js diagnostic-output/build-two-asset.js
       - name: Upload both builds and both live assets
