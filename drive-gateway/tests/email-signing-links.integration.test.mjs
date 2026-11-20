@@ -235,6 +235,39 @@ test("owner revoke invalidates a guest link; resend rotates token and marks the 
 });
 
 
+test("an expired session is closed without consuming the still-valid invitation",async()=>{
+  const f=await fixture();
+  const first=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
+  f.now(new Date(NOW.getTime()+31*60*1000));
+  await assert.rejects(()=>openEmailSigning(f.ctx,first.sessionToken,"198.51.100.27"),error=>error.status===410);
+  const afterExpiry=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(afterExpiry.signers[0].emailLinkSessionStatus,"expired");
+  assert.equal(afterExpiry.signers[0].emailLinkStatus,"issued");
+  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
+  assert.ok(second.sessionToken);
+  assert.notEqual(second.sessionToken,first.sessionToken);
+});
+
+test("owner Send new link replaces a legacy burned invitation and invalidates its old session",async()=>{
+  const f=await fixture();
+  const legacySession=await openEmailSigning(f.ctx,f.token,"198.51.100.28");
+  const envelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  envelope.signers[0].emailLinkStatus="opened";
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:envelope.signers,events:envelope.events},{ifVersion:envelope._v});
+  const resent=await resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1");
+  assert.equal(resent.deliveryStatus,"Sent");
+  const newToken=new URL(f.sent.at(-1).link).searchParams.get("emailSignToken");
+  assert.ok(newToken);
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(current.signers[0].emailLinkStatus,"issued");
+  assert.equal(current.signers[0].emailLinkSessionStatus,"revoked");
+  assert.equal(current.signers[0].emailLinkSessionHash,null);
+  assert.equal(current.signers[0].emailLinkTokenHistory.at(-1).status,"replaced");
+  await assert.rejects(()=>getSigningPdf(f.ctx,legacySession.sessionToken,null));
+  const preview=await previewEmailSigning(f.ctx,newToken);
+  assert.equal(preview.ok,true);
+});
+
 test("external email-link signer can declare and sign without a Firebase UID or authority-register match",async()=>{
   const f=await fixture({authority:false});
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.22");
