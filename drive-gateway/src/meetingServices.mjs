@@ -390,7 +390,7 @@ if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(ctx,request,"Meetin
 const c=await context(ctx,env,token,claims,meetingId);
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
 if(!c.canManage||!hostUid||hostUid!==uid)return fail(ctx,request,"Only the authenticated recorded meeting host may request closure of the attendance signing invitations.",403);
-const id=await hash(meetingId+"\\\\0"+date),dispatch=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id);
+const id=await hash(meetingId+"\0"+date),dispatch=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id);
 if(!dispatch)return fail(ctx,request,"No daily attendance signing dispatch exists for this meeting date.",404);
 if(["COMPLETED","CLOSED","CANCELLED","CANCELED"].includes(clean(dispatch.status).toUpperCase()))return fail(ctx,request,"This attendance signing dispatch is already closed.",409);
 if(dispatch.gatewayEnvelopeId){
