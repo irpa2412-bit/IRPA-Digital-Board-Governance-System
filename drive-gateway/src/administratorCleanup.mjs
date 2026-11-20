@@ -295,7 +295,7 @@ export function createAdministratorCleanupRouter(deps) {
       const id = clean(value);
       if (id && /^[A-Za-z0-9_-]{10,}$/.test(id)) return id;
     }
-    for (const value of [data?.fileUrl,data?.webViewLink,data?.signedPdfUrl,data?.downloadUrl,data?.url]) {
+    for (const value of [data?.fileUrl,data?.webViewLink,data?.signedPdfUrl,data?.downloadUrl,data?.fileReference,data?.signedPdfReference,data?.driveFileId,data?.fileId,data?.url]) {
       const url = clean(value);
       if (!/drive\.google\.com/i.test(url)) continue;
       const match = url.match(/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/i) || url.match(/[?&]id=([A-Za-z0-9_-]+)/i);
