@@ -273,6 +273,7 @@ test("v2 invitation copy and Worker routes describe a reusable, signer-scoped li
   assert.ok(worker.includes("reopen the same email link"));
   assert.ok(worker.includes("previewGatewayEmailSigning"));
   assert.ok(worker.includes("openGatewayEmailSigning"));
+  assert.ok(signing.includes('emailSigningModule=EMAIL_SIGNING_REBUILD_ENABLED?"v2":"legacy"'));
   assert.ok(signing.includes('emailSigningModule==="v2"'));
 });
 
