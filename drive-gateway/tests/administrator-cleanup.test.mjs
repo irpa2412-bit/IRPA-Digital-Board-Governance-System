@@ -10,7 +10,7 @@ function harness({email="irpa2412@gmail.com",active=true,collections={}}={}) {
     get: async key => kv.get(key) || null
   }};
   const deps = {
-    authenticateFirebaseRequest: async () => ({user_id:"admin-uid",email}),
+    authenticateFirebaseRequest: async () => ({user_id:"admin-uid",email,emailVerified:true,firebaseClaims:{admin:true}}),
     getFirestoreAdminAccessToken: async () => "firestore-token",
     getFirestoreDocument: async (_env,path) => path==="adminProfiles/admin-uid" ? {fields:{}} : null,
     firestoreDocumentToPlain: doc => {
@@ -65,6 +65,23 @@ test("execution stays locked even after typed confirmation until destructive acc
 });
 test("non-primary identity is refused", async () => {
   const {route,env}=harness({email:"other@example.test"});
+  const res=await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory");
+  assert.equal(res.status,403);
+});
+
+test("verified email and current Firebase admin claim are mandatory", async () => {
+  const {env}=harness();
+  const deps={
+    authenticateFirebaseRequest:async()=>({user_id:"admin-uid",email:"irpa2412@gmail.com",emailVerified:false,firebaseClaims:{admin:false}}),
+    getFirestoreAdminAccessToken:async()=>"firestore-token",
+    getFirestoreDocument:async()=>({data:{active:true,role:"Administrator"}}),
+    firestoreDocumentToPlain:doc=>doc?.data||{},
+    getFirestoreCollectionDocuments:async()=>[],
+    getFirebaseAuthAdminAccessToken:async()=>"auth-token",
+    listFirebaseAuthUsers:async()=>[],
+    json:response,corsHeaders:()=>({})
+  };
+  const route=createAdministratorCleanupRouter(deps);
   const res=await route(new Request("https://gateway.test/api/admin/cleanup/inventory"),env,"/api/admin/cleanup/inventory");
   assert.equal(res.status,403);
 });
