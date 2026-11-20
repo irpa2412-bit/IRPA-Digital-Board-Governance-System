@@ -22,6 +22,18 @@ test("Meeting Portal compiles daily categorical attendance and defaults missing 
  assert.match(service,/Not registered for this meeting/);
 });
 
+test("daily attendance resolves visible participant names from active member and employee registers by UID",()=>{
+ const start=service.indexOf('if(pathname==="/api/meeting-attendance/daily/register")');
+ const end=service.indexOf('if(pathname==="/api/meeting-attendance/daily/mark")',start);
+ const route=service.slice(start,end);
+ assert.match(route,/listCollection\(ctx,env,token,"employees"\)/);
+ assert.match(route,/registerByUid\.get\(uid\)/);
+ assert.match(route,/registeredName\(registerRecord\)/);
+ assert.match(route,/nameResolved:Boolean\(name\)/);
+ assert.match(route,/NAME NOT FOUND — VERIFY REGISTER/);
+ assert.match(route,/nameSource:/);
+});
+
 test("only the meeting host owns the attendance document and dispatches signing",()=>{
  assert.match(room,/isMeetingHost/);
  assert.match(room,/disabled=!isMeetingHost/);
