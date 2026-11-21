@@ -197,9 +197,13 @@ export default function SignaturePathwaySelfTest() {
     const response = await fetch(gateway + "/api/signature-pathway/emergency-storage", {
       method: "POST",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      redirect: "error"
     });
-    const raw = await response.json().catch(() => null);
+    const responseText = await response.text();
+    if (responseText.length > 1000000) throw new Error("Emergency-storage Gateway response exceeds the size limit.");
+    let raw;
+    try { raw = JSON.parse(responseText); } catch { raw = null; }
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Emergency-storage Gateway returned an invalid response shape.");
     const data = sanitizeGatewayValue(raw);
     if (!response.ok || data.ok !== true) throw new Error(typeof data.error === "string" ? data.error.slice(0, 300) : "Emergency-storage discovery request failed (HTTP " + response.status + ").");
@@ -225,7 +229,11 @@ export default function SignaturePathwaySelfTest() {
       let rootCursor = null;
       do {
         const page = await emergencyStorageRequest({ action: "collections", pageToken: rootCursor });
-        collectionIds.push(...(page.collectionIds || []));
+        if (!Array.isArray(page.collectionIds) || page.collectionIds.length > 1000 ||
+            (page.nextPageToken != null && typeof page.nextPageToken !== "string")) {
+          throw new Error("Emergency-storage collections response has an invalid schema.");
+        }
+        collectionIds.push(...page.collectionIds);
         rootCursor = page.nextPageToken || null;
       } while (rootCursor);
       const uniqueCollectionIds = [...new Set(collectionIds)];
@@ -235,7 +243,12 @@ export default function SignaturePathwaySelfTest() {
         let cursor = null;
         do {
           const page = await emergencyStorageRequest({ action: "scan", collectionId, pageToken: cursor });
-          hits.push(...(page.hits || []));
+          if (!Array.isArray(page.hits) || page.hits.length > 1000 ||
+              page.hits.some(hit => !hit || typeof hit !== "object" || typeof hit.collectionPath !== "string" ||
+                typeof hit.documentId !== "string" || !Array.isArray(hit.fields))) {
+            throw new Error("Emergency-storage scan response has an invalid schema.");
+          }
+          hits.push(...page.hits);
           cursor = page.nextPageToken || null;
         } while (cursor);
         scannedCollectionIds.push(collectionId);
@@ -300,7 +313,10 @@ export default function SignaturePathwaySelfTest() {
         cache: "no-store",
         redirect: "error"
       });
-      const raw = await response.json().catch(() => null);
+      const responseText = await response.text();
+      if (responseText.length > 1000000) throw new Error("Drive health Gateway response exceeds the size limit.");
+      let raw;
+      try { raw = JSON.parse(responseText); } catch { raw = null; }
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Drive health Gateway returned an invalid response shape.");
       const data = sanitizeGatewayValue(raw);
       setDriveHealth({
