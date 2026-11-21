@@ -1,6 +1,8 @@
 // drive-gateway/src/invitationEmail.mjs
 // Isolated member invitation sender. Caller authorization remains in the Worker route.
 
+import { buildMailMimeMessage, normalizeRecipientEmail } from "./mailDelivery.js";
+
 const EMAIL_RE = /^[^\s@<>"',;:\\]+@[^\s@<>"',;:\\]+\.[^\s@<>"',;:\\]+$/;
 const CRLF_RE = /[\r\n\u2028\u2029]/;
 const SUBJECT = "Invitation to the IRPA Digital Board Governance System";
@@ -11,6 +13,36 @@ export function validateRecipient(email) {
   if (!v || v.length > 254 || CRLF_RE.test(v) || !EMAIL_RE.test(v)) return null;
   return v;
 }
+export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
+  const typedRecipient=validateRecipient(to);
+  if(!typedRecipient)throw new Error("A valid single signer recipient email address is required.");
+  const recipient=normalizeRecipientEmail(typedRecipient);
+  const mime=buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
+  return {recipient,rcptCommand:"RCPT TO:<"+recipient+">",toHeader:"<"+recipient+">",mime};
+}
+
+export function buildSignerInvitationSubject({title,position,positionCount,name}={}) {
+  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+  const safeName=validateName(name);
+  if(!safeName)throw new Error("Invalid signer name");
+  const firstName=safeName.split(/\s+/)[0]||"Signer";
+  return "Please sign: "+safeTitle+" - "+firstName+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+")";
+}
+
+export function buildSigningInvitationAuditMessage({recipientPrefix,recipientDomain,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,invitationKind="creation",at=new Date()}={}) {
+  const domain=String(recipientDomain||"unknown").toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,253)||"unknown";
+  const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...@"+domain;
+  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+  const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
+  const type=invitationKind==="resend"?"resend":"creation";
+  const category="SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
+  const details=category+(stageCode?"\nStage code: "+String(stageCode).slice(0,40):"");
+  const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" - "+safeTitle;
+  const text="Time (EAT): "+when+"\nEnvelope ID: "+String(envelopeId||"")+"\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\nMessage-ID: "+String(messageId||"Not recorded")+"\nType: "+type+"\n"+details+"\nRecipient domain: "+domain;
+  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p><strong>Type:</strong> "+type+"</p><p>"+escapeHtml(details).replace(/\n/g,"<br>")+"</p><p><strong>Recipient domain:</strong> "+escapeHtml(domain)+"</p>";
+  return {to:"info@irpa.or.tz",subject,text,html};
+}
+
 export function validateName(name) {
   if (name === undefined || name === null || name === "") return "Member";
   if (typeof name !== "string" || name.length > 100 || CRLF_RE.test(name)) return null;
