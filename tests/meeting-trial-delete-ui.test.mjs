@@ -7,6 +7,8 @@ const source = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url
 test("meeting deletion is visible only for exact TRIAL environment and REAL is protected", () => {
   assert.match(source, /m\.environment==="TRIAL"/);
   assert.match(source, /m\.environment!=="TRIAL"/);
+  assert.ok(source.includes('name="environment" value={form.environment||"REAL"}'));
+  assert.ok(source.includes('form.environment==="TRIAL"?"TRIAL":"REAL (protected)"'));
   assert.match(source, /Protected — REAL/);
 });
 
