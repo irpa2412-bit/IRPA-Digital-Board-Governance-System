@@ -477,8 +477,10 @@ test("invitation audit message includes a masked recipient domain and required d
   assert.match(audit.text,/Time \(EAT\):/);
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
+  assert.match(audit.text,/Type: creation/);
+  assert.match(audit.text,/Recipient domain: gmail\\.com/);
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
-  assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
+  assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
 });
 
 
