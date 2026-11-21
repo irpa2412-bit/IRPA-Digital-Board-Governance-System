@@ -473,7 +473,7 @@ test("invitation audit message includes a masked recipient domain and required d
     smtpReplyCategory:"ACCEPTED",at:NOW
   });
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Policy");
   assert.match(audit.text,/Time \(EAT\):/);
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
@@ -517,8 +517,9 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
     envelopeId:"ENV-FAIL-AUDIT",messageId:"<failed@irpa.or.tz>",
     smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",invitationKind:"resend",at:NOW
   });
-  assert.equal(audit.subject,"AUDIT: invitation to abc... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
   assert.match(audit.text,/Type: resend/);
+  assert.match(audit.text,/Recipient domain: example\\.com/);
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
   assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
