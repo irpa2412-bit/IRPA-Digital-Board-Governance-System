@@ -8,8 +8,6 @@ export function normalizeRecipientEmail(value) {
   }
   return email;
 }
-  return email;
-}
 export function validateMailHeader(value, label) {
   const text = String(value ?? "");
   if (text.includes("\r") || text.includes("\n")) throw new Error(String(label) + " contains invalid newline characters.");
