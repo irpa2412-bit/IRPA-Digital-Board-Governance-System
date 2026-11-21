@@ -116,8 +116,9 @@
       "openedAt": "2026-11-21T09:30:33Z",
       "closesAt": "2026-11-23T09:30:33Z",
       "durationHours": 48,
-      "rollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458",
-      "rollbackCommitEvidence": "Owner identified production web build eb68a06 as the frontend rollback target. Worker-only rollback remains the separately verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd."
+      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+      "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
+      "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
     },
     "prohibitedChanges": [
       "Do not change signing rules, signer identity, invitation token format/hash custody, session lifecycle, resend rules or field assignment.",
