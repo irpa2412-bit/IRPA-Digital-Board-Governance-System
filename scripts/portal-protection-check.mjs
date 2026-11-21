@@ -9,6 +9,15 @@ export function parseActivityTimestamps(history) {
   return String(history || "").split(/\r?\n/).filter(Boolean);
 }
 
+export function portalPolicyPaths(affectedPortals) {
+  if (!Array.isArray(affectedPortals) || affectedPortals.length !== 1) return null;
+  const slug = affectedPortals[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return {
+    windowPath: `docs/portal-protection/windows/${slug}.json`,
+    recordPath: `docs/portal-protection/records/${slug}.json`
+  };
+}
+
 export function evaluatePolicy({ changedFiles, registry, windowState, record, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
   const affected = new Set();
   const protectedFiles = [];
@@ -79,14 +88,10 @@ function main() {
   // Prefer an isolated per-portal declaration when a PR changes exactly one
   // registered portal. Shared/multi-portal changes continue to require the
   // shared Change Record and repair window.
-  if (discovery.affected.length === 1) {
-    const slug = discovery.affected[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const portalWindowPath = `docs/portal-protection/windows/${slug}.json`;
-    const portalRecordPath = `docs/portal-protection/records/${slug}.json`;
-    if (fs.existsSync(portalWindowPath) && fs.existsSync(portalRecordPath)) {
-      windowState = readJson(portalWindowPath);
-      record = readJson(portalRecordPath);
-    }
+  const portalPaths = portalPolicyPaths(discovery.affected);
+  if (portalPaths && fs.existsSync(portalPaths.windowPath) && fs.existsSync(portalPaths.recordPath)) {
+    windowState = readJson(portalPaths.windowPath);
+    record = readJson(portalPaths.recordPath);
   }
   const initial = evaluatePolicy({ changedFiles, registry, windowState, record });
   if (!initial.protectedFiles.length) {
