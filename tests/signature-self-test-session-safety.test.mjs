@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const selfTest = await readFile(new URL("../src/components/SignaturePathwaySelfTest.jsx", import.meta.url), "utf8");
 const page = await readFile(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
 const boundary = await readFile(new URL("../src/components/SignaturePathwaySelfTestErrorBoundary.jsx", import.meta.url), "utf8");
+const startup = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
 
 test("self-test panel is isolated by an error boundary", () => {
   assert.match(page, /SignaturePathwaySelfTestErrorBoundary><SignaturePathwaySelfTest\/>/);
