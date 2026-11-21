@@ -397,13 +397,14 @@
       "closesAt": "2026-11-23T20:14:09Z",
       "durationHours": 48,
       "rollbackCommit": "352d8b36718a3b88173934c607e6c7834f72a71b",
-      "rollbackVersionId": "679db4b3-0677-4d45-bd21-19d06700ec1c"
+      "rollbackVersionId": "5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3"
     },
     "baseline": {
       "commit": "352d8b36718a3b88173934c607e6c7834f72a71b",
       "rollbackCommit": "352d8b36718a3b88173934c607e6c7834f72a71b",
       "productionWorkerVersionId": "5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3",
-      "rollbackVersionId": "679db4b3-0677-4d45-bd21-19d06700ec1c"
+      "rollbackVersionId": "5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3",
+      "precedingDeploymentRollbackVersionId": "679db4b3-0677-4d45-bd21-19d06700ec1c"
     },
     "validation": {
       "baselineSmoke": "PASS",
