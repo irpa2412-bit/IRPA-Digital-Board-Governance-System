@@ -470,12 +470,12 @@ test("invitation audit message includes only a three-character recipient prefix 
   });
   assert.equal(audit.to,"info@irpa.or.tz");
   assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Policy");
-  assert.match(audit.text,/Time \\(EAT\\):/);
+  assert.match(audit.text,/Time \(EAT\):/);
   assert.match(audit.text,/Position: 2 of 3/);
-  assert.match(audit.text,/Message-ID: <unique@irpa\\.or\\.tz>/);
+  assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
-  assert.match(audit.text,/Recipient domain: gmail\\.com/);\n  assert.doesNotMatch(JSON.stringify(audit),/daniel\\.mollel@gmail\\.com|emailSignToken|https?:\\/\\/|secret-token/i);
-});
+  assert.match(audit.text,/Recipient domain: gmail\.com/);
+  assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
 
 
 test("signing invitation uses one distinct Message-ID per signer position and the exact ordinal subject",()=>{
@@ -489,7 +489,7 @@ test("signing invitation uses one distinct Message-ID per signer position and th
 
 test("audit send is best-effort and never changes invitation acceptance or failure",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
-  assert.match(worker,/try\{await onAudit\?\.\(\{messageId,lastCategory/);
+  assert.match(worker,/try\{await onAudit\?\.\(\{messageId,smtpReplyCategory:lastCategory/);
   assert.match(worker,/SIGNING_INVITATION_AUDIT_EMAIL_FAILED/);
   assert.match(worker,/if\(failure\)throw failure;\s*return result;/);
 });
@@ -498,7 +498,7 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mail=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
   assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
-  assert.match(worker,/buildSignerInvitationSubject\\(\\{title:safeTitle,position,positionCount,name:safeName\\}\\)/);
+  assert.match(worker,/buildSignerInvitationSubject\(\{title:safeTitle,position,positionCount,name:safeName\}\)/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: "\+generatedMessageId/);
   assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
@@ -516,7 +516,7 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
   assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
-  assert.doesNotMatch(audit.text,/abc@example\\.com|emailSignToken|https?:\\/\\//);
+  assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
 });
 
 
