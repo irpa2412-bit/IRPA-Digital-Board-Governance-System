@@ -14,7 +14,7 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
@@ -134,6 +134,18 @@ test("mail delivery is delegated once to the existing Worker invitation sender",
   assert.match(source,/smtpSend\(env,\{to:email,subject,text,html:htmlBody\}\)/);
 });
 
+
+test("email-link invitations retry transient SMTP 4xx responses but do not retry permanent 5xx responses",async()=>{
+  let attempts=0;
+  const accepted=await sendWithRetry(async()=>{attempts++;if(attempts<3)throw new Error("IRPA SMTP error 451");return "250 2.0.0 accepted";},{sleep:async()=>{},logger:{error(){}}});
+  assert.equal(accepted,"250 2.0.0 accepted");
+  assert.equal(attempts,3,"temporary provider throttling is retried within the bounded policy");
+  attempts=0;
+  await assert.rejects(()=>sendWithRetry(async()=>{attempts++;throw new Error("IRPA SMTP error 550");},{sleep:async()=>{},logger:{error(){}}}),/550/);
+  assert.equal(attempts,1,"permanent recipient rejection is not retried");
+  const source=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  assert.match(source,/return sendWithRetry\\(\\(\\)=>smtpSend\\(env,\\{to,subject,text,html,onStage\\}\\),\\{logger:console\\}\\);/);
+});
 
 test("profile lookup errors and a 3-second timeout never block an unregistered signer invitation",async()=>{
   async function attempt(resolveEmailLinkProfileUid,suffix){
