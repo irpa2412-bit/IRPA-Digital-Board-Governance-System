@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   MEETING_CHILD_COLLECTIONS,
   buildMeetingDeletionPreview,
@@ -140,4 +141,17 @@ test("export sanitizer recursively removes secret-bearing fields", () => {
     title: "Trial",
     nested: { note: "keep" }
   });
+});
+
+test("gateway preview and delete routes enforce admin, preview, validation and one atomic commit", () => {
+  const source = readFileSync(new URL("../src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.ok(source.includes('/api/meeting-register/delete-preview'));
+  assert.ok(source.includes('/api/meeting-register/delete'));
+  assert.match(source, /Only an authorised administrator may preview meeting deletion/);
+  assert.match(source, /Only an authorised administrator may delete a registered meeting/);
+  assert.match(source, /validateMeetingDeletion\(/);
+  assert.match(source, /previewDigest:data\.previewDigest/);
+  assert.match(source, /action:"TRIAL_MEETING_DELETED"/);
+  assert.match(source, /commitWrites\(ctx,env,token,writes\)/);
+  assert.match(source, /deletedChildCount:validation\.childCount/);
 });
