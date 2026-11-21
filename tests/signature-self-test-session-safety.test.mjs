@@ -12,8 +12,8 @@ test("self-test does not run Drive refresh as part of the main diagnostic", () =
 
 test("self-test Gateway calls reject redirects instead of following an interactive login gateway", () => {
   assert.match(selfTest, /redirect: "error"/, "direct Drive health fetch must reject redirects");
-  assert.match(selfTest, /async function selfTestGatewayPost\(path, payload\)/);
+  assert.match(selfTest, /async function selfTestGatewayPost\(path, payload, requestOptions = \{\}\)/);
   assert.match(selfTest, /redirect: "error"/);
-  assert.match(selfTest, /selfTestReconcileDocument\(oneDocument\[0\], options\)/);
-  assert.match(selfTest, /selfTestDownloadControlledDocument\(fileId, item\.documentId\)/);
+  assert.match(selfTest, /selfTestReconcileDocument\(item, \{\}, \{ signal: controller\.signal \}\)/);
+  assert.match(selfTest, /selfTestDownloadControlledDocument\(fileId, item\.documentId, \{ signal: controller\.signal \}\)/);
 });
