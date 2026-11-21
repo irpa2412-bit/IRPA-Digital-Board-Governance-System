@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getIdToken } from "firebase/auth";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { collection as firestoreCollection, doc, documentId, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs, limit, orderBy, query, startAfter } from "firebase/firestore";
@@ -143,6 +143,17 @@ function diagnosticRow(item, result) {
   };
 }
 
+function clearSavedSelfTestData() {
+  try {
+    for (const storage of [window.localStorage, window.sessionStorage]) {
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+        if (key && /signature[._-]?pathway[._-]?self[._-]?test|signature[._-]?self[._-]?test[._-]?(results|data)/i.test(key)) storage.removeItem(key);
+      }
+    }
+  } catch { /* Storage may be unavailable; diagnostics remain in component memory only. */ }
+}
+
 export default function SignaturePathwaySelfTest() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Ready. Run the test to inspect registered controlled documents.");
@@ -172,8 +183,10 @@ export default function SignaturePathwaySelfTest() {
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.ok !== true) throw new Error(data.error || "Emergency-storage discovery request failed (HTTP " + response.status + ").");
+    const raw = await response.json().catch(() => null);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Emergency-storage Gateway returned an invalid response shape.");
+    const data = sanitizeGatewayValue(raw);
+    if (!response.ok || data.ok !== true) throw new Error(typeof data.error === "string" ? data.error.slice(0, 300) : "Emergency-storage discovery request failed (HTTP " + response.status + ").");
     return data;
   }
 
@@ -271,10 +284,12 @@ export default function SignaturePathwaySelfTest() {
         cache: "no-store",
         redirect: "error"
       });
-      const data = await response.json().catch(() => ({}));
+      const raw = await response.json().catch(() => null);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Drive health Gateway returned an invalid response shape.");
+      const data = sanitizeGatewayValue(raw);
       setDriveHealth({
-        statusClass: String(data.statusClass || (response.ok ? "ok" : "error")),
-        classification: String(data.classification || "unknown")
+        statusClass: String(data.statusClass || (response.ok ? "ok" : "error")).slice(0, 80),
+        classification: String(data.classification || "unknown").slice(0, 120)
       });
     } catch {
       setDriveHealth({ statusClass: "error", classification: "gateway_redirect_blocked_or_network_or_authentication" });
@@ -284,9 +299,12 @@ export default function SignaturePathwaySelfTest() {
   const [cursor, setCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [cancelled, setCancelled] = useState(false);
+  const cancelledRef = useRef(false);
   const activeAbort = useRef(null);
+  useEffect(() => { clearSavedSelfTestData(); }, []);
 
   function cancelReconcile() {
+    cancelledRef.current = true;
     setCancelled(true);
     activeAbort.current?.abort();
     setMessage("Cancellation requested. The active document request is being stopped.");
@@ -295,6 +313,7 @@ export default function SignaturePathwaySelfTest() {
   async function reconcile() {
     if (busy || !hasMore) return;
     setBusy(true);
+    cancelledRef.current = false;
     setCancelled(false);
     setMessage("Read-only diagnostic: processing at most 20 documents sequentially. Each document is limited to 15 seconds and each run to 60 seconds. No signing state is changed.");
     const runStarted = Date.now();
@@ -303,7 +322,10 @@ export default function SignaturePathwaySelfTest() {
       await requireAdministrator();
       const baseQuery = query(collection(db, "documents"), orderBy(documentId()), limit(20));
       const pageQuery = cursor ? query(collection(db, "documents"), orderBy(documentId()), startAfter(cursor), limit(20)) : baseQuery;
-      const snapshot = await getDocs(pageQuery);
+      const snapshot = await Promise.race([
+        getDocs(pageQuery),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error("Self-test document query timed out after 60 seconds.")), 60000))
+      ]);
       const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
       setCursor(snapshot.docs.at(-1) || cursor);
       setHasMore(snapshot.docs.length === 20);
@@ -311,7 +333,7 @@ export default function SignaturePathwaySelfTest() {
       setProgress({ completed: 0, total: documentRows.length, active: 0 });
       const output = rows.filter(item => classifySelfTestRecord(item) === "NON_FILE_RECORD").map(item => diagnosticRow(item, {}));
       for (const [index, item] of documentRows.entries()) {
-        if (cancelled || Date.now() - runStarted >= 60000) break;
+        if (cancelledRef.current || Date.now() - runStarted >= 60000) break;
         const remaining = 60000 - (Date.now() - runStarted);
         const timeoutMs = Math.max(1, Math.min(15000, remaining));
         const controller = new AbortController();
@@ -371,7 +393,7 @@ export default function SignaturePathwaySelfTest() {
       setResults(pageRows);
       const finished = documentRows.length === 0 || output.length >= documentRows.length;
       const elapsed = Date.now() - runStarted;
-      setMessage(cancelled ? "Self-test cancelled safely. No signing state was changed."
+      setMessage(cancelledRef.current ? "Self-test cancelled safely. No signing state was changed."
         : elapsed >= 60000 && !finished ? "60-second run limit reached. Select Run next 20 to continue."
         : "Read-only diagnostics completed for " + documentRows.length + " document(s) in this page. Select Run next 20 to continue when available.");
     } catch (error) {
