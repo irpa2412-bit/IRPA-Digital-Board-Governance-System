@@ -539,6 +539,16 @@ test("three shared-mailbox signer positions produce three distinct exact subject
 });
 
 
+test("signer delivery panel renders only Not sent, Sent, Accepted by the mail server, or Failed with its stage code",()=>{
+  const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  assert.match(ui,/function signerDeliveryLabel\\(item=\\{\\}\\)/);
+  assert.match(ui,/delivery\\.state==="Accepted by the mail server"/);
+  assert.match(ui,/delivery\\.failureStageCode\\|\\|item\\.deliveryStageCode/);
+  assert.match(ui,/Delivery: \\{signerDeliveryLabel\\(item\\)\\}/);
+  assert.doesNotMatch(ui,/Delivery: \\{item\\.invitation\\|\\|"Not sent"\\}/);
+  assert.doesNotMatch(ui,/Delivered/);
+});
+
 test("unsigned signer copy and WhatsApp actions reuse the exact link returned by the existing resend flow",()=>{
   const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
   assert.match(ui,/const result=await resendGatewayEmailInvitation\(selected\.gatewayEnvelopeId,signerId\)/);
