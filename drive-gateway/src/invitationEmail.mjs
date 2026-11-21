@@ -179,7 +179,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
   const outcomes=new Map();
-  const capture=async(stage,outcome,smtpReplyCategory)=>outcomes.set(stage,{outcome,smtpReplyCategory});
+  const capture=async(stage,outcome,smtpReplyCategory,metadata={})=>outcomes.set(stage,{outcome,smtpReplyCategory,metadata});
   let result,error;
   try{
     const message=await runEmailStage("BUILD_MESSAGE",()=>buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}),capture);
@@ -188,7 +188,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
     error=err;
     if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,"failure");
   }
-  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory)}catch{}}
+  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory,result.metadata||{})}catch{}}
   if(error)throw error;
   return result;
 }
