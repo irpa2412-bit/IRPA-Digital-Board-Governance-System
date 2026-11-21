@@ -526,7 +526,7 @@ function signerInvitationDelivery(envelope,signer){
   const failed=Boolean(lastStage&&lastStage.event.outcome==="failure"&&(!lastSubmit||lastStage.index>lastSubmit.index));
   const accepted=Boolean(lastSubmit&&lastSubmit.event.outcome==="success"&&(!lastStage||lastStage.index<=lastSubmit.index));
   const handoff=events.filter(event=>event?.signerId===signer.id&&String(event.type||"").startsWith("email_link.handoff.")).at(-1)||null;
-  const status=failed?"Failed":accepted?"Accepted by mail server":signer.invitation==="Sent"?"Sent":signer.invitation==="Failed"?"Failed":"Pending";
+  const status=failed?"Failed":accepted?"Accepted by mail server":signer.invitation==="Portal"?"Portal signing (no invitation email)":signer.invitation==="Sent"?"Sent":signer.invitation==="Failed"?"Failed":"Pending";
   const evidence=failed?lastStage?.event:lastSubmit?.event||lastStage?.event||null;
   return {
     status,
