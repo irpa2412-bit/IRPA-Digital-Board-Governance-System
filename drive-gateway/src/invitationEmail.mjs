@@ -19,6 +19,62 @@ export function validateName(name) {
 export function escapeHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+
+function safeMailHeader(value, label, max = 998) {
+  const clean = String(value ?? "").trim();
+  if (!clean || clean.length > max || CRLF_RE.test(clean) || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(clean)) throw new Error("Invalid " + label + " mail header.");
+  return clean;
+}
+function encodeMimeHeader(value) {
+  const clean = safeMailHeader(value, "Subject", 200);
+  if (/^[\x20-\x7e]+$/.test(clean)) return clean;
+  const bytes = new TextEncoder().encode(clean);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return "=?UTF-8?B?" + btoa(binary) + "?=";
+}
+function base64MimePart(value) {
+  const bytes = new TextEncoder().encode(String(value ?? ""));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/.{1,76}/g, "$&\r\n").trimEnd();
+}
+export function buildRawMailMimeMessage({fromName="IRPA Digital Signing",from,replyTo=from,to,subject,text,html,messageId,date=new Date().toUTCString()}) {
+  const sender=validateRecipient(from),recipient=validateRecipient(to),reply=validateRecipient(replyTo);
+  if(!sender||!recipient||!reply)throw new Error("Invalid mail address.");
+  const cleanName=safeMailHeader(fromName,"From name",120);
+  const cleanSubject=encodeMimeHeader(subject);
+  const cleanMessageId=safeMailHeader(messageId,"Message-ID",180);
+  if(!/^<[A-Za-z0-9._-]+@irpa\.or\.tz>$/.test(cleanMessageId))throw new Error("Message-ID must use the irpa.or.tz domain.");
+  const cleanDate=safeMailHeader(date,"Date",100);
+  if(!Number.isFinite(Date.parse(cleanDate)))throw new Error("Invalid Date mail header.");
+  if(typeof text!=="string"||typeof html!=="string"||!text.trim()||!html.trim())throw new Error("Both plain-text and HTML invitation parts are required.");
+  const boundary="IRPA_ALT_"+crypto.randomUUID().replace(/-/g,"");
+  return [
+    "From: "+cleanName+" <"+sender+">",
+    "Reply-To: <"+reply+">",
+    "To: <"+recipient+">",
+    "Subject: "+cleanSubject,
+    "Message-ID: "+cleanMessageId,
+    "Date: "+cleanDate,
+    "MIME-Version: 1.0",
+    'Content-Type: multipart/alternative; boundary="'+boundary+'"',
+    "",
+    "--"+boundary,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    base64MimePart(text),
+    "--"+boundary,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    base64MimePart(html),
+    "--"+boundary+"--",
+    ""
+  ].join("\r\n");
+}
+
 export const MAX_INVITATION_MAIL_ATTEMPTS = 3;
 export const MAX_INVITATION_RETRY_DELAY_MS = 2000;
 
