@@ -1,6 +1,8 @@
 // drive-gateway/src/invitationEmail.mjs
 // Isolated member invitation sender. Caller authorization remains in the Worker route.
 
+import { buildMailMimeMessage, normalizeRecipientEmail } from "./mailDelivery.js";
+
 const EMAIL_RE = /^[^\s@<>"',;:\\]+@[^\s@<>"',;:\\]+\.[^\s@<>"',;:\\]+$/;
 const CRLF_RE = /[\r\n\u2028\u2029]/;
 const SUBJECT = "Invitation to the IRPA Digital Board Governance System";
@@ -10,6 +12,13 @@ export function validateRecipient(email) {
   const v = email.trim();
   if (!v || v.length > 254 || CRLF_RE.test(v) || !EMAIL_RE.test(v)) return null;
   return v;
+}
+export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
+  const typedRecipient=validateRecipient(to);
+  if(!typedRecipient)throw new Error("A valid single signer recipient email address is required.");
+  const recipient=normalizeRecipientEmail(typedRecipient);
+  const mime=buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
+  return {recipient,rcptCommand:"RCPT TO:<"+recipient+">",toHeader:"<"+recipient+">",mime};
 }
 export function validateName(name) {
   if (name === undefined || name === null || name === "") return "Member";
