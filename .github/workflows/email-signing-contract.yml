@@ -35,5 +35,7 @@ jobs:
         run: npm ci
       - name: Run Signature Pathway Self-Test session-safety regression
         run: npm run test:signature-self-test
+      - name: Smoke-test public production entry bundles and every imported chunk on both hosts
+        run: node scripts/signature-self-test-public-assets-smoke.mjs
       - name: Run seven-portal protection smoke tests
         run: node scripts/portal-protection-smoke.mjs
