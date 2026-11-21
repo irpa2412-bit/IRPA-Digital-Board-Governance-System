@@ -588,7 +588,6 @@ export default {
             },
             sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,positionCount,invitationKind="creation",onStage,onAudit}) => {
               const recipient=validateRecipient(to);
-              if(!recipient){const invalid=new Error("Invalid signer email address.");invalid.stageCode="BUILD_MESSAGE";throw invalid;}
               const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
               const safeTitle=String(title||"Controlled document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA signer").replace(/[\r\n]+/g," ").slice(0,160);
@@ -601,6 +600,7 @@ export default {
                 try{await onStage?.(stage,outcome,category,metadata);}catch{}
               };
               try{
+                if(!recipient){const invalid=new Error("Invalid signer email address.");invalid.stageCode="BUILD_MESSAGE";throw invalid;}
                 if(!emailLink){
                   result=await sendInvitationEmail({email:recipient,name,link,smtpSend:async ({to:target,subject:mailSubject,text,html})=>smtpSend(env,{to:target,subject:mailSubject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage}),logger:console});
                 }else if(emailSigningModule==="v2"){
