@@ -48,6 +48,7 @@ import {
   getSigningPdf as getGatewaySigningPdf,
   resendInvitation as resendGatewayInvitation,
   resendAllUnsignedInvitations as resendAllGatewayUnsignedInvitations,
+  retryFailedInvitations as retryFailedGatewayInvitations,
   updateSignerContact as updateGatewaySignerContact
 } from "./signing.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
@@ -580,6 +581,7 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
+            sendDeliveryReport: async ({to,subject,text,html}) => smtpSend(env,{to,subject,text,html}),
             smtpSelfCheck: async () => { const result=await smtpSend(env,{to:resolveSmtpConfiguration(env).from,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
             resolveEmailLinkProfileUid: async (email, signerName) => {
               const normalized=String(email||"").trim().toLowerCase();
@@ -628,6 +630,12 @@ export default {
               const masked=signer?.email?maskEmailForConfirmation(signer.email):"recipient";
               return emailRouteJson({...result,maskedRecipient:masked,confirmationText:"New link sent to "+masked+"...",expiresAtEAT:result.expiresAt?formatEmailLinkExpiryEAT(result.expiresAt):null},200);
             }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
+          }
+          if(request.method==="POST"&&emailPathParts.length===6&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&emailPathParts[5]==="retry-failed"){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{return emailRouteJson(await retryFailedGatewayInvitations(ctx,user,emailPathParts[3]),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Failed invitation retry failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
           }
           if(request.method==="POST"&&emailPathParts.length===6&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&emailPathParts[5]==="resend-all"){
             const user=await ctx.verifyUser(request).catch(()=>null);
@@ -3034,7 +3042,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
       for(const line of lines){
         if(/^\d{3} /.test(line)){
           const code=Number(line.slice(0,3));
-          if(code>=400){const failure=new Error("IRPA SMTP error "+code);failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));throw failure;}
+          if(code>=400){const failure=new Error("IRPA SMTP error "+code);failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));const enhanced=(line.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1];if(enhanced)failure.smtpEnhancedStatusCode=enhanced;throw failure;}
           return line;
         }
       }

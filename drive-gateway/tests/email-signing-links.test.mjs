@@ -14,8 +14,8 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
-import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
+import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry,classifySmtpReplyCategory} from "../src/invitationEmail.mjs";
+import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage,getEnvelopeStatus} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
@@ -126,6 +126,61 @@ test("email invitation has real plain-text newlines and one HTML/plain-text SMTP
   let calls=0;
   await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);return {ok:true};},logger:{warn(){},error(){}}});
   assert.equal(calls,1);
+});
+
+test("SMTP enhanced status codes distinguish policy rejection, invalid recipient and mailbox quota",()=>{
+  assert.equal(classifySmtpReplyCategory(new Error("550 5.7.1 Message rejected by policy")),"POLICY_REJECTED");
+  assert.equal(classifySmtpReplyCategory(new Error("550 5.1.1 Unknown recipient")),"RECIPIENT_REJECTED");
+  assert.equal(classifySmtpReplyCategory(new Error("552 5.2.2 Mailbox full")),"MAILBOX_FULL");
+});
+
+test("failed SMTP invitation stages retain structured diagnostics for the sender report",async()=>{
+  const captured=[];
+  const failure=Object.assign(new Error("IRPA SMTP error 535"),{smtpResponseCode:535,smtpEnhancedStatusCode:"5.7.8",smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH"});
+  await assert.rejects(()=>sendEmailSigningInvitation({
+    email:"signer@gmail.com",name:"Gmail Signer",link:"https://irpa.example.test/?emailSignToken=secret",title:"Board Policy",ownerName:"Document Owner",
+    smtpSend:async ({onStage})=>runEmailStage("SMTP_AUTH",async()=>{throw failure},onStage),
+    onStage:async(stage,outcome,category,diagnostics)=>captured.push({stage,outcome,category,diagnostics}),
+    logger:{error(){}},sleep:async()=>{}
+  }),/535/);
+  const failures=captured.filter(item=>item.outcome==="failure");
+  assert.equal(failures.length,1);
+  assert.deepEqual(failures[0],{stage:"SMTP_AUTH",outcome:"failure",category:"AUTH_FAILED",diagnostics:{stageCode:"SMTP_AUTH",smtpResponseCode:535,smtpEnhancedStatusCode:"5.7.8",errorCode:null,deliveryOutcome:"failed"}});
+});
+
+test("failed invitation delivery generates a dedicated sender report and exposes recipient-level failures",async()=>{
+  const reports=[];
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
+    verifyUser:async()=>null,
+    sendInvitation:async invitation=>{
+      await invitation.onStage("SMTP_AUTH","failure","AUTH_FAILED",{smtpResponseCode:535,smtpEnhancedStatusCode:"5.7.8"});
+      throw Object.assign(new Error("IRPA SMTP error 535"),{stageCode:"SMTP_AUTH",smtpResponseCode:535,smtpEnhancedStatusCode:"5.7.8",smtpReplyCategory:"AUTH_FAILED"});
+    },
+    logger:{error(){}}
+  });
+  ctx.sendDeliveryReport=async report=>reports.push(report);
+  const bytes=new TextEncoder().encode("%PDF-1.7\\nIRPA sender delivery report test");
+  const stored=await ctx.storage.put({path:"source/delivery-report.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  await ctx.meta.create("documents","DOC-DELIVERY-REPORT",{id:"DOC-DELIVERY-REPORT",status:"Stored",ownerUid:"owner",primaryStorageId:stored.id,sha256:await sha256Hex(bytes),fileName:"delivery-report.pdf",title:"Delivery Report Test",classification:"Restricted"});
+  const created=await createEnvelope(ctx,{uid:"owner",email:"owner@example.org",name:"Document Owner",isAdmin:false},{documentId:"DOC-DELIVERY-REPORT",title:"Delivery Report Test",archives:["board-governance"],signingMode:"Sequential",signers:[{identityType:"email-link",email:"signer@gmail.com",name:"Gmail Signer",order:1}],fields:[{fieldId:"SIGN-REPORT",type:"Signature",page:1,x:10,y:10,width:25,height:10,signerId:"S1",required:true}]});
+  assert.equal(reports.length,1);
+  assert.equal(reports[0].to,"owner@example.org");
+  assert.match(reports[0].subject,/email delivery failure report/i);
+  assert.match(reports[0].text,/signer@gmail.com/);
+  assert.match(reports[0].text,/SMTP_AUTH/);
+  assert.match(reports[0].text,/535/);
+  assert.doesNotMatch(JSON.stringify(reports[0]),/emailSignToken|secret/);
+  const status=await getEnvelopeStatus(ctx,{uid:"owner",isAdmin:false},created.envelopeId);
+  assert.equal(status.deliveryReport.failed,1);
+  assert.equal(status.deliveryReport.failures[0].email,"signer@gmail.com");
+  assert.equal(status.deliveryReport.failures[0].smtpReplyCategory,"AUTH_FAILED");
+  assert.equal(status.deliveryReport.failures[0].smtpResponseCode,535);
+  assert.equal(status.deliveryReport.failures[0].deliveryStatus,"Failed");
+  assert.equal(status.deliveryReport.failures[0].deliveryOutcome,"failed");
+  assert.equal(status.deliveryReport.unconfirmed,0);
+  assert.equal(status.deliveryReport.reportStatus,"submitted");
+  assert.equal(status.auditChainValid,true);
 });
 
 test("mail delivery is delegated once to the existing Worker invitation sender", () => {

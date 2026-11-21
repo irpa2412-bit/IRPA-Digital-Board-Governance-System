@@ -418,18 +418,10 @@ async function gatewayAuthenticatedRequest(path, {method="GET",body,contentType=
 
 export async function resendFailedGatewaySignatureInvitations(envelopeId) {
   if (!envelopeId) throw new Error("A Gateway envelope ID is required.");
-  const statusResponse = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId));
-  const status = await statusResponse.json().catch(() => ({}));
-  if (!statusResponse.ok || status.ok === false) throw new Error(status.error || "Unable to retrieve Gateway invitation delivery status.");
-  const failed = (status.signers || []).filter(s => s.invitation === "Failed" || s.invitation === "Pending");
-  const results = [];
-  for (const signer of failed) {
-    const response = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId) + "/invitations/" + encodeURIComponent(signer.id) + "/resend", {method:"POST",body:JSON.stringify({})});
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.ok === false) throw new Error(result.error || ("Invitation retry failed for signer " + signer.id + "."));
-    results.push(result);
-  }
-  return {ok:true,envelopeId,attempted:results.length,results};
+  const response = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId) + "/invitations/retry-failed", {method:"POST",body:JSON.stringify({})});
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok === false) throw new Error(result.error || "Unable to retry failed Gateway invitations.");
+  return result;
 }
 
 export async function createGatewaySignatureEnvelope({envelope,sourceBytes}={}) {

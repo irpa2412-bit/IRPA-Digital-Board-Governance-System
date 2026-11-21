@@ -11,13 +11,17 @@ export async function chainEvents(events,e){const body={...e,prevHash:events.len
 export async function verifyChain(events){if(!Array.isArray(events))return false;let p="GENESIS";for(const e of events){const {hash,...b}=e;if(b.prevHash!==p||await sha256Hex(canonicalJson(b))!==hash)return false;p=hash}return true}
 async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get("envelopes",id);if(!c)throw new HttpError(404,"Envelope not found.");if(!await verifyChain(c.events))throw new HttpError(409,"Signing audit chain failed verification.");const {patch,result}=await fn(c);if(!patch)return result;try{await ctx.meta.update("envelopes",id,patch,{ifVersion:c._v});return result}catch(e){if(!(e instanceof VersionConflict))throw e}}throw new HttpError(409,"Please retry.")}
 const EMAIL_STAGE_SET=new Set(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT","TOKEN_LOOKUP","SESSION_CREATE","PDF_PREVIEW","SIGN_SUBMIT"]);
-export async function recordEmailLinkStage(ctx,envelopeId,signerId,stage,outcome,smtpReplyCategory="UNKNOWN"){
+export async function recordEmailLinkStage(ctx,envelopeId,signerId,stage,outcome,smtpReplyCategory="UNKNOWN",diagnostics={}){
   if(!EMAIL_STAGE_SET.has(stage)||!["success","failure"].includes(outcome))return;
-  const category=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(smtpReplyCategory)?smtpReplyCategory:"UNKNOWN";
+  const category=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","POLICY_REJECTED","UNKNOWN"].includes(smtpReplyCategory)?smtpReplyCategory:"UNKNOWN";
+  const smtpResponseCode=Number(diagnostics?.smtpResponseCode)||null;
+  const smtpEnhancedStatusCode=/^[245]\.\d\.\d{1,3}$/.test(String(diagnostics?.smtpEnhancedStatusCode||""))?String(diagnostics.smtpEnhancedStatusCode):null;
+  const errorCode=/^[A-Z0-9_-]{1,40}$/i.test(String(diagnostics?.errorCode||""))?String(diagnostics.errorCode):null;
+  const deliveryOutcome=["failed","unknown","not-confirmed"].includes(String(diagnostics?.deliveryOutcome||""))?String(diagnostics.deliveryOutcome):"unknown";
   try{
     await mutate(ctx,envelopeId,async current=>{
       if(!(current.signers||[]).some(signer=>signer.id===signerId))return{patch:null};
-      return{patch:{events:await chainEvents(current.events,{type:"email_link.stage",stage,outcome,smtpReplyCategory:category,signerId,at:ctx.now().toISOString()})}};
+      return{patch:{events:await chainEvents(current.events,{type:"email_link.stage",stage,outcome,smtpReplyCategory:category,signerId,...(outcome==="failure"?{smtpResponseCode,smtpEnhancedStatusCode,errorCode,deliveryOutcome}:{}),at:ctx.now().toISOString()})}};
     });
   }catch(error){
     ctx.logger?.error?.("EMAIL_LINK_STAGE_AUDIT_FAILED",{stage,outcome,smtpReplyCategory:category,errorType:String(error?.name||"Error").slice(0,40)});
@@ -26,10 +30,14 @@ export async function recordEmailLinkStage(ctx,envelopeId,signerId,stage,outcome
 function invitationFailureDiagnostics(error){
   const message=String(error?.message||"");
   const smtp=message.match(/IRPA SMTP error (\d{3})/i);
-  const smtpResponseCode=smtp?Number(smtp[1]):null;
+  const smtpResponseCode=smtp?Number(smtp[1]):Number(error?.smtpResponseCode)||null;
+  const enhanced=String(error?.smtpEnhancedStatusCode||((message.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1]||""));
+  const smtpEnhancedStatusCode=/^[245]\.\d\.\d{1,3}$/.test(enhanced)?enhanced:null;
   const errorCode=String(error?.code||"").replace(/[^A-Z0-9_-]/gi,"").slice(0,40)||null;
-  const failureClass=smtpResponseCode!==null?(smtpResponseCode>=500?"permanent-provider-rejection":smtpResponseCode>=400?"temporary-provider-rejection":"provider-response"):error?.deliveryOutcome==="unknown"?"delivery-outcome-unknown":errorCode||/password.*not configured/i.test(message)?"smtp-configuration-or-transport":"smtp-transport-error";
-  return{errorType:String(error?.name||"Error").slice(0,60),errorCode,smtpResponseCode,failureClass,deliveryOutcome:error?.deliveryOutcome==="unknown"?"unknown":"not-confirmed",retryable:error?.retryable===false?false:(smtpResponseCode!==null?smtpResponseCode>=400&&smtpResponseCode<500:true)};
+  const smtpReplyCategory=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","POLICY_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:"UNKNOWN";
+  const deliveryOutcome=error?.deliveryOutcome==="unknown"?"unknown":(smtpResponseCode!==null||error?.stageCode!=="SUBMIT"?"failed":"unknown");
+  const failureClass=smtpResponseCode!==null?(smtpResponseCode>=500?"permanent-provider-rejection":smtpResponseCode>=400?"temporary-provider-rejection":"provider-response"):deliveryOutcome==="unknown"?"delivery-outcome-unknown":errorCode||/password.*not configured/i.test(message)?"smtp-configuration-or-transport":"smtp-transport-error";
+  return{errorType:String(error?.name||"Error").slice(0,60),errorCode,smtpResponseCode,smtpEnhancedStatusCode,smtpReplyCategory,failureClass,deliveryOutcome,retryable:error?.retryable===false?false:(smtpResponseCode!==null?smtpResponseCode>=400&&smtpResponseCode<500:true)};
 }
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d+$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
 async function load(ctx,t){
@@ -55,6 +63,45 @@ async function load(ctx,t){
 }
 function active(ctx,e,s=null){if(["Voided","Declined","Cancelled","Canceled"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");const expiry=s?.tokenExpiresAt||s?.emailLinkExpiresAt||e.expiresAt;if(expiry&&ctx.now().getTime()>new Date(expiry).getTime())throw new HttpError(403,"This signing link has expired.")}
 const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
+function emailDeliveryFailureForSigner(envelope,signer){
+  const events=Array.isArray(envelope?.events)?envelope.events:[];
+  const relevantTypes=new Set(["email_link.issued","invitation.issued","email_link.resent","invitation.resent","invitation.resend.failed"]);
+  let latestIndex=-1;
+  for(let index=events.length-1;index>=0;index--)if(events[index]?.signerId===signer.id&&relevantTypes.has(events[index]?.type)){latestIndex=index;break;}
+  const latest=latestIndex>=0?events[latestIndex]:null;
+  const linkStatus=String(signer.emailLinkStatus||"").trim().toLowerCase();
+  const failed=latest?.type==="invitation.resend.failed"||latest?.deliveryStatus==="Failed"||(!latest&&(signer.invitation==="Failed"||["send failed","failed"].includes(linkStatus)));
+  if(!failed)return null;
+  const stageEvent=events.slice(0,latestIndex>=0?latestIndex+1:events.length).filter(event=>event?.type==="email_link.stage"&&event.signerId===signer.id&&event.outcome==="failure").at(-1)||null;
+  const deliveryOutcome=stageEvent?.deliveryOutcome==="failed"?"failed":stageEvent?.deliveryOutcome==="unknown"?"unknown":(latest?.deliveryStatus==="Failed"||linkStatus==="send failed"?"failed":"unknown");
+  return{signerId:signer.id,name:signer.name||"Signer",email:signer.email||"",deliveryStatus:deliveryOutcome==="failed"?"Failed":"Unconfirmed",deliveryOutcome,stageCode:stageEvent?.stage||latest?.stageCode||signer.deliveryStageCode||"SUBMIT",smtpReplyCategory:stageEvent?.smtpReplyCategory||"UNKNOWN",smtpResponseCode:stageEvent?.smtpResponseCode||null,smtpEnhancedStatusCode:stageEvent?.smtpEnhancedStatusCode||null,errorCode:stageEvent?.errorCode||null,failedAt:latest?.at||stageEvent?.at||null};
+}
+function escapeDeliveryReportHtml(value){return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+async function notifySenderOfFailedDeliveries(ctx,user,envelopeId,signerIds){
+  const uniqueIds=[...new Set((signerIds||[]).filter(Boolean))];
+  if(!uniqueIds.length)return{status:"not-required",failed:0};
+  let envelope;
+  try{envelope=await ctx.meta.get("envelopes",envelopeId);}
+  catch(error){ctx.logger?.error?.("EMAIL_DELIVERY_REPORT_LOOKUP_FAILED",{envelopeId,errorType:String(error?.name||"Error").slice(0,40)});return{status:"unavailable",failed:uniqueIds.length};}
+  if(!envelope)return{status:"unavailable",failed:uniqueIds.length};
+  const failures=uniqueIds.map(id=>envelope.signers.find(signer=>signer.id===id)).filter(Boolean).map(signer=>emailDeliveryFailureForSigner(envelope,signer)||{signerId:signer.id,name:signer.name||"Signer",email:signer.email||"",deliveryStatus:"Failed",deliveryOutcome:"failed",stageCode:signer.deliveryStageCode||"SUBMIT",smtpReplyCategory:"UNKNOWN",smtpResponseCode:null,smtpEnhancedStatusCode:null,errorCode:null,failedAt:ctx.now().toISOString()});
+  if(!failures.length)return{status:"not-required",failed:0};
+  const senderEmail=String(user?.email||"").trim();
+  if(!senderEmail||typeof ctx.sendDeliveryReport!=="function")return{status:"unavailable",failed:failures.length};
+  const reportAt=ctx.now().toISOString();
+  let reportStatus="unavailable";
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)&&typeof ctx.sendDeliveryReport==="function"){
+    const rows=failures.map((failure,index)=>(index+1)+". "+failure.deliveryStatus+": "+failure.name+" <"+failure.email+"> — "+failure.stageCode+"; "+failure.smtpReplyCategory+(failure.smtpResponseCode?" (SMTP "+failure.smtpResponseCode+(failure.smtpEnhancedStatusCode?" / "+failure.smtpEnhancedStatusCode:"")+")":"")+"; "+(failure.failedAt||reportAt));
+    const subject="IRPA e-signature email delivery failure report — "+String(envelope.title||envelope.id).replace(/[\r\n]+/g," ").slice(0,120);
+    const text="Email delivery failure report\n\nDocument: "+String(envelope.title||"Controlled document")+"\nEnvelope: "+envelope.id+"\nReport time: "+reportAt+"\nFailed deliveries: "+failures.filter(failure=>failure.deliveryStatus==="Failed").length+"\nUnconfirmed submissions: "+failures.filter(failure=>failure.deliveryStatus==="Unconfirmed").length+"\n\n"+rows.join("\n")+"\n\nThis report lists only failed or unconfirmed invitation submissions. A successful SMTP acceptance is not proof of inbox placement. No signing links or authentication tokens are included.";
+    const html="<h2>IRPA e-signature email delivery failure report</h2><p><strong>Document:</strong> "+escapeDeliveryReportHtml(envelope.title||"Controlled document")+"<br><strong>Envelope:</strong> "+escapeDeliveryReportHtml(envelope.id)+"<br><strong>Report time:</strong> "+escapeDeliveryReportHtml(reportAt)+"<br><strong>Failed deliveries:</strong> "+failures.filter(failure=>failure.deliveryStatus==="Failed").length+"<br><strong>Unconfirmed submissions:</strong> "+failures.filter(failure=>failure.deliveryStatus==="Unconfirmed").length+"</p><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\"><thead><tr><th>Delivery result</th><th>Recipient</th><th>Failure stage</th><th>Provider response</th><th>Time</th></tr></thead><tbody>"+failures.map(failure=>"<tr><td>"+escapeDeliveryReportHtml(failure.deliveryStatus)+"</td><td>"+escapeDeliveryReportHtml(failure.name)+" &lt;"+escapeDeliveryReportHtml(failure.email)+"&gt;</td><td>"+escapeDeliveryReportHtml(failure.stageCode)+"</td><td>"+escapeDeliveryReportHtml(failure.smtpReplyCategory)+(failure.smtpResponseCode?" — SMTP "+failure.smtpResponseCode:"")+(failure.smtpEnhancedStatusCode?" / "+escapeDeliveryReportHtml(failure.smtpEnhancedStatusCode):"")+"</td><td>"+escapeDeliveryReportHtml(failure.failedAt||reportAt)+"</td></tr>").join("")+"</tbody></table><p>This report lists only failed or unconfirmed invitation submissions. A successful SMTP acceptance is not proof of inbox placement. No signing links or authentication tokens are included.</p>";
+    try{await ctx.sendDeliveryReport({to:senderEmail,subject,text,html});reportStatus="submitted";}
+    catch(error){reportStatus="failed";ctx.logger?.error?.("EMAIL_DELIVERY_REPORT_SEND_FAILED",{envelopeId,errorType:String(error?.name||"Error").slice(0,40),smtpResponseCode:Number(error?.smtpResponseCode)||null});}
+  }
+  try{await mutate(ctx,envelopeId,async current=>({patch:{events:await chainEvents(current.events,{type:"email_delivery_report."+reportStatus,actor:user?.uid||"system",recipientHash:senderEmail?await sha256Hex(senderEmail.toLowerCase()):null,failedSignerIds:failures.filter(failure=>failure.deliveryStatus==="Failed").map(failure=>failure.signerId),failedCount:failures.filter(failure=>failure.deliveryStatus==="Failed").length,unconfirmedCount:failures.filter(failure=>failure.deliveryStatus==="Unconfirmed").length,at:reportAt})}}));}
+  catch(error){ctx.logger?.error?.("EMAIL_DELIVERY_REPORT_AUDIT_FAILED",{envelopeId,errorType:String(error?.name||"Error").slice(0,40)});}
+  return{status:reportStatus,failed:failures.filter(failure=>failure.deliveryStatus==="Failed").length,unconfirmed:failures.filter(failure=>failure.deliveryStatus==="Unconfirmed").length};
+}
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
   if(signer?.identityType==="email-link") return signer.emailLinkSessionStatus==="active"||signer.emailLinkSessionStatus==="used"||signer.emailLinkStatus==="opened";
@@ -217,7 +264,7 @@ export async function createEnvelope(ctx,user,body){
       if(signers[i].id===ownerPreSignSigner.id)signers[i].invitation="Portal";
       continue;
     }
-    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,emailSigningModule:e.emailSigningModule,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signers[i].id,stage,outcome,category)}:{}),expiresAt:signers[i].tokenExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
+    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,emailSigningModule:e.emailSigningModule,...(emailLink?{onStage:(stage,outcome,category,diagnostics)=>recordEmailLinkStage(ctx,id,signers[i].id,stage,outcome,category,diagnostics)}:{}),expiresAt:signers[i].tokenExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";signers[i].deliveryStageCode=EMAIL_STAGE_SET.has(err?.stageCode)?err.stageCode:null;ctx.logger?.error?.("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,...invitationFailureDiagnostics(err),...(signers[i].deliveryStageCode?{stageCode:signers[i].deliveryStageCode}:{})});}}
     else signers[i].invitation="Sent";
   }
@@ -232,6 +279,8 @@ export async function createEnvelope(ctx,user,body){
     }
     return{patch:{signers:updatedSigners,events}};
   });
+  const failedInitialDeliveries=signers.filter(signer=>signer.invitation==="Failed").map(signer=>signer.id);
+  if(failedInitialDeliveries.length)await notifySenderOfFailedDeliveries(ctx,user,id,failedInitialDeliveries);
   const returnTokens=ctx.env?.IRPA_ENVIRONMENT==="staging"&&ctx.env?.IRPA_STAGING_CRYPTO_TEST_MODE==="true"?(body?.returnTokens===true&&signers.every(s=>s.uid===user.uid)):ctx.allowReturnTokens;
   return{ok:true,envelopeId:id,status:ownerPreSignEmail?"Awaiting Owner Signature":"Sent",invitations:signers.map(s=>({signerId:s.id,email:s.email,status:s.invitation,...(s.deliveryStageCode?{stageCode:s.deliveryStageCode}:{})})),...(ownerPreSignSigner?{ownerSigningToken:`${id}.${ownerPreSignSigner.id}.${secrets[ownerPreSignIndex]}`}:{}),...(returnTokens?{tokens:secrets.map((s,i)=>signers[i].order===firstPosition?`${id}.S${i+1}.${s}`:null).filter(Boolean)}:{})};
 }
@@ -380,7 +429,7 @@ export async function retryCompletion(ctx,user,id){const e=await ctx.meta.get("e
 export async function retryCompletedDocumentDistribution(ctx,user,id){return retryFailedSignatureDistributions(ctx,user,id)}
 export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");for(const signer of c.signers||[])if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="used"){signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);signer.emailLinkStatus="revoked";signer.emailLinkSessionStatus="revoked";signer.emailLinkSessionHash=null;}return{patch:{status:"Voided",signers:c.signers,events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
 
-export async function resendInvitation(ctx,user,id,signerId){
+export async function resendInvitation(ctx,user,id,signerId,{sendFailureReport=true}={}){
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
   if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
@@ -408,7 +457,7 @@ export async function resendInvitation(ctx,user,id,signerId){
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.started",signerId,actor:user.uid,at:now.toISOString()})}};
   });
   try{
-    await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,emailSigningModule:envelope.emailSigningModule,expiresAt,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signerId,stage,outcome,category)}:{})});
+    await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,emailSigningModule:envelope.emailSigningModule,expiresAt,...(emailLink?{onStage:(stage,outcome,category,diagnostics)=>recordEmailLinkStage(ctx,id,signerId,stage,outcome,category,diagnostics)}:{})});
   }catch(error){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
     await mutate(ctx,id,async current=>{
@@ -421,6 +470,7 @@ export async function resendInvitation(ctx,user,id,signerId){
       else delete signer.resendAttempt;
       return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:now.toISOString()})}};
     });
+    if(sendFailureReport)await notifySenderOfFailedDeliveries(ctx,user,id,[signerId]);
     const failure=new HttpError(502,"The signing invitation could not be delivered. The previous link remains valid; retry after resolving the delivery error.");failure.code=EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT";throw failure;
   }
   await mutate(ctx,id,async current=>{
@@ -450,10 +500,27 @@ export async function resendAllUnsignedInvitations(ctx,user,id){
   const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed");
   const results=[];
   for(const signer of targets){
-    try{results.push(await resendInvitation(ctx,user,id,signer.id));}
+    try{results.push(await resendInvitation(ctx,user,id,signer.id,{sendFailureReport:false}));}
     catch(error){results.push({ok:false,signerId:signer.id,stageCode:error?.code||"SUBMIT",error:String(error?.message||"Delivery failed.")});}
   }
+  const failedSignerIds=results.filter(item=>item.ok===false).map(item=>item.signerId);
+  if(failedSignerIds.length)await notifySenderOfFailedDeliveries(ctx,user,id,failedSignerIds);
   return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:results.filter(item=>item.ok===false).length,results};
+}
+
+export async function retryFailedInvitations(ctx,user,id){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
+  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed"&&(signer.invitation==="Failed"||["send failed","failed"].includes(String(signer.emailLinkStatus||"").trim().toLowerCase())||emailDeliveryFailureForSigner(envelope,signer)?.deliveryStatus==="Failed"));
+  const results=[];
+  for(const signer of targets){
+    try{results.push(await resendInvitation(ctx,user,id,signer.id,{sendFailureReport:false}));}
+    catch(error){results.push({ok:false,signerId:signer.id,stageCode:error?.code||"SUBMIT",error:String(error?.message||"Delivery failed.")});}
+  }
+  const failedSignerIds=results.filter(item=>item.ok===false).map(item=>item.signerId);
+  if(failedSignerIds.length)await notifySenderOfFailedDeliveries(ctx,user,id,failedSignerIds);
+  return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:failedSignerIds.length,results};
 }
 
 export async function updateSignerContact(ctx,user,id,signerId,{email,name}={}){
@@ -489,7 +556,17 @@ export async function revokeInvitation(ctx,user,id,signerId){
 }
 
 
-export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}const last=e.events?.at(-1)||null;const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>({id:s.id,name:s.name,email:s.email,title:s.title||"",roleAssignments:s.roleAssignments||[],order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation,identityType:s.identityType||"account",emailLinkStatus:s.emailLinkStatus||null,emailLinkSessionStatus:s.emailLinkSessionStatus||null,deliveryStageCode:s.deliveryStageCode||null,emailLinkExpiresAt:s.emailLinkExpiresAt||null,linkExpiresAt:s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt,linkExpired:Boolean((Date.parse(String(s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt||""))||0)<=ctx.now().getTime())})),lastEvent,completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events),distribution:await getSignatureDistributionSummary(ctx,id)}}
+export async function getEnvelopeStatus(ctx,user,id){
+  let e=await ctx.meta.get("envelopes",id);
+  if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");
+  if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}
+  const last=e.events?.at(-1)||null;
+  const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;
+  const failures=e.signers.map(signer=>emailDeliveryFailureForSigner(e,signer)).filter(Boolean);
+  const reportEvent=[...(e.events||[])].reverse().find(event=>String(event.type||"").startsWith("email_delivery_report."))||null;
+  const deliveryReport={failed:failures.filter(item=>item.deliveryStatus==="Failed").length,unconfirmed:failures.filter(item=>item.deliveryStatus==="Unconfirmed").length,failures,reportStatus:reportEvent?String(reportEvent.type).replace("email_delivery_report.",""):"not-sent",reportAt:reportEvent?.at||null};
+  return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>({id:s.id,name:s.name,email:s.email,title:s.title||"",roleAssignments:s.roleAssignments||[],order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation,identityType:s.identityType||"account",emailLinkStatus:s.emailLinkStatus||null,emailLinkSessionStatus:s.emailLinkSessionStatus||null,deliveryStageCode:s.deliveryStageCode||null,emailLinkExpiresAt:s.emailLinkExpiresAt||null,linkExpiresAt:s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt,linkExpired:Boolean((Date.parse(String(s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt||""))||0)<=ctx.now().getTime())})),deliveryReport,lastEvent,completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events),distribution:await getSignatureDistributionSummary(ctx,id)}
+}
 export async function resyncMirror(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status!=="Completed"||!e.externalReference||!e.completion)throw new HttpError(409,"Only completed linked envelopes can be resynchronized.");if(typeof ctx.persistCompletedSignatureEnvelope!=="function")throw new HttpError(503,"Signature mirror persistence is not configured.");await persistMirrorWithStatus(ctx,e,e.completion);const updated=await ctx.meta.get("envelopes",id);return{ok:true,envelopeId:id,status:updated?.status||"Completed",mirrorStatus:updated?.mirrorStatus||"Pending",mirrorError:updated?.mirrorError||null,mirrorAttempts:Number(updated?.mirrorAttempts||0)}}
 export async function persistMirrorWithStatus(ctx,envelope,completion){const id=envelope.id;const now=ctx.now();const nextAt=Number(new Date(envelope.mirrorNextRetryAt||0));if(envelope.mirrorStatus==="Pending"&&Number.isFinite(nextAt)&&nextAt>now.getTime())return false;const attempts=Number(envelope.mirrorAttempts||0)+1;try{await ctx.persistCompletedSignatureEnvelope({envelope,completion});await ctx.meta.update("envelopes",id,{mirrorStatus:"Completed",mirrorError:null,mirrorAttempts:attempts,mirrorNextRetryAt:null,mirrorUpdatedAt:now.toISOString()});return true}catch(error){const message=String(error?.message||error).slice(0,300);const delayMs=Math.min(60*60*1000,30*1000*Math.pow(2,Math.min(attempts-1,7)));try{const latest=await ctx.meta.get("envelopes",id);if(latest)await ctx.meta.update("envelopes",id,{mirrorStatus:"Pending",mirrorError:message,mirrorAttempts:attempts,mirrorNextRetryAt:new Date(now.getTime()+delayMs).toISOString(),mirrorUpdatedAt:now.toISOString()},{ifVersion:latest._v})}catch(statusError){ctx.logger?.error?.("SIGNATURE_MIRROR_STATUS_PERSIST_FAILED",{envelopeId:id,message:String(statusError?.message||statusError).slice(0,200)})}ctx.logger?.error?.("SIGNATURE_PORTAL_COMPLETION_PERSIST_FAILED",{envelopeId:envelope.externalReference,gatewayEnvelopeId:id,message,attempts});return false}}
 export async function getSigningStatus(ctx,token,user=null){const{env,signer}=await load(ctx,token);const privileged=Boolean(user?.uid)&&(user.uid===env.createdBy||user.isAdmin===true);if(!privileged)assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");const completion=env.completion?{finalHash:env.completion.finalHash,completedAt:env.completion.completedAt,primaryStorageId:env.completion.primaryStorageId,fileName:env.completion.fileName,signedFileReference:env.completion.primaryStorageId,files:(env.completion.files||[]).filter(file=>file?.kind==="archive"||(file?.kind==="signer-copy"&&file.signerId===signer.id)),cryptographicEvidenceIds:env.completion.cryptographicEvidenceIds||[]}:null;const distribution=await getSignatureDistributionSummary(ctx,env.id);return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,status:env.status,distribution:{complete:distribution.complete,sent:distribution.sent,total:distribution.total},signingMode:env.signingMode||"Sequential",signer:{id:signer.id,uid:signer.uid||null,status:signer.status},signers:env.signers.map(s=>({id:s.id,uid:privileged||s.id===signer.id?(s.uid||null):null,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),completion,eventCount:env.events.length,auditChainValid:await verifyChain(env.events)}}

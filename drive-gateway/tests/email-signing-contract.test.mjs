@@ -8,7 +8,7 @@ import {
   formatEmailLinkExpiryEAT, EMAIL_SIGNING_ALREADY_SIGNED, EMAIL_SIGNING_RESEND_STATUSES
 } from "../src/emailSigning/index.mjs";
 import { inspectEmailSigningToken } from "../src/emailSigningLinks.mjs";
-import { resendAllUnsignedInvitations, resendInvitation, updateSignerContact, chainEvents } from "../src/signing.mjs";
+import { resendAllUnsignedInvitations, retryFailedInvitations, resendInvitation, updateSignerContact, chainEvents } from "../src/signing.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
 const NOW = new Date("2026-11-20T17:00:00.000Z");
@@ -191,6 +191,18 @@ test("bulk resend delivers a separate replacement link for every unsigned signer
   const saved=await f.ctx.meta.get("envelopes",f.record.id);
   for(let index=0;index<7;index++)assert.equal(saved.signers[index].emailLinkStatus,"issued",statuses[index]);
   assert.equal(saved.signers[7].emailLinkStatus,"used");
+});
+
+test("failure-only retry resends failed invitations without rotating healthy unsigned links",async()=>{
+  const f=await resendContext([{id:"S1",email:"failed@example.org",emailLinkStatus:"send failed"},{id:"S2",email:"healthy@example.org",emailLinkStatus:"issued"}]);
+  const result=await retryFailedInvitations(f.ctx,{uid:"owner-uid",email:"owner@example.org"},f.record.id);
+  assert.equal(result.attempted,1);
+  assert.equal(result.sent,1);
+  assert.equal(result.failed,0);
+  assert.equal(f.sent.length,1);
+  const saved=await f.ctx.meta.get("envelopes",f.record.id);
+  assert.equal(saved.signers[0].emailLinkStatus,"issued");
+  assert.equal(saved.signers[1].emailLinkStatus,"issued");
 });
 
 test("actual resend is blocked after signer completion",async()=>{
