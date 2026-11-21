@@ -329,11 +329,10 @@ export default function SignaturePathwaySelfTest() {
         new Promise((_, reject) => window.setTimeout(() => reject(new Error("Self-test document query timed out after 60 seconds.")), 60000))
       ]);
       const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
-      setCursor(snapshot.docs.at(-1) || cursor);
-      setHasMore(snapshot.docs.length === 20);
+      const nonFileRows = rows.filter(item => classifySelfTestRecord(item) === "NON_FILE_RECORD");
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
       setProgress({ completed: 0, total: documentRows.length, active: 0 });
-      const output = rows.filter(item => classifySelfTestRecord(item) === "NON_FILE_RECORD").map(item => diagnosticRow(item, {}));
+      const output = nonFileRows.map(item => diagnosticRow(item, {}));
       const batch = await runSequentialSelfTestBatch(documentRows, async (item, signal) => {
         const response = await selfTestReconcileDocument(item, { signal });
         if (!Array.isArray(response.results) || response.results.length !== 1 ||
@@ -379,6 +378,9 @@ export default function SignaturePathwaySelfTest() {
       }
       pageRows.push(...output);
       setResults(pageRows);
+      const processedCount = nonFileRows.length + batch.results.length;
+      if (processedCount > 0) setCursor(snapshot.docs[processedCount - 1] || cursor);
+      setHasMore(snapshot.docs.length === 20 || processedCount < snapshot.docs.length);
       const finished = batch.results.length >= documentRows.length;
       setMessage(batch.cancelled || cancelledRef.current ? "Self-test cancelled safely. No signing state was changed."
         : batch.timedOut && !finished ? "60-second run limit reached. Select Run next 20 to continue."
