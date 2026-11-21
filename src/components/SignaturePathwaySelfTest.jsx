@@ -240,14 +240,14 @@ export default function SignaturePathwaySelfTest() {
       const diagnostics = await runControlledDocumentDiagnosticBatch(
         documentRows,
         async (oneDocument, options) => {
-          const response = await reconcileSignatureDocumentIds(oneDocument, options);
+          const response = await reconcileSignatureDocumentIds(oneDocument, options, { redirect: "error" });
           const item = oneDocument[0];
           const result = response.results[0];
           let pdfPageCheck;
           try {
             const fileId = result.fileId || driveFileId(item);
             if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
-            const bytes = await downloadControlledDocumentBytes(fileId, item.documentId);
+            const bytes = await downloadControlledDocumentBytes(fileId, item.documentId, { redirect: "error" });
             const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
             const pages = [];
             try {
