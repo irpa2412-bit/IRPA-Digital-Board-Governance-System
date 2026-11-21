@@ -30,7 +30,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   const fail = (reason) => ({ ok: false, affected: [...affected].sort(), protectedFiles, reason });
   if (!record || record.status !== "complete") return fail("A completed Change Record is required.");
   if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.");
-  const openedAt = Date.parse(windowState.openedAt);
+  const openedAt = Date.parse(windowState.reopenedAt || windowState.openedAt);
   const activities = [...new Set([...(activityTimestamps ?? []), ...(latestActivityAt ? [latestActivityAt] : [])])]
     .map(Date.parse).filter((time) => Number.isFinite(time) && time >= openedAt).sort((a, b) => a - b);
   if (!Number.isFinite(openedAt) || !activities.length) return fail("No repair activity is recorded after the current window declaration.");
@@ -40,22 +40,31 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
     previousActivity = activityTime;
   }
   if (now - previousActivity >= HOURS_24) return fail("Repair window automatically closed after 24 consecutive hours without activity.");
+  const amendment = affected.has("Meeting Portal") && record.meetingAmendment
+    ? record.meetingAmendment
+    : record.activeAmendment;
+  const validation = amendment?.validation ?? record.validation;
+  const baseline = amendment?.baseline ?? record.baseline;
+  const declaredFiles = [...(record.declaration?.files ?? []), ...(amendment?.files ?? [])];
   const scope = windowState.scope ?? [];
   const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
   if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
-  const declaredFiles = [...(record.declaration?.files ?? []), ...(record.activeAmendment?.files ?? [])];
   const missingDeclarations = protectedFiles.filter((file) => !declaredFiles.some((p) => isWithin(file, p)));
   if (missingDeclarations.length) return fail("Change Record omits changed files: " + missingDeclarations.join(", "));
-  const declaredPortals = new Set(record.declaration?.affectedPortals ?? []);
+  const declaredPortals = new Set([...(record.declaration?.affectedPortals ?? []), ...(amendment?.affectedPortals ?? [])]);
   const missingPortals = [...affected].filter((portal) => !declaredPortals.has(portal));
   if (missingPortals.length) return fail("Change Record omits affected portals: " + missingPortals.join(", "));
-  if (!record.declaration?.reason || !record.declaration?.expectedEffect || !Array.isArray(record.declaration?.prohibitedChanges) || !record.declaration.prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.");
-  if (!record.baseline?.commit || !record.baseline?.rollbackCommit) return fail("Baseline and rollback commits are mandatory.");
-  if (record.validation?.baselineSmoke !== "PASS" || record.validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.");
-  const smoke = record.validation?.portalSmoke ?? {};
+  const reason = amendment?.reason || record.declaration?.reason;
+  const expectedEffect = amendment?.expectedEffect || record.declaration?.expectedEffect;
+  const prohibitedChanges = amendment?.prohibitedChanges || record.declaration?.prohibitedChanges;
+  if (!reason || !expectedEffect || !Array.isArray(prohibitedChanges) || !prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.");
+  if (!baseline?.commit || !baseline?.rollbackCommit) return fail("Baseline and rollback commits are mandatory.");
+  if (validation?.baselineSmoke !== "PASS" || validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.");
+  const smoke = validation?.portalSmoke ?? {};
   const missingSmoke = [...affected].filter((portal) => smoke[portal] !== "PASS");
   if (missingSmoke.length) return fail("Missing passing smoke evidence for: " + missingSmoke.join(", "));
-  if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
+  if (!Array.isArray(validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
+  if (affected.has("Meeting Portal") && (!Array.isArray(validation?.evidence) || validation.evidence.length === 0)) return fail("Meeting Portal amendment must include linked validation evidence.");
   return { ok: true, affected: [...affected].sort(), protectedFiles, reason: "Protected changes are declared and within the active repair window." };
 }
 
