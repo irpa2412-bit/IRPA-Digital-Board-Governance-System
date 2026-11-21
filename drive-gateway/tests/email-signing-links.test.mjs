@@ -144,7 +144,7 @@ test("email-link invitations retry transient SMTP 4xx responses but do not retry
   await assert.rejects(()=>sendWithRetry(async()=>{attempts++;throw new Error("IRPA SMTP error 550");},{sleep:async()=>{},logger:{error(){}}}),/550/);
   assert.equal(attempts,1,"permanent recipient rejection is not retried");
   const source=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
-  assert.match(source,/return sendInvitationWithRetry\(\(\)=>smtpSend\(env,\{to,subject,text,html,onStage\}\),\{logger:console\}\);/);
+  assert.match(source,/return sendInvitationWithRetry\(\(\)=>smtpSend\(env,\{to,subject,text,html,fromName:"IRPA Digital Signing",onStage\}\),\{logger:console\}\);/);
 });
 
 test("profile lookup errors and a 3-second timeout never block an unregistered signer invitation",async()=>{
