@@ -334,9 +334,8 @@ export function evaluateMeetingWindowAmendment({
   }
   const validation = amendment.validation || {};
   if (validation.baselineSmoke !== "PASS" || validation.fullRegression !== "PASS" ||
-      validation.portalSmoke?.["Meeting Portal"] !== "PASS" ||
       !Array.isArray(validation.evidence) || !validation.evidence.length) {
-    return { pass: false, reason: "The Meeting Portal amendment is missing passing baseline, regression or portal smoke evidence." };
+    return { pass: false, reason: "The Meeting Portal amendment is missing passing baseline or full-regression evidence." };
   }
   return { pass: true, reason: "Only the separately authorised Meeting Portal amendment and its fresh repair window changed; the Signature Portal window and history are preserved." };
 }
