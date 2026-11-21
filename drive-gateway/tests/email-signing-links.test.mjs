@@ -348,16 +348,16 @@ test("production signing mail uses a signer-position subject, IRPA signing sende
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
-  assert.match(worker,/@irpa\\.or\\.tz/);
-  assert.match(mime,/Content-Type: text\\/plain; charset=UTF-8/);
-  assert.match(mime,/Content-Type: text\\/html; charset=UTF-8/);
-  assert.match(mime,/Content-Type: multipart\\/alternative/);
+  assert.match(worker,/@irpa\.or\.tz/);
+  assert.match(mime,/Content-Type: text\/plain; charset=UTF-8/);
+  assert.match(mime,/Content-Type: text\/html; charset=UTF-8/);
+  assert.match(mime,/Content-Type: multipart\/alternative/);
 });
 
 test("owner/admin SMTP self-check accepts a typed recipient and rejects other roles before sending",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
-  assert.match(worker,/const body=await request\\.json\\(\\)\\.catch\\(\\(\\)=>null\\)/);
-  assert.match(worker,/const to=validateRecipient\\(body\\?\\.to\\)/);
-  assert.match(worker,/!active\\|\\|!\\["administrator","owner"\\]\\.includes\\(role\\)/);
+  assert.match(worker,/const body=await request\.json\(\)\.catch\(\(\)=>null\)/);
+  assert.match(worker,/const to=validateRecipient\(body\?\.to\)/);
+  assert.match(worker,/!active\|\|!\["administrator","owner"\]\.includes\(role\)/);
   assert.match(worker,/messageId,stages/);
 });
