@@ -518,7 +518,65 @@ export async function revokeInvitation(ctx,user,id,signerId){
 }
 
 
-export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}const last=e.events?.at(-1)||null;const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>({id:s.id,name:s.name,email:s.email,title:s.title||"",roleAssignments:s.roleAssignments||[],order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation,identityType:s.identityType||"account",emailLinkStatus:s.emailLinkStatus||null,emailLinkSessionStatus:s.emailLinkSessionStatus||null,deliveryStageCode:s.deliveryStageCode||null,emailLinkExpiresAt:s.emailLinkExpiresAt||null,linkExpiresAt:s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt,linkExpired:Boolean((Date.parse(String(s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt||""))||0)<=ctx.now().getTime())})),lastEvent,completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events),distribution:await getSignatureDistributionSummary(ctx,id)}}
+function signerInvitationDelivery(envelope,signer){
+  const events=envelope.events||[];
+  const stages=events.map((event,index)=>({event,index})).filter(item=>item.event?.type==="email_link.stage"&&item.event.signerId===signer.id);
+  const lastStage=stages.at(-1)||null;
+  const lastSubmit=[...stages].reverse().find(item=>item.event.stage==="SUBMIT")||null;
+  const failed=Boolean(lastStage&&lastStage.event.outcome==="failure"&&(!lastSubmit||lastStage.index>lastSubmit.index));
+  const accepted=Boolean(lastSubmit&&lastSubmit.event.outcome==="success"&&(!lastStage||lastStage.index<=lastSubmit.index));
+  const handoff=events.filter(event=>event?.signerId===signer.id&&String(event.type||"").startsWith("email_link.handoff.")).at(-1)||null;
+  const status=failed?"Failed":accepted?"Accepted by mail server":signer.invitation==="Sent"?"Sent":signer.invitation==="Failed"?"Failed":"Pending";
+  const evidence=failed?lastStage?.event:lastSubmit?.event||lastStage?.event||null;
+  return {
+    status,
+    stageCode:failed?lastStage.event.stage:accepted?"SUBMIT":lastStage?.event.stage||signer.deliveryStageCode||null,
+    smtpReplyCategory:evidence?.smtpReplyCategory||null,
+    smtpReplyCode:evidence?.smtpReplyCode||null,
+    smtpReply:evidence?.smtpReply||null,
+    acceptedAt:accepted?lastSubmit.event.at||null:null,
+    attemptedAt:lastStage?.event.at||null,
+    messageId:evidence?.messageId||null,
+    handoffStatus:handoff?String(handoff.type).replace("email_link.handoff.",""):null,
+    handoffFromSignerId:handoff?.fromSignerId||null,
+    handoffAt:handoff?.at||null
+  };
+}
+
+export async function getEnvelopeStatus(ctx,user,id){
+  let e=await ctx.meta.get("envelopes",id);
+  if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");
+  if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){
+    await persistMirrorWithStatus(ctx,e,e.completion);
+    e=await ctx.meta.get("envelopes",id)||e;
+  }
+  const last=e.events?.at(-1)||null;
+  const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;
+  return {
+    ok:true,
+    envelopeId:id,
+    documentId:e.documentId,
+    status:e.status,
+    mirrorStatus:e.mirrorStatus||null,
+    mirrorError:e.mirrorError||null,
+    mirrorAttempts:Number(e.mirrorAttempts||0),
+    signers:e.signers.map(s=>({
+      id:s.id,name:s.name,email:s.email,title:s.title||"",roleAssignments:s.roleAssignments||[],
+      order:s.order,status:s.status,signedAt:s.signedAt||null,invitation:s.invitation,
+      identityType:s.identityType||"account",emailLinkStatus:s.emailLinkStatus||null,
+      emailLinkSessionStatus:s.emailLinkSessionStatus||null,deliveryStageCode:s.deliveryStageCode||null,
+      delivery:signerInvitationDelivery(e,s),
+      emailLinkExpiresAt:s.emailLinkExpiresAt||null,
+      linkExpiresAt:s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt,
+      linkExpired:Boolean((Date.parse(String(s.tokenExpiresAt||s.emailLinkExpiresAt||e.expiresAt||""))||0)<=ctx.now().getTime())
+    })),
+    lastEvent,
+    completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,
+    eventCount:e.events.length,
+    auditChainValid:await verifyChain(e.events),
+    distribution:await getSignatureDistributionSummary(ctx,id)
+  };
+}
 export async function resyncMirror(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status!=="Completed"||!e.externalReference||!e.completion)throw new HttpError(409,"Only completed linked envelopes can be resynchronized.");if(typeof ctx.persistCompletedSignatureEnvelope!=="function")throw new HttpError(503,"Signature mirror persistence is not configured.");await persistMirrorWithStatus(ctx,e,e.completion);const updated=await ctx.meta.get("envelopes",id);return{ok:true,envelopeId:id,status:updated?.status||"Completed",mirrorStatus:updated?.mirrorStatus||"Pending",mirrorError:updated?.mirrorError||null,mirrorAttempts:Number(updated?.mirrorAttempts||0)}}
 export async function persistMirrorWithStatus(ctx,envelope,completion){const id=envelope.id;const now=ctx.now();const nextAt=Number(new Date(envelope.mirrorNextRetryAt||0));if(envelope.mirrorStatus==="Pending"&&Number.isFinite(nextAt)&&nextAt>now.getTime())return false;const attempts=Number(envelope.mirrorAttempts||0)+1;try{await ctx.persistCompletedSignatureEnvelope({envelope,completion});await ctx.meta.update("envelopes",id,{mirrorStatus:"Completed",mirrorError:null,mirrorAttempts:attempts,mirrorNextRetryAt:null,mirrorUpdatedAt:now.toISOString()});return true}catch(error){const message=String(error?.message||error).slice(0,300);const delayMs=Math.min(60*60*1000,30*1000*Math.pow(2,Math.min(attempts-1,7)));try{const latest=await ctx.meta.get("envelopes",id);if(latest)await ctx.meta.update("envelopes",id,{mirrorStatus:"Pending",mirrorError:message,mirrorAttempts:attempts,mirrorNextRetryAt:new Date(now.getTime()+delayMs).toISOString(),mirrorUpdatedAt:now.toISOString()},{ifVersion:latest._v})}catch(statusError){ctx.logger?.error?.("SIGNATURE_MIRROR_STATUS_PERSIST_FAILED",{envelopeId:id,message:String(statusError?.message||statusError).slice(0,200)})}ctx.logger?.error?.("SIGNATURE_PORTAL_COMPLETION_PERSIST_FAILED",{envelopeId:envelope.externalReference,gatewayEnvelopeId:id,message,attempts});return false}}
 export async function getSigningStatus(ctx,token,user=null){const{env,signer}=await load(ctx,token);const privileged=Boolean(user?.uid)&&(user.uid===env.createdBy||user.isAdmin===true);if(!privileged)assertSignerAuthentication(signer,user);if(!await verifyChain(env.events))throw new HttpError(409,"Signing audit chain failed verification.");const completion=env.completion?{finalHash:env.completion.finalHash,completedAt:env.completion.completedAt,primaryStorageId:env.completion.primaryStorageId,fileName:env.completion.fileName,signedFileReference:env.completion.primaryStorageId,files:(env.completion.files||[]).filter(file=>file?.kind==="archive"||(file?.kind==="signer-copy"&&file.signerId===signer.id)),cryptographicEvidenceIds:env.completion.cryptographicEvidenceIds||[]}:null;const distribution=await getSignatureDistributionSummary(ctx,env.id);return{ok:true,envelopeId:env.id,externalReference:env.externalReference||null,documentId:env.documentId,status:env.status,distribution:{complete:distribution.complete,sent:distribution.sent,total:distribution.total},signingMode:env.signingMode||"Sequential",signer:{id:signer.id,uid:signer.uid||null,status:signer.status},signers:env.signers.map(s=>({id:s.id,uid:privileged||s.id===signer.id?(s.uid||null):null,name:s.name,order:s.order,status:s.status,signedAt:s.signedAt||null})),completion,eventCount:env.events.length,auditChainValid:await verifyChain(env.events)}}
