@@ -233,11 +233,11 @@ test("participant creation and field assignment are performed inside the PDF pal
 test("duplicate participant identities are reused and rapid repeated add actions are locked before asynchronous work", () => {
   const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner, "the palette participant handler must exist");
-  assert.match(addSigner[1], /const duplicate=registered\?recipients\.find\(x=>x\.uid===registered\.uid\):null/);
+  assert.match(addSigner[1], /findRegisteredSignerDuplicate\(recipients,registered\?\.uid\)/);
   assert.match(addSigner[1], /Random per-participant key/);
   assert.doesNotMatch(addSigner[1], /emailHash\.slice\(0,24\)/);
   assert.match(addSigner[1], /const existingAssignments=Array\.isArray\(duplicate\.roleAssignments\)/);
-  assert.match(addSigner[1], /const sameAssignment=existingAssignments\.some/);
+  assert.match(addSigner[1], /hasSignerResponsibility\(existingAssignments,assignment\)/);
   assert.match(addSigner[1], /The existing responsibility was selected; no duplicate was created/);
   assert.match(addSigner[1], /roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
   assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
