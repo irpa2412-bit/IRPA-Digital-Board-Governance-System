@@ -505,3 +505,16 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
   assert.match(mail,/Content-Type: text\/plain; charset=UTF-8/);
   assert.match(mail,/Content-Type: text\/html; charset=UTF-8/);
 });
+
+
+test("failed invitation audit includes both the failure stage code and SMTP reply category",()=>{
+  const audit=buildSigningInvitationAuditMessage({
+    recipientPrefix:"abc",position:2,positionCount:3,title:"Board Policy",
+    envelopeId:"ENV-FAIL-AUDIT",messageId:"<failed@irpa.or.tz>",
+    smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",at:NOW
+  });
+  assert.equal(audit.subject,"AUDIT: invitation to abc... position 2 of 3 - Board Policy");
+  assert.match(audit.text,/Stage code: SMTP_AUTH/);
+  assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
+  assert.doesNotMatch(audit.text,/abc@example\\.com|emailSignToken|https?:\\/\\//);
+});
