@@ -1,11 +1,6 @@
 {
-  "result": {
-    "content": "{\n  \"schemaVersion\": 1,\n  \"status\": \"complete\",\n  \"declaration\": {\n    \"affectedPortals\": [\n      \"Board Members Portal\",\n      \"Communication and Media Portal\",\n      \"Grants Intelligence and Funding Opportunities Portal\",\n      \"Invitation Portal\",\n      \"Meeting Portal\",\n      \"Members and Employees Portal\",\n      \"Signature Portal\"\n    ],\n    \"reason\": \"Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.\",\n    \"files\": [\n      \"src/components/SignaturePathwaySelfTest.jsx\",\n      \"tests/signature-self-test-session-safety.test.mjs\",\n      \"package.json\",\n      \"drive-gateway/tests/signature-workflow-draft-route.test.mjs\",\n      \".github/workflows/email-signing-contract.yml\",\n      \"tests/signature-pathway-contract.test.mjs\"\n    ],\n    \"expectedEffect\": \"The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.\",\n    \"prohibitedChanges\": [\n      \"Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.\",\n      \"Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.\",\n      \"Do not change Firestore rules, indexes, production records, signing permissions or authentication/session lifecycle.\",\n      \"Do not deploy production resources as part of this merge.\"\n    ]\n  },\n  \"repairWindow\": {\n    \"openedAt\": \"2026-11-20T09:18:00Z\",\n    \"lastActivityAt\": \"2026-11-20T09:23:00Z\",\n    \"emergency\": false\n  },\n  \"baseline\": {\n    \"commit\": \"21f33960395e09d9da74f030732e43558eac6e6d\",\n    \"rollbackCommit\": \"21f33960395e09d9da74f030732e43558eac6e6d\"\n  },\n  \"validation\": {\n    \"baselineSmoke\": \"PASS\",\n    \"portalSmoke\": {\n      \"Board Members Portal\": \"PASS\",\n      \"Communication and Media Portal\": \"PASS\",\n      \"Grants Intelligence and Funding Opportunities Portal\": \"PASS\",\n      \"Invitation Portal\": \"PASS\",\n      \"Meeting Portal\": \"PASS\",\n      \"Members and Employees Portal\": \"PASS\",\n      \"Signature Portal\": \"PASS\"\n    },\n    \"dependentSmoke\": {\n      \"Signature owner profile and independent submission regression\": \"PASS — CI run 44870080649 complete root test suite; browser signature ceremony tests in run 44870080291\",\n      \"Meeting Portal shared-component regression\": \"PASS — CI run 44870080649 complete root test suite\",\n      \"Production application build\": \"PASS — CI run 44870080649\",\n      \"Complete root test suite\": \"PASS — CI run 44870080649\"\n    },\n    \"fullRegression\": \"PASS\",\n    \"behaviourDifferences\": [\n      \"Owner Signature Profile assets now use the owner-authorized Drive download route rather than the envelope-scoped signer route that requires documentId and envelopeId.\",\n      \"Envelope-scoped signature-file retrieval remains unchanged for actual signing.\",\n      \"Prepare Envelope submit and save-draft controls are moved to a separate sticky control bar above the PDF designer/navigation.\",\n      \"No Meeting Portal workflow behavior is changed.\",\n      \"The main Signature Pathway Self-Test no longer automatically runs the separate Google Drive token-refresh health request; the operator can still run it explicitly.\",\n      \"Self-test-only Gateway reconciliation and controlled-document download requests reject redirects rather than following an interactive login gateway.\",\n      \"The existing diagnostic contract test now asserts the self-test-specific Gateway request helper and redirect rejection.\"\n    ],\n    \"evidence\": [\n      \"Verified production frontend baseline before this repair: main commit 21f33960395e09d9da74f030732e43558eac6e6d.\",\n      \"Complete root test suite and application build passed in CI run 44870080649.\",\n      \"Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.\",\n      \"Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx.\",\n      \"PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair.\",\n      \"Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite.\",\n      \"Seven-portal protection smoke tests passed in email-signing-contract CI run 44881398093 (job step: Run seven-portal protection smoke tests); the self-test component at this point already contained the final self-test-only Gateway request isolation. A later commit only updated a legacy source-contract assertion and governance documentation.\",\n      \"The dedicated self-test session-safety regression is now an explicit step in .github/workflows/email-signing-contract.yml and runs after frontend dependency installation.\"\n    ]\n  },\n  \"closure\": {\n    \"closedAt\": \"\",\n    \"updatedBaselineCommit\": \"\"\n  },\n  \"activeAmendment\": {\n    \"status\": \"open\",\n    \"operation\": \"shared-mailbox-signing-invitation-delivery\",\n    \"affectedPortals\": [\n      \"Signature Portal\"\n    ],\n    \"reason\": \"Owner-authorised 24-hour repair of typed signer-address routing for envelope creation, parallel invitations, signer-specific resend and resend-all, SMTP delivery recording, privacy-safe audit email and per-signer delivery visibility.\",\n    \"files\": [\n      \"drive-gateway/src/index.js\",\n      \"drive-gateway/src/invitationEmail.mjs\",\n      \"drive-gateway/src/signing.mjs\",\n      \"drive-gateway/tests/email-signing-contract.test.mjs\",\n      \"drive-gateway/tests/email-signing-links.integration.test.mjs\",\n      \"drive-gateway/tests/email-signing-links.test.mjs\",\n      \"src/pages/SignaturePlatform.jsx\",\n      \"tests/signature-workflow-policy.test.mjs\",\n      \"scripts/portal-protection-check.mjs\",\n      \"tests/portal-protection-policy.test.mjs\",\n      \"docs/portal-protection/repair-window.json\"\n    ],\n    \"expectedEffect\": \"The typed signer-row address, trimmed and lower-cased, is the sole recipient source. SMTP RCPT TO and the single-recipient To header are identical. Parallel mode sends independently to every signer position; resend and resend-all use each signer record's own address. Every invitation has a unique Message-ID, text and HTML parts, the IRPA Digital Signing From name and a position-specific subject. One best-effort audit email per final SMTP outcome records EAT time, envelope, position, Message-ID, creation/resend, reply category or stage code, and only the first three local-part characters plus full recipient domain. The per-signer panel displays Not sent, Sent, Accepted by the mail server with category/time, or Failed with stage code; no Delivered label.\",\n    \"repairWindow\": {\n      \"openedAt\": \"2026-11-21T09:57:28Z\",\n      \"closesAt\": \"2026-11-22T09:57:28Z\",\n      \"durationHours\": 24,\n      \"rollbackCommit\": \"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd\"\n    },\n    \"prohibitedChanges\": [\n      \"Signing rules, token format/hash custody, link format, sessions, signer identity, resend eligibility/rules or field assignment.\",\n      \"PDF stamping, document hash, certificate, archive logic or completed PDFs.\",\n      \"Firestore rules, secrets, environment variables, SMTP settings, credentials or Worker bindings.\",\n      \"Authentication/authorization rules, GitHub branch protection, or any policy bypass.\",\n      \"Self-test crash handling, Meeting Portal behavior, hash verification, rebuild or unrelated portals.\"\n    ],\n    \"ownerInstruction\": \"Complete PR #836 only. Always use the typed signer-row address after trimming and lower-casing. Never substitute a Signature Profile, registered-account, owner or previous-signer email. Preserve signer identity and all signing/token/session/resend semantics. Keep existing branch-protection and portal-protection enforcement; no policy bypass.\",\n    \"supersededAmendment\": {\n      \"status\": \"open\",\n      \"operation\": \"signature-self-test-crash-safety-and-email-signer-delivery\",\n      \"affectedPortals\": [\n        \"Signature Portal\"\n      ],\n      \"reason\": \"Owner-authorised 48-hour repair following a workspace crash immediately after the administrator pressed SELF-TEST. Treat unbounded full-collection reads, concurrent controlled-PDF downloads/page rendering and unvalidated Gateway response rendering in reconcile() as the proven cause. Also deliver per-signer SMTP acceptance visibility and verify sequential next-position invitations for shared email addresses.\",\n      \"files\": [\n        \"src/components/SignaturePathwaySelfTest.jsx\",\n        \"src/components/SignaturePathwaySelfTestErrorBoundary.jsx\",\n        \"src/components/SignatureDeliveryPanel.jsx\",\n        \"src/pages/SignaturePlatform.jsx\",\n        \"src/main.jsx\",\n        \"src/App.jsx\",\n        \"drive-gateway/src/index.js\",\n        \"drive-gateway/src/signing.mjs\",\n        \"drive-gateway/src/emailSigning/\",\n        \"drive-gateway/src/emailSigningLinks.mjs\",\n        \"drive-gateway/tests/\",\n        \"tests/signature-self-test-session-safety.test.mjs\",\n        \"tests/browser/\",\n        \"tests/email-signing-contract.test.mjs\",\n        \"tests/signature-pathway-contract.test.mjs\",\n        \"package.json\",\n        \".github/workflows/email-signing-contract.yml\",\n        \".github/workflows/startup-smoke.yml\",\n        \"scripts/\",\n        \"docs/portal-protection/change-record.json\",\n        \"docs/portal-protection/repair-window.json\",\n        \"docs/portal-protection/portal-register.json\",\n        \"docs/regression/\"\n      ],\n      \"expectedEffect\": \"The self-test is isolated by its own error boundary; processes at most 20 documents per page one at a time, renders only first PDF page at reduced scale, releases resources, supports cancellation and enforces 15-second per-document and 60-second total limits. Gateway responses are shape/length validated and sanitised. Startup ignores/clears legacy self-test result data and displays only a short safe code plus module name on startup errors. Delivery UI reports per-signer SMTP acceptance/failure without claiming delivery; sequential next signer receives a distinct invitation per signer position.\",\n      \"repairWindow\": {\n        \"openedAt\": \"2026-11-21T09:30:33Z\",\n        \"closesAt\": \"2026-11-23T09:30:33Z\",\n        \"durationHours\": 48,\n        \"rollbackCommit\": \"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd\",\n        \"rollbackCommitEvidence\": \"Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.\",\n        \"frontendRollbackCommit\": \"eb68a06fdd04454b0e73d2dc9c010eae5519f458\"\n      },\n      \"prohibitedChanges\": [\n        \"Do not change signing rules, signer identity, invitation token format/hash custody, session lifecycle, resend rules or field assignment.\",\n        \"Do not change PDF stamping, document hash, certificate, archive logic, completed PDFs or existing signing records.\",\n        \"Do not change Firestore rules or indexes, secrets, environment variables, SMTP settings, credentials or Worker bindings.\",\n        \"Do not expose tokens, secrets, recipient-private data or full exception payloads in startup/self-test error UI.\",\n        \"Do not bypass branch protection or deploy a historical whole-application/Gateway rollback.\",\n        \"Self-test may perform read-only checks or send at most one explicit test email to the typed address; it must not mutate signing state.\"\n      ],\n      \"ownerInstruction\": \"Complete PR A, PR B and PR C without asking the owner to interact with GitHub. Do not bypass branch protection. Never change signing rules, tokens, sessions, signer identity, resend rules, field assignment, stamping, PDF, hash, certificate, archive logic, Firestore rules, secrets, environment variables or SMTP settings. Use CI headless browser/emulator tests; never log in to production.\",\n      \"supersededAmendment\": {\n        \"status\": \"open\",\n        \"operation\": \"restore-pre-11-eat-baseline\",\n        \"affectedPortals\": [\n          \"Signature Portal\"\n        ],\n        \"reason\": \"Restore the Email-link E-signature source and routing to the exact state deployed before 11:00 EAT on 20 Nov 2026. The verified production Gateway deployment at 09:49:57 EAT used commit eb04405; the immediately preceding source snapshot 8bfa67 is byte-identical for all restored signature files.\",\n        \"cutoffEAT\": \"2026-11-20T11:00:00+03:00\",\n        \"targetProductionWorkerCommit\": \"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd\",\n        \"targetSourceSnapshot\": \"8bfa67b2a8757519befb2f6be1074c0f34457c99\",\n        \"files\": [\n          \"drive-gateway/src/signing.mjs\",\n          \"drive-gateway/src/router.mjs\",\n          \"drive-gateway/src/index.js\",\n          \"src/pages/EmailSigningReadOnlyPage.jsx\",\n          \"src/pages/SignaturePlatform.jsx\",\n          \"drive-gateway/src/emailSigning/index.mjs\",\n          \"drive-gateway/tests/email-signing-contract.test.mjs\",\n          \".github/workflows/email-signing-contract.yml\",\n          \"drive-gateway/tests/email-signing-links.integration.test.mjs\",\n          \"drive-gateway/tests/email-signing-links.release-contract.test.mjs\",\n          \"drive-gateway/tests/email-signing-links.test.mjs\",\n          \"drive-gateway/tests/gate5-document-signature-persistence.test.mjs\",\n          \"drive-gateway/tests/signature-field-assignment-regression.test.mjs\",\n          \"drive-gateway/tests/signing-invitation.test.mjs\",\n          \"tests/signature-email-link-unification.test.mjs\",\n          \"tests/signature-workflow-policy.test.mjs\"\n        ],\n        \"repairWindow\": {\n          \"openedAt\": \"2026-11-20T17:08:47Z\",\n          \"closesAt\": \"2026-11-22T17:08:47Z\",\n          \"durationHours\": 48,\n          \"rollbackCommit\": \"eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd\",\n          \"rollbackCommitEvidence\": \"Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.\"\n        },\n        \"prohibitedChanges\": [\n          \"Do not change existing Firestore signing envelopes, invitation tokens, signer profiles, audit trails, completed PDFs or recipient copies.\",\n          \"Do not change SMTP configuration, credentials, secrets, Worker bindings or mail transport.\",\n          \"Do not change Firestore rules, indexes, document hashing, PDF stamping, certificates or archive logic.\",\n          \"Do not roll back Meeting Portal attendance registration, attendance-sheet preparation, ordinary meeting invitations or other portal functionality.\",\n          \"Do not deploy a whole-application or whole-Gateway historical rollback.\"\n        ],\n        \"ownerInstruction\": \"Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links.\",\n        \"supersededAmendment\": {\n          \"status\": \"open\",\n          \"affectedPortals\": [\n            \"Signature Portal\"\n          ],\n          \"reason\": \"Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.\",\n          \"files\": [\n            \"drive-gateway/src/emailSigning/\",\n            \"drive-gateway/src/emailSigningLinks.mjs\",\n            \"drive-gateway/src/signing.mjs\",\n            \"drive-gateway/src/index.js\",\n            \"src/pages/EmailSigningReadOnlyPage.jsx\",\n            \"src/pages/SignaturePlatform.jsx\",\n            \"drive-gateway/tests/email-signing-contract.test.mjs\",\n            \"drive-gateway/tests/email-signing-links.test.mjs\",\n            \"drive-gateway/tests/email-signing-links.integration.test.mjs\",\n            \"tests/email-signing-contract.test.mjs\",\n            \".github/workflows/email-signing-contract.yml\",\n            \"scripts/meeting-portal-fixture-isolation-guard.sh\",\n            \"scripts/portal-repair-window-guard-policy.mjs\",\n            \"tests/meeting-isolation-guard.test.mjs\"\n          ],\n          \"repairWindow\": {\n            \"openedAt\": \"2026-11-20T17:08:47Z\",\n            \"closesAt\": \"2026-11-22T17:08:47Z\",\n            \"durationHours\": 48,\n            \"rollbackCommit\": \"fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8\",\n            \"rollbackCommitEvidence\": \"Latest successful production Worker deploy run 44737326668; production health gate verified deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.\",\n            \"rollbackCommitStatus\": \"verified-production-worker-deploy\"\n          },\n          \"prohibitedChanges\": [\n            \"Secrets\",\n            \"Environment variables\",\n            \"SMTP credentials and settings (reuse existing wrapper)\",\n            \"Firestore rules\",\n            \"PDF stamping engine\",\n            \"Hash logic\",\n            \"Certificate logic\",\n            \"Archive logic\"\n          ],\n          \"ownerInstruction\": \"Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120. Preserve the independent Meeting Portal window and baseline. Do not change secrets, environment variables, SMTP credentials/settings (reuse existing wrapper), Firestore rules, PDF stamping engine, hash, certificate, or archive logic.\",\n          \"closedAt\": \"2026-11-20T17:56:30Z\",\n          \"completion\": {\n            \"repairPR\": 817,\n            \"mergeCommit\": \"386b73b02e1ae89696ab0a73fea7ee00dd739d48\",\n            \"implementation\": {\n              \"preview\": \"GET /api/sign/email/open and GET /api/sign/email/pdf are read-only\",\n              \"session\": \"POST /api/sign/email/session creates the explicit short-lived session after Open document to sign\",\n              \"consumption\": \"Invitation is consumed on signer completion, invitation expiry, decline/cancel, or owner resend; session expiry alone leaves an unexpired invitation usable\",\n              \"resend\": \"Owner resend rotates invitation and invalidates prior active/legacy sessions\",\n              \"errors\": [\n                \"TOKEN_LOOKUP\",\n                \"SESSION_CREATE\",\n                \"PDF_PREVIEW\",\n                \"SIGN_SUBMIT\"\n              ]\n            },\n            \"tests\": {\n              \"gatewayRegression\": \"PASS\",\n              \"authenticationParity\": \"PASS\",\n              \"signatureSecurityRegression\": \"PASS\",\n              \"emailInvitationTests\": \"PASS\",\n              \"pdfESignatureTests\": \"PASS\",\n              \"signatureEnvelopeRefreshAndDelivery\": \"PASS\",\n              \"sevenPortalsSmoke\": \"PASS\",\n              \"meetingPortalBrowserRegression\": \"PASS (360, 412, 768, 1280 viewports)\"\n            },\n            \"production\": {\n              \"workerCommit\": \"386b73b02e1ae89696ab0a73fea7ee00dd739d48\",\n              \"noSecretSyncWorkerDeployRun\": 44787425215,\n              \"workerHealthGate\": \"PASS — HTTP 200 and exact deployed commit confirmed by the workflow\",\n              \"firebaseHostingDeployRun\": 44787424924,\n              \"firebaseHostingVerification\": \"PASS — exact build commit confirmed\",\n              \"cloudflareFrontendDeployRun\": 44787425010,\n              \"productionBrowserSmokeRun\": 44787661874,\n              \"productionBrowserSmoke\": \"PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION\",\n              \"browserLimitation\": \"Signed-out production browser did not exercise the authenticated Documents → Signing workspace; public endpoints, JavaScript assets, module hash and page errors passed.\"\n            },\n            \"additionalDeploymentEvidence\": {\n              \"parallelLegacyWorkerDeployRun\": 44787425008,\n              \"status\": \"SUCCESS\",\n              \"note\": \"A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed.\"\n            }\n          },\n          \"reopenedAt\": \"2026-11-20T18:10:00Z\",\n          \"reopenReason\": \"PR #820 closed the Signature Portal window before the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120 was completed. The prior closure evidence is preserved in priorClosure.\",\n          \"priorClosure\": {\n            \"closedAt\": \"2026-11-20T17:56:30Z\",\n            \"completion\": {\n              \"repairPR\": 817,\n              \"mergeCommit\": \"386b73b02e1ae89696ab0a73fea7ee00dd739d48\",\n              \"implementation\": {\n                \"preview\": \"GET /api/sign/email/open and GET /api/sign/email/pdf are read-only\",\n                \"session\": \"POST /api/sign/email/session creates the explicit short-lived session after Open document to sign\",\n                \"consumption\": \"Invitation is consumed on signer completion, invitation expiry, decline/cancel, or owner resend; session expiry alone leaves an unexpired invitation usable\",\n                \"resend\": \"Owner resend rotates invitation and invalidates prior active/legacy sessions\",\n                \"errors\": [\n                  \"TOKEN_LOOKUP\",\n                  \"SESSION_CREATE\",\n                  \"PDF_PREVIEW\",\n                  \"SIGN_SUBMIT\"\n                ]\n              },\n              \"tests\": {\n                \"gatewayRegression\": \"PASS\",\n                \"authenticationParity\": \"PASS\",\n                \"signatureSecurityRegression\": \"PASS\",\n                \"emailInvitationTests\": \"PASS\",\n                \"pdfESignatureTests\": \"PASS\",\n                \"signatureEnvelopeRefreshAndDelivery\": \"PASS\",\n                \"sevenPortalsSmoke\": \"PASS\",\n                \"meetingPortalBrowserRegression\": \"PASS (360, 412, 768, 1280 viewports)\"\n              },\n              \"production\": {\n                \"workerCommit\": \"386b73b02e1ae89696ab0a73fea7ee00dd739d48\",\n                \"noSecretSyncWorkerDeployRun\": 44787425215,\n                \"workerHealthGate\": \"PASS — HTTP 200 and exact deployed commit confirmed by the workflow\",\n                \"firebaseHostingDeployRun\": 44787424924,\n                \"firebaseHostingVerification\": \"PASS — exact build commit confirmed\",\n                \"cloudflareFrontendDeployRun\": 44787425010,\n                \"productionBrowserSmokeRun\": 44787661874,\n                \"productionBrowserSmoke\": \"PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION\",\n                \"browserLimitation\": \"Signed-out production browser did not exercise the authenticated Documents → Signing workspace; public endpoints, JavaScript assets, module hash and page errors passed.\"\n              },\n              \"additionalDeploymentEvidence\": {\n                \"parallelLegacyWorkerDeployRun\": 44787425008,\n                \"status\": \"SUCCESS\",\n                \"note\": \"A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed.\"\n              }\n            },\n            \"closedByPR\": 820\n          }\n        },\n        \"validation\": {\n          \"baselineSmoke\": \"PASS\",\n          \"fullRegression\": \"PENDING\",\n          \"portalSmoke\": {\n            \"Signature Portal\": \"PENDING\"\n          },\n          \"behaviourDifferences\": [\n            \"Invitation-link preview/session lifecycle returns to the legacy pre-cutoff behavior.\",\n            \"Post-cutoff v2 email-signing routes and module are removed; legacy email-link routes remain.\",\n            \"Resend and signer-status behavior returns to the pre-cutoff implementation.\",\n            \"Existing signing records and links are not rewritten or revoked.\"\n          ],\n          \"evidence\": [\n            \"Production Gateway deployment run 44690520757: success, deployed exact commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd; live health check passed.\",\n            \"Signature source files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.\",\n            \"Post-cutoff signature changes were identified in commits 514249c, 67ba1ed, 386b73b and d8b52fd.\"\n          ]\n        }\n      },\n      \"validation\": {\n        \"baselineSmoke\": \"PENDING\",\n        \"fullRegression\": \"PENDING\",\n        \"portalSmoke\": {\n          \"Signature Portal\": \"PENDING\"\n        },\n        \"startupSmoke\": \"PENDING\",\n        \"stressTest\": \"PENDING\",\n        \"productionSmoke\": \"PENDING\",\n        \"evidence\": []\n      }\n    }\n  }\n}\n",
-    "encoding": "utf-8",
-    "sha": "f28fbdcbaff70c0431ca18b818fc708fdc09b1b6",
-    "display_url": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/blob/portal/meeting/trial-delete-guard/docs/portal-protection/change-record.json",
-    "display_title": "change-record.json"
-  },
+  "schemaVersion": 1,
+  "status": "complete",
   "declaration": {
     "affectedPortals": [
       "Meeting Portal"
@@ -37,12 +32,374 @@
     },
     "fullRegression": "PENDING",
     "behaviourDifferences": [
-      "New environment field is immutable after creation.",
-      "REAL, missing or invalid environment is non-deletable; only explicitly TRIAL meetings may be deleted by an administrator."
+      "Environment is immutable after creation.",
+      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable."
     ],
     "evidence": [
-      "Owner's exact approval is recorded in PR #845 issue comment 7068716176.",
-      "No test result has been manually marked PASS. CI evidence will be recorded only after actual test logs are retrieved."
+      "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
+      "No test result has been manually marked PASS; CI logs are required before validation is updated."
+    ]
+  },
+  "closure": {
+    "closedAt": "",
+    "updatedBaselineCommit": ""
+  },
+  "activeAmendment": {
+    "status": "open",
+    "operation": "shared-mailbox-signing-invitation-delivery",
+    "affectedPortals": [
+      "Signature Portal"
+    ],
+    "reason": "Owner-authorised 24-hour repair of typed signer-address routing for envelope creation, parallel invitations, signer-specific resend and resend-all, SMTP delivery recording, privacy-safe audit email and per-signer delivery visibility.",
+    "files": [
+      "drive-gateway/src/index.js",
+      "drive-gateway/src/invitationEmail.mjs",
+      "drive-gateway/src/signing.mjs",
+      "drive-gateway/tests/email-signing-contract.test.mjs",
+      "drive-gateway/tests/email-signing-links.integration.test.mjs",
+      "drive-gateway/tests/email-signing-links.test.mjs",
+      "src/pages/SignaturePlatform.jsx",
+      "tests/signature-workflow-policy.test.mjs",
+      "scripts/portal-protection-check.mjs",
+      "tests/portal-protection-policy.test.mjs",
+      "docs/portal-protection/repair-window.json"
+    ],
+    "expectedEffect": "The typed signer-row address, trimmed and lower-cased, is the sole recipient source. SMTP RCPT TO and the single-recipient To header are identical. Parallel mode sends independently to every signer position; resend and resend-all use each signer record's own address. Every invitation has a unique Message-ID, text and HTML parts, the IRPA Digital Signing From name and a position-specific subject. One best-effort audit email per final SMTP outcome records EAT time, envelope, position, Message-ID, creation/resend, reply category or stage code, and only the first three local-part characters plus full recipient domain. The per-signer panel displays Not sent, Sent, Accepted by the mail server with category/time, or Failed with stage code; no Delivered label.",
+    "repairWindow": {
+      "openedAt": "2026-11-21T09:57:28Z",
+      "closesAt": "2026-11-22T09:57:28Z",
+      "durationHours": 24,
+      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
+    },
+    "prohibitedChanges": [
+      "Signing rules, token format/hash custody, link format, sessions, signer identity, resend eligibility/rules or field assignment.",
+      "PDF stamping, document hash, certificate, archive logic or completed PDFs.",
+      "Firestore rules, secrets, environment variables, SMTP settings, credentials or Worker bindings.",
+      "Authentication/authorization rules, GitHub branch protection, or any policy bypass.",
+      "Self-test crash handling, Meeting Portal behavior, hash verification, rebuild or unrelated portals."
+    ],
+    "ownerInstruction": "Complete PR #836 only. Always use the typed signer-row address after trimming and lower-casing. Never substitute a Signature Profile, registered-account, owner or previous-signer email. Preserve signer identity and all signing/token/session/resend semantics. Keep existing branch-protection and portal-protection enforcement; no policy bypass.",
+    "supersededAmendment": {
+      "status": "open",
+      "operation": "signature-self-test-crash-safety-and-email-signer-delivery",
+      "affectedPortals": [
+        "Signature Portal"
+      ],
+      "reason": "Owner-authorised 48-hour repair following a workspace crash immediately after the administrator pressed SELF-TEST. Treat unbounded full-collection reads, concurrent controlled-PDF downloads/page rendering and unvalidated Gateway response rendering in reconcile() as the proven cause. Also deliver per-signer SMTP acceptance visibility and verify sequential next-position invitations for shared email addresses.",
+      "files": [
+        "src/components/SignaturePathwaySelfTest.jsx",
+        "src/components/SignaturePathwaySelfTestErrorBoundary.jsx",
+        "src/components/SignatureDeliveryPanel.jsx",
+        "src/pages/SignaturePlatform.jsx",
+        "src/main.jsx",
+        "src/App.jsx",
+        "drive-gateway/src/index.js",
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/emailSigning/",
+        "drive-gateway/src/emailSigningLinks.mjs",
+        "drive-gateway/tests/",
+        "tests/signature-self-test-session-safety.test.mjs",
+        "tests/browser/",
+        "tests/email-signing-contract.test.mjs",
+        "tests/signature-pathway-contract.test.mjs",
+        "package.json",
+        ".github/workflows/email-signing-contract.yml",
+        ".github/workflows/startup-smoke.yml",
+        "scripts/",
+        "docs/portal-protection/change-record.json",
+        "docs/portal-protection/repair-window.json",
+        "docs/portal-protection/portal-register.json",
+        "docs/regression/"
+      ],
+      "expectedEffect": "The self-test is isolated by its own error boundary; processes at most 20 documents per page one at a time, renders only first PDF page at reduced scale, releases resources, supports cancellation and enforces 15-second per-document and 60-second total limits. Gateway responses are shape/length validated and sanitised. Startup ignores/clears legacy self-test result data and displays only a short safe code plus module name on startup errors. Delivery UI reports per-signer SMTP acceptance/failure without claiming delivery; sequential next signer receives a distinct invitation per signer position.",
+      "repairWindow": {
+        "openedAt": "2026-11-21T09:30:33Z",
+        "closesAt": "2026-11-23T09:30:33Z",
+        "durationHours": 48,
+        "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+        "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
+        "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
+      },
+      "prohibitedChanges": [
+        "Do not change signing rules, signer identity, invitation token format/hash custody, session lifecycle, resend rules or field assignment.",
+        "Do not change PDF stamping, document hash, certificate, archive logic, completed PDFs or existing signing records.",
+        "Do not change Firestore rules or indexes, secrets, environment variables, SMTP settings, credentials or Worker bindings.",
+        "Do not expose tokens, secrets, recipient-private data or full exception payloads in startup/self-test error UI.",
+        "Do not bypass branch protection or deploy a historical whole-application/Gateway rollback.",
+        "Self-test may perform read-only checks or send at most one explicit test email to the typed address; it must not mutate signing state."
+      ],
+      "ownerInstruction": "Complete PR A, PR B and PR C without asking the owner to interact with GitHub. Do not bypass branch protection. Never change signing rules, tokens, sessions, signer identity, resend rules, field assignment, stamping, PDF, hash, certificate, archive logic, Firestore rules, secrets, environment variables or SMTP settings. Use CI headless browser/emulator tests; never log in to production.",
+      "supersededAmendment": {
+        "status": "open",
+        "operation": "restore-pre-11-eat-baseline",
+        "affectedPortals": [
+          "Signature Portal"
+        ],
+        "reason": "Restore the Email-link E-signature source and routing to the exact state deployed before 11:00 EAT on 20 Nov 2026. The verified production Gateway deployment at 09:49:57 EAT used commit eb04405; the immediately preceding source snapshot 8bfa67 is byte-identical for all restored signature files.",
+        "cutoffEAT": "2026-11-20T11:00:00+03:00",
+        "targetProductionWorkerCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+        "targetSourceSnapshot": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
+        "files": [
+          "drive-gateway/src/signing.mjs",
+          "drive-gateway/src/router.mjs",
+          "drive-gateway/src/index.js",
+          "src/pages/EmailSigningReadOnlyPage.jsx",
+          "src/pages/SignaturePlatform.jsx",
+          "drive-gateway/src/emailSigning/index.mjs",
+          "drive-gateway/tests/email-signing-contract.test.mjs",
+          ".github/workflows/email-signing-contract.yml",
+          "drive-gateway/tests/email-signing-links.integration.test.mjs",
+          "drive-gateway/tests/email-signing-links.release-contract.test.mjs",
+          "drive-gateway/tests/email-signing-links.test.mjs",
+          "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+          "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+          "drive-gateway/tests/signing-invitation.test.mjs",
+          "tests/signature-email-link-unification.test.mjs",
+          "tests/signature-workflow-policy.test.mjs"
+        ],
+        "repairWindow": {
+          "openedAt": "2026-11-20T17:08:47Z",
+          "closesAt": "2026-11-22T17:08:47Z",
+          "durationHours": 48,
+          "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+          "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified."
+        },
+        "prohibitedChanges": [
+          "Do not change existing Firestore signing envelopes, invitation tokens, signer profiles, audit trails, completed PDFs or recipient copies.",
+          "Do not change SMTP configuration, credentials, secrets, Worker bindings or mail transport.",
+          "Do not change Firestore rules, indexes, document hashing, PDF stamping, certificates or archive logic.",
+          "Do not roll back Meeting Portal attendance registration, attendance-sheet preparation, ordinary meeting invitations or other portal functionality.",
+          "Do not deploy a whole-application or whole-Gateway historical rollback."
+        ],
+        "ownerInstruction": "Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links.",
+        "supersededAmendment": {
+          "status": "open",
+          "affectedPortals": [
+            "Signature Portal"
+          ],
+          "reason": "Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
+          "files": [
+            "drive-gateway/src/emailSigning/",
+            "drive-gateway/src/emailSigningLinks.mjs",
+            "drive-gateway/src/signing.mjs",
+            "drive-gateway/src/index.js",
+            "src/pages/EmailSigningReadOnlyPage.jsx",
+            "src/pages/SignaturePlatform.jsx",
+            "drive-gateway/tests/email-signing-contract.test.mjs",
+            "drive-gateway/tests/email-signing-links.test.mjs",
+            "drive-gateway/tests/email-signing-links.integration.test.mjs",
+            "tests/email-signing-contract.test.mjs",
+            ".github/workflows/email-signing-contract.yml",
+            "scripts/meeting-portal-fixture-isolation-guard.sh",
+            "scripts/portal-repair-window-guard-policy.mjs",
+            "tests/meeting-isolation-guard.test.mjs"
+          ],
+          "repairWindow": {
+            "openedAt": "2026-11-20T17:08:47Z",
+            "closesAt": "2026-11-22T17:08:47Z",
+            "durationHours": 48,
+            "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+            "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; production health gate verified deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+            "rollbackCommitStatus": "verified-production-worker-deploy"
+          },
+          "prohibitedChanges": [
+            "Secrets",
+            "Environment variables",
+            "SMTP credentials and settings (reuse existing wrapper)",
+            "Firestore rules",
+            "PDF stamping engine",
+            "Hash logic",
+            "Certificate logic",
+            "Archive logic"
+          ],
+          "ownerInstruction": "Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120. Preserve the independent Meeting Portal window and baseline. Do not change secrets, environment variables, SMTP credentials/settings (reuse existing wrapper), Firestore rules, PDF stamping engine, hash, certificate, or archive logic.",
+          "closedAt": "2026-11-20T17:56:30Z",
+          "completion": {
+            "repairPR": 817,
+            "mergeCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+            "implementation": {
+              "preview": "GET /api/sign/email/open and GET /api/sign/email/pdf are read-only",
+              "session": "POST /api/sign/email/session creates the explicit short-lived session after Open document to sign",
+              "consumption": "Invitation is consumed on signer completion, invitation expiry, decline/cancel, or owner resend; session expiry alone leaves an unexpired invitation usable",
+              "resend": "Owner resend rotates invitation and invalidates prior active/legacy sessions",
+              "errors": [
+                "TOKEN_LOOKUP",
+                "SESSION_CREATE",
+                "PDF_PREVIEW",
+                "SIGN_SUBMIT"
+              ]
+            },
+            "tests": {
+              "gatewayRegression": "PASS",
+              "authenticationParity": "PASS",
+              "signatureSecurityRegression": "PASS",
+              "emailInvitationTests": "PASS",
+              "pdfESignatureTests": "PASS",
+              "signatureEnvelopeRefreshAndDelivery": "PASS",
+              "sevenPortalsSmoke": "PASS",
+              "meetingPortalBrowserRegression": "PASS (360, 412, 768, 1280 viewports)"
+            },
+            "production": {
+              "workerCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+              "noSecretSyncWorkerDeployRun": 44787425215,
+              "workerHealthGate": "PASS — HTTP 200 and exact deployed commit confirmed by the workflow",
+              "firebaseHostingDeployRun": 44787424924,
+              "firebaseHostingVerification": "PASS — exact build commit confirmed",
+              "cloudflareFrontendDeployRun": 44787425010,
+              "productionBrowserSmokeRun": 44787661874,
+              "productionBrowserSmoke": "PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION",
+              "browserLimitation": "Signed-out production browser did not exercise the authenticated Documents → Signing workspace; public endpoints, JavaScript assets, module hash and page errors passed."
+            },
+            "additionalDeploymentEvidence": {
+              "parallelLegacyWorkerDeployRun": 44787425008,
+              "status": "SUCCESS",
+              "note": "A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed."
+            }
+          },
+          "reopenedAt": "2026-11-20T18:10:00Z",
+          "reopenReason": "PR #820 closed the Signature Portal window before the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120 was completed. The prior closure evidence is preserved in priorClosure.",
+          "priorClosure": {
+            "closedAt": "2026-11-20T17:56:30Z",
+            "completion": {
+              "repairPR": 817,
+              "mergeCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+              "implementation": {
+                "preview": "GET /api/sign/email/open and GET /api/sign/email/pdf are read-only",
+                "session": "POST /api/sign/email/session creates the explicit short-lived session after Open document to sign",
+                "consumption": "Invitation is consumed on signer completion, invitation expiry, decline/cancel, or owner resend; session expiry alone leaves an unexpired invitation usable",
+                "resend": "Owner resend rotates invitation and invalidates prior active/legacy sessions",
+                "errors": [
+                  "TOKEN_LOOKUP",
+                  "SESSION_CREATE",
+                  "PDF_PREVIEW",
+                  "SIGN_SUBMIT"
+                ]
+              },
+              "tests": {
+                "gatewayRegression": "PASS",
+                "authenticationParity": "PASS",
+                "signatureSecurityRegression": "PASS",
+                "emailInvitationTests": "PASS",
+                "pdfESignatureTests": "PASS",
+                "signatureEnvelopeRefreshAndDelivery": "PASS",
+                "sevenPortalsSmoke": "PASS",
+                "meetingPortalBrowserRegression": "PASS (360, 412, 768, 1280 viewports)"
+              },
+              "production": {
+                "workerCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+                "noSecretSyncWorkerDeployRun": 44787425215,
+                "workerHealthGate": "PASS — HTTP 200 and exact deployed commit confirmed by the workflow",
+                "firebaseHostingDeployRun": 44787424924,
+                "firebaseHostingVerification": "PASS — exact build commit confirmed",
+                "cloudflareFrontendDeployRun": 44787425010,
+                "productionBrowserSmokeRun": 44787661874,
+                "productionBrowserSmoke": "PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION",
+                "browserLimitation": "Signed-out production browser did not exercise the authenticated Documents → Signing workspace; public endpoints, JavaScript assets, module hash and page errors passed."
+              },
+              "additionalDeploymentEvidence": {
+                "parallelLegacyWorkerDeployRun": 44787425008,
+                "status": "SUCCESS",
+                "note": "A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed."
+              }
+            },
+            "closedByPR": 820
+          }
+        },
+        "validation": {
+          "baselineSmoke": "PASS",
+          "fullRegression": "PENDING",
+          "portalSmoke": {
+            "Signature Portal": "PENDING"
+          },
+          "behaviourDifferences": [
+            "Invitation-link preview/session lifecycle returns to the legacy pre-cutoff behavior.",
+            "Post-cutoff v2 email-signing routes and module are removed; legacy email-link routes remain.",
+            "Resend and signer-status behavior returns to the pre-cutoff implementation.",
+            "Existing signing records and links are not rewritten or revoked."
+          ],
+          "evidence": [
+            "Production Gateway deployment run 44690520757: success, deployed exact commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd; live health check passed.",
+            "Signature source files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
+            "Post-cutoff signature changes were identified in commits 514249c, 67ba1ed, 386b73b and d8b52fd."
+          ]
+        }
+      },
+      "validation": {
+        "baselineSmoke": "PENDING",
+        "fullRegression": "PENDING",
+        "portalSmoke": {
+          "Signature Portal": "PENDING"
+        },
+        "startupSmoke": "PENDING",
+        "stressTest": "PENDING",
+        "productionSmoke": "PENDING",
+        "evidence": []
+      }
+    }
+  },
+  "priorDeclaration": {
+    "affectedPortals": [
+      "Board Members Portal",
+      "Communication and Media Portal",
+      "Grants Intelligence and Funding Opportunities Portal",
+      "Invitation Portal",
+      "Meeting Portal",
+      "Members and Employees Portal",
+      "Signature Portal"
+    ],
+    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
+    "files": [
+      "src/components/SignaturePathwaySelfTest.jsx",
+      "tests/signature-self-test-session-safety.test.mjs",
+      "package.json",
+      "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
+      ".github/workflows/email-signing-contract.yml",
+      "tests/signature-pathway-contract.test.mjs"
+    ],
+    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
+    "prohibitedChanges": [
+      "Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.",
+      "Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.",
+      "Do not change Firestore rules, indexes, production records, signing permissions or authentication/session lifecycle.",
+      "Do not deploy production resources as part of this merge."
+    ]
+  },
+  "priorValidation": {
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Board Members Portal": "PASS",
+      "Communication and Media Portal": "PASS",
+      "Grants Intelligence and Funding Opportunities Portal": "PASS",
+      "Invitation Portal": "PASS",
+      "Meeting Portal": "PASS",
+      "Members and Employees Portal": "PASS",
+      "Signature Portal": "PASS"
+    },
+    "dependentSmoke": {
+      "Signature owner profile and independent submission regression": "PASS — CI run 44870080649 complete root test suite; browser signature ceremony tests in run 44870080291",
+      "Meeting Portal shared-component regression": "PASS — CI run 44870080649 complete root test suite",
+      "Production application build": "PASS — CI run 44870080649",
+      "Complete root test suite": "PASS — CI run 44870080649"
+    },
+    "fullRegression": "PASS",
+    "behaviourDifferences": [
+      "Owner Signature Profile assets now use the owner-authorized Drive download route rather than the envelope-scoped signer route that requires documentId and envelopeId.",
+      "Envelope-scoped signature-file retrieval remains unchanged for actual signing.",
+      "Prepare Envelope submit and save-draft controls are moved to a separate sticky control bar above the PDF designer/navigation.",
+      "No Meeting Portal workflow behavior is changed.",
+      "The main Signature Pathway Self-Test no longer automatically runs the separate Google Drive token-refresh health request; the operator can still run it explicitly.",
+      "Self-test-only Gateway reconciliation and controlled-document download requests reject redirects rather than following an interactive login gateway.",
+      "The existing diagnostic contract test now asserts the self-test-specific Gateway request helper and redirect rejection."
+    ],
+    "evidence": [
+      "Verified production frontend baseline before this repair: main commit 21f33960395e09d9da74f030732e43558eac6e6d.",
+      "Complete root test suite and application build passed in CI run 44870080649.",
+      "Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.",
+      "Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx.",
+      "PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair.",
+      "Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite.",
+      "Seven-portal protection smoke tests passed in email-signing-contract CI run 44881398093 (job step: Run seven-portal protection smoke tests); the self-test component at this point already contained the final self-test-only Gateway request isolation. A later commit only updated a legacy source-contract assertion and governance documentation.",
+      "The dedicated self-test session-safety regression is now an explicit step in .github/workflows/email-signing-contract.yml and runs after frontend dependency installation."
     ]
   }
 }
