@@ -19,6 +19,10 @@ const run = (changedFiles, record = valid, win = windowState, activity = "2026-1
 
 test("protected change without Change Record fails", () => assert.equal(run([file], null).ok, false));
 test("valid record and active scoped window pass", () => assert.equal(run([file]).ok, true));
+test("active amendment file declarations extend the original change record", () => {
+  const amended = { ...valid, declaration: { ...valid.declaration, files: [] }, activeAmendment: { files: [file] } };
+  assert.equal(run([file], amended).ok, true);
+});
 test("24-hour inactivity closes the window", () => assert.equal(run([file], valid, windowState, "2026-11-18T19:59:00Z").ok, false));
 test("out-of-scope protected change fails", () => assert.equal(run([file], valid, { ...windowState, scope: ["src/pages/Invitations.jsx"] }).ok, false));
 test("shared dependency fans out to every dependent portal", () => {
