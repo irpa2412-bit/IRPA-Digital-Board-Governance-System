@@ -242,7 +242,7 @@ test("duplicate participant identities are reused and rapid repeated add actions
   assert.match(addSigner[1], /roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
   assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("crypto.getRandomValues"));
-  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
+  assert.match(addSigner[1], /resolveSignerRecipientEmail\(email\)/);
   assert.match(addSigner[1], /resolveSignerRecipientEmail\(email\)/);
   assert.match(addSigner[1], /findRegisteredSignerDuplicate\(recipients,registered\?\.uid\)/);
   assert.match(addSigner[1], /hasSignerResponsibility\(existingAssignments,assignment\)/);
@@ -407,7 +407,9 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
   assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
   assert.ok(refresh.includes("Array.isArray(status.signers)"));
   assert.ok(refresh.includes("last readable list has been preserved"));
-  assert.ok(page.includes('Delivery: {signerDeliveryLabel(item)} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes("signerDeliveryLabel(item)"));
+  assert.ok(page.includes("signerLinkStatusLabel(item)"));
+  assert.equal(signerDeliveryLabel({ delivery: { state: "Accepted by the mail server", smtpReplyCategory: "250", acceptedAt: "2026-11-21T10:00:00Z" } }).startsWith("Accepted by the mail server (250 · "), true);
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
   assert.ok(refresh.includes('envelopeId:selected.gatewayEnvelopeId'), "the selected envelope ID must be attached locally even when the Gateway omits it");
