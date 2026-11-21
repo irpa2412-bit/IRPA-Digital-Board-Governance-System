@@ -477,7 +477,8 @@ test("parallel creation sends every position to its own normalized typed mailbox
   assert.ok(sent.every(item=>item.positionCount===3));
   const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
   assert.ok(stored.signers.every(signer=>signer.email==="shared.mailbox@gmail.com"));
-  assert.ok(stored.signers.every(signer=>signer.emailHash===await sha256Hex("shared.mailbox@gmail.com")));
+  const expectedEmailHash=await sha256Hex("shared.mailbox@gmail.com");
+  assert.ok(stored.signers.every(signer=>signer.emailHash===expectedEmailHash));
   assert.ok(stored.signers.every(signer=>signer.profileUid&&signer.profileUid.startsWith("profile-uid-")));
   assert.ok(profileLookups.every(item=>item.email==="shared.mailbox@gmail.com"));
   const tokens=sent.map(item=>new URL(item.link).searchParams.get("emailSignToken"));
