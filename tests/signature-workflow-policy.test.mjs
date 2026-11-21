@@ -234,8 +234,10 @@ test("duplicate participant identities are reused and rapid repeated add actions
   assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("crypto.getRandomValues"));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(registeredEmail))'));
-  assert.ok(addSigner[1].includes("email:registeredEmail,role,"));
+  assert.match(addSigner[1], /const recipientEmail=email;/);
+  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipientEmail))'));
+  assert.ok(addSigner[1].includes("email:recipientEmail,role,"));
+  assert.doesNotMatch(addSigner[1], /registeredEmail/);
   assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
   assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
 });
@@ -296,7 +298,7 @@ test("refreshing an envelope uses one authoritative status read and keeps signer
   assert.doesNotMatch(storage,/export async function getGatewaySignatureEnvelopeDeliveryStatus/);
   assert.ok(page.includes("onClick={refreshGatewayEmailStatus}"));
   assert.ok(page.includes("onClick={()=>resendEmailLink(item.id)}"));
-  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('Delivery: {signerDeliveryLabel(item)} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
@@ -382,7 +384,7 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
   assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
   assert.ok(refresh.includes("Array.isArray(status.signers)"));
   assert.ok(refresh.includes("last readable list has been preserved"));
-  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes('Delivery: {signerDeliveryLabel(item)} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
   assert.ok(refresh.includes('envelopeId:selected.gatewayEnvelopeId'), "the selected envelope ID must be attached locally even when the Gateway omits it");
@@ -437,12 +439,14 @@ test("per-signer copy and WhatsApp actions reuse the existing accepted invitatio
   assert.match(page,/Share on WhatsApp/);
   assert.match(page,/shareEmailSigningLink\(item\.id,"copy"\)/);
   assert.match(page,/shareEmailSigningLink\(item\.id,"whatsapp"\)/);
-  assert.match(page,/navigator\.clipboard\?\.writeText\(signingLink\)/);
+  assert.ok(page.includes('if(!navigator.clipboard?.writeText)throw new Error("Clipboard access is unavailable in this browser.");'));
+  assert.ok(page.includes("await navigator.clipboard.writeText(signingLink)"));
   assert.match(page,/wa\.me\/\?text=/);
   assert.match(worker,/return\{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt,signingLink:link\}/);
   assert.match(storage,/return data;/);
   assert.ok(page.includes("email.slice(0,3)")&&page.includes("...@"),"signer recipient masking must show the first three local-part characters and domain");
-  assert.match(page,/The same signer-specific link sent by email/);
+  assert.match(page,/that exact signer-specific link was copied/);
+  assert.match(page,/that exact signer-specific link is ready to share in WhatsApp/);
 });
 
 
