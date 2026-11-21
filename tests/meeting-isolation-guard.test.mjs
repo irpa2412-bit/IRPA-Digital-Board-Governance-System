@@ -545,5 +545,5 @@ test("baseline evidence jobs execute protected smoke and full regression on the 
   assert.ok(workflow.includes("npm run test:all"));
   assert.ok(workflow.includes("npm test --prefix drive-gateway"));
   assert.ok(workflow.includes("baseline-protection-smoke:"));
-  assert.ok(workflow.includes("baseline-full-regression:"));
+  assert.ok(workflow.includes("baseline-full-regression:") && workflow.includes("BASELINE_SOURCE_SHA="));
 });
