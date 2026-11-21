@@ -7,7 +7,7 @@ const SUBJECT = "Invitation to the IRPA Digital Board Governance System";
 
 export function validateRecipient(email) {
   if (typeof email !== "string") return null;
-  const v = email.trim().toLowerCase();
+  const v = email.trim();
   if (!v || v.length > 254 || CRLF_RE.test(v) || !EMAIL_RE.test(v)) return null;
   return v;
 }
@@ -110,14 +110,6 @@ export async function sendInvitationEmail({email,name,link,meetingAccess=null,sm
 
 
 
-export function buildSignerInvitationSubject({title,position,positionCount,name}={}) {
-  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
-  const safeName=validateName(name);
-  if(!safeName)throw new Error("Invalid signer name");
-  const firstName=safeName.split(/\s+/)[0]||"Signer";
-  return "Please sign: "+safeTitle+" - "+firstName+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+")";
-}
-
 export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}) {
   const safeName=validateName(name);
   if(!safeName)throw new Error("Invalid name");
@@ -134,20 +126,6 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
   const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\n"+expiryText+"\n\nOpen your single-use secure link:\n"+safeLink+"\n\nOpening the link verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.\n\nThis link does not independently verify your legal identity or institutional authority. Do not forward it. If you did not expect this invitation, contact IRPA Administration.";
   const html="<p>Dear "+escapeHtml(safeName)+",</p><p>"+escapeHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeHtml(safeTitle)+"<br>"+expiryHtml+"</p><p><a href=\""+escapeHtml(safeLink)+"\">Open secure document link</a></p><p>This is a private, single-use link. Opening it verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.</p><p>This link does not independently verify your legal identity or institutional authority. Do not forward it.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
   return {subject,text,html};
-}
-
-export function buildSigningInvitationAuditMessage({recipientPrefix,recipientDomain,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,invitationKind="creation",at=new Date()}={}) {
-  const domain=String(recipientDomain||"unknown").toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,253)||"unknown";
-  const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...@"+domain;
-  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
-  const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
-  const type=invitationKind==="resend"?"resend":"creation";
-  const category="SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
-  const details=category+(stageCode?"\nStage code: "+String(stageCode).slice(0,40):"");
-  const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" - "+safeTitle;
-  const text="Time (EAT): "+when+"\nEnvelope ID: "+String(envelopeId||"")+"\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\nMessage-ID: "+String(messageId||"Not recorded")+"\nType: "+type+"\n"+details+"\nRecipient domain: "+domain;
-  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p><strong>Type:</strong> "+type+"</p><p>"+escapeHtml(details).replace(/\n/g,"<br>")+"</p><p><strong>Recipient domain:</strong> "+escapeHtml(domain)+"</p>";
-  return {to:"info@irpa.or.tz",subject,text,html};
 }
 
 export const EMAIL_LINK_STAGE_CODES=Object.freeze(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT","TOKEN_LOOKUP","SESSION_CREATE"]);
@@ -188,7 +166,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
   const outcomes=new Map();
-  const capture=async(stage,outcome,smtpReplyCategory,metadata={})=>outcomes.set(stage,{outcome,smtpReplyCategory,metadata});
+  const capture=async(stage,outcome,smtpReplyCategory)=>outcomes.set(stage,{outcome,smtpReplyCategory});
   let result,error;
   try{
     const message=await runEmailStage("BUILD_MESSAGE",()=>buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}),capture);
@@ -197,7 +175,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
     error=err;
     if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,"failure");
   }
-  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory,result.metadata||{})}catch{}}
+  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory)}catch{}}
   if(error)throw error;
   return result;
 }
