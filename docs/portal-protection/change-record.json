@@ -3,41 +3,76 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Meeting Portal"
+      "Board Members Portal",
+      "Communication and Media Portal",
+      "Grants Intelligence and Funding Opportunities Portal",
+      "Invitation Portal",
+      "Meeting Portal",
+      "Members and Employees Portal",
+      "Signature Portal"
     ],
-    "reason": "Implement the owner-approved fail-closed REAL/TRIAL meeting deletion boundary. A meeting is REAL by default; only an administrator explicitly creating it as TRIAL can mark it TRIAL. Environment is immutable after creation. Only administrators may delete explicitly TRIAL meetings, with all existing safeguards retained. REAL, missing and invalid environments are non-deletable.",
+    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
     "files": [
-      "drive-gateway/src/meetingServices.mjs"
+      "src/components/SignaturePathwaySelfTest.jsx",
+      "tests/signature-self-test-session-safety.test.mjs",
+      "package.json",
+      "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
+      ".github/workflows/email-signing-contract.yml",
+      "tests/signature-pathway-contract.test.mjs"
     ],
-    "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
+    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
     "prohibitedChanges": [
-      "Never delete REAL or unclassified meetings.",
-      "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
-      "Do not change signing, sign-in, invitations, email-link rules, SMTP, secrets, Firestore rules or production deployment."
+      "Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.",
+      "Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.",
+      "Do not change Firestore rules, indexes, production records, signing permissions or authentication/session lifecycle.",
+      "Do not deploy production resources as part of this merge."
     ]
   },
   "repairWindow": {
-    "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-21T20:23:03Z",
+    "openedAt": "2026-11-20T09:18:00Z",
+    "lastActivityAt": "2026-11-20T09:23:00Z",
     "emergency": false
   },
   "baseline": {
-    "commit": "5fa8d46deeeb96c3172a1798411c18f57991855d",
-    "rollbackCommit": "5fa8d46deeeb96c3172a1798411c18f57991855d"
+    "commit": "21f33960395e09d9da74f030732e43558eac6e6d",
+    "rollbackCommit": "21f33960395e09d9da74f030732e43558eac6e6d"
   },
   "validation": {
-    "baselineSmoke": "PENDING",
+    "baselineSmoke": "PASS",
     "portalSmoke": {
-      "Meeting Portal": "PENDING"
+      "Board Members Portal": "PASS",
+      "Communication and Media Portal": "PASS",
+      "Grants Intelligence and Funding Opportunities Portal": "PASS",
+      "Invitation Portal": "PASS",
+      "Meeting Portal": "PASS",
+      "Members and Employees Portal": "PASS",
+      "Signature Portal": "PASS"
     },
-    "fullRegression": "PENDING",
+    "dependentSmoke": {
+      "Signature owner profile and independent submission regression": "PASS — CI run 44870080649 complete root test suite; browser signature ceremony tests in run 44870080291",
+      "Meeting Portal shared-component regression": "PASS — CI run 44870080649 complete root test suite",
+      "Production application build": "PASS — CI run 44870080649",
+      "Complete root test suite": "PASS — CI run 44870080649"
+    },
+    "fullRegression": "PASS",
     "behaviourDifferences": [
-      "Environment is immutable after creation.",
-      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable."
+      "Owner Signature Profile assets now use the owner-authorized Drive download route rather than the envelope-scoped signer route that requires documentId and envelopeId.",
+      "Envelope-scoped signature-file retrieval remains unchanged for actual signing.",
+      "Prepare Envelope submit and save-draft controls are moved to a separate sticky control bar above the PDF designer/navigation.",
+      "No Meeting Portal workflow behavior is changed.",
+      "The main Signature Pathway Self-Test no longer automatically runs the separate Google Drive token-refresh health request; the operator can still run it explicitly.",
+      "Self-test-only Gateway reconciliation and controlled-document download requests reject redirects rather than following an interactive login gateway.",
+      "The existing diagnostic contract test now asserts the self-test-specific Gateway request helper and redirect rejection."
     ],
     "evidence": [
-      "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
-      "No test result has been manually marked PASS; CI logs are required before validation is updated."
+      "Verified production frontend baseline before this repair: main commit 21f33960395e09d9da74f030732e43558eac6e6d.",
+      "Complete root test suite and application build passed in CI run 44870080649.",
+      "Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.",
+      "Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx.",
+      "PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair.",
+      "Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite.",
+      "Seven-portal protection smoke tests passed in email-signing-contract CI run 44881398093 (job step: Run seven-portal protection smoke tests); the self-test component at this point already contained the final self-test-only Gateway request isolation. A later commit only updated a legacy source-contract assertion and governance documentation.",
+      "The dedicated self-test session-safety regression is now an explicit step in .github/workflows/email-signing-contract.yml and runs after frontend dependency installation."
     ]
   },
   "closure": {
@@ -336,70 +371,5 @@
         "evidence": []
       }
     }
-  },
-  "priorDeclaration": {
-    "affectedPortals": [
-      "Board Members Portal",
-      "Communication and Media Portal",
-      "Grants Intelligence and Funding Opportunities Portal",
-      "Invitation Portal",
-      "Meeting Portal",
-      "Members and Employees Portal",
-      "Signature Portal"
-    ],
-    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
-    "files": [
-      "src/components/SignaturePathwaySelfTest.jsx",
-      "tests/signature-self-test-session-safety.test.mjs",
-      "package.json",
-      "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
-      ".github/workflows/email-signing-contract.yml",
-      "tests/signature-pathway-contract.test.mjs"
-    ],
-    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
-    "prohibitedChanges": [
-      "Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.",
-      "Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.",
-      "Do not change Firestore rules, indexes, production records, signing permissions or authentication/session lifecycle.",
-      "Do not deploy production resources as part of this merge."
-    ]
-  },
-  "priorValidation": {
-    "baselineSmoke": "PASS",
-    "portalSmoke": {
-      "Board Members Portal": "PASS",
-      "Communication and Media Portal": "PASS",
-      "Grants Intelligence and Funding Opportunities Portal": "PASS",
-      "Invitation Portal": "PASS",
-      "Meeting Portal": "PASS",
-      "Members and Employees Portal": "PASS",
-      "Signature Portal": "PASS"
-    },
-    "dependentSmoke": {
-      "Signature owner profile and independent submission regression": "PASS — CI run 44870080649 complete root test suite; browser signature ceremony tests in run 44870080291",
-      "Meeting Portal shared-component regression": "PASS — CI run 44870080649 complete root test suite",
-      "Production application build": "PASS — CI run 44870080649",
-      "Complete root test suite": "PASS — CI run 44870080649"
-    },
-    "fullRegression": "PASS",
-    "behaviourDifferences": [
-      "Owner Signature Profile assets now use the owner-authorized Drive download route rather than the envelope-scoped signer route that requires documentId and envelopeId.",
-      "Envelope-scoped signature-file retrieval remains unchanged for actual signing.",
-      "Prepare Envelope submit and save-draft controls are moved to a separate sticky control bar above the PDF designer/navigation.",
-      "No Meeting Portal workflow behavior is changed.",
-      "The main Signature Pathway Self-Test no longer automatically runs the separate Google Drive token-refresh health request; the operator can still run it explicitly.",
-      "Self-test-only Gateway reconciliation and controlled-document download requests reject redirects rather than following an interactive login gateway.",
-      "The existing diagnostic contract test now asserts the self-test-specific Gateway request helper and redirect rejection."
-    ],
-    "evidence": [
-      "Verified production frontend baseline before this repair: main commit 21f33960395e09d9da74f030732e43558eac6e6d.",
-      "Complete root test suite and application build passed in CI run 44870080649.",
-      "Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.",
-      "Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx.",
-      "PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair.",
-      "Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite.",
-      "Seven-portal protection smoke tests passed in email-signing-contract CI run 44881398093 (job step: Run seven-portal protection smoke tests); the self-test component at this point already contained the final self-test-only Gateway request isolation. A later commit only updated a legacy source-contract assertion and governance documentation.",
-      "The dedicated self-test session-safety regression is now an explicit step in .github/workflows/email-signing-contract.yml and runs after frontend dependency installation."
-    ]
   }
 }
