@@ -36,7 +36,17 @@ test("owner signs in the portal before any other signer is invited; completing o
   const sent=[];let now=NOW;
   const ctx=buildEsignContext({
     env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
-    now:()=>new Date(now),verifyUser:async()=>null,sendInvitation:async message=>sent.push(message),logger:{error(){}}
+    now:()=>new Date(now),verifyUser:async()=>null,sendInvitation:async message=>{
+      sent.push(message);
+      for(const stage of ["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"]){
+        const accepted=["RCPT_ACCEPTED","SUBMIT"].includes(stage);
+        await message.onStage?.(stage,"success",accepted?"ACCEPTED":"UNKNOWN",{
+          messageId:"<owner-first-"+sent.length+"@irpa.or.tz>",
+          smtpReplyCode:250,
+          smtpReply:stage==="SUBMIT"?"250 2.0.0 queued":stage==="RCPT_ACCEPTED"?"250 2.1.5 recipient accepted":"250 OK"
+        });
+      }
+    },logger:{error(){}}
   });
   const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
   const source=await ctx.storage.put({path:"source/owner-first.pdf",bytes,contentType:"application/pdf",metadata:{}});
@@ -70,6 +80,13 @@ test("owner signs in the portal before any other signer is invited; completing o
   const stored=await ctx.meta.get("envelopes",created.envelopeId);
   assert.equal(stored.signers[0].status,"Signed");
   assert.equal(stored.signers[1].invitation,"Sent");
+  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.started").length,1);
+  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.sent").length,1);
+  const delivery=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(delivery.signers[1].delivery.status,"Accepted by mail server");
+  assert.equal(delivery.signers[1].delivery.stageCode,"SUBMIT");
+  assert.equal(delivery.signers[1].delivery.smtpReplyCode,250);
+  assert.equal(delivery.signers[1].delivery.handoffStatus,"sent");
 });
 
 test("invalid token failures are rate-limited by token and IP with one neutral response",async()=>{
