@@ -12,7 +12,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, buildSmtpRecipientEnvelope, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, buildSigningInvitationAuditMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 
@@ -582,15 +582,9 @@ export default {
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
               const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"||ownerProfile.isOwner===true||String(ownerProfile.role||"").trim().toLowerCase()==="owner"};
             },
-            sendInvitationAudit: async ({recipientPrefix,position,positionCount,title,envelopeId,messageId,smtpReplyCategory,stageCode,at}) => {
-              const safeTitle=String(title||"Controlled document").replace(/[\\r\\n]+/g," ").slice(0,180);
-              const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...";
-              const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
-              const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" of "+Number(positionCount||1)+" - "+safeTitle;
-              const result=stageCode?"Stage code: "+stageCode:"SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN");
-              const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\n"+result;
-              const html="<p><strong>Time (EAT):</strong> "+escapeMailHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeMailHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeMailHtml(messageId||"Not recorded")+"</p><p>"+escapeMailHtml(result)+"</p>";
-              return smtpSend(env,{to:"info@irpa.or.tz",subject,text,html,fromName:"IRPA Digital Signing"});
+            sendInvitationAudit: async details => {
+              const message=buildSigningInvitationAuditMessage(details);
+              return smtpSend(env,{...message,fromName:"IRPA Digital Signing"});
             },
             sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,positionCount,invitationKind="creation",onStage,onAudit}) => {
               const recipient=validateRecipient(to);
@@ -599,7 +593,7 @@ export default {
               const safeTitle=String(title||"Controlled document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA signer").replace(/[\r\n]+/g," ").slice(0,160);
               const firstName=safeName.split(/\s+/)[0]||"Signer";
-              const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName;
+              const subject="Please sign: "+safeTitle+" - "+firstName+" (position "+(Number(position)||1)+" of "+(Number(positionCount)||1)+")";
               let lastStage="BUILD_MESSAGE",lastCategory="UNKNOWN",result=null,failure=null;
               const captureStage=async(stage,outcome,category,metadata={})=>{
                 lastStage=String(stage||lastStage);
