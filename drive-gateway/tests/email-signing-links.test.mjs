@@ -476,6 +476,7 @@ test("invitation audit message includes only a three-character recipient prefix 
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
   assert.match(audit.text,/Recipient domain: gmail\.com/);
   assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
+});
 
 
 test("signing invitation uses one distinct Message-ID per signer position and the exact ordinal subject",()=>{
