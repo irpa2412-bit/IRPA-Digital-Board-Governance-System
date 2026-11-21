@@ -14,6 +14,22 @@ import "./styles/mobile-app-enhancement.css";
 import "./styles/page-back-next-navigation.css";
 import "./styles/grant-intelligence-layout.css";
 
+function clearLegacySignatureSelfTestResultsAtStartup() {
+  if (typeof window === "undefined") return;
+  try {
+    for (const storage of [window.localStorage, window.sessionStorage]) {
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+        if (key && /signature[._-]?pathway[._-]?self[._-]?test|signature[._-]?self[._-]?test[._-]?(results|data)/i.test(key)) storage.removeItem(key);
+      }
+    }
+  } catch {
+    // Storage may be unavailable; the self-test keeps results in component memory only.
+  }
+}
+clearLegacySignatureSelfTestResultsAtStartup();
+
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     const hadController = Boolean(navigator.serviceWorker.controller);
