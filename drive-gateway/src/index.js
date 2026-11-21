@@ -589,9 +589,9 @@ export default {
               const subject="IRPA SMTP self-check "+new Date().toISOString();
               const text="This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System. Acceptance by the mail server does not confirm inbox delivery.";
               const html="<p>This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System.</p><p>Acceptance by the mail server does not confirm inbox delivery.</p>";
-              const rawMime=buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to:recipient,subject,text,html,messageId,date});
               const stages=[];
               const onStage=async(stageCode,outcome,smtpReplyCategory="UNKNOWN",details={})=>stages.push({stageCode,outcome,smtpReplyCategory,at:new Date().toISOString(),messageId:details.messageId||messageId,...(details.smtpReplyCode?{smtpReplyCode:details.smtpReplyCode}:{}),...(details.smtpReply?{smtpReply:details.smtpReply}:{})});
+              const rawMime=await runEmailStage("BUILD_MESSAGE",()=>buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to:recipient,subject,text,html,messageId,date}),onStage,{messageId,date});
               try{
                 const smtpReply=await smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage});
                 return {ok:true,acceptedByMailServer:true,deliveryMeaning:"Accepted by the mail server is not proof of inbox delivery.",messageId,smtpReply,stages};
