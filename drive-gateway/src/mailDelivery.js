@@ -3,7 +3,8 @@ export const RETRY_BACKOFF_MS = [250, 500];
 
 export function normalizeRecipientEmail(value) {
   const email = String(value || "").trim().toLowerCase();
-  if (!email || email.includes("\r") || email.includes("\n") || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  const valid = /^[^\\s@<>"',;\\\\]+@[^\\s@<>"',;\\\\]+\\.[^\\s@<>"',;\\\\]+$/.test(email);
+  if (!email || email.includes("\\r") || email.includes("\\n") || !valid) {
     throw new Error("A valid recipient email address is required.");
   }
   return email;
