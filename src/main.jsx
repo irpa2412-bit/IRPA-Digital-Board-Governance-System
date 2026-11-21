@@ -12,6 +12,13 @@ import "./styles/portal-typography.css";
 import "./styles/shared-header-hero.css";
 import "./styles/mobile-app-enhancement.css";
 import "./styles/page-back-next-navigation.css";
+
+// Diagnostic output is intentionally ephemeral and must never survive a workspace restart.
+for (const storage of [window.sessionStorage, window.localStorage]) {
+  try {
+    for (const key of ["irpaSignatureSelfTestResults", "signaturePathwaySelfTestResults", "irpaSelfTestResults"]) storage.removeItem(key);
+  } catch { /* Storage may be unavailable in restricted browser contexts. */ }
+}
 import "./styles/grant-intelligence-layout.css";
 
 if ("serviceWorker" in navigator) {
