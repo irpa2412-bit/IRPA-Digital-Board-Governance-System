@@ -123,8 +123,8 @@ export default function EmailSigningReadOnlyPage({token}){
   if(field.type==="Checkbox")return field.required?value==="true":value!==undefined;
   return value!==undefined&&String(value).trim()!=="";
  };
- const incomplete=fields.filter(field=>!complete(field));
- const canReview=Boolean(record)&&pageRendered;
+ const incomplete=fields.filter(field=>field.required&&!complete(field));
+ const canReview=Boolean(record)&&Boolean(pdfDocument);
  const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
 
  function canvasPoint(event){const canvas=signatureCanvasRef.current,rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*(canvas.width/rect.width),y:(event.clientY-rect.top)*(canvas.height/rect.height)};}
@@ -148,8 +148,7 @@ export default function EmailSigningReadOnlyPage({token}){
  function clearPad(){const canvas=signatureCanvasRef.current;if(canvas)canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);setSignatureMarks(current=>{const next={...current};delete next[selectedFieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
  function enterReview(){
   if(!record){setError("The signing assignment is unavailable.");return;}
-  if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
-  if(incomplete.length){setError("Complete every responsibility and its assigned fields before final review. "+incomplete.length+" field(s) remain.");return;}
+  if(!pdfDocument){setError("The controlled document is not ready for review.");return;}
   setError("");setReviewMode(true);if(pageNum!==1){setPageRendered(false);setPageNum(1);}
  }
  async function openDocumentToSign(){
@@ -274,7 +273,7 @@ export default function EmailSigningReadOnlyPage({token}){
     {!signatureFields.length&&(savedProfile||showSigningPane)&&<label style={{display:"block",margin:"14px 0"}}>Typed signature<input style={inputStyle} disabled={signingClosed} value={typedSignature} onChange={e=>setTypedSignature(e.target.value)} placeholder="Type your full name as your signature"/></label>}
     <label style={{display:"flex",gap:9,alignItems:"flex-start",margin:"18px 0"}}><input type="checkbox" checked={consent} disabled={signingClosed} onChange={e=>setConsent(e.target.checked)}/><span>I have reviewed the complete document, understand its contents and the marked signature location(s), and consent to apply my electronic signature.</span></label>
     {!record.canSign&&<p role="status">Your assignment is waiting for the preceding action. You may review the document, but cannot submit yet.</p>}
-    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)||incomplete.length>0} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError)||incomplete.length>0)?0.5:1}}>Review complete document and signature placement</button>}
+    {!reviewMode&&!signingClosed&&<button type="button" disabled={!canReview||!pdfDocument||Boolean(pageError)} onClick={enterReview} style={{...buttonStyle,opacity:(!canReview||!pdfDocument||Boolean(pageError))?0.5:1}}>Review complete document and signature placement</button>}
     {reviewMode&&!signingClosed&&<section style={{marginTop:16,padding:12,border:"2px solid #174a78",borderRadius:8}}>
      <h2 style={{fontSize:18,marginTop:0}}>Final review — signature not yet submitted</h2>
      <p style={{fontSize:13}}>Navigate through every page above. Confirm that the complete document is correct and that each stamp appears at the intended location. Changes to assigned fields update this preview. Your signature has not been submitted yet.</p>
