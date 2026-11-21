@@ -67,7 +67,8 @@ function emailDeliveryFailureForSigner(envelope,signer){
   let latestIndex=-1;
   for(let index=events.length-1;index>=0;index--)if(events[index]?.signerId===signer.id&&relevantTypes.has(events[index]?.type)){latestIndex=index;break;}
   const latest=latestIndex>=0?events[latestIndex]:null;
-  const failed=latest?.type==="invitation.resend.failed"||latest?.deliveryStatus==="Failed"||(!latest&&signer.invitation==="Failed");
+  const linkStatus=String(signer.emailLinkStatus||"").trim().toLowerCase();
+  const failed=latest?.type==="invitation.resend.failed"||latest?.deliveryStatus==="Failed"||(!latest&&(signer.invitation==="Failed"||["send failed","failed"].includes(linkStatus)));
   if(!failed)return null;
   const stageEvent=events.slice(0,latestIndex>=0?latestIndex+1:events.length).filter(event=>event?.type==="email_link.stage"&&event.signerId===signer.id&&event.outcome==="failure").at(-1)||null;
   return{signerId:signer.id,name:signer.name||"Signer",email:signer.email||"",deliveryStatus:"Failed",stageCode:stageEvent?.stage||latest?.stageCode||signer.deliveryStageCode||"SUBMIT",smtpReplyCategory:stageEvent?.smtpReplyCategory||"UNKNOWN",smtpResponseCode:stageEvent?.smtpResponseCode||null,smtpEnhancedStatusCode:stageEvent?.smtpEnhancedStatusCode||null,errorCode:stageEvent?.errorCode||null,failedAt:latest?.at||stageEvent?.at||null};
@@ -81,6 +82,7 @@ async function notifySenderOfFailedDeliveries(ctx,user,envelopeId,signerIds){
   const failures=uniqueIds.map(id=>envelope.signers.find(signer=>signer.id===id)).filter(Boolean).map(signer=>emailDeliveryFailureForSigner(envelope,signer)||{signerId:signer.id,name:signer.name||"Signer",email:signer.email||"",deliveryStatus:"Failed",stageCode:signer.deliveryStageCode||"SUBMIT",smtpReplyCategory:"UNKNOWN",smtpResponseCode:null,smtpEnhancedStatusCode:null,errorCode:null,failedAt:ctx.now().toISOString()});
   if(!failures.length)return{status:"not-required",failed:0};
   const senderEmail=String(user?.email||"").trim();
+  if(!senderEmail||typeof ctx.sendDeliveryReport!=="function")return{status:"unavailable",failed:failures.length};
   const reportAt=ctx.now().toISOString();
   let reportStatus="unavailable";
   if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)&&typeof ctx.sendDeliveryReport==="function"){
@@ -490,7 +492,7 @@ export async function resendAllUnsignedInvitations(ctx,user,id){
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
   if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
-  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed"&&(signer.invitation==="Failed"||signer.invitation==="Pending"||emailDeliveryFailureForSigner(envelope,signer)));
+  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed");
   const results=[];
   for(const signer of targets){
     try{results.push(await resendInvitation(ctx,user,id,signer.id,{sendFailureReport:false}));}
@@ -499,6 +501,21 @@ export async function resendAllUnsignedInvitations(ctx,user,id){
   const failedSignerIds=results.filter(item=>item.ok===false).map(item=>item.signerId);
   if(failedSignerIds.length)await notifySenderOfFailedDeliveries(ctx,user,id,failedSignerIds);
   return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:results.filter(item=>item.ok===false).length,results};
+}
+
+export async function retryFailedInvitations(ctx,user,id){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+  if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
+  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed"&&(signer.invitation==="Failed"||signer.invitation==="Pending"||["send failed","failed"].includes(String(signer.emailLinkStatus||"").trim().toLowerCase())||emailDeliveryFailureForSigner(envelope,signer)));
+  const results=[];
+  for(const signer of targets){
+    try{results.push(await resendInvitation(ctx,user,id,signer.id,{sendFailureReport:false}));}
+    catch(error){results.push({ok:false,signerId:signer.id,stageCode:error?.code||"SUBMIT",error:String(error?.message||"Delivery failed.")});}
+  }
+  const failedSignerIds=results.filter(item=>item.ok===false).map(item=>item.signerId);
+  if(failedSignerIds.length)await notifySenderOfFailedDeliveries(ctx,user,id,failedSignerIds);
+  return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:failedSignerIds.length,results};
 }
 
 export async function updateSignerContact(ctx,user,id,signerId,{email,name}={}){
