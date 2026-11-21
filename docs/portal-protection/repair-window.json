@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-21T07:42:00Z",
+  "lastActivityAt": "2026-11-21T07:44:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -42,7 +42,8 @@
     "vite.meeting-fixture.config.js",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "src/components/SignaturePathwaySelfTest.jsx",
-    "tests/signature-self-test-session-safety.test.mjs"
+    "tests/signature-self-test-session-safety.test.mjs",
+    "drive-gateway/tests/signature-workflow-draft-route.test.mjs"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
@@ -191,6 +192,11 @@
       "at": "2026-11-21T07:42:00Z",
       "action": "scope-amended",
       "description": "Owner-authorised Signature Pathway Self-Test repair: prevent diagnostic Gateway calls from following authentication redirects into the interactive login gateway. Scope is limited to the self-test component, its regression test and root test-suite registration; shared signature storage, Meeting Portal behavior, records, secrets, Firestore rules and deployment configuration remain unchanged."
+    },
+    {
+      "at": "2026-11-21T07:44:00Z",
+      "action": "repair",
+      "description": "Kept shared signature storage unchanged and updated the existing single-document diagnostic contract test to assert the self-test's isolated redirect-safe Gateway helper. The regression remains scoped to Signature Portal."
     }
   ],
   "durationHours": 48,
