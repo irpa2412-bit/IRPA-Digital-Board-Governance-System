@@ -1,4 +1,5 @@
 import { isTrialMeeting, meetingEnvironment } from "./meetingEnvironment.mjs";
+import { MEETING_CHILD_COLLECTIONS, buildMeetingDeletionPreview, validateMeetingDeletion } from "./meetingDeletion.mjs";
 const clean = v => String(v ?? "").trim();
 const lower = v => clean(v).toLowerCase();
 const denied = new Set(["cancelled","canceled","revoked","removed","inactive","closed"]);
@@ -502,16 +503,91 @@ await patchDoc(ctx,env,token,"meetings",meetingId,changed);
 await audit(ctx,env,token,claims,"MEETING_REGISTER_UPDATED",current,meetingId,{changedFields:Object.keys(changed)});
 return response(ctx,request,{ok:true,meetingId,changedFields:Object.keys(changed)});
 }
+const loadMeetingChildren = async meetingId => (await Promise.all(
+  MEETING_CHILD_COLLECTIONS.map(async collection =>
+    (await listByField(ctx,env,token,collection,"meetingId",meetingId))
+      .map(record => ({ collection, record }))
+  )
+)).flat();
+
+if(pathname==="/api/meeting-register/delete-preview"){
+const meetingId=clean(data.meetingId);
+if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
+const c=await context(ctx,env,token,claims,meetingId);
+if(!c.isAdmin)return fail(ctx,request,"Only an authorised administrator may preview meeting deletion.",403);
+if(!c.meeting)return fail(ctx,request,"Meeting not found.",404);
+if(!isTrialMeeting(c.meeting))return fail(ctx,request,"Only an explicitly TRIAL meeting may be previewed for deletion. Missing or invalid environment is treated as REAL.",409);
+const childRecords=await loadMeetingChildren(meetingId);
+const preview=await buildMeetingDeletionPreview(meetingId,c.meeting,childRecords);
+return response(ctx,request,{
+  ok:true,
+  environment:"TRIAL",
+  meetingId,
+  title:clean(c.meeting.title),
+  childCount:preview.childCount,
+  collectionCounts:preview.collectionCounts,
+  previewDigest:preview.previewDigest,
+  exportData:preview.exportData
+});
+}
+
 if(pathname==="/api/meeting-register/delete"){
 const meetingId=clean(data.meetingId);
+if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 if(!c.isAdmin)return fail(ctx,request,"Only an authorised administrator may delete a registered meeting.",403);
-// Fail closed: only the exact creation-time TRIAL marker permits an administrator to delete this meeting.
+if(!c.meeting)return fail(ctx,request,"Meeting not found.",404);
 if(!isTrialMeeting(c.meeting))return fail(ctx,request,"Only an explicitly TRIAL meeting may be deleted. Missing or invalid environment is treated as REAL.",409);
+const childRecords=await loadMeetingChildren(meetingId);
+const preview=await buildMeetingDeletionPreview(meetingId,c.meeting,childRecords);
+const validation=validateMeetingDeletion({
+  meeting:c.meeting,
+  reason:data.reason,
+  confirmationTitle:data.confirmationTitle,
+  previewDigest:data.previewDigest,
+  currentDigest:preview.previewDigest,
+  childRecords
+});
+if(!validation.ok)return fail(ctx,request,validation.message,validation.status);
 const base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/";
+const writes=childRecords.map(({collection,record})=>({
+  delete:base+collection+"/"+encodeURIComponent(record.id),
+  currentDocument:{updateTime:record.updateTime}
+}));
+writes.push({delete:base+"meetings/"+encodeURIComponent(meetingId),currentDocument:{updateTime:c.meeting.updateTime}});
 const auditId=crypto.randomUUID();
-await commitWrites(ctx,env,token,[{delete:base+"meetings/"+meetingId,currentDocument:{updateTime:c.meeting.updateTime}},{update:{name:base+"audit/"+auditId,fields:fields({action:"MEETING_REGISTER_DELETED",collection:"meetings",recordId:meetingId,details:{title:clean(c.meeting.title),meetingReference:clean(c.meeting.meetingReference||c.meeting.reference)},actorUid:c.uid,actorEmail:c.email||null,createdAt:new Date()})},currentDocument:{exists:false}}]);
-return response(ctx,request,{ok:true,meetingId,deleted:true});
+writes.push({
+  update:{
+    name:base+"audit/"+auditId,
+    fields:fields({
+      action:"TRIAL_MEETING_DELETED",
+      collection:"meetings",
+      recordId:meetingId,
+      details:{
+        title:clean(c.meeting.title),
+        meetingReference:clean(c.meeting.meetingReference||c.meeting.reference),
+        reason:validation.reason,
+        confirmationTitle:validation.confirmationTitle,
+        previewDigest:preview.previewDigest,
+        deletedChildCount:validation.childCount,
+        deletedChildCollections:validation.collectionCounts
+      },
+      actorUid:c.uid,
+      actorEmail:c.email||null,
+      createdAt:new Date()
+    })
+  },
+  currentDocument:{exists:false}
+});
+await commitWrites(ctx,env,token,writes);
+return response(ctx,request,{
+  ok:true,
+  meetingId,
+  deleted:true,
+  deletedChildCount:validation.childCount,
+  deletedChildCollections:validation.collectionCounts,
+  auditId
+});
 }
 if(pathname==="/api/meeting-voting/open"){
 const meetingId=clean(data.meetingId),reference=clean(data.votingReference),resolutionId=clean(data.resolutionId);
