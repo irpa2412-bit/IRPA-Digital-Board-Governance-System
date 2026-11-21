@@ -13,6 +13,24 @@ test("isolation baseline compares against the fetched current main snapshot", ()
   assert.ok(guard.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
 });
 
+test("TRIAL deletion repair is allowed only with its exact paired gateway and policy tests", () => {
+  assert.match(guard, /const meetingTrialDeletionFiles = new Set/);
+  assert.match(guard, /const meetingTrialDeletionGuard =/);
+  for (const path of [
+    "docs/implementation-status.md",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/src/meetingServices.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs",
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "scripts/portal-protection-check.mjs",
+    "tests/meeting-isolation-guard.test.mjs",
+    "tests/portal-protection-policy.test.mjs"
+  ]) assert.ok(guard.includes(path), `TRIAL deletion guard must pair ${path}`);
+  assert.match(guard, /!meetingTrialDeletionGuard/);
+});
+
 test("Wrangler changes cannot alter production configuration", () => {
   assert.match(guard, /if \(changed\.includes\(wranglerPath\)\)/);
   assert.match(guard, /productionSection\(baselineConfig, "Baseline Wrangler config"\) !== productionSection\(currentConfig, "Current Wrangler config"\)/);
