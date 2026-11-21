@@ -155,6 +155,7 @@ export async function runEmailStage(stage,action,onStage){
     safe.stageCode=stage;
     safe.smtpReplyCategory=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:classifySmtpReplyCategory(error,stage);
     if(response)safe.smtpResponseCode=Number(response[1]);
+    const message=String(error?.message||"");
     const enhanced=String(error?.smtpEnhancedStatusCode||((message.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1]||""));
     if(/^[245]\.\d\.\d{1,3}$/.test(enhanced))safe.smtpEnhancedStatusCode=enhanced;
     if(/^[A-Z0-9_-]{1,40}$/i.test(String(error?.code||"")))safe.code=String(error.code);
