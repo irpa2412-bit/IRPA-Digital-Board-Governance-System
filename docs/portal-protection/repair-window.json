@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-20T17:08:47Z",
+  "lastActivityAt": "2026-11-21T07:42:00Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -40,7 +40,9 @@
     "package.json",
     "tests/meeting-isolation-guard.test.mjs",
     "vite.meeting-fixture.config.js",
-    "scripts/meeting-portal-fixture-isolation-guard.sh"
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "src/components/SignaturePathwaySelfTest.jsx",
+    "tests/signature-self-test-session-safety.test.mjs"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
@@ -184,6 +186,11 @@
       "at": "2026-11-20T12:09:00Z",
       "action": "repair",
       "description": "Raised the isolated fixture banner's mobile font size from 11px to the repository's 12px readability floor after candidate-proof reported the single violation."
+    },
+    {
+      "at": "2026-11-21T07:42:00Z",
+      "action": "scope-amended",
+      "description": "Owner-authorised Signature Pathway Self-Test repair: prevent diagnostic Gateway calls from following authentication redirects into the interactive login gateway. Scope is limited to the self-test component, its regression test and root test-suite registration; shared signature storage, Meeting Portal behavior, records, secrets, Firestore rules and deployment configuration remain unchanged."
     }
   ],
   "durationHours": 48,
