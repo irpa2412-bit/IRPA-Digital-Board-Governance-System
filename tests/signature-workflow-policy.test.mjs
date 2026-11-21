@@ -11,7 +11,7 @@ test("Signature Portal exposes a recipient-level failed invitation delivery repo
   assert.match(portal,/deliveryReport\.failures\.map/);
   assert.match(portal,/smtpReplyCategory/);
   assert.match(portal,/Retry only pending or failed invitations/);
-  assert.match(storage,/invitations\/resend-all/);
+  assert.match(storage,/invitations\/retry-failed/);
   const gateway=fs.readFileSync("drive-gateway/src/signing.mjs","utf8");
   assert.match(gateway,/deliveryReport=\{failed:failures\.length,failures/);
   assert.match(gateway,/email_delivery_report\./);
