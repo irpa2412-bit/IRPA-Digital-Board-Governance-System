@@ -13,7 +13,7 @@ jobs:
   email-signing-contract:
     name: email-signing-contract
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,7 +33,24 @@ jobs:
         run: node --test drive-gateway/tests/email-signing-links.integration.test.mjs
       - name: Install frontend dependencies
         run: npm ci
+      - name: Set up Java for isolated Firebase browser emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install emulator-only fixture seeding dependency
+        run: npm --prefix functions install --omit=dev
+      - name: Install Playwright for startup smoke
+        run: npm install --no-save --package-lock=false @playwright/test
+      - name: Install Chromium for startup smoke
+        run: npx playwright install --with-deps chromium
+      - name: Run clean and mocked signed-in startup smoke at Android and desktop widths
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/signature-self-test-startup.spec.mjs --workers=1"
       - name: Run Signature Pathway Self-Test session-safety regression
         run: npm run test:signature-self-test
+      - name: Smoke-test public production entry bundles and every imported chunk on both hosts
+        run: node scripts/signature-self-test-public-assets-smoke.mjs
       - name: Run seven-portal protection smoke tests
         run: node scripts/portal-protection-smoke.mjs
+      - name: Run full repository regression suite
+        run: npm run test:all
