@@ -574,7 +574,7 @@ test("d) parallel signing sends every signer position at envelope creation witho
   assert.equal(created.invitations.length,3);
 });
 
-test("f) an owner mailbox matching a signer address does not suppress that signer's invitation",async()=>{
+test("c) the owner's IRPA address at position 1 is emailed and Gmail X is automatically emailed at position 2",async()=>{
   const f=await fixture(),sent=[];
   f.ctx.sendInvitation=async message=>sent.push(message);
   const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false},{
@@ -698,4 +698,29 @@ test("mock SMTP proves creation, resend and resend-all RCPT TO and To header equ
   assert.equal(bulk.attempted,3);
   assert.equal(bulk.failed,0);
   assertTrace(sent,expected);
+});
+
+
+test("f) the owner's IRPA address at a later signer position is not deduplicated against the owner account",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-F-LATER-OWNER-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[
+      {identityType:"email-link",email:"gmail-x@gmail.com",name:"Gmail X",order:1},
+      {identityType:"email-link",email:"owner@irpa.or.tz",name:"Owner-address signer",order:2}
+    ],
+    fields:[1,2].map(index=>({fieldId:"F-LATER-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,"gmail-x@gmail.com");
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.74");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"F-LATER-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Gmail X"}});
+  assert.equal(result.nextInvitations.status,"sent");
+  assert.equal(sent.length,2);
+  assert.equal(sent[1].signerId,"S2");
+  assert.equal(sent[1].to,"owner@irpa.or.tz","the owner's address is still the assigned recipient for that signer position");
 });
