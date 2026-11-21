@@ -286,7 +286,7 @@ test("smtp-selfcheck rejects non-admin and non-owner callers before invoking SMT
 test("smtp-selfcheck permits an authenticated system owner and invokes exactly one send",async()=>{
   let sends=0;
   const ctx=makeContext({verifyUser:async()=>({uid:"system-owner",isAdmin:false,isOwner:true}),smtpSelfCheck:async()=>{sends++;return{ok:true,stageCode:"SUBMIT"}}});
-  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST"}),ctx);
+  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({to:"owner@example.org"})}),ctx);
   assert.equal(response.status,200);
   assert.equal(sends,1);
   assert.deepEqual(await response.json(),{ok:true,stageCode:"SUBMIT"});
