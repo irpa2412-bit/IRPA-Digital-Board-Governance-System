@@ -14,18 +14,17 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient,validateRecipient} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
 import {buildSmtpRecipientEnvelope} from "../src/mailDelivery.js";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
-import {buildSmtpRecipientEnvelope} from "../src/mailDelivery.js";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
 test("email signing invitation clearly states its EAT expiry",()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
+import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
   assert.match(message.text,/Link expiry:.*EAT/i);
   assert.match(message.text,/after expiry or replacement/i);
   assert.match(message.html,/Link expiry:.*EAT/i);
@@ -121,7 +120,7 @@ test("registered login-based signing access remains UID-bound", () => {
 });
 
 test("email invitation has real plain-text newlines and one HTML/plain-text SMTP send",async()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
+import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
   assert.match(message.text,/\nDocument: Board Policy/);
   assert.doesNotMatch(message.text,/\\n/);
   assert.match(message.html,/href=/);
