@@ -582,16 +582,18 @@ export default {
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
               const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"||ownerProfile.isOwner===true||String(ownerProfile.role||"").trim().toLowerCase()==="owner"};
             },
-            sendInvitationAudit: async ({recipientPrefix,position,positionCount,title,envelopeId,messageId,smtpReplyCategory,stageCode,at}) => {
-              const safeTitle=String(title||"Controlled document").replace(/[\\r\\n]+/g," ").slice(0,180);
+            sendInvitationAudit: async ({recipientPrefix,recipientDomain:domain,position,positionCount,title,envelopeId,messageId,smtpReplyCategory,stageCode,invitationKind,at}) => {
+              const safeTitle=String(title||"Controlled document").replace(/[\r\n]+/g," ").slice(0,180);
+              const safeDomain=String(domain||"unknown").toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,253)||"unknown";
+              const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...@"+safeDomain;
               const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
-              const subject="AUDIT: invitation to "+String(recipientPrefix||"").slice(0,3)+"... position "+Number(position||1)+" of "+Number(positionCount||1)+" - "+safeTitle;
-              const detail=stageCode?"Stage code: "+stageCode:"SMTP reply category: "+String(smtpReplyCategory||"ACCEPTED");
-              const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nSigner position: "+Number(position||1)+" of "+Number(positionCount||1)+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\n"+detail;
-              const html="<p><strong>Time (EAT):</strong> "+escapeMailHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeMailHtml(envelopeId||"")+"</p><p><strong>Signer position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeMailHtml(messageId||"Not recorded")+"</p><p>"+escapeMailHtml(detail)+"</p>";
+              const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" - "+safeTitle;
+              const result=stageCode?"Stage code: "+stageCode:"SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN");
+              const text="Time (EAT): "+when+"\nEnvelope ID: "+String(envelopeId||"")+"\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\nMessage-ID: "+String(messageId||"Not recorded")+"\nType: "+(invitationKind==="resend"?"resend":"creation")+"\n"+result+"\nRecipient domain: "+safeDomain;
+              const html="<p><strong>Time (EAT):</strong> "+escapeMailHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeMailHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeMailHtml(messageId||"Not recorded")+"</p><p><strong>Type:</strong> "+(invitationKind==="resend"?"resend":"creation")+"</p><p>"+escapeMailHtml(result)+"</p><p><strong>Recipient domain:</strong> "+escapeMailHtml(safeDomain)+"</p>";
               return smtpSend(env,{to:"info@irpa.or.tz",subject,text,html,fromName:"IRPA Digital Signing"});
             },
-            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,positionCount,invitationKind="creation",onStage}) => {
+            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,positionCount,invitationKind="creation",onStage,onAudit}) => {
               const recipient=validateRecipient(to);
               if(!recipient){const invalid=new Error("Invalid signer email address.");invalid.stageCode="BUILD_MESSAGE";throw invalid;}
               const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
@@ -600,10 +602,10 @@ export default {
               const firstName=safeName.split(/\s+/)[0]||"Signer";
               const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName;
               let lastStage="BUILD_MESSAGE",lastCategory="UNKNOWN",result=null,failure=null;
-              const captureStage=async(stage,outcome,category)=>{
+              const captureStage=async(stage,outcome,category,metadata={})=>{
                 lastStage=String(stage||lastStage);
                 if(category)lastCategory=String(category);
-                try{await onStage?.(stage,outcome,category);}catch{}
+                try{await onStage?.(stage,outcome,category,metadata);}catch{}
               };
               try{
                 if(!emailLink){
@@ -625,18 +627,7 @@ export default {
                 lastStage=String(error?.stageCode||lastStage);
                 lastCategory=String(error?.smtpReplyCategory||lastCategory);
               }
-              try{
-                const [localPart,domain]=recipient.split("@");
-                const maskedRecipient=String(recipient).slice(0,3)+"...";
-                const auditTime=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date())+" EAT";
-                const auditSubject="AUDIT: invitation to "+maskedRecipient+" position "+(Number(position)||1)+" of "+(Number(positionCount)||1)+" - "+safeTitle;
-                const auditText="Time: "+auditTime+"\nEnvelope ID: "+String(envelopeId||"")+
-                  "\nPosition: "+(Number(position)||1)+" of "+(Number(positionCount)||1)+
-                  "\nMessage-ID: "+messageId+"\nType: "+(invitationKind==="resend"?"resend":"creation")+
-                  "\nSMTP reply category: "+lastCategory+"\nStage code: "+lastStage+
-                  "\nRecipient domain: "+domain;
-                await smtpSend(env,{to:"info@irpa.or.tz",subject:auditSubject,text:auditText,html:"<p>"+escapeMailHtml(auditText).replace(/\n/g,"<br>")+"</p>",fromName:"IRPA Digital Signing"});
-              }catch(auditError){
+              try{await onAudit?.({messageId,smtpReplyCategory:lastCategory,stageCode:failure?lastStage:null});}catch(auditError){
                 console.error("SIGNING_INVITATION_AUDIT_EMAIL_FAILED",{envelopeId:String(envelopeId||""),signerId:String(signerId||""),stageCode:lastStage,errorType:String(auditError?.name||"Error")});
               }
               if(failure)throw failure;
@@ -3094,7 +3085,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromNam
   if(!/^<[^<>\s@]+@irpa\.or\.tz>$/.test(generatedMessageId))throw new Error("Invalid signing email Message-ID.");
   const reportStage=async(stage,outcome,category)=>onStage?.(stage,outcome,stage==="SUBMIT"&&outcome==="success"?"ACCEPTED":category,{messageId:generatedMessageId,smtpReplyCategory:stage==="SUBMIT"&&outcome==="success"?"ACCEPTED":category||"UNKNOWN"});
   const envelope=await runEmailStage("BUILD_MESSAGE",()=>buildSmtpRecipientEnvelope({from:fromHeader,to:toEmail,subject:cleanSubject,text,html,attachments}),reportStage);
-  const mime=envelope.mime.replace(/\\r\\n\\r\\n/,"\\r\\nMessage-ID: "+generatedMessageId+"\\r\\nDate: "+new Date().toUTCString()+"\\r\\n\\r\\n");
+  const mime=envelope.mime.replace(/\r\n\r\n/,"\r\nMessage-ID: "+generatedMessageId+"\r\nDate: "+new Date().toUTCString()+"\r\n\r\n");
   if(env.SMTP_MOCK==="success"){
     for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await reportStage(stage,"success")}catch{}
     return "250 MOCK ACCEPTED";
