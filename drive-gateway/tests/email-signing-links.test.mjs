@@ -14,7 +14,7 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry,classifySmtpReplyCategory} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage,getEnvelopeStatus} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
@@ -126,6 +126,12 @@ test("email invitation has real plain-text newlines and one HTML/plain-text SMTP
   let calls=0;
   await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);return {ok:true};},logger:{warn(){},error(){}}});
   assert.equal(calls,1);
+});
+
+test("SMTP enhanced status codes distinguish policy rejection, invalid recipient and mailbox quota",()=>{
+  assert.equal(classifySmtpReplyCategory(new Error("550 5.7.1 Message rejected by policy")),"POLICY_REJECTED");
+  assert.equal(classifySmtpReplyCategory(new Error("550 5.1.1 Unknown recipient")),"RECIPIENT_REJECTED");
+  assert.equal(classifySmtpReplyCategory(new Error("552 5.2.2 Mailbox full")),"MAILBOX_FULL");
 });
 
 test("failed SMTP invitation stages retain structured diagnostics for the sender report",async()=>{
