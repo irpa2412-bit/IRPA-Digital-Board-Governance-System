@@ -526,7 +526,7 @@ test("isolation guard blocks reopening if another portal's Change Record history
 test("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
-  assert.ok(workflow.includes("cancel-in-progress: true"));
+  assert.ok(workflow.includes("cancel-in-progress: false"));
   for (const path of [
     "docs/implementation-status.md",
     "docs/portal-protection/records/meeting-portal.json",
