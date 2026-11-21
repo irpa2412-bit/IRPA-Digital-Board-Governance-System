@@ -225,10 +225,12 @@
       "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
         "drive-gateway/src/index.js",
+        "drive-gateway/src/invitationEmail.mjs",
+        "drive-gateway/src/mailDelivery.js",
         "drive-gateway/src/signing.mjs",
-        "src/pages/SignaturePlatform.jsx",
         "drive-gateway/tests/email-signing-links.integration.test.mjs",
-        "drive-gateway/tests/email-signing-links.test.mjs"
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "src/pages/SignaturePlatform.jsx"
       ],
       "prohibitions": [
         "signing rules, signer identity, token format or hash custody, sessions, owner resend rules, field assignment",
