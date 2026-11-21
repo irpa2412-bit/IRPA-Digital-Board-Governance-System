@@ -181,7 +181,7 @@ export function createR2RecordingOutput(env, filepath, meeting = {}) {
   };
 }
 async function liveKitRequest(env,endpoint,body,method="POST"){const host=clean(env.LIVEKIT_URL).replace(/^wss:/i,"https:").replace(/^ws:/i,"http:").replace(/\/$/,""),key=clean(env.LIVEKIT_API_KEY),secret=clean(env.LIVEKIT_API_SECRET);if(!host||!key||!secret)throw Object.assign(new Error("Live meeting infrastructure is not configured in Cloudflare secrets."),{status:503});const now=Math.floor(Date.now()/1000),auth=await signedJwt(key,secret,{iss:key,sub:key,nbf:now-5,exp:now+60,video:{roomRecord:true,roomAdmin:true,roomCreate:true}});const r=await fetch(host+endpoint,{method,headers:{Authorization:"Bearer "+auth,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});const result=await r.json().catch(()=>({}));if(!r.ok){const e=new Error("LiveKit request failed ("+r.status+").");e.status=r.status;throw e;}return result;}
-export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-attendance/daily/register","/api/meeting-attendance/daily/mark","/api/meeting-attendance/daily/dispatch","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
+export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-attendance/daily/register","/api/meeting-attendance/daily/mark","/api/meeting-attendance/daily/dispatch","/api/meeting-attendance/daily/close","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
 if(pathname==="/api/meeting-invitee-directory/list"){
  const [memberRecords,employeeRecords]=await Promise.all([listCollection(ctx,env,token,"members"),listCollection(ctx,env,token,"employees")]);
  const activeRecord=row=>[row.status,row.employmentStatus,row.registrationStatus].map(lower).some(v=>["active","activated"].includes(v));
@@ -344,13 +344,13 @@ return response(ctx,request,{ok:true,attendanceDate:date,participantId,attendanc
 }
 if(pathname==="/api/meeting-attendance/daily/dispatch"){
 const meetingId=clean(data.meetingId),date=clean(data.date),phase=clean(data.phase).toUpperCase(),envelopeId=clean(data.envelopeId),documentId=clean(data.documentId),ownerUid=clean(data.ownerUid),uid=clean(claims.user_id);
-if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["PREPARE","SENT","FAILED","UNCERTAIN"].includes(phase)||!envelopeId||!documentId)return fail(ctx,request,"Meeting, date, phase, envelope and controlled document are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
 const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
 if(!c.canManage||!hostUid||ownerUid!==uid||hostUid!==uid)return fail(ctx,request,"The authenticated meeting host must be the attendance document owner and dispatching officer.",403);
 const id=await hash(meetingId+"\\0"+date),existing=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id),now=new Date();
 if(phase==="PREPARE"){
- if(existing&&["PREPARING","DISPATCHED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared or dispatched.",409);
+ if(existing&&["PREPARING","DISPATCHED","RECONCILIATION_REQUIRED"].includes(clean(existing.status)))return fail(ctx,request,"A daily attendance signing request has already been prepared, dispatched or requires reconciliation. Do not create another envelope or resend invitations.",409);
  const [participants,dailyRows]=await Promise.all([listByField(ctx,env,token,"participants","meetingId",meetingId),listByField(ctx,env,token,"meetingDailyAttendance","meetingId",meetingId)]);
  const dayRows=dailyRows.filter(r=>clean(r.attendanceDate)===date&&clean(r.attendanceStatus)==="Present");
  const presentUids=new Set(dayRows.map(r=>clean(r.participantUid)).filter(Boolean));
@@ -375,12 +375,34 @@ if(phase==="PREPARE"){
   });
   if(!mappingValid)return fail(ctx,request,"The Gateway signer identities did not verify against the prepared participant register and audit chain. The request remains pending reconciliation.",409);
   await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"DISPATCHED",dispatchedAt:now,gatewayEnvelopeId,gatewayInvitationStatus:clean(data.gatewayInvitationStatus)||"Sent",gatewayAuditChainValid:true,updatedAt:now});
+ }else if(phase==="UNCERTAIN"){
+  await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"RECONCILIATION_REQUIRED",dispatchError:clean(data.error).slice(0,500),gatewayEnvelopeId:clean(data.gatewayEnvelopeId)||existing.gatewayEnvelopeId||null,gatewayInvitationStatus:clean(data.gatewayInvitationStatus)||existing.gatewayInvitationStatus||null,reconciliationRequiredAt:now,updatedAt:now});
  }else{
   await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{status:"FAILED",dispatchError:clean(data.error).slice(0,500),failedAt:now,updatedAt:now});
  }
 }
-await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_SIGNING_"+phase,c.meeting,id,{date,envelopeId,documentId,ownerUid:uid});
-return response(ctx,request,{ok:true,date,status:phase==="PREPARE"?"PREPARING":phase==="SENT"?"DISPATCHED":"FAILED",envelopeId});
+await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_SIGNING_"+phase,c.meeting,id,{date,envelopeId,documentId,ownerUid:uid,dispatchOutcome:phase==="UNCERTAIN"?"RECONCILIATION_REQUIRED":undefined});
+return response(ctx,request,{ok:true,date,status:phase==="PREPARE"?"PREPARING":phase==="SENT"?"DISPATCHED":phase==="UNCERTAIN"?"RECONCILIATION_REQUIRED":"FAILED",envelopeId});
+}
+if(pathname==="/api/meeting-attendance/daily/close"){
+const meetingId=clean(data.meetingId),date=clean(data.date),uid=clean(claims.user_id);
+if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(ctx,request,"Meeting and attendance date are required.",400);
+const c=await context(ctx,env,token,claims,meetingId);
+const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
+if(!c.canManage||!hostUid||hostUid!==uid)return fail(ctx,request,"Only the authenticated recorded meeting host may request closure of the attendance signing invitations.",403);
+const id=await hash(meetingId+"\\0"+date),dispatch=await getDoc(ctx,env,token,"meetingAttendanceDispatches",id);
+if(!dispatch)return fail(ctx,request,"No daily attendance signing dispatch exists for this meeting date.",404);
+if(["COMPLETED","CLOSED","CANCELLED","CANCELED"].includes(clean(dispatch.status).toUpperCase()))return fail(ctx,request,"This attendance signing dispatch is already closed.",409);
+if(dispatch.gatewayEnvelopeId){
+ if(typeof ctx.getGatewayEnvelopeStatus!=="function")return fail(ctx,request,"Read-only Gateway verification is unavailable; no closure state was changed.",503);
+ const gateway=await ctx.getGatewayEnvelopeStatus(uid,env,clean(dispatch.gatewayEnvelopeId)).catch(()=>null);
+ if(!gateway||gateway.auditChainValid!==true||clean(gateway.envelopeId)!==clean(dispatch.gatewayEnvelopeId))return fail(ctx,request,"The existing Gateway envelope or its audit chain could not be verified; no closure state was changed.",409);
+ if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(clean(gateway.status)))return fail(ctx,request,"The Gateway signing envelope is already terminal. Completed signatures and audit evidence were left untouched.",409);
+}
+const now=new Date();
+await patchDoc(ctx,env,token,"meetingAttendanceDispatches",id,{closureRequestedAt:now,closureRequestedByUid:uid,closureStatus:"PENDING_LINK_LIFECYCLE_FINALIZATION",updatedAt:now});
+await audit(ctx,env,token,claims,"MEETING_DAILY_ATTENDANCE_CLOSURE_REQUESTED",c.meeting,id,{date,envelopeId:clean(dispatch.envelopeId),gatewayEnvelopeId:clean(dispatch.gatewayEnvelopeId)||null,closureStatus:"PENDING_LINK_LIFECYCLE_FINALIZATION",signingLinksRevoked:false});
+return response(ctx,request,{ok:true,date,closureStatus:"PENDING_LINK_LIFECYCLE_FINALIZATION",signingLinksRevoked:false,message:"The host-authorised closure request is recorded. Email-link invitations remain unchanged until the separately authorised link-lifecycle finalization."});
 }
 if(pathname==="/api/meeting-attendance/mark"){
 const meetingId=clean(data.meetingId),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);

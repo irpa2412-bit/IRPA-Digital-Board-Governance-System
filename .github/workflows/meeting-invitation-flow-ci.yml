@@ -1,6 +1,7 @@
 name: Meeting Invitation Flow CI
 # Build and entry-policy verification only; this workflow never deploys.
 # Verification-only regression workflow; no production deployment is performed.
+# Attendance dispatch reconciliation regression is executed as part of the pull-request gate.
 
 on:
   push:
@@ -32,6 +33,7 @@ on:
       - "drive-gateway/src/meetingServices.mjs"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-quorum-reconciliation.test.mjs"
+      - "tests/meeting-attendance-dispatch-reconciliation.test.mjs"
   pull_request:
     branches:
       - main
@@ -61,6 +63,7 @@ on:
       - "drive-gateway/src/meetingServices.mjs"
       - "src/firebase/meetingPolicy.js"
       - "tests/meeting-quorum-reconciliation.test.mjs"
+      - "tests/meeting-attendance-dispatch-reconciliation.test.mjs"
 
   workflow_dispatch:
 
@@ -95,5 +98,7 @@ jobs:
         run: npm run test:meeting-invitation-resend
       - name: Test three-source Board quorum reconciliation
         run: npm run test:meeting-quorum
+      - name: Test attendance dispatch reconciliation and host closure
+        run: node --test tests/meeting-attendance-dispatch-reconciliation.test.mjs
       - name: Build web application
         run: npm run build
