@@ -377,13 +377,13 @@ test("signing audit email masks the local part and retains the recipient domain"
   const message=buildSigningInvitationAuditMessage({recipientPrefix:"alice",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Policy",envelopeId:"ENV-123",messageId:"<unique@irpa.or.tz>",invitationKind:"resend",smtpReplyCategory:"ACCEPTED",at:new Date("2026-11-21T07:00:00Z")});
   assert.match(message.subject,/ali\.\.\.@example\.org position 2 - Board Policy/);
   assert.match(message.text,/Type: resend/);
-  assert.match(message.html,/Invitation:<\/strong> resend/);
+  assert.match(message.html,/Type:<\/strong> resend/);
   const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
   assert.equal(audit.to,"info@irpa.or.tz");
   assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Type: creation/);
-  assert.match(audit.text,/Recipient domain: example\\.org/);
+  assert.match(audit.text,/Recipient domain: example\.org/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
   assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
