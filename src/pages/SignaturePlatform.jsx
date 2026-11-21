@@ -594,8 +594,8 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   if(!registered&&!email){setMessage("Select a registered officer or enter a signer name and email address.");return;}
   if(!title.trim()){setMessage("Enter the envelope title before adding a signer.");return;}
   if(!documentId||!documentUrl){setMessage("Select a controlled PDF before adding a signer.");return;}
-  const registeredEmail=String(registered?.email||email).trim().toLowerCase();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registeredEmail)){setMessage("The selected participant must have a valid email address before they can be assigned.");return;}if(!registered&&!String(signerName||"").trim()){setMessage("Enter the signer’s full name as well as their email address.");return;}
+   const recipientEmail=email||String(registered?.email||"").trim().toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)){setMessage("The selected participant must have a valid email address before they can be assigned.");return;}if(!registered&&!String(signerName||"").trim()){setMessage("Enter the signer’s full name as well as their email address.");return;}
   // Mailbox addresses are delivery channels, not signer identities.
   const isOwnerDuplicate=!!(registered&&registered.uid===documentOwner.uid);
   if(isOwnerDuplicate){
@@ -639,7 +639,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   try{
     let next;
     if(registered){
-      next={uid:registered.uid,identityType:"account",name:registered.name||registered.email,email:registeredEmail,role,institutionalRole:registered.boardPosition||registered.role||"",title:String(signerTitle||registered.jobTitle||registered.boardPosition||"").trim(),occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
+      next={uid:registered.uid,identityType:"account",name:registered.name||registered.email,email:recipientEmail,role,institutionalRole:registered.boardPosition||registered.role||"",title:String(signerTitle||registered.jobTitle||registered.boardPosition||"").trim(),occupation:signerAuthorityRole.trim(),capacity:signerCapacity.trim(),routingOrder:signingMode==="Sequential"?recipients.length+2:1,status:"Pending"};
     }else{
       if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error("Enter a valid email address for the external participant.");
       // Random per-participant key: never derive identity from a shared mailbox.
