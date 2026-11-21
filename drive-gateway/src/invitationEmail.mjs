@@ -132,10 +132,11 @@ export function buildSigningInvitationAuditMessage({recipientPrefix,position,pos
   const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...";
   const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
   const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
-  const result=stageCode?"Stage code: "+String(stageCode).slice(0,40):"SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
+  const reply="SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
+  const result=(stageCode?"Stage code: "+String(stageCode).slice(0,40)+"\\n":"")+reply;
   const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" of "+Number(positionCount||1)+" - "+safeTitle;
   const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\n"+result;
-  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p>"+escapeHtml(result)+"</p>";
+  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p>"+escapeHtml(result).replace(/\\n/g,"<br>")+"</p>";
   return {to:"info@irpa.or.tz",subject,text,html};
 }
 
