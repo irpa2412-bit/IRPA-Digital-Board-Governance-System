@@ -541,8 +541,11 @@ test("parallel same-position group is released after portal-first owner signs; r
   assert.deepEqual(stored.signers.map(signer=>signer.status),["Signed","Signed","Signed","Signed"]);
   assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.started").length,3);
   assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.sent").length,3);
-  assert.equal(stored.events.filter(event=>event.type==="email_link.stage"&&event.stage==="SUBMIT"&&event.outcome==="success").length,3);
+  const submitEvents=stored.events.filter(event=>event.type==="email_link.stage"&&event.stage==="SUBMIT"&&event.outcome==="success");
+  assert.equal(submitEvents.length,3);
+  assert.deepEqual(submitEvents.map(event=>event.signerId).sort(),["S2","S3","S4"]);
   const status=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.deepEqual(status.signers.slice(1).map(signer=>signer.id),["S2","S3","S4"]);
   assert.equal(status.status,"Completed");
   assert.equal(status.signers.length,4);
   assert.equal(status.signers[0].delivery.status,"Portal signing (no invitation email)");
