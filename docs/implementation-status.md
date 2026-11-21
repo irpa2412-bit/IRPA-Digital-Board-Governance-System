@@ -27,7 +27,7 @@ Last updated: 2026-11-21T19:59Z
 | Phase | State | PR | Commit SHA | Run link | Next step |
 |---|---|---|---|---|---|
 | 0 Baseline | PARTIAL — source SHA and PR inventory retrieved; live Worker and web stamp not retrieved | — | `352d8b36718a3b88173934c607e6c7834f72a71b` | — | Capture live Worker version/build stamp before production deployment |
-| 1 TRIAL-only Worker deletion hotfix | IMPLEMENTED ON BRANCH; tests authored, NOT RUN | Pending | `cd5297800e04440d0835adc4563bb874529339fe` | NOT AVAILABLE YET | Open PR; run Worker tests; inspect every delete entry point; merge only when all checks green |
+| 1 TRIAL-only Worker deletion hotfix | IMPLEMENTED ON PR BRANCH; first CI round found one protection-gate failure; scope declaration repaired; second CI round running | [#844](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/844) | `b2faa9d731bc5e91001c20088cb0ec3da60877bf` | [First CI run](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44943910189); [second CI round](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions) | Wait for second CI; resolve any further failures once; verify all delete entry points; no production deploy until live rollback version/build stamp retrieved |
 | 2 Firestore deploy safeguard | NOT STARTED | — | — | — | Gate rules/indexes deployment to manual workflow_dispatch with explicit DEPLOY confirmation; add push-path CI guard |
 | 3 Meeting Portal sequence | NOT STARTED | #826, #827, #815, #812, #813 | — | — | Rebase and merge in required order |
 | 4 Access and protection | NOT STARTED | — | — | — | Full-control roles/grants, inventory, TRIAL safeguards, audit, versioning, protected export; rules diff + emulator tests only |
@@ -47,3 +47,12 @@ Last updated: 2026-11-21T19:59Z
 - No Firestore rules have been changed or deployed.
 - Do not deploy Firestore rules/indexes until the user explicitly says `DEPLOY RULES` after reviewing the final diff and emulator results.
 - Production deployment requires a verified pre-deploy live Worker version and web build stamp to establish rollback.
+
+### Phase 1 CI evidence (first round, head `84fdd861ba3c05b10d362526d8d045360b39b1f4`)
+- PASS: PDF E-Signature Tests — [run 44943910246](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44943910246).
+- PASS: Authentication and Identity Parity Tests — [run 44943910085](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44943910085).
+- PASS: email-signing-contract — [run 44943910060](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44943910060).
+- FAIL: Firebase Functions Entrypoint Integrity Test — [run 44943910189](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44943910189). Exact error: `Change Record omits changed files: drive-gateway/src/meetingServices.mjs`. The change record and repair-window scope were amended in the subsequent commit; second CI round is running.
+- FAIL: IRPA Security Baseline Gate — [run 44943909992](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44943909992). Same exact portal-protection error above.
+- Other jobs were still queued/in progress at the time of inspection; no overall PASS claim.
+- Firestore Rules Change Approval CI passed its validation job; no rules were changed or deployed.
