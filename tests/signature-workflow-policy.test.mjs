@@ -7,7 +7,7 @@ const portal = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", imp
 
 test("Signature Portal exposes a recipient-level failed invitation delivery report to the sender",()=>{
   const storage=fs.readFileSync("src/firebase/signatureStorage.js","utf8");
-  assert.match(portal,/Failed Email Deliveries/);
+  assert.match(portal,/Email Delivery Failures/);
   assert.match(portal,/deliveryReport\.failures\.map/);
   assert.match(portal,/smtpReplyCategory/);
   assert.match(portal,/Retry only pending or failed invitations/);
