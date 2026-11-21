@@ -377,14 +377,15 @@ test("typed signer addresses are trimmed and lower-cased; display names and mult
   assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/valid recipient/i);
 });
 
-test("signing audit email exposes only the first three address characters and no recipient domain",()=>{
-  const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW});
+test("signing audit email masks the first three local-part characters while retaining the recipient domain",()=>{
+  const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Minutes");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
+  assert.match(audit.text,/Type: creation/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
-  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel|gmail\.com|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
+  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
 });
 
 
