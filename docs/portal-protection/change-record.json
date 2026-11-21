@@ -96,7 +96,8 @@
       "src/pages/SignaturePlatform.jsx",
       "tests/signature-workflow-policy.test.mjs",
       "scripts/portal-protection-check.mjs",
-      "tests/portal-protection-policy.test.mjs"
+      "tests/portal-protection-policy.test.mjs",
+      "docs/portal-protection/repair-window.json"
     ],
     "expectedEffect": "The typed signer-row address, trimmed and lower-cased, is the sole recipient source. SMTP RCPT TO and the single-recipient To header are identical. Parallel mode sends independently to every signer position; resend and resend-all use each signer record's own address. Every invitation has a unique Message-ID, text and HTML parts, the IRPA Digital Signing From name and a position-specific subject. One best-effort audit email per final SMTP outcome records EAT time, envelope, position, Message-ID, creation/resend, reply category or stage code, and only the first three local-part characters plus full recipient domain. The per-signer panel displays Not sent, Sent, Accepted by the mail server with category/time, or Failed with stage code; no Delivered label.",
     "repairWindow": {
