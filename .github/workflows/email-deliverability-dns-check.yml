@@ -33,7 +33,7 @@ jobs:
           node-version: 22
       - name: Query MX, SPF, DKIM, DMARC, reverse DNS, SPF coverage and DNS blocklists
         env:
-          DKIM_SELECTOR_FROM_HEADER: ""
+          DKIM_SELECTOR_FROM_HEADER: ${{ github.event.inputs.dkim_selector_from_header }}
         shell: bash
         run: |
           set -euo pipefail
