@@ -445,7 +445,8 @@ test("per-signer copy and WhatsApp actions reuse the existing accepted invitatio
   assert.match(worker,/return\{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt,signingLink:link\}/);
   assert.match(storage,/return data;/);
   assert.ok(page.includes("email.slice(0,3)")&&page.includes("...@"),"signer recipient masking must show the first three local-part characters and domain");
-  assert.match(page,/The same signer-specific link sent by email/);
+  assert.match(page,/that exact signer-specific link was copied/);
+  assert.match(page,/that exact signer-specific link is ready to share in WhatsApp/);
 });
 
 
