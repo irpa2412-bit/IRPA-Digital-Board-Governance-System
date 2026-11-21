@@ -536,3 +536,18 @@ test("end-to-end unregistered signer, owner and three same-address positions han
   const parsed=await PDFDocument.load(finalPdf.bytes);
   assert.equal(parsed.getPageCount(),1,"the original page count and PDF readability remain intact after the four-signer signing ceremony");
 });
+
+
+test("failed replacement email keeps the previous invitation link valid until SMTP accepts a new message",async()=>{
+  const f=await fixture();
+  const originalHash=f.envelope.signers[0].tokenHash;
+  f.ctx.sendInvitation=async()=>{const error=new Error("IRPA SMTP error 550");error.stageCode="RCPT_ACCEPTED";error.smtpResponseCode=550;error.smtpReply="550 5.1.1 recipient rejected";throw error;};
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),error=>error.status===502&&error.code==="RCPT_ACCEPTED");
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(current.signers[0].tokenHash,originalHash);
+  assert.equal(current.signers[0].emailLinkStatus,"issued");
+  assert.equal(current.signers[0].resendAttempt,undefined);
+  assert.equal(current.events.at(-1).type,"invitation.resend.failed");
+  const stillValid=await openEmailSigning(f.ctx,f.token,"198.51.100.71");
+  assert.equal(stillValid.signer.email,"board.secretary@example.org");
+});
