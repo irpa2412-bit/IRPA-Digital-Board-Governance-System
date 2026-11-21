@@ -3,9 +3,15 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
+      "Board Members Portal",
+      "Communication and Media Portal",
+      "Grants Intelligence and Funding Opportunities Portal",
+      "Invitation Portal",
+      "Meeting Portal",
+      "Members and Employees Portal",
       "Signature Portal"
     ],
-    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. Keep Google Drive token-refresh health as a separate explicit diagnostic. Implement the redirect-safe requests inside the self-test component only; do not modify shared signature storage or Meeting Portal dependencies.",
+    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
     "files": [
       "src/components/SignaturePathwaySelfTest.jsx",
       "tests/signature-self-test-session-safety.test.mjs",
@@ -32,8 +38,13 @@
   "validation": {
     "baselineSmoke": "PASS",
     "portalSmoke": {
-      "Signature Portal": "PASS",
-      "Meeting Portal": "PASS"
+      "Board Members Portal": "PASS",
+      "Communication and Media Portal": "PASS",
+      "Grants Intelligence and Funding Opportunities Portal": "PASS",
+      "Invitation Portal": "PASS",
+      "Meeting Portal": "PASS",
+      "Members and Employees Portal": "PASS",
+      "Signature Portal": "PASS"
     },
     "dependentSmoke": {
       "Signature owner profile and independent submission regression": "PASS — CI run 44870080649 complete root test suite; browser signature ceremony tests in run 44870080291",
@@ -56,7 +67,8 @@
       "Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.",
       "Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx.",
       "PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair.",
-      "Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite."
+      "Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite.",
+      "Seven-portal protection smoke tests passed in email-signing-contract CI run 44881398093 (job step: Run seven-portal protection smoke tests); the self-test component at this point already contained the final self-test-only Gateway request isolation. A later commit only updated a legacy source-contract assertion and governance documentation."
     ]
   },
   "closure": {
