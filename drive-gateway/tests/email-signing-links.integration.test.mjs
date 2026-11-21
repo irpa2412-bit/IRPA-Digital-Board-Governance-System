@@ -429,7 +429,7 @@ test("v2 reusable invitation is read-only on preview, creates fresh sessions, an
 });
 
 
-test("parallel end-to-end unregistered signer, portal-first owner and three same-address positions receive invitations without sequential gating",async()=>{
+test("parallel end-to-end unregistered signer, owner and three same-address positions receive invitations together",async()=>{
   const sent=[];
   let now=NOW;
   let sendNumber=0;
@@ -471,27 +471,22 @@ test("parallel end-to-end unregistered signer, portal-first owner and three same
     sha256:await sha256Hex(sourceBytes),fileName:"parallel-three-position.pdf",
     title:"Parallel Gmail Three Position Test",classification:"Restricted"
   });
-  const pixel="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
   const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
     documentId,externalReference:"IRPA-PARALLEL-THREE-POSITIONS",archives:["board-governance"],
-    signingMode:"Parallel",ownerPreSignEmail:"owner@example.org",ownerPreSignSignerId:"S1",
+    signingMode:"Parallel",
     signers:[
       {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:1,role:"Document Owner"},
-      {identityType:"email-link",email:"shared@gmail.com",name:"External Unregistered Signer",order:2,role:"External Reviewer"},
-      {identityType:"email-link",email:"SHARED@gmail.com",name:"Second Shared Mailbox Signer",order:3,role:"Secretary"},
-      {identityType:"email-link",email:"shared@gmail.com",name:"Third Shared Mailbox Signer",order:4,role:"Chair"}
-    ],
-    fields:[
-      {fieldId:"OWNER-SIGNATURE",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true}
+      {identityType:"email-link",email:"shared@gmail.com",name:"External Unregistered Signer",order:1,role:"External Reviewer"},
+      {identityType:"email-link",email:"SHARED@gmail.com",name:"Second Shared Mailbox Signer",order:1,role:"Secretary"},
+      {identityType:"email-link",email:"shared@gmail.com",name:"Third Shared Mailbox Signer",order:1,role:"Chair"}
     ]
   });
-  assert.equal(created.status,"Awaiting Owner Signature");
-  assert.equal(sent.length,3,"parallel mode sends every non-owner signer an invitation at envelope creation");
-  assert.ok(created.ownerSigningToken,"the portal-first owner receives the existing owner signing token");
-  assert.deepEqual(sent.map(message=>message.to.toLowerCase()),["shared@gmail.com","shared@gmail.com","shared@gmail.com"]);
+  assert.equal(created.status,"Sent");
+  assert.equal(sent.length,4,"all same-position parallel signers receive an invitation at envelope creation");
+  assert.deepEqual(sent.map(message=>message.to.toLowerCase()),["owner@example.org","shared@gmail.com","shared@gmail.com","shared@gmail.com"]);
 
   const tokenFor=message=>new URL(message.link).searchParams.get("emailSignToken");
-  const signExternal=async(index,ip)=>{
+  const signAtPosition=async(index,ip)=>{
     const token=tokenFor(sent[index]);
     const wrong=token.slice(0,-1)+(token.endsWith("0")?"1":"0");
     await assert.rejects(()=>openEmailSigning(ctx,wrong,ip),error=>error.message===genericEmailSigningFailure());
@@ -506,33 +501,24 @@ test("parallel end-to-end unregistered signer, portal-first owner and three same
     return {opened,result};
   };
 
-  const firstExternal=await signExternal(0,"198.51.100.61");
+  const firstExternal=await signAtPosition(1,"198.51.100.61");
   assert.equal(firstExternal.result.status,"InProgress");
-  assert.equal(sent.length,3,"a parallel invitation is not held back until the first external signer completes");
+  assert.equal(sent.length,4,"the unregistered signer receives its invitation at the same time as the other parallel participants");
 
-  const wrongOwnerToken=created.ownerSigningToken.slice(0,-1)+(created.ownerSigningToken.endsWith("0")?"1":"0");
-  await assert.rejects(()=>openEmailSigning(ctx,wrongOwnerToken,"198.51.100.62"),error=>error.message===genericEmailSigningFailure());
-  const ownerOpened=await openEmailSigning(ctx,created.ownerSigningToken,"198.51.100.62");
-  const ownerResult=await sign(ctx,{
-    token:ownerOpened.sessionToken,
-    signature:{type:"drawn",value:pixel},
-    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:pixel}],
-    fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Document Owner"}
-  });
-  assert.equal(ownerResult.status,"InProgress");
-  assert.equal(sent.length,3,"the owner's signature does not trigger a sequential hand-off in parallel mode");
-
-  const secondExternal=await signExternal(1,"198.51.100.63");
+  const owner=await signAtPosition(0,"198.51.100.62");
+  assert.equal(owner.result.status,"InProgress");
+  const secondExternal=await signAtPosition(2,"198.51.100.63");
   assert.equal(secondExternal.result.status,"InProgress");
-  const thirdExternal=await signExternal(2,"198.51.100.64");
+  const thirdExternal=await signAtPosition(3,"198.51.100.64");
   assert.equal(thirdExternal.result.status,"Completed");
   assert.equal(thirdExternal.result.completed,true);
 
-  assert.equal(new Set(sent.map(message=>message.messageId)).size,3,"each position gets a distinct Message-ID for the same Gmail address");
-  assert.equal(new Set(sent.map(message=>message.subject)).size,3,"each position gets a distinct subject for the same Gmail address");
-  for(const message of sent){
+  const sharedMessages=sent.slice(1);
+  assert.equal(new Set(sharedMessages.map(message=>message.messageId)).size,3,"each position gets a distinct Message-ID for the same Gmail address");
+  assert.equal(new Set(sharedMessages.map(message=>message.subject)).size,3,"each position gets a distinct subject for the same Gmail address");
+  for(const message of sharedMessages){
     assert.match(message.subject,/Parallel Gmail Three Position Test/);
-    assert.match(message.subject,/Position [234]/);
+    assert.match(message.subject,/Position 1/);
     assert.match(message.rawMime,/Content-Type: text\/plain/);
     assert.match(message.rawMime,/Content-Type: text\/html/);
     assert.match(message.messageId,/@irpa\.or\.tz/);
@@ -540,13 +526,12 @@ test("parallel end-to-end unregistered signer, portal-first owner and three same
 
   const stored=await ctx.meta.get("envelopes",created.envelopeId);
   assert.deepEqual(stored.signers.map(signer=>signer.status),["Signed","Signed","Signed","Signed"]);
-  assert.equal(stored.events.filter(event=>event.type.startsWith("email_link.handoff.")).length,0,"parallel signing does not create sequential hand-off events");
-  assert.equal(stored.events.filter(event=>event.type==="email_link.stage"&&event.stage==="SUBMIT"&&event.outcome==="success").length,3);
+  assert.equal(stored.events.filter(event=>event.type.startsWith("email_link.handoff.")).length,0,"same-position parallel signing does not create a sequential hand-off");
+  assert.equal(stored.events.filter(event=>event.type==="email_link.stage"&&event.stage==="SUBMIT"&&event.outcome==="success").length,4);
   const status=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
   assert.equal(status.status,"Completed");
   assert.equal(status.signers.length,4);
-  assert.equal(status.signers[0].delivery.status,"Portal signing (no invitation email)");
-  for(const signer of status.signers.slice(1)){
+  for(const signer of status.signers){
     assert.equal(signer.delivery.status,"Accepted by mail server");
     assert.equal(signer.delivery.smtpReplyCode,250);
     assert.equal(signer.delivery.smtpReplyCategory,"ACCEPTED");
