@@ -4,7 +4,7 @@ import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,resendAllUnsignedInvitations,revokeInvitation,getEnvelopeStatus,recordEmailLinkStage} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
-import {buildSmtpRecipientEnvelope} from "../src/index.js";
+import {buildSmtpRecipientEnvelope} from "../src/invitationEmail.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
 import {openSigning,sign,declineSigning} from "../src/signing.mjs";
