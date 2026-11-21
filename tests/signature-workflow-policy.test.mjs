@@ -25,7 +25,9 @@ test("Signature Portal signing reads use the scoped download route and preserve 
 
   assert.match(platform, /downloadSignatureBytes/);
   assert.match(platform, /fetchBytes\(envelope\.signedDocumentUrl\|\|envelope\.documentUrl,envelope\.documentId,envelope\.id\)/);
-  assert.doesNotMatch(page, /downloadDriveBytes/);
+  assert.match(page, /downloadDriveBytes/);
+  assert.match(page, /downloadDriveBytes\(value\.slice\("drive:\/\/".length\)\)/);
+  assert.match(page, /downloadSignatureBytes\(fileId,documentId,envelopeId\)/);
   assert.doesNotMatch(page, /<option>Mixed<\/option>/);
   assert.match(storage, /\/api\/signature-file\/download/);
   assert.match(storage, /metadata\.customMetadata\?\.envelopeId/);
@@ -402,4 +404,26 @@ test("saved signature drafts return canonical persisted fields in preparation-ed
   const save = platform.slice(platform.indexOf("export async function saveSignatureWorkflowDraft("), platform.indexOf("\nexport async function finalizeSignatureWorkflowDraft"));
   assert.match(platform, /signatureFieldsToPercent/);
   assert.match(save, /const savedDraft=result\.draft\|\|workerDraft;return\{id,\.\.\.savedDraft,fields:signatureFieldsToPercent\(savedDraft\.fields/);
+});
+
+test("owner Signature Profile assets use owner-authorized Drive download, not envelope-scoped signer download", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const storage = fs.readFileSync(new URL("../src/firebase/signatureStorage.js", import.meta.url), "utf8");
+  const gateway = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.match(page, /downloadDriveBytes\(value\.slice\("drive:\/\/".length\)\)/);
+  assert.match(storage, /export async function downloadDriveBytes\(fileId, documentId = null\)/);
+  assert.match(gateway, /description\.purpose === "Signature Profile" && description\.ownerUid !== claims\.user_id/);
+  assert.match(page, /signingStage&&envelopeId\?await downloadSignatureBytes\(fileId,documentId,envelopeId\)/);
+});
+
+test("Prepare Envelope submission is a separate sticky control outside the PDF navigator", () => {
+  const page = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+  const start = page.indexOf('<form onSubmit={createEnvelope} noValidate>');
+  const controls = page.indexOf('data-testid="envelope-submit-controls"', start);
+  const designer = page.indexOf("<PDFDesigner", start);
+  assert.ok(start >= 0 && controls > start && designer > controls);
+  assert.match(page.slice(controls, designer), /position:"sticky"/);
+  assert.match(page.slice(controls, designer), /type="submit"/);
+  assert.match(page.slice(controls, designer), /Independent of PDF navigation/);
+  assert.doesNotMatch(page.slice(designer, page.indexOf("</form>", designer)), /type="submit"/);
 });
