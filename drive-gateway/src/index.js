@@ -3049,11 +3049,11 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromNam
   const fromHeader='"'+safeFromName+'" <'+smtpConfig.from+'>';
   const generatedMessageId=messageId||"<"+crypto.randomUUID()+"@"+(String(smtpConfig.from).split("@")[1]||"irpa.or.tz")+">";
   if(!/^<[^<>\s@]+@irpa\.or\.tz>$/.test(generatedMessageId))throw new Error("Invalid signing email Message-ID.");
+  const reportStage=async(stage,outcome,category)=>onStage?.(stage,outcome,stage==="SUBMIT"&&outcome==="success"?"ACCEPTED":category);
   const baseMime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:fromHeader,to:toEmail,subject:cleanSubject,text,html,attachments}),reportStage);
   const mime=baseMime.replace(/\r\n\r\n/,"\r\nMessage-ID: "+generatedMessageId+"\r\nDate: "+new Date().toUTCString()+"\r\n\r\n");
-  const reportStage=async(stage,outcome,category)=>onStage?.(stage,outcome,stage==="SUBMIT"&&outcome==="success"?"ACCEPTED":category);
   if(env.SMTP_MOCK==="success"){
-    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success")}catch{}
+    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await reportStage(stage,"success")}catch{}
     return "250 MOCK ACCEPTED";
   }
   if(env.SMTP_MOCK==="fail")return runEmailStage("SMTP_CONNECT",async()=>{throw new Error("SMTP provider unavailable.")},reportStage);
