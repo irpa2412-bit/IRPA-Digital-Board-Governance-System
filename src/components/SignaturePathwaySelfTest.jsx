@@ -102,7 +102,7 @@ function diagnosticRow(item, result) {
     "PDF page check: " + (result.pdfPageCheck?.status || "NOT RUN"),
     "PDF page count: " + (result.pdfPageCheck?.pageCount ?? "(not parsed)"),
     ...(result.pdfPageCheck?.pages || []).map(page => "Page " + page.pageNumber + ": " + page.textCharacters + " text characters; non-blank pixel ratio " + (page.nonBlankPixelRatio ?? "unavailable") + "; render " + (page.rendered ? "PASS" : "FAIL") + (page.error ? "; error " + page.error.name + ": " + page.error.message : "")),
-    "Last-page check: " + (result.pdfPageCheck?.lastPageFlag || "NOT RUN"),
+    "Page check note: " + (result.pdfPageCheck?.pageCheckNote || result.pdfPageCheck?.lastPageFlag || "NOT RUN"),
     "Drive description.documentId: " + (result.previousDescriptionDocumentId || "(not checked)"),
     "Reason: " + (result.reason || "(no reason returned)")
   ].filter(Boolean).join("\n");
@@ -305,7 +305,7 @@ function SignaturePathwaySelfTestPanel() {
           const work = (async () => {
             const response = await selfTestReconcileDocument(item, { signal: documentController.signal });
             const result = response.results[0];
-            let pdfPageCheck = { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: "PDF check not completed." };
+            let pdfPageCheck = { status: "FAIL", pageCount: 0, pages: [], pageCheckNote: "PDF check not completed." };
             const fileId = result.fileId || driveFileId(item);
             if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
             bytes = await selfTestDownloadControlledDocument(fileId, item.documentId, { signal: documentController.signal });
@@ -315,7 +315,7 @@ function SignaturePathwaySelfTestPanel() {
             try {
               const page = await pdf.getPage(1);
               const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 420, maxPixels: 1000000, zoom: 0.65, signal: documentController.signal });
-              pdfPageCheck = { status: metrics.textCharacters > 0 && metrics.nonBlankPixelRatio > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages, pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }], lastPageFlag: "First-page-only check; remaining pages were not rendered." };
+              pdfPageCheck = { status: metrics.textCharacters > 0 && metrics.nonBlankPixelRatio > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages, pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }], pageCheckNote: "First-page-only check; remaining pages were not rendered." };
             } finally { canvas.width = 1; canvas.height = 1; }
             return { ...result, pdfPageCheck };
           })();
@@ -324,7 +324,7 @@ function SignaturePathwaySelfTestPanel() {
           })]);
           diagnostic = diagnosticRow(item, result);
         } catch (error) {
-          diagnostic = diagnosticRow(item, { status: "unreadable", reason: safeGatewayText(error?.message, "Diagnostic failed."), pdfPageCheck: { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: safeGatewayText(error?.message, "Diagnostic failed.") } });
+          diagnostic = diagnosticRow(item, { status: "unreadable", reason: safeGatewayText(error?.message, "Diagnostic failed."), pdfPageCheck: { status: "FAIL", pageCount: 0, pages: [], pageCheckNote: safeGatewayText(error?.message, "Diagnostic failed.") } });
         } finally {
           clearTimeout(timeout);
           controller.signal.removeEventListener("abort", abortOnCancel);
