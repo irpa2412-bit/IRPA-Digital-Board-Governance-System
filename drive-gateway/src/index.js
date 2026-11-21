@@ -3073,7 +3073,8 @@ async function writeSmtpSelfcheckAudit(env, claims, event) {
 
 
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromName="IRPA Administration",messageId=null}) {
-  const smtpConfig=resolveSmtpConfiguration(env);
+  let smtpConfig;
+  try{smtpConfig=resolveSmtpConfiguration(env);}catch(error){if(!error?.stageCode)error.stageCode="SMTP_CONNECT";throw error;}
   const toEmail=normalizeRecipientEmail(to);
   const cleanSubject=validateMailHeader(subject,"Subject");
   const safeFromName=validateMailHeader(fromName||"IRPA Administration","From name").replace(/"/g,"");
