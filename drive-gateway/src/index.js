@@ -569,7 +569,7 @@ export default {
                 // Retry transient SMTP 4xx responses for reusable email-link invitations; permanent 5xx recipient/auth failures remain fail-fast.
                 return sendInvitationWithRetry(()=>smtpSend(env,{to,subject,text,html,onStage}),{logger:console});
               }
-              return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,position,from:resolveSmtpConfiguration(env).from,replyTo:resolveSmtpConfiguration(env).from,onStage,smtpSend:async ({to:recipient,subject,text,html,rawMime,messageId,date,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage:stageCallback}),logger:console});
+              return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,position,from:resolveSmtpConfiguration(env).from,replyTo:resolveSmtpConfiguration(env).from,expectedOrigin:env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app",onStage,smtpSend:async ({to:recipient,subject,text,html,rawMime,messageId,date,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage:stageCallback}),logger:console});
             },
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
