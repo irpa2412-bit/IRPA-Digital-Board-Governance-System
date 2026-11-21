@@ -479,11 +479,30 @@ const readabilityOnlyChange = changed.includes("src/styles/portal-readability-st
   changed.every(path => readabilityOnlyFiles.has(path)) && packageJsonReadabilityOnly;
 // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
 // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
+const meetingTrialDeletionFiles = new Set([
+  "docs/implementation-status.md",
+  "docs/portal-protection/records/meeting-portal.json",
+  "docs/portal-protection/windows/meeting-portal.json",
+  "drive-gateway/src/meetingEnvironment.mjs",
+  "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/tests/meeting-environment.test.mjs",
+  "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "scripts/portal-protection-check.mjs",
+  "tests/meeting-isolation-guard.test.mjs",
+  "tests/portal-protection-policy.test.mjs"
+]);
+const meetingTrialDeletionGuard =
+  changed.includes("drive-gateway/src/meetingServices.mjs") &&
+  changed.includes("drive-gateway/src/meetingEnvironment.mjs") &&
+  changed.includes("drive-gateway/tests/meeting-environment.test.mjs") &&
+  changed.includes("tests/meeting-isolation-guard.test.mjs") &&
+  changed.includes("tests/portal-protection-policy.test.mjs") &&
+  changed.every(path => meetingTrialDeletionFiles.has(path));
 if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !meetingTrialDeletionGuard && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
