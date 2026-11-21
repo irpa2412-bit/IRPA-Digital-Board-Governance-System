@@ -380,10 +380,14 @@ export default function SignaturePathwaySelfTest() {
       }
       pageRows.push(...output);
       setResults(pageRows);
-      const processedCount = nonFileRows.length + batch.results.length;
-      if (processedCount > 0) setCursor(snapshot.docs[processedCount - 1] || cursor);
-      setHasMore(snapshot.docs.length === 20 || processedCount < snapshot.docs.length);
       const finished = batch.results.length >= documentRows.length;
+      const lastProcessedDocumentId = batch.results.at(-1)?.document?.documentId;
+      const lastProcessedIndex = lastProcessedDocumentId
+        ? snapshot.docs.findIndex(item => item.id === lastProcessedDocumentId)
+        : -1;
+      if (finished && snapshot.docs.length) setCursor(snapshot.docs.at(-1));
+      else if (lastProcessedIndex >= 0) setCursor(snapshot.docs[lastProcessedIndex]);
+      setHasMore(snapshot.docs.length === 20 || !finished);
       setMessage(batch.cancelled || cancelledRef.current ? "Self-test cancelled safely. No signing state was changed."
         : batch.timedOut && !finished ? "60-second run limit reached. Select Run next 20 to continue."
         : "Read-only diagnostics completed for " + batch.results.length + " document(s) in this page. Select Run next 20 to continue when available.");
