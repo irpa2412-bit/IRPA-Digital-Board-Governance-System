@@ -750,11 +750,16 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
 function signerDeliveryLabel(item={}) {
  const delivery=item.delivery||{};
  if(delivery.state==="Failed")return "Failed ("+String(delivery.failureStageCode||item.deliveryStageCode||"SUBMIT")+")";
- if(delivery.state==="Accepted by the mail server")return "Accepted by the mail server";
+ if(delivery.state==="Accepted by the mail server"){
+  const category=String(delivery.smtpReplyCategory||"UNKNOWN");
+  const acceptedAt=delivery.acceptedAt||delivery.at;
+  const acceptedTime=acceptedAt?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(new Date(acceptedAt))+" EAT":"time not recorded";
+  return "Accepted by the mail server ("+category+" · "+acceptedTime+")";
+ }
  if(delivery.state==="Sent"||delivery.state==="Not sent")return delivery.state;
  const legacy=String(item.invitation||"").trim();
- if(/^failed(?:\\s|$)/i.test(legacy))return "Failed ("+String(item.deliveryStageCode||legacy.match(/\\(([^)]+)\\)/)?.[1]||"SUBMIT")+")";
- if(/^accepted by the mail server/i.test(legacy))return "Accepted by the mail server";
+ if(/^failed(?:\s|$)/i.test(legacy))return "Failed ("+String(item.deliveryStageCode||legacy.match(/\(([^)]+)\)/)?.[1]||"SUBMIT")+")";
+ if(/^accepted by the mail server/i.test(legacy))return legacy;
  if(/^sent$/i.test(legacy))return "Sent";
  return "Not sent";
 }
