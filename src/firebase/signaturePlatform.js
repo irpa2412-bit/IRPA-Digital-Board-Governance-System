@@ -353,6 +353,12 @@ export async function finalizeSignatureWorkflowDraft(args){
   return saveSignatureWorkflowDraft(args);
 }
 
+export async function cancelSignatureWorkflowDraft(envelopeId){
+  if(!envelopeId)throw new Error("A saved draft envelope is required.");
+  await mutateSignatureEnvelope(envelopeId,"cancel-draft",{});
+  return {id:envelopeId,status:"Cancelled"};
+}
+
 export async function startSignatureWorkflow(envelope){
   requireSupportedSignatureRoutingMode(envelope?.signingMode);
   const u=user();
