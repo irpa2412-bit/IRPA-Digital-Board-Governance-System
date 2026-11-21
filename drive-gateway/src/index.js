@@ -580,6 +580,7 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
+            sendDeliveryReport: async ({to,subject,text,html}) => smtpSend(env,{to,subject,text,html}),
             smtpSelfCheck: async () => { const result=await smtpSend(env,{to:resolveSmtpConfiguration(env).from,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
             resolveEmailLinkProfileUid: async (email, signerName) => {
               const normalized=String(email||"").trim().toLowerCase();
@@ -3034,7 +3035,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
       for(const line of lines){
         if(/^\d{3} /.test(line)){
           const code=Number(line.slice(0,3));
-          if(code>=400){const failure=new Error("IRPA SMTP error "+code);failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));throw failure;}
+          if(code>=400){const failure=new Error("IRPA SMTP error "+code);failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));const enhanced=(line.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1];if(enhanced)failure.smtpEnhancedStatusCode=enhanced;throw failure;}
           return line;
         }
       }
