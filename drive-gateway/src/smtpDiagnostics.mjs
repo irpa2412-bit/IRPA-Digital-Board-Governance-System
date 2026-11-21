@@ -1,4 +1,4 @@
-import { classifySmtpReplyCategory, buildRawMailMimeMessage, validateRecipient } from "./invitationEmail.mjs";
+import { classifySmtpReplyCategory, buildRawMailMimeMessage, validateRecipient, runEmailStage } from "./invitationEmail.mjs";
 
 const REQUIRED_STAGES = Object.freeze(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"]);
 const REPLY_CATEGORIES = Object.freeze(["ACCEPTED","RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"]);
@@ -31,10 +31,6 @@ export function createSmtpSelfcheckRoute({authenticateFirebaseRequest,getFiresto
     const subject="IRPA SMTP self-check "+new Date().toISOString();
     const text="This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System. It tests the configured sender and SMTP route only; acceptance by the mail server does not confirm inbox delivery.";
     const html="<p>This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System.</p><p>It tests the configured sender and SMTP route only; acceptance by the mail server does not confirm inbox delivery.</p>";
-    let rawMime;
-    try{rawMime=buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to,subject,text,html,messageId,date});}
-    catch{return json({ok:false,error:"The SMTP self-check message could not be built.",stageCode:"BUILD_MESSAGE",messageId},400,corsHeaders(request));}
-
     const stages=[];
     const onStage=async(stageCode,outcome,smtpReplyCategory="UNKNOWN",details={})=>{
       if(!REQUIRED_STAGES.includes(stageCode))return;
@@ -51,6 +47,10 @@ export function createSmtpSelfcheckRoute({authenticateFirebaseRequest,getFiresto
       stages.push(stage);
       await writeAudit(env,claims,stage);
     };
+    let rawMime;
+    try{rawMime=await runEmailStage("BUILD_MESSAGE",()=>buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to,subject,text,html,messageId,date}),onStage,{messageId,date});}
+    catch{return json({ok:false,error:"The SMTP self-check message could not be built.",stageCode:"BUILD_MESSAGE",messageId,stages},400,corsHeaders(request));}
+
     try {
       const smtpReply=await smtpSend(env,{to,subject,text,html,rawMime,messageId,date,onStage});
       const submit=[...stages].reverse().find(stage=>stage.stageCode==="SUBMIT")||null;
