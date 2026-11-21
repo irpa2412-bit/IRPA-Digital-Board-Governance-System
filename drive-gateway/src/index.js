@@ -601,7 +601,7 @@ export default {
               try{
                 if(!recipient){const invalid=new Error("Invalid signer email address.");invalid.stageCode="BUILD_MESSAGE";throw invalid;}
                 if(!emailLink){
-                  result=await sendInvitationEmail({email:recipient,name,link,smtpSend:async ({to:target,subject:mailSubject,text,html})=>smtpSend(env,{to:target,subject:mailSubject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage}),logger:console});
+                  result=await sendInvitationEmail({email:recipient,name,link,smtpSend:async ({to:target,text,html})=>smtpSend(env,{to:target,subject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage}),logger:console});
                 }else if(emailSigningModule==="v2"){
                   const safeOwner=String(ownerName||"IRPA Document Owner").replace(/[\r\n]+/g," ").slice(0,160);
                   const expiryDate=expiresAt?new Date(expiresAt):null;
