@@ -594,7 +594,8 @@ export default {
               const rawMime=await runEmailStage("BUILD_MESSAGE",()=>buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to:recipient,subject,text,html,messageId,date}),onStage,{messageId,date});
               try{
                 const smtpReply=await smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage});
-                return {ok:true,acceptedByMailServer:true,deliveryMeaning:"Accepted by the mail server is not proof of inbox delivery.",messageId,smtpReply,stages};
+                const submit=[...stages].reverse().find(stage=>stage.stageCode==="SUBMIT")||null;
+                return {ok:true,acceptedByMailServer:true,deliveryMeaning:"Accepted by the mail server is not proof of inbox delivery.",messageId,smtpReply,smtpReplyCode:submit?.smtpReplyCode||Number(String(smtpReply||"").slice(0,3))||null,stages};
               }catch(error){error.stages=stages;error.messageId=messageId;throw error;}
             },
             resolveEmailLinkProfileUid: async (email, signerName) => {
