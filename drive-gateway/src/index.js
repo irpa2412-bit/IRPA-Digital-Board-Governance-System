@@ -10,7 +10,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
-import { buildMailMimeMessage, buildSmtpRecipientEnvelope, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, buildSigningInvitationAuditMessage, buildSignerInvitationSubject, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
@@ -3067,6 +3067,12 @@ async function writeSmtpSelfcheckAudit(env, claims, event) {
   if (!response.ok) throw new Error("Unable to persist SMTP self-check audit event.");
   return {auditId};
 }
+export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
+  const recipient=normalizeRecipientEmail(to);
+  const mime=buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
+  return{recipient,rcptCommand:"RCPT TO:<"+recipient+">",mime};
+}
+
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromName="IRPA Administration",messageId=null}) {
   const smtpConfig=resolveSmtpConfiguration(env);
   const toEmail=normalizeRecipientEmail(to);
