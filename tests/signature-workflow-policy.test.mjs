@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
 import { requireSupportedSignatureRoutingMode } from "../src/firebase/signatureWorkflowPolicy.js";
+import {
+  resolveSignerRecipientEmail,
+  findRegisteredSignerDuplicate,
+  hasSignerResponsibility,
+  signerDeliveryLabel,
+  signerLinkStatusLabel,
+  copySignerInvitationLink,
+  buildSignerWhatsAppInvitationUrl
+} from "../src/utils/signatureInvitationUi.mjs";
 
 const portal = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
 
@@ -234,10 +243,18 @@ test("duplicate participant identities are reused and rapid repeated add actions
   assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("crypto.getRandomValues"));
   assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.match(addSigner[1], /const recipientEmail=email;/);
-  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipientEmail))'));
-  assert.ok(addSigner[1].includes("email:recipientEmail,role,"));
-  assert.doesNotMatch(addSigner[1], /registeredEmail/);
+  assert.match(addSigner[1], /resolveSignerRecipientEmail\(email\)/);
+  assert.match(addSigner[1], /findRegisteredSignerDuplicate\(recipients,registered\?\.uid\)/);
+  assert.match(addSigner[1], /hasSignerResponsibility\(existingAssignments,assignment\)/);
+  assert.equal(resolveSignerRecipientEmail(" Daniel@Example.org "), "daniel@example.org");
+  assert.throws(() => resolveSignerRecipientEmail("not-an-email"), /valid email address/);
+  const recipients = [{ uid: "member-1", email: "shared@example.org" }, { uid: "email-link-2", email: "shared@example.org" }];
+  assert.equal(findRegisteredSignerDuplicate(recipients, "member-1"), recipients[0]);
+  assert.equal(findRegisteredSignerDuplicate(recipients, "different-person"), null);
+  assert.equal(findRegisteredSignerDuplicate(recipients, null), null);
+  const existingAssignments = [{ role: "Review", title: "Chair", capacity: "Board" }];
+  assert.equal(hasSignerResponsibility(existingAssignments, { role: "review", title: "chair", capacity: "board" }), true);
+  assert.equal(hasSignerResponsibility(existingAssignments, { role: "Approve", title: "Chair", capacity: "Board" }), false);
   assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
   assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
 });
@@ -298,7 +315,13 @@ test("refreshing an envelope uses one authoritative status read and keeps signer
   assert.doesNotMatch(storage,/export async function getGatewaySignatureEnvelopeDeliveryStatus/);
   assert.ok(page.includes("onClick={refreshGatewayEmailStatus}"));
   assert.ok(page.includes("onClick={()=>resendEmailLink(item.id)}"));
-  assert.ok(page.includes('Delivery: {signerDeliveryLabel(item)} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes("signerDeliveryLabel(item)"));
+  assert.ok(page.includes("signerLinkStatusLabel(item)"));
+  assert.equal(signerDeliveryLabel({ delivery: { state: "Sent" } }), "Sent");
+  assert.equal(signerDeliveryLabel({ delivery: { state: "Failed", failureStageCode: "SMTP_AUTH" } }), "Failed (SMTP_AUTH)");
+  assert.equal(signerLinkStatusLabel({ linkExpired: true, emailLinkStatus: "opened" }), "Expired");
+  assert.equal(signerLinkStatusLabel({ emailLinkStatus: "opened" }), "opened");
+  assert.equal(signerLinkStatusLabel({}), "—");
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
@@ -439,8 +462,17 @@ test("per-signer copy and WhatsApp actions reuse the existing accepted invitatio
   assert.match(page,/Share on WhatsApp/);
   assert.match(page,/shareEmailSigningLink\(item\.id,"copy"\)/);
   assert.match(page,/shareEmailSigningLink\(item\.id,"whatsapp"\)/);
-  assert.ok(page.includes('if(!navigator.clipboard?.writeText)throw new Error("Clipboard access is unavailable in this browser.");'));
-  assert.ok(page.includes("await navigator.clipboard.writeText(signingLink)"));
+  assert.ok(page.includes("copySignerInvitationLink(signingLink,navigator.clipboard)"));
+  assert.ok(page.includes("buildSignerWhatsAppInvitationUrl(signingLink)"));
+  const link = "https://irpa.or.tz/?emailSignToken=opaque-signer-token";
+  const copied = [];
+  await copySignerInvitationLink(link, { writeText: async (value) => copied.push(value) });
+  assert.deepEqual(copied, [link]);
+  await assert.rejects(() => copySignerInvitationLink(link, {}), /Clipboard access is unavailable/);
+  assert.throws(() => buildSignerWhatsAppInvitationUrl("http://example.org/?emailSignToken=x"), /valid signer-specific/);
+  const whatsapp = new URL(buildSignerWhatsAppInvitationUrl(link));
+  assert.equal(whatsapp.origin, "https://wa.me");
+  assert.ok(new URLSearchParams(whatsapp.search).get("text").includes(link));
   assert.match(page,/wa\.me\/\?text=/);
   assert.match(worker,/return\{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt,signingLink:link\}/);
   assert.match(storage,/return data;/);
