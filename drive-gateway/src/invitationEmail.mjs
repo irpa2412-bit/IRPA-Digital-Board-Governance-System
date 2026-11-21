@@ -9,7 +9,7 @@ const SUBJECT = "Invitation to the IRPA Digital Board Governance System";
 
 export function validateRecipient(email) {
   if (typeof email !== "string") return null;
-  const v = email.trim();
+  const v = email.trim().toLowerCase();
   if (!v || v.length > 254 || CRLF_RE.test(v) || !EMAIL_RE.test(v)) return null;
   return v;
 }
