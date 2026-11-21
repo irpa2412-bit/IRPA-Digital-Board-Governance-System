@@ -11,21 +11,23 @@
       "Members and Employees Portal",
       "Signature Portal"
     ],
-    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
+    "reason": "The shared SignaturePlatform.jsx change is covered by the open cross-portal component repair window. The current repair combines the already authorised Signature Self-Test session-safety fix with a Signature Portal-only invitation delivery diagnostics panel. The panel adds per-signer SMTP evidence and owner-controlled copy/share actions; all seven portal smoke checks remain mandatory because the component is shared.",
     "files": [
       "src/components/SignaturePathwaySelfTest.jsx",
       "tests/signature-self-test-session-safety.test.mjs",
       "package.json",
       "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
       ".github/workflows/email-signing-contract.yml",
-      "tests/signature-pathway-contract.test.mjs"
+      "tests/signature-pathway-contract.test.mjs",
+      "src/pages/SignaturePlatform.jsx"
     ],
-    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
+    "expectedEffect": "The Signature Self-Test cannot follow Gateway authentication redirects into an interactive login gateway. Signature invitation messages use signer/position-specific multipart MIME and unique Message-ID; SMTP stage replies and automatic hand-off outcomes are recorded and visible to the envelope owner. Copy and WhatsApp actions use the same signer-specific link returned after the existing resend flow accepts the email. All other portal workflows and the signing protocol remain unchanged.",
     "prohibitedChanges": [
       "Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.",
       "Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.",
       "Do not change Firestore rules, indexes, production records, signing permissions or authentication/session lifecycle.",
-      "Do not deploy production resources as part of this merge."
+      "Do not deploy production resources as part of this merge.",
+      "Do not change signer order, identity, invitation tokens, link format, session lifecycle, resend acceptance semantics, field assignments, stamping, PDFs, hashes, certificates, archives, Firestore rules, SMTP settings, credentials, secrets or environment variables."
     ]
   },
   "repairWindow": {
