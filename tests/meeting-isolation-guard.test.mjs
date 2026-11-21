@@ -227,7 +227,7 @@ const isolatedWindowFixture = () => {
   const activeAmendment = {
     status: "open",
     files: ["drive-gateway/src/signing.mjs", "drive-gateway/src/emailSigningLinks.mjs"],
-    repairWindow: { rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd" }
+    repairWindow: { rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd", frontendRollbackCommit: "eb68a06fdd04454b0e73d2dc9c010eae5519f458" }
   };
   const baselineChangeRecord = { status: "complete", repairWindow: { status: "open", portal: "Meeting Portal" }, history: [{ action: "meeting-window-opened" }] };
   const currentChangeRecord = { ...structuredClone(baselineChangeRecord), activeAmendment };
@@ -236,7 +236,8 @@ const isolatedWindowFixture = () => {
       portal: "Signature Portal",
       status: "open",
       closesAt: "2026-11-22T17:08:47Z",
-      rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
+      rollbackCommit: "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+      frontendRollbackCommit: "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
     }]
   };
   return { changedPaths: [...SIGNATURE_WINDOW_AMENDMENT_PATHS], repairWindow, changeRecord: { activeAmendment }, baselineChangeRecord, currentChangeRecord };

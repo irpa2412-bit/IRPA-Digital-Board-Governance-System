@@ -38,9 +38,12 @@ export function evaluateSignatureWindowAmendment({
     return { pass: false, reason: "Another portal's window or existing Change Record history was altered." };
   }
   const expectedRollback = "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd";
+  const expectedFrontendRollback = "eb68a06fdd04454b0e73d2dc9c010eae5519f458";
   if (signatureWindow.rollbackCommit !== expectedRollback ||
-      amendment.repairWindow?.rollbackCommit !== expectedRollback) {
-    return { pass: false, reason: "Signature Portal rollback reference does not match the latest successful production Worker deploy." };
+      amendment.repairWindow?.rollbackCommit !== expectedRollback ||
+      signatureWindow.frontendRollbackCommit !== expectedFrontendRollback ||
+      amendment.repairWindow?.frontendRollbackCommit !== expectedFrontendRollback) {
+    return { pass: false, reason: "Signature Portal Worker or frontend rollback reference does not match the recorded production baseline." };
   }
   return { pass: true, reason: "Only the separate Signature Portal window amendment is permitted." };
 }
