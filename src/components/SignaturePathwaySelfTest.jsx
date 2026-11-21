@@ -314,7 +314,7 @@ function SignaturePathwaySelfTestPanel() {
               const viewport = page.getViewport({ scale: 0.65 });
               canvas.width = Math.max(1, Math.floor(viewport.width));
               canvas.height = Math.max(1, Math.floor(viewport.height));
-              const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 420, maxPixels: 1000000, scale: 0.65 });
+              const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 420, maxPixels: 1000000, zoom: 0.65, signal: documentController.signal });
               pdfPageCheck = { status: metrics.textCharacters > 0 && metrics.nonBlankPixelRatio > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages, pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }], lastPageFlag: "First-page-only check; remaining pages were not rendered." };
             } finally { canvas.width = 1; canvas.height = 1; }
             return { ...result, pdfPageCheck };
