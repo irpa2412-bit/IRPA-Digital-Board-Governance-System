@@ -22,125 +22,24 @@ export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachment
 }
 
 export function buildSignerInvitationSubject({title,position,positionCount,name}={}) {
-  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
   const safeName=validateName(name);
   if(!safeName)throw new Error("Invalid signer name");
-  const firstName=safeName.split(/\s+/)[0]||"Signer";
-  return "Please sign: "+safeTitle+" - "+firstName+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+")";
+  const firstName=safeName.split(/\\s+/)[0]||"Signer";
+  return "Please sign: "+safeTitle+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+") - "+firstName;
 }
 
-export function buildSigningInvitationAuditMessage({recipientPrefix,recipientDomain,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,invitationKind="creation",at=new Date()}={}) {
-  const domain=String(recipientDomain||"unknown").toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,253)||"unknown";
-  const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...@"+domain;
-  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+export function buildSigningInvitationAuditMessage({recipientPrefix,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,at=new Date()}={}) {
+  const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...";
+  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
   const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
-  const type=invitationKind==="resend"?"resend":"creation";
   const category="SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
-  const details=category+(stageCode?"\nStage code: "+String(stageCode).slice(0,40):"");
-  const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" - "+safeTitle;
-  const text="Time (EAT): "+when+"\nEnvelope ID: "+String(envelopeId||"")+"\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\nMessage-ID: "+String(messageId||"Not recorded")+"\nType: "+type+"\n"+details+"\nRecipient domain: "+domain;
-  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p><strong>Type:</strong> "+type+"</p><p>"+escapeHtml(details).replace(/\n/g,"<br>")+"</p><p><strong>Recipient domain:</strong> "+escapeHtml(domain)+"</p>";
+  const details=(stageCode?"Stage code: "+String(stageCode).slice(0,40)+"\\n":"")+category;
+  const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" of "+Number(positionCount||1)+" - "+safeTitle;
+  const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\n"+details;
+  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p>"+escapeHtml(details).replace(/\\n/g,"<br>")+"</p>";
   return {to:"info@irpa.or.tz",subject,text,html};
 }
-
-export function validateName(name) {
-  if (name === undefined || name === null || name === "") return "Member";
-  if (typeof name !== "string" || name.length > 100 || CRLF_RE.test(name)) return null;
-  return name.trim() || "Member";
-}
-export function escapeHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-}
-export const MAX_INVITATION_MAIL_ATTEMPTS = 3;
-export const MAX_INVITATION_RETRY_DELAY_MS = 2000;
-
-// A queued delivery is considered in-flight only for a short bounded lease.
-// Missing or stale timestamps are recoverable and must not block a resend forever.
-export function isInvitationQueueActive(queuedAt, now = Date.now(), leaseMs = 5 * 60 * 1000) {
-  const queuedAtMs = Date.parse(String(queuedAt || ""));
-  return Number.isFinite(queuedAtMs) && queuedAtMs <= now + 30_000 && now - queuedAtMs < leaseMs;
-}
-
-export function isRetryableMailError(error) {
-  const message = String(error?.message || error || "");
-  const smtp = message.match(/IRPA SMTP error (\d{3})/i);
-  if (smtp) {
-    const code = Number(smtp[1]);
-    return Number(smtp[1]) >= 400 && Number(smtp[1]) < 500;
-  }
-  if (error?.deliveryOutcome === "unknown" || error?.retryable === false) return false;
-  return true;
-}
-
-export async function sendWithRetry(fn, opts = {}) {
-  const { attempts=MAX_INVITATION_MAIL_ATTEMPTS, delayMs=300,
-    maxDelayMs=MAX_INVITATION_RETRY_DELAY_MS, logger=console,
-    shouldRetry=isRetryableMailError, sleep=(ms)=>new Promise(r=>setTimeout(r,ms)) }=opts;
-  const boundedAttempts=Math.max(1,Math.min(MAX_INVITATION_MAIL_ATTEMPTS,Number(attempts)||MAX_INVITATION_MAIL_ATTEMPTS));
-  let lastErr;
-  for(let i=1;i<=boundedAttempts;i++){
-    try{return await fn(i);}
-    catch(e){
-      lastErr=e;
-      try { logger?.error?.("IRPA invitation mail attempt failed", {attempt:i, retryable:shouldRetry(e), stage:e?.stage||"provider"}); } catch {}
-      if(i===boundedAttempts||!shouldRetry(e)) break;
-      const cap=Math.max(0,Number(maxDelayMs)||MAX_INVITATION_RETRY_DELAY_MS);
-      const exponential=Math.min(cap,Math.max(0,Number(delayMs)||300)*2**(i-1));
-      const jitter=Math.floor(Math.random()*Math.max(1,Math.floor(exponential*0.2)));
-      await sleep(Math.min(cap,exponential+jitter));
-    }
-  }
-  throw lastErr || new Error("Invitation mail delivery failed.");
-}
-export function buildInvitationMessage({name,link,meetingAccess=null,username=""}) {
-  const safeName=validateName(name);
-  if(!safeName) throw new Error("Invalid name");
-  const safeLink=new URL(link).toString();
-  let meetingText="";
-  let meetingHtml="";
-  let subject=SUBJECT;
-  if(meetingAccess){
-    const meetingName=validateName(String(meetingAccess.meetingReference||"IRPA Meeting"));
-    const gateLink=new URL(String(meetingAccess.link||"")).toString();
-    const password=String(meetingAccess.password||"").trim();
-    const cleanUsername=validateRecipient(String(username||""))||"";
-    const usernameText=cleanUsername?"\nIRPA username: "+cleanUsername:"";
-    const usernameHtml=cleanUsername?"<p><strong>IRPA username:</strong> "+escapeHtml(cleanUsername)+"</p>":"";
-    if(!meetingName||!password||password.length>32||CRLF_RE.test(password))throw new Error("Invalid meeting access details");
-    const detail=(value,max=240)=>String(value??"").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,max);
-    const meetingIdentity=detail(meetingAccess.meetingIdentity||"System identity not recorded",180);
-    const meetingTitle=detail(meetingAccess.meetingTitle||meetingName,180);
-    const meetingDate=detail(meetingAccess.meetingDate,80);
-    const meetingTime=detail([meetingAccess.meetingStartTime,meetingAccess.meetingEndTime].filter(Boolean).join(" – "),80);
-    const meetingPlatform=detail(meetingAccess.meetingPlatform||"Platform details not recorded",120);
-    const meetingVenue=detail(meetingAccess.meetingVenue,240);
-    const platformMeetingId=detail(meetingAccess.platformMeetingId,120);
-    const platformPasscode=detail(meetingAccess.platformPasscode,120);
-    const meetingChairperson=detail(meetingAccess.meetingChairperson,120);
-    const meetingAgenda=detail(meetingAccess.meetingAgenda,1000);
-    let platformUrl="";
-    if(String(meetingAccess.platformAccessUrl||"").trim()){
-      try{const parsed=new URL(String(meetingAccess.platformAccessUrl).trim());if(parsed.protocol!=="https:")throw new Error("protocol");platformUrl=parsed.toString();}
-      catch{throw new Error("Invalid registered meeting platform URL");}
-    }
-    subject="IRPA account activation and meeting access";
-    meetingText=`\n\nREGISTERED MEETING PARTICULARS\nMeeting identity: ${meetingIdentity}\nMeeting reference: ${meetingName}\nMeeting title: ${meetingTitle}\nDate: ${meetingDate||"Not recorded"}\nTime: ${meetingTime||"Not recorded"}\nPlatform: ${meetingPlatform}\nPlatform access URL: ${platformUrl||"Not recorded"}\nPlatform meeting ID: ${platformMeetingId||"Not recorded"}\nPlatform passcode: ${platformPasscode||"Not recorded"}\nPhysical venue: ${meetingVenue||"Not recorded"}\nChairperson: ${meetingChairperson||"Not recorded"}\nAgenda / purpose: ${meetingAgenda||"Refer to the official meeting agenda"}\n\nMEETING ACCESS${usernameText}\nOpen the IRPA meeting gate after activating your account: ${gateLink}\nMeeting gate password: ${password}\nThis gate pass expires on ${String(meetingAccess.expiresAt||"the date shown by IRPA Administration")}. Do not forward it to another person.`;
-    meetingHtml=`<hr><h3>Registered Meeting Particulars</h3><table><tbody><tr><th align="left">Meeting identity</th><td>${escapeHtml(meetingIdentity)}</td></tr><tr><th align="left">Meeting reference</th><td>${escapeHtml(meetingName)}</td></tr><tr><th align="left">Meeting title</th><td>${escapeHtml(meetingTitle)}</td></tr><tr><th align="left">Date</th><td>${escapeHtml(meetingDate||"Not recorded")}</td></tr><tr><th align="left">Time</th><td>${escapeHtml(meetingTime||"Not recorded")}</td></tr><tr><th align="left">Platform</th><td>${escapeHtml(meetingPlatform)}</td></tr><tr><th align="left">Platform access</th><td>${platformUrl?`<a href="${escapeHtml(platformUrl)}">Open ${escapeHtml(meetingPlatform)} platform</a>`:"Not recorded"}</td></tr><tr><th align="left">Platform meeting ID</th><td>${escapeHtml(platformMeetingId||"Not recorded")}</td></tr><tr><th align="left">Platform passcode</th><td>${escapeHtml(platformPasscode||"Not recorded")}</td></tr><tr><th align="left">Physical venue</th><td>${escapeHtml(meetingVenue||"Not recorded")}</td></tr><tr><th align="left">Chairperson</th><td>${escapeHtml(meetingChairperson||"Not recorded")}</td></tr><tr><th align="left">Agenda / purpose</th><td>${escapeHtml(meetingAgenda||"Refer to the official meeting agenda")}</td></tr></tbody></table><h3>IRPA Meeting Access</h3>${usernameHtml}<p>After activating your account, open the meeting gate:</p><p><a href="${escapeHtml(gateLink)}">Open IRPA Meeting Gateway</a></p><p><strong>Meeting gate password:</strong> <code>${escapeHtml(password)}</code></p><p>This gate pass expires on ${escapeHtml(String(meetingAccess.expiresAt||"the date shown by IRPA Administration"))}. Do not forward it to another person.</p>`;
-  }
-  return {
-    subject,
-    text:`Dear ${safeName},\n\nYou have been invited to access the IRPA Digital Board Governance System workspace.\n\nOpen the invitation link to create your password and activate your account:\n${safeLink}\n\nAfter activation, you can sign in directly to your IRPA workspace.${meetingText}\n\nIf you did not expect this email, please contact IRPA Administration.`,
-    html:`<p>Dear ${escapeHtml(safeName)},</p><p>You have been invited to access the IRPA Digital Board Governance System workspace.</p><p>Open the invitation link below to create your password and activate your account:</p><p><a href="${escapeHtml(safeLink)}">Activate My Account</a></p><p>After activation, you can sign in directly to your IRPA workspace.</p>${meetingHtml}<p>If you did not expect this email, please contact IRPA Administration.</p>`
-  };
-}
-export async function sendInvitationEmail({email,name,link,meetingAccess=null,smtpSend,logger=console,sleep}) {
-  const to=validateRecipient(email);
-  if(!to) throw new Error("Invalid recipient");
-  const message=buildInvitationMessage({name,link,meetingAccess,username:to});
-  return sendWithRetry(()=>smtpSend({to,...message}),{logger,sleep});
-}
-
-
 
 export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}) {
   const safeName=validateName(name);
