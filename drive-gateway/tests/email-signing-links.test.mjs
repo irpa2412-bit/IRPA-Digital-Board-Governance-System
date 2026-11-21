@@ -451,6 +451,7 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
   const resentAll=await resendAllUnsignedInvitations(ctx,owner,created.envelopeId);
   assert.equal(resentAll.attempted,3);
   assert.equal(resentAll.failed,0);
+  assert.ok(resentAll.results.every(item=>!Object.prototype.hasOwnProperty.call(item,"signingLink")),"bulk resend must not expose every bearer link in its aggregate response");
   assert.deepEqual(sent.slice(-3).map(item=>item.to),expected,"resend-all must address each unsigned signer position independently");
   assert.deepEqual(sent.slice(-3).map(item=>item.rcptCommand),expected.map(email=>"RCPT TO:<"+email+">"));
   assert.deepEqual(sent.slice(-3).map(item=>item.toHeader),expected);
