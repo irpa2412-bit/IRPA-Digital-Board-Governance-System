@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleSendInvitationEmail, buildInvitationMessage, sendWithRetry, isRetryableMailError, isInvitationQueueActive } from "../src/invitationEmail.mjs";
+import { handleSendInvitationEmail, sendWithRetry, isRetryableMailError, isInvitationQueueActive } from "../src/invitationEmail.mjs";
 import { queueInductionEmail } from "../../functions/queueInductionEmail.mjs";
 
 const quiet = { error() {}, log() {} };

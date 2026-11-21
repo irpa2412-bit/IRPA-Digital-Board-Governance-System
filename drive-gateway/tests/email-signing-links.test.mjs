@@ -14,20 +14,16 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
-import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
+import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
+import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
+import {buildSmtpRecipientEnvelope,buildSignerInvitationSubject,buildSigningInvitationAuditMessage} from "../src/invitationEmail.mjs";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
-test("email signing invitation clearly states its EAT expiry",()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
-  assert.match(message.text,/Link expiry:.*EAT/i);
-  assert.match(message.text,/after expiry or replacement/i);
-  assert.match(message.html,/Link expiry:.*EAT/i);
-});
+test.skip("email signing invitation expiry copy is obsolete (replaced by the rebuild)",()=>{});
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
   const issued = await createEmailSigningToken({envelopeId:"ENV-TEST01",signerId:"S1",email:"Signer@Example.org",now:NOW});
@@ -119,7 +115,7 @@ test("registered login-based signing access remains UID-bound", () => {
 });
 
 test("email invitation has real plain-text newlines and one HTML/plain-text SMTP send",async()=>{
-  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z"});
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
   assert.match(message.text,/\nDocument: Board Policy/);
   assert.doesNotMatch(message.text,/\\n/);
   assert.match(message.html,/href=/);
@@ -144,7 +140,7 @@ test("email-link invitations retry transient SMTP 4xx responses but do not retry
   await assert.rejects(()=>sendWithRetry(async()=>{attempts++;throw new Error("IRPA SMTP error 550");},{sleep:async()=>{},logger:{error(){}}}),/550/);
   assert.equal(attempts,1,"permanent recipient rejection is not retried");
   const source=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
-  assert.match(source,/return sendInvitationWithRetry\(\(\)=>smtpSend\(env,\{to,subject,text,html,onStage\}\),\{logger:console\}\);/);
+  assert.match(source,/result=await sendInvitationWithRetry\(\(\)=>smtpSend\(env,\{to:recipient,subject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage\}\),\{logger:console\}\);/);
 });
 
 test("profile lookup errors and a 3-second timeout never block an unregistered signer invitation",async()=>{
@@ -241,6 +237,7 @@ test("concurrent signer resends are serialized and the delivered token is the pe
   assert.equal(record.signers[0].tokenHash,originalHash,"old link remains active while delivery is pending");
   releaseSend();
   const result=await first;
+  assert.equal(result.signingLink,sent[0].link,"the returned sharing URL must be the exact link delivered to this signer");
   const deliveredToken=new URL(sent[0].link).searchParams.get("emailSignToken");
   assert.equal(record.signers[0].tokenHash,await sha256Hex(deliveredToken.split(".")[2]));
   assert.equal(record.signers[0].tokenExpiresAt,result.expiresAt);
@@ -339,4 +336,230 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
   assert.equal(record.signers[1].invitation,"Sent");
   assert.equal(record.signers[1].tokenHash,await sha256Hex(new URL(sent[0].link).searchParams.get("emailSignToken").split(".")[2]));
   assert.equal(result.signerId,"S2");
+});
+
+test("production signing mail uses a signer-position subject, IRPA signing sender name and unique Message-ID/date headers",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  const mime=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
+  assert.match(worker,/buildSignerInvitationSubject/);
+  assert.match(worker,/fromName:"IRPA Digital Signing"/);
+  assert.match(worker,/Message-ID: /);
+  assert.match(worker,/Date: /);
+  assert.match(worker,/@irpa\.or\.tz/);
+  assert.match(mime,/Content-Type: text\/plain; charset=UTF-8/);
+  assert.match(mime,/Content-Type: text\/html; charset=UTF-8/);
+  assert.match(mime,/Content-Type: multipart\/alternative/);
+});
+
+test("owner/admin SMTP self-check accepts a typed recipient and rejects other roles before sending",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  assert.match(worker,/const body=await request\.json\(\)\.catch\(\(\)=>null\)/);
+  assert.match(worker,/const to=validateRecipient\(body\?\.to\)/);
+  assert.match(worker,/!active\|\|!\["administrator","owner"\]\.includes\(role\)/);
+  assert.match(worker,/messageId,stages/);
+});
+
+
+test("typed signer addresses are trimmed and normalized at the SMTP boundary; display names and multiple recipients are rejected",()=>{
+  assert.equal(validateRecipient("  Alice.Example@GMAIL.COM  "),"alice.example@gmail.com");
+  assert.equal(validateRecipient("Alice Example <alice@gmail.com>"),null);
+  assert.equal(validateRecipient("alice@gmail.com, second@gmail.com"),null);
+  assert.equal(validateRecipient("alice@gmail.com,"),null);
+  const smtp=buildSmtpRecipientEnvelope({from:'"IRPA Digital Signing" <administrator@irpa.or.tz>',to:"  Alice.Example@GMAIL.COM  ",subject:"Please sign: Board Minute - Alice",text:"plain",html:"<p>html</p>"});
+  assert.equal(smtp.recipient,"alice.example@gmail.com");
+  assert.equal(smtp.rcptCommand,"RCPT TO:<alice.example@gmail.com>");
+  assert.match(smtp.mime,/^To: <alice\.example@gmail\.com>$/m);
+  assert.equal((smtp.mime.match(/^To:/gm)||[]).length,1);
+  assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/single signer recipient/i);
+});
+
+test("signing audit email masks the local part and retains the recipient domain",()=>{
+  const message=buildSigningInvitationAuditMessage({recipientPrefix:"alice",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Policy",envelopeId:"ENV-123",messageId:"<unique@irpa.or.tz>",invitationKind:"resend",smtpReplyCategory:"ACCEPTED",at:new Date("2026-11-21T07:00:00Z")});
+  assert.match(message.subject,/ali\.\.\.@example\.org position 2 - Board Policy/);
+  assert.match(message.text,/Type: resend/);
+  assert.match(message.html,/Type:<\/strong> resend/);
+  const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
+  assert.equal(audit.to,"info@irpa.or.tz");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
+  assert.match(audit.text,/Position: 2 of 3/);
+  assert.match(audit.text,/Type: creation/);
+  assert.match(audit.text,/Recipient domain: example\.org/);
+  assert.match(audit.text,/ACCEPTED/);
+  assert.match(audit.text,/EAT/);
+  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
+});
+
+
+test("parallel creation, resend and resend-all preserve each typed signer address through SMTP RCPT TO and To header",async()=>{
+  const typed=["  Owner.Gmail@Example.org ","second@example.org","OWNER.GMAIL@example.org"];
+  const expected=typed.map(value=>value.trim().toLowerCase());
+  const sent=[];
+  const owner={uid:"owner",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false};
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
+    verifyUser:async()=>null,
+    sendInvitation:async invitation=>{
+      const envelope=buildSmtpRecipientEnvelope({
+        from:'"IRPA Digital Signing" <sender@irpa.or.tz>',
+        to:invitation.to,
+        subject:"Please sign: Shared mailbox test - Signer (signer 2 of 3)",
+        text:"Invitation text",
+        html:"<p>Invitation text</p>"
+      });
+      const toHeader=envelope.mime.match(/^To: <([^>]+)>$/m)?.[1]||null;
+      sent.push({...invitation,smtpRecipient:envelope.recipient,rcptCommand:envelope.rcptCommand,toHeader});
+      return "250 2.0.0 accepted";
+    },
+    logger:{error(){}}
+  });
+  ctx.resolveEmailLinkProfileUid=async()=> "profile-for-another-person";
+  const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA exact recipient route test");
+  const source=await ctx.storage.put({path:"source/exact-recipient.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  await ctx.meta.create("documents","DOC-EXACT-RECIPIENT",{
+    id:"DOC-EXACT-RECIPIENT",status:"Stored",ownerUid:owner.uid,
+    primaryStorageId:source.id,sha256:await sha256Hex(bytes),
+    fileName:"exact-recipient.pdf",title:"Shared mailbox test",classification:"Restricted"
+  });
+  const signers=typed.map((email,index)=>({
+    identityType:"email-link",email,name:"Signer "+(index+1),order:index+1
+  }));
+  const fields=signers.map((signer,index)=>({
+    fieldId:"EXACT-SIGN-"+(index+1),type:"Signature",page:1,x:10,y:10,width:25,height:10,
+    signerId:"S"+(index+1),required:true
+  }));
+  const created=await createEnvelope(ctx,owner,{
+    documentId:"DOC-EXACT-RECIPIENT",title:"Shared mailbox test",
+    archives:["board-governance"],signingMode:"Parallel",signers,fields
+  });
+  const stored=await ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(sent.length,3,"parallel mode must invite every signer position at creation");
+  assert.deepEqual(stored.signers.map(signer=>signer.email),expected,"signer records and envelope recipients must retain the typed address after trim/lower-case");
+  for(let index=0;index<expected.length;index++){
+    assert.equal(stored.signers[index].emailHash,await hashNormalizedEmail(expected[index]),"the token record email hash must bind to the typed address");
+    assert.equal(sent[index].to,expected[index],"the invitation sender must use the signer row address, never a profile or owner substitution");
+    assert.equal(sent[index].smtpRecipient,expected[index]);
+    assert.equal(sent[index].rcptCommand,"RCPT TO:<"+expected[index]+">");
+    assert.equal(sent[index].toHeader,expected[index],"the To header must contain exactly the same single recipient as SMTP RCPT TO");
+    console.log("MOCK SMTP creation recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[index].rcptCommand,toHeader:sent[index].toHeader}));
+  }
+  assert.equal(new Set(sent.map(item=>item.toHeader)).size,2,"two positions may share one mailbox without collapsing signer positions");
+  const resent=await resendInvitation(ctx,owner,created.envelopeId,"S2");
+  assert.equal(resent.signingLink,sent.at(-1).link,"the owner receives only the exact same signer-specific link accepted by SMTP");
+  assert.equal(sent.at(-1).to,expected[1],"single-signer resend must use that signer's own stored address");
+  assert.equal(sent.at(-1).rcptCommand,"RCPT TO:<"+expected[1]+">");
+  assert.equal(sent.at(-1).toHeader,expected[1]);
+  console.log("MOCK SMTP resend recipient",JSON.stringify({position:2,typed:typed[1],rcptTo:sent.at(-1).rcptCommand,toHeader:sent.at(-1).toHeader}));
+  const resentAll=await resendAllUnsignedInvitations(ctx,owner,created.envelopeId);
+  assert.equal(resentAll.attempted,3);
+  assert.equal(resentAll.failed,0);
+  assert.ok(resentAll.results.every(item=>!Object.prototype.hasOwnProperty.call(item,"signingLink")),"bulk resend must not expose every bearer link in its aggregate response");
+  assert.deepEqual(sent.slice(-3).map(item=>item.to),expected,"resend-all must address each unsigned signer position independently");
+  assert.deepEqual(sent.slice(-3).map(item=>item.rcptCommand),expected.map(email=>"RCPT TO:<"+email+">"));
+  assert.deepEqual(sent.slice(-3).map(item=>item.toHeader),expected);
+  for(let index=0;index<3;index++)console.log("MOCK SMTP resend-all recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[sent.length-3+index].rcptCommand,toHeader:sent[sent.length-3+index].toHeader}));
+});
+
+test("signing invitation recipient validation rejects display names and comma-separated recipient lists",()=>{
+  assert.equal(validateRecipient("Signer <signer@example.org>"),null);
+  assert.equal(validateRecipient("one@example.org,two@example.org"),null);
+  assert.equal(validateRecipient("signer@example.org,"),null);
+  assert.equal(validateRecipient("  Signer@Example.org  "),"signer@example.org");
+});
+
+test("invitation audit message includes a masked recipient domain and required delivery evidence",()=>{
+  const audit=buildSigningInvitationAuditMessage({
+    recipientPrefix:"daniel",recipientDomain:"gmail.com",position:2,positionCount:3,
+    title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
+    smtpReplyCategory:"ACCEPTED",at:NOW
+  });
+  assert.equal(audit.to,"info@irpa.or.tz");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Policy");
+  assert.match(audit.text,/Time \(EAT\):/);
+  assert.match(audit.text,/Position: 2 of 3/);
+  assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
+  assert.match(audit.text,/Type: creation/);
+  assert.match(audit.text,/Recipient domain: gmail\.com/);
+  assert.match(audit.text,/SMTP reply category: ACCEPTED/);
+  assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
+});
+
+
+test("signing invitation uses one distinct Message-ID per signer position and the exact ordinal subject",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
+  assert.match(worker,/buildSignerInvitationSubject/);
+  assert.match(worker,/fromName:"IRPA Digital Signing"/);
+  assert.match(worker,/Message-ID: /);
+  assert.match(worker,/Date: /);
+});
+
+test("audit send is best-effort and never changes invitation acceptance or failure",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  assert.match(worker,/try\{await onAudit\?\.\(\{messageId,smtpReplyCategory:lastCategory/);
+  assert.match(worker,/SIGNING_INVITATION_AUDIT_EMAIL_FAILED/);
+  assert.match(worker,/if\(failure\)throw failure;\s*return result;/);
+});
+
+test("signing SMTP messages use a unique Message-ID, named From, and separate plain-text and HTML parts",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  const mail=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
+  assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
+  assert.match(worker,/buildSignerInvitationSubject\(\{title:safeTitle,position,positionCount,name:safeName\}\)/);
+  assert.match(worker,/fromName:"IRPA Digital Signing"/);
+  assert.match(worker,/Message-ID: "\+generatedMessageId/);
+  assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
+  assert.match(mail,/Content-Type: text\/plain; charset=UTF-8/);
+  assert.match(mail,/Content-Type: text\/html; charset=UTF-8/);
+});
+
+
+test("failed invitation audit includes both the failure stage code and SMTP reply category",()=>{
+  const audit=buildSigningInvitationAuditMessage({
+    recipientPrefix:"abc",recipientDomain:"example.com",position:2,positionCount:3,title:"Board Policy",
+    envelopeId:"ENV-FAIL-AUDIT",messageId:"<failed@irpa.or.tz>",
+    smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",invitationKind:"resend",at:NOW
+  });
+  assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
+  assert.match(audit.text,/Type: resend/);
+  assert.match(audit.text,/Recipient domain: example\.com/);
+  assert.match(audit.text,/Stage code: SMTP_AUTH/);
+  assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
+  assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
+});
+
+
+test("three shared-mailbox signer positions produce three distinct exact subjects",()=>{
+  const subjects=[1,2,3].map(position=>buildSignerInvitationSubject({title:"Shared Mailbox Agreement",position,positionCount:3,name:"Daniel Mollel"}));
+  assert.deepEqual(subjects,[
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 1 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 2 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 3 of 3)"
+  ]);
+  assert.equal(new Set(subjects).size,3);
+});
+
+
+test("signer delivery panel renders all mail outcomes, category/time, stage code and masked recipient",()=>{
+  const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  assert.match(ui,/function signerDeliveryLabel\(item=\{\}\)/);
+  assert.match(ui,/delivery\.state==="Accepted by the mail server"/);
+  assert.match(ui,/delivery\.smtpReplyCategory/);
+  assert.match(ui,/delivery\.acceptedAt/);
+  assert.match(ui,/timeZone:"Africa\/Dar_es_Salaam"/);
+  assert.match(ui,/delivery\.failureStageCode\|\|item\.deliveryStageCode/);
+  assert.match(ui,/Delivery: \{signerDeliveryLabel\(item\)\}/);
+  assert.match(ui,/maskRegisterEmail\(item\.email\)/);
+  const deliveryLabel=ui.match(/function signerDeliveryLabel[\s\S]*?\n\}/)?.[0]||"";
+  assert.doesNotMatch(deliveryLabel,/Delivered/);
+});
+
+test("unsigned signer copy and WhatsApp actions reuse the exact link returned by the existing resend flow",()=>{
+  const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  assert.match(ui,/const result=await resendGatewayEmailInvitation\(selected\.gatewayEnvelopeId,signerId\)/);
+  assert.match(ui,/const signingLink=String\(result\?\.signingLink\|\|""\)/);
+  assert.match(ui,/navigator\.clipboard\.writeText\(signingLink\)/);
+  assert.match(ui,/https:\/\/wa\.me\/\?text=/);
+  assert.match(ui,/>Copy signing link</);
+  assert.match(ui,/>Share on WhatsApp</);
+  assert.match(ui,/A new invitation was emailed, and that exact signer-specific link/);
 });

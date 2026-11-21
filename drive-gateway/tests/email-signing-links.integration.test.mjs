@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
-import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,getEnvelopeStatus} from "../src/signing.mjs";
+import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,resendAllUnsignedInvitations,revokeInvitation,getEnvelopeStatus,recordEmailLinkStage} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
+import {buildSmtpRecipientEnvelope} from "../src/invitationEmail.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
 import {openSigning,sign,declineSigning} from "../src/signing.mjs";
@@ -31,7 +32,7 @@ async function fixture({authority=true,failMail=false}={}) {
 }
 
 
-test("owner signs in the portal before any other signer is invited; completing owner signature releases the next signer",async()=>{
+test("a) IRPA-account owner at position 1 signs and automatically emails Gmail X at position 2",async()=>{
   const sent=[];let now=NOW;
   const ctx=buildEsignContext({
     env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
@@ -41,11 +42,11 @@ test("owner signs in the portal before any other signer is invited; completing o
   const source=await ctx.storage.put({path:"source/owner-first.pdf",bytes,contentType:"application/pdf",metadata:{}});
   const documentId="DOC-OWNER-FIRST";
   await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"owner-first.pdf",title:"Owner First Signing",classification:"Restricted"});
-  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
-    documentId,externalReference:"IRPA-OWNER-FIRST",archives:["board-governance"],signingMode:"Sequential",ownerPreSignEmail:"owner@example.org",
+  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false},{
+    documentId,externalReference:"IRPA-OWNER-FIRST",archives:["board-governance"],signingMode:"Sequential",ownerPreSignEmail:"owner@irpa.or.tz",ownerPreSignSignerId:"S1",
     signers:[
-      {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:1,role:"Document Owner"},
-      {identityType:"email-link",email:"signer@example.org",name:"Next Signer",order:2,role:"Signer"}
+      {identityType:"account",uid:"owner-uid",email:"owner@irpa.or.tz",name:"Document Owner",order:1,role:"Document Owner"},
+      {identityType:"email-link",email:"gmail-x@gmail.com",name:"Gmail Signer",order:2,role:"Signer"}
     ],
     fields:[
       {fieldId:"OWNER-SIGNATURE",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true},
@@ -53,19 +54,21 @@ test("owner signs in the portal before any other signer is invited; completing o
     ]
   });
   assert.equal(created.status,"Awaiting Owner Signature");
-  assert.equal(sent.length,0,"no participant invitation is sent before the owner signs");
-  assert.ok(created.ownerSigningToken,"the authenticated owner receives the portal session token");
-  const ownerOpened=await openEmailSigning(ctx,created.ownerSigningToken,"198.51.100.31");
-  assert.equal(ownerOpened.signer.email,"owner@example.org");
+  assert.equal(sent.length,0,"the owner portal-first signing flow does not send the owner an email");
+  assert.ok(created.ownerSigningToken,"the authenticated owner receives the portal signing token");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
   const result=await sign(ctx,{
-    token:ownerOpened.sessionToken,signature:{type:"drawn",value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="},
-    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}],
+    token:created.ownerSigningToken,user:{uid:"owner-uid"},
+    signature:{type:"drawn",value:png},
+    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],
     fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Document Owner"}
   });
   assert.equal(result.status,"InProgress");
-  assert.equal(sent.length,1,"the next signer is invited only after the owner completes signing");
-  assert.equal(sent[0].to,"signer@example.org");
-  assert.match(sent[0].link,/emailSignToken=/);
+  assert.equal(result.nextInvitations.status,"sent");
+  assert.equal(sent.length,1,"the next position is dispatched automatically after the owner signs");
+  assert.equal(sent[0].to,"gmail-x@gmail.com","hand-off targets the next signer's own email, not the owner");
+  assert.equal(sent[0].signerId,"S2");
+  assert.equal(sent[0].position,2);
   const stored=await ctx.meta.get("envelopes",created.envelopeId);
   assert.equal(stored.signers[0].status,"Signed");
   assert.equal(stored.signers[1].invitation,"Sent");
@@ -408,4 +411,318 @@ test("v2 reusable invitation is read-only on preview, creates fresh sessions, an
     ()=>openEmailSigning(f.ctx,f.token,"198.51.100.82"),
     error=>error.status===410&&error.message==="This document is already signed."
   );
+});
+
+test("e) three sequential positions on one mailbox receive distinct mocked-SMTP messages and safe audit notices",async()=>{
+  const f=await fixture();
+  const sent=[],audits=[];let messageNumber=0;
+  f.ctx.sendInvitationAudit=async record=>audits.push(record);
+  f.ctx.sendInvitation=async message=>{
+    const messageId="<mock-"+(++messageNumber)+"@irpa.or.tz>";
+    sent.push({...message,messageId});
+    for(const stage of ["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])
+      await message.onStage?.(stage,"success",stage==="SUBMIT"?"ACCEPTED":"UNKNOWN",{messageId});
+    await message.onAudit?.({messageId,smtpReplyCategory:"ACCEPTED"});
+    return "250 MOCK ACCEPTED";
+  };
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,
+    externalReference:"IRPA-THREE-SHARED-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[1,2,3].map(index=>({identityType:"email-link",email:"shared@example.org",name:"Signer "+index,order:index,role:"Signer"})),
+    fields:[1,2,3].map(index=>({fieldId:"SHARED-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1,"only the first sequential position is initially invited");
+  await recordEmailLinkStage(f.ctx,created.envelopeId,"S1","SUBMIT","success","ACCEPTED");
+  const ownerStatus=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(ownerStatus.signers[0].delivery.state,"Accepted by the mail server");
+  assert.equal(ownerStatus.signers[0].delivery.smtpReplyCategory,"ACCEPTED");
+  const tokenIds=[];
+  for(let position=1;position<=3;position++){
+    const invitation=sent[position-1];
+    assert.equal(invitation.to,"shared@example.org");
+    assert.equal(invitation.signerId,"S"+position);
+    assert.equal(invitation.position,position);
+    assert.equal(invitation.positionCount,3);
+    const token=new URL(invitation.link).searchParams.get("emailSignToken");
+    tokenIds.push(token);
+    const opened=await openEmailSigning(f.ctx,token,"198.51.100."+position);
+    const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const result=await sign(f.ctx,{
+      token:opened.sessionToken,
+      signature:{type:"drawn",value:png},
+      fieldApplications:[{fieldId:"SHARED-SIGN-"+position,confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],
+      fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Signer "+position}
+    });
+    if(position<3){
+      assert.equal(result.status,"InProgress");
+      assert.equal(sent.length,position+1);
+    }
+  }
+  assert.equal(sent.length,3);
+  assert.equal(new Set(tokenIds).size,3);
+  assert.deepEqual(sent.map(item=>item.signerId),["S1","S2","S3"]);
+  assert.equal(new Set(sent.map(item=>item.messageId)).size,3,"each position has a unique SMTP Message-ID");
+  assert.equal(audits.length,3,"one audit message follows each accepted invitation");
+  assert.equal(new Set(audits.map(item=>item.messageId)).size,3);
+  for(const audit of audits){
+    const serialized=JSON.stringify(audit);
+    assert.equal(serialized.includes("shared@example.org"),false,"audit contains no full recipient address");
+    assert.equal(serialized.includes("emailSignToken"),false,"audit contains no signing token");
+    assert.equal(serialized.includes("https://"),false,"audit contains no signing link");
+    assert.equal(audit.recipientPrefix,"sha");
+    assert.equal(audit.recipientDomain,"example.org","audit subject must retain only the masked local part and recipient domain");
+    assert.equal(audit.invitationKind,"creation");
+  }
+});
+
+
+test("parallel creation sends every position to its own normalized typed mailbox without profile substitution",async()=>{
+  const f=await fixture();
+  const sent=[];
+  const profileLookups=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  f.ctx.resolveEmailLinkProfileUid=async(email,name)=>{profileLookups.push({email,name});return "profile-uid-"+name.replace(/\s+/g,"-").toLowerCase();};
+  const sharedTyped="  Shared.Mailbox@GMAIL.COM  ";
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner-account@irpa.or.tz",name:"Owner Account",isAdmin:false},{
+    documentId:f.envelope.documentId,
+    externalReference:"IRPA-PARALLEL-RECIPIENT-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:[1,2,3].map(index=>({identityType:"email-link",email:sharedTyped,name:"Signer "+index,order:index})),
+    fields:[1,2,3].map(index=>({fieldId:"PARALLEL-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,3,"parallel mode must email every signer position");
+  assert.deepEqual(sent.map(item=>item.to),["shared.mailbox@gmail.com","shared.mailbox@gmail.com","shared.mailbox@gmail.com"]);
+  assert.deepEqual(sent.map(item=>item.signerId),["S1","S2","S3"]);
+  assert.deepEqual(sent.map(item=>item.position),[1,2,3]);
+  assert.ok(sent.every(item=>item.positionCount===3));
+  const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.ok(stored.signers.every(signer=>signer.email==="shared.mailbox@gmail.com"));
+  const expectedEmailHash=await sha256Hex("shared.mailbox@gmail.com");
+  assert.ok(stored.signers.every(signer=>signer.emailHash===expectedEmailHash));
+  assert.ok(stored.signers.every(signer=>signer.profileUid&&signer.profileUid.startsWith("profile-uid-")));
+  assert.ok(profileLookups.every(item=>item.email==="shared.mailbox@gmail.com"));
+  const tokens=sent.map(item=>new URL(item.link).searchParams.get("emailSignToken"));
+  assert.deepEqual(tokens.map(token=>token.split(".")[1]),["S1","S2","S3"]);
+  assert.equal(new Set(tokens).size,3);
+});
+
+test("resend and resend-all always use each pending signer's own stored address",async()=>{
+  const f=await fixture();
+  const sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner-account@irpa.or.tz",name:"Owner Account",isAdmin:false},{
+    documentId:f.envelope.documentId,
+    externalReference:"IRPA-RESEND-RECIPIENT-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:[
+      {identityType:"email-link",email:"first.signer@gmail.com",name:"First Signer",order:1},
+      {identityType:"email-link",email:"second.signer@outlook.com",name:"Second Signer",order:2},
+      {identityType:"email-link",email:"third.signer@yahoo.com",name:"Third Signer",order:3}
+    ],
+    fields:[1,2,3].map(index=>({fieldId:"RESEND-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.deepEqual(sent.map(item=>item.to),["first.signer@gmail.com","second.signer@outlook.com","third.signer@yahoo.com"]);
+  sent.length=0;
+  await resendInvitation(f.ctx,{uid:"owner-uid",email:"owner-account@irpa.or.tz"},created.envelopeId,"S2");
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,"second.signer@outlook.com");
+  sent.length=0;
+  const all=await resendAllUnsignedInvitations(f.ctx,{uid:"owner-uid",email:"owner-account@irpa.or.tz"},created.envelopeId);
+  assert.equal(all.attempted,3);
+  assert.equal(all.sent,3);
+  assert.deepEqual(sent.map(item=>item.to),["first.signer@gmail.com","second.signer@outlook.com","third.signer@yahoo.com"]);
+});
+
+
+test("b) owner is not a signer; the same Gmail mailbox receives one invitation per sequential signer position",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-B-SHARED-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[1,2].map(index=>({identityType:"email-link",email:"same-gmail@example.com",name:"Signer "+index,order:index,role:"Signer"})),
+    fields:[1,2].map(index=>({fieldId:"B-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1,"only position 1 is invited at creation in sequential mode");
+  assert.equal(sent[0].to,"same-gmail@example.com");
+  assert.equal(sent[0].signerId,"S1");
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.71");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"B-SIGN-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Signer 1"}});
+  assert.equal(result.nextInvitations.status,"sent");
+  assert.equal(sent.length,2);
+  assert.deepEqual(sent.map(item=>item.signerId),["S1","S2"]);
+  assert.deepEqual(sent.map(item=>item.to),["same-gmail@example.com","same-gmail@example.com"]);
+  assert.equal(sent[1].position,2);
+});
+
+test("d) parallel signing sends every signer position at envelope creation without email deduplication",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-D-PARALLEL-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:[1,2,3].map(index=>({identityType:"email-link",email:"parallel-gmail@example.com",name:"Parallel "+index,order:index,role:"Signer"})),
+    fields:[1,2,3].map(index=>({fieldId:"D-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,3,"parallel mode emails all positions during creation");
+  assert.deepEqual(sent.map(item=>item.signerId),["S1","S2","S3"]);
+  assert.deepEqual(sent.map(item=>item.position),[1,2,3]);
+  assert.deepEqual(sent.map(item=>item.to),["parallel-gmail@example.com","parallel-gmail@example.com","parallel-gmail@example.com"]);
+  const tokens=sent.map(item=>new URL(item.link).searchParams.get("emailSignToken"));
+  assert.equal(new Set(tokens).size,3,"each position has its own signer-bound token");
+  assert.equal(created.invitations.length,3);
+});
+
+test("c) the owner's IRPA address at position 1 is emailed and Gmail X is automatically emailed at position 2",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-F-OWNER-MAILBOX-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[
+      {identityType:"email-link",email:"owner@irpa.or.tz",name:"Owner mailbox signer",order:1,role:"Signer"},
+      {identityType:"email-link",email:"gmail-x@gmail.com",name:"Gmail X",order:2,role:"Signer"}
+    ],
+    fields:[1,2].map(index=>({fieldId:"F-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,"owner@irpa.or.tz","the owner-address signer receives its own invitation rather than being deduplicated");
+  assert.equal(sent[0].signerId,"S1");
+  assert.equal(created.invitations[1].status,"Pending");
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.73");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"F-SIGN-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Owner mailbox signer"}});
+  assert.equal(result.nextInvitations.status,"sent");
+  assert.equal(sent.length,2);
+  assert.equal(sent[1].to,"gmail-x@gmail.com","the hand-off uses the next signer's own Gmail address, not the owner or previous signer");
+  assert.equal(sent[1].signerId,"S2");
+});
+
+
+test("audit-email failure never blocks or repeats an accepted invitation",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitationAudit=async()=>{throw new Error("audit mailbox unavailable");};
+  f.ctx.sendInvitation=async message=>{
+    sent.push(message);
+    await message.onStage?.("SUBMIT","success","ACCEPTED",{messageId:"<accepted-once@irpa.or.tz>"});
+    await message.onAudit?.({messageId:"<accepted-once@irpa.or.tz>",smtpReplyCategory:"ACCEPTED"});
+    return "250 MOCK ACCEPTED";
+  };
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-AUDIT-FAIL-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[{identityType:"email-link",email:"audit-test@gmail.com",name:"Audit Test",order:1}],
+    fields:[{fieldId:"AUDIT-FAIL-SIGN",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true}]
+  });
+  assert.equal(sent.length,1,"the invitation is submitted exactly once");
+  assert.equal(created.invitations[0].status,"Sent");
+  const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(stored.signers[0].invitation,"Sent");
+});
+
+test("a failed next-position SMTP hand-off is returned and recorded on the envelope with its stage code",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>{
+    sent.push(message);
+    if(message.signerId==="S2"){const error=new Error("mock SMTP connection failed");error.stageCode="SMTP_CONNECT";throw error;}
+    return "250 MOCK ACCEPTED";
+  };
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-HANDOFF-FAIL-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[1,2].map(index=>({identityType:"email-link",email:"handoff@example.com",name:"Signer "+index,order:index})),
+    fields:[1,2].map(index=>({fieldId:"HANDOFF-FAIL-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1);
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.72");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"HANDOFF-FAIL-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Signer 1"}});
+  assert.equal(result.nextInvitations.status,"failed");
+  assert.deepEqual(result.nextInvitations.failures,[{signerId:"S2",stageCode:"SMTP_CONNECT"}]);
+  assert.equal(sent.length,2,"the hand-off was attempted once, without resend or duplicate invitation");
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(status.signers[1].delivery.state,"Failed");
+  assert.equal(status.signers[1].deliveryStageCode,"SMTP_CONNECT");
+  assert.equal(status.signers[1].invitation,"Failed (SMTP_CONNECT)");
+});
+
+test("mock SMTP proves creation, resend and resend-all RCPT TO and To header equal each typed signer address",async()=>{
+  const f=await fixture();
+  const sent=[];
+  f.ctx.resolveEmailLinkProfileUid=async()=>"registered-profile-uid-not-an-email";
+  f.ctx.sendInvitation=async message=>{
+    const envelope=buildSmtpRecipientEnvelope({
+      from:'"IRPA Digital Signing" <administrator@irpa.or.tz>',
+      to:message.to,subject:"Please sign: Recipient test - "+message.name,
+      text:"plain invitation",html:"<p>html invitation</p>"
+    });
+    const toHeader=envelope.mime.match(/^To:\s*(.+)$/m)?.[1]||"";
+    sent.push({...message,smtpRecipient:envelope.recipient,rcptCommand:envelope.rcptCommand,toHeader});
+  };
+  const typed=["  Owner.Gmail@GMAIL.COM  ","  Assigned.Person@Example.org ","Assigned.Person@example.org"];
+  const expected=["owner.gmail@gmail.com","assigned.person@example.org","assigned.person@example.org"];
+  const owner={uid:"owner-uid",email:"owner-account@irpa.or.tz",name:"Document Owner",isAdmin:false};
+  const created=await createEnvelope(f.ctx,owner,{
+    documentId:f.envelope.documentId,
+    externalReference:"IRPA-MOCK-SMTP-ROUTING-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:typed.map((email,index)=>({identityType:"email-link",email,name:"Signer "+(index+1),order:index+1})),
+    fields:[1,2,3].map(index=>({fieldId:"MOCK-SMTP-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  const assertTrace=(rows,emails)=>{
+    assert.deepEqual(rows.map(item=>item.smtpRecipient),emails);
+    assert.deepEqual(rows.map(item=>item.rcptCommand),emails.map(email=>"RCPT TO:<"+email+">"));
+    assert.deepEqual(rows.map(item=>item.toHeader),emails.map(email=>"<"+email+">"));
+    for(let index=0;index<rows.length;index++){
+      assert.equal(rows[index].to,emails[index]);
+      console.log("MOCK SMTP RCPT TO / To",JSON.stringify({position:rows[index].position,rcptTo:rows[index].rcptCommand,toHeader:rows[index].toHeader,typed:typed[rows[index].position-1]||emails[index]}));
+    }
+  };
+  assert.equal(sent.length,3,"parallel creation sends every signer position");
+  assertTrace(sent,expected);
+  const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.deepEqual(stored.signers.map(signer=>signer.email),expected);
+  for(let index=0;index<expected.length;index++){
+    assert.equal(stored.signers[index].emailHash,await sha256Hex(expected[index]));
+    assert.equal(stored.signers[index].profileUid,"registered-profile-uid-not-an-email");
+  }
+  sent.length=0;
+  await resendInvitation(f.ctx,owner,created.envelopeId,"S2");
+  assert.equal(sent.length,1);
+  assertTrace(sent,[expected[1]]);
+  sent.length=0;
+  const bulk=await resendAllUnsignedInvitations(f.ctx,owner,created.envelopeId);
+  assert.equal(bulk.attempted,3);
+  assert.equal(bulk.failed,0);
+  assertTrace(sent,expected);
+});
+
+
+test("f) the owner's IRPA address at a later signer position is not deduplicated against the owner account",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-F-LATER-OWNER-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[
+      {identityType:"email-link",email:"gmail-x@gmail.com",name:"Gmail X",order:1},
+      {identityType:"email-link",email:"owner@irpa.or.tz",name:"Owner-address signer",order:2}
+    ],
+    fields:[1,2].map(index=>({fieldId:"F-LATER-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].to,"gmail-x@gmail.com");
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.74");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"F-LATER-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Gmail X"}});
+  assert.equal(result.nextInvitations.status,"sent");
+  assert.equal(sent.length,2);
+  assert.equal(sent[1].signerId,"S2");
+  assert.equal(sent[1].to,"owner@irpa.or.tz","the owner's address is still the assigned recipient for that signer position");
 });

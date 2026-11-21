@@ -207,6 +207,7 @@ test("actual resend failure preserves the previous token hash and exposes the SM
   const saved=await f.ctx.meta.get("envelopes",f.record.id);
   assert.equal(saved.signers[0].tokenHash,oldHash);
   assert.equal(saved.signers[0].resendAttempt,undefined);
+  assert.deepEqual(saved.signers[0].resendAttempts,[],"failed resend releases only its own reservation");
   assert.equal(saved.events.at(-1).type,"invitation.resend.failed");
   assert.equal(saved.events.at(-1).stageCode,"SUBMIT");
 });
