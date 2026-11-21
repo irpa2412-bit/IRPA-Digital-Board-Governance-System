@@ -46,3 +46,54 @@ test("a fresh declaration reopens after an earlier closure", () => {
 test("Git activity history is parsed into individual timestamps", () => {
   assert.deepEqual(parseActivityTimestamps("2026-11-19T21:10:19Z\n2026-11-19T21:11:00Z\n"), ["2026-11-19T21:10:19Z","2026-11-19T21:11:00Z"]);
 });
+
+
+const meetingFile = "drive-gateway/src/meetingServices.mjs";
+const meetingAmendmentRecord = {
+  ...valid,
+  meetingAmendment: {
+    status: "open",
+    affectedPortals: ["Meeting Portal"],
+    reason: "Protect REAL meetings and allow only administrator deletion of explicit TRIAL meetings.",
+    expectedEffect: "Missing and invalid environment values fail closed as REAL; environment is immutable after creation.",
+    prohibitedChanges: ["Do not delete REAL meetings.", "Do not change signing or voting rules."],
+    files: [meetingFile],
+    baseline: { commit: "352d8b36718a3b88173934c607e6c7834f72a71b", rollbackCommit: "352d8b36718a3b88173934c607e6c7834f72a71b" },
+    validation: {
+      baselineSmoke: "PASS",
+      fullRegression: "PASS",
+      portalSmoke: { "Meeting Portal": "PASS" },
+      behaviourDifferences: ["Only explicit TRIAL meetings are deletable."],
+      evidence: ["https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446474"]
+    }
+  }
+};
+const meetingWindow = {
+  ...windowState,
+  reopenedAt: "2026-11-21T20:00:00Z",
+  scope: [meetingFile]
+};
+
+test("Meeting Portal amendment uses its own passing validation without rewriting Signature Portal history", () => {
+  const result = evaluatePolicy({
+    changedFiles: [meetingFile],
+    record: meetingAmendmentRecord,
+    windowState: meetingWindow,
+    latestActivityAt: "2026-11-21T20:01:00Z",
+    now: Date.parse("2026-11-21T20:02:00Z")
+  });
+  assert.equal(result.ok, true);
+});
+
+test("Meeting Portal amendment fails without its own passing portal smoke evidence", () => {
+  const record = structuredClone(meetingAmendmentRecord);
+  record.meetingAmendment.validation.portalSmoke = {};
+  const result = evaluatePolicy({
+    changedFiles: [meetingFile],
+    record,
+    windowState: meetingWindow,
+    latestActivityAt: "2026-11-21T20:01:00Z",
+    now: Date.parse("2026-11-21T20:02:00Z")
+  });
+  assert.equal(result.ok, false);
+});

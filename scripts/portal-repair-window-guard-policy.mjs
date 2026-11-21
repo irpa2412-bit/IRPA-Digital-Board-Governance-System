@@ -259,3 +259,83 @@ export function evaluateSignatureWindowReopen({
   }
   return { pass: true, reason: "Only the previously closed Signature Portal full-rebuild amendment was reopened, with history preserved." };
 }
+
+
+export const MEETING_WINDOW_AMENDMENT_PATHS = Object.freeze([
+  "docs/implementation-status.md",
+  "docs/portal-protection/change-record.json",
+  "docs/portal-protection/repair-window.json",
+  "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/tests/meeting-trial-deletion-policy.test.mjs",
+  "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "scripts/portal-protection-check.mjs",
+  "scripts/portal-repair-window-guard-policy.mjs",
+  "tests/meeting-isolation-guard.test.mjs",
+  "tests/portal-protection-policy.test.mjs"
+]);
+
+export function evaluateMeetingWindowAmendment({
+  changedPaths, repairWindow, changeRecord, baselineRepairWindow,
+  baselineChangeRecord, currentChangeRecord, now = new Date()
+}) {
+  const changed = [...new Set(changedPaths)].sort();
+  const expected = [...MEETING_WINDOW_AMENDMENT_PATHS].sort();
+  if (JSON.stringify(changed) !== JSON.stringify(expected)) {
+    return { pass: false, reason: "Meeting Portal amendment is not limited to its declared implementation, policy and regression files." };
+  }
+  const amendment = changeRecord?.meetingAmendment;
+  if (!amendment || amendment.status !== "open" ||
+      amendment.operation !== "trial-meeting-delete-guard-and-immutable-environment" ||
+      JSON.stringify(amendment.affectedPortals) !== JSON.stringify(["Meeting Portal"]) ||
+      !Array.isArray(amendment.files) || !expected.every(path => amendment.files.includes(path))) {
+    return { pass: false, reason: "The separate Meeting Portal amendment is missing or does not cover the exact implementation scope." };
+  }
+  const openedAt = Date.parse(repairWindow?.reopenedAt || "");
+  const closesAt = Date.parse(repairWindow?.closesAt || "");
+  const lastActivityAt = Date.parse(repairWindow?.lastActivityAt || "");
+  const previousActivity = Date.parse(baselineRepairWindow?.lastActivityAt || "");
+  if (repairWindow?.status !== "open" || !Number.isFinite(openedAt) ||
+      !Number.isFinite(closesAt) || closesAt <= now.getTime() ||
+      !Number.isFinite(lastActivityAt) || lastActivityAt < openedAt ||
+      !Number.isFinite(previousActivity) || openedAt <= previousActivity) {
+    return { pass: false, reason: "The Meeting Portal repair window was not freshly reopened after its inactivity closure." };
+  }
+  const baselineLog = baselineRepairWindow?.activityLog || [];
+  const currentLog = repairWindow?.activityLog || [];
+  if (currentLog.length !== baselineLog.length + 1 ||
+      JSON.stringify(currentLog.slice(0, baselineLog.length)) !== JSON.stringify(baselineLog) ||
+      currentLog.at(-1)?.action !== "reopened" ||
+      Date.parse(currentLog.at(-1)?.at || "") < openedAt) {
+    return { pass: false, reason: "The prior Meeting Portal repair history was not preserved and appended with one reopen event." };
+  }
+  if (JSON.stringify(repairWindow.parallelWindows || []) !== JSON.stringify(baselineRepairWindow.parallelWindows || [])) {
+    return { pass: false, reason: "The Meeting Portal amendment changed the independent Signature Portal window." };
+  }
+  if (JSON.stringify(changeRecord.activeAmendment) !== JSON.stringify(baselineChangeRecord.activeAmendment)) {
+    return { pass: false, reason: "The Meeting Portal amendment changed the independent Signature Portal Change Record." };
+  }
+  const stripMeeting = value => {
+    const copy = structuredClone(value);
+    delete copy.meetingAmendment;
+    return copy;
+  };
+  if (JSON.stringify(stripMeeting(baselineChangeRecord)) !== JSON.stringify(stripMeeting(currentChangeRecord))) {
+    return { pass: false, reason: "The Meeting Portal amendment changed existing Change Record history or another portal's record." };
+  }
+  if (amendment.repairWindow?.reopenedAt !== repairWindow.reopenedAt ||
+      amendment.repairWindow?.closesAt !== repairWindow.closesAt ||
+      amendment.repairWindow?.rollbackCommit !== amendment.baseline?.rollbackCommit ||
+      !amendment.baseline?.commit || !amendment.baseline?.rollbackCommit) {
+    return { pass: false, reason: "The Meeting Portal amendment baseline or repair-window reference is inconsistent." };
+  }
+  const scope = repairWindow.scope || [];
+  if (!expected.every(path => scope.includes(path))) {
+    return { pass: false, reason: "The Meeting Portal repair window does not include every declared policy, implementation and test file." };
+  }
+  const validation = amendment.validation || {};
+  if (validation.baselineSmoke !== "PASS" || validation.fullRegression !== "PASS" ||
+      !Array.isArray(validation.evidence) || !validation.evidence.length) {
+    return { pass: false, reason: "The Meeting Portal amendment is missing passing baseline or full-regression evidence." };
+  }
+  return { pass: true, reason: "Only the separately authorised Meeting Portal amendment and its fresh repair window changed; the Signature Portal window and history are preserved." };
+}

@@ -211,7 +211,7 @@ test("parallel portal window amendment delegates to the executable exact-scope p
   assert.match(guard, /parallelWindowDecision\.pass \|\| signatureWindowClosureDecision\.pass/);
   assert.match(guard, /evaluateSignatureWindowReopen/);
   assert.match(guard, /signatureWindowClosureDecision\.pass \|\| signatureWindowReopenDecision\.pass/);
-  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(signatureWindowReopenDecision\.reason \|\| signatureWindowClosureDecision\.reason \|\| parallelWindowDecision\.reason\)/);
+  assert.match(guard, /if \(!parallelWindowRecordAmendment\) throw new Error\(meetingWindowDecision\.reason \|\| signatureWindowReopenDecision\.reason/);
 });
 
 
@@ -220,6 +220,8 @@ import {
   evaluateSignatureWindowRepair,
   evaluateSignatureWindowClosure,
   evaluateSignatureWindowReopen,
+  evaluateMeetingWindowAmendment,
+  MEETING_WINDOW_AMENDMENT_PATHS,
   SIGNATURE_WINDOW_AMENDMENT_PATHS
 } from "../scripts/portal-repair-window-guard-policy.mjs";
 
@@ -520,4 +522,58 @@ test("isolation guard blocks reopening if another portal's Change Record history
   const fixture=reopenFixture();
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
+});
+
+
+const meetingWindowFixture = () => {
+  const activeAmendment = {
+    status: "open",
+    operation: "shared-mailbox-signing-invitation-delivery",
+    affectedPortals: ["Signature Portal"],
+    files: ["drive-gateway/src/signing.mjs"]
+  };
+  const baselineChangeRecord = { status: "complete", declaration: { affectedPortals: ["Meeting Portal", "Signature Portal"] }, activeAmendment };
+  const meetingAmendment = {
+    status: "open",
+    operation: "trial-meeting-delete-guard-and-immutable-environment",
+    affectedPortals: ["Meeting Portal"],
+    files: [...MEETING_WINDOW_AMENDMENT_PATHS],
+    baseline: { commit: "352d8b36718a3b88173934c607e6c7834f72a71b", rollbackCommit: "352d8b36718a3b88173934c607e6c7834f72a71b" },
+    validation: { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { "Meeting Portal": "PASS" }, evidence: ["run-44897446474"] },
+    repairWindow: { reopenedAt: "2026-11-21T20:00:00Z", closesAt: "2026-11-23T20:00:00Z", rollbackCommit: "352d8b36718a3b88173934c607e6c7834f72a71b" }
+  };
+  const currentChangeRecord = { ...structuredClone(baselineChangeRecord), meetingAmendment };
+  const baselineRepairWindow = {
+    status: "open",
+    openedAt: "2026-11-20T11:08:48Z",
+    lastActivityAt: "2026-11-21T07:49:00Z",
+    activityLog: [{ at: "2026-11-20T11:08:48Z", action: "opened" }],
+    parallelWindows: [{ portal: "Signature Portal", status: "open", closesAt: "2026-11-22T09:57:28Z" }]
+  };
+  const currentRepairWindow = {
+    ...structuredClone(baselineRepairWindow),
+    reopenedAt: "2026-11-21T20:00:00Z",
+    lastActivityAt: "2026-11-21T20:00:00Z",
+    closesAt: "2026-11-23T20:00:00Z",
+    scope: [...MEETING_WINDOW_AMENDMENT_PATHS],
+    activityLog: [...baselineRepairWindow.activityLog, { at: "2026-11-21T20:00:00Z", action: "reopened" }]
+  };
+  return { changedPaths: [...MEETING_WINDOW_AMENDMENT_PATHS], repairWindow: currentRepairWindow, baselineRepairWindow, changeRecord: currentChangeRecord, baselineChangeRecord, currentChangeRecord };
+};
+
+test("Meeting Portal amendment is separate from and preserves the active Signature Portal amendment", () => {
+  const fixture = meetingWindowFixture();
+  assert.equal(evaluateMeetingWindowAmendment({ ...fixture, now: new Date("2026-11-21T20:01:00Z") }).pass, true);
+});
+
+test("Meeting Portal amendment rejects changes to the independent Signature Portal amendment", () => {
+  const fixture = meetingWindowFixture();
+  fixture.currentChangeRecord.activeAmendment.operation = "changed";
+  assert.equal(evaluateMeetingWindowAmendment({ ...fixture, now: new Date("2026-11-21T20:01:00Z") }).pass, false);
+});
+
+test("Meeting Portal amendment rejects changes to the parallel Signature Portal window", () => {
+  const fixture = meetingWindowFixture();
+  fixture.repairWindow.parallelWindows[0].status = "closed";
+  assert.equal(evaluateMeetingWindowAmendment({ ...fixture, now: new Date("2026-11-21T20:01:00Z") }).pass, false);
 });

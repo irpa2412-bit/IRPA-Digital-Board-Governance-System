@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-21T07:49:00Z",
-  "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
+  "lastActivityAt": "2026-11-21T20:14:09Z",
+  "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes. Owner-authorised urgent REAL/TRIAL deletion hotfix reopened after the 24-hour inactivity closure; Signature Portal parallel window preserved unchanged.",
   "scope": [
     "docs/portal-protection/portal-register.json",
     "docs/portal-protection/repair-window.json",
@@ -45,7 +45,11 @@
     "tests/signature-self-test-session-safety.test.mjs",
     "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
     ".github/workflows/email-signing-contract.yml",
-    "tests/signature-pathway-contract.test.mjs"
+    "tests/signature-pathway-contract.test.mjs",
+    "docs/implementation-status.md",
+    "drive-gateway/tests/meeting-trial-deletion-policy.test.mjs",
+    "scripts/portal-protection-check.mjs",
+    "scripts/portal-repair-window-guard-policy.mjs"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
@@ -209,10 +213,15 @@
       "at": "2026-11-21T07:49:00Z",
       "action": "repair",
       "description": "Updated the Signature Pathway diagnostic source-contract test to assert the self-test-specific redirect-safe Gateway helper; all unrelated diagnostic batch and Worker route assertions remain unchanged."
+    },
+    {
+      "at": "2026-11-21T20:14:09Z",
+      "action": "reopened",
+      "description": "Owner-authorised urgent REAL/TRIAL meeting deletion hotfix reopened after the 24-hour inactivity closure. Previous Meeting Portal history and independent Signature Portal parallel window are preserved."
     }
   ],
   "durationHours": 48,
-  "closesAt": "2026-11-22T11:08:48Z",
+  "closesAt": "2026-11-23T20:14:09Z",
   "parallelWindows": [
     {
       "portal": "Signature Portal",
@@ -310,5 +319,6 @@
       "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
       "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
     }
-  ]
+  ],
+  "reopenedAt": "2026-11-21T20:14:09Z"
 }

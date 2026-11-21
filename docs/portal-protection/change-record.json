@@ -371,5 +371,68 @@
         "evidence": []
       }
     }
+  },
+  "meetingAmendment": {
+    "status": "open",
+    "operation": "trial-meeting-delete-guard-and-immutable-environment",
+    "affectedPortals": [
+      "Meeting Portal"
+    ],
+    "reason": "Owner-authorised urgent Worker hotfix. Protect every meeting unless it was explicitly created with environment TRIAL; only an administrator may delete TRIAL meetings. Missing or invalid values are REAL. Assign environment once at creation and ignore it on updates. Physical meeting-record PURGE is subject to the same parent-meeting gate.",
+    "files": [
+      "docs/implementation-status.md",
+      "docs/portal-protection/change-record.json",
+      "docs/portal-protection/repair-window.json",
+      "drive-gateway/src/meetingServices.mjs",
+      "drive-gateway/tests/meeting-trial-deletion-policy.test.mjs",
+      "scripts/meeting-portal-fixture-isolation-guard.sh",
+      "scripts/portal-protection-check.mjs",
+      "scripts/portal-repair-window-guard-policy.mjs",
+      "tests/meeting-isolation-guard.test.mjs",
+      "tests/portal-protection-policy.test.mjs"
+    ],
+    "expectedEffect": "Meeting creation assigns REAL by default and accepts TRIAL only from an administrator. Updates cannot change environment. Both meeting-register deletion and meeting-record PURGE refuse REAL, missing and invalid environments; only administrators can delete explicit TRIAL. Existing append-only/atomic audit writes remain intact.",
+    "repairWindow": {
+      "reopenedAt": "2026-11-21T20:14:09Z",
+      "closesAt": "2026-11-23T20:14:09Z",
+      "durationHours": 48,
+      "rollbackCommit": "352d8b36718a3b88173934c607e6c7834f72a71b",
+      "rollbackVersionId": "5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3"
+    },
+    "baseline": {
+      "commit": "352d8b36718a3b88173934c607e6c7834f72a71b",
+      "rollbackCommit": "352d8b36718a3b88173934c607e6c7834f72a71b",
+      "productionWorkerVersionId": "5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3",
+      "rollbackVersionId": "5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3",
+      "precedingDeploymentRollbackVersionId": "679db4b3-0677-4d45-bd21-19d06700ec1c"
+    },
+    "validation": {
+      "baselineSmoke": "PASS",
+      "fullRegression": "PASS",
+      "portalSmoke": {
+        "Meeting Portal": "PASS"
+      },
+      "behaviourDifferences": [
+        "Meeting environment is assigned at creation; default REAL, and only administrator creation may request TRIAL.",
+        "Meeting updates ignore any incoming environment value.",
+        "Both physical meeting deletion and meeting-record PURGE require administrator authority and an exact stored TRIAL value; the existing audit writes remain."
+      ],
+      "evidence": [
+        "Baseline production Gateway deployment and health gate: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446474 (source 352d8b36718a3b88173934c607e6c7834f72a71b; 608 Gateway tests, production health verified).",
+        "Baseline authentication and identity parity: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446469.",
+        "Baseline email-signing contract: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446670.",
+        "Baseline release build: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446517.",
+        "Baseline staging Gateway E2E: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446478.",
+        "Meeting Portal isolated browser regression at four viewport sizes: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44945507181 (PASS)."
+      ]
+    },
+    "prohibitedChanges": [
+      "Do not deploy Firestore rules or indexes.",
+      "Do not weaken meeting authentication, authorization, or append-only audit logging.",
+      "Do not delete REAL or ambiguous meetings or records belonging to REAL meetings.",
+      "Do not change meeting signing, email-link rules, quorum, voting, or attendance behavior.",
+      "Do not deploy production until the pre-deploy live Worker version and rollback version are verified."
+    ],
+    "ownerInstruction": "Implement the TRIAL-only meeting deletion guard and immutable environment. Preserve all other meeting behavior. Do not deploy Firestore rules."
   }
 }

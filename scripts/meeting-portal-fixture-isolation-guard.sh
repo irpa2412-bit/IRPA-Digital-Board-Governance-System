@@ -3,7 +3,7 @@ set -euo pipefail
 git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
-import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen, evaluateMeetingWindowAmendment } from "./scripts/portal-repair-window-guard-policy.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -278,8 +278,13 @@ const communicationMediaArchiveIntegration =
 if (changed.includes("docs/portal-protection/change-record.json")) {
   const baselineRecord = JSON.parse(execFileSync("git", ["show", `${base}:docs/portal-protection/change-record.json`], { encoding: "utf8" }));
   const currentRecord = JSON.parse(execFileSync("git", ["show", "HEAD:docs/portal-protection/change-record.json"], { encoding: "utf8" }));
-  delete baselineRecord.activeAmendment;
-  delete currentRecord.activeAmendment;
+  if (changed.includes("drive-gateway/src/meetingServices.mjs")) {
+    delete baselineRecord.meetingAmendment;
+    delete currentRecord.meetingAmendment;
+  } else {
+    delete baselineRecord.activeAmendment;
+    delete currentRecord.activeAmendment;
+  }
   if (JSON.stringify(baselineRecord) !== JSON.stringify(currentRecord)) {
     throw new Error("Parallel repair-window amendment changed existing change-record history or another portal's record.");
   }
@@ -309,7 +314,15 @@ const signatureWindowReopenDecision = evaluateSignatureWindowReopen({
   baselineChangeRecord,
   currentChangeRecord
 });
-const parallelWindowRecordAmendment = parallelWindowDecision.pass || signatureWindowClosureDecision.pass || signatureWindowReopenDecision.pass;
+const meetingWindowDecision = evaluateMeetingWindowAmendment({
+  changedPaths: changed,
+  repairWindow: currentRepairWindow,
+  changeRecord: currentChangeRecord,
+  baselineRepairWindow,
+  baselineChangeRecord,
+  currentChangeRecord
+});
+const parallelWindowRecordAmendment = parallelWindowDecision.pass || signatureWindowClosureDecision.pass || signatureWindowReopenDecision.pass || meetingWindowDecision.pass;
 const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
   changedPaths: changed,
   repairWindow: currentRepairWindow,
@@ -320,7 +333,7 @@ const signatureWindowRepairDecision = evaluateSignatureWindowRepair({
 const signatureEmailLinkSessionRepair = signatureWindowRepairDecision.pass;
 if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
-  if (!parallelWindowRecordAmendment) throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
+  if (!parallelWindowRecordAmendment) throw new Error(meetingWindowDecision.reason || signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
 }
 const unexpected = changed.filter(path =>
   !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
@@ -329,6 +342,7 @@ const unexpected = changed.filter(path =>
   !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
   !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
   !(signatureEmailLinkSessionRepair && changed.includes(path)) &&
+    !(meetingWindowDecision.pass && changed.includes(path)) &&
   !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/")))
 );
 if (unexpected.length) {
