@@ -1,10 +1,10 @@
 import React, { useRef, useState } from "react";
+import { SELF_TEST_RUN_LIMIT, SELF_TEST_DOCUMENT_TIMEOUT_MS, SELF_TEST_TOTAL_TIMEOUT_MS, safeGatewayText, validateSelfTestGatewayResponse, takeSelfTestBatch } from "../utils/signatureSelfTestSafety.mjs";
 import { getIdToken } from "firebase/auth";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { collection as firestoreCollection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs } from "firebase/firestore";
 import { runSignatureFirestore } from "../firebase/signatureFirestoreDiagnostics.js";
 import { auth, db } from "../firebase/config";
-import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { renderPdfPageToCanvas, describePdfPageError } from "../utils/pdfPageRendering.mjs";
@@ -13,8 +13,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreCollection(...args));
 const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDoc(ref));
 const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDocs(ref));
-
-import { SELF_TEST_RUN_LIMIT, SELF_TEST_DOCUMENT_TIMEOUT_MS, SELF_TEST_TOTAL_TIMEOUT_MS, safeGatewayText, validateSelfTestGatewayResponse, takeSelfTestBatch } from "../utils/signatureSelfTestSafety.mjs";
 
 
 async function selfTestGatewayPost(path, payload, { signal, kind = "generic" } = {}) {
