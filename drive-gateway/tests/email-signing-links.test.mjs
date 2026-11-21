@@ -176,7 +176,7 @@ test("failed invitation delivery generates a dedicated sender report and exposes
   assert.equal(status.deliveryReport.failures[0].email,"signer@gmail.com");
   assert.equal(status.deliveryReport.failures[0].smtpReplyCategory,"AUTH_FAILED");
   assert.equal(status.deliveryReport.failures[0].smtpResponseCode,535);
-  assert.equal(status.deliveryReport.reportStatus,"sent");
+  assert.equal(status.deliveryReport.reportStatus,"submitted");
   assert.equal(status.auditChainValid,true);
 });
 
