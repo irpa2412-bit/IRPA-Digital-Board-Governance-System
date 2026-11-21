@@ -648,7 +648,7 @@ test("a failed next-position SMTP hand-off is returned and recorded on the envel
   const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
   assert.equal(status.signers[1].delivery.state,"Failed");
   assert.equal(status.signers[1].deliveryStageCode,"SMTP_CONNECT");
-  assert.match(status.signers[1].invitation,/Failed \\(SMTP_CONNECT\\)/);
+  assert.equal(status.signers[1].invitation,"Failed (SMTP_CONNECT)");
 });
 
 test("mock SMTP proves creation, resend and resend-all RCPT TO and To header equal each typed signer address",async()=>{
