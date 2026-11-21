@@ -186,8 +186,9 @@ export function meetingEnvironmentAtCreation(incoming = {}, isAdmin = false) {
 }
 
 export function meetingDeletionPolicy(meeting = {}, isAdmin = false) {
+  const environment = meeting?.environment === "TRIAL" ? "TRIAL" : "REAL";
   if (!isAdmin) return { allowed: false, status: 403, error: "Only an authorised administrator may delete a meeting." };
-  if (meeting.environment !== "TRIAL") return { allowed: false, status: 409, error: "This meeting is protected. Only meetings explicitly created with environment TRIAL may be deleted." };
+  if (environment !== "TRIAL") return { allowed: false, status: 409, error: "This meeting is protected. Missing, invalid, or non-TRIAL environment values are treated as REAL." };
   return { allowed: true, status: 200, error: null };
 }
 
