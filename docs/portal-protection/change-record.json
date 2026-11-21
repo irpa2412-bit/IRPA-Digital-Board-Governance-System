@@ -325,8 +325,13 @@
       "sevenPortalSmoke": "PENDING",
       "fullRegression": "PENDING",
       "dnsWorkflow": "PENDING",
-      "productionSmoke": "PENDING"
+      "productionSmoke": "PENDING",
+      "parallelFanOut": "PENDING",
+      "sequentialHandoff": "PENDING"
     },
-    "completion": null
-  }
+    "completion": null,
+    "expectedEffect": "Parallel envelopes invite every assigned signer at creation, including non-owner signers when the owner uses portal-first signing. Sequential envelopes retain first-position delivery and release the next position only after the prior signer completes, with explicit hand-off events. Each email invitation uses a signer/position-specific subject and multipart MIME with unique Message-ID; SMTP stage replies and hand-off results are owner-visible. Copy and WhatsApp actions use the existing resend flow and the exact link returned only after SMTP acceptance. No signing order rules or token/session semantics change."
+  },
+  "declarationNote": "The affected prior case was described as parallel/non-hierarchical; the repair fixes the unconditional first-position filter for Parallel mode and does not reclassify that case as sequential.",
+  "declarationNoteSource": "Prior conversation on 2026-11-20: user rejected a sequential-signing explanation for the affected envelope."
 }
