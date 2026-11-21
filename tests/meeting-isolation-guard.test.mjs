@@ -534,7 +534,11 @@ test("meeting fixture guard is concurrency-scoped and watches all deletion-prote
     "scripts/portal-protection-check.mjs",
     "tests/portal-protection-policy.test.mjs",
     "drive-gateway/src/meetingEnvironment.mjs",
-    "drive-gateway/tests/meeting-environment.test.mjs"
+    "drive-gateway/src/meetingDeletion.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs",
+    "drive-gateway/tests/meeting-trial-deletion.test.mjs",
+    "src/pages/Meetings.jsx",
+    "tests/meeting-trial-delete-ui.test.mjs"
   ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
 });
 
