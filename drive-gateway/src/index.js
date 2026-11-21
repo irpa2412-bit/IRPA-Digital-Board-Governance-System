@@ -3036,7 +3036,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,rawMime
   const mime=rawMime||await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:'"IRPA Administration" <'+smtpConfig.from+'>',to:toEmail,subject:cleanSubject,text,html,attachments}),onStage,{messageId:messageId||null,date:date||null});
   const stageDetails={messageId:messageId||null,date:date||null};
   if(env.SMTP_MOCK==="success"){
-    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success","UNKNOWN",{...stageDetails,smtpReply:stage==="SUBMIT"?"250 MOCK ACCEPTED":stage==="RCPT_ACCEPTED"?"250 MOCK RCPT ACCEPTED":null,smtpReplyCode:stage==="SUBMIT"||stage==="RCPT_ACCEPTED"?250:null})}catch{}
+    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success",["RCPT_ACCEPTED","SUBMIT"].includes(stage)?"ACCEPTED":"UNKNOWN",{...stageDetails,smtpReply:stage==="SUBMIT"?"250 MOCK ACCEPTED":stage==="RCPT_ACCEPTED"?"250 MOCK RCPT ACCEPTED":null,smtpReplyCode:stage==="SUBMIT"||stage==="RCPT_ACCEPTED"?250:null})}catch{}
     return "250 MOCK ACCEPTED";
   }
   if(env.SMTP_MOCK==="fail")return runEmailStage("SMTP_CONNECT",async()=>{throw new Error("SMTP provider unavailable.")},onStage,stageDetails);
