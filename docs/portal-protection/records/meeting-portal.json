@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "portal": "Meeting Portal",
+  "status": "complete",
+  "declaration": {
+    "affectedPortals": [
+      "Meeting Portal"
+    ],
+    "reason": "Implement the owner-approved fail-closed REAL/TRIAL meeting deletion boundary. A meeting is REAL by default; only an administrator explicitly creating it with the exact TRIAL marker can mark it TRIAL. Environment is immutable after creation. Only administrators may delete explicitly TRIAL meetings, with all existing safeguards retained. REAL, missing, invalid, lowercase and whitespace-padded values are non-deletable.",
+    "files": [
+      "drive-gateway/src/meetingServices.mjs"
+    ],
+    "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
+    "prohibitedChanges": [
+      "Never delete REAL or unclassified meetings.",
+      "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
+      "Do not change signing, sign-in, invitations, email-link rules, SMTP, secrets, Firestore rules or production deployment."
+    ]
+  },
+  "repairWindow": {
+    "openedAt": "2026-11-21T20:23:03Z",
+    "lastActivityAt": "2026-11-21T20:23:03Z",
+    "emergency": false
+  },
+  "baseline": {
+    "commit": "5fa8d46deeeb96c3172a1798411c18f57991855d",
+    "rollbackCommit": "5fa8d46deeeb96c3172a1798411c18f57991855d"
+  },
+  "validation": {
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Meeting Portal": "PASS"
+    },
+    "fullRegression": "FAIL",
+    "behaviourDifferences": [
+      "Environment is immutable after creation.",
+      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable."
+    ],
+    "evidence": [
+      "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
+      "Baseline smoke executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110084. npm run test:protected-portals reported PASS for all seven registered portals, including Meeting Portal.",
+      "Meeting Portal baseline smoke evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110084",
+      "Full regression executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110196. npm run test:all FAILED: tests/workflow-production-deploy-policy.test.mjs — production Firebase CLI rules and Worker deployments require explicit owner dispatch approval (8 passed, 1 failed).",
+      "Full regression failure evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110196",
+      "No full-regression PASS is recorded; the protected portal policy must remain blocked until the baseline failure is repaired and a new real full-regression run succeeds."
+    ]
+  }
+}

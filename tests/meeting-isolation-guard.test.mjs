@@ -197,6 +197,21 @@ test("only stale runs for the same pull request are cancelled", () => {
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
 
+test("Meeting Portal uses isolated protection records without editing shared Signature history", () => {
+  for (const path of [
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "scripts/portal-protection-check.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs",
+    "docs/implementation-status.md"
+  ]) assert.ok(guard.includes(`"${path}"`), `missing isolated protection allowlist entry: ${path}`);
+  assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
+  assert.match(guard, /delete baselineRecord\.activeAmendment/);
+  assert.match(guard, /delete currentRecord\.activeAmendment/);
+});
+
 test("parallel portal window amendments preserve existing meeting and historical change records", () => {
   assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
   assert.match(guard, /delete baselineRecord\.activeAmendment/);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy, parseActivityTimestamps } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps, portalPolicyPaths } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/portal-register.json", import.meta.url), "utf8"));
 
@@ -45,4 +45,15 @@ test("a fresh declaration reopens after an earlier closure", () => {
 
 test("Git activity history is parsed into individual timestamps", () => {
   assert.deepEqual(parseActivityTimestamps("2026-11-19T21:10:19Z\n2026-11-19T21:11:00Z\n"), ["2026-11-19T21:10:19Z","2026-11-19T21:11:00Z"]);
+});
+
+test("single-portal changes resolve to isolated per-portal records", () => {
+  assert.deepEqual(portalPolicyPaths(["Meeting Portal"]), {
+    windowPath: "docs/portal-protection/windows/meeting-portal.json",
+    recordPath: "docs/portal-protection/records/meeting-portal.json"
+  });
+});
+test("shared or multi-portal changes retain the shared protection record", () => {
+  assert.equal(portalPolicyPaths(["Meeting Portal", "Signature Portal"]), null);
+  assert.equal(portalPolicyPaths([]), null);
 });
