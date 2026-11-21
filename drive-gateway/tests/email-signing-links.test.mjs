@@ -145,7 +145,7 @@ test("failed SMTP invitation stages retain structured diagnostics for the sender
   }),/535/);
   const failures=captured.filter(item=>item.outcome==="failure");
   assert.equal(failures.length,1);
-  assert.deepEqual(failures[0],{stage:"SMTP_AUTH",outcome:"failure",category:"AUTH_FAILED",diagnostics:{stageCode:"SMTP_AUTH",smtpResponseCode:535,smtpEnhancedStatusCode:"5.7.8",errorCode:null,deliveryOutcome:"not-confirmed"}});
+  assert.deepEqual(failures[0],{stage:"SMTP_AUTH",outcome:"failure",category:"AUTH_FAILED",diagnostics:{stageCode:"SMTP_AUTH",smtpResponseCode:535,smtpEnhancedStatusCode:"5.7.8",errorCode:null,deliveryOutcome:"failed"}});
 });
 
 test("failed invitation delivery generates a dedicated sender report and exposes recipient-level failures",async()=>{
