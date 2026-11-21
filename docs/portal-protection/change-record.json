@@ -273,5 +273,33 @@
         "Post-cutoff signature changes were identified in commits 514249c, 67ba1ed, 386b73b and d8b52fd."
       ]
     }
+  },
+  "invitationDeliveryAmendment": {
+    "status": "open",
+    "pullRequest": 836,
+    "affectedPortals": [
+      "Signature Portal"
+    ],
+    "operation": "shared-mailbox-signing-invitation-delivery",
+    "reason": "Repair per-position invitation creation, parallel dispatch, sequential next-signer hand-off, SMTP delivery recording and invitation regressions. Self-test crash and unrelated portal work are excluded.",
+    "files": [
+      "drive-gateway/src/index.js",
+      "drive-gateway/src/signing.mjs",
+      "src/pages/SignaturePlatform.jsx",
+      "drive-gateway/tests/email-signing-links.integration.test.mjs",
+      "drive-gateway/tests/email-signing-links.test.mjs"
+    ],
+    "repairWindow": {
+      "openedAt": "2026-11-21T09:57:28Z",
+      "closesAt": "2026-11-22T09:57:28Z",
+      "durationHours": 24,
+      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
+    },
+    "prohibitedChanges": [
+      "signing rules, signer identity, token format/hash custody, sessions, owner resend rules, field assignment",
+      "PDF stamping, document hash, certificate, archive logic, completed PDFs",
+      "Firestore rules/indexes, secrets, environment variables, SMTP settings/credentials, Worker bindings",
+      "self-test crash, Meeting Portal, hash check, rebuild, unrelated portals"
+    ]
   }
 }
