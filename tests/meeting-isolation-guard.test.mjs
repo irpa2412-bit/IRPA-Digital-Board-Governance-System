@@ -21,12 +21,16 @@ test("TRIAL deletion repair is allowed only with its exact paired gateway and po
     "docs/portal-protection/records/meeting-portal.json",
     "docs/portal-protection/windows/meeting-portal.json",
     "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/src/meetingDeletion.mjs",
     "drive-gateway/src/meetingServices.mjs",
     "drive-gateway/tests/meeting-environment.test.mjs",
+    "drive-gateway/tests/meeting-trial-deletion.test.mjs",
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "scripts/portal-protection-check.mjs",
     "tests/meeting-isolation-guard.test.mjs",
-    "tests/portal-protection-policy.test.mjs"
+    "tests/meeting-trial-delete-ui.test.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "src/pages/Meetings.jsx"
   ]) assert.ok(guard.includes(path), `TRIAL deletion guard must pair ${path}`);
   assert.match(guard, /!meetingTrialDeletionGuard/);
 });
