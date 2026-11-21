@@ -383,7 +383,7 @@ test("signing audit email masks the local part and retains the recipient domain"
   assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Type: creation/);
-  assert.match(audit.text,/Recipient domain: example\.org/);
+  assert.match(audit.text,/Recipient domain: example\.com/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
   assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
@@ -477,6 +477,8 @@ test("invitation audit message includes a masked recipient domain and required d
   assert.match(audit.text,/Time \(EAT\):/);
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
+  assert.match(audit.text,/Type: creation/);
+  assert.match(audit.text,/Recipient domain: gmail\.com/);
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
   assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
 });
