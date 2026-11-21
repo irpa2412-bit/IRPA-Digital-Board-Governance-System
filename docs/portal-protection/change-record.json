@@ -3,19 +3,20 @@
   "status": "complete",
   "declaration": {
     "affectedPortals": [
-      "Signature Portal"
+      "Signature Portal",
+      "Meeting Portal"
     ],
-    "reason": "Ensure envelope status refresh, resend, revoke and completed-distribution retry retain the selected envelope identity even when the Gateway response omits envelopeId, and keep signer rows legible during asynchronous refresh in both themes.",
+    "reason": "Repair the document owner's saved Signature Profile retrieval using the owner-authorized Drive download route, and separate Prepare Envelope submission controls from PDF navigation. SignaturePlatform.jsx is registered as a shared dependency of the Signature and Meeting Portals; the Meeting Portal behavior is not intentionally changed.",
     "files": [
       "src/pages/SignaturePlatform.jsx",
       "tests/signature-workflow-policy.test.mjs"
     ],
-    "expectedEffect": "The portal locally associates every successful Gateway status response with the selected envelope ID. The signer status panel and portal root retain full opacity and readable foreground text while aria-busy is true; long signer metadata wraps instead of clipping.",
+    "expectedEffect": "The owner Signature Profile loads through /api/download with owner authorization; envelope-scoped signer downloads remain unchanged. Prepare Envelope save/submit controls remain visible in a separate sticky bar above the PDF designer and are independent of PDF page navigation. Meeting Portal behavior remains unchanged.",
     "prohibitedChanges": [
-      "Do not change Cloudflare Worker routes or token generation.",
-      "Do not change Firestore rules, indexes, or production records.",
-      "Do not change SMTP credentials, secrets, or deployment configuration.",
-      "Do not alter other portals, shared stylesheets, signature validation, or audit controls."
+      "Do not change email invitation sending, SMTP, sender, transport, recipient addressing, dispatch sequence, invitation expiry or email-link validation.",
+      "Do not change signing backend routes, Firestore rules, indexes, production records, Worker configuration, secrets or deployment configuration.",
+      "Do not change signature validation, PDF stamping, certificates, hashes, audit trails, archives, completed documents or recipient copies.",
+      "Do not change Meeting Portal workflows or behavior; include its registered shared-component regression coverage only."
     ]
   },
   "repairWindow": {
@@ -24,32 +25,33 @@
     "emergency": false
   },
   "baseline": {
-    "commit": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
-    "rollbackCommit": "8bfa67b2a8757519befb2f6be1074c0f34457c99"
+    "commit": "21f33960395e09d9da74f030732e43558eac6e6d",
+    "rollbackCommit": "21f33960395e09d9da74f030732e43558eac6e6d"
   },
   "validation": {
     "baselineSmoke": "PASS",
     "portalSmoke": {
-      "Signature Portal": "PASS"
+      "Signature Portal": "PASS",
+      "Meeting Portal": "PASS"
     },
     "dependentSmoke": {
-      "Signature envelope refresh and delivery regression": "PASS",
-      "Readability CI and token contrast": "PASS",
-      "Production application build": "PASS",
-      "Complete root test suite": "PASS"
+      "Signature owner profile and independent submission regression": "PASS — CI run 44870080649 complete root test suite; browser signature ceremony tests in run 44870080291",
+      "Meeting Portal shared-component regression": "PASS — CI run 44870080649 complete root test suite",
+      "Production application build": "PASS — CI run 44870080649",
+      "Complete root test suite": "PASS — CI run 44870080649"
     },
     "fullRegression": "PASS",
     "behaviourDifferences": [
-      "Signer status responses are now associated with the selected Gateway envelope ID locally for refresh, resend, revoke, and completed-distribution retry.",
-      "The Signature Portal root and signer status panel retain full opacity and readable text during aria-busy refresh state.",
-      "Signer metadata wraps on narrow screens to avoid clipping."
+      "Owner Signature Profile assets now use the owner-authorized Drive download route rather than the envelope-scoped signer route that requires documentId and envelopeId.",
+      "Envelope-scoped signature-file retrieval remains unchanged for actual signing.",
+      "Prepare Envelope submit and save-draft controls are moved to a separate sticky control bar above the PDF designer/navigation.",
+      "No Meeting Portal workflow behavior is changed."
     ],
     "evidence": [
-      "Baseline commit 8bfa67b2a8757519befb2f6be1074c0f34457c99 is the current main baseline.",
-      "Signature Envelope Refresh and Delivery Regression completed successfully on the exact PR head before scope correction.",
-      "Readability CI and token contrast completed successfully on the exact PR head before scope correction.",
-      "IRPA Release Build completed successfully on the exact PR head before scope correction.",
-      "Firebase-free governance migration checks completed the complete root test suite successfully on the exact PR head before scope correction."
+      "Verified production frontend baseline before this repair: main commit 21f33960395e09d9da74f030732e43558eac6e6d.",
+      "Complete root test suite and application build passed in CI run 44870080649.",
+      "Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.",
+      "Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx."
     ]
   },
   "closure": {
