@@ -77,7 +77,9 @@ function escapeDeliveryReportHtml(value){return String(value??"").replace(/&/g,"
 async function notifySenderOfFailedDeliveries(ctx,user,envelopeId,signerIds){
   const uniqueIds=[...new Set((signerIds||[]).filter(Boolean))];
   if(!uniqueIds.length)return{status:"not-required",failed:0};
-  const envelope=await ctx.meta.get("envelopes",envelopeId);
+  let envelope;
+  try{envelope=await ctx.meta.get("envelopes",envelopeId);}
+  catch(error){ctx.logger?.error?.("EMAIL_DELIVERY_REPORT_LOOKUP_FAILED",{envelopeId,errorType:String(error?.name||"Error").slice(0,40)});return{status:"unavailable",failed:uniqueIds.length};}
   if(!envelope)return{status:"unavailable",failed:uniqueIds.length};
   const failures=uniqueIds.map(id=>envelope.signers.find(signer=>signer.id===id)).filter(Boolean).map(signer=>emailDeliveryFailureForSigner(envelope,signer)||{signerId:signer.id,name:signer.name||"Signer",email:signer.email||"",deliveryStatus:"Failed",stageCode:signer.deliveryStageCode||"SUBMIT",smtpReplyCategory:"UNKNOWN",smtpResponseCode:null,smtpEnhancedStatusCode:null,errorCode:null,failedAt:ctx.now().toISOString()});
   if(!failures.length)return{status:"not-required",failed:0};
