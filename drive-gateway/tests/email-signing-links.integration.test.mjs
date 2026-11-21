@@ -42,7 +42,7 @@ test("owner signs in the portal before any other signer is invited; completing o
   const documentId="DOC-OWNER-FIRST";
   await ctx.meta.create("documents",documentId,{id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,sha256:await sha256Hex(bytes),fileName:"owner-first.pdf",title:"Owner First Signing",classification:"Restricted"});
   const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
-    documentId,externalReference:"IRPA-OWNER-FIRST",archives:["board-governance"],signingMode:"Sequential",ownerPreSignEmail:"owner@example.org",
+    documentId,externalReference:"IRPA-OWNER-FIRST",archives:["board-governance"],signingMode:"Sequential",ownerPreSignEmail:"owner@example.org",ownerPreSignSignerId:"S1",
     signers:[
       {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:1,role:"Document Owner"},
       {identityType:"email-link",email:"owner@example.org",name:"Next Signer",order:2,role:"Signer"}
