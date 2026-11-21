@@ -21,7 +21,9 @@ test("email-link signer can enter full-document review before every assigned fie
 
 test("email-link Submit remains visible in review and gated by required fields, consent, and signing order", () => {
   assert.match(page, /\{reviewMode&&!signingClosed&&<section/);
-  assert.match(page, /disabled=\{submitting\|\|!record\.canSign\|\|!pageRendered\|\|incomplete\.length>0/);
+  assert.match(page, /disabled=\{submitting\|\|!record\.canSign\|\|!pageRendered/);
+  assert.doesNotMatch(page, /disabled=\{[^}]*incomplete\.length>0/);
+  assert.match(page, /if\(incomplete\.length\)\{setError\("Complete all required assigned fields before submitting/);
   assert.match(page, /!declarations\.name\.trim\(\)\|\|!consent/);
   assert.match(page, /if\(!record\?\.canSign\)/);
   assert.match(page, /if\(incomplete\.length\)\{setError\("Complete all required assigned fields before submitting/);
