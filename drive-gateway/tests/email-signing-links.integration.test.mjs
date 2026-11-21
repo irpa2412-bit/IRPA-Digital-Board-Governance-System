@@ -586,9 +586,17 @@ test("f) an owner mailbox matching a signer address does not suppress that signe
     fields:[1,2].map(index=>({fieldId:"F-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
   });
   assert.equal(sent.length,1);
-  assert.equal(sent[0].to,"owner@irpa.or.tz");
+  assert.equal(sent[0].to,"owner@irpa.or.tz","the owner-address signer receives its own invitation rather than being deduplicated");
   assert.equal(sent[0].signerId,"S1");
   assert.equal(created.invitations[1].status,"Pending");
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.73");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"F-SIGN-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Owner mailbox signer"}});
+  assert.equal(result.nextInvitations.status,"sent");
+  assert.equal(sent.length,2);
+  assert.equal(sent[1].to,"gmail-x@gmail.com","the hand-off uses the next signer's own Gmail address, not the owner or previous signer");
+  assert.equal(sent[1].signerId,"S2");
 });
 
 
