@@ -11,7 +11,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
-import { buildSmtpRecipientEnvelope } from "./smtpRecipientEnvelope.mjs";
+
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
