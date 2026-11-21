@@ -18,7 +18,7 @@ import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRe
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
-import {buildSmtpRecipientEnvelope,buildSignerInvitationSubject,buildSigningInvitationAuditMessage} from "../src/index.js";
+import {buildSmtpRecipientEnvelope,buildSignerInvitationSubject,buildSigningInvitationAuditMessage} from "../src/invitationEmail.mjs";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
