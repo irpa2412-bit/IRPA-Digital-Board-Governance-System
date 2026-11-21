@@ -11,16 +11,17 @@
       "Members and Employees Portal",
       "Signature Portal"
     ],
-    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
+    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified. This declaration also covers the signer-invitation delivery panel and per-signer copy/share controls in src/pages/SignaturePlatform.jsx under the same Signature Portal repair window.",
     "files": [
       "src/components/SignaturePathwaySelfTest.jsx",
       "tests/signature-self-test-session-safety.test.mjs",
       "package.json",
       "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
       ".github/workflows/email-signing-contract.yml",
-      "tests/signature-pathway-contract.test.mjs"
+      "tests/signature-pathway-contract.test.mjs",
+      "src/pages/SignaturePlatform.jsx"
     ],
-    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
+    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change. The signer-invitation panel reports Not sent, Sent, Accepted by the mail server or Failed per signer with masked recipient details, and exposes the existing single-signer resend link for copy or WhatsApp sharing.",
     "prohibitedChanges": [
       "Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.",
       "Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.",
