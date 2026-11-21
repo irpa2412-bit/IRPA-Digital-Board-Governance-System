@@ -12,7 +12,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 import { createSmtpSelfcheckRoute } from "./smtpDiagnostics.mjs";
@@ -566,7 +566,8 @@ export default {
                 const subject="IRPA secure document-signing invitation";
                 const text="Dear "+safeName+",\\n\\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\\n\\nDocument: "+safeTitle+"\\nLink expiry: "+expiryLabel+".\\n\\nYour link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit Open document to sign action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.\\n\\nOpen your document: "+String(link||"")+"\\n\\nDo not forward this link. This link controls access to this signing assignment only; it does not independently verify legal identity or institutional authority. If you did not expect this invitation, contact IRPA Administration.";
                 const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>"+escapeMailHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeMailHtml(expiryLabel)+"</p><p>Your link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit <strong>Open document to sign</strong> action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.</p><p><a href='"+escapeMailHtml(String(link||""))+"'>Open your document</a></p><p>Do not forward this link. It controls access to this signing assignment only and does not independently verify legal identity or institutional authority.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
-                return smtpSend(env,{to,subject,text,html,onStage});
+                // Retry transient SMTP 4xx responses for reusable email-link invitations; permanent 5xx recipient/auth failures remain fail-fast.
+                return sendWithRetry(()=>smtpSend(env,{to,subject,text,html,onStage}),{logger:console});
               }
               return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console});
             },
