@@ -271,6 +271,7 @@ function SignaturePathwaySelfTestPanel() {
     setBusy(true);
     setMessage("Read-only diagnostic: one document at a time; maximum 20 documents in this run.");
     const startedAt = Date.now();
+    const totalTimeout = setTimeout(() => controller.abort(), SELF_TEST_TOTAL_TIMEOUT_MS);
     runStartedAt.current = startedAt;
     try {
       let rows = documentQueue;
@@ -298,6 +299,7 @@ function SignaturePathwaySelfTestPanel() {
         const timeout = setTimeout(() => documentController.abort(), SELF_TEST_DOCUMENT_TIMEOUT_MS);
         let diagnostic;
         let pdf = null;
+        let pdfLoadingTask = null;
         let bytes = null;
         try {
           const work = (async () => {
@@ -307,7 +309,8 @@ function SignaturePathwaySelfTestPanel() {
             const fileId = result.fileId || driveFileId(item);
             if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
             bytes = await selfTestDownloadControlledDocument(fileId, item.documentId, { signal: documentController.signal });
-            pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+            pdfLoadingTask = pdfjsLib.getDocument({ data: bytes });
+            pdf = await pdfLoadingTask.promise;
             const canvas = document.createElement("canvas");
             try {
               const page = await pdf.getPage(1);
@@ -328,7 +331,10 @@ function SignaturePathwaySelfTestPanel() {
         } finally {
           clearTimeout(timeout);
           controller.signal.removeEventListener("abort", abortOnCancel);
-          try { if (pdf) await pdf.destroy(); } catch {}
+          try {
+            if (pdf) await pdf.destroy();
+            else if (pdfLoadingTask) await pdfLoadingTask.destroy();
+          } catch {}
           if (bytes) bytes.fill(0);
           bytes = null;
           pdf = null;
@@ -336,6 +342,7 @@ function SignaturePathwaySelfTestPanel() {
         }
         diagnostics.push(diagnostic);
         setResults(previous => [...previous, diagnostic]);
+        setNextOffset(offset + index + 1);
         setProgress({ completed: index + 1, total: batch.length, active: 0 });
       }
       const next = offset + batch.length;
@@ -346,6 +353,7 @@ function SignaturePathwaySelfTestPanel() {
     } catch (error) {
       setMessage("Read-only diagnostic stopped: " + safeGatewayText(error?.message, "Unknown diagnostic error."));
     } finally {
+      clearTimeout(totalTimeout);
       cancelController.current = null;
       setBusy(false);
     }
