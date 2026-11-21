@@ -400,3 +400,14 @@ test("signing invitation rejects link shorteners and non-HTTPS links",async()=>{
     await assert.rejects(()=>sendEmailSigningInvitation({email:"signer@gmail.com",name:"Signer",link,title:"Policy",ownerName:"Owner",from:"info@irpa.or.tz",smtpSend:async()=>{}}),/direct HTTPS IRPA application link/);
   }
 });
+
+
+test("production signing invitations must use the configured application origin",async()=>{
+  await assert.rejects(()=>sendEmailSigningInvitation({
+    email:"signer@gmail.com",name:"Signer",
+    link:"https://lookalike.example/?emailSignToken=x",
+    title:"Board Resolution",ownerName:"Owner",position:1,
+    from:"info@irpa.or.tz",expectedOrigin:"https://irpa-digital-board-governance.web.app",
+    smtpSend:async()=>{}
+  }),/configured IRPA application domain/);
+});
