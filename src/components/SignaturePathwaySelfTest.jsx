@@ -299,7 +299,7 @@ export default function SignaturePathwaySelfTest() {
 
   const [cursor, setCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
-  const [cancelled, setCancelled] = useState(false);
+  const [, setCancelled] = useState(false);
   const cancelledRef = useRef(false);
   const runAbort = useRef(null);
   useEffect(() => { clearSavedSelfTestData(); }, []);
