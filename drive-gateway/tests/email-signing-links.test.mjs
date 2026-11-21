@@ -347,7 +347,7 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
 test("production signing mail uses a signer-position subject, IRPA signing sender name and unique Message-ID/date headers",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mime=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
-  assert.match(worker,/Please sign: .* - .*position/);
+  assert.match(worker,/Please sign: .*\\(signer .* of .*\\) - /);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
@@ -378,15 +378,14 @@ test("typed signer addresses are trimmed and lower-cased; display names and mult
   assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/valid recipient/i);
 });
 
-test("signing audit email exposes only the first three local-part characters and full domain",()=>{
-  const audit=buildSigningInvitationAuditMessage({recipientPrefix:"daniel.mollel",recipientDomain:"gmail.com",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",invitationKind:"resend",at:NOW});
+test("signing audit email exposes only the first three address characters and no recipient domain",()=>{
+  const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW});
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Minutes");
-  assert.match(audit.text,/gmail\.com/);
-  assert.match(audit.text,/Type: resend/);
+  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Minutes");
+  assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
-  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
+  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel|gmail\\.com|emailSignToken|https?:\\/\\/|[a-f0-9]{64}/i);
 });
 
 
@@ -500,7 +499,7 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mail=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
   assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
-  assert.match(worker,/const subject="Please sign: "\+safeTitle\+" - "\+firstName\+" \(position "/);
+  assert.match(worker,/const subject="Please sign: "\\+safeTitle\\+" \\(signer "\\+\\(Number\\(position\\)\\|\\|1\\)\\+" of "\\+\\(Number\\(positionCount\\)\\|\\|1\\)\\+"\\) - "\\+firstName/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: "\+generatedMessageId/);
   assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
