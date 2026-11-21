@@ -151,12 +151,14 @@ function SignaturePathwaySelfTestPanel() {
     const token = await getIdToken(auth.currentUser);
     const response = await fetch(gateway + "/api/signature-pathway/emergency-storage", {
       method: "POST",
-      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "error"
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.ok !== true) throw new Error(data.error || "Emergency-storage discovery request failed (HTTP " + response.status + ").");
-    return data;
+    const data = await response.json().catch(() => null);
+    const validated = validateSelfTestGatewayResponse(data, { httpStatus: response.status });
+    if (validated.ok !== true) throw new Error(safeGatewayText(validated.error, "Emergency-storage discovery request failed."));
+    return validated;
   }
 
   async function findEmergencyStorage() {
