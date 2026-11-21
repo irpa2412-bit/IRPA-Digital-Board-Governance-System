@@ -393,13 +393,52 @@ export function createCommunicationsSiteRouter(deps) {
       throw configurationError("cpanel_document_root_invalid_for_environment", variable + " does not match the permitted " + environment + " document root.");
     }
     const documentRoot = "public_html" + (environment === "staging" ? "/staging" : "");
-    return { root: base.origin + "/execute", username, token, documentRoot };
+    return { root: base.origin + "/execute", username, token, documentRoot, configuredDocumentRoot: configuredRoot };
+  }
+
+  const cpanelHomeCache = new Map();
+  async function cpanelAbsoluteDirectory(config, relativeDirectory) {
+    const supplied = String(relativeDirectory || "").replace(/\\/g, "/");
+    if (supplied.startsWith("/home/")) return supplied.replace(/\/+$/g, "");
+    const cacheKey = config.root + "|" + config.username;
+    let home = cpanelHomeCache.get(cacheKey);
+    if (!home) {
+      const variablesUrl = new URL(config.root + "/Variables/get_user_information");
+      const response = await fetch(variablesUrl, {
+        headers: { Authorization: authHeader(config.username, config.token), Accept: "application/json" },
+        signal: AbortSignal.timeout(15000)
+      });
+      const payload = await response.json().catch(() => null);
+      const rows = [payload?.data, payload?.data?.[0], payload?.data?.data, payload?.data?.data?.[0], payload?.result, payload?.result?.data];
+      // Accept only the canonical /home/<account> value before building absolute Fileman paths.
+      home = rows.map(row => row && typeof row === "object" ? row.home : null).find(value => typeof value === "string" && /^\/home\/[^/]+$/.test(value));
+      if (!response.ok || !payload || payload.status !== 1 || !home) {
+        const errors = Array.isArray(payload?.errors) ? payload.errors.join(" ") : "";
+        const safeErrors = errors.split(config.token).join("[REDACTED]").slice(0, 500);
+        throw Object.assign(new Error("cPanel Variables/get_user_information failed to resolve account home" +
+          (safeErrors ? ": " + safeErrors : "; UAPI field home was not returned.")),
+          { diagnosticCode: "cpanel_home_not_resolved", httpStatus: response.status, uapiStatus: payload?.status ?? "unknown", uapiErrors: safeErrors });
+      }
+      cpanelHomeCache.set(cacheKey, home.replace(/\/+$/g, ""));
+    }
+    const relative = supplied.replace(/^\/+/, "");
+    if (!relative || relative.split("/").some(part => !part || part === "." || part === "..")) {
+      throw Object.assign(new Error("Invalid relative cPanel directory."), { diagnosticCode: "cpanel_invalid_relative_directory" });
+    }
+    return home.replace(/\/+$/g, "") + "/" + relative;
   }
 
   async function cpanelCall(config, operation, params = {}, method = "GET") {
+    const requestParams = { ...params };
+    if (operation.startsWith("Fileman/") && Object.prototype.hasOwnProperty.call(requestParams, "dir")) {
+      requestParams.dir = await cpanelAbsoluteDirectory(config, requestParams.dir);
+    }
+    if (operation === "Fileman/mkdir" && Object.prototype.hasOwnProperty.call(requestParams, "path")) {
+      requestParams.path = await cpanelAbsoluteDirectory(config, requestParams.path);
+    }
     const url = new URL(config.root + "/" + operation);
     const body = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) body.set(key, String(value));
+    for (const [key, value] of Object.entries(requestParams)) body.set(key, String(value));
     const response = await fetch(method === "GET" ? (url.search = body.toString(), url) : url, {
       method, headers: {
         Authorization: authHeader(config.username, config.token),
@@ -414,15 +453,22 @@ export function createCommunicationsSiteRouter(deps) {
       const status = Number.isInteger(response.status) ? response.status : 0;
       const uapiStatus = data && Number.isInteger(data.status) ? data.status : "unknown";
       const errorCount = Array.isArray(data?.errors) ? data.errors.length : 0;
-      const errorText = Array.isArray(data?.errors) ? data.errors.join(" ").toLowerCase() : "";
-      const category = /permission|access denied|not authorized|not allowed/.test(errorText) ? "permission_denied" :
-        /not found|does not exist|no such file|cannot find/.test(errorText) ? "not_found" :
-        /invalid|unsupported|unknown function|unknown api/.test(errorText) ? "invalid_operation" :
-        /auth|token|login/.test(errorText) ? "authentication_rejected" : "uapi_error";
+      const exactErrors = Array.isArray(data?.errors) ? data.errors.join(" ") : "";
+      const safeErrors = exactErrors.split(config.token).join("[REDACTED]").slice(0, 500);
+      const categoryText = exactErrors.toLowerCase();
+      const category = /permission|access denied|not authorized|not allowed/.test(categoryText) ? "permission_denied" :
+        /not found|does not exist|no such file|cannot find/.test(categoryText) ? "not_found" :
+        /invalid|unsupported|unknown function|unknown api/.test(categoryText) ? "invalid_operation" :
+        /auth|token|login/.test(categoryText) ? "authentication_rejected" : "uapi_error";
       const diagnosticCode = "cpanel_" + category;
+      const requestedPath = [requestParams.dir, requestParams.file].filter(Boolean).join("/");
+      const pathDetail = operation.startsWith("Fileman/") ?
+        "; CPANEL_DOCUMENT_ROOT=" + String(config.configuredDocumentRoot || config.documentRoot) +
+        "; Fileman path=" + (requestedPath || String(requestParams.path || "(not supplied)")) : "";
       throw Object.assign(new Error("cPanel " + operation.replace(/[^A-Za-z0-9_/-]/g, "").slice(0, 80) +
-        " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category + "."),
-        { diagnosticCode, httpStatus: status, uapiStatus, errorCount });
+        " failed with HTTP " + status + ", UAPI status " + uapiStatus + ", " + errorCount + " API error(s), category " + category +
+        pathDetail + (safeErrors ? ". Exact UAPI error: " + safeErrors : ".")),
+        { diagnosticCode, httpStatus: status, uapiStatus, errorCount, uapiErrors: safeErrors, requestedPath });
     }
     Object.defineProperty(data, "__httpStatus", { value: response.status, enumerable: false });
     return data;
@@ -1105,7 +1151,7 @@ export function createCommunicationsSiteRouter(deps) {
       let bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
       if(String(input.contentType||"")==="image/svg+xml")bytes=new TextEncoder().encode(sanitizeWebsiteSvg(new TextDecoder().decode(bytes)));
       const meta=validateWebsiteMedia({filename:safe.file,contentType:String(input.contentType||""),bytes});
-      const form=new FormData();form.set("dir",safe.dir);form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
+      const form=new FormData();form.set("dir",await cpanelAbsoluteDirectory(cp,safe.dir));form.set("file-1",new File([bytes],meta.filename,{type:meta.contentType}));
       const target=new URL(cp.root+"/Fileman/upload_files");
       const response=await fetch(target,{method:"POST",headers:{Authorization:authHeader(cp.username,cp.token),Accept:"application/json"},body:form,signal:AbortSignal.timeout(60000)});
       const result=await response.json().catch(()=>null);
@@ -1290,7 +1336,7 @@ export function createCommunicationsSiteRouter(deps) {
         return json({ testRun: true, diagnosticMode: true, createdDrafts: { pageId: null, postId: null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
       }
       for (const type of ["pages", "posts"]) {
-        const title = "TEST — IRPA Production Acceptance " + stamp + " — " + type;
+        const title = "TEST: IRPA Production Acceptance " + stamp + " — " + type;
         const slug = "test-irpa-production-acceptance-" + stamp.toLowerCase() + "-" + type;
         try {
           const created = await wpRequest(type, "POST", { title, slug, status: "draft", content: "<p>TEST ONLY — IRPA production acceptance. This draft is intentionally retained and will not be published.</p>" });
@@ -1323,7 +1369,7 @@ export function createCommunicationsSiteRouter(deps) {
       const registerCpanelMediaFallback = async (file, filename, bytes) => {
         const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
         const form = new FormData();
-        form.set("dir", directory);
+        form.set("dir", await cpanelAbsoluteDirectory(cp, directory));
         form.set("file-1", new File([bytes], filename, { type: file.mime }));
         const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
           method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
@@ -1358,7 +1404,7 @@ export function createCommunicationsSiteRouter(deps) {
                 try {
                   const cp = cpanelConfig(env), directory = safeCpanelDirectory("wp-content/uploads", cp.documentRoot);
                   const form = new FormData();
-                  form.set("dir", directory);
+                  form.set("dir", await cpanelAbsoluteDirectory(cp, directory));
                   form.set("file-1", new File([bytes], filename, { type: file.mime }));
                   const cpResponse = await fetch(new URL(cp.root + "/Fileman/upload_files"), {
                     method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" },
@@ -1414,7 +1460,7 @@ export function createCommunicationsSiteRouter(deps) {
           try {
             const bytes = Uint8Array.from(atob(file.b64), char => char.charCodeAt(0));
             validateWebsiteMedia({ filename, contentType: file.mime, bytes });
-            const form = new FormData(); form.set("dir", directory); form.set("file-1", new File([bytes], filename, { type: file.mime }));
+            const form = new FormData(); form.set("dir", await cpanelAbsoluteDirectory(cp, directory)); form.set("file-1", new File([bytes], filename, { type: file.mime }));
             const response = await fetch(new URL(cp.root + "/Fileman/upload_files"), { method: "POST", headers: { Authorization: authHeader(cp.username, cp.token), Accept: "application/json" }, body: form, signal: AbortSignal.timeout(60000) });
             const data = await response.json().catch(() => null);
             if (!response.ok || data?.status !== 1) { add(file.name + " upload to cPanel folder", "FAIL", response.status, data?.errors?.join(" ") || "cPanel UAPI upload failed."); continue; }
@@ -1435,7 +1481,11 @@ export function createCommunicationsSiteRouter(deps) {
       }
       const passCount = report.filter(row => row.status === "PASS").length;
       const failCount = report.filter(row => row.status === "FAIL").length;
-      return json({ testRun: true, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
+      const runId = crypto.randomUUID();
+      if (env.DRIVE_KV) await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify({
+        runId, createdAt: new Date().toISOString(), items: cleanupItems.map(item => ({ ...item, testInventory: true }))
+      }), { expirationTtl: 2592000 });
+      return json({ testRun: true, runId, createdDrafts: { pageId: testPageId || null, postId: testPostId || null }, cleanupItems, uploadsRetained: true, nothingDeleted: true, nothingPublished: true, passCount, failCount, report }, 200, corsHeaders(request));
     }
 
     if (path === "/api/communications/website/seo-capabilities" && request.method === "GET") {
@@ -2047,6 +2097,113 @@ export function createCommunicationsSiteRouter(deps) {
       await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: safe.relative, updatedByUid: claims.user_id, updatedAt: now, rollbackBackupId: backupId }), ["path", "updatedByUid", "updatedAt", "rollbackBackupId"], auditFields, { createOnly: true });
       return json({ success: true, path: safe.relative, backupId, message: "Website file saved through cPanel. A rollback snapshot is retained for seven days; verify the public page before considering the edit complete." }, 200, corsHeaders(request));
     }
+    if (path === "/api/communications/cpanel/maintenance/self-test" && request.method === "POST") {
+      const { claims } = await websiteMaintenanceAdminAuthorised(request, env);
+      const cp = cpanelConfig(env);
+      const environment = String(env.IRPA_WORKER_ENVIRONMENT || env.IRPA_ENVIRONMENT || "").trim().toLowerCase();
+      if (environment !== "staging" || cp.documentRoot !== "public_html/staging") {
+        return json({ error: "The maintenance self-test is restricted to the staging document root." }, 409, corsHeaders(request));
+      }
+      if (!env.DRIVE_KV) return json({ error: "Snapshot storage is unavailable; no test file was changed." }, 503, corsHeaders(request));
+      const report = [];
+      const add = (name, status, httpStatus, detail = "") => report.push({ name, status, httpStatus, detail });
+      const relativeDirectory = "portal-test";
+      const relativeFile = "portal-test/maintenance-test.txt";
+      const directory = safeWebsiteMaintenanceDirectory(relativeDirectory, cp.documentRoot);
+      const safe = safeWebsiteMaintenancePath(relativeFile, cp.documentRoot);
+      const parseRows = response => {
+        const candidates = [response?.data?.[0]?.data, response?.data, response?.data?.data, response?.data?.data?.[0]?.data];
+        return candidates.find(Array.isArray) || [];
+      };
+      let folderReady = false;
+      try {
+        const rootListing = await cpanelCall(cp, "Fileman/list_files", { dir: cp.documentRoot });
+        const folderExists = parseRows(rootListing).some(row => String(row.file || row.name || "") === relativeDirectory &&
+          (String(row.type || "").toLowerCase().includes("dir") || row.is_dir === true));
+        if (!folderExists) {
+          await cpanelCall(cp, "Fileman/mkdir", { path: directory, permissions: "0755" }, "POST");
+          add("Create staging/portal-test", "PASS", 200, "Folder did not exist and was created through cPanel Fileman::mkdir.");
+        } else add("Create staging/portal-test", "PASS", 200, "Existing staging/portal-test folder reused; no other directory was touched.");
+        folderReady = true;
+      } catch (error) {
+        add("Create staging/portal-test", "FAIL", error.httpStatus || 0, error.message || "cPanel folder provisioning failed.");
+      }
+      if (!folderReady) {
+        add("Read TEST maintenance file", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("Edit TEST maintenance file", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("Snapshot exists", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("Rollback exact bytes", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        add("List TEST files", "FAIL", 0, "Skipped because the TEST folder could not be verified.");
+        return json({ readOnly: false, configuredDocumentRoot: cp.configuredDocumentRoot, absoluteTestDirectory: await cpanelAbsoluteDirectory(cp, directory).catch(() => null), report }, 200, corsHeaders(request));
+      }
+      let originalContent = null, snapshotId = "", createdFile = false;
+      try {
+        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
+        const rows = parseRows(listing);
+        const exists = rows.some(row => String(row.file || row.name || "") === "maintenance-test.txt");
+        if (exists) {
+          const current = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          originalContent = current.data?.content ?? current.data?.[0]?.content ?? current.data?.data?.content ?? current.data?.data?.[0]?.content ?? current.data?.result?.data?.content;
+          if (typeof originalContent !== "string" || !originalContent.startsWith("TEST ONLY — IRPA Website Maintenance")) {
+            add("Create TEST maintenance-test.txt", "FAIL", current.__httpStatus || 0, "An existing file with that name is not marked TEST; it was not overwritten.");
+            throw new Error("Existing maintenance-test.txt is not verified TEST content.");
+          }
+        } else {
+          originalContent = "TEST ONLY — IRPA Website Maintenance self-test\nOriginal bytes\r\n";
+          await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: originalContent, charset: "utf-8" }, "POST");
+          createdFile = true;
+        }
+        add("Create TEST maintenance-test.txt", "PASS", 200, createdFile ? "TEST file created using Fileman/save_file_content." : "Existing TEST file reused without replacing its original bytes.");
+      } catch (error) {
+        if (!report.some(row => row.name === "Create TEST maintenance-test.txt")) add("Create TEST maintenance-test.txt", "FAIL", error.httpStatus || 0, error.message || "TEST file creation failed.");
+      }
+      try {
+        const read = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+        const content = read.data?.content ?? read.data?.[0]?.content ?? read.data?.data?.content ?? read.data?.data?.[0]?.content ?? read.data?.result?.data?.content;
+        if (typeof content !== "string" || !content.startsWith("TEST ONLY — IRPA Website Maintenance")) throw new Error("Read content was not verified as TEST data.");
+        if (originalContent === null) originalContent = content;
+        add("Read TEST maintenance-test.txt", "PASS", read.__httpStatus, "Read verified TEST content from the absolute cPanel path.");
+      } catch (error) { add("Read TEST maintenance-test.txt", "FAIL", error.httpStatus || 0, error.message || "TEST file read failed."); }
+      if (originalContent !== null) {
+        try {
+          snapshotId = "cpanel-backup:" + crypto.randomUUID();
+          await env.DRIVE_KV.put(snapshotId, JSON.stringify({ path: relativeFile, content: originalContent, environment: "staging", test: true }), { expirationTtl: 604800 });
+          const edited = "TEST ONLY — IRPA Website Maintenance self-test\nEdited bytes\r\n";
+          await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: edited, charset: "utf-8" }, "POST");
+          const verify = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          const value = verify.data?.content ?? verify.data?.[0]?.content ?? verify.data?.data?.content ?? verify.data?.data?.[0]?.content ?? verify.data?.result?.data?.content;
+          const passed = value === edited;
+          add("Edit TEST maintenance-test.txt", passed ? "PASS" : "FAIL", verify.__httpStatus, passed ? "Edit verified; snapshot ID " + snapshotId : "Save request returned but the subsequent read did not match the edited bytes; snapshot ID " + snapshotId);
+        } catch (error) { add("Edit TEST maintenance-test.txt", "FAIL", error.httpStatus || 0, (error.message || "TEST edit failed.") + (snapshotId ? "; snapshot ID " + snapshotId : "")); }
+        const snapshot = await env.DRIVE_KV.get(snapshotId, "json");
+        add("Snapshot exists", snapshot && snapshot.path === relativeFile && snapshot.content === originalContent ? "PASS" : "FAIL", 200, "Snapshot ID " + snapshotId);
+        try {
+          const beforeRollback = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          const current = beforeRollback.data?.content ?? beforeRollback.data?.[0]?.content ?? beforeRollback.data?.data?.content ?? beforeRollback.data?.data?.[0]?.content ?? beforeRollback.data?.result?.data?.content;
+          if (typeof current !== "string") throw new Error("Current TEST bytes could not be read.");
+          await cpanelCall(cp, "Fileman/save_file_content", { dir: safe.dir, file: safe.file, content: originalContent, charset: "utf-8" }, "POST");
+          const restored = await cpanelCall(cp, "Fileman/get_file_content", { dir: safe.dir, file: safe.file });
+          const restoredContent = restored.data?.content ?? restored.data?.[0]?.content ?? restored.data?.data?.content ?? restored.data?.data?.[0]?.content ?? restored.data?.result?.data?.content;
+          add("Rollback exact bytes", restoredContent === originalContent ? "PASS" : "FAIL", restored.__httpStatus, restoredContent === originalContent ? "Rollback restored the exact original bytes." : "Rollback read-back differed from the original bytes.");
+        } catch (error) { add("Rollback exact bytes", "FAIL", error.httpStatus || 0, error.message || "Rollback failed."); }
+      } else {
+        add("Edit TEST maintenance-test.txt", "FAIL", 0, "No verified TEST file was available.");
+        add("Snapshot exists", "FAIL", 0, "No verified TEST file was available.");
+        add("Rollback exact bytes", "FAIL", 0, "No verified TEST file was available.");
+      }
+      try {
+        const listing = await cpanelCall(cp, "Fileman/list_files", { dir: directory });
+        const testFiles = parseRows(listing).map(row => String(row.file || row.name || "")).filter(name => name.startsWith("TEST") || name === "maintenance-test.txt");
+        add("List TEST files", "PASS", listing.__httpStatus, testFiles.join(", ") || "No TEST files found.");
+      } catch (error) { add("List TEST files", "FAIL", error.httpStatus || 0, error.message || "TEST file listing failed."); }
+      const runId = crypto.randomUUID();
+      const inventory = { runId, createdAt: new Date().toISOString(), items: [{ kind: "cpanel-file", path: relativeFile, title: "TEST maintenance-test.txt", createdByRun: true }] };
+      await env.DRIVE_KV.put("website-maintenance-test-inventory:" + runId, JSON.stringify(inventory), { expirationTtl: 2592000 });
+      const audit = fields({ action: "CPANEL_MAINTENANCE_TEST_RUN", category: "COMMUNICATIONS", collection: "cpanelFiles", recordId: relativeFile, actorUid: claims.user_id, actorEmail: claims.email || "", details: { runId, path: relativeFile, snapshotId, report: report.map(row => ({ name: row.name, status: row.status, httpStatus: row.httpStatus })) }, createdAt: new Date().toISOString() });
+      await commitDocumentAndAudit(env, "cpanelFileEdits/" + crypto.randomUUID(), claims.token, fields({ path: relativeFile, updatedByUid: claims.user_id, updatedAt: new Date().toISOString(), runId, snapshotId, test: true }), ["path", "updatedByUid", "updatedAt", "runId", "snapshotId", "test"], audit, { createOnly: true });
+      return json({ configuredDocumentRoot: cp.configuredDocumentRoot, relativeAllowlistPath: relativeFile, absoluteFilePath: await cpanelAbsoluteDirectory(cp, safe.dir) + "/" + safe.file, snapshotId, runId, report }, 200, corsHeaders(request));
+    }
+
     if (path === "/api/communications/cpanel/maintenance/files" && request.method === "GET") {
       await websiteMaintenanceAdminAuthorised(request, env);
       const cp = cpanelConfig(env);
@@ -2186,9 +2343,10 @@ export function createCommunicationsSiteRouter(deps) {
     try { return await handle(request, env); }
     catch (error) {
       const status = Number.isInteger(error?.status) ? error.status :
+        error?.diagnosticCode === "cpanel_not_found" ? 404 :
         /authentication|token/i.test(String(error.message)) ? 401 :
         /role does not permit|authorised|authorized|restricted to active administrators/i.test(String(error.message)) ? 403 :
-        /not found/i.test(String(error.message)) ? 404 : 502;
+        /not found|no such file or directory/i.test(String(error.message)) ? 404 : 502;
       return json({ error: error.message || "Website management request failed." }, status, corsHeaders(request));
     }
   };
