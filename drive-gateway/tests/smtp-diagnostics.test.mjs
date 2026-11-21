@@ -124,6 +124,7 @@ test("SMTP self-check returns the exact failing stage, reply category and saniti
   assert.equal(result.body.smtpReplyCode,550);
   assert.equal(result.body.smtpReply,"550 5.1.1 recipient rejected");
   assert.match(result.body.messageId,/@irpa\.or\.tz/);
-  assert.equal(audits.length,2);
+  assert.equal(audits.length,3);
+  assert.deepEqual(audits.map(event=>event.stageCode),["BUILD_MESSAGE","SMTP_CONNECT","RCPT_ACCEPTED"]);
   assert.equal(JSON.stringify(result.body).includes("recipient@gmail.com"),false);
 });
