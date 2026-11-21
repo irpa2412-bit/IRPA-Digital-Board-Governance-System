@@ -6,13 +6,17 @@ const viewports = [
   { name: "small-mobile-320", width: 320, height: 740 },
   { name: "mobile-360", width: 360, height: 800 },
   { name: "mobile-390", width: 390, height: 844 },
+  { name: "mobile-breakpoint-760", width: 760, height: 900 },
+  { name: "tablet-breakpoint-761", width: 761, height: 900 },
   { name: "tablet-768", width: 768, height: 1024 },
   { name: "tablet-1024", width: 1024, height: 768 },
+  { name: "tablet-breakpoint-1100", width: 1100, height: 900 },
+  { name: "desktop-breakpoint-1101", width: 1101, height: 900 },
   { name: "desktop-1280", width: 1280, height: 900 },
   { name: "desktop-1440", width: 1440, height: 900 }
 ];
 
-test("collects portal responsive layout metrics without enforcing thresholds", async ({ page }) => {
+test("asserts shell positioning and collects portal responsive layout metrics", async ({ page }) => {
   const outputDirectory = resolve("artifacts/portal-responsive-audit");
   mkdirSync(outputDirectory, { recursive: true });
   const results = [];
@@ -66,7 +70,26 @@ test("collects portal responsive layout metrics without enforcing thresholds", a
           clientWidth: element.clientWidth
         }));
       const tableRegion = document.querySelector("[data-audit-scroll-region]");
+      const sidebar = document.querySelector(".sidebar");
+      const sidebarNav = sidebar?.querySelector("nav");
+      const mainArea = document.querySelector(".main-area");
+      const sidebarRect = sidebar?.getBoundingClientRect();
+      const mainRect = mainArea?.getBoundingClientRect();
       return {
+        shellLayout: {
+          sidebar: {
+            display: sidebar ? getComputedStyle(sidebar).display : "missing",
+            position: sidebar ? getComputedStyle(sidebar).position : "missing",
+            width: sidebar ? getComputedStyle(sidebar).width : "missing",
+            right: sidebarRect ? sidebarRect.right : null,
+            navOverflowY: sidebarNav ? getComputedStyle(sidebarNav).overflowY : "missing"
+          },
+          main: {
+            marginLeft: mainArea ? getComputedStyle(mainArea).marginLeft : "missing",
+            left: mainRect ? mainRect.left : null,
+            top: mainRect ? mainRect.top : null
+          }
+        },
         viewport: { width, height },
         document: {
           clientWidth: document.documentElement.clientWidth,
@@ -80,6 +103,17 @@ test("collects portal responsive layout metrics without enforcing thresholds", a
       };
     });
 
+    if (viewport.width > 760) {
+      expect(metrics.shellLayout.sidebar.position, viewport.name + " sidebar position").toBe("fixed");
+      expect(metrics.shellLayout.main.marginLeft, viewport.name + " main left offset").toBe("180px");
+      expect(Math.abs(metrics.shellLayout.sidebar.right - metrics.shellLayout.main.left), viewport.name + " sidebar/main horizontal alignment").toBeLessThanOrEqual(1);
+      expect(metrics.shellLayout.main.top, viewport.name + " main starts at viewport top").toBeLessThanOrEqual(1);
+      expect(metrics.shellLayout.sidebar.navOverflowY, viewport.name + " sidebar independent scroll").toBe("auto");
+    } else {
+      expect(metrics.shellLayout.sidebar.display, viewport.name + " mobile sidebar visibility").toBe("none");
+      expect(metrics.shellLayout.main.marginLeft, viewport.name + " mobile main offset").toBe("0px");
+    }
+
     results.push({ name: viewport.name, ...metrics });
     await page.screenshot({
       path: resolve(outputDirectory, viewport.name + ".png"),
@@ -89,14 +123,14 @@ test("collects portal responsive layout metrics without enforcing thresholds", a
 
   const report = {
     audit: "IRPA portal responsive layout",
-    mode: "report-only",
+    mode: "layout-regression",
     generatedAt: new Date().toISOString(),
-    thresholdsEnforced: false,
+    thresholdsEnforced: true,
     viewportCount: results.length,
     results
   };
   writeFileSync(resolve(outputDirectory, "responsive-audit.json"), JSON.stringify(report, null, 2));
   const overflowCount = results.filter(result => result.document.horizontalOverflow).length;
   const targetCount = results.reduce((sum, result) => sum + result.undersizedTouchTargets.length, 0);
-  console.log("REPORT ONLY: " + results.length + " viewports; " + overflowCount + " document overflow findings; " + targetCount + " undersized touch targets. Findings are recorded, not asserted.");
+  console.log("SHELL LAYOUT ASSERTIONS: PASS across " + results.length + " viewports; " + overflowCount + " document overflow findings and " + targetCount + " undersized touch targets remain report-only.");
 });
