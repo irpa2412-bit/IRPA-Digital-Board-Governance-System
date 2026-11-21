@@ -593,7 +593,7 @@ export default {
               const safeTitle=String(title||"Controlled document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA signer").replace(/[\r\n]+/g," ").slice(0,160);
               const firstName=safeName.split(/\s+/)[0]||"Signer";
-              const subject="Please sign: "+safeTitle+" - "+firstName+" (position "+(Number(position)||1)+" of "+(Number(positionCount)||1)+")";
+              const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName;
               let lastStage="BUILD_MESSAGE",lastCategory="UNKNOWN",result=null,failure=null;
               const captureStage=async(stage,outcome,category,metadata={})=>{
                 lastStage=String(stage||lastStage);
