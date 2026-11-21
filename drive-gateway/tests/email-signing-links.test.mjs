@@ -15,11 +15,12 @@ import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mj
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
 import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
-import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
+import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
 import {buildSmtpRecipientEnvelope} from "../src/mailDelivery.js";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
+import {buildSmtpRecipientEnvelope} from "../src/mailDelivery.js";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
@@ -385,4 +386,92 @@ test("signing audit email exposes only the first three local-part characters and
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
   assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
+});
+
+
+test("parallel creation, resend and resend-all preserve each typed signer address through SMTP RCPT TO and To header",async()=>{
+  const typed=["  Owner.Gmail@Example.org ","second@example.org","OWNER.GMAIL@example.org"];
+  const expected=typed.map(value=>value.trim().toLowerCase());
+  const sent=[];
+  const owner={uid:"owner",email:"owner@irpa.or.tz",name:"Document Owner",isAdmin:false};
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test"},
+    verifyUser:async()=>null,
+    sendInvitation:async invitation=>{
+      const envelope=buildSmtpRecipientEnvelope({
+        from:'"IRPA Digital Signing" <sender@irpa.or.tz>',
+        to:invitation.to,
+        subject:"Please sign: Shared mailbox test - Signer",
+        text:"Invitation text",
+        html:"<p>Invitation text</p>"
+      });
+      const toHeader=envelope.mime.match(/^To: <([^>]+)>$/m)?.[1]||null;
+      sent.push({...invitation,smtpRecipient:envelope.recipient,rcptCommand:envelope.rcptCommand,toHeader});
+      return "250 2.0.0 accepted";
+    },
+    logger:{error(){}}
+  });
+  ctx.resolveEmailLinkProfileUid=async()=> "profile-for-another-person";
+  const bytes=new TextEncoder().encode("%PDF-1.7\nIRPA exact recipient route test");
+  const source=await ctx.storage.put({path:"source/exact-recipient.pdf",bytes,contentType:"application/pdf",metadata:{}});
+  await ctx.meta.create("documents","DOC-EXACT-RECIPIENT",{
+    id:"DOC-EXACT-RECIPIENT",status:"Stored",ownerUid:owner.uid,
+    primaryStorageId:source.id,sha256:await sha256Hex(bytes),
+    fileName:"exact-recipient.pdf",title:"Shared mailbox test",classification:"Restricted"
+  });
+  const signers=typed.map((email,index)=>({
+    identityType:"email-link",email,name:"Signer "+(index+1),order:index+1
+  }));
+  const fields=signers.map((signer,index)=>({
+    fieldId:"EXACT-SIGN-"+(index+1),type:"Signature",page:1,x:10,y:10,width:25,height:10,
+    signerId:"S"+(index+1),required:true
+  }));
+  const created=await createEnvelope(ctx,owner,{
+    documentId:"DOC-EXACT-RECIPIENT",title:"Shared mailbox test",
+    archives:["board-governance"],signingMode:"Parallel",signers,fields
+  });
+  const stored=await ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(sent.length,3,"parallel mode must invite every signer position at creation");
+  assert.deepEqual(stored.signers.map(signer=>signer.email),expected,"signer records and envelope recipients must retain the typed address after trim/lower-case");
+  for(let index=0;index<expected.length;index++){
+    assert.equal(stored.signers[index].emailHash,await hashNormalizedEmail(expected[index]),"the token record email hash must bind to the typed address");
+    assert.equal(sent[index].to,expected[index],"the invitation sender must use the signer row address, never a profile or owner substitution");
+    assert.equal(sent[index].smtpRecipient,expected[index]);
+    assert.equal(sent[index].rcptCommand,"RCPT TO:<"+expected[index]+">");
+    assert.equal(sent[index].toHeader,expected[index],"the To header must contain exactly the same single recipient as SMTP RCPT TO");
+    console.log("MOCK SMTP recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[index].rcptCommand,toHeader:sent[index].toHeader}));
+  }
+  assert.equal(new Set(sent.map(item=>item.toHeader)).size,2,"two positions may share one mailbox without collapsing signer positions");
+  await resendInvitation(ctx,owner,created.envelopeId,"S2");
+  assert.equal(sent.at(-1).to,expected[1],"single-signer resend must use that signer's own stored address");
+  assert.equal(sent.at(-1).rcptCommand,"RCPT TO:<"+expected[1]+">");
+  assert.equal(sent.at(-1).toHeader,expected[1]);
+  const resentAll=await resendAllUnsignedInvitations(ctx,owner,created.envelopeId);
+  assert.equal(resentAll.attempted,3);
+  assert.equal(resentAll.failed,0);
+  assert.deepEqual(sent.slice(-3).map(item=>item.to),expected,"resend-all must address each unsigned signer position independently");
+  assert.deepEqual(sent.slice(-3).map(item=>item.rcptCommand),expected.map(email=>"RCPT TO:<"+email+">"));
+  assert.deepEqual(sent.slice(-3).map(item=>item.toHeader),expected);
+});
+
+test("SMTP recipient envelope rejects display names and comma-separated recipient lists",()=>{
+  const base={from:'"IRPA Digital Signing" <sender@irpa.or.tz>',subject:"Please sign",text:"text",html:"<p>html</p>"};
+  assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"Signer <signer@example.org>"}),/valid recipient/i);
+  assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"one@example.org,two@example.org"}),/valid recipient/i);
+  assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"signer@example.org,"}),/valid recipient/i);
+});
+
+test("invitation audit message masks the local part, includes the domain and never contains the link or full address",()=>{
+  const audit=buildSigningInvitationAuditMessage({
+    recipientPrefix:"daniel",recipientDomain:"example.org",position:2,positionCount:3,
+    title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
+    invitationKind:"resend",smtpReplyCategory:"ACCEPTED",at:NOW
+  });
+  assert.equal(audit.to,"info@irpa.or.tz");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Policy");
+  assert.match(audit.text,/Time \\(EAT\\):/);
+  assert.match(audit.text,/Type: resend/);
+  assert.match(audit.text,/Message-ID: <unique@irpa\\.or\\.tz>/);
+  assert.match(audit.text,/SMTP reply category: ACCEPTED/);
+  assert.doesNotMatch(JSON.stringify(audit),/daniel@example\\.org|emailSignToken|https?:\\/\\/|secret-token/i);
 });
