@@ -25,7 +25,7 @@ Last updated: 2026-11-21T19:59Z
 - Main rollback source SHA: `352d8b36718a3b88173934c607e6c7834f72a71b`
 - Production Worker version ID: `5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3` (verified in successful production Gateway deployment run [44897446474](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446474)); live Worker commit: `352d8b36718a3b88173934c607e6c7834f72a71b`.
 - Live web build stamp: **NOT RETRIEVED** (live endpoint inaccessible; DNS/network resolution failed).
-- Production rollback version ID: `679db4b3-0677-4d45-bd21-19d06700ec1c` (captured by the same successful deployment run before publishing version `5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3`). This is the verified immediate Worker rollback target; verify it remains retained before deployment.
+- Current production Worker version ID: `5215bdfd-6b8f-4135-baf3-4b6ec02bcfb3`; this is the immediate rollback target for the upcoming hotfix deployment. The preceding deployment's older rollback version was `679db4b3-0677-4d45-bd21-19d06700ec1c`.
 - This file is the durable phase ledger; update it after every phase with verified evidence only.
 
 ## Open PR dependency inventory (checked 2026-11-21)
