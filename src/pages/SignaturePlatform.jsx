@@ -940,7 +940,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
     const liveSigners=Array.isArray(live?.signers)?live.signers:[];
     const pending=liveSigners.filter(s=>s.status==="Pending").sort((a,b)=>Number(a.order||0)-Number(b.order||0));
     const liveCompleted=live?.status==="Completed"||envelope.status==="Completed";
-    const liveClosed=["Voided","Declined"].includes(live?.status)||["Cancelled","Declined"].includes(envelope.status);
+    const liveClosed=["Voided","Declined","Cancelled","Canceled","Revoked"].includes(live?.status)||["Voided","Declined","Cancelled","Canceled","Revoked"].includes(envelope.status);
     const current=pending.length?(envelope.signingMode==="Parallel"?pending:pending.slice(0,1)):[];
     const currentNames=current.map(s=>{const recipient=(envelope.recipients||[]).find(r=>String(r.email||"").trim().toLowerCase()===String(s.email||"").trim().toLowerCase())||{};return {name:s.name||recipient.name||s.email||"Assigned signer",email:s.email||recipient.email||"",role:recipient.role||s.roleAssignments?.[0]?.role||"Signer",invitation:s.invitation||"Pending"};});
     const fallback=(envelope.recipients||[]).find(r=>r.uid===envelope.currentSignerUid);
