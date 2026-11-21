@@ -501,7 +501,11 @@ const meetingTrialDeletionFiles = new Set([
 const meetingTrialDeletionGuard =
   changed.includes("drive-gateway/src/meetingServices.mjs") &&
   changed.includes("drive-gateway/src/meetingEnvironment.mjs") &&
+  changed.includes("drive-gateway/src/meetingDeletion.mjs") &&
   changed.includes("drive-gateway/tests/meeting-environment.test.mjs") &&
+  changed.includes("drive-gateway/tests/meeting-trial-deletion.test.mjs") &&
+  changed.includes("src/pages/Meetings.jsx") &&
+  changed.includes("tests/meeting-trial-delete-ui.test.mjs") &&
   changed.includes("tests/meeting-isolation-guard.test.mjs") &&
   changed.includes("tests/portal-protection-policy.test.mjs") &&
   changed.every(path => meetingTrialDeletionFiles.has(path));
