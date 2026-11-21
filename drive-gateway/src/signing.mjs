@@ -216,10 +216,10 @@ export async function createEnvelope(ctx,user,body){
   catch(error){if(reservationKey)await ctx.meta.delete("externalReferences",reservationKey).catch(()=>{});throw error;}
   const firstPosition=Math.min(...signers.map(s=>s.order));
   for(let i=0;i<signers.length;i++){
-    if(signers[i].order!==firstPosition)continue;
+    if(signingMode==="Sequential"&&signers[i].order!==firstPosition)continue;
     const token=`${id}.${signers[i].id}.${secrets[i]}`;
-    if(ownerPreSignEmail){
-      if(signers[i].id===ownerPreSignSigner.id)signers[i].invitation="Portal";
+    if(ownerPreSignEmail&&signers[i].id===ownerPreSignSigner.id){
+      signers[i].invitation="Portal";
       continue;
     }
     if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,position:signers[i].order,emailSigningModule:e.emailSigningModule,...(emailLink?{onStage:(stage,outcome,category,details)=>recordEmailLinkStage(ctx,id,signers[i].id,stage,outcome,category,details)}:{}),expiresAt:signers[i].tokenExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
@@ -331,7 +331,7 @@ async function recordEmailLinkHandoff(ctx,envelopeId,fromSignerId,toSigner,statu
 
 async function inviteNextPosition(ctx,id,previousSignerId){
   const envelope=await ctx.meta.get("envelopes",id);
-  if(!envelope||["Completed","Voided","Declined","Completing","Finalizing","CompletionFailed"].includes(envelope.status))return;
+  if(!envelope||envelope.signingMode!=="Sequential"||["Completed","Voided","Declined","Completing","Finalizing","CompletionFailed"].includes(envelope.status))return;
   const orders=[...new Set(envelope.signers.filter(s=>s.status!=="Signed").map(s=>s.order))].sort((a,b)=>a-b);
   for(const order of orders){
     if(!envelope.signers.filter(s=>s.order<order).every(s=>s.status==="Signed"))continue;
