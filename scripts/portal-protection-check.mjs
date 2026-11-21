@@ -40,7 +40,8 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
     previousActivity = activityTime;
   }
   if (now - previousActivity >= HOURS_24) return fail("Repair window automatically closed after 24 consecutive hours without activity.");
-  const scope = windowState.scope ?? [];
+  const parallelScopes = (windowState.parallelWindows ?? []).filter((item) => item.status === "open").flatMap((item) => item.scope ?? []);
+  const scope = [...(windowState.scope ?? []), ...parallelScopes];
   const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
   if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
   const declaredFiles = record.declaration?.files ?? [];
