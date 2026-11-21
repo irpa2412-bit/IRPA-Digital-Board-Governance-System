@@ -594,7 +594,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   if(!registered&&!email){setMessage("Select a registered officer or enter a signer name and email address.");return;}
   if(!title.trim()){setMessage("Enter the envelope title before adding a signer.");return;}
   if(!documentId||!documentUrl){setMessage("Select a controlled PDF before adding a signer.");return;}
-   const recipientEmail=email||String(registered?.email||"").trim().toLowerCase();
+   const recipientEmail=email;
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)){setMessage("The selected participant must have a valid email address before they can be assigned.");return;}if(!registered&&!String(signerName||"").trim()){setMessage("Enter the signer’s full name as well as their email address.");return;}
   // Mailbox addresses are delivery channels, not signer identities.
   const isOwnerDuplicate=!!(registered&&registered.uid===documentOwner.uid);
