@@ -3087,6 +3087,14 @@ export function buildSigningInvitationAuditMessage({recipientPrefix,position,pos
 
 
 
+export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
+  const typedRecipient=validateRecipient(to);
+  if(!typedRecipient)throw new Error("A valid single signer recipient email address is required.");
+  const recipient=normalizeRecipientEmail(typedRecipient);
+  const mime=buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
+  return{recipient,rcptCommand:"RCPT TO:<"+recipient+">",toHeader:"<"+recipient+">",mime};
+}
+
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromName="IRPA Administration",messageId=null}) {
   const smtpConfig=resolveSmtpConfiguration(env);
   const toEmail=normalizeRecipientEmail(to);
