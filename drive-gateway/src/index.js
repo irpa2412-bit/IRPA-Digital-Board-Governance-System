@@ -580,7 +580,23 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
-            smtpSelfCheck: async () => { const result=await smtpSend(env,{to:resolveSmtpConfiguration(env).from,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
+            smtpSelfCheck: async (_user,body={}) => {
+              const recipient=validateRecipient(body?.to||body?.email);
+              if(!recipient){const error=new Error("A valid test recipient email address is required.");error.stageCode="BUILD_MESSAGE";throw error;}
+              const from=resolveSmtpConfiguration(env).from;
+              const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
+              const date=new Date().toUTCString();
+              const subject="IRPA SMTP self-check "+new Date().toISOString();
+              const text="This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System. Acceptance by the mail server does not confirm inbox delivery.";
+              const html="<p>This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System.</p><p>Acceptance by the mail server does not confirm inbox delivery.</p>";
+              const rawMime=buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to:recipient,subject,text,html,messageId,date});
+              const stages=[];
+              const onStage=async(stageCode,outcome,smtpReplyCategory="UNKNOWN",details={})=>stages.push({stageCode,outcome,smtpReplyCategory,at:new Date().toISOString(),messageId:details.messageId||messageId,...(details.smtpReplyCode?{smtpReplyCode:details.smtpReplyCode}:{}),...(details.smtpReply?{smtpReply:details.smtpReply}:{})});
+              try{
+                const smtpReply=await smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage});
+                return {ok:true,acceptedByMailServer:true,deliveryMeaning:"Accepted by the mail server is not proof of inbox delivery.",messageId,smtpReply,stages};
+              }catch(error){error.stages=stages;error.messageId=messageId;throw error;}
+            },
             resolveEmailLinkProfileUid: async (email, signerName) => {
               const normalized=String(email||"").trim().toLowerCase();
               const normalizedName=String(signerName||"").trim().toLowerCase();
