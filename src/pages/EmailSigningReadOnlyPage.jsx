@@ -124,7 +124,7 @@ export default function EmailSigningReadOnlyPage({token}){
   return value!==undefined&&String(value).trim()!=="";
  };
  const incomplete=fields.filter(field=>field.required&&!complete(field));
- const canReview=Boolean(record)&&pageRendered;
+ const canReview=Boolean(record)&&Boolean(pdfDocument);
  const setDeclaration=(key,value)=>setDeclarations(current=>({...current,[key]:value}));
 
  function canvasPoint(event){const canvas=signatureCanvasRef.current,rect=canvas.getBoundingClientRect();return{x:(event.clientX-rect.left)*(canvas.width/rect.width),y:(event.clientY-rect.top)*(canvas.height/rect.height)};}
@@ -148,7 +148,7 @@ export default function EmailSigningReadOnlyPage({token}){
  function clearPad(){const canvas=signatureCanvasRef.current;if(canvas)canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);setSignatureMarks(current=>{const next={...current};delete next[selectedFieldId];return next;});setFieldApplications(current=>current.filter(item=>item.fieldId!==selectedFieldId));}
  function enterReview(){
   if(!record){setError("The signing assignment is unavailable.");return;}
-  if(!pageRendered){setError("Wait for the current document page to finish rendering.");return;}
+  if(!pdfDocument){setError("The controlled document is not ready for review.");return;}
   setError("");setReviewMode(true);if(pageNum!==1){setPageRendered(false);setPageNum(1);}
  }
  async function openDocumentToSign(){
