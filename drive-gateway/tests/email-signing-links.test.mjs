@@ -1,4 +1,5 @@
 import test from "node:test";
+import { signerDeliveryLabel, copySignerInvitationLink, buildSignerWhatsAppInvitationUrl } from "../../src/utils/signatureInvitationUi.mjs";
 import assert from "node:assert/strict";
 import {
   createEmailSigningToken,
@@ -539,27 +540,32 @@ test("three shared-mailbox signer positions produce three distinct exact subject
 });
 
 
-test("signer delivery panel renders all mail outcomes, category/time, stage code and masked recipient",()=>{
+test("signer delivery panel renders all mail outcomes, category/time, stage code and masked recipient", async () => {
   const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
-  assert.match(ui,/function signerDeliveryLabel\(item=\{\}\)/);
-  assert.match(ui,/delivery\.state==="Accepted by the mail server"/);
-  assert.match(ui,/delivery\.smtpReplyCategory/);
-  assert.match(ui,/delivery\.acceptedAt/);
-  assert.match(ui,/timeZone:"Africa\/Dar_es_Salaam"/);
-  assert.match(ui,/delivery\.failureStageCode\|\|item\.deliveryStageCode/);
   assert.match(ui,/Delivery: \{signerDeliveryLabel\(item\)\}/);
+  assert.match(ui,/Link: \{signerLinkStatusLabel\(item\)\}/);
   assert.match(ui,/maskRegisterEmail\(item\.email\)/);
-  const deliveryLabel=ui.match(/function signerDeliveryLabel[\s\S]*?\n\}/)?.[0]||"";
-  assert.doesNotMatch(deliveryLabel,/Delivered/);
+  assert.equal(signerDeliveryLabel({delivery:{state:"Sent"}}),"Sent");
+  assert.equal(signerDeliveryLabel({delivery:{state:"Not sent"}}),"Not sent");
+  assert.equal(signerDeliveryLabel({delivery:{state:"Failed",failureStageCode:"SMTP_AUTH"}}),"Failed (SMTP_AUTH)");
+  assert.ok(signerDeliveryLabel({delivery:{state:"Accepted by the mail server",smtpReplyCategory:"250",acceptedAt:"2026-11-21T10:00:00Z"}}).startsWith("Accepted by the mail server (250 · "));
+  assert.doesNotMatch(signerDeliveryLabel({delivery:{state:"Sent"}}),/Delivered/);
 });
 
-test("unsigned signer copy and WhatsApp actions reuse the exact link returned by the existing resend flow",()=>{
+test("unsigned signer copy and WhatsApp actions reuse the exact link returned by the existing resend flow", async () => {
   const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
   assert.match(ui,/const result=await resendGatewayEmailInvitation\(selected\.gatewayEnvelopeId,signerId\)/);
   assert.match(ui,/const signingLink=String\(result\?\.signingLink\|\|""\)/);
-  assert.match(ui,/navigator\.clipboard\.writeText\(signingLink\)/);
-  assert.match(ui,/https:\/\/wa\.me\/\?text=/);
+  assert.match(ui,/copySignerInvitationLink\(signingLink,navigator\.clipboard\)/);
+  assert.match(ui,/buildSignerWhatsAppInvitationUrl\(signingLink\)/);
   assert.match(ui,/>Copy signing link</);
   assert.match(ui,/>Share on WhatsApp</);
+  const link="https://irpa.or.tz/?emailSignToken=opaque-token";
+  const writes=[];
+  await copySignerInvitationLink(link,{writeText:async(value)=>writes.push(value)});
+  assert.deepEqual(writes,[link]);
+  const whatsapp=new URL(buildSignerWhatsAppInvitationUrl(link));
+  assert.equal(whatsapp.origin,"https://wa.me");
+  assert.ok(new URLSearchParams(whatsapp.search).get("text").includes(link));
   assert.match(ui,/A new invitation was emailed, and that exact signer-specific link/);
 });
