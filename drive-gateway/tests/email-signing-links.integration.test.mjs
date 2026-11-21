@@ -4,6 +4,7 @@ import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,resendAllUnsignedInvitations,revokeInvitation,getEnvelopeStatus,recordEmailLinkStage} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
+import {buildSmtpRecipientEnvelope} from "../src/mailDelivery.js";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
 import {openSigning,sign,declineSigning} from "../src/signing.mjs";
@@ -646,4 +647,55 @@ test("a failed next-position SMTP hand-off is returned and recorded on the envel
   assert.equal(status.signers[1].delivery.state,"Failed");
   assert.equal(status.signers[1].deliveryStageCode,"SMTP_CONNECT");
   assert.match(status.signers[1].invitation,/Failed \\(SMTP_CONNECT\\)/);
+});
+
+test("mock SMTP proves creation, resend and resend-all RCPT TO and To header equal each typed signer address",async()=>{
+  const f=await fixture();
+  const sent=[];
+  f.ctx.resolveEmailLinkProfileUid=async()=>"registered-profile-uid-not-an-email";
+  f.ctx.sendInvitation=async message=>{
+    const envelope=buildSmtpRecipientEnvelope({
+      from:'"IRPA Digital Signing" <administrator@irpa.or.tz>',
+      to:message.to,subject:"Please sign: Recipient test - "+message.name,
+      text:"plain invitation",html:"<p>html invitation</p>"
+    });
+    const toHeader=envelope.mime.match(/^To:\s*(.+)$/m)?.[1]||"";
+    sent.push({...message,smtpRecipient:envelope.recipient,rcptCommand:envelope.rcptCommand,toHeader});
+  };
+  const typed=["  Owner.Gmail@GMAIL.COM  ","  Assigned.Person@Example.org ","Assigned.Person@example.org"];
+  const expected=["owner.gmail@gmail.com","assigned.person@example.org","assigned.person@example.org"];
+  const owner={uid:"owner-uid",email:"owner-account@irpa.or.tz",name:"Document Owner",isAdmin:false};
+  const created=await createEnvelope(f.ctx,owner,{
+    documentId:f.envelope.documentId,
+    externalReference:"IRPA-MOCK-SMTP-ROUTING-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:typed.map((email,index)=>({identityType:"email-link",email,name:"Signer "+(index+1),order:index+1})),
+    fields:[1,2,3].map(index=>({fieldId:"MOCK-SMTP-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  const assertTrace=(rows,emails)=>{
+    assert.deepEqual(rows.map(item=>item.smtpRecipient),emails);
+    assert.deepEqual(rows.map(item=>item.rcptCommand),emails.map(email=>"RCPT TO:<"+email+">"));
+    assert.deepEqual(rows.map(item=>item.toHeader),emails.map(email=>"<"+email+">"));
+    for(let index=0;index<rows.length;index++){
+      assert.equal(rows[index].to,emails[index]);
+      console.log("MOCK SMTP RCPT TO / To",JSON.stringify({position:rows[index].position,rcptTo:rows[index].rcptCommand,toHeader:rows[index].toHeader,typed:typed[rows[index].position-1]||emails[index]}));
+    }
+  };
+  assert.equal(sent.length,3,"parallel creation sends every signer position");
+  assertTrace(sent,expected);
+  const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.deepEqual(stored.signers.map(signer=>signer.email),expected);
+  for(let index=0;index<expected.length;index++){
+    assert.equal(stored.signers[index].emailHash,await sha256Hex(expected[index]));
+    assert.equal(stored.signers[index].profileUid,"registered-profile-uid-not-an-email");
+  }
+  sent.length=0;
+  await resendInvitation(f.ctx,owner,created.envelopeId,"S2");
+  assert.equal(sent.length,1);
+  assertTrace(sent,[expected[1]]);
+  sent.length=0;
+  const bulk=await resendAllUnsignedInvitations(f.ctx,owner,created.envelopeId);
+  assert.equal(bulk.attempted,3);
+  assert.equal(bulk.failed,0);
+  assertTrace(sent,expected);
 });
