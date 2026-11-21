@@ -442,7 +442,7 @@ test("parallel same-position group is released after portal-first owner signs; r
       sendNumber++;
       const content=buildEmailSigningInvitationMessage({
         name:message.name,link:message.link,title:message.title,ownerName:message.ownerName,
-        expiresAt:message.expiresAt,position:message.position
+        expiresAt:message.expiresAt,position:message.position,signerId:message.signerId,envelopeId:message.envelopeId
       });
       const messageId="<parallel-"+sendNumber+"@irpa.or.tz>";
       const date=new Date(now).toUTCString();
