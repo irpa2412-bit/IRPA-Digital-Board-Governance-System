@@ -530,3 +530,15 @@ test("three shared-mailbox signer positions produce three distinct exact subject
   ]);
   assert.equal(new Set(subjects).size,3);
 });
+
+
+test("unsigned signer copy and WhatsApp actions reuse the exact link returned by the existing resend flow",()=>{
+  const ui=fs.readFileSync(new URL("../../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  assert.match(ui,/const result=await resendGatewayEmailInvitation\(selected\.gatewayEnvelopeId,signerId\)/);
+  assert.match(ui,/const signingLink=String\(result\?\.signingLink\|\|""\)/);
+  assert.match(ui,/navigator\.clipboard\.writeText\(signingLink\)/);
+  assert.match(ui,/https:\/\/wa\.me\/\?text=/);
+  assert.match(ui,/>Copy signing link</);
+  assert.match(ui,/>Share on WhatsApp</);
+  assert.match(ui,/A new invitation was emailed, and that exact signer-specific link/);
+});
