@@ -124,7 +124,6 @@ function diagnosticRow(item, result) {
 
 function SignaturePathwaySelfTestPanel() {
   const cancelController = useRef(null);
-  const runStartedAt = useRef(0);
   const [busy, setBusy] = useState(false);
   const [documentQueue, setDocumentQueue] = useState([]);
   const [nextOffset, setNextOffset] = useState(0);
@@ -272,7 +271,6 @@ function SignaturePathwaySelfTestPanel() {
     setMessage("Read-only diagnostic: one document at a time; maximum 20 documents in this run.");
     const startedAt = Date.now();
     const totalTimeout = setTimeout(() => controller.abort(), SELF_TEST_TOTAL_TIMEOUT_MS);
-    runStartedAt.current = startedAt;
     try {
       let rows = documentQueue;
       if (startNew || !rows.length) {
@@ -314,9 +312,6 @@ function SignaturePathwaySelfTestPanel() {
             const canvas = document.createElement("canvas");
             try {
               const page = await pdf.getPage(1);
-              const viewport = page.getViewport({ scale: 0.65 });
-              canvas.width = Math.max(1, Math.floor(viewport.width));
-              canvas.height = Math.max(1, Math.floor(viewport.height));
               const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 420, maxPixels: 1000000, zoom: 0.65, signal: documentController.signal });
               pdfPageCheck = { status: metrics.textCharacters > 0 && metrics.nonBlankPixelRatio > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages, pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }], lastPageFlag: "First-page-only check; remaining pages were not rendered." };
             } finally { canvas.width = 1; canvas.height = 1; }
