@@ -412,10 +412,18 @@ test("v2 reusable invitation is read-only on preview, creates fresh sessions, an
   );
 });
 
-test("three sequential signer positions sharing one mailbox each receive their own invitation after the prior signature",async()=>{
+test("e) three sequential positions on one mailbox receive distinct mocked-SMTP messages and safe audit notices",async()=>{
   const f=await fixture();
-  const sent=[];
-  f.ctx.sendInvitation=async message=>sent.push(message);
+  const sent=[],audits=[];let messageNumber=0;
+  f.ctx.sendInvitationAudit=async record=>audits.push(record);
+  f.ctx.sendInvitation=async message=>{
+    const messageId="<mock-"+(++messageNumber)+"@irpa.or.tz>";
+    sent.push({...message,messageId});
+    for(const stage of ["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])
+      await message.onStage?.(stage,"success",stage==="SUBMIT"?"ACCEPTED":"UNKNOWN",{messageId});
+    await message.onAudit?.({messageId,smtpReplyCategory:"ACCEPTED"});
+    return "250 MOCK ACCEPTED";
+  };
   const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
     documentId:f.envelope.documentId,
     externalReference:"IRPA-THREE-SHARED-"+Math.random().toString(16).slice(2,10),
@@ -453,6 +461,16 @@ test("three sequential signer positions sharing one mailbox each receive their o
   assert.equal(sent.length,3);
   assert.equal(new Set(tokenIds).size,3);
   assert.deepEqual(sent.map(item=>item.signerId),["S1","S2","S3"]);
+  assert.equal(new Set(sent.map(item=>item.messageId)).size,3,"each position has a unique SMTP Message-ID");
+  assert.equal(audits.length,3,"one audit message follows each accepted invitation");
+  assert.equal(new Set(audits.map(item=>item.messageId)).size,3);
+  for(const audit of audits){
+    const serialized=JSON.stringify(audit);
+    assert.equal(serialized.includes("shared@example.org"),false,"audit contains no full recipient address");
+    assert.equal(serialized.includes("emailSignToken"),false,"audit contains no signing token");
+    assert.equal(serialized.includes("https://"),false,"audit contains no signing link");
+    assert.equal(audit.recipientPrefix,"sha");
+  }
 });
 
 
