@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/**'
       - 'scripts/check-firestore-deploy-triggers.mjs'
+      - 'tests/workflow-production-deploy-policy.test.mjs'
   push:
     branches: [main]
     paths:
@@ -22,3 +23,5 @@ jobs:
           node-version: 22
       - name: Reject automatic Firestore publication paths
         run: node scripts/check-firestore-deploy-triggers.mjs
+      - name: Test production deployment workflow contracts
+        run: node --test tests/workflow-production-deploy-policy.test.mjs

@@ -68,7 +68,7 @@ test("production deployment workflows are not triggered by pull requests", () =>
 
 test("production Firebase CLI rules and Worker deployments require explicit owner dispatch approval", () => {
   const source = readWorkflow(".github/workflows/firebase-cli-deploy.yml");
-  assert.match(source, /authorize_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
   assert.match(source, /authorize_production_worker_deployment:[\s\S]*?default: "no"/);
   const workerStart = source.indexOf("- name: Deploy grant crawler to Cloudflare Workers");
   const rulesStart = source.indexOf("- name: Deploy Firestore Rules and Indexes");
@@ -78,8 +78,8 @@ test("production Firebase CLI rules and Worker deployments require explicit owne
   const rulesEnd = source.indexOf("\n      - name:", rulesStart + 1);
   const fallbackRulesEnd = source.indexOf("\n      - name:", fallbackRulesStart + 1);
   assert.match(source.slice(workerStart, workerEnd), /inputs\.authorize_production_worker_deployment == 'yes'/);
-  assert.match(source.slice(rulesStart, rulesEnd), /inputs\.authorize_production_firestore_rules_deployment == 'yes'/);
-  assert.match(source.slice(fallbackRulesStart, fallbackRulesEnd), /inputs\.authorize_production_firestore_rules_deployment == 'yes'/);
+  assert.match(source.slice(rulesStart, rulesEnd), /inputs.confirm_production_firestore_rules_deployment == 'DEPLOY'/);
+  assert.match(source.slice(fallbackRulesStart, fallbackRulesEnd), /inputs.confirm_production_firestore_rules_deployment == 'DEPLOY'/);
   assert.match(source, /wrangler deploy --config cloudflare\/grant-crawler\/wrangler\.toml/);
   assert.match(source, /wrangler --config cloudflare\/grant-crawler\/wrangler\.toml secret put FIREBASE_SERVICE_ACCOUNT_JSON/);
   assert.doesNotMatch(source, /working-directory: cloudflare\/grant-crawler/);
@@ -134,4 +134,10 @@ test("production Gateway deployment requires SMTP_PASSWORD secret and configures
   assert.match(source,/SMTP_PORT: "465"/);
   assert.match(source,/SMTP_FROM: "info@irpa\.or\.tz"/);
   assert.match(source,/deploy --keep-vars/);
+});
+
+test("Firestore trigger guard runs the production deployment workflow contract regression", () => {
+  const source = readWorkflow(".github/workflows/firestore-deployment-trigger-guard.yml");
+  assert.match(source, /tests\/workflow-production-deploy-policy\.test\.mjs/);
+  assert.match(source, /node --test tests\/workflow-production-deploy-policy\.test\.mjs/);
 });
