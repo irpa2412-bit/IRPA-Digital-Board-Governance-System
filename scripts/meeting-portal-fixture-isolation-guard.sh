@@ -35,6 +35,7 @@ const allowed = new Set([
   "tests/firestore.rules.test.cjs",
   "tests/research-portal-security.test.mjs",
   "tests/meeting-isolation-guard.test.mjs",
+  "tests/meeting-trial-delete-ui.test.mjs",
   "tests/invitation-removal-policy.test.mjs",
   "tests/meeting-invitation-resend-quorum.test.mjs",
 "tests/signature-signer-picker-regression.test.mjs",
@@ -61,7 +62,9 @@ const allowed = new Set([
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
   "drive-gateway/src/meetingEnvironment.mjs",
+  "drive-gateway/src/meetingDeletion.mjs",
   "drive-gateway/tests/meeting-environment.test.mjs",
+  "drive-gateway/tests/meeting-trial-deletion.test.mjs",
   "docs/implementation-status.md",
   "src/firebase/meetingAttendanceSigning.js",
   "src/firebase/meetingAttendanceSignerIdentity.js",
@@ -484,12 +487,16 @@ const meetingTrialDeletionFiles = new Set([
   "docs/portal-protection/records/meeting-portal.json",
   "docs/portal-protection/windows/meeting-portal.json",
   "drive-gateway/src/meetingEnvironment.mjs",
+  "drive-gateway/src/meetingDeletion.mjs",
   "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/tests/meeting-trial-deletion.test.mjs",
   "drive-gateway/tests/meeting-environment.test.mjs",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
   "scripts/portal-protection-check.mjs",
   "tests/meeting-isolation-guard.test.mjs",
-  "tests/portal-protection-policy.test.mjs"
+  "tests/meeting-trial-delete-ui.test.mjs",
+  "tests/portal-protection-policy.test.mjs",
+  "src/pages/Meetings.jsx"
 ]);
 const meetingTrialDeletionGuard =
   changed.includes("drive-gateway/src/meetingServices.mjs") &&
