@@ -590,3 +590,25 @@ test("f) an owner mailbox matching a signer address does not suppress that signe
   assert.equal(sent[0].signerId,"S1");
   assert.equal(created.invitations[1].status,"Pending");
 });
+
+
+test("audit-email failure never blocks or repeats an accepted invitation",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitationAudit=async()=>{throw new Error("audit mailbox unavailable");};
+  f.ctx.sendInvitation=async message=>{
+    sent.push(message);
+    await message.onStage?.("SUBMIT","success","ACCEPTED",{messageId:"<accepted-once@irpa.or.tz>"});
+    await message.onAudit?.({messageId:"<accepted-once@irpa.or.tz>",smtpReplyCategory:"ACCEPTED"});
+    return "250 MOCK ACCEPTED";
+  };
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-AUDIT-FAIL-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[{identityType:"email-link",email:"audit-test@gmail.com",name:"Audit Test",order:1}],
+    fields:[{fieldId:"AUDIT-FAIL-SIGN",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true}]
+  });
+  assert.equal(sent.length,1,"the invitation is submitted exactly once");
+  assert.equal(created.invitations[0].status,"Sent");
+  const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(stored.signers[0].invitation,"Sent");
+});
