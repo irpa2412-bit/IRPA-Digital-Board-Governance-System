@@ -199,43 +199,52 @@ export function classifySmtpReplyCategory(error, stage = "") {
   if (/recipient.*reject|unknown recipient|user unknown|no such user|address rejected/.test(message) || [550,551,553].includes(code) || /5\.1\.[0-9]/.test(message)) return "RECIPIENT_REJECTED";
   return "UNKNOWN";
 }
-export async function runEmailStage(stage,action,onStage){
+export async function runEmailStage(stage,action,onStage,details={}) {
   if(!EMAIL_LINK_STAGE_CODES.includes(stage))throw new Error("Unsupported email stage.");
-  try{
+  try {
     const result=await action();
-    try{await onStage?.(stage,"success","UNKNOWN")}catch{}
+    const stageDetails={...details};
+    if(typeof result==="string"&&/^\d{3}\s/.test(result)) {
+      stageDetails.smtpReply=result.replace(/[\r\n]+/g," ").slice(0,180);
+      stageDetails.smtpReplyCode=Number(result.slice(0,3));
+    }
+    try{await onStage?.(stage,"success","UNKNOWN",stageDetails)}catch{}
     return result;
-  }catch(error){
+  } catch(error) {
     const response=String(error?.message||"").match(/IRPA SMTP error (\d{3})/i);
-    const safe=new Error(response?`IRPA SMTP error ${response[1]}`:`Email delivery failed at ${stage}.`);
+    const safe=new Error(response?"IRPA SMTP error "+response[1]:"Email delivery failed at "+stage+".");
     safe.name=String(error?.name||"Error").slice(0,40);
     safe.stageCode=stage;
     safe.smtpReplyCategory=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:classifySmtpReplyCategory(error,stage);
     if(response)safe.smtpResponseCode=Number(response[1]);
+    if(Number.isInteger(error?.smtpResponseCode))safe.smtpResponseCode=error.smtpResponseCode;
+    if(error?.smtpReply)safe.smtpReply=String(error.smtpReply).replace(/[\r\n]+/g," ").slice(0,180);
     if(/^[A-Z0-9_-]{1,40}$/i.test(String(error?.code||"")))safe.code=String(error.code);
     if(error?.deliveryOutcome==="unknown")safe.deliveryOutcome="unknown";
     if(error?.retryable===false)safe.retryable=false;
-    try{await onStage?.(stage,"failure",safe.smtpReplyCategory)}catch{}
+    try{await onStage?.(stage,"failure",safe.smtpReplyCategory,{...details,...(safe.smtpResponseCode?{smtpReplyCode:safe.smtpResponseCode}:{}),...(safe.smtpReply?{smtpReply:safe.smtpReply}:{})})}catch{}
     throw safe;
   }
 }
 
-export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,smtpSend,logger=console,sleep,onStage}) {
+export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,position=1,from,replyTo=from,smtpSend,logger=console,sleep,onStage}) {
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
-  const outcomes=new Map();
-  const capture=async(stage,outcome,smtpReplyCategory)=>outcomes.set(stage,{outcome,smtpReplyCategory});
-  let result,error;
-  try{
-    const message=await runEmailStage("BUILD_MESSAGE",()=>buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}),capture);
-    result=await sendWithRetry(()=>smtpSend({to,...message,onStage:capture}),{logger,sleep});
-  }catch(err){
-    error=err;
-    if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,"failure");
-  }
-  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory)}catch{}}
-  if(error)throw error;
-  return result;
+  const safeLink=new URL(link);
+  if(safeLink.protocol!=="https:"||/^(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|is\.gd|short\.io|rebrand\.ly)$/i.test(safeLink.hostname))throw new Error("Signing invitation must use the direct HTTPS IRPA application link.");
+  const sender=validateRecipient(from);
+  const reply=validateRecipient(replyTo);
+  if(!sender||!reply)throw new Error("IRPA signing sender address is not configured.");
+  return sendWithRetry(async()=>{
+    const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
+    const date=new Date().toUTCString();
+    const message=await runEmailStage("BUILD_MESSAGE",()=>{
+      const content=buildEmailSigningInvitationMessage({name,link:safeLink.toString(),title,ownerName,expiresAt,position});
+      const rawMime=buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from:sender,replyTo:reply,to,subject:content.subject,text:content.text,html:content.html,messageId,date});
+      return {...content,rawMime,messageId,date};
+    },onStage,{messageId,date});
+    return smtpSend({to,...message,onStage});
+  },{logger,sleep});
 }
 
 export async function handleSendInvitationEmail(request, env, deps = {}) {
