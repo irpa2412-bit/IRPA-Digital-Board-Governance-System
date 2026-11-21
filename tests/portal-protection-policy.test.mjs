@@ -42,3 +42,27 @@ test("a fresh declaration reopens after an earlier closure", () => {
 test("Git activity history is parsed into individual timestamps", () => {
   assert.deepEqual(parseActivityTimestamps("2026-11-19T21:10:19Z\n2026-11-19T21:11:00Z\n"), ["2026-11-19T21:10:19Z","2026-11-19T21:11:00Z"]);
 });
+
+test("an open parallel portal repair window authorizes only its own additional paths", () => {
+  const parallelFile = "src/components/SignaturePathwaySelfTestErrorBoundary.jsx";
+  const allPortals = Object.keys(registry.portals);
+  const record = {
+    ...valid,
+    declaration: { ...valid.declaration, affectedPortals: allPortals, files: [parallelFile] },
+    validation: { ...valid.validation, portalSmoke: Object.fromEntries(allPortals.map(name => [name, "PASS"])) }
+  };
+  const parallelWindowState = {
+    ...windowState,
+    parallelWindows: [{ portal: "Signature Portal", status: "open", openedAt: windowState.openedAt, scope: [parallelFile] }]
+  };
+  const result = evaluatePolicy({
+    changedFiles: [parallelFile],
+    registry,
+    record,
+    windowState: parallelWindowState,
+    latestActivityAt: "2026-11-19T19:59:00Z",
+    now
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.affected, allPortals.sort());
+});

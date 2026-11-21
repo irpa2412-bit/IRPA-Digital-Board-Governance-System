@@ -31,8 +31,11 @@ test("Worker reconciliation is single-document, read-only, and does not repair d
   assert.match(worker, /diagnoseControlledDocument/);
   assert.match(worker, /This diagnostic endpoint is read-only/);
   assert.match(worker, /writesPerformed:false,driveMutationsPerformed:false/);
-  assert.match(selfTest, /selfTestReconcileDocument\(oneDocument\[0\], options\)/);
-  assert.match(batch, /requestDocument\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
+  assert.match(selfTest, /runSequentialSelfTestBatch\(documentRows/);
+  assert.match(selfTest, /selfTestReconcileDocument\(item, \{ signal \}\)/);
+  assert.match(selfTest, /documents: \[\{/);
+  assert.match(selfTest, /limit\(20\)/);
+  assert.match(selfTest, /startAfter\(cursor\)/);
   assert.doesNotMatch(selfTest, /wiAfPSIxHLTd6MdeM04q/);
   assert.doesNotMatch(selfTest, /autoDiscover: true/);
   assert.match(selfTest, /Copy report/);

@@ -33,7 +33,27 @@ jobs:
         run: node --test drive-gateway/tests/email-signing-links.integration.test.mjs
       - name: Install frontend dependencies
         run: npm ci
-      - name: Run Signature Pathway Self-Test session-safety regression
+      - name: Run Signature Pathway Self-Test safety and 500-document stress regressions
         run: npm run test:signature-self-test
+      - name: Build production application for startup smoke
+        env:
+          VITE_USE_FIREBASE_EMULATORS: "true"
+        run: npm run build
+      - name: Install headless browser
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Start built application
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4174 --strictPort > "$RUNNER_TEMP/signature-startup.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/signature-startup.pid"
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:4174/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/signature-startup.log"
+          exit 1
+      - name: Run built-app startup smoke at desktop and Android widths
+        run: node tests/browser/signature-self-test-startup-smoke.mjs
       - name: Run seven-portal protection smoke tests
         run: node scripts/portal-protection-smoke.mjs
