@@ -208,7 +208,7 @@ export async function runEmailStage(stage,action,onStage,details={}) {
       stageDetails.smtpReply=result.replace(/[\r\n]+/g," ").slice(0,180);
       stageDetails.smtpReplyCode=Number(result.slice(0,3));
     }
-    try{await onStage?.(stage,"success","UNKNOWN",stageDetails)}catch{}
+    try{await onStage?.(stage,"success",["RCPT_ACCEPTED","SUBMIT"].includes(stage)?"ACCEPTED":"UNKNOWN",stageDetails)}catch{}
     return result;
   } catch(error) {
     const response=String(error?.message||"").match(/IRPA SMTP error (\d{3})/i);
