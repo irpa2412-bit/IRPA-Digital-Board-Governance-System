@@ -536,3 +536,13 @@ test("meeting fixture guard is concurrency-scoped and watches all deletion-prote
     "drive-gateway/tests/meeting-environment.test.mjs"
   ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
 });
+
+test("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
+  const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
+  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.ok(workflow.includes("npm run test:protected-portals"));
+  assert.ok(workflow.includes("npm run test:all"));
+  assert.ok(workflow.includes("npm test --prefix drive-gateway"));
+  assert.ok(workflow.includes("baseline-protection-smoke:"));
+  assert.ok(workflow.includes("baseline-full-regression:"));
+});
