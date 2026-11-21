@@ -449,7 +449,7 @@ test("per-signer copy and WhatsApp actions reuse the existing accepted invitatio
 test("typed signer address takes precedence over a registered profile address without changing account identity",()=>{
   const addSigner=portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner);
-  assert.match(addSigner[1],/const recipientEmail=email\|\|String\(registered\?\.email/);
+  assert.match(addSigner[1],/const recipientEmail=email;/);
   assert.match(addSigner[1],/uid:registered\.uid,identityType:"account"[\s\S]*?email:recipientEmail/);
   assert.doesNotMatch(addSigner[1],/email:registeredEmail/);
 });
