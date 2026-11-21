@@ -9,7 +9,8 @@
     "files": [
       "src/components/SignaturePathwaySelfTest.jsx",
       "tests/signature-self-test-session-safety.test.mjs",
-      "package.json"
+      "package.json",
+      "drive-gateway/tests/signature-workflow-draft-route.test.mjs"
     ],
     "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
     "prohibitedChanges": [
@@ -54,7 +55,8 @@
       "Complete root test suite and application build passed in CI run 44870080649.",
       "Desktop/mobile signature ceremony browser tests, three-page PDF content regression and production readability checks passed in CI run 44870080291.",
       "Protected portal policy declaration covers both registered dependents of src/pages/SignaturePlatform.jsx.",
-      "PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair."
+      "PR #832 contains the self-test session-safety regression test and includes it in npm run test:all; CI evidence is being collected for this repair.",
+      "Existing Gateway diagnostic contract test updated to verify the self-test-specific redirect-safe request helper; the test is included in the complete Gateway regression suite."
     ]
   },
   "closure": {
