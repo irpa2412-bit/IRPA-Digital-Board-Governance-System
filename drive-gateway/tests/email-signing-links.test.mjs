@@ -14,10 +14,11 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
+import {buildSmtpRecipientEnvelope} from "../src/mailDelivery.js";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
@@ -360,4 +361,28 @@ test("owner/admin SMTP self-check accepts a typed recipient and rejects other ro
   assert.match(worker,/const to=validateRecipient\(body\?\.to\)/);
   assert.match(worker,/!active\|\|!\["administrator","owner"\]\.includes\(role\)/);
   assert.match(worker,/messageId,stages/);
+});
+
+
+test("typed signer addresses are trimmed and lower-cased; display names and multiple recipients are rejected",()=>{
+  assert.equal(validateRecipient("  Alice.Example@GMAIL.COM  "),"alice.example@gmail.com");
+  assert.equal(validateRecipient("Alice Example <alice@gmail.com>"),null);
+  assert.equal(validateRecipient("alice@gmail.com, second@gmail.com"),null);
+  const smtp=buildSmtpRecipientEnvelope({from:'"IRPA Digital Signing" <administrator@irpa.or.tz>',to:"  Alice.Example@GMAIL.COM  ",subject:"Please sign: Board Minute - Alice",text:"plain",html:"<p>html</p>"});
+  assert.equal(smtp.recipient,"alice.example@gmail.com");
+  assert.equal(smtp.rcptCommand,"RCPT TO:<alice.example@gmail.com>");
+  assert.match(smtp.mime,/^To: <alice\.example@gmail\.com>$/m);
+  assert.equal((smtp.mime.match(/^To:/gm)||[]).length,1);
+  assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/valid recipient/i);
+});
+
+test("signing audit email exposes only the first three local-part characters and full domain",()=>{
+  const audit=buildSigningInvitationAuditMessage({recipientPrefix:"daniel.mollel",recipientDomain:"gmail.com",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",invitationKind:"resend",at:NOW});
+  assert.equal(audit.to,"info@irpa.or.tz");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Minutes");
+  assert.match(audit.text,/gmail\.com/);
+  assert.match(audit.text,/Type: resend/);
+  assert.match(audit.text,/ACCEPTED/);
+  assert.match(audit.text,/EAT/);
+  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel\.mollel@gmail\.com|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
 });
