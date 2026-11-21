@@ -109,10 +109,7 @@
       "docs/portal-protection/change-record.json",
       "docs/portal-protection/repair-window.json",
       "docs/portal-protection/portal-register.json",
-      "docs/regression/",
-      "drive-gateway/src/invitationEmail.mjs",
-      "drive-gateway/src/mailDelivery.js",
-      "tests/signature-workflow-policy.test.mjs"
+      "docs/regression/"
     ],
     "expectedEffect": "The self-test is isolated by its own error boundary; processes at most 20 documents per page one at a time, renders only first PDF page at reduced scale, releases resources, supports cancellation and enforces 15-second per-document and 60-second total limits. Gateway responses are shape/length validated and sanitised. Startup ignores/clears legacy self-test result data and displays only a short safe code plus module name on startup errors. Delivery UI reports per-signer SMTP acceptance/failure without claiming delivery; sequential next signer receives a distinct invitation per signer position.",
     "repairWindow": {
@@ -131,7 +128,7 @@
       "Do not bypass branch protection or deploy a historical whole-application/Gateway rollback.",
       "Self-test may perform read-only checks or send at most one explicit test email to the typed address; it must not mutate signing state."
     ],
-    "ownerInstruction": "Finish MAIL DELIVERY on existing PR #836 as tracker item 2 before PR A crash safety. Do not open another repair PR. Keep PR A paused until PR #836 is live, then continue PR A, PR B and PR C in the tracker order. Preserve all signing/token/session and SMTP configuration invariants.",
+    "ownerInstruction": "Complete PR A, PR B and PR C without asking the owner to interact with GitHub. Do not bypass branch protection. Never change signing rules, tokens, sessions, signer identity, resend rules, field assignment, stamping, PDF, hash, certificate, archive logic, Firestore rules, secrets, environment variables or SMTP settings. Use CI headless browser/emulator tests; never log in to production.",
     "supersededAmendment": {
       "status": "open",
       "operation": "restore-pre-11-eat-baseline",
@@ -373,6 +370,6 @@
       "Firestore rules/indexes, secrets, environment variables, SMTP settings/credentials, Worker bindings",
       "self-test crash, Meeting Portal, hash check, rebuild, unrelated portals"
     ],
-    "ownerInstruction": "Use only existing PR #836. Copy and WhatsApp actions must reuse the existing per-signer resend path and exact link accepted by SMTP; do not introduce a token store or link format. Keep PR A paused until this item is live."
+    "ownerInstruction": "Use only existing PR #836. Finish MAIL DELIVERY as tracker item 2 before PR A crash safety. Copy and WhatsApp actions reuse the existing single-signer resend path and exact link accepted by SMTP; do not introduce a token store or link format. Keep PR A paused until this item is live."
   }
 }
