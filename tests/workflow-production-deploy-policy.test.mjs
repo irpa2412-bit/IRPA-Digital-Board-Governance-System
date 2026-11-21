@@ -68,7 +68,7 @@ test("production deployment workflows are not triggered by pull requests", () =>
 
 test("production Firebase CLI rules and Worker deployments require explicit owner dispatch approval", () => {
   const source = readWorkflow(".github/workflows/firebase-cli-deploy.yml");
-  assert.match(source, /authorize_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
+  assert.match(source, /confirm_production_firestore_rules_deployment:[\s\S]*?default: "no"/);
   assert.match(source, /authorize_production_worker_deployment:[\s\S]*?default: "no"/);
   const workerStart = source.indexOf("- name: Deploy grant crawler to Cloudflare Workers");
   const rulesStart = source.indexOf("- name: Deploy Firestore Rules and Indexes");
