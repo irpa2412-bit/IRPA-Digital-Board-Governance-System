@@ -612,3 +612,30 @@ test("audit-email failure never blocks or repeats an accepted invitation",async(
   const stored=await f.ctx.meta.get("envelopes",created.envelopeId);
   assert.equal(stored.signers[0].invitation,"Sent");
 });
+
+test("a failed next-position SMTP hand-off is returned and recorded on the envelope with its stage code",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>{
+    sent.push(message);
+    if(message.signerId==="S2"){const error=new Error("mock SMTP connection failed");error.stageCode="SMTP_CONNECT";throw error;}
+    return "250 MOCK ACCEPTED";
+  };
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-HANDOFF-FAIL-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[1,2].map(index=>({identityType:"email-link",email:"handoff@example.com",name:"Signer "+index,order:index})),
+    fields:[1,2].map(index=>({fieldId:"HANDOFF-FAIL-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1);
+  const token=new URL(sent[0].link).searchParams.get("emailSignToken");
+  const opened=await openEmailSigning(f.ctx,token,"198.51.100.72");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"drawn",value:png},fieldApplications:[{fieldId:"HANDOFF-FAIL-1",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Signer 1"}});
+  assert.equal(result.nextInvitations.status,"failed");
+  assert.deepEqual(result.nextInvitations.failures,[{signerId:"S2",stageCode:"SMTP_CONNECT"}]);
+  assert.equal(sent.length,2,"the hand-off was attempted once, without resend or duplicate invitation");
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(status.signers[1].delivery.state,"Failed");
+  assert.equal(status.signers[1].deliveryStageCode,"SMTP_CONNECT");
+  assert.match(status.signers[1].invitation,/Failed \\(SMTP_CONNECT\\)/);
+});
