@@ -146,7 +146,9 @@ test("export sanitizer recursively removes secret-bearing fields", () => {
 
 test("gateway preview and delete routes enforce admin, preview, validation and one atomic commit", () => {
   const source = readFileSync(new URL("../src/meetingServices.mjs", import.meta.url), "utf8");
-  assert.ok(source.includes('/api/meeting-register/delete-preview'));
+  assert.ok(source.includes('"/api/meeting-register/delete-preview"'));
+  assert.match(source, /environment:isAdmin&&meetingEnvironment\(incoming\.environment\)==="TRIAL"\?"TRIAL":"REAL"/);
+  assert.ok(source.includes('["id","updateTime","createdAt","environment"].includes(key)'));
   assert.ok(source.includes('/api/meeting-register/delete'));
   assert.match(source, /Only an authorised administrator may preview meeting deletion/);
   assert.match(source, /Only an authorised administrator may delete a registered meeting/);
