@@ -374,7 +374,7 @@ test("typed signer addresses are trimmed and normalized at the SMTP boundary; di
 
 test("signing audit email masks the local part and retains the recipient domain",()=>{
   const message=buildSigningInvitationAuditMessage({recipientPrefix:"alice",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Policy",envelopeId:"ENV-123",messageId:"<unique@irpa.or.tz>",invitationKind:"resend",smtpReplyCategory:"ACCEPTED",at:new Date("2026-11-21T07:00:00Z")});
-  assert.match(message.subject,/alice\.\.\.@example\.org position 2 - Board Policy/);
+  assert.match(message.subject,/ali\.\.\.@example\.org position 2 - Board Policy/);
   assert.match(message.text,/Invitation: resend/);
   assert.match(message.html,/Invitation:<\/strong> resend/);
   const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
