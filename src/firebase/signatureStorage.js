@@ -418,7 +418,7 @@ async function gatewayAuthenticatedRequest(path, {method="GET",body,contentType=
 
 export async function resendFailedGatewaySignatureInvitations(envelopeId) {
   if (!envelopeId) throw new Error("A Gateway envelope ID is required.");
-  const response = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId) + "/invitations/resend-all", {method:"POST",body:JSON.stringify({})});
+  const response = await gatewayAuthenticatedRequest("/api/envelopes/" + encodeURIComponent(envelopeId) + "/invitations/retry-failed", {method:"POST",body:JSON.stringify({})});
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok === false) throw new Error(result.error || "Unable to retry failed Gateway invitations.");
   return result;
