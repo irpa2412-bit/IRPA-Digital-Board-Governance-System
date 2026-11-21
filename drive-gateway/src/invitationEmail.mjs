@@ -166,7 +166,7 @@ export async function sendInvitationEmail({email,name,link,meetingAccess=null,sm
 
 
 
-export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt,position=1}) {
+export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt,position=1,signerId,envelopeId}) {
   const safeName=validateName(name);
   if(!safeName)throw new Error("Invalid name");
   const safeLink=new URL(link).toString();
@@ -180,7 +180,9 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
   const expiryHtml="<strong>Link expiry:</strong> "+escapeHtml(expiryLabel)+". The link can be redeemed once; after expiry or replacement, ask the document owner for a new link.";
   const firstName=safeName.split(/\s+/)[0]||"Signer";
   const signerPosition=Math.max(1,Math.floor(Number(position)||1));
-  const subject=("IRPA signing request: "+clean(safeTitle,120)+" - "+clean(firstName,40)+" (Position "+signerPosition+")").slice(0,200);
+  const signerReference=clean(signerId||"Signer",12);
+  const envelopeReference=clean(envelopeId||"Document",8);
+  const subject=("IRPA signing request: "+clean(safeTitle,80)+" - "+clean(firstName,30)+" (Position "+signerPosition+" / "+signerReference+" / "+envelopeReference+")").slice(0,200);
   const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\n"+expiryText+"\n\nOpen your single-use secure link:\n"+safeLink+"\n\nOpening the link verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.\n\nThis link does not independently verify your legal identity or institutional authority. Do not forward it. If you did not expect this invitation, contact IRPA Administration.";
   const html="<p>Dear "+escapeHtml(safeName)+",</p><p>"+escapeHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeHtml(safeTitle)+"<br>"+expiryHtml+"</p><p><a href=\""+escapeHtml(safeLink)+"\">Open secure document link</a></p><p>This is a private, single-use link. Opening it verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.</p><p>This link does not independently verify your legal identity or institutional authority. Do not forward it.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
   return {subject,text,html};
@@ -227,7 +229,7 @@ export async function runEmailStage(stage,action,onStage,details={}) {
   }
 }
 
-export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,position=1,from,replyTo=from,expectedOrigin,smtpSend,logger=console,sleep,onStage}) {
+export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,position=1,signerId,envelopeId,from,replyTo=from,expectedOrigin,smtpSend,logger=console,sleep,onStage}) {
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
   const safeLink=new URL(link);
@@ -240,7 +242,7 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
     const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
     const date=new Date().toUTCString();
     const message=await runEmailStage("BUILD_MESSAGE",()=>{
-      const content=buildEmailSigningInvitationMessage({name,link:safeLink.toString(),title,ownerName,expiresAt,position});
+      const content=buildEmailSigningInvitationMessage({name,link:safeLink.toString(),title,ownerName,expiresAt,position,signerId,envelopeId});
       const rawMime=buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from:sender,replyTo:reply,to,subject:content.subject,text:content.text,html:content.html,messageId,date});
       return {...content,rawMime,messageId,date};
     },onStage,{messageId,date});
