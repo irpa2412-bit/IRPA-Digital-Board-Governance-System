@@ -347,7 +347,7 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
 test("production signing mail uses a signer-position subject, IRPA signing sender name and unique Message-ID/date headers",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mime=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
-  assert.match(worker,/Please sign: .*\\(signer .* of .*\\) - /);
+  assert.match(worker,/Please sign: .* \(signer .* of .*\) - /);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
@@ -385,7 +385,7 @@ test("signing audit email exposes only the first three address characters and no
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
-  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel|gmail\\.com|emailSignToken|https?:\\/\\/|[a-f0-9]{64}/i);
+  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel|gmail\.com|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
 });
 
 
@@ -482,7 +482,7 @@ test("invitation audit message includes only a three-character recipient prefix 
 test("signing invitation uses one distinct Message-ID per signer position and the exact ordinal subject",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
-  assert.match(worker,/Please sign: "\+safeTitle\+" \\(signer "\+\(Number\(position\)\|\|1\)\+" of "\+\(Number\(positionCount\)\|\|1\)\+"\\) - "\+firstName/);
+  assert.match(worker,/Please sign: .* \(signer .* of .*\) - /);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
@@ -499,7 +499,7 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mail=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
   assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
-  assert.match(worker,/const subject="Please sign: "\\+safeTitle\\+" \\(signer "\\+\\(Number\\(position\\)\\|\\|1\\)\\+" of "\\+\\(Number\\(positionCount\\)\\|\\|1\\)\\+"\\) - "\\+firstName/);
+  assert.match(worker,/const subject="Please sign: "\+safeTitle\+" \(signer "\+\(Number\(position\)\|\|1\)\+" of "\+\(Number\(positionCount\)\|\|1\)\+"\) - "\+firstName/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: "\+generatedMessageId/);
   assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
