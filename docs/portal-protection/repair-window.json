@@ -217,27 +217,35 @@
     {
       "portal": "Signature Portal",
       "status": "open",
-      "openedAt": "2026-11-21T09:57:28Z",
-      "lastActivityAt": "2026-11-21T09:57:28Z",
-      "durationHours": 24,
-      "closesAt": "2026-11-22T09:57:28Z",
-      "reason": "Owner-authorised 24-hour Signature Portal repair window for PR #836: invitation recipient resolution, parallel creation, signer-specific resend, SMTP delivery recording, delivery panel and regression tests. Self-test crash, Meeting Portal, hash check and rebuild are excluded.",
+      "openedAt": "2026-11-20T17:08:47Z",
+      "lastActivityAt": "2026-11-20T20:00:00Z",
+      "durationHours": 48,
+      "closesAt": "2026-11-22T17:08:47Z",
+      "reason": "Owner-authorised restoration of the Email-link E-signature system to its verified production state before 11:00 EAT on 20 Nov 2026. Preserve Meeting Portal functionality and all existing signing records.",
       "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
-        "drive-gateway/src/index.js",
-        "drive-gateway/src/invitationEmail.mjs",
-        "drive-gateway/src/mailDelivery.js",
+        "drive-gateway/src/emailSigning/",
+        "drive-gateway/src/emailSigningLinks.mjs",
         "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/index.js",
+        "src/pages/EmailSigningReadOnlyPage.jsx",
         "src/pages/SignaturePlatform.jsx",
-        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "drive-gateway/tests/email-signing-contract.test.mjs",
         "drive-gateway/tests/email-signing-links.test.mjs",
-        "tests/signature-workflow-policy.test.mjs"
+        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "tests/email-signing-contract.test.mjs",
+        ".github/workflows/email-signing-contract.yml",
+        "scripts/meeting-portal-fixture-isolation-guard.sh",
+        "scripts/portal-repair-window-guard-policy.mjs",
+        "tests/meeting-isolation-guard.test.mjs"
       ],
       "prohibitions": [
-        "Do not change signing rules, token format/hash custody, sessions, signer identity, resend rules or field assignment.",
-        "Do not change PDF stamping, document hash, certificate, archive logic or completed PDFs.",
-        "Do not change Firestore rules, secrets, environment variables, SMTP settings, credentials or Worker bindings.",
-        "Do not change self-test crash handling, Meeting Portal, hash verification, rebuild or unrelated portals."
+        "secrets",
+        "SMTP",
+        "Firestore rules",
+        "certificate logic",
+        "hash logic",
+        "archive logic"
       ],
       "activityLog": [
         {
@@ -274,19 +282,9 @@
           "at": "2026-11-20T20:00:00Z",
           "action": "rollback-target-updated",
           "description": "Owner requested restoration of Email-link E-signature to its pre-11:00 EAT production state. Verified production Worker baseline is eb04405 (09:49:57 EAT); signature source files in 8bfa67 are byte-identical. Preserve Meeting Portal and all existing signing data."
-        },
-        {
-          "at": "2026-11-21T09:30:33Z",
-          "action": "scope-amended",
-          "description": "Owner authorised a new 48-hour Signature Portal and app-shell repair window. Scope includes self-test crash safety, bounded one-at-a-time PDF diagnostics, startup error handling, per-signer delivery visibility, sequential next-signer hand-off and required CI/browser regressions. Workspace recovery was verified by the owner. Rollback frontend build: eb68a06; retain the previously verified production Worker rollback baseline eb04405 for Worker-only rollback."
-        },
-        {
-          "at": "2026-11-21T09:57:28Z",
-          "action": "scope-amended",
-          "description": "Confirmed the owner-authorised 24-hour Signature Portal-only repair window for PR #836. Scope is limited to typed recipient resolution, parallel invitation dispatch, per-signer resend, SMTP acceptance/failure recording, delivery panel and regression tests."
         }
       ],
-      "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
+      "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.",
       "rollbackCommitStatus": "verified-production-worker-deploy",
       "closureEvidence": {
         "repairPR": 817,
@@ -302,8 +300,7 @@
         "limitation": "Production browser run passed public frontend endpoints, all six viewport widths, all built JavaScript asset HTTP 200 checks, DocumentLifecycleModule SHA-256 against the exact deployed Cloudflare artifact, and no page errors. It detected a signed-out browser and therefore did not exercise the authenticated Documents → Signing workspace."
       },
       "reopenedAt": "2026-11-20T18:10:00Z",
-      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
-      "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
+      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8"
     }
   ]
 }
