@@ -153,7 +153,7 @@ export async function runEmailStage(stage,action,onStage){
     const safe=new Error(response?`IRPA SMTP error ${response[1]}`:`Email delivery failed at ${stage}.`);
     safe.name=String(error?.name||"Error").slice(0,40);
     safe.stageCode=stage;
-    safe.smtpReplyCategory=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:classifySmtpReplyCategory(error,stage);
+    safe.smtpReplyCategory=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","POLICY_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:classifySmtpReplyCategory(error,stage);
     if(response)safe.smtpResponseCode=Number(response[1]);
     const message=String(error?.message||"");
     const enhanced=String(error?.smtpEnhancedStatusCode||((message.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1]||""));
