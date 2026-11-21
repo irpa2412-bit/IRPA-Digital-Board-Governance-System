@@ -464,17 +464,17 @@ test("signing invitation recipient validation rejects display names and comma-se
 
 test("invitation audit message includes only a three-character recipient prefix and required delivery evidence",()=>{
   const audit=buildSigningInvitationAuditMessage({
-    recipientPrefix:"daniel",position:2,positionCount:3,
+    recipientPrefix:"daniel",recipientDomain:"gmail.com",position:2,positionCount:3,
     title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
     smtpReplyCategory:"ACCEPTED",at:NOW
   });
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Policy");
   assert.match(audit.text,/Time \\(EAT\\):/);
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\\.or\\.tz>/);
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
-  assert.doesNotMatch(JSON.stringify(audit),/daniel@example\\.org|example\\.org|emailSignToken|https?:\\/\\/|secret-token/i);
+  assert.match(audit.text,/Recipient domain: gmail\\.com/);\n  assert.doesNotMatch(JSON.stringify(audit),/daniel\\.mollel@gmail\\.com|emailSignToken|https?:\\/\\/|secret-token/i);
 });
 
 
@@ -509,11 +509,11 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
 
 test("failed invitation audit includes both the failure stage code and SMTP reply category",()=>{
   const audit=buildSigningInvitationAuditMessage({
-    recipientPrefix:"abc",position:2,positionCount:3,title:"Board Policy",
+    recipientPrefix:"abc",recipientDomain:"example.com",position:2,positionCount:3,title:"Board Policy",
     envelopeId:"ENV-FAIL-AUDIT",messageId:"<failed@irpa.or.tz>",
     smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",at:NOW
   });
-  assert.equal(audit.subject,"AUDIT: invitation to abc... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
   assert.doesNotMatch(audit.text,/abc@example\\.com|emailSignToken|https?:\\/\\//);
@@ -523,9 +523,9 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
 test("three shared-mailbox signer positions produce three distinct exact subjects",()=>{
   const subjects=[1,2,3].map(position=>buildSignerInvitationSubject({title:"Shared Mailbox Agreement",position,positionCount:3,name:"Daniel Mollel"}));
   assert.deepEqual(subjects,[
-    "Please sign: Shared Mailbox Agreement (signer 1 of 3) - Daniel",
-    "Please sign: Shared Mailbox Agreement (signer 2 of 3) - Daniel",
-    "Please sign: Shared Mailbox Agreement (signer 3 of 3) - Daniel"
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 1 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 2 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 3 of 3)"
   ]);
   assert.equal(new Set(subjects).size,3);
 });
