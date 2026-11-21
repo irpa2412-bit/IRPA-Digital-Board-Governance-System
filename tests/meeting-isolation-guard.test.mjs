@@ -520,3 +520,20 @@ test("isolation guard blocks reopening if another portal's Change Record history
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
 });
+
+
+test("Signature email-delivery diagnostics repair has a narrow Change Record policy and does not require rebuild branches", () => {
+  assert.match(policy, /amendment\.operation === "email-delivery-diagnostics-repair"/);
+  for (const path of [
+    "drive-gateway/src/invitationEmail.mjs",
+    "drive-gateway/src/signing.mjs",
+    "drive-gateway/src/index.js",
+    "drive-gateway/src/router.mjs",
+    "drive-gateway/src/smtpDiagnostics.mjs",
+    "src/pages/SignaturePlatform.jsx",
+    "drive-gateway/tests/email-delivery-diagnostics.test.mjs",
+    ".github/workflows/email-deliverability-dns-check.yml",
+    "docs/email-deliverability/HOSTING_REQUEST.md"
+  ]) assert.ok(policy.includes(path), "missing scoped delivery repair path: " + path);
+  assert.doesNotMatch(policy.slice(policy.indexOf('const deliveryDiagnosticsRepair'), policy.indexOf('] : rollbackMode')), /emailSigning\//);
+});
