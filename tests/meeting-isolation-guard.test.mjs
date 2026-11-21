@@ -524,8 +524,8 @@ test("isolation guard blocks reopening if another portal's Change Record history
 
 test("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
-  assert.match(workflow, /concurrency:\\s*\\n\\s*group: meeting-portal-browser-\\$\\{\\{ github\\.event\\.pull_request\\.number \\|\\| github\\.ref \\}\\}/);
-  assert.match(workflow, /cancel-in-progress: true/);
+  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
+  assert.ok(workflow.includes("cancel-in-progress: true"));
   for (const path of [
     "docs/implementation-status.md",
     "docs/portal-protection/records/meeting-portal.json",
@@ -539,7 +539,7 @@ test("meeting fixture guard is concurrency-scoped and watches all deletion-prote
 
 test("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
-  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.ok(workflow.includes("ref: ${{ github.event.pull_request.base.sha }}"));
   assert.ok(workflow.includes("npm run test:protected-portals"));
   assert.ok(workflow.includes("npm run test:all"));
   assert.ok(workflow.includes("npm test --prefix drive-gateway"));
