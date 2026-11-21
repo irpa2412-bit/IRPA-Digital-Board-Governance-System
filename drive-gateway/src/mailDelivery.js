@@ -119,18 +119,3 @@ export function buildMailMimeMessage({from, to, subject, text, html, attachments
     ""
   ].join("\r\n");
 }
-
-
-export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
-  const typedRecipient = String(to || "").trim().toLowerCase();
-  if (!/^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]+$/.test(typedRecipient)) {
-    throw new Error("A single signer recipient email address is required.");
-  }
-  const recipient = normalizeRecipientEmail(typedRecipient);
-  const mime = buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
-  return {
-    recipient,
-    rcptCommand: "RCPT TO:<" + recipient + ">",
-    mime
-  };
-}
