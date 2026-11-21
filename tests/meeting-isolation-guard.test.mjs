@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -193,7 +194,7 @@ test("workflow delegates its source-isolation gate to the extracted guard script
 
 test("only stale runs for the same pull request are cancelled", () => {
   assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
-  assert.ok(workflow.includes("cancel-in-progress: true"));
+  assert.ok(workflow.includes("cancel-in-progress: false"));
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
 
@@ -520,4 +521,29 @@ test("isolation guard blocks reopening if another portal's Change Record history
   const fixture=reopenFixture();
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
+});
+
+test("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
+  const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
+  assert.ok(workflow.includes("cancel-in-progress: false"));
+  for (const path of [
+    "docs/implementation-status.md",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "scripts/portal-protection-check.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs"
+  ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
+});
+
+test("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
+  const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes("ref: ${{ github.event.pull_request.base.sha }}"));
+  assert.ok(workflow.includes("npm run test:protected-portals"));
+  assert.ok(workflow.includes("npm run test:all"));
+  assert.ok(workflow.includes("npm test --prefix drive-gateway"));
+  assert.ok(workflow.includes("baseline-protection-smoke:"));
+  assert.ok(workflow.includes("baseline-full-regression:") && workflow.includes("BASELINE_SOURCE_SHA="));
 });
