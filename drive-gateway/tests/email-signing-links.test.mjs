@@ -14,7 +14,7 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,buildSignerInvitationSubject,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
@@ -346,7 +346,7 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
 test("production signing mail uses a signer-position subject, IRPA signing sender name and unique Message-ID/date headers",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mime=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
-  assert.match(worker,/Please sign: .* \(signer .* of .*\) - /);
+  assert.match(worker,/buildSignerInvitationSubject/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
@@ -481,7 +481,7 @@ test("invitation audit message includes only a three-character recipient prefix 
 test("signing invitation uses one distinct Message-ID per signer position and the exact ordinal subject",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
-  assert.match(worker,/Please sign: .* \(signer .* of .*\) - /);
+  assert.match(worker,/buildSignerInvitationSubject/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
@@ -498,7 +498,7 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mail=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
   assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
-  assert.match(worker,/const subject="Please sign: "\+safeTitle\+" \(signer "\+\(Number\(position\)\|\|1\)\+" of "\+\(Number\(positionCount\)\|\|1\)\+"\) - "\+firstName/);
+  assert.match(worker,/buildSignerInvitationSubject\\(\\{title:safeTitle,position,positionCount,name:safeName\\}\\)/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: "\+generatedMessageId/);
   assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
@@ -517,4 +517,15 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
   assert.doesNotMatch(audit.text,/abc@example\\.com|emailSignToken|https?:\\/\\//);
+});
+
+
+test("three shared-mailbox signer positions produce three distinct exact subjects",()=>{
+  const subjects=[1,2,3].map(position=>buildSignerInvitationSubject({title:"Shared Mailbox Agreement",position,positionCount:3,name:"Daniel Mollel"}));
+  assert.deepEqual(subjects,[
+    "Please sign: Shared Mailbox Agreement (signer 1 of 3) - Daniel",
+    "Please sign: Shared Mailbox Agreement (signer 2 of 3) - Daniel",
+    "Please sign: Shared Mailbox Agreement (signer 3 of 3) - Daniel"
+  ]);
+  assert.equal(new Set(subjects).size,3);
 });
