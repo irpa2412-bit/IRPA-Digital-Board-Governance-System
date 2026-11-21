@@ -427,3 +427,20 @@ test("Prepare Envelope submission is a separate sticky control outside the PDF n
   assert.match(page.slice(controls, designer), /Independent of PDF navigation/);
   assert.doesNotMatch(page.slice(designer, page.indexOf("</form>", designer)), /type="submit"/);
 });
+
+
+test("per-signer copy and WhatsApp actions reuse the existing accepted invitation link",()=>{
+  const page=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
+  const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
+  const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
+  assert.match(page,/Copy signing link/);
+  assert.match(page,/Share on WhatsApp/);
+  assert.match(page,/shareEmailSigningLink\(item\.id,"copy"\)/);
+  assert.match(page,/shareEmailSigningLink\(item\.id,"whatsapp"\)/);
+  assert.match(page,/navigator\.clipboard\?\.writeText\(signingLink\)/);
+  assert.match(page,/wa\.me\/\?text=/);
+  assert.match(worker,/return\{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt,signingLink:link\}/);
+  assert.match(storage,/return data;/);
+  assert.match(page,/email\.slice\(0,3\)\+"\\.\\.\\.@"/);
+  assert.match(page,/The same signer-specific link sent by email/);
+});
