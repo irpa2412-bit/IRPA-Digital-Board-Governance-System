@@ -5,7 +5,7 @@ export const SELF_TEST_TEXT_LIMIT = 500;
 
 export function safeGatewayText(value, fallback = "Gateway request failed.") {
   return typeof value === "string"
-    ? value.replace(/[\\u0000-\\u001f\\u007f]/g, " ").slice(0, SELF_TEST_TEXT_LIMIT)
+    ? value.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, SELF_TEST_TEXT_LIMIT)
     : fallback;
 }
 
