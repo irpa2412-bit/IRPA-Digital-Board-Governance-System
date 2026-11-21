@@ -1,7 +1,7 @@
 // drive-gateway/src/invitationEmail.mjs
 // Isolated member invitation sender. Caller authorization remains in the Worker route.
 
-import { buildMailMimeMessage, normalizeRecipientEmail } from "./mailDelivery.js";
+import { buildMailMimeMessage, escapeHtml, normalizeRecipientEmail } from "./mailDelivery.js";
 
 const EMAIL_RE = /^[^\s@<>"',;:\\]+@[^\s@<>"',;:\\]+\.[^\s@<>"',;:\\]+$/;
 const CRLF_RE = /[\r\n\u2028\u2029]/;
