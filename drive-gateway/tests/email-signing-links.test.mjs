@@ -524,9 +524,9 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
 test("three shared-mailbox signer positions produce three distinct exact subjects",()=>{
   const subjects=[1,2,3].map(position=>buildSignerInvitationSubject({title:"Shared Mailbox Agreement",position,positionCount:3,name:"Daniel Mollel"}));
   assert.deepEqual(subjects,[
-    "Please sign: Shared Mailbox Agreement (signer 1 of 3) - Daniel",
-    "Please sign: Shared Mailbox Agreement (signer 2 of 3) - Daniel",
-    "Please sign: Shared Mailbox Agreement (signer 3 of 3) - Daniel"
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 1 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 2 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 3 of 3)"
   ]);
   assert.equal(new Set(subjects).size,3);
 });
