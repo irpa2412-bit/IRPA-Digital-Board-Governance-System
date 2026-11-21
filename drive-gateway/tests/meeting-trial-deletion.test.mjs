@@ -61,6 +61,7 @@ test("preview digest is stable and export strips credentials and bearer tokens",
   const reordered = await buildMeetingDeletionPreview("trial-1", meeting, [...childRecords].reverse());
   assert.equal(preview.previewDigest, reordered.previewDigest);
   assert.equal(preview.childCount, 2);
+  assert.match(preview.externalArtifactsNotice, /external Google Drive source files and media binaries are not deleted/i);
   assert.deepEqual(preview.collectionCounts, { participants: 1, votes: 1 });
   assert.equal(preview.exportData.children[0].record.accessTokenHash, undefined);
   assert.equal(preview.exportData.children[0].record.signatureImage, undefined);
