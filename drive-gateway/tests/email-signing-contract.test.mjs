@@ -259,7 +259,8 @@ test("owner/admin SMTP self-check remains protected by the existing Worker route
   const diagnostics = fs.readFileSync(new URL("../src/smtpDiagnostics.mjs", import.meta.url), "utf8");
   assert.ok(router.includes("/api/sign/smtp-selfcheck"));
   assert.ok(router.includes("user.isAdmin!==true&&user.isOwner!==true"));
-  assert.ok(diagnostics.includes('profile?.fields?.role?.stringValue==="Administrator"'));
+  assert.ok(diagnostics.includes('role==="administrator"'));
+  assert.ok(diagnostics.includes('owner=fields.isOwner?.booleanValue===true'));
 });
 
 
