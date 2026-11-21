@@ -12,7 +12,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, buildSmtpRecipientEnvelope, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, buildSigningInvitationAuditMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, buildSigningInvitationAuditMessage, buildSignerInvitationSubject, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 
@@ -591,8 +591,7 @@ export default {
               const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
               const safeTitle=String(title||"Controlled document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA signer").replace(/[\r\n]+/g," ").slice(0,160);
-              const firstName=safeName.split(/\s+/)[0]||"Signer";
-              const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName;
+              const subject=buildSignerInvitationSubject({title:safeTitle,position,positionCount,name:safeName});
               let lastStage="BUILD_MESSAGE",lastCategory="UNKNOWN",result=null,failure=null;
               const captureStage=async(stage,outcome,category,metadata={})=>{
                 lastStage=String(stage||lastStage);
