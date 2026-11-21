@@ -6,12 +6,12 @@ const hosts = [
 function assetReferences(source, baseUrl, kind) {
   const refs = [];
   if (kind === "html") {
-    for (const match of source.matchAll(/<(?:script|link)\\b[^>]*?(?:src|href)=["']([^"']+\\.(?:m?js|css)(?:\\?[^"']*)?)["'][^>]*>/gi)) refs.push(new URL(match[1], baseUrl).href);
+    for (const match of source.matchAll(/<(?:script|link)\b[^>]*?(?:src|href)=["']([^"']+\.(?:m?js|css)(?:\?[^"']*)?)["'][^>]*>/gi)) refs.push(new URL(match[1], baseUrl).href);
   } else if (kind === "js") {
-    const pattern = /(?:\\bfrom\\s*|\\bimport\\s*\\(\\s*)["']([^"']+\\.(?:m?js|css)(?:\\?[^"']*)?)["']/g;
+    const pattern = /(?:\bfrom\s*|\bimport\s*\(\s*)["']([^"']+\.(?:m?js|css)(?:\?[^"']*)?)["']/g;
     for (const match of source.matchAll(pattern)) if (!match[1].startsWith("data:")) refs.push(new URL(match[1], baseUrl).href);
   } else if (kind === "css") {
-    for (const match of source.matchAll(/@import\\s+(?:url\\()?["']?([^"')]+\\.css(?:\\?[^"')]+)?)["']?\\)?/gi)) refs.push(new URL(match[1], baseUrl).href);
+    for (const match of source.matchAll(/@import\s+(?:url\()?["']?([^"')]+\.css(?:\?[^"')]+)?)["']?\)?/gi)) refs.push(new URL(match[1], baseUrl).href);
   }
   return refs;
 }
