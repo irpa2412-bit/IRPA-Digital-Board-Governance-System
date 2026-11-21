@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "open",
-  "openedAt": "2026-11-21T20:23:03Z",
-  "lastActivityAt": "2026-11-21T20:23:03Z",
-  "reason": "Owner-approved Tier 1 REAL/TRIAL meeting deletion protection, approved 21 November 2026. REAL and unclassified meetings must never be deleted; only an explicitly TRIAL meeting created as TRIAL may be deleted by an administrator under existing safeguards. Approval is conditional on all required checks green and investigation/fix of the protected portal repair policy failure. No Firestore rules, signing, sign-in, invitation, SMTP, secrets or production deployment changes.",
+  "openedAt": "2026-11-20T11:08:48Z",
+  "lastActivityAt": "2026-11-21T07:49:00Z",
+  "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
     "docs/portal-protection/repair-window.json",
@@ -45,10 +45,7 @@
     "tests/signature-self-test-session-safety.test.mjs",
     "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
     ".github/workflows/email-signing-contract.yml",
-    "tests/signature-pathway-contract.test.mjs",
-    "drive-gateway/src/meetingEnvironment.mjs",
-    "drive-gateway/tests/meeting-environment.test.mjs",
-    "docs/implementation-status.md"
+    "tests/signature-pathway-contract.test.mjs"
   ],
   "inactivityCloseHours": 24,
   "emergency": false,
@@ -212,11 +209,6 @@
       "at": "2026-11-21T07:49:00Z",
       "action": "repair",
       "description": "Updated the Signature Pathway diagnostic source-contract test to assert the self-test-specific redirect-safe Gateway helper; all unrelated diagnostic batch and Worker route assertions remain unchanged."
-    },
-    {
-      "at": "2026-11-21T20:23:03Z",
-      "action": "reopened",
-      "description": "Owner approval: \"APPROVE 845 REAL meetings must never be deleted by anyone; only a meeting explicitly created as TRIAL may be deleted, by an administrator, with safeguards. This is my decision of 21 November 2026.\" Fresh declaration for PR #845. Conditional: every required final-head check must be green; investigate and fix the failed Enforce protected portal repair policy step without bypass or hand-recorded PASS."
     }
   ],
   "durationHours": 48,
