@@ -222,7 +222,7 @@
       "durationHours": 48,
       "closesAt": "2026-11-23T09:30:33Z",
       "reason": "Owner-authorised 48-hour repair of the Signature Portal self-test crash, startup error handling, per-signer delivery visibility and sequential next-signer invitation hand-off. The owner has verified the workspace opens again; this window addresses the self-test resource-overload and unvalidated-response failure. Preserve all signing data and the independent Meeting Portal.",
-      "rollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458",
+      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
         "src/components/SignaturePathwaySelfTest.jsx",
         "src/components/SignaturePathwaySelfTestErrorBoundary.jsx",
@@ -298,7 +298,7 @@
           "description": "Owner authorised a new 48-hour Signature Portal and app-shell repair window. Scope includes self-test crash safety, bounded one-at-a-time PDF diagnostics, startup error handling, per-signer delivery visibility, sequential next-signer hand-off and required CI/browser regressions. Workspace recovery was verified by the owner. Rollback frontend build: eb68a06; retain the previously verified production Worker rollback baseline eb04405 for Worker-only rollback."
         }
       ],
-      "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.",
+      "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
       "rollbackCommitStatus": "verified-production-worker-deploy",
       "closureEvidence": {
         "repairPR": 817,
@@ -314,7 +314,8 @@
         "limitation": "Production browser run passed public frontend endpoints, all six viewport widths, all built JavaScript asset HTTP 200 checks, DocumentLifecycleModule SHA-256 against the exact deployed Cloudflare artifact, and no page errors. It detected a signed-out browser and therefore did not exercise the authenticated Documents → Signing workspace."
       },
       "reopenedAt": "2026-11-20T18:10:00Z",
-      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8"
+      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+      "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
     }
   ]
 }
