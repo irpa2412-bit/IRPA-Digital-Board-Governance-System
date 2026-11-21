@@ -380,7 +380,8 @@ test("signing audit email masks the local part and retains the recipient domain"
   const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
   assert.equal(audit.to,"info@irpa.or.tz");
   assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
-  assert.match(audit.text,/Position: 2 of 3/);\n  assert.match(audit.text,/Recipient domain: example\\.org/);\n  assert.match(audit.text,/Type: creation/);
+  assert.match(audit.text,/Position: 2 of 3/);
+  assert.match(audit.text,/Recipient domain: example\.org/);
   assert.match(audit.text,/Type: creation/);
   assert.match(audit.text,/Recipient domain: example.org/);
   assert.match(audit.text,/ACCEPTED/);
