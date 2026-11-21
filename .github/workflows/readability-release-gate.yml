@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: irpa-readability-gate-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: irpa-readability-gate-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   readability-and-contrast:
