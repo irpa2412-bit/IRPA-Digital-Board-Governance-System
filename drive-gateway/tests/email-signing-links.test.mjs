@@ -539,7 +539,8 @@ test("signer delivery panel renders all mail outcomes, category/time, stage code
   assert.match(ui,/delivery\.failureStageCode\|\|item\.deliveryStageCode/);
   assert.match(ui,/Delivery: \{signerDeliveryLabel\(item\)\}/);
   assert.match(ui,/maskRegisterEmail\(item\.email\)/);
-  const deliveryLabel=ui.match(/function signerDeliveryLabel[\\s\\S]*?\\n\\}/)?.[0]||"";\n  assert.doesNotMatch(deliveryLabel,/Delivered/);
+  const deliveryLabel=ui.match(/function signerDeliveryLabel[\s\S]*?\n\}/)?.[0]||"";
+  assert.doesNotMatch(deliveryLabel,/Delivered/);
 });
 
 test("unsigned signer copy and WhatsApp actions reuse the exact link returned by the existing resend flow",()=>{
