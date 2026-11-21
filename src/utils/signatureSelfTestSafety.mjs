@@ -9,6 +9,15 @@ export function safeGatewayText(value, fallback = "Gateway request failed.") {
     : fallback;
 }
 
+export function sanitiseSelfTestGatewayValue(value, depth = 0) {
+  if (typeof value === "string") return safeGatewayText(value, "");
+  if (value === null || typeof value === "number" || typeof value === "boolean") return value;
+  if (depth >= 5) return "[truncated]";
+  if (Array.isArray(value)) return value.slice(0, 100).map(item => sanitiseSelfTestGatewayValue(item, depth + 1));
+  if (typeof value === "object") return Object.fromEntries(Object.entries(value).slice(0, 100).map(([key, item]) => [safeGatewayText(key, "field"), sanitiseSelfTestGatewayValue(item, depth + 1)]));
+  return "";
+}
+
 export function validateSelfTestGatewayResponse(data, { kind = "generic", httpStatus = 200 } = {}) {
   if (httpStatus === 403) throw Object.assign(new Error("Gateway denied this diagnostic request (HTTP 403)."), { httpStatus });
   if (httpStatus < 200 || httpStatus >= 300) throw Object.assign(new Error("Gateway request failed (HTTP " + httpStatus + ")."), { httpStatus });
@@ -23,7 +32,7 @@ export function validateSelfTestGatewayResponse(data, { kind = "generic", httpSt
   if (kind === "download" && (typeof data.base64 !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(data.base64))) {
     throw new Error("Gateway returned invalid controlled-document content.");
   }
-  return data;
+  return kind === "download" ? data : sanitiseSelfTestGatewayValue(data);
 }
 
 export function takeSelfTestBatch(documents, offset = 0, limit = SELF_TEST_RUN_LIMIT) {
