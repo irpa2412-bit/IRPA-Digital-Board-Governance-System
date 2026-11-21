@@ -1,14 +1,6 @@
 name: Firebase Functions Entrypoint Integrity Test
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: irpa-functions-integrity-pr-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+on: [push, pull_request]
 
 jobs:
   integrity:
