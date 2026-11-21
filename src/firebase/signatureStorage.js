@@ -22,12 +22,11 @@ async function authHeaders() {
   };
 }
 
-async function gatewayPost(path, payload, requestOptions = {}) {
+async function gatewayPost(path, payload) {
   const response = await fetch(`${requireGateway()}${path}`, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify(payload),
-    ...(requestOptions.redirect ? { redirect: requestOptions.redirect } : {})
+    body: JSON.stringify(payload)
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) {
@@ -36,10 +35,10 @@ async function gatewayPost(path, payload, requestOptions = {}) {
   return data;
 }
 
-export async function reconcileSignatureDocumentIds(documents = [], options = {}, requestOptions = {}) {
+export async function reconcileSignatureDocumentIds(documents = [], options = {}) {
   if (!Array.isArray(documents)) throw new Error("Reconciliation documents must be an array.");
   const payload = { ...options, documents: documents.map(item => ({ documentId: String(item.documentId || item.id || ""), fileId: String(item.fileId || item.driveFileId || item.archiveFileId || item.governanceArchiveFileId || item.sourceFileId || "") })) };
-  return gatewayPost("/api/signature-pathway/reconcile", payload, requestOptions);
+  return gatewayPost("/api/signature-pathway/reconcile", payload);
 }
 
 export const storage = { provider: "Google Drive" };
@@ -213,10 +212,10 @@ export async function downloadDriveBytes(fileId, documentId = null) {
   return bytes;
 }
 
-export async function downloadControlledDocumentBytes(fileId, documentId, requestOptions = {}) {
+export async function downloadControlledDocumentBytes(fileId, documentId) {
   if (!fileId || !documentId) throw new Error("STEP controlled document download failed: canonical Firestore document ID and Google Drive file ID are both required.");
   let result;
-  try { result = await gatewayPost("/api/download", { fileId, documentId }, requestOptions); }
+  try { result = await gatewayPost("/api/download", { fileId, documentId }); }
   catch (error) { throw new Error(`STEP gateway controlled download failed (Firestore documentId=${documentId}; Drive fileId=${fileId}): ${error?.message || "Unknown gateway error"}`); }
   const base64 = result.base64;
   if (!base64) throw new Error("Google Drive returned no controlled document content.");
