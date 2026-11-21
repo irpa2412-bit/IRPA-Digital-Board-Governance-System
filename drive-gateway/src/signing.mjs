@@ -47,8 +47,9 @@ export async function resolveOptionalEmailLinkProfileUid(resolveProfileUid,email
   finally{if(timer)clearTimeout(timer)}
 }
 function signerPositionDetails(signers, target) {
-  const positions=[...new Set((signers||[]).map(item=>Number(item.order)||1))].sort((a,b)=>a-b);
-  return {position:positions.indexOf(Number(target?.order)||1)+1,positionCount:positions.length};
+  const list=Array.isArray(signers)?signers:[];
+  const index=list.findIndex(item=>item?.id===target?.id);
+  return {position:index>=0?index+1:1,positionCount:list.length||1};
 }
 export async function createEnvelope(ctx,user,body){
   if(!ctx.sendInvitation&&!ctx.allowReturnTokens)throw new HttpError(500,"Invitation transport is not configured.");
