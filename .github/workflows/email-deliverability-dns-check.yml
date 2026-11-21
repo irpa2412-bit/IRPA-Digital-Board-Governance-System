@@ -142,11 +142,22 @@ jobs:
           fs.writeFileSync(process.env.RUNNER_TEMP + "/irpa-email-dns-report.md", md);
           fs.writeFileSync(process.env.RUNNER_TEMP + "/irpa-email-dns-report.json", JSON.stringify(rows,null,2));
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
+          console.log(md);
           const required = rows.filter(row => row.record.startsWith("MX ") || row.record.startsWith("SPF TXT ") || row.record.startsWith("DKIM TXT ") || row.record.startsWith("DMARC TXT ") || row.record.startsWith("SPF coverage") || row.record.startsWith("PTR ") || row.record.startsWith("DNSBL "));
           const failures = required.filter(row => Boolean(row.problem));
           console.log(JSON.stringify({records:rows.length,requiredChecks:required.length,failedChecks:failures.length,mailHostIPv4:mailA.length,dkimSelectors:dkim.map(item=>({selector:item.selector,found:item.matches.length>0}))},null,2));
           NODE
-      - name: Preserve DNS report artifact
+      - name: Prepare DNS report artifact
         run: |
           test -s "$RUNNER_TEMP/irpa-email-dns-report.md"
           test -s "$RUNNER_TEMP/irpa-email-dns-report.json"
+          cp "$RUNNER_TEMP/irpa-email-dns-report.md" "$GITHUB_WORKSPACE/irpa-email-dns-report.md"
+          cp "$RUNNER_TEMP/irpa-email-dns-report.json" "$GITHUB_WORKSPACE/irpa-email-dns-report.json"
+      - name: Upload DNS report
+        uses: actions/upload-artifact@v4
+        with:
+          name: irpa-email-deliverability-dns-report
+          path: |
+            irpa-email-dns-report.md
+            irpa-email-dns-report.json
+          if-no-files-found: error
