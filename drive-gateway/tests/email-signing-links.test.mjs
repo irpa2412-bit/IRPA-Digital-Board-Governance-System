@@ -18,7 +18,7 @@ import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRe
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
-import {buildSmtpRecipientEnvelope,buildSignerInvitationSubject,buildSigningInvitationAuditMessage} from "../src/index.js";
+import {buildSmtpRecipientEnvelope,buildSignerInvitationSubject,buildSigningInvitationAuditMessage} from "../src/smtpRecipientEnvelope.mjs";
 import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
@@ -374,7 +374,7 @@ test("typed signer addresses are trimmed and lower-cased; display names and mult
   assert.equal(smtp.rcptCommand,"RCPT TO:<alice.example@gmail.com>");
   assert.match(smtp.mime,/^To: <alice\.example@gmail\.com>$/m);
   assert.equal((smtp.mime.match(/^To:/gm)||[]).length,1);
-  assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/valid recipient/i);
+  assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/single signer recipient/i);
 });
 
 test("signing audit email masks the first three local-part characters while retaining the recipient domain",()=>{
