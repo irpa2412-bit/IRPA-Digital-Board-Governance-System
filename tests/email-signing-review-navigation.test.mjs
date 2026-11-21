@@ -11,6 +11,7 @@ test("email-link signer can enter full-document review before every assigned fie
   assert.match(page, /opacity:\(!canReview\|\|!pdfDocument\|\|Boolean\(pageError\)\)\?0\.5:1/);
   assert.doesNotMatch(page, /opacity:\(!canReview\|\|!pdfDocument\|\|Boolean\(pageError\)\|\|incomplete\.length>0/);
   assert.doesNotMatch(page, /if\(incomplete\.length\)\{setError\("Complete every responsibility and its assigned fields before final review/);
+  assert.match(page, /const incomplete=fields\.filter\(field=>field\.required&&!complete\(field\)\)/);
   assert.match(page, /Previous page/);
   assert.match(page, /Next page/);
 });
