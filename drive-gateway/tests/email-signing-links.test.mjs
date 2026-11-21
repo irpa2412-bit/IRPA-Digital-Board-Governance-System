@@ -340,3 +340,16 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
   assert.equal(record.signers[1].tokenHash,await sha256Hex(new URL(sent[0].link).searchParams.get("emailSignToken").split(".")[2]));
   assert.equal(result.signerId,"S2");
 });
+
+test("production signing mail uses a signer-position subject, IRPA signing sender name and unique Message-ID/date headers",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  const mime=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
+  assert.match(worker,/Please sign: .*signer .*positionCount/);
+  assert.match(worker,/fromName:"IRPA Digital Signing"/);
+  assert.match(worker,/Message-ID: /);
+  assert.match(worker,/Date: /);
+  assert.match(worker,/@irpa\\.or\\.tz/);
+  assert.match(mime,/Content-Type: text\\/plain; charset=UTF-8/);
+  assert.match(mime,/Content-Type: text\\/html; charset=UTF-8/);
+  assert.match(mime,/Content-Type: multipart\\/alternative/);
+});
