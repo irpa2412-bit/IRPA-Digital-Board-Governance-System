@@ -447,6 +447,7 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
   assert.equal(sent.at(-1).to,expected[1],"single-signer resend must use that signer's own stored address");
   assert.equal(sent.at(-1).rcptCommand,"RCPT TO:<"+expected[1]+">");
   assert.equal(sent.at(-1).toHeader,expected[1]);
+  console.log("MOCK SMTP resend recipient",JSON.stringify({position:2,typed:typed[1],rcptTo:sent.at(-1).rcptCommand,toHeader:sent.at(-1).toHeader}));
   const resentAll=await resendAllUnsignedInvitations(ctx,owner,created.envelopeId);
   assert.equal(resentAll.attempted,3);
   assert.equal(resentAll.failed,0);
@@ -454,6 +455,7 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
   assert.deepEqual(sent.slice(-3).map(item=>item.to),expected,"resend-all must address each unsigned signer position independently");
   assert.deepEqual(sent.slice(-3).map(item=>item.rcptCommand),expected.map(email=>"RCPT TO:<"+email+">"));
   assert.deepEqual(sent.slice(-3).map(item=>item.toHeader),expected);
+  for(let index=0;index<3;index++)console.log("MOCK SMTP resend-all recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[sent.length-3+index].rcptCommand,toHeader:sent[sent.length-3+index].toHeader}));
 });
 
 test("signing invitation recipient validation rejects display names and comma-separated recipient lists",()=>{
