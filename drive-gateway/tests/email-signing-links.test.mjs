@@ -115,6 +115,7 @@ test("registered login-based signing access remains UID-bound", () => {
 });
 
 test("email invitation has real plain-text newlines and one HTML/plain-text SMTP send",async()=>{
+  const message=buildEmailSigningInvitationMessage({name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});
   assert.match(message.text,/\nDocument: Board Policy/);
   assert.doesNotMatch(message.text,/\\n/);
   assert.match(message.html,/href=/);
