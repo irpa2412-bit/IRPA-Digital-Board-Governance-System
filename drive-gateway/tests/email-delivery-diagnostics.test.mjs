@@ -34,6 +34,8 @@ test("delivery status exposes SMTP acceptance separately from inbox delivery and
   assert.match(signing,/email_link\.handoff\./);
   assert.match(signing,/recordEmailLinkHandoff\(ctx,id,previousSignerId,signer,"sent"\)/);
   assert.match(signing,/recordEmailLinkHandoff\(ctx,id,previousSignerId,signer,"failed"/);
+  assert.match(signing,/signingMode==="Sequential"&&signers\[i\]\.order!==firstPosition/);
+  assert.match(signing,/envelope\.signingMode!=="Sequential"/);
 });
 
 test("envelope panel labels SMTP acceptance accurately and shows reply, stage, time and Message-ID",()=>{
