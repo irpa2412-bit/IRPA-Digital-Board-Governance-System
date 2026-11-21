@@ -412,7 +412,7 @@ test("v2 reusable invitation is read-only on preview, creates fresh sessions, an
 });
 
 
-test("end-to-end unregistered signer, owner and three same-address positions hand off with isolated mail and unchanged PDF stamping",async()=>{
+test("parallel end-to-end unregistered signer, owner and three same-address positions receive distinct invitations with unchanged PDF stamping",async()=>{
   const sent=[];
   let now=NOW;
   let sendNumber=0;
@@ -455,7 +455,7 @@ test("end-to-end unregistered signer, owner and three same-address positions han
     title:"Shared Gmail Three Position Test",classification:"Restricted"
   });
   const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
-    documentId,externalReference:"IRPA-SHARED-THREE-POSITIONS",archives:["board-governance"],signingMode:"Sequential",
+    documentId,externalReference:"IRPA-SHARED-THREE-POSITIONS",archives:["board-governance"],signingMode:"Parallel",
     signers:[
       {identityType:"email-link",email:"shared@gmail.com",name:"External Unregistered Signer",order:1,role:"External Reviewer"},
       {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:2,role:"Document Owner"},
@@ -464,7 +464,7 @@ test("end-to-end unregistered signer, owner and three same-address positions han
     ]
   });
   assert.equal(created.status,"Sent");
-  assert.equal(sent.length,1,"only the first sequential position receives the initial invitation");
+  assert.equal(sent.length,4,"parallel mode sends an initial invitation to every assigned signer");
   const tokenFor=message=>new URL(message.link).searchParams.get("emailSignToken");
   const signAtPosition=async(index,ip)=>{
     const token=tokenFor(sent[index]);
@@ -484,16 +484,16 @@ test("end-to-end unregistered signer, owner and three same-address positions han
 
   const first=await signAtPosition(0,"198.51.100.61");
   assert.equal(first.result.status,"InProgress");
-  assert.equal(sent.length,2,"the first unregistered signer automatically releases the owner's position");
+  assert.equal(sent.length,4,"parallel mode does not wait for the first signer before inviting the owner");
   assert.equal(sent[1].to,"owner@example.org");
 
   const owner=await signAtPosition(1,"198.51.100.62");
   assert.equal(owner.result.status,"InProgress");
-  assert.equal(sent.length,3,"the owner's signature automatically releases the second shared-address position");
+  assert.equal(sent.length,4,"parallel invitations are already issued before the owner signs");
 
   const secondShared=await signAtPosition(2,"198.51.100.63");
   assert.equal(secondShared.result.status,"InProgress");
-  assert.equal(sent.length,4,"the second shared-address signer automatically releases the third shared-address position");
+  assert.equal(sent.length,4,"parallel signers are not re-invited or converted to sequential order after another signer signs");
 
   const thirdShared=await signAtPosition(3,"198.51.100.64");
   assert.equal(thirdShared.result.status,"Completed");
@@ -513,8 +513,7 @@ test("end-to-end unregistered signer, owner and three same-address positions han
 
   const stored=await ctx.meta.get("envelopes",created.envelopeId);
   assert.deepEqual(stored.signers.map(signer=>signer.status),["Signed","Signed","Signed","Signed"]);
-  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.started").length,3);
-  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.sent").length,3);
+  assert.equal(stored.events.filter(event=>event.type.startsWith("email_link.handoff.")).length,0,"parallel signing does not create sequential hand-off events");
   assert.equal(stored.events.filter(event=>event.type==="email_link.stage"&&event.stage==="SUBMIT"&&event.outcome==="success").length,4);
   const status=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
   assert.equal(status.status,"Completed");
@@ -526,9 +525,7 @@ test("end-to-end unregistered signer, owner and three same-address positions han
     assert.equal(signer.delivery.stageCode,"SUBMIT");
     assert.ok(signer.delivery.messageId);
   }
-  assert.equal(status.signers[1].delivery.handoffStatus,"sent");
-  assert.equal(status.signers[2].delivery.handoffStatus,"sent");
-  assert.equal(status.signers[3].delivery.handoffStatus,"sent");
+  assert.equal(status.signers.every(signer=>signer.delivery.handoffStatus===null),true);
 
   const finalPdf=await getSigningPdf(ctx,thirdShared.opened.sessionToken,null);
   assert.match(finalPdf.fileName,/signed-/);
