@@ -5,6 +5,13 @@ on:
     paths:
       - "src/pages/Meetings.jsx"
       - "docs/portal-protection/repair-window.json"
+      - "docs/implementation-status.md"
+      - "docs/portal-protection/records/meeting-portal.json"
+      - "docs/portal-protection/windows/meeting-portal.json"
+      - "scripts/portal-protection-check.mjs"
+      - "tests/portal-protection-policy.test.mjs"
+      - "drive-gateway/src/meetingEnvironment.mjs"
+      - "drive-gateway/tests/meeting-environment.test.mjs"
       - "src/pages/MeetingRoom.jsx"
       - "src/pages/OperationalGatewaysParticipants.jsx"
       - "src/firebase/meetingPolicy.js"
