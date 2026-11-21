@@ -13,6 +13,7 @@ test("meeting deletion is visible only for exact TRIAL environment and REAL is p
 test("deletion requires a read-only preview, offers JSON export, and collects reason and exact title", () => {
   assert.ok(source.includes('/api/meeting-register/delete-preview'));
   assert.ok(source.includes('JSON.stringify(preview.exportData,null,2)'));
+  assert.ok(source.includes("preview.externalArtifactsNotice"));
   assert.ok(source.includes('Enter the written reason for deleting this TRIAL meeting'));
   assert.ok(source.includes('Type the exact meeting title to confirm deletion'));
   assert.ok(source.includes('previewDigest:preview.previewDigest'));
