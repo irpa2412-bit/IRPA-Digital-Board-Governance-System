@@ -159,9 +159,9 @@ export async function runEmailStage(stage,action,onStage){
     const enhanced=String(error?.smtpEnhancedStatusCode||((message.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1]||""));
     if(/^[245]\.\d\.\d{1,3}$/.test(enhanced))safe.smtpEnhancedStatusCode=enhanced;
     if(/^[A-Z0-9_-]{1,40}$/i.test(String(error?.code||"")))safe.code=String(error.code);
-    if(error?.deliveryOutcome==="unknown")safe.deliveryOutcome="unknown";
+    safe.deliveryOutcome=error?.deliveryOutcome==="unknown"?"unknown":(safe.smtpResponseCode||stage!=="SUBMIT"?"failed":"unknown");
     if(error?.retryable===false)safe.retryable=false;
-    const diagnostics={stageCode:stage,smtpResponseCode:safe.smtpResponseCode||null,smtpEnhancedStatusCode:safe.smtpEnhancedStatusCode||null,errorCode:safe.code||null,deliveryOutcome:safe.deliveryOutcome||"not-confirmed"};
+    const diagnostics={stageCode:stage,smtpResponseCode:safe.smtpResponseCode||null,smtpEnhancedStatusCode:safe.smtpEnhancedStatusCode||null,errorCode:safe.code||null,deliveryOutcome:safe.deliveryOutcome};
     try{await onStage?.(stage,"failure",safe.smtpReplyCategory,diagnostics)}catch{}
     throw safe;
   }
