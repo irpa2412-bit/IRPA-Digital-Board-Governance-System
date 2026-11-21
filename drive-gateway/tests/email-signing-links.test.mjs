@@ -494,3 +494,15 @@ test("audit send is best-effort and never changes invitation acceptance or failu
   assert.match(worker,/SIGNING_INVITATION_AUDIT_EMAIL_FAILED/);
   assert.match(worker,/if\(failure\)throw failure;\s*return result;/);
 });
+
+test("signing SMTP messages use a unique Message-ID, named From, and separate plain-text and HTML parts",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  const mail=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
+  assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
+  assert.match(worker,/const subject="Please sign: "\+safeTitle\+" - "\+firstName\+" \(position "/);
+  assert.match(worker,/fromName:"IRPA Digital Signing"/);
+  assert.match(worker,/Message-ID: "\+generatedMessageId/);
+  assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
+  assert.match(mail,/Content-Type: text\\/plain; charset=UTF-8/);
+  assert.match(mail,/Content-Type: text\\/html; charset=UTF-8/);
+});
