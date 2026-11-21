@@ -4,17 +4,55 @@ import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { collection as firestoreCollection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs } from "firebase/firestore";
 import { runSignatureFirestore } from "../firebase/signatureFirestoreDiagnostics.js";
 import { auth, db } from "../firebase/config";
-import { reconcileSignatureDocumentIds } from "../firebase/signatureStorage";
 import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { downloadControlledDocumentBytes } from "../firebase/signatureStorage";
 import { renderPdfPageToCanvas, describePdfPageError } from "../utils/pdfPageRendering.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreCollection(...args));
 const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDoc(ref));
 const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDocs(ref));
+
+async function selfTestGatewayPost(path, payload) {
+  const gateway = getGoogleDriveGatewayUrl();
+  if (!gateway) throw new Error("Google Drive gateway is not configured.");
+  if (!auth.currentUser) throw new Error("Authentication is required.");
+  const token = await getIdToken(auth.currentUser);
+  const response = await fetch(gateway + path, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+    redirect: "error"
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data.error || "Gateway request failed (HTTP " + response.status + ").");
+    error.httpStatus = response.status;
+    throw error;
+  }
+  return data;
+}
+
+async function selfTestReconcileDocument(document, options = {}) {
+  return selfTestGatewayPost("/api/signature-pathway/reconcile", {
+    ...options,
+    documents: [{
+      documentId: String(document.documentId || document.id || ""),
+      fileId: String(document.fileId || document.driveFileId || document.archiveFileId || document.governanceArchiveFileId || document.sourceFileId || "")
+    }]
+  });
+}
+
+async function selfTestDownloadControlledDocument(fileId, documentId) {
+  if (!fileId || !documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
+  const result = await selfTestGatewayPost("/api/download", { fileId, documentId });
+  if (!result.base64) throw new Error("Google Drive returned no controlled document content.");
+  const binary = atob(result.base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
 
 function driveFileId(record = {}) {
   return String(record.fileId || record.driveFileId || record.sourceFileId || record.archiveFileId || record.governanceArchiveFileId || record.primaryArchiveFileId || "").trim();
@@ -213,7 +251,8 @@ export default function SignaturePathwaySelfTest() {
       const response = await fetch(gateway + "/api/signature-pathway/drive-health", {
         method: "GET",
         headers: { Authorization: "Bearer " + token, Accept: "application/json" },
-        cache: "no-store"
+        cache: "no-store",
+        redirect: "error"
       });
       const data = await response.json().catch(() => ({}));
       setDriveHealth({
@@ -221,7 +260,7 @@ export default function SignaturePathwaySelfTest() {
         classification: String(data.classification || "unknown")
       });
     } catch {
-      setDriveHealth({ statusClass: "error", classification: "network_or_authentication" });
+      setDriveHealth({ statusClass: "error", classification: "gateway_redirect_blocked_or_network_or_authentication" });
     }
   }
 
@@ -232,7 +271,6 @@ export default function SignaturePathwaySelfTest() {
     setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 times (4 total attempts). No changes will be made.");
     try {
       await requireAdministrator();
-      await checkDriveHealth();
       const snapshot = await getDocs(collection(db, "documents"));
       const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
@@ -240,14 +278,14 @@ export default function SignaturePathwaySelfTest() {
       const diagnostics = await runControlledDocumentDiagnosticBatch(
         documentRows,
         async (oneDocument, options) => {
-          const response = await reconcileSignatureDocumentIds(oneDocument, options);
+          const response = await selfTestReconcileDocument(oneDocument[0], options);
           const item = oneDocument[0];
           const result = response.results[0];
           let pdfPageCheck;
           try {
             const fileId = result.fileId || driveFileId(item);
             if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
-            const bytes = await downloadControlledDocumentBytes(fileId, item.documentId);
+            const bytes = await selfTestDownloadControlledDocument(fileId, item.documentId);
             const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
             const pages = [];
             try {

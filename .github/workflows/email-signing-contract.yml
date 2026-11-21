@@ -33,5 +33,7 @@ jobs:
         run: node --test drive-gateway/tests/email-signing-links.integration.test.mjs
       - name: Install frontend dependencies
         run: npm ci
+      - name: Run Signature Pathway Self-Test session-safety regression
+        run: npm run test:signature-self-test
       - name: Run seven-portal protection smoke tests
         run: node scripts/portal-protection-smoke.mjs
