@@ -346,7 +346,7 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
 test("production signing mail uses a signer-position subject, IRPA signing sender name and unique Message-ID/date headers",()=>{
   const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
   const mime=fs.readFileSync(new URL("../src/mailDelivery.js",import.meta.url),"utf8");
-  assert.match(worker,/Please sign: .*signer .*positionCount/);
+  assert.match(worker,/Please sign: .* - .*position/);
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: /);
   assert.match(worker,/Date: /);
