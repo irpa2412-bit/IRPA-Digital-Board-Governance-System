@@ -17,13 +17,23 @@ const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:
 function sanitizeGatewayValue(value, depth = 0) {
   if (depth > 6) return "[truncated]";
   if (value === null || typeof value === "boolean" || typeof value === "number") return value;
-  if (typeof value === "string") return value.slice(0, 2000);
+  if (typeof value === "string") return value
+    .replace(/Bearer\\s+[A-Za-z0-9._~-]+/gi, "Bearer [redacted]")
+    .replace(/((?:token|secret|password|api[_-]?key)\\s*[:=]\\s*)[^,;\\s]+/gi, "$1[redacted]")
+    .slice(0, 2000);
   if (Array.isArray(value)) return value.slice(0, 100).map(item => sanitizeGatewayValue(item, depth + 1));
   if (typeof value !== "object") return "[unsupported]";
   const output = {};
   for (const [key, entry] of Object.entries(value).slice(0, 100)) {
     if (/token|secret|authorization|cookie|credential/i.test(key)) continue;
-    output[key.slice(0, 100)] = sanitizeGatewayValue(entry, depth + 1);
+    if (key.toLowerCase() === "base64") {
+      if (typeof entry !== "string" || entry.length > 34000000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(entry)) {
+        throw new Error("Gateway controlled-document payload is invalid or exceeds the 25 MB limit.");
+      }
+      output.base64 = entry;
+    } else {
+      output[key.slice(0, 100)] = sanitizeGatewayValue(entry, depth + 1);
+    }
   }
   return output;
 }
@@ -40,7 +50,12 @@ async function selfTestGatewayPost(path, payload, signal) {
     redirect: "error",
     signal
   });
-  const raw = await response.json().catch(() => null);
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > 36000000) throw new Error("Gateway response exceeds the 25 MB controlled-document limit.");
+  const responseText = await response.text();
+  if (responseText.length > 36000000) throw new Error("Gateway response exceeds the 25 MB controlled-document limit.");
+  let raw;
+  try { raw = JSON.parse(responseText); } catch { raw = null; }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Gateway returned an invalid response shape.");
   const data = sanitizeGatewayValue(raw);
   if (!response.ok || data.ok === false) {
@@ -65,7 +80,7 @@ async function selfTestReconcileDocument(document, options = {}) {
 async function selfTestDownloadControlledDocument(fileId, documentId, signal) {
   if (!fileId || !documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
   const result = await selfTestGatewayPost("/api/download", { fileId, documentId }, signal);
-  if (!result.base64) throw new Error("Google Drive returned no controlled document content.");
+  if (typeof result.base64 !== "string" || !result.base64.length || result.base64.length > 34000000) throw new Error("Google Drive returned no valid controlled document content or exceeded 25 MB.");
   const binary = atob(result.base64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
