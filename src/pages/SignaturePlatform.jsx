@@ -31,7 +31,7 @@ function maskRegisterEmail(value){
  const email=String(value||"").trim();
  const at=email.lastIndexOf("@");
  if(at<1)return email?"***":"unavailable";
- return `${email.slice(0,1)}***@${email.slice(at+1)}`;
+ return `${email.slice(0,3)}...@${email.slice(at+1)}`;
 }
 async function openOriginalPdf(url,documentId,envelopeId,signingStage=false){
  if(!url)return;
