@@ -521,16 +521,19 @@ export async function revokeInvitation(ctx,user,id,signerId){
 function signerInvitationDelivery(envelope,signer){
   const events=envelope.events||[];
   const stages=events.map((event,index)=>({event,index})).filter(item=>item.event?.type==="email_link.stage"&&item.event.signerId===signer.id);
-  const lastStage=stages.at(-1)||null;
-  const lastSubmit=[...stages].reverse().find(item=>item.event.stage==="SUBMIT")||null;
-  const failed=Boolean(lastStage&&lastStage.event.outcome==="failure"&&(!lastSubmit||lastStage.index>lastSubmit.index));
-  const accepted=Boolean(lastSubmit&&lastSubmit.event.outcome==="success"&&(!lastStage||lastStage.index<=lastSubmit.index));
+  const lastBuild=[...stages].reverse().find(item=>item.event.stage==="BUILD_MESSAGE")||null;
+  const attemptStages=lastBuild?stages.filter(item=>item.index>=lastBuild.index):stages;
+  const lastStage=attemptStages.at(-1)||null;
+  const lastSubmit=[...attemptStages].reverse().find(item=>item.event.stage==="SUBMIT")||null;
+  const lastFailure=[...attemptStages].reverse().find(item=>item.event.outcome==="failure")||null;
+  const failed=Boolean(lastFailure&&(!lastSubmit||lastFailure.index>lastSubmit.index));
+  const accepted=Boolean(lastSubmit&&lastSubmit.event.outcome==="success"&&(!lastFailure||lastFailure.index<lastSubmit.index));
   const handoff=events.filter(event=>event?.signerId===signer.id&&String(event.type||"").startsWith("email_link.handoff.")).at(-1)||null;
   const status=failed?"Failed":accepted?"Accepted by mail server":signer.invitation==="Portal"?"Portal signing (no invitation email)":signer.invitation==="Sent"?"Sent":signer.invitation==="Failed"?"Failed":"Pending";
-  const evidence=failed?lastStage?.event:lastSubmit?.event||lastStage?.event||null;
+  const evidence=failed?lastFailure?.event:lastSubmit?.event||lastStage?.event||null;
   return {
     status,
-    stageCode:failed?lastStage.event.stage:accepted?"SUBMIT":lastStage?.event.stage||signer.deliveryStageCode||null,
+    stageCode:failed?lastFailure.event.stage:accepted?"SUBMIT":lastStage?.event.stage||signer.deliveryStageCode||null,
     smtpReplyCategory:evidence?.smtpReplyCategory||null,
     smtpReplyCode:evidence?.smtpReplyCode||null,
     smtpReply:evidence?.smtpReply||null,
