@@ -464,12 +464,8 @@ export async function resendInvitation(ctx,user,id,signerId,options={}){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
     await mutate(ctx,id,async current=>{
       const signer=current.signers.find(s=>s.id===signerId);
-      const attemptActive=current.emailSigningModule==="v2"
-        ?Array.isArray(signer?.resendAttempts)&&signer.resendAttempts.some(item=>item?.id===attemptId)
-        :signer?.resendAttempt?.id===attemptId;
-      if(!attemptActive)return{patch:null};
-      if(current.emailSigningModule==="v2")Object.assign(signer,rollbackEmailSigningResend(signer,attemptId));
-      else delete signer.resendAttempt;
+      if(signer&&current.emailSigningModule==="v2")Object.assign(signer,rollbackEmailSigningResend(signer,attemptId));
+      else if(signer?.resendAttempt?.id===attemptId)delete signer.resendAttempt;
       return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.failed",signerId,actor:user.uid,stageCode:EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT",at:now.toISOString()})}};
     });
     const failure=new HttpError(502,"The signing invitation could not be delivered. The previous link remains valid; retry after resolving the delivery error.");failure.code=EMAIL_STAGE_SET.has(error?.stageCode)?error.stageCode:"SUBMIT";throw failure;
