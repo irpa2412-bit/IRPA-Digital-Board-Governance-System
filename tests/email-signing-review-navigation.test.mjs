@@ -12,6 +12,9 @@ test("email-link signer can enter full-document review before every assigned fie
   assert.doesNotMatch(page, /opacity:\(!canReview\|\|!pdfDocument\|\|Boolean\(pageError\)\|\|incomplete\.length>0/);
   assert.doesNotMatch(page, /if\(incomplete\.length\)\{setError\("Complete every responsibility and its assigned fields before final review/);
   assert.match(page, /const incomplete=fields\.filter\(field=>field\.required&&!complete\(field\)\)/);
+  assert.match(page, /const canReview=Boolean\(record\)&&Boolean\(pdfDocument\)/);
+  assert.doesNotMatch(page, /const canReview=Boolean\(record\)&&pageRendered/);
+  assert.match(page, /if\(!pdfDocument\)\{setError\("The controlled document is not ready for review/);
   assert.match(page, /Previous page/);
   assert.match(page, /Next page/);
 });
