@@ -71,4 +71,9 @@ test("SMTP self-check is recipient-selectable, owner/admin-gated and explicitly 
   assert.match(smtpDiagnostics,/not proof of inbox delivery/);
   assert.match(smtpDiagnostics,/messageId/);
   assert.match(index,/smtpSelfCheck: async \(_user,body=\{\}\)/);
+  assert.match(ui,/Test recipient email/);
+  assert.match(ui,/api\/sign\/smtp-selfcheck/);
+  assert.match(ui,/getIdToken\(\)/);
+  assert.match(ui,/Send one test message/);
+  assert.match(ui,/smtpSelfCheckResult\.stages/);
 });
