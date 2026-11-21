@@ -7,6 +7,7 @@ import { auth, db } from "../firebase/config";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { renderPdfPageToCanvas, describePdfPageError } from "../utils/pdfPageRendering.mjs";
+import { runSequentialSelfTestBatch } from "../utils/signatureSelfTestBatch.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreCollection(...args));
@@ -300,19 +301,20 @@ export default function SignaturePathwaySelfTest() {
   const [hasMore, setHasMore] = useState(true);
   const [cancelled, setCancelled] = useState(false);
   const cancelledRef = useRef(false);
-  const activeAbort = useRef(null);
+  const runAbort = useRef(null);
   useEffect(() => { clearSavedSelfTestData(); }, []);
 
   function cancelReconcile() {
     cancelledRef.current = true;
     setCancelled(true);
-    activeAbort.current?.abort();
+    runAbort.current?.abort();
     setMessage("Cancellation requested. The active document request is being stopped.");
   }
 
   async function reconcile() {
     if (busy || !hasMore) return;
     setBusy(true);
+    runAbort.current = new AbortController();
     cancelledRef.current = false;
     setCancelled(false);
     setMessage("Read-only diagnostic: processing at most 20 documents sequentially. Each document is limited to 15 seconds and each run to 60 seconds. No signing state is changed.");
@@ -332,74 +334,59 @@ export default function SignaturePathwaySelfTest() {
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
       setProgress({ completed: 0, total: documentRows.length, active: 0 });
       const output = rows.filter(item => classifySelfTestRecord(item) === "NON_FILE_RECORD").map(item => diagnosticRow(item, {}));
-      for (const [index, item] of documentRows.entries()) {
-        if (cancelledRef.current || Date.now() - runStarted >= 60000) break;
-        const remaining = 60000 - (Date.now() - runStarted);
-        const timeoutMs = Math.max(1, Math.min(15000, remaining));
-        const controller = new AbortController();
-        activeAbort.current = controller;
-        let timer;
-        try {
-          const task = (async () => {
-            const response = await selfTestReconcileDocument(item, { signal: controller.signal });
-            if (!Array.isArray(response.results) || response.results.length !== 1 ||
-                !response.results[0] || typeof response.results[0] !== "object" || Array.isArray(response.results[0])) {
-              throw new Error("Gateway reconcile response must contain exactly one result object.");
-            }
-            const result = sanitizeGatewayValue(response.results[0]);
-            let pdfPageCheck;
-            let bytes;
-            let pdf;
-            let canvas;
-            try {
-              const fileId = result.fileId || driveFileId(item);
-              bytes = await selfTestDownloadControlledDocument(fileId, item.documentId, controller.signal);
-              pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-              if (!Number.isInteger(pdf.numPages) || pdf.numPages < 1) throw new Error("PDF has no readable pages.");
-              canvas = document.createElement("canvas");
-              const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 480, maxPixels: 900000 });
-              pdfPageCheck = { status: metrics.textCharacters > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages,
-                pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }],
-                lastPageFlag: "FIRST PAGE ONLY" };
-            } catch (error) {
-              pdfPageCheck = { status: "FAIL", pageCount: pdf?.numPages || 0, pages: [],
-                lastPageFlag: "FAIL: " + String(error?.name || "Error").slice(0, 80) + ": " + String(error?.message || "PDF check failed").slice(0, 300) };
-            } finally {
-              if (canvas) { canvas.width = 1; canvas.height = 1; canvas.remove(); }
-              if (pdf) { try { await pdf.destroy(); } catch {} }
-              if (bytes) bytes.fill(0);
-            }
-            return { ...result, pdfPageCheck };
-          })();
-          const timeout = new Promise((_, reject) => {
-            timer = window.setTimeout(() => {
-              controller.abort();
-              reject(new Error(timeoutMs >= 15000 ? "Document diagnostic timed out after 15 seconds." : "Run time limit reached after 60 seconds."));
-            }, timeoutMs);
-          });
-          const result = await Promise.race([task, timeout]);
-          output.push(diagnosticRow(item, result));
-        } catch (error) {
-          output.push(diagnosticRow(item, { status: "unreadable", reason: String(error?.message || "Diagnostic failed").slice(0, 300),
-            pdfPageCheck: { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: "NOT COMPLETED" } }));
-        } finally {
-          if (timer) window.clearTimeout(timer);
-          activeAbort.current = null;
-          setProgress({ completed: index + 1, total: documentRows.length, active: 0 });
-          setResults([...pageRows, ...output]);
+      const batch = await runSequentialSelfTestBatch(documentRows, async (item, signal) => {
+        const response = await selfTestReconcileDocument(item, { signal });
+        if (!Array.isArray(response.results) || response.results.length !== 1 ||
+            !response.results[0] || typeof response.results[0] !== "object" || Array.isArray(response.results[0])) {
+          throw new Error("Gateway reconcile response must contain exactly one result object.");
         }
+        const result = sanitizeGatewayValue(response.results[0]);
+        let pdfPageCheck;
+        let bytes;
+        let pdf;
+        let canvas;
+        try {
+          const fileId = result.fileId || driveFileId(item);
+          bytes = await selfTestDownloadControlledDocument(fileId, item.documentId, signal);
+          pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+          if (!Number.isInteger(pdf.numPages) || pdf.numPages < 1) throw new Error("PDF has no readable pages.");
+          canvas = document.createElement("canvas");
+          const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 480, maxPixels: 900000 });
+          pdfPageCheck = { status: metrics.textCharacters > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages,
+            pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }],
+            lastPageFlag: "FIRST PAGE ONLY" };
+        } catch (error) {
+          pdfPageCheck = { status: "FAIL", pageCount: pdf?.numPages || 0, pages: [],
+            lastPageFlag: "FAIL: " + String(error?.name || "Error").slice(0, 80) + ": " + String(error?.message || "PDF check failed").slice(0, 300) };
+        } finally {
+          if (canvas) { canvas.width = 1; canvas.height = 1; canvas.remove(); }
+          if (pdf) { try { await pdf.destroy(); } catch {} }
+          if (bytes) bytes.fill(0);
+        }
+        return { ...result, pdfPageCheck };
+      }, {
+        signal: runAbort.current.signal,
+        startedAt: runStarted,
+        perDocumentTimeoutMs: 15000,
+        totalTimeoutMs: 60000,
+        onProgress: progress => setProgress({ ...progress, active: 0 })
+      });
+      for (const entry of batch.results) {
+        output.push(entry.error
+          ? diagnosticRow(entry.document, { status: "unreadable", reason: entry.error,
+              pdfPageCheck: { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: "NOT COMPLETED" } })
+          : diagnosticRow(entry.document, entry.result));
       }
       pageRows.push(...output);
       setResults(pageRows);
-      const finished = documentRows.length === 0 || output.length >= documentRows.length;
-      const elapsed = Date.now() - runStarted;
-      setMessage(cancelledRef.current ? "Self-test cancelled safely. No signing state was changed."
-        : elapsed >= 60000 && !finished ? "60-second run limit reached. Select Run next 20 to continue."
-        : "Read-only diagnostics completed for " + documentRows.length + " document(s) in this page. Select Run next 20 to continue when available.");
+      const finished = batch.results.length >= documentRows.length;
+      setMessage(batch.cancelled || cancelledRef.current ? "Self-test cancelled safely. No signing state was changed."
+        : batch.timedOut && !finished ? "60-second run limit reached. Select Run next 20 to continue."
+        : "Read-only diagnostics completed for " + batch.results.length + " document(s) in this page. Select Run next 20 to continue when available.");
     } catch (error) {
       setMessage("Read-only diagnostic failed: " + String(error?.message || "Unknown Gateway error").slice(0, 300));
     } finally {
-      activeAbort.current = null;
+      runAbort.current = null;
       setBusy(false);
     }
   }
