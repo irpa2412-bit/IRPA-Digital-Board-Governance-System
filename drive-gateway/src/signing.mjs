@@ -450,7 +450,7 @@ export async function resendInvitation(ctx,user,id,signerId,{sendFailureReport=t
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.started",signerId,actor:user.uid,at:now.toISOString()})}};
   });
   try{
-    await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,emailSigningModule:envelope.emailSigningModule,expiresAt,...(emailLink?{onStage:(stage,outcome,category)=>recordEmailLinkStage(ctx,id,signerId,stage,outcome,category)}:{})});
+    await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,emailSigningModule:envelope.emailSigningModule,expiresAt,...(emailLink?{onStage:(stage,outcome,category,diagnostics)=>recordEmailLinkStage(ctx,id,signerId,stage,outcome,category,diagnostics)}:{})});
   }catch(error){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
     await mutate(ctx,id,async current=>{
