@@ -397,7 +397,7 @@ export async function resendInvitation(ctx,user,id,signerId,options={}){
     }else{signer.tokenHash=await sha256Hex(secret);signer.tokenExpiresAt=expiresAt;signer.invitation="Sent";delete signer.deliveryStageCode;delete signer.resendAttempt;}
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:emailLink?"email_link.resent":"invitation.resent",signerId,actor:user.uid,expiresAt,at:now.toISOString()})}};
   });
-  return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt};
+  return{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt,signingLink:link};
 }
 
 
