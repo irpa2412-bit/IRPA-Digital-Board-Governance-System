@@ -11,6 +11,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { buildSmtpRecipientEnvelope } from "./smtpRecipientEnvelope.mjs";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
@@ -3084,11 +3085,7 @@ export function buildSigningInvitationAuditMessage({recipientPrefix,position,pos
   return {to:"info@irpa.or.tz",subject,text,html};
 }
 
-export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
-  const recipient=normalizeRecipientEmail(to);
-  const mime=buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
-  return{recipient,rcptCommand:"RCPT TO:<"+recipient+">",mime};
-}
+
 
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromName="IRPA Administration",messageId=null}) {
   const smtpConfig=resolveSmtpConfiguration(env);
