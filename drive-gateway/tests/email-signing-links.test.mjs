@@ -278,7 +278,7 @@ test("email-link delivery stages are appended individually to the envelope audit
 test("smtp-selfcheck rejects non-admin and non-owner callers before invoking SMTP",async()=>{
   let sends=0;
   const ctx=makeContext({verifyUser:async()=>({uid:"ordinary-user",isAdmin:false,isOwner:false}),smtpSelfCheck:async()=>{sends++;return{ok:true}}});
-  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST"}),ctx);
+  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({to:"owner@example.org"})}),ctx);
   assert.equal(response.status,403);
   assert.equal(sends,0);
 });
