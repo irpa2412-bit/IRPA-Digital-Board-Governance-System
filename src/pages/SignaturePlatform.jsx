@@ -798,11 +798,11 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    if(!link)throw new Error("The Gateway did not return the accepted signer link.");
    const shareText="Please review and sign "+String(selected.title||"the IRPA document")+": "+link;
    const shareUrl="https://wa.me/?text="+encodeURIComponent(shareText);
-   if(popup)popup.location.href=shareUrl;
+   if(popup){popup.location.href=shareUrl;setMessage("The same signer-specific link was emailed and prepared for WhatsApp. Mail-server acceptance is not proof of inbox delivery.");}
+   else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(link);setMessage("The invitation was accepted by the mail server; the link was copied because the WhatsApp pop-up was blocked. Acceptance is not proof of inbox delivery.");}
    else setMessage("The invitation was accepted by the mail server. Allow pop-ups to open WhatsApp, or use Copy signing link.");
    const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);
    setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});
-   setMessage("The same signer-specific link was emailed and prepared for WhatsApp. Mail-server acceptance is not proof of inbox delivery.");
   }catch(error){try{popup?.close?.()}catch{}setMessage((error.message||"Unable to prepare the WhatsApp share.")+(error.code?" (Stage: "+error.code+")":""));}
   finally{setGatewayEmailStatusBusy(false);}
  }
