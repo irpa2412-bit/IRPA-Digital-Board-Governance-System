@@ -521,3 +521,18 @@ test("isolation guard blocks reopening if another portal's Change Record history
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
 });
+
+test("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
+  const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
+  assert.match(workflow, /concurrency:\\s*\\n\\s*group: meeting-portal-browser-\\$\\{\\{ github\\.event\\.pull_request\\.number \\|\\| github\\.ref \\}\\}/);
+  assert.match(workflow, /cancel-in-progress: true/);
+  for (const path of [
+    "docs/implementation-status.md",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "scripts/portal-protection-check.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs"
+  ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
+});
