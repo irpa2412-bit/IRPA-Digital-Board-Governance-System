@@ -36,6 +36,99 @@ function createInvitationAuditCallback(ctx,{envelopeId,signerId,email,title,posi
     }catch(error){ctx.logger?.error?.("SIGNING_INVITATION_AUDIT_EMAIL_FAILED",{envelopeId,signerId,errorType:String(error?.name||"Error").slice(0,40)});}
   };
 }
+function invitationFailureDiagnostics(error){
+  const message=String(error?.message||"");
+  const smtp=message.match(/IRPA SMTP error (\d{3})/i);
+  const smtpResponseCode=smtp?Number(smtp[1]):null;
+  const errorCode=String(error?.code||"").replace(/[^A-Z0-9_-]/gi,"").slice(0,40)||null;
+  const failureClass=smtpResponseCode!==null?(smtpResponseCode>=500?"permanent-provider-rejection":smtpResponseCode>=400?"temporary-provider-rejection":"provider-response"):error?.deliveryOutcome==="unknown"?"delivery-outcome-unknown":errorCode||/password.*not configured/i.test(message)?"smtp-configuration-or-transport":"smtp-transport-error";
+  return{errorType:String(error?.name||"Error").slice(0,60),errorCode,smtpResponseCode,failureClass,deliveryOutcome:error?.deliveryOutcome==="unknown"?"unknown":"not-confirmed",retryable:error?.retryable===false?false:(smtpResponseCode!==null?smtpResponseCode>=400&&smtpResponseCode<500:true)};
+}
+function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d+$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
+async function load(ctx,t){
+  const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),signer=e?.signers.find(item=>item.id===sid);
+  if(!e||!signer)throw new HttpError(401,"Invalid signing link.");
+  if(e.emailSigningModule==="v2"&&signer.identityType==="email-link"){
+    const inspected=await inspectEmailSigningLink({token:t,envelope:e,signer,now:ctx.now()});
+    return{env:e,signer,tokenKind:inspected.tokenKind};
+  }
+  const suppliedHash=await sha256Hex(secret),invitationMatch=safeEqual(suppliedHash,String(signer.tokenHash||"")),sessionMatch=Boolean(signer.emailLinkSessionHash)&&safeEqual(suppliedHash,String(signer.emailLinkSessionHash));
+  if(!invitationMatch&&!sessionMatch){
+    const replaced=[...(signer.tokenHistory||[]),...(signer.emailLinkTokenHistory||[])].some(item=>item?.status==="replaced"&&safeEqual(suppliedHash,String(item.tokenHash||"")));
+    if(replaced)throw new HttpError(410,"This link was replaced. Please use the newest email.");
+    throw new HttpError(403,"This signing link is not valid.");
+  }
+  const legacyOpenedSession=signer.identityType==="email-link"&&invitationMatch&&signer.emailLinkStatus==="opened"&&!signer.emailLinkSessionHash;
+  const tokenKind=sessionMatch||legacyOpenedSession?"session":"invitation";
+  if(signer.identityType==="email-link"&&(tokenKind==="session"?!(signer.emailLinkSessionStatus==="active"||legacyOpenedSession||(signer.emailLinkSessionStatus==="used"&&e.status==="Completed"&&signer.status==="Signed")):signer.emailLinkStatus!=="issued"))throw new HttpError(401,genericEmailSigningFailure());
+  const expiry=tokenKind==="session"?(signer.emailLinkSessionExpiresAt||signer.tokenExpiresAt):(signer.tokenExpiresAt||signer.emailLinkExpiresAt||e.expiresAt);
+  const expiryMs=Date.parse(String(expiry||""));
+  if(Number.isFinite(expiryMs)&&ctx.now().getTime()>expiryMs)throw new HttpError(410,"This signing link has expired. Contact the document owner for a new invitation.");
+  return{env:e,signer,tokenKind};
+}
+function active(ctx,e,s=null){if(["Voided","Declined","Cancelled","Canceled"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");const expiry=s?.tokenExpiresAt||s?.emailLinkExpiresAt||e.expiresAt;if(expiry&&ctx.now().getTime()>new Date(expiry).getTime())throw new HttpError(403,"This signing link has expired.")}
+const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
+// Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
+export function canAuthenticatedSignerAccess(signer,user){
+  if(signer?.identityType==="email-link") return signer.emailLinkSessionStatus==="active"||signer.emailLinkSessionStatus==="used"||signer.emailLinkStatus==="opened";
+  if(!signer?.uid) return false;
+  return Boolean(user?.uid)&&user.uid===signer.uid;
+}
+function assertSignerAuthentication(signer,user){
+  if(!canAuthenticatedSignerAccess(signer,user)) throw new HttpError(403,"Sign in as the invited signer to continue.");
+}
+export async function verifySourceDocumentIntegrity(bytes,envelope={},sourceDocument={}){const rawHash=envelope.sha256||envelope.documentHash||envelope.originalHash||sourceDocument.sha256||sourceDocument.hash||null;const rawSize=envelope.byteLength??envelope.documentSize??envelope.fileSize??sourceDocument.fileSize??sourceDocument.byteLength??sourceDocument.size??null;const expectedHash=rawHash==null||String(rawHash).trim()===""?null:String(rawHash).trim().toLowerCase();const expectedSize=rawSize==null||rawSize===""||!Number.isFinite(Number(rawSize))?null:Number(rawSize);if((expectedHash&&expectedHash!==await sha256Hex(bytes))||(expectedSize!=null&&expectedSize!==bytes.byteLength))throw new HttpError(409,"The document failed its integrity check.");return{expectedHash,expectedSize}}
+async function original(ctx,e){const d=await ctx.meta.get("documents",e.documentId),b=d&&await ctx.storage.get(d.primaryStorageId);if(!b)throw new HttpError(409,"The source document is unavailable.");await verifySourceDocumentIntegrity(b,e,d);return{doc:d,bytes:b}}
+export function validateEnvelopeFields(fields,signers){
+  if(fields==null)return[];
+  if(!Array.isArray(fields)||fields.length>100)throw new HttpError(400,"Invalid signing fields.");
+  const ids=new Set(),byId=new Map((signers||[]).map(x=>[x.id,x])),uids=new Set((signers||[]).map(x=>x.uid).filter(Boolean));
+  const allowed=new Set(["Signature","Initials","Date","Number","Text","Comment","Remarks","Checkbox","Name","Title"]);
+  return fields.map(f=>{
+    const fieldId=cleanSegment(f?.fieldId,100),type=String(f?.type||"");
+    const normalized=normalizeSignatureField({page:f?.page||1,x:f?.x??10,y:f?.y??80,width:f?.width??24,height:f?.height??9,coordinateSpace:f?.coordinateSpace,fieldId}),page=Number(normalized.page),x=Number(normalized.x),y=Number(normalized.y),width=Number(normalized.width),height=Number(normalized.height),requestedSignerId=String(f?.signerId||""),signerUid=String(f?.signerUid||""),roleAssignmentIndex=f?.roleAssignmentIndex==null?0:Number(f.roleAssignmentIndex);
+    const assigned=requestedSignerId?byId.get(requestedSignerId):(signerUid?(signers||[]).find(item=>item.uid===signerUid):null);
+    if(!fieldId||ids.has(fieldId)||!allowed.has(type)||!assigned||!Number.isInteger(roleAssignmentIndex)||roleAssignmentIndex<0||roleAssignmentIndex>=Math.max(1,Array.isArray(assigned.roleAssignments)?assigned.roleAssignments.length:1)||(signerUid&&assigned.uid!==signerUid)||!Number.isInteger(page)||page<1||page>500||![x,y,width,height].every(Number.isFinite)||x<0||y<0||width<=0||height<=0||x+width>1||y+height>1)throw new HttpError(400,"A signing field is invalid or assigned to an unauthorized signer.");
+    ids.add(fieldId);
+    return{fieldId,type,page,x,y,width,height,coordinateSpace:SIGNATURE_FIELD_COORDINATE_SPACE,signerId:assigned.id,signerUid:assigned.uid||null,roleAssignmentIndex,required:f?.required===true,placeholder:cleanText(f?.placeholder||"",160)};
+  });
+}
+export function validateFieldValues(fields,signer,values,signature,fieldApplications=[]){
+  const assigned=(fields||[]).map(field=>normalizeSignatureField(field)).filter(f=>f.signerId===signer.id||(!f.signerId&&signer.uid&&f.signerUid===signer.uid)),out={},byId=new Map(assigned.map(f=>[f.fieldId,f])),applications=new Map();
+  if(!Array.isArray(fieldApplications))throw new HttpError(400,"Explicit confirmed signature field applications are required.");
+  for(const application of fieldApplications){
+    const field=byId.get(String(application?.fieldId||""));
+    if(!field||!["Signature","Initials"].includes(field.type))throw new HttpError(403,"A signature field application is not assigned to this signer.");
+    if(applications.has(field.fieldId))throw new HttpError(400,"A signature field may be confirmed only once per submission.");
+    if(application.confirmed!==true)throw new HttpError(400,"Signature application requires an explicit Confirm action.");
+    if(application.coordinateSpace!=null&&application.coordinateSpace!==SIGNATURE_FIELD_COORDINATE_SPACE)throw new HttpError(409,"The confirmed signature field coordinate space is not supported.");
+    for(const key of ["page","x","y","width","height"]){
+      const submitted=Number(application[key]),saved=Number(field[key]??(key==="page"?1:0));
+      if(!Number.isFinite(submitted)||submitted!==saved)throw new HttpError(409,"The confirmed signature field page or position differs from the saved assignment.");
+    }
+    const value=application.value;
+    if(typeof value!=="string"||!value.startsWith("data:image/png;base64,")||value.length>120000)throw new HttpError(400,"Confirmed signature fields require a PNG specimen no larger than 120 KB.");
+    applications.set(field.fieldId,value);
+  }
+  for(const f of assigned){
+    let value=values&&Object.prototype.hasOwnProperty.call(values,f.fieldId)?values[f.fieldId]:undefined;
+    if(f.type==="Signature"||f.type==="Initials"){
+      value=applications.get(f.fieldId);
+      if(!value)throw new HttpError(400,"Tap the assigned "+f.type.toLowerCase()+" field and confirm it before signing.");
+      // Each assigned Signature/Initials field carries its own confirmed specimen; signer-level evidence remains a separate transaction event.
+    }else if(f.type==="Checkbox"){
+      value=value===true||value==="true"?"true":value===false||value==="false"?"false":"";
+      if(value==="")throw new HttpError(400,"Complete the assigned checkbox field.");if(f.required&&value!=="true")throw new HttpError(400,"Complete the required checkbox field.");
+    }else{
+      value=String(value??"").trim();
+      if(!value)throw new HttpError(400,"Complete the assigned "+f.type.toLowerCase()+" field.");
+      if(value.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
+    }
+    out[f.fieldId]=value;
+  }
+  if(JSON.stringify(out).length>240000)throw new HttpError(413,"Assigned signing field values exceed the permitted request size. Reduce the signature image size and try again.");
+  return out;
+}
 export async function resolveOptionalEmailLinkProfileUid(resolveProfileUid,email,signerName,timeoutMs=3000){
   if(typeof resolveProfileUid!=="function")return null;
   let timer;
