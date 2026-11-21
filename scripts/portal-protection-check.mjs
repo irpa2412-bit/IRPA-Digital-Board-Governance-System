@@ -70,9 +70,24 @@ function main() {
     changedFiles = execFileSync("git", ["diff", "--name-only", "HEAD^...HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   }
   const registry = readJson("docs/portal-protection/portal-register.json");
-  const windowState = readJson("docs/portal-protection/repair-window.json");
-  const recordPath = "docs/portal-protection/change-record.json";
-  const record = fs.existsSync(recordPath) ? readJson(recordPath) : null;
+  const sharedWindow = readJson("docs/portal-protection/repair-window.json");
+  const sharedRecordPath = "docs/portal-protection/change-record.json";
+  const sharedRecord = fs.existsSync(sharedRecordPath) ? readJson(sharedRecordPath) : null;
+  const discovery = evaluatePolicy({ changedFiles, registry, windowState: sharedWindow, record: sharedRecord });
+  let windowState = sharedWindow;
+  let record = sharedRecord;
+  // Prefer an isolated per-portal declaration when a PR changes exactly one
+  // registered portal. Shared/multi-portal changes continue to require the
+  // shared Change Record and repair window.
+  if (discovery.affected.length === 1) {
+    const slug = discovery.affected[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const portalWindowPath = `docs/portal-protection/windows/${slug}.json`;
+    const portalRecordPath = `docs/portal-protection/records/${slug}.json`;
+    if (fs.existsSync(portalWindowPath) && fs.existsSync(portalRecordPath)) {
+      windowState = readJson(portalWindowPath);
+      record = readJson(portalRecordPath);
+    }
+  }
   const initial = evaluatePolicy({ changedFiles, registry, windowState, record });
   if (!initial.protectedFiles.length) {
     console.log(JSON.stringify(initial, null, 2));
