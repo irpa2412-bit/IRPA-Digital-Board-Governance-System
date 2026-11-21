@@ -343,26 +343,23 @@
       "Signature Portal"
     ],
     "operation": "shared-mailbox-signing-invitation-delivery",
-    "reason": "Repair the typed-recipient SMTP delivery path for every signer position, including Parallel creation, individual resend and resend-all. Complete this existing PR #836 as tracker item 2 before PR A crash safety. Do not change signing rules, token/link format, sessions or SMTP configuration.",
+    "reason": "Complete existing PR #836 only: invitation creation/sending, per-position next-signer hand-off, SMTP delivery recording, envelope-view delivery status, and regression tests. Copy/WhatsApp remains blocked because the active bearer token is not recoverable from the persisted hash without changing token custody or issuing a replacement. Self-test crash and unrelated work are excluded.",
     "files": [
       "drive-gateway/src/index.js",
       "drive-gateway/src/invitationEmail.mjs",
       "drive-gateway/src/mailDelivery.js",
       "drive-gateway/src/signing.mjs",
+      "src/pages/SignaturePlatform.jsx",
       "drive-gateway/tests/email-signing-links.integration.test.mjs",
       "drive-gateway/tests/email-signing-links.test.mjs",
-      "src/pages/SignaturePlatform.jsx",
-      "tests/signature-workflow-policy.test.mjs",
-      "docs/portal-protection/change-record.json",
-      "docs/portal-protection/repair-window.json"
+      "docs/portal-protection/repair-window.json",
+      "docs/portal-protection/change-record.json"
     ],
     "repairWindow": {
-      "openedAt": "2026-11-21T09:30:33Z",
-      "closesAt": "2026-11-23T09:30:33Z",
-      "durationHours": 48,
-      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
-      "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
-      "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
+      "openedAt": "2026-11-21T09:57:28Z",
+      "closesAt": "2026-11-22T09:57:28Z",
+      "durationHours": 24,
+      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
     },
     "prohibitedChanges": [
       "signing rules, signer identity, token format/hash custody, sessions, owner resend rules, field assignment",
