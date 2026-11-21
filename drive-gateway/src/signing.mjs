@@ -13,7 +13,7 @@ async function mutate(ctx,id,fn){for(let i=0;i<5;i++){const c=await ctx.meta.get
 const EMAIL_STAGE_SET=new Set(["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT","TOKEN_LOOKUP","SESSION_CREATE","PDF_PREVIEW","SIGN_SUBMIT"]);
 export async function recordEmailLinkStage(ctx,envelopeId,signerId,stage,outcome,smtpReplyCategory="UNKNOWN"){
   if(!EMAIL_STAGE_SET.has(stage)||!["success","failure"].includes(outcome))return;
-  const category=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(smtpReplyCategory)?smtpReplyCategory:"UNKNOWN";
+  const category=["ACCEPTED","RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(smtpReplyCategory)?smtpReplyCategory:"UNKNOWN";
   try{
     await mutate(ctx,envelopeId,async current=>{
       if(!(current.signers||[]).some(signer=>signer.id===signerId))return{patch:null};
