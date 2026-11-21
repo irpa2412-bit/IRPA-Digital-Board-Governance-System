@@ -440,7 +440,7 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
     assert.equal(sent[index].smtpRecipient,expected[index]);
     assert.equal(sent[index].rcptCommand,"RCPT TO:<"+expected[index]+">");
     assert.equal(sent[index].toHeader,expected[index],"the To header must contain exactly the same single recipient as SMTP RCPT TO");
-    console.log("MOCK SMTP recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[index].rcptCommand,toHeader:sent[index].toHeader}));
+    console.log("MOCK SMTP creation recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[index].rcptCommand,toHeader:sent[index].toHeader}));
   }
   assert.equal(new Set(sent.map(item=>item.toHeader)).size,2,"two positions may share one mailbox without collapsing signer positions");
   const resent=await resendInvitation(ctx,owner,created.envelopeId,"S2");
