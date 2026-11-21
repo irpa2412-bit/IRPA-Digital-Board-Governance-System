@@ -8,7 +8,7 @@ const ui = await readFile(new URL("../../src/pages/SignaturePlatform.jsx", impor
 const index = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
 const smtpDiagnostics = await readFile(new URL("../src/smtpDiagnostics.mjs", import.meta.url), "utf8");
 
-test("production invitation path uses the legacy invitation builder, not the dormant rebuild module",()=>{
+test("production invitation path uses the legacy invitation builder, not the dormant rebuild module",async()=>{
   assert.match(index,/sendEmailSigningInvitation\(\{email:to,name,link,title,ownerName,expiresAt,position/);
   const module = await readFile(new URL("../src/emailSigning/index.mjs", import.meta.url), "utf8");
   assert.match(module,/EMAIL_SIGNING_REBUILD_ENABLED\s*=\s*false/);
