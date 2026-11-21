@@ -1342,7 +1342,7 @@ async function mutateSignatureWorkflowEnvelopeRoute(request,env) {
     const action=String(body.action||"");
     const details=body.details&&typeof body.details==="object"?body.details:{};
     if(!/^[A-Za-z0-9_-]{6,150}$/.test(envelopeId))return json({ok:false,error:"A valid envelope ID is required."},400,corsHeaders(request));
-    if(!["start","attach-gateway","invitation-sent","initial-invitation-sent"].includes(action))return json({ok:false,error:"Unsupported signing-envelope mutation."},400,corsHeaders(request));
+    if(!["start","attach-gateway","invitation-sent","initial-invitation-sent","cancel-draft"].includes(action))return json({ok:false,error:"Unsupported signing-envelope mutation."},400,corsHeaders(request));
     step="Load envelope and verify owner/participant authority";
     const token=await getFirestoreAdminAccessToken(env);
     const record=await getFirestoreDocument(env,"signatureEnvelopes/"+envelopeId,token);
@@ -1365,6 +1365,11 @@ async function mutateSignatureWorkflowEnvelopeRoute(request,env) {
         Object.assign(patch,{gatewayEnvelopeId:String(g.gatewayEnvelopeId),gatewayDocumentId:g.gatewayDocumentId||null,gatewayOriginalHash:g.gatewayOriginalHash||null,gatewaySigningStatus:String(g.gatewaySigningStatus||"Sent"),gatewayBridgeStatus:"Connected",gatewayEvidenceSchema:"IRPA-CRYPTOGRAPHIC-EVIDENCE-1",gatewayInvitationStatus:String(g.gatewayInvitationStatus||"Sent"),gatewayInvitationFailures:Math.max(0,Number(g.gatewayInvitationFailures)||0)});
       }
       eventName="Workflow Started";eventDetails={...eventDetails,currentSignerUid:envelope.currentSignerUid||null,gatewayEnvelopeId:patch.gatewayEnvelopeId||null};
+    } else if(action==="cancel-draft"){
+      if(String(envelope.status||"")!=="Draft")return json({ok:false,error:"Only an envelope still in Draft status can be cancelled during preparation."},409,corsHeaders(request));
+      if(envelope.gatewayEnvelopeId)return json({ok:false,error:"This draft already has a Gateway workflow. Use the active workflow cancellation process instead."},409,corsHeaders(request));
+      patch.status="Cancelled";patch.cancelledAt=now;patch.cancelledByUid=uid;patch.cancellationReason="Document owner cancelled envelope preparation";
+      eventName="Envelope Preparation Cancelled";eventDetails={...eventDetails,previousStatus:"Draft",reason:"Document owner cancelled envelope preparation"};
     } else if(action==="attach-gateway"){
       if(!/^[A-Za-z0-9_-]{6,150}$/.test(String(details.gatewayEnvelopeId||"")))return json({ok:false,error:"A valid Gateway envelope reference is required."},400,corsHeaders(request));
       patch.gatewayEnvelopeId=String(details.gatewayEnvelopeId);
