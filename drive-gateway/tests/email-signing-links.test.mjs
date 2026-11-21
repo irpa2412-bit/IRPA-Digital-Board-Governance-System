@@ -383,7 +383,7 @@ test("signing audit email masks the first three local-part characters and retain
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
-  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
+  assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
 });
 
 
@@ -463,7 +463,7 @@ test("signing invitation recipient validation rejects display names and comma-se
   assert.equal(validateRecipient("  Signer@Example.org  "),"Signer@Example.org");
 });
 
-test("invitation audit message includes only a three-character recipient prefix and required delivery evidence",()=>{
+test("invitation audit message includes a masked recipient, domain and required delivery evidence",()=>{
   const audit=buildSigningInvitationAuditMessage({
     recipientPrefix:"daniel",recipientDomain:"gmail.com",position:2,positionCount:3,
     title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
