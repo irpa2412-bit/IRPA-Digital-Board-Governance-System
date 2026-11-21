@@ -187,7 +187,7 @@ const smtpSelfcheckRoute = async (request, env) => {
   }catch(error){
     const stageCode=String(error?.stageCode||"SUBMIT");
     const smtpReplyCategory=classifySmtpReplyCategory(error,stageCode);
-    return json({ok:false,error:"SMTP self-check failed.",to,stageCode,smtpReplyCategory,smtpReply:String(error?.message||"").match(/IRPA SMTP error \\d{3}/i)?.[0]||null,messageId,stages},502,corsHeaders(request));
+    return json({ok:false,error:"SMTP self-check failed.",to,stageCode,smtpReplyCategory,smtpReply:String(error?.message||"").match(/IRPA SMTP error \d{3}/i)?.[0]||null,messageId,stages},502,corsHeaders(request));
   }
 };
 const passwordRecoveryRouter = createPasswordRecoveryRouter({
@@ -590,7 +590,8 @@ export default {
                 const safeTitle=String(title||"Controlled document").replace(/[\\r\\n]+/g," ").slice(0,180);
                 const expiryDate=expiresAt?new Date(expiresAt):null;
                 const expiryLabel=expiryDate&&Number.isFinite(expiryDate.getTime())?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(expiryDate)+" EAT":"the configured expiry shown in the signing portal";
-                const firstName=safeName.split(/\\s+/)[0]||"Signer";\n                const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName+" ["+String(signerId||"S1")+"]";
+                const firstName=safeName.split(/\s+/)[0]||"Signer";
+                const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName+" ["+String(signerId||"S1")+"]";
                 const text="Dear "+safeName+",\\n\\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\\n\\nDocument: "+safeTitle+"\\nLink expiry: "+expiryLabel+".\\n\\nYour link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit Open document to sign action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.\\n\\nOpen your document: "+String(link||"")+"\\n\\nDo not forward this link. This link controls access to this signing assignment only; it does not independently verify legal identity or institutional authority. If you did not expect this invitation, contact IRPA Administration.";
                 const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>"+escapeMailHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeMailHtml(expiryLabel)+"</p><p>Your link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit <strong>Open document to sign</strong> action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.</p><p><a href='"+escapeMailHtml(String(link||""))+"'>Open your document</a></p><p>Do not forward this link. It controls access to this signing assignment only and does not independently verify legal identity or institutional authority.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
                 // Retry transient SMTP 4xx responses for reusable email-link invitations; permanent 5xx recipient/auth failures remain fail-fast.
@@ -3047,9 +3048,9 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromNam
   const safeFromName=validateMailHeader(fromName||"IRPA Administration","From name").replace(/"/g,"");
   const fromHeader='"'+safeFromName+'" <'+smtpConfig.from+'>';
   const generatedMessageId=messageId||"<"+crypto.randomUUID()+"@"+(String(smtpConfig.from).split("@")[1]||"irpa.or.tz")+">";
-  if(!/^<[^<>\\s@]+@irpa\\.or\\.tz>$/.test(generatedMessageId))throw new Error("Invalid signing email Message-ID.");
+  if(!/^<[^<>\s@]+@irpa\.or\.tz>$/.test(generatedMessageId))throw new Error("Invalid signing email Message-ID.");
   const baseMime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:fromHeader,to:toEmail,subject:cleanSubject,text,html,attachments}),onStage);
-  const mime=baseMime.replace(/\\r\\n\\r\\n/,"\\r\\nMessage-ID: "+generatedMessageId+"\\r\\nDate: "+new Date().toUTCString()+"\\r\\n\\r\\n");
+  const mime=baseMime.replace(/\r\n\r\n/,"\r\nMessage-ID: "+generatedMessageId+"\r\nDate: "+new Date().toUTCString()+"\r\n\r\n");
   if(env.SMTP_MOCK==="success"){
     for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success")}catch{}
     return "250 MOCK ACCEPTED";
