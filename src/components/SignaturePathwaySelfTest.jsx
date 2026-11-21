@@ -213,7 +213,8 @@ export default function SignaturePathwaySelfTest() {
       const response = await fetch(gateway + "/api/signature-pathway/drive-health", {
         method: "GET",
         headers: { Authorization: "Bearer " + token, Accept: "application/json" },
-        cache: "no-store"
+        cache: "no-store",
+        redirect: "error"
       });
       const data = await response.json().catch(() => ({}));
       setDriveHealth({
@@ -221,7 +222,7 @@ export default function SignaturePathwaySelfTest() {
         classification: String(data.classification || "unknown")
       });
     } catch {
-      setDriveHealth({ statusClass: "error", classification: "network_or_authentication" });
+      setDriveHealth({ statusClass: "error", classification: "gateway_redirect_blocked_or_network_or_authentication" });
     }
   }
 
@@ -232,7 +233,6 @@ export default function SignaturePathwaySelfTest() {
     setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 times (4 total attempts). No changes will be made.");
     try {
       await requireAdministrator();
-      await checkDriveHealth();
       const snapshot = await getDocs(collection(db, "documents"));
       const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
