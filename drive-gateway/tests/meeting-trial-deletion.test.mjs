@@ -15,7 +15,7 @@ const meeting = {
   updateTime: "2026-11-21T20:00:00.000Z"
 };
 const childRecords = [
-  { collection: "participants", record: { id: "p1", meetingId: "trial-1", updateTime: "2026-11-21T20:01:00.000Z", name: "Test Participant", accessToken: "must-not-export" } },
+  { collection: "participants", record: { id: "p1", meetingId: "trial-1", updateTime: "2026-11-21T20:01:00.000Z", name: "Test Participant", accessTokenHash: "must-not-export", signatureImage: "must-not-export" } },
   { collection: "votes", record: { id: "v1", meetingId: "trial-1", updateTime: "2026-11-21T20:02:00.000Z", result: "Pending", tokenHash: "must-not-export" } }
 ];
 
@@ -61,7 +61,8 @@ test("preview digest is stable and export strips credentials and bearer tokens",
   assert.equal(preview.previewDigest, reordered.previewDigest);
   assert.equal(preview.childCount, 2);
   assert.deepEqual(preview.collectionCounts, { participants: 1, votes: 1 });
-  assert.equal(preview.exportData.children[0].record.accessToken, undefined);
+  assert.equal(preview.exportData.children[0].record.accessTokenHash, undefined);
+  assert.equal(preview.exportData.children[0].record.signatureImage, undefined);
   assert.equal(preview.exportData.children[1].record.tokenHash, undefined);
   assert.equal(preview.exportData.meeting.environment, "TRIAL");
 });
