@@ -28,10 +28,11 @@ export async function recordEmailLinkStage(ctx,envelopeId,signerId,stage,outcome
 function createInvitationStageCallback(ctx,envelopeId,signerId){
   return (stage,outcome,smtpReplyCategory="UNKNOWN",metadata={})=>recordEmailLinkStage(ctx,envelopeId,signerId,stage,outcome,smtpReplyCategory,metadata);
 }
-function createInvitationAuditCallback(ctx,{envelopeId,signerId,email,title,position,positionCount}){
+function createInvitationAuditCallback(ctx,{envelopeId,signerId,email,title,position,positionCount,invitationKind="creation"}){
+  const [localPart,domain]=String(email||"").trim().toLowerCase().split("@");
   return async({messageId,smtpReplyCategory="UNKNOWN",stageCode=null}={})=>{
     try{
-      await ctx.sendInvitationAudit?.({recipientPrefix:String(email||"").slice(0,3),envelopeId,position,positionCount,title,messageId:messageId||null,smtpReplyCategory,stageCode,at:ctx.now().toISOString()});
+      await ctx.sendInvitationAudit?.({recipientPrefix:String(localPart||"").slice(0,3),recipientDomain:domain||"unknown",envelopeId,position,positionCount,title,messageId:messageId||null,smtpReplyCategory,stageCode,invitationKind,at:ctx.now().toISOString()});
     }catch(error){ctx.logger?.error?.("SIGNING_INVITATION_AUDIT_EMAIL_FAILED",{envelopeId,signerId,errorType:String(error?.name||"Error").slice(0,40)});}
   };
 }
@@ -141,7 +142,7 @@ export async function createEnvelope(ctx,user,body){
       if(signers[i].id===ownerPreSignSigner.id)signers[i].invitation="Portal";
       continue;
     }
-    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,emailSigningModule:e.emailSigningModule,invitationKind:"creation",...signerPositionDetails(signers,signers[i]),onStage:createInvitationStageCallback(ctx,id,signers[i].id),onAudit:createInvitationAuditCallback(ctx,{envelopeId:id,signerId:signers[i].id,email:signers[i].email,title:e.title,...signerPositionDetails(signers,signers[i])}),expiresAt:signers[i].tokenExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
+    if(ctx.sendInvitation){try{const emailLink=signers[i].identityType==="email-link";const link=emailLink?`${ctx.config.appUrl}/?emailSignToken=${encodeURIComponent(token)}`:`${ctx.config.appUrl}/sign?gatewayToken=${encodeURIComponent(token)}&signEnvelope=${encodeURIComponent(externalReference||"")}`;await ctx.sendInvitation({to:signers[i].email,name:signers[i].name,link,emailLink,title:e.title,ownerName:user.name||user.email||"IRPA Document Owner",envelopeId:id,signerId:signers[i].id,emailSigningModule:e.emailSigningModule,invitationKind:"creation",...signerPositionDetails(signers,signers[i]),onStage:createInvitationStageCallback(ctx,id,signers[i].id),onAudit:createInvitationAuditCallback(ctx,{envelopeId:id,signerId:signers[i].id,email:signers[i].email,title:e.title,invitationKind:"creation",...signerPositionDetails(signers,signers[i])}),expiresAt:signers[i].tokenExpiresAt||e.expiresAt});signers[i].invitation="Sent";}
     catch(err){signers[i].invitation="Failed";signers[i].deliveryStageCode=EMAIL_STAGE_SET.has(err?.stageCode)?err.stageCode:null;ctx.logger?.error?.("ENVELOPE_INVITATION_FAILED",{envelopeId:id,signerId:signers[i].id,...invitationFailureDiagnostics(err),...(signers[i].deliveryStageCode?{stageCode:signers[i].deliveryStageCode}:{})});}}
     else signers[i].invitation="Sent";
   }
@@ -365,7 +366,7 @@ export async function resendInvitation(ctx,user,id,signerId,options={}){
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"invitation.resend.started",signerId,actor:user.uid,at:now.toISOString()})}};
   });
   try{
-    await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,emailSigningModule:envelope.emailSigningModule,invitationKind:options.invitationKind||"resend",...signerPositionDetails(envelope.signers,target),expiresAt,onStage:createInvitationStageCallback(ctx,id,signerId),onAudit:createInvitationAuditCallback(ctx,{envelopeId:id,signerId,email:target.email,title:envelope.title,...signerPositionDetails(envelope.signers,target)})});
+    await ctx.sendInvitation({to:target.email,name:target.name,link,emailLink,title:envelope.title,ownerName:envelope.ownerName||user.email||"IRPA Document Owner",envelopeId:id,signerId,emailSigningModule:envelope.emailSigningModule,invitationKind:options.invitationKind||"resend",...signerPositionDetails(envelope.signers,target),expiresAt,onStage:createInvitationStageCallback(ctx,id,signerId),onAudit:createInvitationAuditCallback(ctx,{envelopeId:id,signerId,email:target.email,title:envelope.title,invitationKind:options.invitationKind||"resend",...signerPositionDetails(envelope.signers,target)})});
   }catch(error){
     ctx.logger?.error?.("SIGNING_INVITATION_DELIVERY_FAILED",{envelopeId:id,signerId,...invitationFailureDiagnostics(error)});
     await mutate(ctx,id,async current=>{
