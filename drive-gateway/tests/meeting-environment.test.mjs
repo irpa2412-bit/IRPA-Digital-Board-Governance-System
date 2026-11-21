@@ -5,7 +5,8 @@ import { readFile } from "node:fs/promises";
 
 test("only an explicit TRIAL environment is classified as deletable", () => {
   assert.equal(meetingEnvironment("TRIAL"), "TRIAL");
-  assert.equal(meetingEnvironment("trial"), "TRIAL");
+  assert.equal(meetingEnvironment("trial"), "REAL");
+  assert.equal(meetingEnvironment(" TRIAL "), "REAL");
   assert.equal(meetingEnvironment(undefined), "REAL");
   assert.equal(meetingEnvironment(null), "REAL");
   assert.equal(meetingEnvironment(""), "REAL");
