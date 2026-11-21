@@ -17,7 +17,8 @@
       "tests/signature-self-test-session-safety.test.mjs",
       "package.json",
       "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
-      ".github/workflows/email-signing-contract.yml"
+      ".github/workflows/email-signing-contract.yml",
+      "tests/signature-pathway-contract.test.mjs"
     ],
     "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
     "prohibitedChanges": [
@@ -60,7 +61,8 @@
       "Prepare Envelope submit and save-draft controls are moved to a separate sticky control bar above the PDF designer/navigation.",
       "No Meeting Portal workflow behavior is changed.",
       "The main Signature Pathway Self-Test no longer automatically runs the separate Google Drive token-refresh health request; the operator can still run it explicitly.",
-      "Self-test-only Gateway reconciliation and controlled-document download requests reject redirects rather than following an interactive login gateway."
+      "Self-test-only Gateway reconciliation and controlled-document download requests reject redirects rather than following an interactive login gateway.",
+      "The existing diagnostic contract test now asserts the self-test-specific Gateway request helper and redirect rejection."
     ],
     "evidence": [
       "Verified production frontend baseline before this repair: main commit 21f33960395e09d9da74f030732e43558eac6e6d.",
