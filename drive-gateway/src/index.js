@@ -10,7 +10,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif","image/bmp","image/tiff","image/avif","application/zip","video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska","audio/mpeg","audio/wav","audio/x-wav","audio/webm","audio/mp4","audio/x-m4a","audio/aac","audio/ogg","audio/flac"
 ]);
 const OAUTH_STATE_TTL = 600;
-import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
+import { buildMailMimeMessage, buildSmtpRecipientEnvelope, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
@@ -591,24 +591,56 @@ export default {
               const html="<p><strong>Time (EAT):</strong> "+escapeMailHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeMailHtml(envelopeId||"")+"</p><p><strong>Signer position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeMailHtml(messageId||"Not recorded")+"</p><p>"+escapeMailHtml(detail)+"</p>";
               return smtpSend(env,{to:"info@irpa.or.tz",subject,text,html,fromName:"IRPA Digital Signing"});
             },
-            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,positionCount,onStage}) => {
-              if(!emailLink)return sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console});
-              if(emailSigningModule==="v2"){
-                const safeName=String(name||"IRPA signer").replace(/[\\r\\n]+/g," ").slice(0,160);
-                const safeOwner=String(ownerName||"IRPA Document Owner").replace(/[\\r\\n]+/g," ").slice(0,160);
-                const safeTitle=String(title||"Controlled document").replace(/[\\r\\n]+/g," ").slice(0,180);
-                const expiryDate=expiresAt?new Date(expiresAt):null;
-                const expiryLabel=expiryDate&&Number.isFinite(expiryDate.getTime())?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(expiryDate)+" EAT":"the configured expiry shown in the signing portal";
-                const firstName=safeName.split(/\s+/)[0]||"Signer";
-                const subject="Please sign: "+safeTitle+" (signer "+(Number(position)||1)+" of "+(Number(positionCount)||1)+") - "+firstName;
-                const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\nLink expiry: "+expiryLabel+".\n\nYour link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit Open document to sign action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.\n\nOpen your document: "+String(link||"")+"\n\nDo not forward this link. This link controls access to this signing assignment only; it does not independently verify legal identity or institutional authority. If you did not expect this invitation, contact IRPA Administration.";
-                const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>"+escapeMailHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeMailHtml(expiryLabel)+"</p><p>Your link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit <strong>Open document to sign</strong> action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.</p><p><a href='"+escapeMailHtml(String(link||""))+"'>Open your document</a></p><p>Do not forward this link. It controls access to this signing assignment only and does not independently verify legal identity or institutional authority.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
-                // Keep one Message-ID across safe pre-acceptance retries for this single signer-position invitation.
-                const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
-                const stageCallback=(stage,outcome,category,details={})=>onStage?.(stage,outcome,category,{...details,messageId});
-                return sendInvitationWithRetry(()=>smtpSend(env,{to,subject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:stageCallback}),{logger:console});
+            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,positionCount,invitationKind="creation",onStage}) => {
+              const recipient=validateRecipient(to);
+              if(!recipient){const invalid=new Error("Invalid signer email address.");invalid.stageCode="BUILD_MESSAGE";throw invalid;}
+              const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
+              const safeTitle=String(title||"Controlled document").replace(/[\r\n]+/g," ").slice(0,180);
+              const safeName=String(name||"IRPA signer").replace(/[\r\n]+/g," ").slice(0,160);
+              const firstName=safeName.split(/\s+/)[0]||"Signer";
+              const subject="Please sign: "+safeTitle+" - "+firstName+" (position "+(Number(position)||1)+" of "+(Number(positionCount)||1)+")";
+              let lastStage="BUILD_MESSAGE",lastCategory="UNKNOWN",result=null,failure=null;
+              const captureStage=async(stage,outcome,category)=>{
+                lastStage=String(stage||lastStage);
+                if(category)lastCategory=String(category);
+                try{await onStage?.(stage,outcome,category);}catch{}
+              };
+              try{
+                if(!emailLink){
+                  result=await sendInvitationEmail({email:recipient,name,link,smtpSend:async ({to:target,subject:mailSubject,text,html})=>smtpSend(env,{to:target,subject:mailSubject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage}),logger:console});
+                }else if(emailSigningModule==="v2"){
+                  const safeOwner=String(ownerName||"IRPA Document Owner").replace(/[\r\n]+/g," ").slice(0,160);
+                  const expiryDate=expiresAt?new Date(expiresAt):null;
+                  const expiryLabel=expiryDate&&Number.isFinite(expiryDate.getTime())?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(expiryDate)+" EAT":"the configured expiry shown in the signing portal";
+                  const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\nLink expiry: "+expiryLabel+".\n\nYour link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit Open document to sign action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.\n\nOpen your document: "+String(link||"")+"\n\nDo not forward this link. This link controls access to this signing assignment only; it does not independently verify legal identity or institutional authority. If you did not expect this invitation, contact IRPA Administration.";
+                  const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>"+escapeMailHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Link expiry:</strong> "+escapeMailHtml(expiryLabel)+"</p><p>Your link is reusable and is bound only to this document and your signer assignment. Previewing the link does not consume it. Each explicit <strong>Open document to sign</strong> action creates a fresh private signing session. You may close the page, reopen the same email link, or continue from another device until you sign, the configured expiry is reached, the owner cancels the envelope, or the owner sends a replacement link.</p><p><a href='"+escapeMailHtml(String(link||""))+"'>Open your document</a></p><p>Do not forward this link. This link controls access to this signing assignment only; it does not independently verify legal identity or institutional authority.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
+                  result=await sendInvitationWithRetry(()=>smtpSend(env,{to:recipient,subject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage}),{logger:console});
+                }else{
+                  result=await sendEmailSigningInvitation({email:recipient,name,link,title,ownerName,expiresAt,onStage:captureStage,smtpSend:async ({to:target,text,html})=>smtpSend(env,{to:target,subject,text,html,fromName:"IRPA Digital Signing",messageId,onStage:captureStage}),logger:console});
+                }
+                lastStage="SUBMIT";
+                if(lastCategory==="UNKNOWN")lastCategory="ACCEPTED";
+              }catch(error){
+                failure=error;
+                lastStage=String(error?.stageCode||lastStage);
+                lastCategory=String(error?.smtpReplyCategory||lastCategory);
               }
-              return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console});
+              try{
+                const [localPart,domain]=recipient.split("@");
+                const maskedRecipient=localPart.slice(0,3)+"...@"+domain;
+                const auditTime=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date())+" EAT";
+                const auditSubject="AUDIT: invitation to "+maskedRecipient+" position "+(Number(position)||1)+" - "+safeTitle;
+                const auditText="Time: "+auditTime+"\nEnvelope ID: "+String(envelopeId||"")+
+                  "\nPosition: "+(Number(position)||1)+" of "+(Number(positionCount)||1)+
+                  "\nMessage-ID: "+messageId+"\nType: "+(invitationKind==="resend"?"resend":"creation")+
+                  "\nSMTP reply category: "+lastCategory+"\nStage code: "+lastStage+
+                  "\nRecipient domain: "+domain;
+                await smtpSend(env,{to:"info@irpa.or.tz",subject:auditSubject,text:auditText,html:"<p>"+escapeMailHtml(auditText).replace(/\n/g,"<br>")+"</p>",fromName:"IRPA Digital Signing"});
+              }catch(auditError){
+                console.error("SIGNING_INVITATION_AUDIT_EMAIL_FAILED",{envelopeId:String(envelopeId||""),signerId:String(signerId||""),stageCode:lastStage,errorType:String(auditError?.name||"Error")});
+              }
+              if(failure)throw failure;
+              return result;
             },
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
@@ -3061,8 +3093,8 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromNam
   const generatedMessageId=messageId||"<"+crypto.randomUUID()+"@"+(String(smtpConfig.from).split("@")[1]||"irpa.or.tz")+">";
   if(!/^<[^<>\s@]+@irpa\.or\.tz>$/.test(generatedMessageId))throw new Error("Invalid signing email Message-ID.");
   const reportStage=async(stage,outcome,category)=>onStage?.(stage,outcome,stage==="SUBMIT"&&outcome==="success"?"ACCEPTED":category,{messageId:generatedMessageId,smtpReplyCategory:stage==="SUBMIT"&&outcome==="success"?"ACCEPTED":category||"UNKNOWN"});
-  const baseMime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:fromHeader,to:toEmail,subject:cleanSubject,text,html,attachments}),reportStage);
-  const mime=baseMime.replace(/\r\n\r\n/,"\r\nMessage-ID: "+generatedMessageId+"\r\nDate: "+new Date().toUTCString()+"\r\n\r\n");
+  const envelope=await runEmailStage("BUILD_MESSAGE",()=>buildSmtpRecipientEnvelope({from:fromHeader,to:toEmail,subject:cleanSubject,text,html,attachments}),reportStage);
+  const mime=envelope.mime.replace(/\\r\\n\\r\\n/,"\\r\\nMessage-ID: "+generatedMessageId+"\\r\\nDate: "+new Date().toUTCString()+"\\r\\n\\r\\n");
   if(env.SMTP_MOCK==="success"){
     for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await reportStage(stage,"success")}catch{}
     return "250 MOCK ACCEPTED";
@@ -3109,7 +3141,7 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromNam
     }),reportStage);
     await runEmailStage("RCPT_ACCEPTED",async()=>{
       await command("MAIL FROM:<"+smtpConfig.from+">","2");
-      await command("RCPT TO:<"+toEmail+">","2");
+      await command(envelope.rcptCommand,"2");
     },reportStage);
     const accepted=await runEmailStage("SUBMIT",async()=>{
       await command("DATA","3");
