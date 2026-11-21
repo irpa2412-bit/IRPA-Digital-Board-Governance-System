@@ -24,7 +24,7 @@ export const MEETING_CHILD_COLLECTIONS = Object.freeze([
 ]);
 
 const clean = value => String(value ?? "").trim();
-const sensitiveKey = /^(?:accessToken|refreshToken|idToken|token|tokenHash|secret|password|authorization|credential|privateKey|apiKey|emailSignToken|gatewayToken)$/i;
+const sensitiveKey = /token|secret|password|authorization|credential|private.?key|api.?key|signature(?:image|data|base64|blob)/i;
 
 export function sanitizeMeetingExport(value) {
   if (Array.isArray(value)) return value.map(sanitizeMeetingExport);
@@ -67,7 +67,7 @@ export async function buildMeetingDeletionPreview(meetingId, meeting, childRecor
     exportData: {
       schemaVersion: 1,
       exportedAt: new Date().toISOString(),
-      meeting: sanitizeMeetingExport({ id: clean(meetingId), ...meeting }),
+      meeting: sanitizeMeetingExport({ ...meeting, id: clean(meetingId) }),
       children: childRecords.map(({ collection, record }) => ({
         collection,
         record: sanitizeMeetingExport(record)
