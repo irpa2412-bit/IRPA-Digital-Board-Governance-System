@@ -16,6 +16,10 @@ test("isolation baseline compares against the fetched current main snapshot", ()
 test("TRIAL deletion repair is allowed only with its exact paired gateway and policy tests", () => {
   assert.match(guard, /const meetingTrialDeletionFiles = new Set/);
   assert.match(guard, /const meetingTrialDeletionGuard =/);
+  assert.match(guard, /changed\.includes\("drive-gateway\\/src\\/meetingDeletion\.mjs"\)/);
+  assert.match(guard, /changed\.includes\("drive-gateway\\/tests\\/meeting-trial-deletion\.test\.mjs"\)/);
+  assert.match(guard, /changed\.includes\("src\\/pages\\/Meetings\.jsx"\)/);
+  assert.match(guard, /changed\.includes\("tests\\/meeting-trial-delete-ui\.test\.mjs"\)/);
   for (const path of [
     "docs/implementation-status.md",
     "docs/portal-protection/records/meeting-portal.json",
