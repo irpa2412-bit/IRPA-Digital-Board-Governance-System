@@ -376,11 +376,13 @@ test("typed signer addresses are trimmed and normalized at the SMTP boundary; di
   assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/single signer recipient/i);
 });
 
-test("signing audit email masks the recipient and omits the recipient domain",()=>{
+test("signing audit email masks the local part and retains the recipient domain",()=>{
   const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Minutes");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
+  assert.match(audit.text,/Type: creation/);
+  assert.match(audit.text,/Recipient domain: example.org/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
   assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
@@ -399,7 +401,7 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
       const envelope=buildSmtpRecipientEnvelope({
         from:'"IRPA Digital Signing" <sender@irpa.or.tz>',
         to:invitation.to,
-        subject:"Please sign: Shared mailbox test (signer 2 of 3) - Signer",
+        subject:"Please sign: Shared mailbox test - Signer (signer 2 of 3)",
         text:"Invitation text",
         html:"<p>Invitation text</p>"
       });
@@ -463,14 +465,14 @@ test("signing invitation recipient validation rejects display names and comma-se
   assert.equal(validateRecipient("  Signer@Example.org  "),"signer@example.org");
 });
 
-test("invitation audit message includes a three-character mask and required evidence without a domain",()=>{
+test("invitation audit message includes a masked recipient domain and required delivery evidence",()=>{
   const audit=buildSigningInvitationAuditMessage({
     recipientPrefix:"daniel",recipientDomain:"gmail.com",position:2,positionCount:3,
     title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
     smtpReplyCategory:"ACCEPTED",at:NOW
   });
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Policy");
   assert.match(audit.text,/Time \(EAT\):/);
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
@@ -512,9 +514,11 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
   const audit=buildSigningInvitationAuditMessage({
     recipientPrefix:"abc",recipientDomain:"example.com",position:2,positionCount:3,title:"Board Policy",
     envelopeId:"ENV-FAIL-AUDIT",messageId:"<failed@irpa.or.tz>",
-    smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",at:NOW
+    smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",invitationKind:"resend",at:NOW
   });
-  assert.equal(audit.subject,"AUDIT: invitation to abc... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
+  assert.match(audit.text,/Type: resend/);
+  assert.match(audit.text,/Recipient domain: example.com/);
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
   assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
@@ -524,9 +528,9 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
 test("three shared-mailbox signer positions produce three distinct exact subjects",()=>{
   const subjects=[1,2,3].map(position=>buildSignerInvitationSubject({title:"Shared Mailbox Agreement",position,positionCount:3,name:"Daniel Mollel"}));
   assert.deepEqual(subjects,[
-    "Please sign: Shared Mailbox Agreement (signer 1 of 3) - Daniel",
-    "Please sign: Shared Mailbox Agreement (signer 2 of 3) - Daniel",
-    "Please sign: Shared Mailbox Agreement (signer 3 of 3) - Daniel"
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 1 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 2 of 3)",
+    "Please sign: Shared Mailbox Agreement - Daniel (signer 3 of 3)"
   ]);
   assert.equal(new Set(subjects).size,3);
 });
