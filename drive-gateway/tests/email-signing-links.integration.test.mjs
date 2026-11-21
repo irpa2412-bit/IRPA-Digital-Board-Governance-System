@@ -471,6 +471,8 @@ test("e) three sequential positions on one mailbox receive distinct mocked-SMTP 
     assert.equal(serialized.includes("emailSignToken"),false,"audit contains no signing token");
     assert.equal(serialized.includes("https://"),false,"audit contains no signing link");
     assert.equal(audit.recipientPrefix,"sha");
+    assert.equal(audit.recipientDomain,"example.org","audit subject must retain only the masked local part and recipient domain");
+    assert.equal(audit.invitationKind,"creation");
   }
 });
 
