@@ -335,38 +335,5 @@
       "productionSmoke": "PENDING",
       "evidence": []
     }
-  },
-  "invitationDeliveryAmendment": {
-    "status": "open",
-    "pullRequest": 836,
-    "affectedPortals": [
-      "Signature Portal"
-    ],
-    "operation": "shared-mailbox-signing-invitation-delivery",
-    "reason": "Complete existing PR #836 only: invitation creation/sending, per-position next-signer hand-off, SMTP delivery recording, envelope-view delivery status, and regression tests. Copy/WhatsApp remains blocked because the active bearer token is not recoverable from the persisted hash without changing token custody or issuing a replacement. Self-test crash and unrelated work are excluded.",
-    "files": [
-      "drive-gateway/src/index.js",
-      "drive-gateway/src/invitationEmail.mjs",
-      "drive-gateway/src/mailDelivery.js",
-      "drive-gateway/src/signing.mjs",
-      "src/pages/SignaturePlatform.jsx",
-      "drive-gateway/tests/email-signing-links.integration.test.mjs",
-      "drive-gateway/tests/email-signing-links.test.mjs",
-      "docs/portal-protection/repair-window.json",
-      "docs/portal-protection/change-record.json"
-    ],
-    "repairWindow": {
-      "openedAt": "2026-11-21T09:57:28Z",
-      "closesAt": "2026-11-22T09:57:28Z",
-      "durationHours": 24,
-      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
-    },
-    "prohibitedChanges": [
-      "signing rules, signer identity, token format/hash custody, sessions, owner resend rules, field assignment",
-      "PDF stamping, document hash, certificate, archive logic, completed PDFs",
-      "Firestore rules/indexes, secrets, environment variables, SMTP settings/credentials, Worker bindings",
-      "self-test crash, Meeting Portal, hash check, rebuild, unrelated portals"
-    ],
-    "ownerInstruction": "Use only existing PR #836. Finish MAIL DELIVERY as tracker item 2 before PR A crash safety. Copy and WhatsApp actions reuse the existing single-signer resend path and exact link accepted by SMTP; do not introduce a token store or link format. Keep PR A paused until this item is live."
   }
 }
