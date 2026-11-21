@@ -7,12 +7,52 @@ const EMAIL_RE = /^[^\s@<>"',;:\\]+@[^\s@<>"',;:\\]+\.[^\s@<>"',;:\\]+$/;
 const CRLF_RE = /[\r\n\u2028\u2029]/;
 const SUBJECT = "Invitation to the IRPA Digital Board Governance System";
 
+export const MAX_INVITATION_MAIL_ATTEMPTS = 3;
+export const MAX_INVITATION_RETRY_DELAY_MS = 2000;
+
 export function validateRecipient(email) {
   if (typeof email !== "string") return null;
   const v = email.trim().toLowerCase();
   if (!v || v.length > 254 || CRLF_RE.test(v) || !EMAIL_RE.test(v)) return null;
   return v;
 }
+export function validateName(name) {
+  if (name === undefined || name === null || name === "") return "Member";
+  if (typeof name !== "string" || name.length > 100 || CRLF_RE.test(name)) return null;
+  return name.trim() || "Member";
+}
+
+export function isInvitationQueueActive(queuedAt, now = Date.now(), leaseMs = 5 * 60 * 1000) {
+  const queuedAtMs = Date.parse(String(queuedAt || ""));
+  return Number.isFinite(queuedAtMs) && queuedAtMs <= now + 30_000 && now - queuedAtMs < leaseMs;
+}
+export function isRetryableMailError(error) {
+  const message = String(error?.message || error || "");
+  const smtp = message.match(/IRPA SMTP error (\\d{3})/i);
+  if (smtp) return Number(smtp[1]) >= 400 && Number(smtp[1]) < 500;
+  if (error?.deliveryOutcome === "unknown" || error?.retryable === false) return false;
+  return true;
+}
+export async function sendWithRetry(fn, opts = {}) {
+  const { attempts=MAX_INVITATION_MAIL_ATTEMPTS, delayMs=300, maxDelayMs=MAX_INVITATION_RETRY_DELAY_MS,
+    logger=console, shouldRetry=isRetryableMailError, sleep=(ms)=>new Promise(resolve=>setTimeout(resolve,ms)) } = opts;
+  const boundedAttempts=Math.max(1,Math.min(MAX_INVITATION_MAIL_ATTEMPTS,Number(attempts)||MAX_INVITATION_MAIL_ATTEMPTS));
+  let lastError;
+  for(let attempt=1;attempt<=boundedAttempts;attempt++){
+    try{return await fn(attempt);}
+    catch(error){
+      lastError=error;
+      try{logger?.error?.("IRPA invitation mail attempt failed",{attempt,retryable:shouldRetry(error),stage:error?.stage||"provider"});}catch{}
+      if(attempt===boundedAttempts||!shouldRetry(error))break;
+      const cap=Math.max(0,Number(maxDelayMs)||MAX_INVITATION_RETRY_DELAY_MS);
+      const exponential=Math.min(cap,Math.max(0,Number(delayMs)||300)*2**(attempt-1));
+      const jitter=Math.floor(Math.random()*Math.max(1,Math.floor(exponential*0.2)));
+      await sleep(Math.min(cap,exponential+jitter));
+    }
+  }
+  throw lastError||new Error("Invitation mail delivery failed.");
+}
+
 export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
   const typedRecipient=validateRecipient(to);
   if(!typedRecipient)throw new Error("A valid single signer recipient email address is required.");
@@ -83,6 +123,13 @@ export function buildInvitationMessage({name,link,meetingAccess=null,username=""
     text:`Dear ${safeName},\n\nYou have been invited to access the IRPA Digital Board Governance System workspace.\n\nOpen the invitation link to create your password and activate your account:\n${safeLink}\n\nAfter activation, you can sign in directly to your IRPA workspace.${meetingText}\n\nIf you did not expect this email, please contact IRPA Administration.`,
     html:`<p>Dear ${escapeHtml(safeName)},</p><p>You have been invited to access the IRPA Digital Board Governance System workspace.</p><p>Open the invitation link below to create your password and activate your account:</p><p><a href="${escapeHtml(safeLink)}">Activate My Account</a></p><p>After activation, you can sign in directly to your IRPA workspace.</p>${meetingHtml}<p>If you did not expect this email, please contact IRPA Administration.</p>`
   };
+}
+
+export async function sendInvitationEmail({email,name,link,meetingAccess=null,smtpSend,logger=console,sleep}) {
+  const to=validateRecipient(email);
+  if(!to) throw new Error("Invalid recipient");
+  const message=buildInvitationMessage({name,link,meetingAccess,username:to});
+  return sendWithRetry(()=>smtpSend({to,...message}),{logger,sleep});
 }
 
 export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}) {
