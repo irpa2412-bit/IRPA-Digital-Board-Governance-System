@@ -512,7 +512,7 @@ export async function retryFailedInvitations(ctx,user,id){
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
   if(["Completed","Voided","Declined","Cancelled","Canceled"].includes(envelope.status))throw new HttpError(409,"A completed or cancelled signing envelope cannot send another link.");
-  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed"&&(signer.invitation==="Failed"||signer.invitation==="Pending"||["send failed","failed"].includes(String(signer.emailLinkStatus||"").trim().toLowerCase())||emailDeliveryFailureForSigner(envelope,signer)?.deliveryStatus==="Failed"));
+  const targets=(envelope.signers||[]).filter(signer=>signer.status!=="Signed"&&(signer.invitation==="Failed"||["send failed","failed"].includes(String(signer.emailLinkStatus||"").trim().toLowerCase())||emailDeliveryFailureForSigner(envelope,signer)?.deliveryStatus==="Failed"));
   const results=[];
   for(const signer of targets){
     try{results.push(await resendInvitation(ctx,user,id,signer.id,{sendFailureReport:false}));}
