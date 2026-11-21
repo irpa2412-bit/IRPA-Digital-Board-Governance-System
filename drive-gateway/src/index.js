@@ -48,6 +48,7 @@ import {
   getSigningPdf as getGatewaySigningPdf,
   resendInvitation as resendGatewayInvitation,
   resendAllUnsignedInvitations as resendAllGatewayUnsignedInvitations,
+  retryFailedInvitations as retryFailedGatewayInvitations,
   updateSignerContact as updateGatewaySignerContact
 } from "./signing.mjs";
 import { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } from "./actualDataAccessPolicy.mjs";
@@ -629,6 +630,12 @@ export default {
               const masked=signer?.email?maskEmailForConfirmation(signer.email):"recipient";
               return emailRouteJson({...result,maskedRecipient:masked,confirmationText:"New link sent to "+masked+"...",expiresAtEAT:result.expiresAt?formatEmailLinkExpiryEAT(result.expiresAt):null},200);
             }catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Invitation resend failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
+          }
+          if(request.method==="POST"&&emailPathParts.length===6&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&emailPathParts[5]==="retry-failed"){
+            const user=await ctx.verifyUser(request).catch(()=>null);
+            if(!user)return emailRouteJson({ok:false,error:"Authentication is required."},401);
+            try{return emailRouteJson(await retryFailedGatewayInvitations(ctx,user,emailPathParts[3]),200);}
+            catch(error){return emailRouteJson({ok:false,error:String(error?.message||"Failed invitation retry failed."),code:error?.code||"SUBMIT"},Number(error?.status||502));}
           }
           if(request.method==="POST"&&emailPathParts.length===6&&emailPathParts[1]==="api"&&emailPathParts[2]==="envelopes"&&validEnvelopeId(emailPathParts[3])&&emailPathParts[4]==="invitations"&&emailPathParts[5]==="resend-all"){
             const user=await ctx.verifyUser(request).catch(()=>null);
