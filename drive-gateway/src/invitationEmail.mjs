@@ -180,7 +180,7 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
   const expiryHtml="<strong>Link expiry:</strong> "+escapeHtml(expiryLabel)+". The link can be redeemed once; after expiry or replacement, ask the document owner for a new link.";
   const firstName=safeName.split(/\s+/)[0]||"Signer";
   const signerPosition=Math.max(1,Math.floor(Number(position)||1));
-  const subject=("IRPA signing request: "+clean(safeTitle,120)+" — "+clean(firstName,40)+" (Position "+signerPosition+")").slice(0,200);
+  const subject=("IRPA signing request: "+clean(safeTitle,120)+" - "+clean(firstName,40)+" (Position "+signerPosition+")").slice(0,200);
   const text="Dear "+safeName+",\n\n"+safeOwner+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.\n\nDocument: "+safeTitle+"\n"+expiryText+"\n\nOpen your single-use secure link:\n"+safeLink+"\n\nOpening the link verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.\n\nThis link does not independently verify your legal identity or institutional authority. Do not forward it. If you did not expect this invitation, contact IRPA Administration.";
   const html="<p>Dear "+escapeHtml(safeName)+",</p><p>"+escapeHtml(safeOwner)+" has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.</p><p><strong>Document:</strong> "+escapeHtml(safeTitle)+"<br>"+expiryHtml+"</p><p><a href=\""+escapeHtml(safeLink)+"\">Open secure document link</a></p><p>This is a private, single-use link. Opening it verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.</p><p>This link does not independently verify your legal identity or institutional authority. Do not forward it.</p><p>If you did not expect this invitation, contact IRPA Administration.</p>";
   return {subject,text,html};
@@ -227,11 +227,12 @@ export async function runEmailStage(stage,action,onStage,details={}) {
   }
 }
 
-export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,position=1,from,replyTo=from,smtpSend,logger=console,sleep,onStage}) {
+export async function sendEmailSigningInvitation({email,name,link,title,ownerName,expiresAt,position=1,from,replyTo=from,expectedOrigin,smtpSend,logger=console,sleep,onStage}) {
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
   const safeLink=new URL(link);
   if(safeLink.protocol!=="https:"||/^(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|is\.gd|short\.io|rebrand\.ly)$/i.test(safeLink.hostname))throw new Error("Signing invitation must use the direct HTTPS IRPA application link.");
+  if(expectedOrigin&&safeLink.origin!==new URL(expectedOrigin).origin)throw new Error("Signing invitation link does not match the configured IRPA application domain.");
   const sender=validateRecipient(from);
   const reply=validateRecipient(replyTo);
   if(!sender||!reply)throw new Error("IRPA signing sender address is not configured.");
