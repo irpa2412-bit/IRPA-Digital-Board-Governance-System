@@ -181,6 +181,16 @@ export function createR2RecordingOutput(env, filepath, meeting = {}) {
   };
 }
 async function liveKitRequest(env,endpoint,body,method="POST"){const host=clean(env.LIVEKIT_URL).replace(/^wss:/i,"https:").replace(/^ws:/i,"http:").replace(/\/$/,""),key=clean(env.LIVEKIT_API_KEY),secret=clean(env.LIVEKIT_API_SECRET);if(!host||!key||!secret)throw Object.assign(new Error("Live meeting infrastructure is not configured in Cloudflare secrets."),{status:503});const now=Math.floor(Date.now()/1000),auth=await signedJwt(key,secret,{iss:key,sub:key,nbf:now-5,exp:now+60,video:{roomRecord:true,roomAdmin:true,roomCreate:true}});const r=await fetch(host+endpoint,{method,headers:{Authorization:"Bearer "+auth,"Content-Type":"application/json"},...(body===undefined?{}:{body:JSON.stringify(body)})});const result=await r.json().catch(()=>({}));if(!r.ok){const e=new Error("LiveKit request failed ("+r.status+").");e.status=r.status;throw e;}return result;}
+export function meetingEnvironmentAtCreation(incoming = {}, isAdmin = false) {
+  return isAdmin && incoming.environment === "TRIAL" ? "TRIAL" : "REAL";
+}
+
+export function meetingDeletionPolicy(meeting = {}, isAdmin = false) {
+  if (!isAdmin) return { allowed: false, status: 403, error: "Only an authorised administrator may delete a meeting." };
+  if (meeting.environment !== "TRIAL") return { allowed: false, status: 409, error: "This meeting is protected. Only meetings explicitly created with environment TRIAL may be deleted." };
+  return { allowed: true, status: 200, error: null };
+}
+
 export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-attendance/daily/register","/api/meeting-attendance/daily/mark","/api/meeting-attendance/daily/dispatch","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
 if(pathname==="/api/meeting-invitee-directory/list"){
  const [memberRecords,employeeRecords]=await Promise.all([listCollection(ctx,env,token,"members"),listCollection(ctx,env,token,"employees")]);
@@ -470,7 +480,7 @@ if(!["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].includes(category)
 const rolePolicy={GOVERNANCE:new Set(["board secretary","secretary to the board","meeting secretary","executive director","director internal oversight"]),ADMINISTRATIVE:new Set(["executive director","director finance & administration","director human resources","hr director","operations manager","departmental director","departmental manager","director outreach","director community development","director livestock","director environment","director field department"]),STAFF:new Set(["executive director","director human resources","hr director","operations manager","departmental director","departmental manager"]),GENERAL:new Set(["executive director","departmental director","departmental manager","operations manager","meeting secretary"]),OTHER:new Set(["executive director","departmental director","departmental manager","operations manager","meeting secretary"])};
 if(!isAdmin&&!roles.some(r=>rolePolicy[category].has(r)))return fail(ctx,request,"Your institutional role is not authorised to register this meeting category.",403);
 if(clean(incoming.initiatorUid)!==uid)return fail(ctx,request,"The meeting initiator must match the authenticated account.",403);
-const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdByUid:uid,createdAt:now,updatedAt:now};
+const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,environment:meetingEnvironmentAtCreation(incoming,isAdmin),meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdByUid:uid,createdAt:now,updatedAt:now};
 await writeDoc(ctx,env,token,"meetings",id,record,false);
 await audit(ctx,env,token,claims,"MEETING_REGISTER_CREATED",{id,...record},id,{meetingCategory:category});
 return response(ctx,request,{ok:true,id});
@@ -480,7 +490,7 @@ const meetingId=clean(data.meetingId),incoming=data.data&&typeof data.data==="ob
 const c=await context(ctx,env,token,claims,meetingId);
 const current=c.meeting;
 const changed={};
-for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
+for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt","environment"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
 if(JSON.stringify(value)!==JSON.stringify(current[key]))changed[key]=value;}
 if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,changedFields:[]});
 const controller=c.isAdmin||clean(current.meetingHostUid)===c.uid||clean(current.hostUid)===c.uid||clean(current.organizerUid)===c.uid||clean(current.organiserUid)===c.uid||clean(current.ownerUid)===c.uid||clean(current.initiatorUid)===c.uid||clean(current.chairpersonUid)===c.uid||clean(current.secretaryUid)===c.uid||lower(current.meetingHostEmail)===c.email||lower(current.hostEmail)===c.email||lower(current.initiatorEmail)===c.email||lower(current.chairpersonEmail)===c.email||lower(current.secretaryEmail)===c.email;
@@ -504,7 +514,8 @@ return response(ctx,request,{ok:true,meetingId,changedFields:Object.keys(changed
 if(pathname==="/api/meeting-register/delete"){
 const meetingId=clean(data.meetingId);
 const c=await context(ctx,env,token,claims,meetingId);
-if(!c.isAdmin)return fail(ctx,request,"Only an authorised administrator may delete a registered meeting.",403);
+const deletion=meetingDeletionPolicy(c.meeting,c.isAdmin);
+if(!deletion.allowed)return fail(ctx,request,deletion.error,deletion.status);
 const base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/";
 const auditId=crypto.randomUUID();
 await commitWrites(ctx,env,token,[{delete:base+"meetings/"+meetingId,currentDocument:{updateTime:c.meeting.updateTime}},{update:{name:base+"audit/"+auditId,fields:fields({action:"MEETING_REGISTER_DELETED",collection:"meetings",recordId:meetingId,details:{title:clean(c.meeting.title),meetingReference:clean(c.meeting.meetingReference||c.meeting.reference)},actorUid:c.uid,actorEmail:c.email||null,createdAt:new Date()})},currentDocument:{exists:false}}]);
