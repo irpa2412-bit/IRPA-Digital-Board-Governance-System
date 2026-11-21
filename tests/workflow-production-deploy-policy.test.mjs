@@ -135,3 +135,9 @@ test("production Gateway deployment requires SMTP_PASSWORD secret and configures
   assert.match(source,/SMTP_FROM: "info@irpa\.or\.tz"/);
   assert.match(source,/deploy --keep-vars/);
 });
+
+test("Firestore trigger guard runs the production deployment workflow contract regression", () => {
+  const source = readWorkflow(".github/workflows/firestore-deployment-trigger-guard.yml");
+  assert.match(source, /tests\/workflow-production-deploy-policy\.test\.mjs/);
+  assert.match(source, /node --test tests\/workflow-production-deploy-policy\.test\.mjs/);
+});
