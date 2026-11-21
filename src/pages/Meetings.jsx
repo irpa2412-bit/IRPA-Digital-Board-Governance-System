@@ -85,9 +85,9 @@ const created=await callMeetingService("/api/meeting-register/create",{data:payl
    const preview=await callMeetingService("/api/meeting-register/delete-preview",{meetingId:m.id});
    const title=String(preview.title||m.title||"").trim();
    const counts=Object.entries(preview.collectionCounts||{}).filter(([,count])=>count>0).map(([collection,count])=>collection+": "+count).join("\n")||"No linked child records";
-   const summary="TRIAL MEETING DELETION PREVIEW\nMeeting: "+title+"\nEnvironment: "+preview.environment+"\nLinked child records: "+preview.childCount+"\n"+counts+"\n\nCancel to leave all records unchanged. Continue to review the export option?";
+   const summary="TRIAL MEETING DELETION PREVIEW\nMeeting: "+title+"\nEnvironment: "+preview.environment+"\nLinked child records: "+preview.childCount+"\n"+counts+"\n\n"+preview.externalArtifactsNotice+"\n\nCancel to leave all records unchanged. Continue to review the export option?";
    if(!window.confirm(summary))return;
-   if(window.confirm("Download a JSON export of the meeting and linked records before deletion?")){
+   if(window.confirm("Download a JSON metadata export before deletion? External files and media binaries are not included. OK = download; Cancel = continue without export.")){
     const blob=new Blob([JSON.stringify(preview.exportData,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob),link=document.createElement("a");
     const fileName=(String(m.meetingReference||m.id).replace(/[^a-z0-9_-]+/gi,"-")||"trial-meeting")+"-export.json";
