@@ -456,7 +456,7 @@ test("Prepare Envelope submission is a separate sticky control outside the PDF n
 });
 
 
-test("per-signer copy and WhatsApp actions reuse the existing accepted invitation link",()=>{
+test("per-signer copy and WhatsApp actions reuse the existing accepted invitation link",async()=>{
   const page=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
   const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
   const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
