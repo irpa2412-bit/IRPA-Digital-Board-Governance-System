@@ -19,6 +19,6 @@ test("meeting deletion and record purge routes require the TRIAL classifier", as
   const source = await readFile(new URL("../src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(source, /if\(!isTrialMeeting\(c\.meeting\)\)return fail\(ctx,request,"Only an explicitly TRIAL meeting may be deleted/);
   assert.match(source, /if\(!isTrialMeeting\(c\.meeting\)\)return fail\(ctx,request,"Meeting records linked to REAL or unclassified meetings cannot be purged/);
-  assert.match(source, /"environment"\]\)\)continue/);
+  assert.ok(source.includes('["id","updateTime","createdAt","environment"].includes(key)'));
   assert.match(source, /environment:isAdmin&&meetingEnvironment\(incoming\.environment\)==="TRIAL"\?"TRIAL":"REAL"/);
 });
