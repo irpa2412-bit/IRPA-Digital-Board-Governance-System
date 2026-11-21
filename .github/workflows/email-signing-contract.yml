@@ -39,3 +39,5 @@ jobs:
         run: node scripts/signature-self-test-public-assets-smoke.mjs
       - name: Run seven-portal protection smoke tests
         run: node scripts/portal-protection-smoke.mjs
+      - name: Run full repository regression suite
+        run: npm run test:all
