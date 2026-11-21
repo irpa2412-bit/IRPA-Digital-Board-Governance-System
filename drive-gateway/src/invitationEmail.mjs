@@ -110,6 +110,14 @@ export async function sendInvitationEmail({email,name,link,meetingAccess=null,sm
 
 
 
+export function buildSignerInvitationSubject({title,position,positionCount,name}={}) {
+  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+  const safeName=validateName(name);
+  if(!safeName)throw new Error("Invalid signer name");
+  const firstName=safeName.split(/\\s+/)[0]||"Signer";
+  return "Please sign: "+safeTitle+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+") - "+firstName;
+}
+
 export function buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}) {
   const safeName=validateName(name);
   if(!safeName)throw new Error("Invalid name");
