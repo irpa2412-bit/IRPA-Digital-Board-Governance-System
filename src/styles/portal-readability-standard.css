@@ -257,3 +257,20 @@
   background: #ffffff !important;
   background-color: #ffffff !important;
 }
+
+
+/* The shared governance field palette sits on a light surface; override the global
+   white-action-button rule for this reusable component in every portal. */
+#root .app-shell .content-area:not(.dashboard-content-area) .page [data-governance-field-palette] button,
+#root .app-shell .content-area:not(.dashboard-content-area) .page [data-governance-field-palette] button :is(strong, small) {
+  color: #17372b !important;
+  -webkit-text-fill-color: #17372b !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page [data-governance-field-palette] button {
+  background: #f4f8f5 !important;
+  background-color: #f4f8f5 !important;
+  border-color: #718a80 !important;
+}
+#root .app-shell .content-area:not(.dashboard-content-area) .page [data-governance-field-palette] button small {
+  opacity: 1 !important;
+}
