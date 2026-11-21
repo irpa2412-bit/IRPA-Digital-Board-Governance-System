@@ -131,12 +131,12 @@ export function buildEmailSigningInvitationMessage({name,link,title,ownerName,ex
 export function buildSigningInvitationAuditMessage({recipientPrefix,recipientDomain,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,invitationKind="creation",at=new Date()}={}) {
   const safeDomain=String(recipientDomain||"unknown").toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,253)||"unknown";
   const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...@"+safeDomain;
-  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
   const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
   const stage=stageCode?"Stage code: "+String(stageCode).slice(0,40):"SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
   const type=invitationKind==="resend"?"resend":"creation";
   const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" - "+safeTitle;
-  const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\nType: "+type+"\\n"+stage+"\\nRecipient domain: "+safeDomain;
+  const text="Time (EAT): "+when+"\nEnvelope ID: "+String(envelopeId||"")+"\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\nMessage-ID: "+String(messageId||"Not recorded")+"\nType: "+type+"\n"+stage+"\nRecipient domain: "+safeDomain;
   const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p><strong>Type:</strong> "+type+"</p><p>"+escapeHtml(stage)+"</p><p><strong>Recipient domain:</strong> "+escapeHtml(safeDomain)+"</p>";
   return {to:"info@irpa.or.tz",subject,text,html};
 }
