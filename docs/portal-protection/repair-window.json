@@ -217,44 +217,27 @@
     {
       "portal": "Signature Portal",
       "status": "open",
-      "openedAt": "2026-11-21T09:30:33Z",
-      "lastActivityAt": "2026-11-21T09:30:33Z",
-      "durationHours": 48,
-      "closesAt": "2026-11-23T09:30:33Z",
-      "reason": "Owner-authorised 48-hour repair of the Signature Portal self-test crash, startup error handling, per-signer delivery visibility and sequential next-signer invitation hand-off. The owner has verified the workspace opens again; this window addresses the self-test resource-overload and unvalidated-response failure. Preserve all signing data and the independent Meeting Portal.",
+      "openedAt": "2026-11-21T09:57:28Z",
+      "lastActivityAt": "2026-11-21T09:57:28Z",
+      "durationHours": 24,
+      "closesAt": "2026-11-22T09:57:28Z",
+      "reason": "Owner-authorised 24-hour Signature Portal repair window for PR #836. Scope: typed invitation recipient resolution, parallel creation, signer-specific resend and resend-all, SMTP delivery recording, per-signer delivery panel and tests. Self-test crash, Meeting Portal, hash check and rebuild are excluded.",
       "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
-        "src/components/SignaturePathwaySelfTest.jsx",
-        "src/components/SignaturePathwaySelfTestErrorBoundary.jsx",
-        "src/components/SignatureDeliveryPanel.jsx",
-        "src/pages/SignaturePlatform.jsx",
-        "src/main.jsx",
-        "src/App.jsx",
         "drive-gateway/src/index.js",
+        "drive-gateway/src/invitationEmail.mjs",
         "drive-gateway/src/signing.mjs",
-        "drive-gateway/src/emailSigning/",
-        "drive-gateway/src/emailSigningLinks.mjs",
-        "drive-gateway/tests/",
-        "tests/signature-self-test-session-safety.test.mjs",
-        "tests/browser/",
-        "tests/email-signing-contract.test.mjs",
-        "tests/signature-pathway-contract.test.mjs",
-        "package.json",
-        ".github/workflows/email-signing-contract.yml",
-        ".github/workflows/startup-smoke.yml",
-        "scripts/",
-        "docs/portal-protection/change-record.json",
-        "docs/portal-protection/repair-window.json",
-        "docs/portal-protection/portal-register.json",
-        "docs/regression/"
+        "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/tests/email-signing-contract.test.mjs",
+        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "tests/signature-workflow-policy.test.mjs"
       ],
       "prohibitions": [
-        "Do not change signing rules, signer identity, invitation token format/hash custody, session lifecycle, resend rules or field assignment.",
-        "Do not change PDF stamping, document hash, certificate, archive logic, completed PDFs or existing signing records.",
-        "Do not change Firestore rules or indexes, secrets, environment variables, SMTP settings, credentials or Worker bindings.",
-        "Do not expose tokens, secrets, recipient-private data or full exception payloads in startup/self-test error UI.",
-        "Do not bypass branch protection or deploy a historical whole-application/Gateway rollback.",
-        "Self-test may perform read-only checks or send at most one explicit test email to the typed address; it must not mutate signing state."
+        "Do not change signing rules, token format or hash custody, sessions, signer identity, resend rules or field assignment.",
+        "Do not change PDF stamping, document hash, certificate, archive logic or completed PDFs.",
+        "Do not change Firestore rules, secrets, environment variables, SMTP settings, credentials or Worker bindings.",
+        "Do not change self-test crash handling, Meeting Portal, hash check, rebuild or unrelated portals."
       ],
       "activityLog": [
         {
@@ -296,6 +279,11 @@
           "at": "2026-11-21T09:30:33Z",
           "action": "scope-amended",
           "description": "Owner authorised a new 48-hour Signature Portal and app-shell repair window. Scope includes self-test crash safety, bounded one-at-a-time PDF diagnostics, startup error handling, per-signer delivery visibility, sequential next-signer hand-off and required CI/browser regressions. Workspace recovery was verified by the owner. Rollback frontend build: eb68a06; retain the previously verified production Worker rollback baseline eb04405 for Worker-only rollback."
+        },
+        {
+          "at": "2026-11-21T09:57:28Z",
+          "action": "scope-amended",
+          "description": "Confirmed 24-hour Signature Portal-only repair window for PR #836: typed recipient resolution, parallel creation, signer-specific resend, SMTP delivery recording, delivery panel and tests."
         }
       ],
       "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
