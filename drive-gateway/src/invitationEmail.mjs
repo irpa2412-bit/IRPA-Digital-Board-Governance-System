@@ -29,20 +29,17 @@ export function buildSignerInvitationSubject({title,position,positionCount,name}
   return "Please sign: "+safeTitle+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+") - "+firstName;
 }
 
-export function buildSigningInvitationAuditMessage({recipientPrefix,recipientDomain,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,invitationKind="creation",at=new Date()}={}) {
-  const prefix=String(recipientPrefix||"").slice(0,3).replace(/[^a-z0-9]/gi,"");
-  const domain=String(recipientDomain||"unknown").trim().toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,253)||"unknown";
-  const maskedRecipient=(prefix||"***")+"...@"+domain;
-  const safeTitle=String(title||"Controlled document").replace(/[\r\n\u2028\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
+export function buildSigningInvitationAuditMessage({recipientPrefix,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,at=new Date()}={}) {
+  const maskedRecipient=String(recipientPrefix||"").replace(/[^a-z0-9]/gi,"").slice(0,3)+"...";
+  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
   const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
   const currentPosition=Math.max(1,Number(position)||1);
   const totalPositions=Math.max(currentPosition,Number(positionCount)||currentPosition);
   const category="SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
-  const kind=String(invitationKind||"creation").toLowerCase()==="resend"?"resend":"creation";
-  const details=(stageCode?"Stage code: "+String(stageCode).replace(/[^A-Z0-9_-]/gi,"").slice(0,40)+"\n":"")+category;
-  const subject="AUDIT: invitation to "+maskedRecipient+" position "+currentPosition+" - "+safeTitle;
-  const text="Time (EAT): "+when+"\nEnvelope ID: "+String(envelopeId||"")+"\nPosition: "+currentPosition+" of "+totalPositions+"\nInvitation: "+kind+"\nMessage-ID: "+String(messageId||"Not recorded")+"\n"+details;
-  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+currentPosition+" of "+totalPositions+"</p><p><strong>Invitation:</strong> "+kind+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p>"+escapeHtml(details).replace(/\n/g,"<br>")+"</p>";
+  const details=(stageCode?"Stage code: "+String(stageCode).replace(/[^A-Z0-9_-]/gi,"").slice(0,40)+"\\n":"")+category;
+  const subject="AUDIT: invitation to "+maskedRecipient+" position "+currentPosition+" of "+totalPositions+" - "+safeTitle;
+  const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nPosition: "+currentPosition+" of "+totalPositions+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\n"+details;
+  const html="<p><strong>Time (EAT):</strong> "+escapeHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+currentPosition+" of "+totalPositions+"</p><p><strong>Message-ID:</strong> "+escapeHtml(messageId||"Not recorded")+"</p><p>"+escapeHtml(details).replace(/\\n/g,"<br>")+"</p>";
   return {to:"info@irpa.or.tz",subject,text,html};
 }
 
