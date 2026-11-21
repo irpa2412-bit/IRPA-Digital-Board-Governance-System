@@ -481,5 +481,3 @@ if (!isMainPush && eventName !== "workflow_dispatch" &&
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));
 NODE
-
-# Keep the shared isolation guard in the five-file portal-window amendment contract.
