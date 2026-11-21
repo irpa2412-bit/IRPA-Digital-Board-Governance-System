@@ -191,6 +191,15 @@ export function meetingDeletionPolicy(meeting = {}, isAdmin = false) {
   return { allowed: true, status: 200, error: null };
 }
 
+export function meetingUpdateChanges(current = {}, incoming = {}, isAdmin = false) {
+  const changed = {};
+  for (const [key, value] of Object.entries(incoming)) {
+    if (["id", "updateTime", "createdAt", "environment"].includes(key) || (!isAdmin && key === "registeredAt")) continue;
+    if (JSON.stringify(value) !== JSON.stringify(current[key])) changed[key] = value;
+  }
+  return changed;
+}
+
 export function createMeetingServicesRouter(ctx){return async (request,env,pathname)=>{const paths=new Set(["/api/meeting-register/create","/api/meeting-register/update","/api/meeting-register/delete","/api/meeting-voting/open","/api/meeting-voting/close","/api/meeting-decisions/create","/api/meeting-actions/create","/api/meeting-participants/create","/api/meeting-participants/update","/api/meeting-participants/delete","/api/meeting-room/activity","/api/meeting-room/event","/api/meeting-subscriptions/mine","/api/meeting-entry-requests/list","/api/meeting-entry-requests/resolve","/api/meeting-attendance/register","/api/meeting-attendance/mark","/api/meeting-attendance/daily/register","/api/meeting-attendance/daily/mark","/api/meeting-attendance/daily/dispatch","/api/meeting-quorum/assess","/api/meeting-board-register/list","/api/meeting-invitee-directory/list","/api/meeting-working-documents/register","/api/meeting-working-documents/list","/api/meeting-working-documents/review","/api/meeting-records/capture","/api/meeting-records/draft","/api/meeting-records/list","/api/meeting-records/retrieve","/api/meeting-records/protection","/api/meeting-records/dispose","/api/meeting-proceedings/save","/api/meeting-transcripts/translate","/api/meeting-reports/compile-email","/api/meeting-media/token","/api/meeting-media/recording/start","/api/meeting-media/recording/stop","/api/meeting-media/recording/status"]);if(!paths.has(pathname)||request.method!=="POST")return null;let claims,data;try{claims=await ctx.authenticateFirebaseRequest(request,env);}catch{return fail(ctx,request,"A valid IRPA sign-in is required.",401);}try{data=await request.json();}catch{return fail(ctx,request,"A valid JSON request is required.",400);}const token=await ctx.getFirestoreAdminAccessToken(env).catch(()=>null);if(!token)return fail(ctx,request,"Meeting services are temporarily unavailable because the server identity is not configured.",503);try{
 if(pathname==="/api/meeting-invitee-directory/list"){
  const [memberRecords,employeeRecords]=await Promise.all([listCollection(ctx,env,token,"members"),listCollection(ctx,env,token,"employees")]);
@@ -489,9 +498,7 @@ if(pathname==="/api/meeting-register/update"){
 const meetingId=clean(data.meetingId),incoming=data.data&&typeof data.data==="object"?data.data:{};
 const c=await context(ctx,env,token,claims,meetingId);
 const current=c.meeting;
-const changed={};
-for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt","environment"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
-if(JSON.stringify(value)!==JSON.stringify(current[key]))changed[key]=value;}
+const changed=meetingUpdateChanges(current,incoming,c.isAdmin);
 if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,changedFields:[]});
 const controller=c.isAdmin||clean(current.meetingHostUid)===c.uid||clean(current.hostUid)===c.uid||clean(current.organizerUid)===c.uid||clean(current.organiserUid)===c.uid||clean(current.ownerUid)===c.uid||clean(current.initiatorUid)===c.uid||clean(current.chairpersonUid)===c.uid||clean(current.secretaryUid)===c.uid||lower(current.meetingHostEmail)===c.email||lower(current.hostEmail)===c.email||lower(current.initiatorEmail)===c.email||lower(current.chairpersonEmail)===c.email||lower(current.secretaryEmail)===c.email;
 if(!controller)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may update this meeting.",403);
