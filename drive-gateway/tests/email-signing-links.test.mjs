@@ -376,10 +376,10 @@ test("typed signer addresses are trimmed and normalized at the SMTP boundary; di
   assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/single signer recipient/i);
 });
 
-test("signing audit email masks the recipient and includes position total without exposing the domain",()=>{
+test("signing audit email masks the first three local-part characters and retains the recipient domain",()=>{
   const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Minutes");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
@@ -470,7 +470,7 @@ test("invitation audit message includes only a three-character recipient prefix 
     smtpReplyCategory:"ACCEPTED",at:NOW
   });
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to dan...@gmail.com position 2 - Board Policy");
   assert.match(audit.text,/Time \(EAT\):/);
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
@@ -514,7 +514,7 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
     envelopeId:"ENV-FAIL-AUDIT",messageId:"<failed@irpa.or.tz>",
     smtpReplyCategory:"AUTH_FAILED",stageCode:"SMTP_AUTH",at:NOW
   });
-  assert.equal(audit.subject,"AUDIT: invitation to abc... position 2 of 3 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
   assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
