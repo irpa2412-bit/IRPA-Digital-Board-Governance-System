@@ -296,11 +296,6 @@
           "at": "2026-11-21T09:30:33Z",
           "action": "scope-amended",
           "description": "Owner authorised a new 48-hour Signature Portal and app-shell repair window. Scope includes self-test crash safety, bounded one-at-a-time PDF diagnostics, startup error handling, per-signer delivery visibility, sequential next-signer hand-off and required CI/browser regressions. Workspace recovery was verified by the owner. Rollback frontend build: eb68a06; retain the previously verified production Worker rollback baseline eb04405 for Worker-only rollback."
-        },
-        {
-          "at": "2026-11-21T09:57:28Z",
-          "action": "pr-836-repair-window-opened",
-          "description": "Opened a separate 24-hour Signature Portal repair subwindow for PR #836 only. It covers invitation sending, next-signer hand-off, delivery recording, envelope-view delivery status and their tests. Self-test crash and all unrelated work are excluded."
         }
       ],
       "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
@@ -320,31 +315,7 @@
       },
       "reopenedAt": "2026-11-20T18:10:00Z",
       "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
-      "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458",
-      "pr836RepairWindow": {
-        "status": "open",
-        "pullRequest": 836,
-        "openedAt": "2026-11-21T09:57:28Z",
-        "lastActivityAt": "2026-11-21T09:57:28Z",
-        "durationHours": 24,
-        "closesAt": "2026-11-22T09:57:28Z",
-        "scope": [
-          "drive-gateway/src/index.js",
-          "drive-gateway/src/invitationEmail.mjs",
-          "drive-gateway/src/mailDelivery.js",
-          "drive-gateway/src/signing.mjs",
-          "src/pages/SignaturePlatform.jsx",
-          "drive-gateway/tests/email-signing-links.integration.test.mjs",
-          "drive-gateway/tests/email-signing-links.test.mjs"
-        ],
-        "prohibitions": [
-          "signing rules, token format/hash custody, sessions, signer identity and owner resend rules",
-          "field assignment, PDF stamping, document hash, certificate and archive logic",
-          "Firestore rules/indexes, secrets, environment variables, SMTP settings/credentials and Worker bindings",
-          "self-test crash, Meeting Portal, hash check, rebuild and unrelated portals"
-        ],
-        "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd"
-      }
+      "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
     }
   ]
 }
