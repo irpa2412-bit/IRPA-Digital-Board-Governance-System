@@ -324,10 +324,12 @@ export default function SignaturePathwaySelfTest() {
       await requireAdministrator();
       const baseQuery = query(collection(db, "documents"), orderBy(documentId()), limit(20));
       const pageQuery = cursor ? query(collection(db, "documents"), orderBy(documentId()), startAfter(cursor), limit(20)) : baseQuery;
+      let queryTimer;
+      const queryTimeoutMs = Math.max(1, 60000 - (Date.now() - runStarted));
       const snapshot = await Promise.race([
         getDocs(pageQuery),
-        new Promise((_, reject) => window.setTimeout(() => reject(new Error("Self-test document query timed out after 60 seconds.")), 60000))
-      ]);
+        new Promise((_, reject) => { queryTimer = window.setTimeout(() => reject(new Error("Self-test document query reached the 60-second run limit.")), queryTimeoutMs); })
+      ]).finally(() => window.clearTimeout(queryTimer));
       const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
       const nonFileRows = rows.filter(item => classifySelfTestRecord(item) === "NON_FILE_RECORD");
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
