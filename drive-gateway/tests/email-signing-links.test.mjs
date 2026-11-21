@@ -14,7 +14,7 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,buildSigningInvitationAuditMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient,validateRecipient} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,resendAllUnsignedInvitations,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
@@ -456,11 +456,11 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
   assert.deepEqual(sent.slice(-3).map(item=>item.toHeader),expected);
 });
 
-test("SMTP recipient envelope rejects display names and comma-separated recipient lists",()=>{
-  const base={from:'"IRPA Digital Signing" <sender@irpa.or.tz>',subject:"Please sign",text:"text",html:"<p>html</p>"};
-  assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"Signer <signer@example.org>"}),/valid recipient/i);
-  assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"one@example.org,two@example.org"}),/valid recipient/i);
-  assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"signer@example.org,"}),/valid recipient/i);
+test("signing invitation recipient validation rejects display names and comma-separated recipient lists",()=>{
+  assert.equal(validateRecipient("Signer <signer@example.org>"),null);
+  assert.equal(validateRecipient("one@example.org,two@example.org"),null);
+  assert.equal(validateRecipient("signer@example.org,"),null);
+  assert.equal(validateRecipient("  Signer@Example.org  "),"signer@example.org");
 });
 
 test("invitation audit message includes only a three-character recipient prefix and required delivery evidence",()=>{
