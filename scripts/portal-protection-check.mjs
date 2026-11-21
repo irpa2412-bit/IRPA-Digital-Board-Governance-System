@@ -43,7 +43,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   const scope = windowState.scope ?? [];
   const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
   if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
-  const declaredFiles = record.declaration?.files ?? [];
+  const declaredFiles = [...(record.declaration?.files ?? []), ...(record.activeAmendment?.files ?? [])];
   const missingDeclarations = protectedFiles.filter((file) => !declaredFiles.some((p) => isWithin(file, p)));
   if (missingDeclarations.length) return fail("Change Record omits changed files: " + missingDeclarations.join(", "));
   const declaredPortals = new Set(record.declaration?.affectedPortals ?? []);
