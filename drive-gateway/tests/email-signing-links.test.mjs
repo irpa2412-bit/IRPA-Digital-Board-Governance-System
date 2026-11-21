@@ -124,7 +124,7 @@ test("email invitation has real plain-text newlines and one HTML/plain-text SMTP
   assert.doesNotMatch(message.text,/\\n/);
   assert.match(message.html,/href=/);
   let calls=0;
-  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);return {ok:true};},logger:{warn(){},error(){}}});
+  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",from:"info@irpa.or.tz",replyTo:"info@irpa.or.tz",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);assert.ok(payload.rawMime);assert.match(payload.messageId,/@irpa\.or\.tz/);return {ok:true};},logger:{warn(){},error(){}}});
   assert.equal(calls,1);
 });
 
