@@ -410,7 +410,7 @@
       "baselineSmoke": "PASS",
       "fullRegression": "PASS",
       "portalSmoke": {
-        "Meeting Portal": "PENDING"
+        "Meeting Portal": "PASS"
       },
       "behaviourDifferences": [
         "Meeting environment is assigned at creation; default REAL, and only administrator creation may request TRIAL.",
@@ -422,7 +422,8 @@
         "Baseline authentication and identity parity: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446469.",
         "Baseline email-signing contract: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446670.",
         "Baseline release build: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446517.",
-        "Baseline staging Gateway E2E: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446478."
+        "Baseline staging Gateway E2E: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44897446478.",
+        "Meeting Portal isolated browser regression at four viewport sizes: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44945507181 (PASS)."
       ]
     },
     "prohibitedChanges": [
