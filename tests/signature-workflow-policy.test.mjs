@@ -5,6 +5,18 @@ import { requireSupportedSignatureRoutingMode } from "../src/firebase/signatureW
 
 const portal = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
 
+test("Signature Portal exposes a recipient-level failed invitation delivery report to the sender",()=>{
+  const storage=fs.readFileSync("src/firebase/signatureStorage.js","utf8");
+  assert.match(portal,/Failed Email Deliveries/);
+  assert.match(portal,/deliveryReport\.failures\.map/);
+  assert.match(portal,/smtpReplyCategory/);
+  assert.match(portal,/Retry only pending or failed invitations/);
+  assert.match(storage,/invitations\/resend-all/);
+  const gateway=fs.readFileSync("drive-gateway/src/signing.mjs","utf8");
+  assert.match(gateway,/deliveryReport=\{failed:failures\.length,failures/);
+  assert.match(gateway,/email_delivery_report\./);
+});
+
 test("Sequential and Parallel are the only supported Signature Portal routing modes", () => {
   assert.equal(requireSupportedSignatureRoutingMode("Sequential"), "Sequential");
   assert.equal(requireSupportedSignatureRoutingMode("Parallel"), "Parallel");
