@@ -28,7 +28,7 @@ export function isInvitationQueueActive(queuedAt, now = Date.now(), leaseMs = 5 
 }
 export function isRetryableMailError(error) {
   const message = String(error?.message || error || "");
-  const smtp = message.match(/IRPA SMTP error (\\d{3})/i);
+  const smtp = message.match(/IRPA SMTP error (\d{3})/i);
   if (smtp) return Number(smtp[1]) >= 400 && Number(smtp[1]) < 500;
   if (error?.deliveryOutcome === "unknown" || error?.retryable === false) return false;
   return true;

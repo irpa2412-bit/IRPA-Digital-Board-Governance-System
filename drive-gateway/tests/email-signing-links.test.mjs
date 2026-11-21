@@ -383,7 +383,7 @@ test("signing audit email masks the local part and retains the recipient domain"
   assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Type: creation/);
-  assert.match(audit.text,/Recipient domain: example\.com/);
+  assert.match(audit.text,/Recipient domain: example\.org/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
   assert.doesNotMatch(audit.subject+" "+audit.text+" "+audit.html,/daniel@example\.org|emailSignToken|https?:\/\/|[a-f0-9]{64}/i);
@@ -521,7 +521,7 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
   });
   assert.equal(audit.subject,"AUDIT: invitation to abc...@example.com position 2 - Board Policy");
   assert.match(audit.text,/Type: resend/);
-  assert.match(audit.text,/Recipient domain: example\\.com/);
+  assert.match(audit.text,/Recipient domain: example\.com/);
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
   assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
