@@ -254,10 +254,10 @@ function SignaturePathwaySelfTestPanel() {
         cache: "no-store",
         redirect: "error"
       });
-      const data = await response.json().catch(() => ({}));
+      const data = validateSelfTestGatewayResponse(await response.json().catch(() => null), { httpStatus: response.status });
       setDriveHealth({
-        statusClass: String(data.statusClass || (response.ok ? "ok" : "error")),
-        classification: String(data.classification || "unknown")
+        statusClass: safeGatewayText(data.statusClass || "ok", "error"),
+        classification: safeGatewayText(data.classification || "unknown", "unknown")
       });
     } catch {
       setDriveHealth({ statusClass: "error", classification: "gateway_redirect_blocked_or_network_or_authentication" });
