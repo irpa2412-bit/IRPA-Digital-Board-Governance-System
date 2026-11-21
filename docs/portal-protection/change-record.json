@@ -326,12 +326,12 @@
       "fullRegression": "PENDING",
       "dnsWorkflow": "PENDING",
       "productionSmoke": "PENDING",
-      "parallelFanOut": "PENDING",
-      "sequentialHandoff": "PENDING"
+      "parallelFanOut": "PENDING: end-to-end same-position parallel group test",
+      "sequentialHandoff": "PENDING: owner-first next-position hand-off test"
     },
     "completion": null,
-    "expectedEffect": "Parallel envelopes invite every assigned signer at creation, including non-owner signers when the owner uses portal-first signing. Sequential envelopes retain first-position delivery and release the next position only after the prior signer completes, with explicit hand-off events. Each email invitation uses a signer/position-specific subject and multipart MIME with unique Message-ID; SMTP stage replies and hand-off results are owner-visible. Copy and WhatsApp actions use the existing resend flow and the exact link returned only after SMTP acceptance. No signing order rules or token/session semantics change."
+    "expectedEffect": "The existing order-group invitation rules remain unchanged: signers in the first eligible position receive invitations together; later positions are released only when all earlier-position signers have signed. The repair records explicit hand-off started/sent/failed events and the SMTP reply evidence for each delivery. Each email invitation uses a signer/position-specific subject and multipart MIME with a unique Message-ID. Copy and WhatsApp actions use the existing resend flow and the exact link returned only after SMTP acceptance. No signing order, token or session semantics change."
   },
-  "declarationNote": "The affected prior case was described as parallel/non-hierarchical; the repair fixes the unconditional first-position filter for Parallel mode and does not reclassify that case as sequential.",
+  "declarationNote": "The previously reported case was described as parallel/non-hierarchical. The repair preserves the existing same-position parallel invitation group and configured order-group rules; it adds delivery evidence and hand-off events without converting the envelope to sequential signing.",
   "declarationNoteSource": "Prior conversation on 2026-11-20: user rejected a sequential-signing explanation for the affected envelope."
 }
