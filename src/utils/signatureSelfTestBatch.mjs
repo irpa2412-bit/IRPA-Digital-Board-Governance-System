@@ -16,6 +16,10 @@ export async function runSequentialSelfTestBatch(documents, processDocument, {
     const abortFromParent = () => controller.abort();
     signal?.addEventListener("abort", abortFromParent, { once: true });
     let timer;
+    let rejectOnCancel;
+    const cancelled = new Promise((_, reject) => { rejectOnCancel = reject; });
+    const cancelListener = () => { controller.abort(); rejectOnCancel(new Error("Self-test cancelled by administrator.")); };
+    signal?.addEventListener("abort", cancelListener, { once: true });
     try {
       const work = Promise.resolve().then(() => processDocument(document, controller.signal));
       const timeout = new Promise((_, reject) => {
@@ -26,12 +30,13 @@ export async function runSequentialSelfTestBatch(documents, processDocument, {
             : "Self-test run reached its 60-second limit."));
         }, timeoutMs);
       });
-      results.push({ document, result: await Promise.race([work, timeout]) });
+      results.push({ document, result: await Promise.race([work, timeout, cancelled]) });
     } catch (error) {
       results.push({ document, error: String(error?.message || "Diagnostic failed").slice(0, 300) });
     } finally {
       if (timer) clearTimeout(timer);
       signal?.removeEventListener("abort", abortFromParent);
+      signal?.removeEventListener("abort", cancelListener);
       controller.abort();
       onProgress({ completed: index + 1, total: batch.length, active: 0 });
     }
