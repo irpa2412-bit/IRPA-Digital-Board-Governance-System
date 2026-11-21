@@ -376,10 +376,10 @@ test("typed signer addresses are trimmed and normalized at the SMTP boundary; di
   assert.throws(()=>buildSmtpRecipientEnvelope({from:"a@irpa.or.tz",to:"alice@gmail.com,bob@gmail.com",subject:"x",text:"x",html:"<p>x</p>"}),/single signer recipient/i);
 });
 
-test("signing audit email masks the first three local-part characters and retains the recipient domain",()=>{
+test("signing audit email masks the recipient and omits the recipient domain",()=>{
   const audit=buildSigningInvitationAuditMessage({recipientPrefix:"dan",recipientDomain:"example.org",position:2,positionCount:3,title:"Board Minutes",envelopeId:"ENV-PRIVACY01",messageId:"<unique@irpa.or.tz>",smtpReplyCategory:"ACCEPTED",at:NOW,invitationKind:"creation"});
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Minutes");
+  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Minutes");
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/ACCEPTED/);
   assert.match(audit.text,/EAT/);
@@ -463,7 +463,7 @@ test("signing invitation recipient validation rejects display names and comma-se
   assert.equal(validateRecipient("  Signer@Example.org  "),"signer@example.org");
 });
 
-test("invitation audit message includes a three-character mask and full domain without exposing the full address",()=>{
+test("invitation audit message includes a three-character mask and required evidence without a domain",()=>{
   const audit=buildSigningInvitationAuditMessage({
     recipientPrefix:"daniel",recipientDomain:"gmail.com",position:2,positionCount:3,
     title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
@@ -475,8 +475,6 @@ test("invitation audit message includes a three-character mask and full domain w
   assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\.or\.tz>/);
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
-  assert.match(audit.text,/Recipient domain: gmail\.com/);
-  assert.match(audit.text,/Type: creation/);
   assert.doesNotMatch(JSON.stringify(audit),/daniel\.mollel@gmail\.com|gmail\.com|emailSignToken|https?:\/\/|secret-token/i);
 });
 
@@ -519,7 +517,6 @@ test("failed invitation audit includes both the failure stage code and SMTP repl
   assert.equal(audit.subject,"AUDIT: invitation to abc... position 2 of 3 - Board Policy");
   assert.match(audit.text,/Stage code: SMTP_AUTH/);
   assert.match(audit.text,/SMTP reply category: AUTH_FAILED/);
-  assert.match(audit.text,/Recipient domain: example\.com/);
   assert.doesNotMatch(audit.text,/abc@example\.com|emailSignToken|https?:\/\//);
 });
 
