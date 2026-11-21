@@ -4,6 +4,39 @@
 
 **DNS evidence:** Pending the read-only GitHub Actions DNS report. Do not publish the candidate records below until the provider confirms the actual outbound SMTP IP and supplies the DKIM public key. The application repair does not change DNS, cPanel, SMTP credentials, or transport settings.
 
+## Invitation message built by the Worker
+
+The active production invitation path is the legacy builder in drive-gateway/src/invitationEmail.mjs. The dormant Email Signing v2 rebuild module was not changed.
+
+The generated header block is:
+
+- From: IRPA Digital Signing <info@irpa.or.tz>
+- Reply-To: <info@irpa.or.tz>
+- To: <the assigned signer email>
+- Subject: IRPA signing request: <document title> - <signer's first name> (Position <position number>)
+- Message-ID: <unique-random-UUID@irpa.or.tz>
+- Date: <current UTC date>
+- MIME-Version: 1.0
+- Content-Type: multipart/alternative; boundary=<unique MIME boundary>
+
+The MIME body contains both a text/plain; charset=UTF-8 part and a text/html; charset=UTF-8 part, each UTF-8 base64 encoded. The visible plain-text body is:
+
+Dear <signer's full name>,
+
+<document owner's name> has invited you to review and sign a controlled document in the IRPA Digital Board Governance System.
+
+Document: <document title>
+Link expiry: <date and time in Africa/Dar_es_Salaam, or the expiry shown in the invitation>. The link can be redeemed once; after expiry or replacement, ask the document owner for a new link.
+
+Open your single-use secure link:
+<direct HTTPS signing URL on the configured IRPA production application origin>
+
+Opening the link verifies control of this email address and starts a signer-specific session. Review the document, complete your transaction declaration and sign in that session. Keep the same browser tab open to resume; if you lose the session, ask the document owner to resend the invitation.
+
+This link does not independently verify your legal identity or institutional authority. Do not forward it. If you did not expect this invitation, contact IRPA Administration.
+
+The HTML part contains the same key content, with an explicit "Open secure document link" anchor. No hidden text, invisible tracking text, or link shortener is generated. The invitation remains single-use under the existing token/session protocol; the copy and WhatsApp actions share the exact link from the existing accepted resend, not a second token.
+
 ## DNS records to confirm or publish
 
 | Name | Type | Value / action |
