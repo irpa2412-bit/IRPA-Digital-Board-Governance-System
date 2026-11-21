@@ -13,7 +13,7 @@ const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
 
 import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
-import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
+import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, buildSmtpRecipientEnvelope, buildSignerInvitationSubject, buildSigningInvitationAuditMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 
@@ -3070,29 +3070,7 @@ async function writeSmtpSelfcheckAudit(env, claims, event) {
 }
 
 
-export function buildSignerInvitationSubject({title,position,positionCount,name}={}) {
-  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
-  const firstName=String(name||"Signer").replace(/[\\r\\n]+/g," ").trim().split(/\\s+/)[0]||"Signer";
-  return "Please sign: "+safeTitle+" (signer "+Math.max(1,Number(position)||1)+" of "+Math.max(1,Number(positionCount)||1)+") - "+firstName;
-}
-export function buildSigningInvitationAuditMessage({recipientPrefix,position,positionCount,title,envelopeId,messageId,smtpReplyCategory="UNKNOWN",stageCode=null,at=new Date()}={}) {
-  const maskedRecipient=String(recipientPrefix||"").slice(0,3)+"...";
-  const safeTitle=String(title||"Controlled document").replace(/[\\r\\n\\u2028\\u2029]+/g," ").trim().slice(0,180)||"Controlled document";
-  const when=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium"}).format(new Date(at||Date.now()))+" EAT";
-  const reply="SMTP reply category: "+String(smtpReplyCategory||"UNKNOWN").slice(0,40);
-  const details=(stageCode?"Stage code: "+String(stageCode).slice(0,40)+"\\n":"")+reply;
-  const subject="AUDIT: invitation to "+maskedRecipient+" position "+Number(position||1)+" of "+Number(positionCount||1)+" - "+safeTitle;
-  const text="Time (EAT): "+when+"\\nEnvelope ID: "+String(envelopeId||"")+"\\nPosition: "+Number(position||1)+" of "+Number(positionCount||1)+"\\nMessage-ID: "+String(messageId||"Not recorded")+"\\n"+details;
-  const html="<p><strong>Time (EAT):</strong> "+escapeMailHtml(when)+"</p><p><strong>Envelope ID:</strong> "+escapeMailHtml(envelopeId||"")+"</p><p><strong>Position:</strong> "+Number(position||1)+" of "+Number(positionCount||1)+"</p><p><strong>Message-ID:</strong> "+escapeMailHtml(messageId||"Not recorded")+"</p><p>"+escapeMailHtml(details).replace(/\\n/g,"<br>")+"</p>";
-  return {to:"info@irpa.or.tz",subject,text,html};
-}
-export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
-  const typedRecipient=validateRecipient(to);
-  if(!typedRecipient)throw new Error("A valid single signer recipient email address is required.");
-  const recipient=normalizeRecipientEmail(typedRecipient);
-  const mime=buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
-  return{recipient,rcptCommand:"RCPT TO:<"+recipient+">",toHeader:"<"+recipient+">",mime};
-}
+
 
 async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,fromName="IRPA Administration",messageId=null}) {
   const smtpConfig=resolveSmtpConfiguration(env);
