@@ -45,7 +45,7 @@ test("owner signs in the portal before any other signer is invited; completing o
     documentId,externalReference:"IRPA-OWNER-FIRST",archives:["board-governance"],signingMode:"Sequential",ownerPreSignEmail:"owner@example.org",
     signers:[
       {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:1,role:"Document Owner"},
-      {identityType:"email-link",email:"signer@example.org",name:"Next Signer",order:2,role:"Signer"}
+      {identityType:"email-link",email:"owner@example.org",name:"Next Signer",order:2,role:"Signer"}
     ],
     fields:[
       {fieldId:"OWNER-SIGNATURE",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true},
@@ -64,7 +64,7 @@ test("owner signs in the portal before any other signer is invited; completing o
   });
   assert.equal(result.status,"InProgress");
   assert.equal(sent.length,1,"the next signer is invited only after the owner completes signing");
-  assert.equal(sent[0].to,"signer@example.org");
+  assert.equal(sent[0].to,"owner@example.org");
   assert.match(sent[0].link,/emailSignToken=/);
   const stored=await ctx.meta.get("envelopes",created.envelopeId);
   assert.equal(stored.signers[0].status,"Signed");
@@ -408,4 +408,43 @@ test("v2 reusable invitation is read-only on preview, creates fresh sessions, an
     ()=>openEmailSigning(f.ctx,f.token,"198.51.100.82"),
     error=>error.status===410&&error.message==="This document is already signed."
   );
+});
+
+test("three sequential signer positions sharing one mailbox each receive their own invitation after the prior signature",async()=>{
+  const f=await fixture();
+  const sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,
+    externalReference:"IRPA-THREE-SHARED-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Sequential",
+    signers:[1,2,3].map(index=>({identityType:"email-link",email:"shared@example.org",name:"Signer "+index,order:index,role:"Signer"})),
+    fields:[1,2,3].map(index=>({fieldId:"SHARED-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+  });
+  assert.equal(sent.length,1,"only the first sequential position is initially invited");
+  const tokenIds=[];
+  for(let position=1;position<=3;position++){
+    const invitation=sent[position-1];
+    assert.equal(invitation.to,"shared@example.org");
+    assert.equal(invitation.signerId,"S"+position);
+    assert.equal(invitation.position,position);
+    assert.equal(invitation.positionCount,3);
+    const token=new URL(invitation.link).searchParams.get("emailSignToken");
+    tokenIds.push(token);
+    const opened=await openEmailSigning(f.ctx,token,"198.51.100."+position);
+    const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const result=await sign(f.ctx,{
+      token:opened.sessionToken,
+      signature:{type:"drawn",value:png},
+      fieldApplications:[{fieldId:"SHARED-SIGN-"+position,confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],
+      fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Signer "+position}
+    });
+    if(position<3){
+      assert.equal(result.status,"InProgress");
+      assert.equal(sent.length,position+1);
+    }
+  }
+  assert.equal(sent.length,3);
+  assert.equal(new Set(tokenIds).size,3);
+  assert.deepEqual(sent.map(item=>item.signerId),["S1","S2","S3"]);
 });
