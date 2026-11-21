@@ -502,6 +502,6 @@ test("signing SMTP messages use a unique Message-ID, named From, and separate pl
   assert.match(worker,/fromName:"IRPA Digital Signing"/);
   assert.match(worker,/Message-ID: "\+generatedMessageId/);
   assert.equal((worker.match(/await onAudit\?\./g)||[]).length,1,"each invitation attempt must make one non-blocking audit attempt");
-  assert.match(mail,/Content-Type: text\\/plain; charset=UTF-8/);
-  assert.match(mail,/Content-Type: text\\/html; charset=UTF-8/);
+  assert.match(mail,/Content-Type: text\/plain; charset=UTF-8/);
+  assert.match(mail,/Content-Type: text\/html; charset=UTF-8/);
 });
