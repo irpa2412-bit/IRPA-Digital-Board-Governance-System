@@ -9,7 +9,7 @@ try {
     page.on("pageerror", error => failures.push(viewport.width + "px pageerror: " + error.message));
     page.on("response", response => {
       const url = response.url();
-      if (/\\/assets\\/.*\\.js(?:$|\\?)/.test(url) && response.status() !== 200) {
+      if (/\/assets\/.*\.js(?:$|\?)/.test(url) && response.status() !== 200) {
         failures.push(viewport.width + "px asset " + response.status() + ": " + url);
       }
     });
