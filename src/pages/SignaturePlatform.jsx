@@ -791,7 +791,7 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    }
    const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);
    setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});
-   setMessage(mode==="copy"?"The same signer-specific link sent by email was copied. The previous link was replaced only after mail-server acceptance.":"The same signer-specific link sent by email is ready to share in WhatsApp. The previous link was replaced only after mail-server acceptance.");
+   setMessage(mode==="copy"?"A new invitation was emailed, and that exact signer-specific link was copied. The previous link was replaced only after mail-server acceptance.":"A new invitation was emailed, and that exact signer-specific link is ready to share in WhatsApp. The previous link was replaced only after mail-server acceptance.");
   }catch(error){
    if(whatsappWindow)whatsappWindow.close();
    setMessage((error.message||"Unable to prepare the signer-specific link.")+(error.code?" (Stage: "+error.code+")":""));
