@@ -136,9 +136,10 @@ export function classifySmtpReplyCategory(error, stage = "") {
   const transportCode = String(error?.code || "").toUpperCase();
   if (stage === "SMTP_AUTH" || /authentication failed|auth failed|invalid credentials|credentials rejected|not authorized/.test(message)) return "AUTH_FAILED";
   if (transportCode === "ECONNREFUSED" || /connection refused/.test(message)) return "CONNECTION_REFUSED";
-  if (/mailbox full|mailbox is full|quota exceeded|over quota|insufficient storage/.test(message) || code === 552 || code === 452 && /4\.2\.2/.test(message)) return "MAILBOX_FULL";
-  if (/rate.?limit|too many messages|throttl|sending limit|try again later/.test(message) || [421,450,451,452,454].includes(code)) return "RATE_LIMITED";
-  if (/recipient.*reject|unknown recipient|user unknown|no such user|address rejected/.test(message) || [550,551,553].includes(code) || /5\.1\.[0-9]/.test(message)) return "RECIPIENT_REJECTED";
+  if (/mailbox full|mailbox is full|quota exceeded|over quota|insufficient storage/.test(message) || code === 552 || code === 452 && /4\.2\.2/.test(message) || /5\.2\.[0-9]/.test(message)) return "MAILBOX_FULL";
+  if (/rate.?limit|too many messages|throttl|sending limit|try again later/.test(message) || [421,450,451,452,454].includes(code) || /4\.7\.[0-9]/.test(message)) return "RATE_LIMITED";
+  if (/5\.7\.[0-9]/.test(message) || /policy.*reject|blocked.*policy|spam.*reject|not permitted to send/.test(message)) return "POLICY_REJECTED";
+  if (/5\.1\.[0-9]/.test(message) || /recipient.*reject|unknown recipient|user unknown|no such user|address rejected/.test(message) || [551,553].includes(code) || code === 550 && !/5\.7\.[0-9]/.test(message)) return "RECIPIENT_REJECTED";
   return "UNKNOWN";
 }
 export async function runEmailStage(stage,action,onStage){
@@ -154,10 +155,13 @@ export async function runEmailStage(stage,action,onStage){
     safe.stageCode=stage;
     safe.smtpReplyCategory=["RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:classifySmtpReplyCategory(error,stage);
     if(response)safe.smtpResponseCode=Number(response[1]);
+    const enhanced=String(error?.smtpEnhancedStatusCode||((message.match(/\b([245]\.\d\.\d{1,3})\b/)||[])[1]||""));
+    if(/^[245]\.\d\.\d{1,3}$/.test(enhanced))safe.smtpEnhancedStatusCode=enhanced;
     if(/^[A-Z0-9_-]{1,40}$/i.test(String(error?.code||"")))safe.code=String(error.code);
     if(error?.deliveryOutcome==="unknown")safe.deliveryOutcome="unknown";
     if(error?.retryable===false)safe.retryable=false;
-    try{await onStage?.(stage,"failure",safe.smtpReplyCategory)}catch{}
+    const diagnostics={stageCode:stage,smtpResponseCode:safe.smtpResponseCode||null,smtpEnhancedStatusCode:safe.smtpEnhancedStatusCode||null,errorCode:safe.code||null,deliveryOutcome:safe.deliveryOutcome||"not-confirmed"};
+    try{await onStage?.(stage,"failure",safe.smtpReplyCategory,diagnostics)}catch{}
     throw safe;
   }
 }
@@ -166,16 +170,16 @@ export async function sendEmailSigningInvitation({email,name,link,title,ownerNam
   const to=validateRecipient(email);
   if(!to)throw new Error("Invalid recipient");
   const outcomes=new Map();
-  const capture=async(stage,outcome,smtpReplyCategory)=>outcomes.set(stage,{outcome,smtpReplyCategory});
+  const capture=async(stage,outcome,smtpReplyCategory,diagnostics={})=>outcomes.set(stage,{outcome,smtpReplyCategory,...(diagnostics&&typeof diagnostics==="object"?diagnostics:{})});
   let result,error;
   try{
     const message=await runEmailStage("BUILD_MESSAGE",()=>buildEmailSigningInvitationMessage({name,link,title,ownerName,expiresAt}),capture);
     result=await sendWithRetry(()=>smtpSend({to,...message,onStage:capture}),{logger,sleep});
   }catch(err){
     error=err;
-    if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,"failure");
+    if(EMAIL_LINK_STAGE_CODES.includes(err?.stageCode))outcomes.set(err.stageCode,{outcome:"failure",smtpReplyCategory:err?.smtpReplyCategory||classifySmtpReplyCategory(err,err.stageCode),stageCode:err.stageCode,smtpResponseCode:err?.smtpResponseCode||null,smtpEnhancedStatusCode:err?.smtpEnhancedStatusCode||null,errorCode:err?.code||null,deliveryOutcome:err?.deliveryOutcome||"not-confirmed"});
   }
-  for(const [stage,result] of outcomes){try{await onStage?.(stage,result.outcome,result.smtpReplyCategory)}catch{}}
+  for(const [stage,details] of outcomes){try{await onStage?.(stage,details.outcome,details.smtpReplyCategory,details)}catch{}}
   if(error)throw error;
   return result;
 }
