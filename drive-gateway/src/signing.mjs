@@ -411,7 +411,8 @@ export async function resendAllUnsignedInvitations(ctx,user,id){
     try{results.push(await resendInvitation(ctx,user,id,signer.id));}
     catch(error){results.push({ok:false,signerId:signer.id,stageCode:error?.code||"SUBMIT",error:String(error?.message||"Delivery failed.")});}
   }
-  return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:results.filter(item=>item.ok===false).length,results};
+  const summaries=results.map(({signingLink,...result})=>result);
+  return{ok:true,envelopeId:id,attempted:targets.length,sent:results.filter(item=>item.deliveryStatus==="Sent").length,failed:results.filter(item=>item.ok===false).length,results:summaries};
 }
 
 export async function updateSignerContact(ctx,user,id,signerId,{email,name}={}){
