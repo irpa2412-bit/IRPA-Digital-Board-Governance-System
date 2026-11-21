@@ -527,6 +527,7 @@ return response(ctx,request,{
   childCount:preview.childCount,
   collectionCounts:preview.collectionCounts,
   previewDigest:preview.previewDigest,
+  externalArtifactsNotice:preview.externalArtifactsNotice,
   exportData:preview.exportData
 });
 }
@@ -570,7 +571,8 @@ writes.push({
         confirmationTitle:validation.confirmationTitle,
         previewDigest:preview.previewDigest,
         deletedChildCount:validation.childCount,
-        deletedChildCollections:validation.collectionCounts
+        deletedChildCollections:validation.collectionCounts,
+        externalArtifactsNotice:preview.externalArtifactsNotice
       },
       actorUid:c.uid,
       actorEmail:c.email||null,
