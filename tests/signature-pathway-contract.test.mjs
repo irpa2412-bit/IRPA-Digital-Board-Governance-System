@@ -209,7 +209,8 @@ test("Signature Pathway diagnostics batch one document per Worker request with b
     read("../drive-gateway/src/releaseReadinessRoutes.mjs"),
     read("../src/utils/controlledDocumentDiagnosticBatch.mjs")
   ]);
-  assert.match(ui, /reconcileSignatureDocumentIds\(oneDocument, options\)/);
+  assert.match(ui, /selfTestReconcileDocument\(oneDocument\[0\], options\)/);
+  assert.match(ui, /redirect: "error"/);
   assert.match(batch, /requestDocument\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
   assert.match(batch, /Math\.max\(1, Math\.min\(3, Number\(concurrency\)/);
   assert.match(batch, /Math\.min\(limit, rows\.length\)/);
