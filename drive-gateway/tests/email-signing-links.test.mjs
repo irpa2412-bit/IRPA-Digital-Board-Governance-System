@@ -461,17 +461,34 @@ test("SMTP recipient envelope rejects display names and comma-separated recipien
   assert.throws(()=>buildSmtpRecipientEnvelope({...base,to:"signer@example.org,"}),/valid recipient/i);
 });
 
-test("invitation audit message masks the local part, includes the domain and never contains the link or full address",()=>{
+test("invitation audit message includes only a three-character recipient prefix and required delivery evidence",()=>{
   const audit=buildSigningInvitationAuditMessage({
-    recipientPrefix:"daniel",recipientDomain:"example.org",position:2,positionCount:3,
+    recipientPrefix:"daniel",position:2,positionCount:3,
     title:"Board Policy",envelopeId:"ENV-AUDIT-01",messageId:"<unique@irpa.or.tz>",
-    invitationKind:"resend",smtpReplyCategory:"ACCEPTED",at:NOW
+    smtpReplyCategory:"ACCEPTED",at:NOW
   });
   assert.equal(audit.to,"info@irpa.or.tz");
-  assert.equal(audit.subject,"AUDIT: invitation to dan...@example.org position 2 - Board Policy");
+  assert.equal(audit.subject,"AUDIT: invitation to dan... position 2 of 3 - Board Policy");
   assert.match(audit.text,/Time \\(EAT\\):/);
-  assert.match(audit.text,/Type: resend/);
+  assert.match(audit.text,/Position: 2 of 3/);
   assert.match(audit.text,/Message-ID: <unique@irpa\\.or\\.tz>/);
   assert.match(audit.text,/SMTP reply category: ACCEPTED/);
-  assert.doesNotMatch(JSON.stringify(audit),/daniel@example\\.org|emailSignToken|https?:\\/\\/|secret-token/i);
+  assert.doesNotMatch(JSON.stringify(audit),/daniel@example\\.org|example\\.org|emailSignToken|https?:\\/\\/|secret-token/i);
+});
+
+
+test("signing invitation uses one distinct Message-ID per signer position and the exact ordinal subject",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  assert.match(worker,/const messageId="<"\+crypto\.randomUUID\(\)\+"@irpa\.or\.tz>"/);
+  assert.match(worker,/Please sign: "\+safeTitle\+" \\(signer "\+\(Number\(position\)\|\|1\)\+" of "\+\(Number\(positionCount\)\|\|1\)\+"\\) - "\+firstName/);
+  assert.match(worker,/fromName:"IRPA Digital Signing"/);
+  assert.match(worker,/Message-ID: /);
+  assert.match(worker,/Date: /);
+});
+
+test("audit send is best-effort and never changes invitation acceptance or failure",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  assert.match(worker,/try\{await onAudit\?\.\(\{messageId,lastCategory/);
+  assert.match(worker,/SIGNING_INVITATION_AUDIT_EMAIL_FAILED/);
+  assert.match(worker,/if\(failure\)throw failure;\s*return result;/);
 });
