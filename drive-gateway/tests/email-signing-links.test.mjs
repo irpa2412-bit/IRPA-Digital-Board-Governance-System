@@ -359,7 +359,8 @@ test("signing invitation MIME has signer-position subject, unique irpa.or.tz Mes
   assert.match(firstMime,/Content-Type: multipart\/alternative/);
   assert.match(firstMime,/Content-Type: text\/plain; charset=UTF-8/);
   assert.match(firstMime,/Content-Type: text\/html; charset=UTF-8/);
-  assert.match(firstMime,/https:\/\/irpa-digital-board-governance\.web\.app\/\?emailSignToken=first/);
+  assert.match(first.text,/https:\/\/irpa-digital-board-governance\.web\.app\/\?emailSignToken=first/);
+  assert.match(first.html,/href="https:\/\/irpa-digital-board-governance\.web\.app\/\?emailSignToken=first"/);
   assert.doesNotMatch(first.html,/display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0/i);
   assert.notEqual(firstMime.match(/Message-ID: ([^\r\n]+)/)[1],thirdMime.match(/Message-ID: ([^\r\n]+)/)[1]);
 });
