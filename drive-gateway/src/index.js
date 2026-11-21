@@ -3150,12 +3150,16 @@ async function downloadMySignatureCopy(request, env) {
 async function deleteMySignatureCopy(request, env) {
   const access = await getMySignatureCopyAccess(request, env);
   if (access.response) return access.response;
+  // Trash only the authenticated recipient's dedicated My Documents copy.
+  // Keep the Drive object recoverable and retain the Firestore signature record
+  // as the deletion audit entry; never delete the authoritative executed PDF.
   const deleted = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(access.fileId), {
-    method:"DELETE",
-    headers:{Authorization:"Bearer " + access.accessToken}
+    method:"PATCH",
+    headers:{Authorization:"Bearer " + access.accessToken,"Content-Type":"application/json"},
+    body:JSON.stringify({trashed:true})
   });
-  if (!deleted.ok && deleted.status !== 404) {
-    return json({ok:false,error:"Google Drive could not delete your personal copy."},502,corsHeaders(request));
+  if (!deleted.ok) {
+    return json({ok:false,error:"Google Drive could not move your personal copy to trash."},502,corsHeaders(request));
   }
   const deletedAt = new Date().toISOString();
   const fields = {
@@ -3164,7 +3168,7 @@ async function deleteMySignatureCopy(request, env) {
     personalCopyDeletedByUid:{stringValue:String(access.claims.user_id)}
   };
   await updateFirestoreDocument(env,"signatures/" + access.recordId,access.adminToken,fields,Object.keys(fields));
-  return json({ok:true,deleted:true,recordId:access.recordId,deletedAt,authoritativeDocumentRetained:true,auditTrailRetained:true},200,corsHeaders(request));
+  return json({ok:true,deleted:true,recordId:access.recordId,deletedAt,personalCopyTrashed:true,authoritativeDocumentRetained:true,auditTrailRetained:true},200,corsHeaders(request));
 }
 
 async function deleteDriveFile(request, env) {
