@@ -60,13 +60,16 @@ export async function buildMeetingDeletionPreview(meetingId, meeting, childRecor
   const collectionCounts = {};
   for (const row of rows) collectionCounts[row.collection] = (collectionCounts[row.collection] || 0) + 1;
 
+  const externalArtifactsNotice = "External Google Drive source files and media binaries are not deleted by this Firestore atomic operation. The JSON export contains their linked metadata only.";
   return {
     previewDigest,
     childCount: rows.length,
     collectionCounts,
+    externalArtifactsNotice,
     exportData: {
       schemaVersion: 1,
       exportedAt: new Date().toISOString(),
+      externalArtifactsNotice,
       meeting: sanitizeMeetingExport({ ...meeting, id: clean(meetingId) }),
       children: childRecords.map(({ collection, record }) => ({
         collection,
