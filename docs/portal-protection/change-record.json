@@ -11,21 +11,23 @@
       "Members and Employees Portal",
       "Signature Portal"
     ],
-    "reason": "Repair the Signature Pathway Self-Test so its Gateway diagnostic requests cannot follow an authentication redirect into an interactive login gateway or interrupt the administrator's existing session. The repository registers src/components/ as a shared dependency across all seven portals, so all seven portal smoke checks are required even though the intended behavior change is limited to the self-test component. Google Drive token-refresh health remains a separate explicit diagnostic. Shared signature storage and other portal behavior are not modified.",
+    "reason": "The shared SignaturePlatform.jsx change is covered by the open cross-portal component repair window. The current repair combines the already authorised Signature Self-Test session-safety fix with a Signature Portal-only invitation delivery diagnostics panel. The panel adds per-signer SMTP evidence and owner-controlled copy/share actions; all seven portal smoke checks remain mandatory because the component is shared.",
     "files": [
       "src/components/SignaturePathwaySelfTest.jsx",
       "tests/signature-self-test-session-safety.test.mjs",
       "package.json",
       "drive-gateway/tests/signature-workflow-draft-route.test.mjs",
       ".github/workflows/email-signing-contract.yml",
-      "tests/signature-pathway-contract.test.mjs"
+      "tests/signature-pathway-contract.test.mjs",
+      "src/pages/SignaturePlatform.jsx"
     ],
-    "expectedEffect": "The main read-only self-test runs without automatically invoking Drive token refresh. Reconciliation and controlled-document download requests reject Gateway redirects and report a diagnostic error in the panel instead of following the redirect. The explicit Check Drive refresh action remains available and also rejects redirects. No sign-out, session reset, data mutation, or shared storage behavior change.",
+    "expectedEffect": "The Signature Self-Test cannot follow Gateway authentication redirects into an interactive login gateway. Signature invitation messages use signer/position-specific multipart MIME and unique Message-ID; SMTP stage replies and automatic hand-off outcomes are recorded and visible to the envelope owner. Copy and WhatsApp actions use the same signer-specific link returned after the existing resend flow accepts the email. All other portal workflows and the signing protocol remain unchanged.",
     "prohibitedChanges": [
       "Do not change shared signature storage, Meeting Portal behavior, signature creation, placement, stamping, certificates, hashes, envelopes, invitation tokens, audit trails, archives, completed PDFs or recipient copies.",
       "Do not change SMTP configuration, credentials, secrets, Worker bindings or deployment configuration.",
       "Do not change Firestore rules, indexes, production records, signing permissions or authentication/session lifecycle.",
-      "Do not deploy production resources as part of this merge."
+      "Do not deploy production resources as part of this merge.",
+      "Do not change signer order, identity, invitation tokens, link format, session lifecycle, resend acceptance semantics, field assignments, stamping, PDFs, hashes, certificates, archives, Firestore rules, SMTP settings, credentials, secrets or environment variables."
     ]
   },
   "repairWindow": {
@@ -81,134 +83,131 @@
   },
   "activeAmendment": {
     "status": "open",
-    "operation": "restore-pre-11-eat-baseline",
+    "operation": "email-delivery-diagnostics-repair",
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Restore the Email-link E-signature source and routing to the exact state deployed before 11:00 EAT on 20 Nov 2026. The verified production Gateway deployment at 09:49:57 EAT used commit eb04405; the immediately preceding source snapshot 8bfa67 is byte-identical for all restored signature files.",
-    "cutoffEAT": "2026-11-20T11:00:00+03:00",
-    "targetProductionWorkerCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
-    "targetSourceSnapshot": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
+    "reason": "Diagnose and repair missing signer invitation emails and provide per-signer SMTP acceptance/failure evidence without changing the working signing protocol.",
     "files": [
+      "drive-gateway/src/invitationEmail.mjs",
       "drive-gateway/src/signing.mjs",
-      "drive-gateway/src/router.mjs",
       "drive-gateway/src/index.js",
-      "src/pages/EmailSigningReadOnlyPage.jsx",
+      "drive-gateway/src/router.mjs",
+      "drive-gateway/src/smtpDiagnostics.mjs",
       "src/pages/SignaturePlatform.jsx",
-      "drive-gateway/src/emailSigning/index.mjs",
       "drive-gateway/tests/email-signing-contract.test.mjs",
-      ".github/workflows/email-signing-contract.yml",
-      "drive-gateway/tests/email-signing-links.integration.test.mjs",
-      "drive-gateway/tests/email-signing-links.release-contract.test.mjs",
       "drive-gateway/tests/email-signing-links.test.mjs",
-      "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
-      "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
-      "drive-gateway/tests/signing-invitation.test.mjs",
-      "tests/signature-email-link-unification.test.mjs",
-      "tests/signature-workflow-policy.test.mjs"
+      "drive-gateway/tests/email-signing-links.integration.test.mjs",
+      "drive-gateway/tests/smtp-diagnostics.test.mjs",
+      "drive-gateway/tests/email-delivery-diagnostics.test.mjs",
+      ".github/workflows/email-signing-contract.yml",
+      ".github/workflows/email-deliverability-dns-check.yml",
+      "docs/email-deliverability/HOSTING_REQUEST.md",
+      "docs/portal-protection/repair-window.json",
+      "docs/portal-protection/change-record.json",
+      "scripts/portal-repair-window-guard-policy.mjs",
+      "tests/meeting-isolation-guard.test.mjs"
     ],
     "repairWindow": {
-      "openedAt": "2026-11-20T17:08:47Z",
-      "closesAt": "2026-11-22T17:08:47Z",
+      "openedAt": "2026-11-21T08:14:24Z",
+      "closesAt": "2026-11-23T08:14:24Z",
       "durationHours": 48,
-      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
-      "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified."
+      "rollbackCommit": "e36b4e301411ed5378916112d880bab8eb82ddba",
+      "rollbackCommitEvidence": "Production Gateway deployment run 44879429522 completed successfully; its production health gate confirmed the exact live Worker commit e36b4e301411ed5378916112d880bab8eb82ddba."
     },
     "prohibitedChanges": [
-      "Do not change existing Firestore signing envelopes, invitation tokens, signer profiles, audit trails, completed PDFs or recipient copies.",
-      "Do not change SMTP configuration, credentials, secrets, Worker bindings or mail transport.",
-      "Do not change Firestore rules, indexes, document hashing, PDF stamping, certificates or archive logic.",
-      "Do not roll back Meeting Portal attendance registration, attendance-sheet preparation, ordinary meeting invitations or other portal functionality.",
-      "Do not deploy a whole-application or whole-Gateway historical rollback."
+      "Do not change signing rules/order, signer identity, tokens, link format, signing sessions, or email-link validation.",
+      "Do not change resend semantics: the prior link remains valid until the replacement email is accepted by the SMTP server.",
+      "Do not change signature field assignment, stamping, PDF rendering, document hashes, certificates, archive logic, or completed-document distribution.",
+      "Do not change Firestore rules or indexes, secrets, environment variables, SMTP host, port, sender address, credentials, or transport configuration.",
+      "Do not touch email-signing rebuild branches or the dormant v2 module; current production envelope creation uses the legacy invitation builder.",
+      "Do not deploy or merge around branch protection; no secret synchronization or credential rotation."
     ],
-    "ownerInstruction": "Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links.",
-    "supersededAmendment": {
+    "ownerInstruction": "Execute the one-run invitation-delivery diagnosis and repair within the declared scope. Preserve the current production signing protocol and use e36b4e301411ed5378916112d880bab8eb82ddba as the Worker rollback target.",
+    "priorAmendment": {
       "status": "open",
+      "operation": "restore-pre-11-eat-baseline",
       "affectedPortals": [
         "Signature Portal"
       ],
-      "reason": "Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
+      "reason": "Restore the Email-link E-signature source and routing to the exact state deployed before 11:00 EAT on 20 Nov 2026. The verified production Gateway deployment at 09:49:57 EAT used commit eb04405; the immediately preceding source snapshot 8bfa67 is byte-identical for all restored signature files.",
+      "cutoffEAT": "2026-11-20T11:00:00+03:00",
+      "targetProductionWorkerCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+      "targetSourceSnapshot": "8bfa67b2a8757519befb2f6be1074c0f34457c99",
       "files": [
-        "drive-gateway/src/emailSigning/",
-        "drive-gateway/src/emailSigningLinks.mjs",
         "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/router.mjs",
         "drive-gateway/src/index.js",
         "src/pages/EmailSigningReadOnlyPage.jsx",
         "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/src/emailSigning/index.mjs",
         "drive-gateway/tests/email-signing-contract.test.mjs",
-        "drive-gateway/tests/email-signing-links.test.mjs",
-        "drive-gateway/tests/email-signing-links.integration.test.mjs",
-        "tests/email-signing-contract.test.mjs",
         ".github/workflows/email-signing-contract.yml",
-        "scripts/meeting-portal-fixture-isolation-guard.sh",
-        "scripts/portal-repair-window-guard-policy.mjs",
-        "tests/meeting-isolation-guard.test.mjs"
+        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "drive-gateway/tests/email-signing-links.release-contract.test.mjs",
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "drive-gateway/tests/gate5-document-signature-persistence.test.mjs",
+        "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+        "drive-gateway/tests/signing-invitation.test.mjs",
+        "tests/signature-email-link-unification.test.mjs",
+        "tests/signature-workflow-policy.test.mjs"
       ],
       "repairWindow": {
         "openedAt": "2026-11-20T17:08:47Z",
         "closesAt": "2026-11-22T17:08:47Z",
         "durationHours": 48,
-        "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
-        "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; production health gate verified deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
-        "rollbackCommitStatus": "verified-production-worker-deploy"
+        "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+        "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified."
       },
       "prohibitedChanges": [
-        "Secrets",
-        "Environment variables",
-        "SMTP credentials and settings (reuse existing wrapper)",
-        "Firestore rules",
-        "PDF stamping engine",
-        "Hash logic",
-        "Certificate logic",
-        "Archive logic"
+        "Do not change existing Firestore signing envelopes, invitation tokens, signer profiles, audit trails, completed PDFs or recipient copies.",
+        "Do not change SMTP configuration, credentials, secrets, Worker bindings or mail transport.",
+        "Do not change Firestore rules, indexes, document hashing, PDF stamping, certificates or archive logic.",
+        "Do not roll back Meeting Portal attendance registration, attendance-sheet preparation, ordinary meeting invitations or other portal functionality.",
+        "Do not deploy a whole-application or whole-Gateway historical rollback."
       ],
-      "ownerInstruction": "Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120. Preserve the independent Meeting Portal window and baseline. Do not change secrets, environment variables, SMTP credentials/settings (reuse existing wrapper), Firestore rules, PDF stamping engine, hash, certificate, or archive logic.",
-      "closedAt": "2026-11-20T17:56:30Z",
-      "completion": {
-        "repairPR": 817,
-        "mergeCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
-        "implementation": {
-          "preview": "GET /api/sign/email/open and GET /api/sign/email/pdf are read-only",
-          "session": "POST /api/sign/email/session creates the explicit short-lived session after Open document to sign",
-          "consumption": "Invitation is consumed on signer completion, invitation expiry, decline/cancel, or owner resend; session expiry alone leaves an unexpired invitation usable",
-          "resend": "Owner resend rotates invitation and invalidates prior active/legacy sessions",
-          "errors": [
-            "TOKEN_LOOKUP",
-            "SESSION_CREATE",
-            "PDF_PREVIEW",
-            "SIGN_SUBMIT"
-          ]
+      "ownerInstruction": "Restore only the Email-link E-signature code paths to their pre-11:00 EAT state, based on the verified 09:49:57 EAT production Gateway deployment. Preserve independent application changes and all existing signing records and links.",
+      "supersededAmendment": {
+        "status": "open",
+        "affectedPortals": [
+          "Signature Portal"
+        ],
+        "reason": "Rebuild email signing around reusable envelope-and-signer-bound links, explicit POST/open sessions, deterministic expiry, atomic resend after SMTP acceptance, signer-row and bulk resend, masked EAT confirmation, stage diagnostics, audit events, and owner/admin SMTP self-check.",
+        "files": [
+          "drive-gateway/src/emailSigning/",
+          "drive-gateway/src/emailSigningLinks.mjs",
+          "drive-gateway/src/signing.mjs",
+          "drive-gateway/src/index.js",
+          "src/pages/EmailSigningReadOnlyPage.jsx",
+          "src/pages/SignaturePlatform.jsx",
+          "drive-gateway/tests/email-signing-contract.test.mjs",
+          "drive-gateway/tests/email-signing-links.test.mjs",
+          "drive-gateway/tests/email-signing-links.integration.test.mjs",
+          "tests/email-signing-contract.test.mjs",
+          ".github/workflows/email-signing-contract.yml",
+          "scripts/meeting-portal-fixture-isolation-guard.sh",
+          "scripts/portal-repair-window-guard-policy.mjs",
+          "tests/meeting-isolation-guard.test.mjs"
+        ],
+        "repairWindow": {
+          "openedAt": "2026-11-20T17:08:47Z",
+          "closesAt": "2026-11-22T17:08:47Z",
+          "durationHours": 48,
+          "rollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+          "rollbackCommitEvidence": "Latest successful production Worker deploy run 44737326668; production health gate verified deployed commit fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8.",
+          "rollbackCommitStatus": "verified-production-worker-deploy"
         },
-        "tests": {
-          "gatewayRegression": "PASS",
-          "authenticationParity": "PASS",
-          "signatureSecurityRegression": "PASS",
-          "emailInvitationTests": "PASS",
-          "pdfESignatureTests": "PASS",
-          "signatureEnvelopeRefreshAndDelivery": "PASS",
-          "sevenPortalsSmoke": "PASS",
-          "meetingPortalBrowserRegression": "PASS (360, 412, 768, 1280 viewports)"
-        },
-        "production": {
-          "workerCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
-          "noSecretSyncWorkerDeployRun": 44787425215,
-          "workerHealthGate": "PASS — HTTP 200 and exact deployed commit confirmed by the workflow",
-          "firebaseHostingDeployRun": 44787424924,
-          "firebaseHostingVerification": "PASS — exact build commit confirmed",
-          "cloudflareFrontendDeployRun": 44787425010,
-          "productionBrowserSmokeRun": 44787661874,
-          "productionBrowserSmoke": "PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION",
-          "browserLimitation": "Signed-out production browser did not exercise the authenticated Documents → Signing workspace; public endpoints, JavaScript assets, module hash and page errors passed."
-        },
-        "additionalDeploymentEvidence": {
-          "parallelLegacyWorkerDeployRun": 44787425008,
-          "status": "SUCCESS",
-          "note": "A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed."
-        }
-      },
-      "reopenedAt": "2026-11-20T18:10:00Z",
-      "reopenReason": "PR #820 closed the Signature Portal window before the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120 was completed. The prior closure evidence is preserved in priorClosure.",
-      "priorClosure": {
+        "prohibitedChanges": [
+          "Secrets",
+          "Environment variables",
+          "SMTP credentials and settings (reuse existing wrapper)",
+          "Firestore rules",
+          "PDF stamping engine",
+          "Hash logic",
+          "Certificate logic",
+          "Archive logic"
+        ],
+        "ownerInstruction": "Execute the complete Email Signing rebuild on feat/email-signing-rebuild-20261120. Preserve the independent Meeting Portal window and baseline. Do not change secrets, environment variables, SMTP credentials/settings (reuse existing wrapper), Firestore rules, PDF stamping engine, hash, certificate, or archive logic.",
         "closedAt": "2026-11-20T17:56:30Z",
         "completion": {
           "repairPR": 817,
@@ -252,26 +251,87 @@
             "note": "A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed."
           }
         },
-        "closedByPR": 820
+        "reopenedAt": "2026-11-20T18:10:00Z",
+        "reopenReason": "PR #820 closed the Signature Portal window before the owner-authorised full Email Signing rebuild on feat/email-signing-rebuild-20261120 was completed. The prior closure evidence is preserved in priorClosure.",
+        "priorClosure": {
+          "closedAt": "2026-11-20T17:56:30Z",
+          "completion": {
+            "repairPR": 817,
+            "mergeCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+            "implementation": {
+              "preview": "GET /api/sign/email/open and GET /api/sign/email/pdf are read-only",
+              "session": "POST /api/sign/email/session creates the explicit short-lived session after Open document to sign",
+              "consumption": "Invitation is consumed on signer completion, invitation expiry, decline/cancel, or owner resend; session expiry alone leaves an unexpired invitation usable",
+              "resend": "Owner resend rotates invitation and invalidates prior active/legacy sessions",
+              "errors": [
+                "TOKEN_LOOKUP",
+                "SESSION_CREATE",
+                "PDF_PREVIEW",
+                "SIGN_SUBMIT"
+              ]
+            },
+            "tests": {
+              "gatewayRegression": "PASS",
+              "authenticationParity": "PASS",
+              "signatureSecurityRegression": "PASS",
+              "emailInvitationTests": "PASS",
+              "pdfESignatureTests": "PASS",
+              "signatureEnvelopeRefreshAndDelivery": "PASS",
+              "sevenPortalsSmoke": "PASS",
+              "meetingPortalBrowserRegression": "PASS (360, 412, 768, 1280 viewports)"
+            },
+            "production": {
+              "workerCommit": "386b73b02e1ae89696ab0a73fea7ee00dd739d48",
+              "noSecretSyncWorkerDeployRun": 44787425215,
+              "workerHealthGate": "PASS — HTTP 200 and exact deployed commit confirmed by the workflow",
+              "firebaseHostingDeployRun": 44787424924,
+              "firebaseHostingVerification": "PASS — exact build commit confirmed",
+              "cloudflareFrontendDeployRun": 44787425010,
+              "productionBrowserSmokeRun": 44787661874,
+              "productionBrowserSmoke": "PASS_WITH_AUTHENTICATED_DOCUMENTS_LIMITATION",
+              "browserLimitation": "Signed-out production browser did not exercise the authenticated Documents → Signing workspace; public endpoints, JavaScript assets, module hash and page errors passed."
+            },
+            "additionalDeploymentEvidence": {
+              "parallelLegacyWorkerDeployRun": 44787425008,
+              "status": "SUCCESS",
+              "note": "A separate pre-existing push-triggered Worker workflow also deployed the same commit. Its generated Wrangler configuration declares the repository's existing SMTP_HOST, SMTP_PORT and SMTP_FROM values; no secret values were exposed."
+            }
+          },
+          "closedByPR": 820
+        }
+      },
+      "validation": {
+        "baselineSmoke": "PASS",
+        "fullRegression": "PENDING",
+        "portalSmoke": {
+          "Signature Portal": "PENDING"
+        },
+        "behaviourDifferences": [
+          "Invitation-link preview/session lifecycle returns to the legacy pre-cutoff behavior.",
+          "Post-cutoff v2 email-signing routes and module are removed; legacy email-link routes remain.",
+          "Resend and signer-status behavior returns to the pre-cutoff implementation.",
+          "Existing signing records and links are not rewritten or revoked."
+        ],
+        "evidence": [
+          "Production Gateway deployment run 44690520757: success, deployed exact commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd; live health check passed.",
+          "Signature source files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
+          "Post-cutoff signature changes were identified in commits 514249c, 67ba1ed, 386b73b and d8b52fd."
+        ]
       }
     },
     "validation": {
-      "baselineSmoke": "PASS",
+      "contractTests": "PENDING",
+      "endToEnd": "PENDING",
+      "sevenPortalSmoke": "PENDING",
       "fullRegression": "PENDING",
-      "portalSmoke": {
-        "Signature Portal": "PENDING"
-      },
-      "behaviourDifferences": [
-        "Invitation-link preview/session lifecycle returns to the legacy pre-cutoff behavior.",
-        "Post-cutoff v2 email-signing routes and module are removed; legacy email-link routes remain.",
-        "Resend and signer-status behavior returns to the pre-cutoff implementation.",
-        "Existing signing records and links are not rewritten or revoked."
-      ],
-      "evidence": [
-        "Production Gateway deployment run 44690520757: success, deployed exact commit eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd; live health check passed.",
-        "Signature source files at source snapshot 8bfa67b2a8757519befb2f6be1074c0f34457c99 were byte-identical to the deployed eb04405 snapshot.",
-        "Post-cutoff signature changes were identified in commits 514249c, 67ba1ed, 386b73b and d8b52fd."
-      ]
-    }
-  }
+      "dnsWorkflow": "PENDING",
+      "productionSmoke": "PENDING",
+      "parallelFanOut": "PENDING: end-to-end same-position parallel group test",
+      "sequentialHandoff": "PENDING: owner-first next-position hand-off test"
+    },
+    "completion": null,
+    "expectedEffect": "The existing order-group invitation rules remain unchanged: signers in the first eligible position receive invitations together; later positions are released only when all earlier-position signers have signed. The repair records explicit hand-off started/sent/failed events and the SMTP reply evidence for each delivery. Each email invitation uses a signer/position-specific subject and multipart MIME with a unique Message-ID. Copy and WhatsApp actions use the existing resend flow and the exact link returned only after SMTP acceptance. No signing order, token or session semantics change."
+  },
+  "declarationNote": "The previously reported case was described as parallel/non-hierarchical. The repair preserves the existing same-position parallel invitation group and configured order-group rules; it adds delivery evidence and hand-off events without converting the envelope to sequential signing.",
+  "declarationNoteSource": "Prior conversation on 2026-11-20: user rejected a sequential-signing explanation for the affected envelope."
 }

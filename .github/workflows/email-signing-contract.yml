@@ -27,6 +27,8 @@ jobs:
         run: npm ci --prefix drive-gateway
       - name: Run email signing contract
         run: node --test drive-gateway/tests/email-signing-contract.test.mjs
+      - name: Run legacy invitation, SMTP and delivery diagnostics contracts
+        run: node --test drive-gateway/tests/email-signing-links.test.mjs drive-gateway/tests/smtp-diagnostics.test.mjs drive-gateway/tests/email-delivery-diagnostics.test.mjs
       - name: Run email signer review and submission navigation regression
         run: node --test tests/email-signing-review-navigation.test.mjs
       - name: Run email signing integration regressions

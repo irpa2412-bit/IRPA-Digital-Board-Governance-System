@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "open",
   "openedAt": "2026-11-20T11:08:48Z",
-  "lastActivityAt": "2026-11-21T07:49:00Z",
+  "lastActivityAt": "2026-11-21T08:14:24Z",
   "reason": "Meeting Portal operational-readiness repairs authorised for 48 hours. Preserve all existing signature, resend, upright stamping, EAT, placed-position and saved-signature confirmation behaviour. No secrets, SMTP settings, Firestore rules, certificates, hashes, archive logic, or standard Worker deployment workflow changes.",
   "scope": [
     "docs/portal-protection/portal-register.json",
@@ -217,25 +217,29 @@
     {
       "portal": "Signature Portal",
       "status": "open",
-      "openedAt": "2026-11-20T17:08:47Z",
-      "lastActivityAt": "2026-11-20T20:00:00Z",
+      "openedAt": "2026-11-21T08:14:24Z",
+      "lastActivityAt": "2026-11-21T08:14:24Z",
       "durationHours": 48,
-      "closesAt": "2026-11-22T17:08:47Z",
-      "reason": "Owner-authorised restoration of the Email-link E-signature system to its verified production state before 11:00 EAT on 20 Nov 2026. Preserve Meeting Portal functionality and all existing signing records.",
-      "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+      "closesAt": "2026-11-23T08:14:24Z",
+      "reason": "Owner-authorised 48-hour Signature Portal invitation-delivery diagnosis and repair. Limit changes to invitation MIME construction, delivery-stage/audit recording, owner delivery-status route and envelope panel, owner/admin SMTP self-check, read-only DNS diagnostics, tests and documentation. Preserve all signing protocol, tokens, link format, session, signer identity/order, resend acceptance rule, PDF/stamping/hash/certificate/archive logic, Firestore rules, SMTP settings, credentials and environment variables. Do not touch Email Signing rebuild branches.",
+      "rollbackCommit": "e36b4e301411ed5378916112d880bab8eb82ddba",
       "scope": [
-        "drive-gateway/src/emailSigning/",
-        "drive-gateway/src/emailSigningLinks.mjs",
+        "drive-gateway/src/invitationEmail.mjs",
         "drive-gateway/src/signing.mjs",
         "drive-gateway/src/index.js",
-        "src/pages/EmailSigningReadOnlyPage.jsx",
+        "drive-gateway/src/router.mjs",
+        "drive-gateway/src/smtpDiagnostics.mjs",
         "src/pages/SignaturePlatform.jsx",
         "drive-gateway/tests/email-signing-contract.test.mjs",
         "drive-gateway/tests/email-signing-links.test.mjs",
         "drive-gateway/tests/email-signing-links.integration.test.mjs",
-        "tests/email-signing-contract.test.mjs",
+        "drive-gateway/tests/smtp-diagnostics.test.mjs",
+        "drive-gateway/tests/email-delivery-diagnostics.test.mjs",
         ".github/workflows/email-signing-contract.yml",
-        "scripts/meeting-portal-fixture-isolation-guard.sh",
+        ".github/workflows/email-deliverability-dns-check.yml",
+        "docs/email-deliverability/HOSTING_REQUEST.md",
+        "docs/portal-protection/repair-window.json",
+        "docs/portal-protection/change-record.json",
         "scripts/portal-repair-window-guard-policy.mjs",
         "tests/meeting-isolation-guard.test.mjs"
       ],
@@ -282,6 +286,11 @@
           "at": "2026-11-20T20:00:00Z",
           "action": "rollback-target-updated",
           "description": "Owner requested restoration of Email-link E-signature to its pre-11:00 EAT production state. Verified production Worker baseline is eb04405 (09:49:57 EAT); signature source files in 8bfa67 are byte-identical. Preserve Meeting Portal and all existing signing data."
+        },
+        {
+          "at": "2026-11-21T08:14:24Z",
+          "action": "scope-amended",
+          "description": "Opened the owner-authorised 48-hour Signature Portal email-delivery diagnostics and repair window. Rollback is the production Worker commit e36b4e301411ed5378916112d880bab8eb82ddba, verified by successful production deployment run 44879429522 and its live health gate. Scope is limited to invitation message construction, delivery recording/status, envelope delivery panel, owner/admin SMTP self-check, read-only DNS workflow, associated tests and docs. No signing protocol, tokens, sessions, signer identity/order, resend acceptance rule, PDF, hashes, certificates, archives, Firestore rules, SMTP configuration, secrets or environment variables may change."
         }
       ],
       "rollbackCommitEvidence": "Production Gateway deploy run 44690520757 completed successfully at 06:49:57Z (09:49:57 EAT); exact target commit and live health gate verified.",
@@ -300,7 +309,23 @@
         "limitation": "Production browser run passed public frontend endpoints, all six viewport widths, all built JavaScript asset HTTP 200 checks, DocumentLifecycleModule SHA-256 against the exact deployed Cloudflare artifact, and no page errors. It detected a signed-out browser and therefore did not exercise the authenticated Documents → Signing workspace."
       },
       "reopenedAt": "2026-11-20T18:10:00Z",
-      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8"
+      "priorRollbackCommit": "fd3e5c8580c28d0c00f2ad0ca1c62e0131abafb8",
+      "previousScope": [
+        "drive-gateway/src/emailSigning/",
+        "drive-gateway/src/emailSigningLinks.mjs",
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/index.js",
+        "src/pages/EmailSigningReadOnlyPage.jsx",
+        "src/pages/SignaturePlatform.jsx",
+        "drive-gateway/tests/email-signing-contract.test.mjs",
+        "drive-gateway/tests/email-signing-links.test.mjs",
+        "drive-gateway/tests/email-signing-links.integration.test.mjs",
+        "tests/email-signing-contract.test.mjs",
+        ".github/workflows/email-signing-contract.yml",
+        "scripts/meeting-portal-fixture-isolation-guard.sh",
+        "scripts/portal-repair-window-guard-policy.mjs",
+        "tests/meeting-isolation-guard.test.mjs"
+      ]
     }
   ]
 }

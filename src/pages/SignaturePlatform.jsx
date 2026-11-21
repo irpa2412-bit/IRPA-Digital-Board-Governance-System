@@ -3,6 +3,7 @@ import"../styles/signature-portal.css";
 import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthorityRegisterEntries,getControlledDocumentsForSigning,getRecords}from"../firebase/data";
 import{createGatewaySignatureEnvelope,voidGatewaySignatureEnvelope,downloadControlledDocumentBytes,downloadDriveBytes,downloadSignatureBytes,resendFailedGatewaySignatureInvitations,getGatewaySignatureEnvelopeStatus,retryGatewaySignatureDistribution,resendGatewayEmailInvitation,revokeGatewayEmailInvitation}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
+import{getGoogleDriveGatewayUrl}from"../firebase/gatewayUrl";
 import{resolveExpectedIntegrity,hasIntegrityMismatch,sha256Hex as signatureSha256}from"../utils/documentIntegrity.mjs";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
 import{createCompletionCertificate,createSignatureEnvelope,attachGatewayEmailLinkEnvelope,getMySignatureProfile,getSignatureEnvelope,getSignatureEnvelopes,getMySignedDocuments,downloadMySignedDocumentCopy,deleteMySignedDocumentCopy,saveMySignatureProfile,saveSignatureWorkflowDraft,finalizeSignatureWorkflowDraft,startSignatureWorkflow,revokeSignatureApplication,migrateExistingSignatureProfile}from"../firebase/signaturePlatform";
@@ -251,6 +252,7 @@ function SigningDocumentViewer({url,documentId,envelopeId,fields,profile,fieldVa
 
 export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=null,initialDocument=null}){
  const addSignerInFlightRef=useRef(false),signInFlightRef=useRef(false);const[gatewayEmailStatus,setGatewayEmailStatus]=useState(null),[gatewayEmailStatusBusy,setGatewayEmailStatusBusy]=useState(false),[trackingSnapshots,setTrackingSnapshots]=useState({}),[trackingBusy,setTrackingBusy]=useState(false);
+ const[smtpTestAddress,setSmtpTestAddress]=useState(""),[smtpSelfCheckBusy,setSmtpSelfCheckBusy]=useState(false),[smtpSelfCheckResult,setSmtpSelfCheckResult]=useState(null);
  const[isAdmin,setIsAdmin]=useState(false);
  useEffect(()=>{let alive=true;(async()=>{try{const token=await auth.currentUser?.getIdTokenResult();if(alive)setIsAdmin(auth.currentUser?.email?.toLowerCase()==="irpa2412@gmail.com"||token?.claims?.admin===true);}catch{if(alive)setIsAdmin(auth.currentUser?.email?.toLowerCase()==="irpa2412@gmail.com");}})();return()=>{alive=false}},[]);
  const[tab,setTab]=useState("Profile"),[profile,setProfile]=useState(null),[signerIdentity,setSignerIdentity]=useState(null),[docs,setDocs]=useState([]),[envelopes,setEnvelopes]=useState([]),[signedDocuments,setSignedDocuments]=useState([]),[members,setMembers]=useState([]),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[revokeOpen,setRevokeOpen]=useState(false),[revokeBusy,setRevokeBusy]=useState(false);
@@ -772,6 +774,67 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   catch(error){setMessage((error.message||"Unable to send a new signing link.")+(error.code?" (Stage: "+error.code+")":""));}
   finally{setGatewayEmailStatusBusy(false);}
  }
+ async function copySigningLink(signerId){
+  if(!selected?.gatewayEnvelopeId)return;
+  setGatewayEmailStatusBusy(true);
+  try{
+   const result=await resendGatewayEmailInvitation(selected.gatewayEnvelopeId,signerId);
+   const link=String(result.signingLink||"");
+   if(!link)throw new Error("The Gateway did not return the accepted signer link.");
+   if(!navigator.clipboard?.writeText)throw new Error("Clipboard access is unavailable in this browser. Use Share on WhatsApp instead.");
+   await navigator.clipboard.writeText(link);
+   const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);
+   setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});
+   setMessage("The signer-specific link was emailed and copied. Acceptance by the mail server is not proof of inbox delivery.");
+  }catch(error){setMessage((error.message||"Unable to copy the signer link.")+(error.code?" (Stage: "+error.code+")":""));}
+  finally{setGatewayEmailStatusBusy(false);}
+ }
+ async function shareSigningLinkWhatsApp(signerId){
+  if(!selected?.gatewayEnvelopeId)return;
+  const popup=window.open("about:blank","_blank");
+  if(popup)popup.opener=null;
+  setGatewayEmailStatusBusy(true);
+  try{
+   const result=await resendGatewayEmailInvitation(selected.gatewayEnvelopeId,signerId);
+   const link=String(result.signingLink||"");
+   if(!link)throw new Error("The Gateway did not return the accepted signer link.");
+   const shareText="Please review and sign "+String(selected.title||"the IRPA document")+": "+link;
+   const shareUrl="https://wa.me/?text="+encodeURIComponent(shareText);
+   if(popup){popup.location.href=shareUrl;setMessage("The same signer-specific link was emailed and prepared for WhatsApp. Mail-server acceptance is not proof of inbox delivery.");}
+   else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(link);setMessage("The invitation was accepted by the mail server; the link was copied because the WhatsApp pop-up was blocked. Acceptance is not proof of inbox delivery.");}
+   else setMessage("The invitation was accepted by the mail server. Allow pop-ups to open WhatsApp, or use Copy signing link.");
+   const status=await getGatewaySignatureEnvelopeStatus(selected.gatewayEnvelopeId);
+   setGatewayEmailStatus({...status,envelopeId:selected.gatewayEnvelopeId});
+  }catch(error){try{popup?.close?.()}catch{}setMessage((error.message||"Unable to prepare the WhatsApp share.")+(error.code?" (Stage: "+error.code+")":""));}
+  finally{setGatewayEmailStatusBusy(false);}
+ }
+ async function runSmtpSelfCheck(){
+  if(!isAdmin){setMessage("Administrator access is required for the SMTP self-check.");return;}
+  const recipient=String(smtpTestAddress||"").trim();
+  if(!recipient){setMessage("Enter a test recipient email address.");return;}
+  setSmtpSelfCheckBusy(true);
+  setSmtpSelfCheckResult(null);
+  try{
+   const token=await auth.currentUser?.getIdToken();
+   if(!token)throw new Error("An authenticated administrator session is required.");
+   const gateway=getGoogleDriveGatewayUrl();
+   if(!gateway)throw new Error("The Gateway URL is not configured.");
+   const response=await fetch(gateway+"/api/sign/smtp-selfcheck",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},
+    body:JSON.stringify({to:recipient}),
+    cache:"no-store",
+    redirect:"error"
+   });
+   const data=await response.json().catch(()=>({ok:false,error:"The Gateway returned an unreadable response."}));
+   setSmtpSelfCheckResult(data);
+   if(!response.ok||data.ok===false)setMessage("SMTP self-check failed at "+String(data.stageCode||"an unreported stage")+". See the reply and stage results below.");
+   else setMessage("The mail server accepted the test message. This does not confirm inbox delivery.");
+  }catch(error){
+   setSmtpSelfCheckResult({ok:false,error:error.message||"SMTP self-check could not reach the Gateway."});
+   setMessage(error.message||"SMTP self-check could not reach the Gateway.");
+  }finally{setSmtpSelfCheckBusy(false);}
+ }
  async function revokeEmailLink(signerId){
   if(!selected?.gatewayEnvelopeId)return;
   setGatewayEmailStatusBusy(true);
@@ -962,7 +1025,52 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
    })}
   </div>}
  </section>}
- {tab==="Sign Document"&&<section className="panel">{!selected?<><h2>Signing Ceremony</h2><p className="muted">This signing invitation could not be loaded.</p></>:<><div className="panel-heading"><div><span className="eyebrow">SIGNING CEREMONY</span><h2>{selected.title}</h2><p>{selected.envelopeReference} · {selected.status}</p></div></div>{!signerOnly&&selected.gatewayEnvelopeId&&<><div className="panel signature-envelope-status" aria-busy={gatewayEmailStatusBusy?"true":"false"} style={{marginBottom:18,color:"var(--text)"}}><div className="panel-heading"><div><h3>Signer invitations</h3><p className="muted">Every signer receives an individual, single-use signing link, including registered IRPA members and employees. Send a new link to any unsigned signer when their signing turn has arrived.</p></div><button type="button" disabled={gatewayEmailStatusBusy} onClick={refreshGatewayEmailStatus}>{gatewayEmailStatusBusy?"Loading…":"Refresh status"}</button></div>{gatewayEmailStatus?.envelopeId===selected.gatewayEnvelopeId&&gatewayEmailStatus?.signers?.map(item=><div key={item.id} style={{display:"flex",gap:10,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",padding:"10px 0",borderBottom:"1px solid var(--border)",color:"var(--text)",opacity:1}}><div><strong style={{display:"block",color:"var(--text)",opacity:1}}>{item.name||"Email signer"}</strong><small style={{display:"block",color:"var(--text)",opacity:1}}>{maskRegisterEmail(item.email)} · Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"} · {item.status==="Signed"?"Signed":item.status||"Pending"}</small></div><div style={{display:"flex",gap:6}}><button type="button" className="text-button" disabled={gatewayEmailStatusBusy||item.status==="Signed"||gatewayEmailStatus?.status==="Completed"||["Voided","Declined","Cancelled","Canceled"].includes(gatewayEmailStatus?.status)} onClick={()=>resendEmailLink(item.id)}>Send new link</button>{item.identityType==="email-link"&&<button type="button" className="text-button" disabled={gatewayEmailStatusBusy||item.emailLinkStatus==="revoked"||item.status==="Signed"} onClick={()=>revokeEmailLink(item.id)}>Revoke</button>}</div></div>)}{gatewayEmailStatusBusy&&<p role="status" aria-live="polite" style={{margin:"8px 0 0",color:"var(--text)",opacity:1}}>Refreshing delivery status. The signer list remains visible.</p>}{(!gatewayEmailStatusBusy&&gatewayEmailStatus?.envelopeId===selected.gatewayEnvelopeId&&!gatewayEmailStatus?.signers?.length)&&<p role="status" style={{color:"var(--text)",opacity:1}}>Press Refresh status to retrieve the current signer and invitation records.</p>}</div><div className="panel" style={{marginBottom:18}}><h3>Invitation Delivery</h3><p className="muted">Retry any pending or failed Gateway invitations. Each retry rotates the signer token and records the delivery outcome.</p><button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{const result=await resendFailedGatewaySignatureInvitations(selected.gatewayEnvelopeId);setMessage(result.attempted?("Invitation retry completed for "+result.attempted+" signer(s). Check the Gateway delivery status for any remaining failures."):"No pending or failed signer invitations were found.");}catch(error){setMessage(error.message||"Unable to retry Gateway invitations.");}finally{setBusy(false)}}}>Retry pending or failed invitations</button></div>{gatewayEmailStatus?.status==="Completed"&&gatewayEmailStatus?.distribution&&<div className="panel" style={{marginBottom:18}}><h3>Completed Document Distribution</h3><p className="muted">The final executed PDF is emailed to the document owner and every signer. Registered recipients also receive a personal copy in My Documents. Delivery outcomes are recorded separately from the immutable signing audit trail.</p><p>{gatewayEmailStatus.distribution.sent||0} of {gatewayEmailStatus.distribution.total||0} recipient email(s) delivered · {gatewayEmailStatus.distribution.failed||0} failed · {gatewayEmailStatus.distribution.unknown||0} with an ambiguous SMTP outcome.</p>{gatewayEmailStatus.distribution.failed>0&&<button type="button" disabled={gatewayEmailStatusBusy} onClick={retryCompletedDistribution}>{gatewayEmailStatusBusy?"Retrying…":"Retry failed recipient emails"}</button>}{gatewayEmailStatus.distribution.unknown>0&&<small style={{display:"block",marginTop:8,opacity:.7}}>Ambiguous SMTP outcomes are not retried automatically because the provider may already have accepted the email. Check the recipient mailbox before requesting a manual resend.</small>}</div>}</>}<div className="panel" style={{marginBottom:18}}><h3>Signing Progress</h3><div style={{display:"grid",gap:8,marginTop:10}}>{(selected.recipients||[]).filter(r=>r?.uid===auth.currentUser?.uid).map((r)=>{const isCurrent=selected.status!=="Completed"&&selected.currentSignerUid===r.uid;const isSigned=r.status==="Signed"||((selected.workflowHistory||[]).some(h=>h.uid===r.uid));const state=selected.status==="Completed"&&isSigned?"Completed":isSigned?"Signed":isCurrent?"Your assignment is active":"Your assignment is pending";const when=r.completedAt||((selected.workflowHistory||[]).filter(h=>h.uid===r.uid).slice(-1)[0]?.completedAt)||"";return <div key={r.uid} style={{display:"grid",gridTemplateColumns:"36px 1fr auto",gap:10,alignItems:"center",padding:"10px 12px",border:"1px solid var(--border)",borderRadius:8}}><strong>✓</strong><div><strong>My assignment</strong><div style={{fontSize:12,opacity:.7}}>{r.role||"Action"}</div>{when&&<div style={{fontSize:11,opacity:.6}}>Completed: {new Date(when).toLocaleString()}</div>}</div><span>{state}</span></div>})}</div>{selected.currentSignerUid===auth.currentUser?.uid&&selected.status!=="Completed"&&<p className="muted" style={{marginBottom:0,marginTop:10}}>Next action: complete your assigned fields.</p>}{selected.status==="Completed"&&<p className="muted" style={{marginBottom:0,marginTop:10}}>All required signing actions are complete.</p>}</div>{selected.documentUrl&&<SigningDocumentViewer url={selected.signedDocumentUrl||selected.documentUrl} documentId={selected.documentId} envelopeId={selected.id} fields={selected.fields||[]} profile={profile} fieldValues={fieldValues} setFieldValues={setFieldValues} record={selected} sourceDocument={docs.find(item=>item.id===selected.documentId)||null} isAdmin={isAdmin} setMessage={setMessage}/>}<div className="panel" style={{marginTop:18}}>
+ {tab==="Sign Document"&&<section className="panel">{!selected?<><h2>Signing Ceremony</h2><p className="muted">This signing invitation could not be loaded.</p></>:<><div className="panel-heading"><div><span className="eyebrow">SIGNING CEREMONY</span><h2>{selected.title}</h2><p>{selected.envelopeReference} · {selected.status}</p></div></div>{!signerOnly&&selected.gatewayEnvelopeId&&<><div className="panel signature-envelope-status" aria-busy={gatewayEmailStatusBusy?"true":"false"} style={{marginBottom:18,color:"var(--text)"}}>
+<div className="panel-heading"><div><h3>Signer invitations</h3><p className="muted">Each signer has an individual link bound to that signer position. Copy and WhatsApp actions use the existing resend process: the same link is emailed and shared, and the previous link remains valid until the new email is accepted by the mail server. Mail-server acceptance is not proof of inbox delivery.</p></div><button type="button" disabled={gatewayEmailStatusBusy} onClick={refreshGatewayEmailStatus}>{gatewayEmailStatusBusy?"Loading…":"Refresh status"}</button></div>
+{gatewayEmailStatus?.envelopeId===selected.gatewayEnvelopeId&&gatewayEmailStatus?.signers?.map(item=>{
+ const delivery=item.delivery||{};
+ const blockedByEarlierSigner=(gatewayEmailStatus.signers||[]).some(other=>other.order<item.order&&other.status!=="Signed");
+ const unavailable= gatewayEmailStatus?.status==="Completed"||["Voided","Declined","Cancelled","Canceled"].includes(gatewayEmailStatus?.status);
+ const detail=delivery.status==="Accepted by mail server"?"Accepted by the mail server (not Delivered)":delivery.status==="Failed"?"Failed at "+String(delivery.stageCode||item.deliveryStageCode||"unknown stage"):delivery.status==="Sent"?"Sent (older record; SMTP reply not recorded)":delivery.status||"Pending";
+ const acceptedTime=delivery.acceptedAt?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(new Date(delivery.acceptedAt))+" EAT":"";
+ const attemptedTime=delivery.attemptedAt?new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"short"}).format(new Date(delivery.attemptedAt))+" EAT":"";
+ return <div key={item.id} style={{display:"flex",gap:10,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",padding:"10px 0",borderBottom:"1px solid var(--border)",color:"var(--text)",opacity:1}}>
+  <div style={{minWidth:220,flex:"1 1 240px"}}>
+   <strong style={{display:"block",color:"var(--text)",opacity:1}}>{item.name||"Email signer"} · Position {item.order}</strong>
+   <small style={{display:"block",color:"var(--text)",opacity:1}}>{maskRegisterEmail(item.email)} · Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"} · {item.status==="Signed"?"Signed":item.status||"Pending"}</small>
+   <small style={{display:"block",color:"var(--text)",opacity:1}}>Delivery: {detail}{delivery.smtpReplyCategory?" · "+delivery.smtpReplyCategory:""}{delivery.smtpReplyCode?" · SMTP "+delivery.smtpReplyCode:""}{acceptedTime?" · "+acceptedTime:attemptedTime?" · "+attemptedTime:""}</small>
+   {delivery.smtpReply&&<small style={{display:"block",color:"var(--text)",opacity:1}}>SMTP reply: {delivery.smtpReply}</small>}
+   {delivery.stageCode&&<small style={{display:"block",color:"var(--text)",opacity:1}}>Last stage: {delivery.stageCode}</small>}
+   {delivery.messageId&&<small style={{display:"block",color:"var(--text)",opacity:1}}>Message-ID: {delivery.messageId}</small>}
+   {delivery.handoffStatus&&<small style={{display:"block",color:"var(--text)",opacity:1}}>Automatic hand-off: {delivery.handoffStatus}{delivery.handoffAt?" · "+delivery.handoffAt:""}</small>}
+  </div>
+  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+   <button type="button" className="text-button" disabled={gatewayEmailStatusBusy||item.status==="Signed"||unavailable||blockedByEarlierSigner} onClick={()=>resendEmailLink(item.id)}>Send new link</button>
+   <button type="button" className="text-button" disabled={gatewayEmailStatusBusy||item.status==="Signed"||unavailable||blockedByEarlierSigner} onClick={()=>copySigningLink(item.id)}>Copy signing link</button>
+   <button type="button" className="text-button" disabled={gatewayEmailStatusBusy||item.status==="Signed"||unavailable||blockedByEarlierSigner} onClick={()=>shareSigningLinkWhatsApp(item.id)}>Share on WhatsApp</button>
+   {item.identityType==="email-link"&&<button type="button" className="text-button" disabled={gatewayEmailStatusBusy||item.emailLinkStatus==="revoked"||item.status==="Signed"} onClick={()=>revokeEmailLink(item.id)}>Revoke</button>}
+  </div>
+ </div>;
+})}
+{gatewayEmailStatusBusy&&<p role="status" aria-live="polite" style={{margin:"8px 0 0",color:"var(--text)",opacity:1}}>Refreshing delivery status. The signer list remains visible.</p>}
+{(!gatewayEmailStatusBusy&&gatewayEmailStatus?.envelopeId===selected.gatewayEnvelopeId&&!gatewayEmailStatus?.signers?.length)&&<p role="status" style={{color:"var(--text)",opacity:1}}>Press Refresh status to retrieve the current signer and invitation records.</p>}
+</div>{isAdmin&&<div className="panel" style={{marginBottom:18,color:"var(--text)"}}>
+ <h3>SMTP delivery self-check</h3>
+ <p className="muted">Send one test message from info@irpa.or.tz to an address you enter. The report shows SMTP stages and the mail server reply. Acceptance by the mail server is not proof that the message reached the inbox.</p>
+ <div style={{display:"flex",gap:8,alignItems:"end",flexWrap:"wrap"}}>
+  <label style={{flex:"1 1 260px",minWidth:220}}>Test recipient email
+   <input type="email" value={smtpTestAddress} onChange={event=>setSmtpTestAddress(event.target.value)} placeholder="recipient@example.com" autoComplete="email"/>
+  </label>
+  <button type="button" disabled={smtpSelfCheckBusy||!smtpTestAddress.trim()} onClick={runSmtpSelfCheck}>{smtpSelfCheckBusy?"Sending one test message…":"Send one test message"}</button>
+ </div>
+ {smtpSelfCheckResult&&<div role="status" aria-live="polite" style={{marginTop:12}}>
+  <strong>{smtpSelfCheckResult.acceptedByMailServer?"Accepted by the mail server — not Delivered":smtpSelfCheckResult.error||"SMTP self-check failed"}</strong>
+  {smtpSelfCheckResult.stageCode&&<p>Failed stage: {smtpSelfCheckResult.stageCode} · {smtpSelfCheckResult.smtpReplyCategory||"UNKNOWN"}</p>}
+  {smtpSelfCheckResult.smtpReply&&<p>SMTP reply: {smtpSelfCheckResult.smtpReply}{smtpSelfCheckResult.smtpReplyCode?" ("+smtpSelfCheckResult.smtpReplyCode+")":""}</p>}
+  {smtpSelfCheckResult.messageId&&<p>Message-ID: {smtpSelfCheckResult.messageId}</p>}
+  {smtpSelfCheckResult.stages?.map((stage,index)=><p key={stage.stageCode+"-"+index}>{stage.stageCode}: {stage.outcome} · {stage.smtpReplyCategory||"UNKNOWN"}{stage.smtpReplyCode?" · "+stage.smtpReplyCode:""}{stage.smtpReply?" · "+stage.smtpReply:""}{stage.at?" · "+stage.at:""}</p>)}
+ </div>}
+</div>}<div className="panel" style={{marginBottom:18}}><h3>Invitation Delivery</h3><p className="muted">Retry any pending or failed Gateway invitations. Each retry rotates the signer token and records the delivery outcome.</p><button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{const result=await resendFailedGatewaySignatureInvitations(selected.gatewayEnvelopeId);setMessage(result.attempted?("Invitation retry completed for "+result.attempted+" signer(s). Check the Gateway delivery status for any remaining failures."):"No pending or failed signer invitations were found.");}catch(error){setMessage(error.message||"Unable to retry Gateway invitations.");}finally{setBusy(false)}}}>Retry pending or failed invitations</button></div>{gatewayEmailStatus?.status==="Completed"&&gatewayEmailStatus?.distribution&&<div className="panel" style={{marginBottom:18}}><h3>Completed Document Distribution</h3><p className="muted">The final executed PDF is emailed to the document owner and every signer. Registered recipients also receive a personal copy in My Documents. Delivery outcomes are recorded separately from the immutable signing audit trail.</p><p>{gatewayEmailStatus.distribution.sent||0} of {gatewayEmailStatus.distribution.total||0} recipient email(s) delivered · {gatewayEmailStatus.distribution.failed||0} failed · {gatewayEmailStatus.distribution.unknown||0} with an ambiguous SMTP outcome.</p>{gatewayEmailStatus.distribution.failed>0&&<button type="button" disabled={gatewayEmailStatusBusy} onClick={retryCompletedDistribution}>{gatewayEmailStatusBusy?"Retrying…":"Retry failed recipient emails"}</button>}{gatewayEmailStatus.distribution.unknown>0&&<small style={{display:"block",marginTop:8,opacity:.7}}>Ambiguous SMTP outcomes are not retried automatically because the provider may already have accepted the email. Check the recipient mailbox before requesting a manual resend.</small>}</div>}</>}<div className="panel" style={{marginBottom:18}}><h3>Signing Progress</h3><div style={{display:"grid",gap:8,marginTop:10}}>{(selected.recipients||[]).filter(r=>r?.uid===auth.currentUser?.uid).map((r)=>{const isCurrent=selected.status!=="Completed"&&selected.currentSignerUid===r.uid;const isSigned=r.status==="Signed"||((selected.workflowHistory||[]).some(h=>h.uid===r.uid));const state=selected.status==="Completed"&&isSigned?"Completed":isSigned?"Signed":isCurrent?"Your assignment is active":"Your assignment is pending";const when=r.completedAt||((selected.workflowHistory||[]).filter(h=>h.uid===r.uid).slice(-1)[0]?.completedAt)||"";return <div key={r.uid} style={{display:"grid",gridTemplateColumns:"36px 1fr auto",gap:10,alignItems:"center",padding:"10px 12px",border:"1px solid var(--border)",borderRadius:8}}><strong>✓</strong><div><strong>My assignment</strong><div style={{fontSize:12,opacity:.7}}>{r.role||"Action"}</div>{when&&<div style={{fontSize:11,opacity:.6}}>Completed: {new Date(when).toLocaleString()}</div>}</div><span>{state}</span></div>})}</div>{selected.currentSignerUid===auth.currentUser?.uid&&selected.status!=="Completed"&&<p className="muted" style={{marginBottom:0,marginTop:10}}>Next action: complete your assigned fields.</p>}{selected.status==="Completed"&&<p className="muted" style={{marginBottom:0,marginTop:10}}>All required signing actions are complete.</p>}</div>{selected.documentUrl&&<SigningDocumentViewer url={selected.signedDocumentUrl||selected.documentUrl} documentId={selected.documentId} envelopeId={selected.id} fields={selected.fields||[]} profile={profile} fieldValues={fieldValues} setFieldValues={setFieldValues} record={selected} sourceDocument={docs.find(item=>item.id===selected.documentId)||null} isAdmin={isAdmin} setMessage={setMessage}/>}<div className="panel" style={{marginTop:18}}>
  <h3>Document Archive</h3>
  <p className="muted" style={{marginBottom:12}}>The controlled document remains available to the assigned signee throughout the workflow. After an action is completed, the latest signed version is exposed here for review and intended use.</p>
  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>

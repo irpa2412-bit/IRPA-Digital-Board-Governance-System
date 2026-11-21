@@ -11,7 +11,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 const OAUTH_STATE_TTL = 600;
 import { buildMailMimeMessage, escapeHtml as escapeMailHtml, normalizeRecipientEmail, recipientDomain, safeMailError, sendWithRetry, validateMailHeader } from "./mailDelivery.js";
-import { classifySmtpReplyCategory } from "./invitationEmail.mjs";
+import { classifySmtpReplyCategory, buildRawMailMimeMessage } from "./invitationEmail.mjs";
 import { sendInvitationEmail, sendEmailSigningInvitation, buildInvitationMessage, validateRecipient, runEmailStage, isInvitationQueueActive, handleSendInvitationEmail, sendWithRetry as sendInvitationWithRetry } from "./invitationEmail.mjs";
 import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
@@ -555,7 +555,7 @@ export default {
               const ownerProfile = firestoreDocumentToPlain(member || employee || admin) || {};
               const adminData=firestoreDocumentToPlain(admin)||{};return {uid:claims.user_id,email:claims.email||"",name:String(ownerProfile.displayName||ownerProfile.fullName||ownerProfile.name||claims.name||claims.email||"IRPA Document Owner"),token:claims.token,isAdmin:Boolean(admin?.fields?.active?.booleanValue),isOwner:adminData.isOwner===true||String(adminData.role||"").trim().toLowerCase()==="owner"||ownerProfile.isOwner===true||String(ownerProfile.role||"").trim().toLowerCase()==="owner"};
             },
-            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,onStage}) => {
+            sendInvitation: async ({to,name,link,emailLink,emailSigningModule,title,ownerName,expiresAt,envelopeId,signerId,position,onStage}) => {
               if(!emailLink)return sendInvitationEmail({email:to,name,link,smtpSend:async ({to:recipient,subject,text,html})=>smtpSend(env,{to:recipient,subject,text,html}),logger:console});
               if(emailSigningModule==="v2"){
                 const safeName=String(name||"IRPA signer").replace(/[\\r\\n]+/g," ").slice(0,160);
@@ -569,7 +569,7 @@ export default {
                 // Retry transient SMTP 4xx responses for reusable email-link invitations; permanent 5xx recipient/auth failures remain fail-fast.
                 return sendInvitationWithRetry(()=>smtpSend(env,{to,subject,text,html,onStage}),{logger:console});
               }
-              return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,onStage,smtpSend:async ({to:recipient,subject,text,html,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,onStage:stageCallback}),logger:console});
+              return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,position,signerId,envelopeId,from:resolveSmtpConfiguration(env).from,replyTo:resolveSmtpConfiguration(env).from,expectedOrigin:env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app",onStage,smtpSend:async ({to:recipient,subject,text,html,rawMime,messageId,date,onStage:stageCallback})=>smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage:stageCallback}),logger:console});
             },
             sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
@@ -580,7 +580,24 @@ export default {
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
               return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
             },
-            smtpSelfCheck: async () => { const result=await smtpSend(env,{to:resolveSmtpConfiguration(env).from,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
+            smtpSelfCheck: async (_user,body={}) => {
+              const recipient=validateRecipient(body?.to||body?.email);
+              if(!recipient){const error=new Error("A valid test recipient email address is required.");error.stageCode="BUILD_MESSAGE";throw error;}
+              const from=resolveSmtpConfiguration(env).from;
+              const messageId="<"+crypto.randomUUID()+"@irpa.or.tz>";
+              const date=new Date().toUTCString();
+              const subject="IRPA SMTP self-check "+new Date().toISOString();
+              const text="This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System. Acceptance by the mail server does not confirm inbox delivery.";
+              const html="<p>This is an administrator-requested SMTP delivery self-check for the IRPA Digital Board Governance System.</p><p>Acceptance by the mail server does not confirm inbox delivery.</p>";
+              const stages=[];
+              const onStage=async(stageCode,outcome,smtpReplyCategory="UNKNOWN",details={})=>stages.push({stageCode,outcome,smtpReplyCategory,at:new Date().toISOString(),messageId:details.messageId||messageId,...(details.smtpReplyCode?{smtpReplyCode:details.smtpReplyCode}:{}),...(details.smtpReply?{smtpReply:details.smtpReply}:{})});
+              const rawMime=await runEmailStage("BUILD_MESSAGE",()=>buildRawMailMimeMessage({fromName:"IRPA Digital Signing",from,replyTo:from,to:recipient,subject,text,html,messageId,date}),onStage,{messageId,date});
+              try{
+                const smtpReply=await smtpSend(env,{to:recipient,subject,text,html,rawMime,messageId,date,onStage});
+                const submit=[...stages].reverse().find(stage=>stage.stageCode==="SUBMIT")||null;
+                return {ok:true,acceptedByMailServer:true,deliveryMeaning:"Accepted by the mail server is not proof of inbox delivery.",messageId,smtpReply,smtpReplyCode:submit?.smtpReplyCode||Number(String(smtpReply||"").slice(0,3))||null,stages};
+              }catch(error){error.stages=stages;error.messageId=messageId;throw error;}
+            },
             resolveEmailLinkProfileUid: async (email, signerName) => {
               const normalized=String(email||"").trim().toLowerCase();
               const normalizedName=String(signerName||"").trim().toLowerCase();
@@ -3013,17 +3030,18 @@ async function writeSmtpSelfcheckAudit(env, claims, event) {
   if (!response.ok) throw new Error("Unable to persist SMTP self-check audit event.");
   return {auditId};
 }
-async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
+async function smtpSend(env,{to,subject,text,html,attachments=[],onStage,rawMime,messageId,date}) {
   const smtpConfig=resolveSmtpConfiguration(env);
   const toEmail=normalizeRecipientEmail(to);
   const cleanSubject=validateMailHeader(subject,"Subject");
-  const mime=await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:`"IRPA Administration" <${smtpConfig.from}>`,to:toEmail,subject:cleanSubject,text,html,attachments}),onStage);
+  const mime=rawMime||await runEmailStage("BUILD_MESSAGE",()=>buildMailMimeMessage({from:'"IRPA Administration" <'+smtpConfig.from+'>',to:toEmail,subject:cleanSubject,text,html,attachments}),onStage,{messageId:messageId||null,date:date||null});
+  const stageDetails={messageId:messageId||null,date:date||null};
   if(env.SMTP_MOCK==="success"){
-    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success")}catch{}
+    for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])try{await onStage?.(stage,"success",["RCPT_ACCEPTED","SUBMIT"].includes(stage)?"ACCEPTED":"UNKNOWN",{...stageDetails,smtpReply:stage==="SUBMIT"?"250 MOCK ACCEPTED":stage==="RCPT_ACCEPTED"?"250 MOCK RCPT ACCEPTED":null,smtpReplyCode:stage==="SUBMIT"||stage==="RCPT_ACCEPTED"?250:null})}catch{}
     return "250 MOCK ACCEPTED";
   }
-  if(env.SMTP_MOCK==="fail")return runEmailStage("SMTP_CONNECT",async()=>{throw new Error("SMTP provider unavailable.")},onStage);
-  if(!smtpConfig.password)return runEmailStage("SMTP_AUTH",async()=>{throw new Error("SMTP authentication is unavailable.")},onStage);
+  if(env.SMTP_MOCK==="fail")return runEmailStage("SMTP_CONNECT",async()=>{throw new Error("SMTP provider unavailable.")},onStage,stageDetails);
+  if(!smtpConfig.password)return runEmailStage("SMTP_AUTH",async()=>{throw new Error("SMTP authentication is unavailable.")},onStage,stageDetails);
   let socket,reader,writer,buffer="";
   async function readResponse(){
     while(true){
@@ -3034,7 +3052,13 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
       for(const line of lines){
         if(/^\d{3} /.test(line)){
           const code=Number(line.slice(0,3));
-          if(code>=400){const failure=new Error("IRPA SMTP error "+code);failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));throw failure;}
+          if(code>=400){
+            const failure=new Error("IRPA SMTP error "+code);
+            failure.smtpResponseCode=code;
+            failure.smtpReply=String(line).replace(/[\r\n]+/g," ").slice(0,180);
+            failure.smtpReplyCategory=classifySmtpReplyCategory(new Error(line));
+            throw failure;
+          }
           return line;
         }
       }
@@ -3053,26 +3077,26 @@ async function smtpSend(env,{to,subject,text,html,attachments=[],onStage}) {
       reader=socket.readable.getReader();
       writer=socket.writable.getWriter();
       await readResponse();
-      await command("EHLO irpa-digital-board-governance","2");
-    },onStage);
+      return command("EHLO irpa-digital-board-governance","2");
+    },onStage,stageDetails);
     await runEmailStage("SMTP_AUTH",()=>authenticateSmtpPlain({
       username:smtpConfig.username,
       password:smtpConfig.password,
       writeLine:async line=>writer.write(new TextEncoder().encode(line+"\r\n")),
       readResponse,
       command
-    }),onStage);
+    }),onStage,stageDetails);
     await runEmailStage("RCPT_ACCEPTED",async()=>{
       await command("MAIL FROM:<"+smtpConfig.from+">","2");
-      await command("RCPT TO:<"+toEmail+">","2");
-    },onStage);
+      return command("RCPT TO:<"+toEmail+">","2");
+    },onStage,stageDetails);
     const accepted=await runEmailStage("SUBMIT",async()=>{
       await command("DATA","3");
       await writer.write(new TextEncoder().encode(mime+"\r\n.\r\n"));
       const response=await readResponse();
       if(!response.startsWith("2"))throw new Error("SMTP message was not accepted.");
       return response;
-    },onStage);
+    },onStage,stageDetails);
     try{await command("QUIT","2")}catch{}
     return accepted;
   }finally{

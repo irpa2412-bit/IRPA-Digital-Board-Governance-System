@@ -6,6 +6,7 @@ import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resend
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
+import {buildEmailSigningInvitationMessage,buildRawMailMimeMessage} from "../src/invitationEmail.mjs";
 import {openSigning,sign,declineSigning} from "../src/signing.mjs";
 
 const NOW=new Date("2026-11-16T08:00:00.000Z");
@@ -35,7 +36,17 @@ test("owner signs in the portal before any other signer is invited; completing o
   const sent=[];let now=NOW;
   const ctx=buildEsignContext({
     env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa.example.test",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
-    now:()=>new Date(now),verifyUser:async()=>null,sendInvitation:async message=>sent.push(message),logger:{error(){}}
+    now:()=>new Date(now),verifyUser:async()=>null,sendInvitation:async message=>{
+      sent.push(message);
+      for(const stage of ["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"]){
+        const accepted=["RCPT_ACCEPTED","SUBMIT"].includes(stage);
+        await message.onStage?.(stage,"success",accepted?"ACCEPTED":"UNKNOWN",{
+          messageId:"<owner-first-"+sent.length+"@irpa.or.tz>",
+          smtpReplyCode:250,
+          smtpReply:stage==="SUBMIT"?"250 2.0.0 queued":stage==="RCPT_ACCEPTED"?"250 2.1.5 recipient accepted":"250 OK"
+        });
+      }
+    },logger:{error(){}}
   });
   const sourcePdf=await PDFDocument.create();sourcePdf.addPage([595.28,841.89]);const bytes=await sourcePdf.save();
   const source=await ctx.storage.put({path:"source/owner-first.pdf",bytes,contentType:"application/pdf",metadata:{}});
@@ -69,6 +80,13 @@ test("owner signs in the portal before any other signer is invited; completing o
   const stored=await ctx.meta.get("envelopes",created.envelopeId);
   assert.equal(stored.signers[0].status,"Signed");
   assert.equal(stored.signers[1].invitation,"Sent");
+  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.started").length,1);
+  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.sent").length,1);
+  const delivery=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(delivery.signers[1].delivery.status,"Accepted by mail server");
+  assert.equal(delivery.signers[1].delivery.stageCode,"SUBMIT");
+  assert.equal(delivery.signers[1].delivery.smtpReplyCode,250);
+  assert.equal(delivery.signers[1].delivery.handoffStatus,"sent");
 });
 
 test("invalid token failures are rate-limited by token and IP with one neutral response",async()=>{
@@ -408,4 +426,155 @@ test("v2 reusable invitation is read-only on preview, creates fresh sessions, an
     ()=>openEmailSigning(f.ctx,f.token,"198.51.100.82"),
     error=>error.status===410&&error.message==="This document is already signed."
   );
+});
+
+
+test("parallel same-position group is released after portal-first owner signs; repeated Gmail assignments stay isolated",async()=>{
+  const sent=[];
+  let now=NOW;
+  let sendNumber=0;
+  const ctx=buildEsignContext({
+    env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test",IRPA_APP_URL:"https://irpa-digital-board-governance.web.app",IRPA_EMAIL_SIGNING_LINK_TTL_DAYS:"7"},
+    now:()=>new Date(now),
+    verifyUser:async()=>null,
+    verifyEmailSignerAuthority:async()=>({verified:false}),
+    sendInvitation:async message=>{
+      sendNumber++;
+      const content=buildEmailSigningInvitationMessage({
+        name:message.name,link:message.link,title:message.title,ownerName:message.ownerName,
+        expiresAt:message.expiresAt,position:message.position,signerId:message.signerId,envelopeId:message.envelopeId
+      });
+      const messageId="<parallel-"+sendNumber+"@irpa.or.tz>";
+      const date=new Date(now).toUTCString();
+      const rawMime=buildRawMailMimeMessage({
+        from:"info@irpa.or.tz",replyTo:"info@irpa.or.tz",to:message.to,
+        subject:content.subject,text:content.text,html:content.html,messageId,date
+      });
+      sent.push({...message,...content,messageId,date,rawMime});
+      for(const stage of ["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"]){
+        const accepted=["RCPT_ACCEPTED","SUBMIT"].includes(stage);
+        await message.onStage?.(stage,"success",accepted?"ACCEPTED":"UNKNOWN",{
+          messageId,date,smtpReplyCode:250,
+          smtpReply:stage==="RCPT_ACCEPTED"?"250 2.1.5 recipient accepted":stage==="SUBMIT"?"250 2.0.0 queued":"250 OK"
+        });
+      }
+    },
+    logger:{error(){}}
+  });
+  const sourcePdf=await PDFDocument.create();
+  sourcePdf.addPage([595.28,841.89]);
+  const sourceBytes=await sourcePdf.save();
+  const source=await ctx.storage.put({path:"source/parallel-three-position.pdf",bytes:sourceBytes,contentType:"application/pdf",metadata:{}});
+  const documentId="DOC-PARALLEL-THREE-POSITIONS";
+  await ctx.meta.create("documents",documentId,{
+    id:documentId,status:"Stored",ownerUid:"owner-uid",primaryStorageId:source.id,
+    sha256:await sha256Hex(sourceBytes),fileName:"parallel-three-position.pdf",
+    title:"Parallel Gmail Three Position Test",classification:"Restricted"
+  });
+  const pixel="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const created=await createEnvelope(ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId,externalReference:"IRPA-PARALLEL-THREE-POSITIONS",archives:["board-governance"],
+    signingMode:"Parallel",ownerPreSignEmail:"owner@example.org",ownerPreSignSignerId:"S1",
+    signers:[
+      {identityType:"email-link",email:"owner@example.org",name:"Document Owner",order:1,role:"Document Owner"},
+      {identityType:"email-link",email:"shared@gmail.com",name:"External Unregistered Signer",order:1,role:"External Reviewer"},
+      {identityType:"email-link",email:"SHARED@gmail.com",name:"Second Shared Mailbox Signer",order:1,role:"Secretary"},
+      {identityType:"email-link",email:"shared@gmail.com",name:"Third Shared Mailbox Signer",order:1,role:"Chair"}
+    ],
+    fields:[
+      {fieldId:"OWNER-SIGNATURE",type:"Signature",signerId:"S1",page:1,x:10,y:10,width:20,height:8,required:true}
+    ]
+  });
+  assert.equal(created.status,"Awaiting Owner Signature");
+  assert.equal(sent.length,0,"the existing portal-first owner rule remains in force before the owner signs");
+  assert.ok(created.ownerSigningToken,"the portal-first owner receives the existing owner signing token");
+
+  const wrongOwnerToken=created.ownerSigningToken.slice(0,-1)+(created.ownerSigningToken.endsWith("0")?"1":"0");
+  await assert.rejects(()=>openEmailSigning(ctx,wrongOwnerToken,"198.51.100.62"),error=>error.message===genericEmailSigningFailure());
+  const ownerOpened=await openEmailSigning(ctx,created.ownerSigningToken,"198.51.100.62");
+  const ownerResult=await sign(ctx,{
+    token:ownerOpened.sessionToken,
+    signature:{type:"drawn",value:pixel},
+    fieldApplications:[{fieldId:"OWNER-SIGNATURE",confirmed:true,page:1,x:0.1,y:0.1,width:0.2,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:pixel}],
+    fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Document Owner"}
+  });
+  assert.equal(ownerResult.status,"InProgress");
+  assert.equal(sent.length,3,"after the owner signs, every remaining signer in the same parallel position receives an invitation together");
+  assert.deepEqual(sent.map(message=>message.to.toLowerCase()),["shared@gmail.com","shared@gmail.com","shared@gmail.com"]);
+
+  const tokenFor=message=>new URL(message.link).searchParams.get("emailSignToken");
+  const signExternal=async(index,ip)=>{
+    const token=tokenFor(sent[index]);
+    const wrong=token.slice(0,-1)+(token.endsWith("0")?"1":"0");
+    await assert.rejects(()=>openEmailSigning(ctx,wrong,ip),error=>error.message===genericEmailSigningFailure());
+    const opened=await openEmailSigning(ctx,token,ip);
+    assert.equal(opened.signer.identityType,"email-link");
+    const result=await sign(ctx,{
+      token:opened.sessionToken,
+      signature:{type:"typed",value:sent[index].name},
+      declarations:{name:sent[index].name,occupation:"Signing participant"},
+      consent:true,user:null
+    });
+    return {opened,result};
+  };
+
+  const firstExternal=await signExternal(0,"198.51.100.61");
+  assert.equal(firstExternal.result.status,"InProgress");
+  assert.equal(sent.length,3,"one external signer signing does not delay the other members of the parallel group");
+  const secondExternal=await signExternal(1,"198.51.100.63");
+  assert.equal(secondExternal.result.status,"InProgress");
+  const thirdExternal=await signExternal(2,"198.51.100.64");
+  assert.equal(thirdExternal.result.status,"Completed");
+  assert.equal(thirdExternal.result.completed,true);
+
+  assert.equal(new Set(sent.map(message=>message.messageId)).size,3,"each position gets a distinct Message-ID for the same Gmail address");
+  assert.equal(new Set(sent.map(message=>message.subject)).size,3,"each position gets a distinct subject for the same Gmail address");
+  for(const message of sent){
+    assert.match(message.subject,/Parallel Gmail Three Position Test/);
+    assert.match(message.subject,/Position 1/);
+    assert.match(message.rawMime,/Content-Type: text\/plain/);
+    assert.match(message.rawMime,/Content-Type: text\/html/);
+    assert.match(message.messageId,/@irpa\.or\.tz/);
+  }
+
+  const stored=await ctx.meta.get("envelopes",created.envelopeId);
+  assert.deepEqual(stored.signers.map(signer=>signer.status),["Signed","Signed","Signed","Signed"]);
+  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.started").length,3);
+  assert.equal(stored.events.filter(event=>event.type==="email_link.handoff.sent").length,3);
+  const submitEvents=stored.events.filter(event=>event.type==="email_link.stage"&&event.stage==="SUBMIT"&&event.outcome==="success");
+  assert.equal(submitEvents.length,3);
+  assert.deepEqual(submitEvents.map(event=>event.signerId).sort(),["S2","S3","S4"]);
+  const status=await getEnvelopeStatus(ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.deepEqual(status.signers.slice(1).map(signer=>signer.id),["S2","S3","S4"]);
+  assert.equal(status.status,"Completed");
+  assert.equal(status.signers.length,4);
+  assert.equal(status.signers[0].delivery.status,"Portal signing (no invitation email)");
+  for(const signer of status.signers.slice(1)){
+    assert.equal(signer.delivery.status,"Accepted by mail server");
+    assert.equal(signer.delivery.smtpReplyCode,250);
+    assert.equal(signer.delivery.smtpReplyCategory,"ACCEPTED");
+    assert.equal(signer.delivery.stageCode,"SUBMIT");
+    assert.ok(signer.delivery.messageId);
+    assert.equal(signer.delivery.handoffStatus,"sent");
+  }
+
+  const finalPdf=await getSigningPdf(ctx,thirdExternal.opened.sessionToken,null);
+  assert.match(finalPdf.fileName,/signed-/);
+  assert.ok(finalPdf.bytes.length>sourceBytes.length);
+  const parsed=await PDFDocument.load(finalPdf.bytes);
+  assert.equal(parsed.getPageCount(),1,"the original page count and PDF readability remain intact after the parallel signing ceremony");
+});
+
+test("failed replacement email keeps the previous invitation link valid until SMTP accepts a new message",async()=>{
+  const f=await fixture();
+  const originalHash=f.envelope.signers[0].tokenHash;
+  f.ctx.sendInvitation=async()=>{const error=new Error("IRPA SMTP error 550");error.stageCode="RCPT_ACCEPTED";error.smtpResponseCode=550;error.smtpReply="550 5.1.1 recipient rejected";throw error;};
+  await assert.rejects(()=>resendInvitation(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId,"S1"),error=>error.status===502&&error.code==="RCPT_ACCEPTED");
+  const current=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(current.signers[0].tokenHash,originalHash);
+  assert.equal(current.signers[0].emailLinkStatus,"issued");
+  assert.equal(current.signers[0].resendAttempt,undefined);
+  assert.equal(current.events.at(-1).type,"invitation.resend.failed");
+  const stillValid=await openEmailSigning(f.ctx,f.token,"198.51.100.71");
+  assert.equal(stillValid.signer.email,"board.secretary@example.org");
 });

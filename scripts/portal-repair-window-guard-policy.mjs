@@ -75,8 +75,25 @@ export function evaluateSignatureWindowRepair({
   if (!Number.isFinite(expiry) || now.getTime() >= expiry) {
     return { pass: false, reason: "The Signature Portal repair window has expired." };
   }
+  const deliveryDiagnosticsRepair = amendment.operation === "email-delivery-diagnostics-repair";
   const rollbackMode = amendment.operation === "restore-pre-11-eat-baseline";
-  const required = rollbackMode ? [
+  const required = deliveryDiagnosticsRepair ? [
+    "drive-gateway/src/invitationEmail.mjs",
+    "drive-gateway/src/signing.mjs",
+    "drive-gateway/src/index.js",
+    "drive-gateway/src/router.mjs",
+    "drive-gateway/src/smtpDiagnostics.mjs",
+    "src/pages/SignaturePlatform.jsx",
+    "drive-gateway/tests/email-signing-contract.test.mjs",
+    "drive-gateway/tests/email-signing-links.test.mjs",
+    "drive-gateway/tests/email-signing-links.integration.test.mjs",
+    "drive-gateway/tests/smtp-diagnostics.test.mjs",
+    "drive-gateway/tests/email-delivery-diagnostics.test.mjs",
+    ".github/workflows/email-signing-contract.yml",
+    ".github/workflows/email-deliverability-dns-check.yml",
+    "docs/email-deliverability/HOSTING_REQUEST.md",
+    "tests/meeting-isolation-guard.test.mjs"
+  ] : rollbackMode ? [
     "drive-gateway/src/signing.mjs", "drive-gateway/src/router.mjs", "drive-gateway/src/index.js",
     "src/pages/EmailSigningReadOnlyPage.jsx", "src/pages/SignaturePlatform.jsx",
     "drive-gateway/src/emailSigning/index.mjs", "drive-gateway/tests/email-signing-contract.test.mjs",
@@ -87,7 +104,7 @@ export function evaluateSignatureWindowRepair({
     "drive-gateway/tests/email-signing-contract.test.mjs"
   ];
   if (!required.every(path => changed.includes(path)) ||
-      (!rollbackMode && !changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")))) {
+      (!rollbackMode && !deliveryDiagnosticsRepair && !changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")))) {
     return { pass: false, reason: "The repair is missing its scoped implementation or end-to-end regression test." };
   }
   if (amendment.repairWindow?.rollbackCommit !== window.rollbackCommit) {

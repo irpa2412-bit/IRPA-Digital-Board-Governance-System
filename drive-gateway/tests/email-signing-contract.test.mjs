@@ -259,7 +259,8 @@ test("owner/admin SMTP self-check remains protected by the existing Worker route
   const diagnostics = fs.readFileSync(new URL("../src/smtpDiagnostics.mjs", import.meta.url), "utf8");
   assert.ok(router.includes("/api/sign/smtp-selfcheck"));
   assert.ok(router.includes("user.isAdmin!==true&&user.isOwner!==true"));
-  assert.ok(diagnostics.includes('profile?.fields?.role?.stringValue==="Administrator"'));
+  assert.ok(diagnostics.includes('role==="administrator"'));
+  assert.ok(diagnostics.includes('owner=fields.isOwner?.booleanValue===true'));
 });
 
 
@@ -279,4 +280,16 @@ test("v2 invitation copy and Worker routes describe a reusable, signer-scoped li
 test("resend confirmation masks the recipient and formats expiry in EAT", () => {
   assert.equal(maskEmailForConfirmation("board.secretary@example.org"), "bo***@example.org");
   assert.match(formatEmailLinkExpiryEAT(EXPIRY), /EAT$/);
+});
+
+
+test("active production legacy invitation path uses the signer-specific MIME builder without touching the dormant rebuild module",()=>{
+  const worker=fs.readFileSync(new URL("../src/index.js",import.meta.url),"utf8");
+  const mail=fs.readFileSync(new URL("../src/invitationEmail.mjs",import.meta.url),"utf8");
+  const module=fs.readFileSync(new URL("../src/emailSigning/index.mjs",import.meta.url),"utf8");
+  assert.ok(worker.includes("return sendEmailSigningInvitation({email:to,name,link,title,ownerName,expiresAt,position"));
+  assert.ok(worker.includes("expectedOrigin:env.IRPA_APP_URL"));
+  assert.ok(mail.includes("buildRawMailMimeMessage"));
+  assert.ok(mail.includes("IRPA Digital Signing"));
+  assert.ok(module.includes("EMAIL_SIGNING_REBUILD_ENABLED = false"));
 });

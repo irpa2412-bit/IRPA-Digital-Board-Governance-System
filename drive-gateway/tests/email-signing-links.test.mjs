@@ -14,7 +14,7 @@ import { sha256Hex } from "../src/util.mjs";
 import { validateSignatureDraftRecipients } from "../src/signatureDraftPolicy.mjs";
 import { canAuthenticatedSignerAccess } from "../src/signing.mjs";
 import fs from "node:fs";
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
+import {buildEmailSigningInvitationMessage,buildRawMailMimeMessage,sendEmailSigningInvitation,sendWithRetry} from "../src/invitationEmail.mjs";
 import {resolveOptionalEmailLinkProfileUid,resendInvitation,chainEvents,createEnvelope,recordEmailLinkStage} from "../src/signing.mjs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {runEmailStage,EMAIL_LINK_STAGE_CODES} from "../src/invitationEmail.mjs";
@@ -124,7 +124,7 @@ test("email invitation has real plain-text newlines and one HTML/plain-text SMTP
   assert.doesNotMatch(message.text,/\\n/);
   assert.match(message.html,/href=/);
   let calls=0;
-  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);return {ok:true};},logger:{warn(){},error(){}}});
+  await sendEmailSigningInvitation({email:"signer@example.org",name:"A Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner",expiresAt:"2026-11-23T08:00:00.000Z",from:"info@irpa.or.tz",replyTo:"info@irpa.or.tz",smtpSend:async payload=>{calls++;assert.ok(payload.text);assert.ok(payload.html);assert.ok(payload.rawMime);assert.match(payload.messageId,/@irpa\.or\.tz/);return {ok:true};},logger:{warn(){},error(){}}});
   assert.equal(calls,1);
 });
 
@@ -278,7 +278,7 @@ test("email-link delivery stages are appended individually to the envelope audit
 test("smtp-selfcheck rejects non-admin and non-owner callers before invoking SMTP",async()=>{
   let sends=0;
   const ctx=makeContext({verifyUser:async()=>({uid:"ordinary-user",isAdmin:false,isOwner:false}),smtpSelfCheck:async()=>{sends++;return{ok:true}}});
-  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST"}),ctx);
+  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({to:"owner@example.org"})}),ctx);
   assert.equal(response.status,403);
   assert.equal(sends,0);
 });
@@ -286,7 +286,7 @@ test("smtp-selfcheck rejects non-admin and non-owner callers before invoking SMT
 test("smtp-selfcheck permits an authenticated system owner and invokes exactly one send",async()=>{
   let sends=0;
   const ctx=makeContext({verifyUser:async()=>({uid:"system-owner",isAdmin:false,isOwner:true}),smtpSelfCheck:async()=>{sends++;return{ok:true,stageCode:"SUBMIT"}}});
-  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST"}),ctx);
+  const response=await esignRoute(new Request("https://irpa.example.org/api/sign/smtp-selfcheck",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({to:"owner@example.org"})}),ctx);
   assert.equal(response.status,200);
   assert.equal(sends,1);
   assert.deepEqual(await response.json(),{ok:true,stageCode:"SUBMIT"});
@@ -339,4 +339,75 @@ test("parallel-mode signer can receive a resend without waiting for earlier sign
   assert.equal(record.signers[1].invitation,"Sent");
   assert.equal(record.signers[1].tokenHash,await sha256Hex(new URL(sent[0].link).searchParams.get("emailSignToken").split(".")[2]));
   assert.equal(result.signerId,"S2");
+});
+
+
+test("signing invitation MIME has signer-position subject, unique irpa.or.tz Message-ID and both visible MIME alternatives",()=>{
+  const first=buildEmailSigningInvitationMessage({name:"Miriam Mollel",link:"https://irpa-digital-board-governance.web.app/?emailSignToken=first",title:"Board Resolution 14",ownerName:"Document Owner",expiresAt:"2026-11-28T08:00:00.000Z",position:1});
+  const third=buildEmailSigningInvitationMessage({name:"Miriam Mollel",link:"https://irpa-digital-board-governance.web.app/?emailSignToken=third",title:"Board Resolution 14",ownerName:"Document Owner",expiresAt:"2026-11-28T08:00:00.000Z",position:3});
+  assert.match(first.subject,/Board Resolution 14.*Miriam.*Position 1/);
+  assert.match(third.subject,/Board Resolution 14.*Miriam.*Position 3/);
+  assert.notEqual(first.subject,third.subject,"the same Gmail address in different positions must not receive duplicate subjects");
+  const firstMime=buildRawMailMimeMessage({from:"info@irpa.or.tz",replyTo:"info@irpa.or.tz",to:"shared@gmail.com",subject:first.subject,text:first.text,html:first.html,messageId:"<first-send@irpa.or.tz>",date:"Sat, 21 Nov 2026 08:00:00 GMT"});
+  const thirdMime=buildRawMailMimeMessage({from:"info@irpa.or.tz",replyTo:"info@irpa.or.tz",to:"shared@gmail.com",subject:third.subject,text:third.text,html:third.html,messageId:"<third-send@irpa.or.tz>",date:"Sat, 21 Nov 2026 08:01:00 GMT"});
+  assert.match(firstMime,/From: IRPA Digital Signing <info@irpa\.or\.tz>/);
+  assert.match(firstMime,/Reply-To: <info@irpa\.or\.tz>/);
+  assert.match(firstMime,/To: <shared@gmail\.com>/);
+  assert.match(firstMime,/Subject: .*Board Resolution 14/);
+  assert.match(firstMime,/Message-ID: <first-send@irpa\.or\.tz>/);
+  assert.match(firstMime,/Date: Sat, 21 Nov 2026 08:00:00 GMT/);
+  assert.match(firstMime,/Content-Type: multipart\/alternative/);
+  assert.match(firstMime,/Content-Type: text\/plain; charset=UTF-8/);
+  assert.match(firstMime,/Content-Type: text\/html; charset=UTF-8/);
+  assert.match(first.text,/https:\/\/irpa-digital-board-governance\.web\.app\/\?emailSignToken=first/);
+  assert.match(first.html,/href="https:\/\/irpa-digital-board-governance\.web\.app\/\?emailSignToken=first"/);
+  assert.doesNotMatch(first.html,/display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0/i);
+  assert.notEqual(firstMime.match(/Message-ID: ([^\r\n]+)/)[1],thirdMime.match(/Message-ID: ([^\r\n]+)/)[1]);
+});
+
+test("each SMTP retry creates a new Message-ID for the same signer-position message",async()=>{
+  const sends=[];
+  let attempt=0;
+  const result=await sendEmailSigningInvitation({
+    email:"shared@gmail.com",
+    name:"Miriam Mollel",
+    link:"https://irpa-digital-board-governance.web.app/?emailSignToken=retry",
+    title:"Board Resolution 14",
+    ownerName:"Document Owner",
+    expiresAt:"2026-11-28T08:00:00.000Z",
+    position:3,
+    from:"info@irpa.or.tz",
+    smtpSend:async message=>{
+      sends.push(message);
+      attempt++;
+      if(attempt===1){const error=new Error("IRPA SMTP error 451");error.stageCode="SMTP_CONNECT";throw error;}
+      return "250 2.0.0 queued";
+    },
+    logger:{error(){}},
+    sleep:async()=>{}
+  });
+  assert.equal(result,"250 2.0.0 queued");
+  assert.equal(sends.length,2);
+  assert.notEqual(sends[0].messageId,sends[1].messageId);
+  assert.match(sends[0].messageId,/^<.+@irpa\.or\.tz>$/);
+  assert.equal(sends[0].subject,sends[1].subject);
+  assert.match(sends[0].rawMime,/Content-Type: text\/plain/);
+  assert.match(sends[0].rawMime,/Content-Type: text\/html/);
+});
+
+test("signing invitation rejects link shorteners and non-HTTPS links",async()=>{
+  for(const link of ["http://irpa.or.tz/?emailSignToken=x","https://bit.ly/short","https://tinyurl.com/short"]){
+    await assert.rejects(()=>sendEmailSigningInvitation({email:"signer@gmail.com",name:"Signer",link,title:"Policy",ownerName:"Owner",from:"info@irpa.or.tz",smtpSend:async()=>{}}),/direct HTTPS IRPA application link/);
+  }
+});
+
+
+test("production signing invitations must use the configured application origin",async()=>{
+  await assert.rejects(()=>sendEmailSigningInvitation({
+    email:"signer@gmail.com",name:"Signer",
+    link:"https://lookalike.example/?emailSignToken=x",
+    title:"Board Resolution",ownerName:"Owner",position:1,
+    from:"info@irpa.or.tz",expectedOrigin:"https://irpa-digital-board-governance.web.app",
+    smtpSend:async()=>{}
+  }),/configured IRPA application domain/);
 });
