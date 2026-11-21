@@ -218,10 +218,10 @@
       "portal": "Signature Portal",
       "status": "open",
       "openedAt": "2026-11-21T09:30:33Z",
-      "lastActivityAt": "2026-11-21T10:12:00Z",
+      "lastActivityAt": "2026-11-21T09:30:33Z",
       "durationHours": 48,
       "closesAt": "2026-11-23T09:30:33Z",
-      "reason": "Owner-authorised 48-hour Signature Portal repair window. Execute MAIL DELIVERY on existing PR #836 as item 2 before PR A crash safety; then continue the self-test crash and app-shell work in the same protected window. Preserve all signing data and the independent Meeting Portal.",
+      "reason": "Owner-authorised 48-hour repair of the Signature Portal self-test crash, startup error handling, per-signer delivery visibility and sequential next-signer invitation hand-off. The owner has verified the workspace opens again; this window addresses the self-test resource-overload and unvalidated-response failure. Preserve all signing data and the independent Meeting Portal.",
       "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
       "scope": [
         "src/components/SignaturePathwaySelfTest.jsx",
@@ -246,10 +246,7 @@
         "docs/portal-protection/change-record.json",
         "docs/portal-protection/repair-window.json",
         "docs/portal-protection/portal-register.json",
-        "docs/regression/",
-        "drive-gateway/src/invitationEmail.mjs",
-        "drive-gateway/src/mailDelivery.js",
-        "tests/signature-workflow-policy.test.mjs"
+        "docs/regression/"
       ],
       "prohibitions": [
         "Do not change signing rules, signer identity, invitation token format/hash custody, session lifecycle, resend rules or field assignment.",
@@ -299,11 +296,6 @@
           "at": "2026-11-21T09:30:33Z",
           "action": "scope-amended",
           "description": "Owner authorised a new 48-hour Signature Portal and app-shell repair window. Scope includes self-test crash safety, bounded one-at-a-time PDF diagnostics, startup error handling, per-signer delivery visibility, sequential next-signer hand-off and required CI/browser regressions. Workspace recovery was verified by the owner. Rollback frontend build: eb68a06; retain the previously verified production Worker rollback baseline eb04405 for Worker-only rollback."
-        },
-        {
-          "at": "2026-11-21T10:12:00Z",
-          "action": "execution-order-and-scope-amended",
-          "description": "Owner reordered tracker #839: finish MAIL DELIVERY on existing PR #836 before PR A crash safety. The existing 48-hour Signature Portal window remains open; added the invitation mail builder, single-recipient SMTP envelope helper and Signature Portal envelope-view regression test to the existing scope. Signing/token/session and SMTP configuration invariants remain unchanged."
         }
       ],
       "rollbackCommitEvidence": "Worker rollback baseline: production Gateway deploy run 44690520757 verified eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd. Frontend rollback baseline: owner identified deployed web build eb68a06fdd04454b0e73d2dc9c010eae5519f458.",
