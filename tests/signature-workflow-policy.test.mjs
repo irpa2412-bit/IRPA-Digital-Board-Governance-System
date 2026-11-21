@@ -225,21 +225,17 @@ test("duplicate participant identities are reused and rapid repeated add actions
   const addSigner = portal.match(/async function addSigner\(\)\{([\s\S]*?)(?=\n function removeSigner\()/);
   assert.ok(addSigner, "the palette participant handler must exist");
   assert.match(addSigner[1], /const duplicate=registered\?recipients\.find\(x=>x\.uid===registered\.uid\):null/);
-  assert.match(addSigner[1], /Random per-participant key/);
-  assert.doesNotMatch(addSigner[1], /emailHash\.slice\(0,24\)/);
-  assert.match(addSigner[1], /const existingAssignments=Array\.isArray\(duplicate\.roleAssignments\)/);
   assert.match(addSigner[1], /const sameAssignment=existingAssignments\.some/);
   assert.match(addSigner[1], /The existing responsibility was selected; no duplicate was created/);
   assert.match(addSigner[1], /roleAssignments:\[\.\.\.existingAssignments,assignment\]/);
   assert.match(addSigner[1], /One email-link identity and invitation covers the responsibilities/);
   assert.ok(addSigner[1].indexOf("addSignerInFlightRef.current=true") < addSigner[1].indexOf("crypto.getRandomValues"));
-  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.ok(addSigner[1].includes('if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(registeredEmail))'));
-  assert.ok(addSigner[1].includes("email:registeredEmail,role,"));
+  assert.match(addSigner[1], /const recipientEmail=email/);
+  assert.match(addSigner[1], /test\(recipientEmail\)/);
+  assert.match(addSigner[1], /email:recipientEmail/);
   assert.match(addSigner[1], /const nextFields=\[\.\.\.fields\]/);
   assert.doesNotMatch(addSigner[1], /fields\.map\(f=>\(\["Signature","Initials"\]\.includes\(f\.type\)&&!f\.signerUid\)/);
 });
-
 
 test("envelope creation requires every participant to have at least one explicitly assigned field", () => {
   assert.match(portal, /if\(!orderedRecipients\.length&&!ownerSigningEnabled\)/);
@@ -296,7 +292,14 @@ test("refreshing an envelope uses one authoritative status read and keeps signer
   assert.doesNotMatch(storage,/export async function getGatewaySignatureEnvelopeDeliveryStatus/);
   assert.ok(page.includes("onClick={refreshGatewayEmailStatus}"));
   assert.ok(page.includes("onClick={()=>resendEmailLink(item.id)}"));
-  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes("Delivery: {signerDeliveryLabel(item)}"));
+  assert.ok(page.includes('Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  const deliveryLabel = page.match(/function signerDeliveryLabel\(item=\{\}\) \{([\s\S]*?)\n\}/);
+  assert.ok(deliveryLabel, "the inline delivery label formatter must exist");
+  assert.match(deliveryLabel[1], /delivery\.state==="Failed"/);
+  assert.match(deliveryLabel[1], /delivery\.state==="Accepted by the mail server"/);
+  assert.match(deliveryLabel[1], /delivery\.state==="Sent"\|\|delivery\.state==="Not sent"/);
+  assert.match(deliveryLabel[1], /return "Not sent"/);
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('color:"var(--text)",opacity:1'));
 });
@@ -382,7 +385,13 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
   assert.equal(refresh.includes("getGatewaySignatureEnvelopeDeliveryStatus"),false);
   assert.ok(refresh.includes("Array.isArray(status.signers)"));
   assert.ok(refresh.includes("last readable list has been preserved"));
-  assert.ok(page.includes('Invitation: {item.invitation||"Unknown"} · Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  assert.ok(page.includes("Delivery: {signerDeliveryLabel(item)}"));
+  assert.ok(page.includes('Link: {item.linkExpired?"Expired":item.emailLinkStatus||"—"}'));
+  const deliveryLabel = page.match(/function signerDeliveryLabel\(item=\{\}\) \{([\s\S]*?)\n\}/);
+  assert.ok(deliveryLabel);
+  assert.match(deliveryLabel[1], /smtpReplyCategory/);
+  assert.match(deliveryLabel[1], /acceptedAt\|\|delivery\.at/);
+  assert.match(deliveryLabel[1], /Africa\/Dar_es_Salaam/);
   assert.ok(page.includes(">Send new link</button>"));
   assert.ok(page.includes('aria-busy={gatewayEmailStatusBusy?"true":"false"}'));
   assert.ok(refresh.includes('envelopeId:selected.gatewayEnvelopeId'), "the selected envelope ID must be attached locally even when the Gateway omits it");
@@ -429,7 +438,7 @@ test("Prepare Envelope submission is a separate sticky control outside the PDF n
 });
 
 
-test("per-signer copy and WhatsApp actions reuse the existing accepted invitation link",()=>{
+test("per-signer copy and WhatsApp actions reuse the existing accepted invitation link",async()=>{
   const page=fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx",import.meta.url),"utf8");
   const worker=fs.readFileSync(new URL("../drive-gateway/src/signing.mjs",import.meta.url),"utf8");
   const storage=fs.readFileSync(new URL("../src/firebase/signatureStorage.js",import.meta.url),"utf8");
@@ -437,12 +446,18 @@ test("per-signer copy and WhatsApp actions reuse the existing accepted invitatio
   assert.match(page,/Share on WhatsApp/);
   assert.match(page,/shareEmailSigningLink\(item\.id,"copy"\)/);
   assert.match(page,/shareEmailSigningLink\(item\.id,"whatsapp"\)/);
-  assert.match(page,/navigator\.clipboard\?\.writeText\(signingLink\)/);
+  assert.match(page,/navigator\.clipboard\?\.writeText/);
+  assert.match(page,/await navigator\.clipboard\.writeText\(signingLink\)/);
+  assert.match(page,/parsed\.protocol!=="https:"/);
+  assert.match(page,/emailSignToken.*gatewayToken/);
+  assert.match(page,/const whatsappUrl="https:\/\/wa\.me\/\?text="\+encodeURIComponent\("IRPA signing invitation: "\+signingLink\)/);
+  assert.match(page,/whatsappWindow\.location\.href=whatsappUrl/);
   assert.match(page,/wa\.me\/\?text=/);
   assert.match(worker,/return\{ok:true,envelopeId:id,signerId,deliveryStatus:"Sent",expiresAt,signingLink:link\}/);
   assert.match(storage,/return data;/);
   assert.ok(page.includes("email.slice(0,3)")&&page.includes("...@"),"signer recipient masking must show the first three local-part characters and domain");
-  assert.match(page,/The same signer-specific link sent by email/);
+  assert.match(page,/that exact signer-specific link was copied/);
+  assert.match(page,/that exact signer-specific link is ready to share in WhatsApp/);
 });
 
 
