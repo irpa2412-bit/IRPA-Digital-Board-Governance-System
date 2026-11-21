@@ -48,12 +48,6 @@ function attachmentBase64(bytes) {
   return encoded.match(/.{1,76}/g)?.join("\r\n") || "";
 }
 
-export function buildSmtpRecipientEnvelope({from,to,subject,text,html,attachments=[]}) {
-  const recipient = normalizeRecipientEmail(to);
-  const mime = buildMailMimeMessage({from,to:recipient,subject,text,html,attachments});
-  return {recipient,rcptCommand:"RCPT TO:<"+recipient+">",mime};
-}
-
 export function buildMailMimeMessage({from, to, subject, text, html, attachments = []}) {
   const cleanFrom = validateMailHeader(from, "From");
   const cleanTo = normalizeRecipientEmail(to);
