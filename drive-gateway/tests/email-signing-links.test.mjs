@@ -120,7 +120,6 @@ test("registered login-based signing access remains UID-bound", () => {
 });
 
 test("email invitation has real plain-text newlines and one HTML/plain-text SMTP send",async()=>{
-import {buildEmailSigningInvitationMessage,sendEmailSigningInvitation,sendWithRetry,validateRecipient} from "../src/invitationEmail.mjs";
   assert.match(message.text,/\nDocument: Board Policy/);
   assert.doesNotMatch(message.text,/\\n/);
   assert.match(message.html,/href=/);
@@ -365,8 +364,8 @@ test("owner/admin SMTP self-check accepts a typed recipient and rejects other ro
 });
 
 
-test("typed signer addresses are trimmed and lower-cased; display names and multiple recipients are rejected",()=>{
-  assert.equal(validateRecipient("  Alice.Example@GMAIL.COM  "),"alice.example@gmail.com");
+test("typed signer addresses are trimmed and normalized at the SMTP boundary; display names and multiple recipients are rejected",()=>{
+  assert.equal(validateRecipient("  Alice.Example@GMAIL.COM  "),"Alice.Example@GMAIL.COM");
   assert.equal(validateRecipient("Alice Example <alice@gmail.com>"),null);
   assert.equal(validateRecipient("alice@gmail.com, second@gmail.com"),null);
   const smtp=buildSmtpRecipientEnvelope({from:'"IRPA Digital Signing" <administrator@irpa.or.tz>',to:"  Alice.Example@GMAIL.COM  ",subject:"Please sign: Board Minute - Alice",text:"plain",html:"<p>html</p>"});
@@ -461,7 +460,7 @@ test("signing invitation recipient validation rejects display names and comma-se
   assert.equal(validateRecipient("Signer <signer@example.org>"),null);
   assert.equal(validateRecipient("one@example.org,two@example.org"),null);
   assert.equal(validateRecipient("signer@example.org,"),null);
-  assert.equal(validateRecipient("  Signer@Example.org  "),"signer@example.org");
+  assert.equal(validateRecipient("  Signer@Example.org  "),"Signer@Example.org");
 });
 
 test("invitation audit message includes only a three-character recipient prefix and required delivery evidence",()=>{
