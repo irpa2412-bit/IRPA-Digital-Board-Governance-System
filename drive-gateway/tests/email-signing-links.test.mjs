@@ -243,6 +243,7 @@ test("concurrent signer resends are serialized and the delivered token is the pe
   assert.equal(record.signers[0].tokenHash,originalHash,"old link remains active while delivery is pending");
   releaseSend();
   const result=await first;
+  assert.equal(result.signingLink,sent[0].link,"the returned sharing URL must be the exact link delivered to this signer");
   const deliveredToken=new URL(sent[0].link).searchParams.get("emailSignToken");
   assert.equal(record.signers[0].tokenHash,await sha256Hex(deliveredToken.split(".")[2]));
   assert.equal(record.signers[0].tokenExpiresAt,result.expiresAt);
@@ -442,7 +443,8 @@ test("parallel creation, resend and resend-all preserve each typed signer addres
     console.log("MOCK SMTP recipient",JSON.stringify({position:index+1,typed:typed[index],rcptTo:sent[index].rcptCommand,toHeader:sent[index].toHeader}));
   }
   assert.equal(new Set(sent.map(item=>item.toHeader)).size,2,"two positions may share one mailbox without collapsing signer positions");
-  await resendInvitation(ctx,owner,created.envelopeId,"S2");
+  const resent=await resendInvitation(ctx,owner,created.envelopeId,"S2");
+  assert.equal(resent.signingLink,sent.at(-1).link,"the owner receives only the exact same signer-specific link accepted by SMTP");
   assert.equal(sent.at(-1).to,expected[1],"single-signer resend must use that signer's own stored address");
   assert.equal(sent.at(-1).rcptCommand,"RCPT TO:<"+expected[1]+">");
   assert.equal(sent.at(-1).toHeader,expected[1]);
