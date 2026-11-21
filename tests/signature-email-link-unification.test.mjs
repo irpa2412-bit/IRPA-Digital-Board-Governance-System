@@ -13,7 +13,9 @@ const invitation=fs.readFileSync(new URL("../drive-gateway/src/invitationEmail.m
 test("registered member and employee assignments are serialized to Gateway as email-link identities",()=>{
   const registered=portal.match(/if\(registered\)\{([\s\S]*?)\}else\{/);
   assert.ok(registered,"registered signer branch must remain explicit");
-  assert.match(registered[1],/email:registeredEmail/);
+  assert.match(portal,/const recipientEmail=email/);
+  assert.match(portal,/test\(recipientEmail\)/);
+  assert.match(registered[1],/email:recipientEmail/);
   assert.match(storage,/identityType:"email-link"/);
   assert.match(registered[1],/occupation:signerAuthorityRole\.trim\(\)/);
 });
