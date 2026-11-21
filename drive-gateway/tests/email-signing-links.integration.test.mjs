@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
-import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,getEnvelopeStatus} from "../src/signing.mjs";
+import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,revokeInvitation,getEnvelopeStatus,recordEmailLinkStage} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
@@ -422,6 +422,10 @@ test("three sequential signer positions sharing one mailbox each receive their o
     fields:[1,2,3].map(index=>({fieldId:"SHARED-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
   });
   assert.equal(sent.length,1,"only the first sequential position is initially invited");
+  await recordEmailLinkStage(f.ctx,created.envelopeId,"S1","SUBMIT","success","ACCEPTED");
+  const ownerStatus=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},created.envelopeId);
+  assert.equal(ownerStatus.signers[0].delivery.state,"Accepted by the mail server");
+  assert.equal(ownerStatus.signers[0].delivery.smtpReplyCategory,"ACCEPTED");
   const tokenIds=[];
   for(let position=1;position<=3;position++){
     const invitation=sent[position-1];
