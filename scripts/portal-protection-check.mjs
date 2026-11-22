@@ -152,7 +152,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
       protectedFiles.push(file);
       continue;
     }
-    const portalPolicyFile = file.match(/^docs\\/portal-protection\\/(?:windows|records)\\/([a-z0-9-]+)\\.json$/);
+    const portalPolicyFile = file.match(/^docs\/portal-protection\/(?:windows|records)\/([a-z0-9-]+)\.json$/);
     if (portalPolicyFile) {
       const owner = Object.keys(registry.portals).find(name => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === portalPolicyFile[1]);
       if (owner) {
