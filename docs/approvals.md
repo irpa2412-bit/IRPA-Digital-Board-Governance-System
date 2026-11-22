@@ -16,3 +16,14 @@ This ledger stores exact owner approval quotations and the resulting scoped acti
 - Cause: PR #869 combined the protected approval ledger (`docs/approvals.md`) with general handover documentation (`docs/HANDOVER.md`). The protection classifier correctly treated the approval ledger as a protected change affecting multiple portal owners; the PR was not a valid guard-only change.
 - Repair: split the approval-ledger record into its own single-file PR #872; handover/inventory changes must remain in a separate docs-only PR. No guard condition was weakened.
 - Follow-up on PR #872: initial checks ran before the owner approval comment was posted and reported `ownerApproved: false`. The exact prior Guard-core approval is present in the owner account comment #7076820276, alongside the current standing approval A. A fresh run is required to evaluate the approval comment after it exists.
+
+
+## Owner approval — issue-comment canary trigger (2026-11-22)
+
+Verbatim owner approval:
+
+> I, the owner, approve adding an owner-only comment trigger to the canary job of "Live Meeting REAL Record Protection Verification", so that the canary I authorised ("RUN CANARY") can start without the manual button, and approve merging that PR when its required checks are green. It covers this one workflow change only, never portal source, Worker routes, Firestore rules or other deploy workflows. Quote my words in the PR from the owner account and in docs/approvals.md (in its own protected PR, as before).
+
+Scope is limited to this one workflow's owner-comment canary trigger and its text-level trigger tests. This is not approval for portal source, Worker routes, Firestore rules, other deploy workflows, or canary execution before the workflow change is merged and independently verified. Merge only when every required check is green.
+
+Dedicated request issue: [#876 — Canary run request](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/issues/876), locked. Workflow must enforce comment action `created`, issue number `876`, owner login `irpa2412-bit`, owner numeric ID `319164319`, and exact body `RUN CANARY`; edited comments must not trigger.
