@@ -21,7 +21,7 @@ test("evidence router accepts envelope IDs, document IDs and document references
 test("screen-generated evidence URL uses the queue envelopeId and matches the router", async () => {
   const panel = await readFile(new URL("../../src/pages/SignatureRecoveryOwnerPanel.jsx", import.meta.url), "utf8");
   const queue = await readFile(new URL("../../src/pages/SignatureRecoveryOwnerEnvelopes.jsx", import.meta.url), "utf8");
-  assert.match(panel, /encodeURIComponent\\(envelopeId\\)/);
+  assert.match(panel, /encodeURIComponent\(envelopeId\)/);
   assert.match(panel, /diagnose-finalisation/);
   assert.match(panel, /\/preview\.pdf/);
   assert.match(queue, /\/api\/recovery\/envelopes\?limit=50&offset=/);
