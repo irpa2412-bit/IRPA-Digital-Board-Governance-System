@@ -144,7 +144,28 @@
       "revocation": "top-level and nested authority status, active flag, revoked marker, effective date and expiry are re-evaluated on each Worker request and client authority refresh",
       "firestoreRulesChanged": false
     },
-    "lastUpdatedAt": "2026-11-22T16:52:00Z"
+    "lastUpdatedAt": "2026-11-22T16:52:00Z",
+    "files": [
+      "config/org-structure-authority.json",
+      "docs/MEETING-PORTAL-AUTHORITY-RESOLVER-AMENDMENT-2026-11-22.md",
+      "docs/MEETING-PORTAL-OPERATIONAL-ACCESS-DECISION.md",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json",
+      "drive-gateway/src/meetingPortal.mjs",
+      "drive-gateway/src/meetingServices.mjs",
+      "drive-gateway/tests/meeting-portal-router.test.mjs",
+      "drive-gateway/tests/meeting-services-router.test.mjs",
+      "package.json",
+      "shared/meetingAuthority.mjs",
+      "src/firebase/data.js",
+      "src/firebase/meetingPolicy.js",
+      "src/pages/MeetingRoom.jsx",
+      "src/pages/Meetings.jsx",
+      "tests/meeting-authority-resolver.test.mjs",
+      "tests/meeting-category-policy.test.mjs",
+      "tests/operational-access-policy.test.mjs",
+      "tests/org-structure-authority.test.mjs"
+    ]
   },
   "ownerInstruction": "Owner instruction — 22 November 2026: grant permanent full Meeting Portal access (view, create, schedule, edit, cancel, invite, admit entry requests, record attendance, agenda, working documents, minutes, resolutions, voting control and voting, decisions, actions, close meeting, export records, sign minutes) to the Internal Oversight Director, Executive Director and every head of department. Resolve each person only from their ACTIVE registered authority in the Members and Employees registers, the same source used by the governance tool and Authorized User Access Categories card. Access remains permanent until owner revocation; inactive or revoked authority is denied on the next request. The one-hour period referred to the repair-window time frame, not access expiry. Everyone else retains PR #863's duty-based policy; default deny."
 }
