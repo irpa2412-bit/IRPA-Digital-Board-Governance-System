@@ -1,7 +1,8 @@
 import React,{useEffect,useState}from"react";
 import{getIdToken}from"firebase/auth";
 import{auth}from"../firebase/config";
-import{getGoogleDriveGatewayUrl}from"../firebase/gatewayUrl";\nimport{normalizeFinalisationDiagnostic}from"../utils/finalisationDiagnosticResponse.mjs";
+import{getGoogleDriveGatewayUrl}from"../firebase/gatewayUrl";
+import{normalizeFinalisationDiagnostic}from"../utils/finalisationDiagnosticResponse.mjs";
 
 const TARGET_DOCUMENT_ID="IRPA-ENV-2026-11501354";
 const TARGET_TITLE="Muhtasari wa Kikao cha Familia";
