@@ -1,8 +1,8 @@
 PR #845 is merged and deployed; the three live deletion-path refusal checks remain unverified.
 
-## FIRST TASK NEXT SESSION — retention lock and controlled disposal
+## Queued work after the current rebuild sequence — retention lock and controlled disposal
 
-Create a small, separate implementation PR based on [the Records Retention and Disposal Policy](policies/records-retention-and-disposal.md). This is the first task; keep it separate from #845 and #855. Do not weaken checks or publish Firestore rules.
+Create a small, separate implementation PR based on [the Records Retention and Disposal Policy](policies/records-retention-and-disposal.md) after the currently approved sequence (documentation reconciliation, #845 read-only proof, and #863 access split) is complete. Keep it separate from #845 and #855. Do not weaken checks or publish Firestore rules.
 
 1. **Retention calculation and inheritance:** for every REAL meeting, set `retainUntil = proceedings date + 10 calendar years`. For a single-day meeting, use its meeting date; for a multi-day meeting, use the final day of proceedings. Do not use the signing, approval, upload or filing date. Every minute, resolution, vote, attendance record, action and recording of that meeting inherits exactly the same `retainUntil`.
 2. **Worker enforcement:** enforce the retention deadline server-side. No actor, role, administrator, request, approval or client route may dispose of a REAL proceedings record before `retainUntil`. An active legal hold blocks disposal even after the retention period expires.
@@ -15,9 +15,9 @@ Create a small, separate implementation PR based on [the Records Retention and D
 The live member-register read and live deletion-path probes were not available in the 22 November wind-up. Keep those items explicitly NOT VERIFIED until safe, authoritative evidence is obtained.
 
 
-## Open decisions
+## Resolved owner decisions
 
-- **Role-title confirmation (OPEN DECISION):** the retention policy records the role as "Director of Internal Oversight", while repository records show "Director of International Oversight"; the owner must confirm the correct title before the disposal workflow is built.
+- **Role title:** Director of Internal Oversight. The owner has settled this title; it is not an open decision. Do not substitute “Director of International Oversight”.
 
 
 # IRPA-DBGS handover — 22 November 2026
@@ -29,10 +29,32 @@ The live member-register read and live deletion-path probes were not available i
 - PR #845 is merged and deployed through those workflows. The Worker release health check is green. However, the three requested live deletion-path probes were NOT RUN: the delete and PURGE endpoints perform irreversible writes and do not expose a read-only mode. No authenticated safe canary/probe was available. Do not describe those live refusal checks as passed. The PR and Gateway test suites passed their corresponding code-level tests.
 - Firestore rules and indexes were unchanged; the deployment workflow explicitly skipped their deployment. No rules were published. No scheduled workflow or crawler schedule was changed.
 
-## Merged and deployed
-- PR #853 — portal-protection guard and repair-window controls. Merge commit: 61fe8f360021bea5692f06c99d7ce5cc770a58ae.
-- PR #851 — exact manual DEPLOY RULES confirmation for Firestore publishers and removal of push-triggered staging rules publication. Merge commit: 40c7cfa33a53871a48c8568a5ff3f876f2df5ac5.
-- PR #845 — Meeting REAL/TRIAL deletion protection. Merge commit: 57368a8c2ceb418178aa28e5707b02605851dc83. Worker and web release workflows completed successfully.
+## Verified merged PRs — GitHub state checked 22 November 2026
+- #843 — 5fa8d46deeeb96c3172a1798411c18f57991855d.
+- #853 — 61fe8f360021bea5692f06c99d7ce5cc770a58ae.
+- #851 — 40c7cfa33a53871a48c8568a5ff3f876f2df5ac5.
+- #845 — 57368a8c2ceb418178aa28e5707b02605851dc83.
+- #846 — 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c.
+- #855 — 368b9781dca0817daed082720ecfdffe908ddd82.
+- #588 — 8f65e2a38bb4e2ad6ef9e5f32dc0570d61ef196a.
+- #591 — 3a0d6d21d610a5fc729daeb063ebeda16d62fa1c.
+- #592 — fe4e3de45c718e5c0aa7df8cb46a6f800a9c873f.
+- #578 — ffe701e93665b63e6f4a6ee32fb643adee795bca.
+- #579 — f72efc45820d3e399151ff9bff252a47528ed892.
+- #857 — af787e71492930ad28a31e278c02d13dc8c68778.
+- #858 — c4c5abc05e0b8f11b61ad5e993b36fed274f7f7b.
+- #859 — 824e08582841d511948dfbe5a5a8786352d4aebd.
+- #585 — 7778e95b81b19b8d06c18090abae17646c73da86.
+
+## Verified open PRs — GitHub state checked 22 November 2026
+- #863 (head c276e350365e1147d0e65766de1e523ade5c3db9); four required gates failing. Staging Gateway E2E/Deploy is skipped and is not counted as a failure.
+- #593, #826, #827, #815, #812, #813, #793, #789 and #830 remain open. A non-null merge_commit_sha in stale metadata does not override state=open and merged=false.
+- PR checks are commit-specific. Do not infer current branch or production state from a prior run.
+
+## Current work order
+1. Reconcile this handover and implementation-status record; no runtime or rules change.
+2. Run fresh read-only production proof for #845 through GitHub Actions. Report Worker versions, frontend/web build stamp and Firestore rules version if readable. Prepare but do not dispatch the destructive canary until the owner posts exactly RUN CANARY.
+3. Split #863 into separate portal-scoped PRs, diagnose each failed gate at its cause, and prepare rollback evidence. Stop before merge/publication at the exact owner boundaries APPROVE 863 ... and DEPLOY RULES.
 
 ## Not done — parked
 - Renewal workflow hardening and a fresh renewal PR.
@@ -73,7 +95,9 @@ For each path, record the portal, exact screen/control or route/rule location, a
 - Current Firebase Hosting build stamp: commit 57368a8c2ceb418178aa28e5707b02605851dc83; built 2026-11-22T04:23:07Z.
 - Current Firestore rules version: NOT RETRIEVED; rules were unchanged and not published in this wind-up.
 
-## First three tasks next session
-1. Add or use a safe, authenticated, read-only production probe for REAL meeting delete refusal, missing-environment-as-REAL classification, and REAL meeting-record purge refusal. Do not issue a destructive delete or PURGE request against a real record.
-2. Complete Meeting roles and grants, then member upload/signing, with separate scope, tests and approvals. Keep the three live deletion checks clearly marked unverified until safe evidence exists.
-3. Create the fresh owner-only RENEW workflow PR: validate repository owner comment author ID and github.actor, pass comment body through an environment variable with strict validation, renew exactly one portal by 72 hours, and test wrong-named/stale evidence. Keep all parked work separate.
+## Next tasks after this handover
+1. Complete the documentation reconciliation PRs #867 and #868 only after their required checks and exact protection approval are satisfied.
+2. Run the fresh read-only #845 production proof through GitHub Actions. Prepare, but do not run, the canary until the owner writes exactly RUN CANARY.
+3. Split #863 into one-portal PRs, diagnose and repair the failing gates at their causes, and prepare rollback evidence. Stop at APPROVE 863 ... and DEPLOY RULES.
+
+Do not treat skipped staging WordPress/cPanel jobs as failures for this rebuild. Do not publish Firestore rules.
