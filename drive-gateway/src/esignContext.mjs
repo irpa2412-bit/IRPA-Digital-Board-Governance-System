@@ -1,3 +1,4 @@
+import { probeDriveArchiveDestinations } from "./driveArchiveDiagnostics.mjs";
 import { createCloudflareSignerKeyProvider, importPublicKeyJwk } from "./cryptographicGate.mjs";
 import { sha256Hex } from "./util.mjs";
 import { Conflict, VersionConflict } from "./adapters.mjs";
@@ -231,6 +232,7 @@ function driveStorage(env, helpers) {
     },
     async get(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`,{headers:{Authorization:`Bearer ${token}`}}); return r.ok?new Uint8Array(await r.arrayBuffer()):null;},
     async probeWritePermission(paths){const token=await helpers.getDriveAccessToken(env);for(const path of paths||[]){const parts=String(path).split("/").filter(Boolean);parts.pop();let parent=await findExistingFolder(env,token,getDriveRootFolderName(env),null,helpers.driveFetch);if(!parent)return false;for(const part of parts){parent=await findExistingFolder(env,token,part,parent,helpers.driveFetch);if(!parent)return false;}const folder=await helpers.driveFetch(env,token,"/drive/v3/files/"+encodeURIComponent(parent)+"?fields=id,capabilities(canAddChildren)");if(folder?.capabilities?.canAddChildren!==true)return false;}return true;},
+    async probeWritePermissionDetailed(paths){return probeDriveArchiveDestinations({env,helpers,paths});},
     async delete(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}); if(!r.ok&&r.status!==404) throw new Error("Google Drive deletion failed.");}
   };
 }
