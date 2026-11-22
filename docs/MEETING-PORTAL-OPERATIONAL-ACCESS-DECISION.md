@@ -40,19 +40,19 @@ Do not claim Meeting Portal category confidentiality is live. A safe correction 
 - Direct-read, list/query, participant, invitation, category, released-record and data-gate regression tests.
 - Staging acceptance and independent review.
 
-This implementation branch does not modify `firestore.rules` or `firestore.staging.rules`. No rules are published.
+The current implementation branch changes both `firestore.rules` and `firestore.staging.rules` so meeting document reads require the category/participant helper. Category-based role reads now require an active member or employee record. The generic client meeting-list and meeting-document adapters are routed through the Cloudflare Gateway, which applies server-side category, initiator, participant and invitation filtering. These are source changes only; rules have not been published and the gateway has not been deployed.
 
 ## 5. Release sequence and current gate
 
 1. Correct the confirmed occupancy baseline and record the duty-based access decision. **Implemented in this branch.**
 2. Bind each active person to verified identity, current appointment/volunteer assignment, approved job description and ED duty scope. **Pending authoritative records and controlled assignment.**
-3. Implement server-side role/module/record authorization and revocation across all applicable routes. **Not implemented.**
-4. Close the Meeting Portal Firestore read-boundary gap with compatible rules and query changes. **Not implemented; separate review and rules approval required.**
-5. Run automated regression/security checks and staging acceptance. **Not run by this change.**
+3. Implement server-side role/module/record authorization and revocation across all applicable routes. **Meeting read-list and get routes implemented in this branch; broader role/module grants and revocation remain pending.**
+4. Close the Meeting Portal Firestore read-boundary gap with compatible rules and query changes. **Source changes implemented in this branch; emulator/security validation, staging acceptance, independent review and rules publication remain pending.**
+5. Run automated regression/security checks and staging acceptance. **CI triggered; staging acceptance not yet run.**
 6. Obtain independent review and merge only after all required checks pass. **Pending.**
-7. Publish Firestore rules only after separate exact `DEPLOY RULES` approval; deploy production only after explicit production-release approval and verified staging. **Not authorized by this change.**
+7. Publish Firestore rules only after separate exact `DEPLOY RULES` approval; deploy production only after explicit production-release approval and verified staging. **Not performed.**
 
 ## 6. Status language
 
 - **Live: No** — no user permissions were activated, no Firestore rules were published, no staging acceptance was completed, and no production deployment was performed.
-- **Implemented in branch** means the policy and occupancy baseline are committed to a review branch; it does not mean merged or live.
+- **Implemented in branch** means policy, occupancy, Gateway read paths and Firestore rule source changes are committed to a review branch; it does not mean merged or live.
