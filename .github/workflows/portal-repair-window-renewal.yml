@@ -76,6 +76,10 @@ jobs:
               }
             }
             if (!kind || !portal || !reason) return;
+            if (!context.payload.issue.pull_request) {
+              core.setFailed("Renewal commands must be posted on a pull request so the approval is recorded on a reviewable branch.");
+              return;
+            }
             if (context.payload.comment.author_association !== "OWNER") {
               core.setFailed("Owner association is required.");
               return;
