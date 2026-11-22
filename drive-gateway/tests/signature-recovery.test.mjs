@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";
 import { memoryMeta,memoryStorage } from "../src/adapters.mjs";
 import { canonicalJson,sha256Hex } from "../src/util.mjs";
-import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots } from "../src/signatureRecovery.mjs";
+import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots,createSignatureRecoveryRouter } from "../src/signatureRecovery.mjs";
 
 async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
@@ -215,4 +215,34 @@ test("owner queue still exposes an envelope when its signing audit chain is inva
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.auditChain.status,"FAILED");
   assert.equal(result.stampSlots.every(row=>row.status==="UNVERIFIABLE"),true);
+});
+
+test("read-only recovery evidence GET route is wired and rejects unauthenticated requests",async()=>{
+  let authenticationAttempts=0;
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>{authenticationAttempts++;throw new Error("missing bearer token");},
+    getFirestoreDocument:async()=>null,
+    buildContext:()=>{throw new Error("context must not be built for an unauthenticated request");},
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({"content-type":"application/json"})
+  });
+  const request=new Request("https://worker.test/api/recovery/envelopes/test-id/evidence",{method:"GET"});
+  const response=await router(request,{},"/api/recovery/envelopes/test-id/evidence");
+  assert.equal(response.status,401);
+  assert.match((await response.json()).error,/sign-in/i);
+  assert.equal(authenticationAttempts,1);
+});
+
+test("recovery evidence router refuses non-GET methods before authentication or mutation",async()=>{
+  let authenticationAttempts=0;
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>{authenticationAttempts++;throw new Error("should not be called");},
+    getFirestoreDocument:async()=>null,
+    buildContext:()=>{throw new Error("should not be called");},
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({"content-type":"application/json"})
+  });
+  const response=await router(new Request("https://worker.test/api/recovery/envelopes/test-id/evidence",{method:"POST"}),{},"/api/recovery/envelopes/test-id/evidence");
+  assert.equal(response.status,405);
+  assert.equal(authenticationAttempts,0);
 });
