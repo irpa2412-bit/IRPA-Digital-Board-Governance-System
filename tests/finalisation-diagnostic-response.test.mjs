@@ -1,0 +1,5 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {normalizeFinalisationDiagnostic} from "../../src/utils/finalisationDiagnosticResponse.mjs";
+test("valid diagnostic response is normalised",()=>{const result=normalizeFinalisationDiagnostic({schema:"IRPA-FINALISATION-DIAGNOSTIC-1",envelopeId:"ENV-1",steps:[{stageCode:"PDF_BUILD",status:"PASS"}]});assert.equal(result.steps.length,1);assert.equal(result.summary.passed,1);});
+test("malformed diagnostic responses never throw and return null",()=>{for(const value of [null,undefined,[],{}, {schema:"wrong",envelopeId:"ENV-1",steps:[]},{schema:"IRPA-FINALISATION-DIAGNOSTIC-1",envelopeId:"ENV-1",steps:[null]},{schema:"IRPA-FINALISATION-DIAGNOSTIC-1",envelopeId:"ENV-1",steps:"bad"}])assert.doesNotThrow(()=>normalizeFinalisationDiagnostic(value));for(const value of [null,[],{}, {schema:"wrong",envelopeId:"ENV-1",steps:[]},{schema:"IRPA-FINALISATION-DIAGNOSTIC-1",envelopeId:"ENV-1",steps:[null]}])assert.equal(normalizeFinalisationDiagnostic(value),null);});
