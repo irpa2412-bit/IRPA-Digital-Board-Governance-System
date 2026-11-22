@@ -83,10 +83,18 @@ async function getDoc(ctx, env, token, collection, id) {
   catch (error) { if (error.status === 404) return null; throw error; }
 }
 async function listCollection(ctx, env, token, collection) {
-  const rows = await firestoreRequest(ctx, env, token, ":runQuery", {
+  const url = `https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents:runQuery`;
+  const response = await fetch(url, {
     method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collection }] } })
   });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) {
+    const error = new Error(`Firestore query failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
   return (Array.isArray(rows) ? rows : []).filter(row => row.document).map(row => docToPlain(row.document));
 }
 function denyDuty(ctx, request, authority, duty, allowed) {
