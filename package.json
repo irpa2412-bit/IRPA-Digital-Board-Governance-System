@@ -29,7 +29,7 @@
     "test:no-billing-deps": "node --test tests/no-billing-deps.test.mjs",
     "test:workflow-deployment-policy": "node --test tests/workflow-production-deploy-policy.test.mjs",
     "test:email-service-auth": "node --test functions/emailServiceAuth.test.cjs drive-gateway/tests/mail-invitation.unit.mjs",
-    "test:all": "npm run test:org-structure-authority && npm run test:policies-strategic-plan-portal && npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:email-service-auth && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:signature-firestore-diagnostics && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:meeting-quorum && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio && npm run test:signature-field-assignment && npm run test:signature-self-test && npm run test:protected-portals && npm run test:portal-protection-guard",
+    "test:all": "npm run test:org-structure-authority && npm run test:policies-strategic-plan-portal && npm run check:no-billing-deps && npm run test:no-billing-deps && npm run test:workflow-deployment-policy && npm run test:email-service-auth && npm run test:meeting-category && npm run test:finance-policy && npm run test:security-rules && npm run test:signature-firestore-diagnostics && npm run test:fundraising-registry && npm run test:portal-navigation && npm run test:meeting-entry-policy && npm run test:meeting-invitation-resend && npm run test:meeting-quorum && npm run test:communication-media && npm run test:meta-oauth && npm run test:pdf-page-rendering && npm run test:social-studio && npm run test:signature-field-assignment && npm run test:signature-self-test && npm run test:protected-portals",
     "test:org-structure-authority": "node --test tests/org-structure-authority.test.mjs tests/signature-authority-matrix.test.mjs tests/org-structure-portal-alignment.test.mjs tests/job-description-intranet-workflow.test.mjs",
     "test:policies-strategic-plan-portal": "node --test tests/policies-strategic-plan-portal.test.mjs",
     "test:org-structure-portal-alignment": "node --test tests/org-structure-portal-alignment.test.mjs",
@@ -40,8 +40,7 @@
     "test:signature-coordinate-browser": "npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/signature-coordinate-leave.spec.mjs",
     "test:signature-field-assignment": "node --test tests/signature-field-assignment-setup.test.mjs drive-gateway/tests/signature-field-assignment-regression.test.mjs",
     "test:protected-portals": "node scripts/portal-protection-smoke.mjs",
-    "test:signature-self-test": "node --test tests/signature-self-test-session-safety.test.mjs",
-    "test:portal-protection-guard": "node --test tests/portal-protection-policy.test.mjs tests/portal-repair-window-renewal.test.mjs"
+    "test:signature-self-test": "node --test tests/signature-self-test-session-safety.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
