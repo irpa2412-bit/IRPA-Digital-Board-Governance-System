@@ -1,3 +1,4 @@
+import { resolveMeetingAuthority } from "../../shared/meetingAuthority.mjs";
 export const MEETING_CATEGORIES={
   GOVERNANCE:{id:"GOVERNANCE",label:"Governance Meetings",meetingTypes:["Governance","Board","Board Meeting","Board Committee Meeting","Annual General Meeting","Special Meeting"],quorumRequired:false,votingEnabled:true,resolutionsEnabled:true,documentsLabel:"Governance Documents",documentsAccess:true,authorizationAccess:true,signatureAccess:true,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:true,confidentiality:"BOARD_RESTRICTED",aiMode:"GOVERNANCE",accessScope:"BOARD_RESTRICTED",accessRoles:["Board Member","Board Chairperson","Board Secretary","Executive Director","Director Internal Oversight"],registrationRoles:["Board Secretary","Secretary to the Board","Meeting Secretary","Executive Director","Director Internal Oversight"],votingRoles:["Board Member","Board Chairperson"],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Board Chairperson","Board Secretary","Secretary to the Board"]},
   ADMINISTRATIVE:{id:"ADMINISTRATIVE",label:"Administrative Meetings",meetingTypes:["Administrative","Management","Management Meeting","Administration Meeting","Operations Meeting"],quorumRequired:false,votingEnabled:false,resolutionsEnabled:false,documentsLabel:"Administrative Documents",documentsAccess:true,authorizationAccess:true,signatureAccess:true,decisionsAccess:true,actionsAccess:true,transcriptAccess:true,mediaAccess:true,attendanceAccess:true,autoRegistration:true,quorumAccess:false,aiReviewRequired:true,confidentiality:"MANAGEMENT",aiMode:"OPERATIONAL",accessScope:"MANAGEMENT_RESTRICTED",accessRoles:["Executive Director","Director Finance & Administration","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Director Outreach","Director Community Development","Director Livestock","Director Environment","Director Field Department"],registrationRoles:["Executive Director","Director Finance & Administration","Director Human Resources","HR Director","Operations Manager","Departmental Director","Departmental Manager","Director Outreach","Director Community Development","Director Livestock","Director Environment","Director Field Department"],votingRoles:[],editAfterRelease:"ADMINISTRATOR_ONLY",minutesApprovalRoles:["Executive Director","Meeting Secretary"]},
@@ -23,13 +24,13 @@ function identityRoles(identity={}){
   return new Set(values.map(NORMALIZE_ROLE).filter(Boolean));
 }
 export function canRegisterMeeting(identity={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
+  if(identity.isAdmin===true||identity.admin===true||identity.fullMeetingAccess===true)return true;
   if(identity.active!==true)return false;
   const roles=identityRoles(identity);
   return MEETING_REGISTRATION_ROLES.some(role=>roles.has(NORMALIZE_ROLE(role)));
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
+  if(identity.isAdmin===true||identity.admin===true||identity.fullMeetingAccess===true)return true;
   if(options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true)return true;
   if(identity.active!==true)return false;
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
@@ -38,7 +39,7 @@ export function canAccessMeetingCategory(meeting={},identity={},options={}){
   return policy.accessRoles.some(role=>roles.has(NORMALIZE_ROLE(role)));
 }
 export function canEditMeeting(meeting={},identity={}){
-  if(identity.isAdmin===true||identity.admin===true)return true;
+  if(identity.isAdmin===true||identity.admin===true||identity.fullMeetingAccess===true)return true;
   const released=Boolean(meeting.registeredAt||meeting.registerStatus==="Registered"||meeting.status==="Released");
   if(released)return false;
   if(identity.active!==true)return false;
@@ -50,6 +51,7 @@ export function canEditMeeting(meeting={},identity={}){
 export function canVoteInMeeting(meeting={},identity={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   if(!policy.votingEnabled||identity.active!==true)return false;
+  if(identity.fullMeetingAccess===true)return true;
   const roles=identityRoles(identity);
   return policy.votingRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&identity.isBoardMember===true;
 }
@@ -123,3 +125,4 @@ export function meetingCapabilities(meeting={}){
 export function governanceLineage(meeting={},recordType="MEETING"){
   return {origin:"MEETING",meetingId:meeting.id||null,meetingType:meeting.meetingType||null,meetingCategory:meeting.meetingCategory||null,meetingPolicyId:meeting.meetingPolicyId||null,recordType,authorityClass:meeting.meetingCategory==="GOVERNANCE"?"BOARD_GOVERNANCE":"OPERATIONAL",confidentialityClass:meeting.confidentialityClass||"INTERNAL"};
 }
+\nexport function resolveMeetingAuthorityForIdentity(identity={},registers={}){return resolveMeetingAuthority(identity,registers);}\n
