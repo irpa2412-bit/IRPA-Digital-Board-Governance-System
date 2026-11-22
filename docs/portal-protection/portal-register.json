@@ -126,7 +126,9 @@
         "src/firebase/meetingRecords.js",
         "drive-gateway/src/meetingPortal.mjs",
         "drive-gateway/src/meetingServices.mjs",
-        "drive-gateway/src/meetingDeletion.mjs"
+        "drive-gateway/src/meetingDeletion.mjs",
+        "drive-gateway/src/meetingEnvironment.mjs",
+        "drive-gateway/tests/meeting-environment.test.mjs"
       ],
       "sharedDependencies": [
         "src/App.jsx",
