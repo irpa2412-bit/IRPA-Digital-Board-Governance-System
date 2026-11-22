@@ -7,3 +7,6 @@
 - Tests: add seeded title-variant and whitespace-normalization cases while preserving existing identity-key, multi-role, department-head, inactive and member-only/employee-only coverage.
 - Boundaries: no Firestore rules, secrets, environment variables, SMTP, signature workflow, production data or branch protection changes.
 - Status: resolver amendment committed for PR validation; merge/deployment remain gated on required checks and review.
+- Worker parity: `drive-gateway/src/meetingPortal.mjs` now calls the same `resolveMeetingAuthority` function against Members, Employees and institutional department-head registers before issue, dispatch and revoke operations. The existing participant identity check for the `authorize` entry path remains separate and unchanged.
+- Duty denial responses identify the attempted operation, active register role/source, and roles allowed. Register lookup failure is fail-closed with HTTP 503.
+- Gateway tests cover a registered Director of Internal Oversight issuing access and an ordinary member receiving the specific denial message.
