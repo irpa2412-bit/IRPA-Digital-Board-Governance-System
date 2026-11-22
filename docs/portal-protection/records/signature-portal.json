@@ -347,6 +347,77 @@
         "cloudflareFrontend": "NOT_STARTED",
         "productionEnvelopeMutation": "NONE"
       }
+    },
+    {
+      "changeId": "SR-2026-11-22-04",
+      "status": "owner-approved-scope-amendment",
+      "approvedAt": "2026-11-22T18:13:01Z",
+      "ownerDecision": "Do not move Completed after distribution. Completed means signatures verified, completed PDF built, byte length and hash recorded, certificate built and archive written. Email delivery is independent.",
+      "acceptedSourceFinding": {
+        "file": "drive-gateway/src/signing.mjs",
+        "line": 440,
+        "detail": "Completed is persisted before distribution.",
+        "distributionFile": "drive-gateway/src/signatureDistribution.mjs",
+        "lines": "67-131",
+        "detail2": "Individual recipient delivery failures are caught and not propagated to envelope-level distribution status."
+      },
+      "distributionScope": {
+        "statusValues": [
+          "NotStarted",
+          "Sent",
+          "PartiallyFailed",
+          "Failed"
+        ],
+        "perRecipient": [
+          "maskedAddress",
+          "mailServerAccepted",
+          "sanitisedFailureStageCode",
+          "replyCategory"
+        ],
+        "ownerUi": "Completed, but N emails failed; Resend completion emails for failed recipients only using existing signed copies and existing resend rules; no new tokens.",
+        "completedIndependentOfEmail": true
+      },
+      "sequence": [
+        "PR #911 remains the repair-window and Change Record PR; stage recorder and zero-write dry run first",
+        "Separate PR for distribution status and failed-recipient resend UI",
+        "Separate PR for owner/admin retry control"
+      ],
+      "immutable": [
+        "No envelope mutation",
+        "No signatures, signer records, audit events or stored hashes touched",
+        "No changes to PDF building, hashing, certificate or archive logic",
+        "No change to signing rules, tokens, link format, sessions, signer identity, field assignment, secrets, env vars, SMTP settings, Firestore rules or branch protection"
+      ],
+      "retry": {
+        "ownerAdminOnly": true,
+        "enableAfter": "all-PASS dry run or explicit owner confirmation",
+        "backupBefore": true,
+        "exclude": [
+          "signature images",
+          "tokens",
+          "links"
+        ],
+        "runNormalFinalisationOnce": true,
+        "auditEvent": [
+          "actor",
+          "time",
+          "action",
+          "result"
+        ],
+        "failure": "No changes to existing envelope, signatures or audit evidence",
+        "undoDays": 7,
+        "rateLimitPerHour": 3,
+        "neverSetCompletedDirectly": true
+      }
     }
-  ]
+  ],
+  "activeAmendment": {
+    "ownerDecision": "Do not move Completed after distribution. Completed is independent of email delivery; implement envelope-level distribution status and failed-recipient-only resend in its own PR.",
+    "files": [
+      "drive-gateway/src/signatureDistribution.mjs",
+      "drive-gateway/src/signing.mjs",
+      "src/pages/SignatureRecoveryOwnerPanel.jsx"
+    ],
+    "expectedEffect": "First PR stage recording and zero-write dry run; second PR envelope-level distribution status and failed-recipient-only resend; third PR backup-first audited retry. Completed remains independent of email delivery."
+  }
 }
