@@ -13,7 +13,9 @@
       "src/pages/Meetings.jsx",
       "drive-gateway/src/meetingEnvironment.mjs",
       "drive-gateway/tests/meeting-environment.test.mjs",
-      "docs/portal-protection/records/meeting-portal.json"
+      "docs/portal-protection/records/meeting-portal.json",
+      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/windows/meeting-portal.json"
     ],
     "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
     "prohibitedChanges": [
@@ -53,5 +55,115 @@
       "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
     ]
   },
-  "renewals": []
+  "renewals": [],
+  "attendanceCallableAudit": {
+    "changeId": "MP-2026-11-22-ATTENDANCE-CALLABLE-GUARD",
+    "relatedPullRequest": 908,
+    "baselineCommit": "f07e880e5c8944d2cfb775fa620b2f492a46151b",
+    "rollbackCommit": "f07e880e5c8944d2cfb775fa620b2f492a46151b",
+    "status": "ACTIVE_SCREENS_USE_WORKER; LEGACY_UNDEPLOYED_CALLABLE_COMPONENT_UNREFERENCED",
+    "activeAttendanceActions": [
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "mark meeting attendance",
+        "helper": "markMeetingAttendance",
+        "workerRoute": "/api/meeting-attendance/mark"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "read meeting attendance register",
+        "helper": "getMeetingAttendanceRegister",
+        "workerRoute": "/api/meeting-attendance/register"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "read daily attendance",
+        "helper": "getDailyMeetingAttendance",
+        "workerRoute": "/api/meeting-attendance/daily/register"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "mark daily attendance",
+        "helper": "markDailyMeetingAttendance",
+        "workerRoute": "/api/meeting-attendance/daily/mark"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "dispatch or resume daily attendance signing",
+        "helper": "dispatchDailyAttendanceSigning/resumeDailyAttendanceSigning",
+        "workerRoute": "/api/meeting-attendance/daily/dispatch"
+      },
+      {
+        "screen": "src/meeting/MeetingAccessControl.jsx",
+        "action": "list pending entry requests",
+        "helper": "callMeetingService",
+        "workerRoute": "/api/meeting-entry-requests/list"
+      },
+      {
+        "screen": "src/meeting/MeetingAccessControl.jsx",
+        "action": "admit or decline entry requests",
+        "helper": "callMeetingService",
+        "workerRoute": "/api/meeting-entry-requests/resolve"
+      }
+    ],
+    "undeployedCallableFindings": [
+      {
+        "source": "functions/meetingAttendanceRegister.js",
+        "callable": "signMeetingAttendance",
+        "activeScreenCaller": false
+      },
+      {
+        "source": "functions/meetingAttendanceRegister.js",
+        "callable": "getMeetingAttendanceRegister",
+        "activeScreenCaller": false
+      },
+      {
+        "source": "src/components/MeetingAccessControl.jsx",
+        "action": "load pending entry requests",
+        "callable": "listMeetingEntryRequests",
+        "activeScreenCaller": false,
+        "workerEquivalent": "/api/meeting-entry-requests/list"
+      },
+      {
+        "source": "src/components/MeetingAccessControl.jsx",
+        "action": "resolve entry request",
+        "callable": "resolveMeetingEntryRequest",
+        "activeScreenCaller": false,
+        "workerEquivalent": "/api/meeting-entry-requests/resolve"
+      }
+    ],
+    "rules": "Active MeetingRoom uses the Worker-backed src/meeting/MeetingAccessControl.jsx component; the legacy callable-backed src/components/MeetingAccessControl.jsx is not imported by the active screen. No signer, guest, duplicate-signer, envelope, or signature behavior was changed.",
+    "test": "tests/meeting-category-policy.test.mjs — fails if active attendance screens import or call Firebase callable APIs or the undeployed attendance callables; verifies Worker route mapping.",
+    "prohibitedChanges": [
+      "signing rules",
+      "tokens",
+      "link format",
+      "sessions",
+      "signer identity",
+      "field assignment",
+      "stamping",
+      "PDF logic",
+      "hash logic",
+      "certificate logic",
+      "archive logic",
+      "Firestore rules",
+      "secrets",
+      "environment variables",
+      "SMTP settings",
+      "branch protection"
+    ],
+    "repairWindow": {
+      "openedAt": "2026-11-22T18:10:00Z",
+      "expiresAt": "2026-11-25T18:10:00Z",
+      "durationHours": 72
+    },
+    "files": [
+      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json"
+    ],
+    "expectedEffect": "Prevent active Meeting Portal attendance screens from invoking Firebase callables that are not deployed; preserve Worker-backed attendance and entry-request routes.",
+    "changeRecord": "The active MeetingRoom uses Worker routes for attendance read/write and daily dispatch. The active Meeting Access Control component uses Worker list/resolve routes. The callable-backed src/components/MeetingAccessControl.jsx is legacy and not imported by the active screen. Firebase attendance callable exports are not used by active screens.",
+    "validation": "Static regression guard added; required CI and live deployment verification pending."
+  }
 }
