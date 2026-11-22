@@ -66,6 +66,24 @@ test("isolated staging Firestore rules publisher requires manual DEPLOY RULES co
   assert.match(source, /inputs\.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'/);
 });
 
+
+test("staging Gateway E2E rules publisher requires exact manual DEPLOY RULES confirmation", () => {
+  const source = readWorkflow(".github/workflows/staging-gateway-e2e.yml");
+  assert.match(source, /confirm_staging_firestore_rules_deployment:[\s\S]*?default: "no"/);
+  const start = source.indexOf("- name: Deploy approved Firestore rules to isolated staging only");
+  assert.ok(start >= 0);
+  const next = source.indexOf("\n      - name:", start + 1);
+  assert.match(source.slice(start, next < 0 ? source.length : next), /github\.event_name == 'workflow_dispatch'.*inputs\.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'/);
+});
+
+test("LiveKit staging frontend rules publisher requires exact manual DEPLOY RULES confirmation", () => {
+  const source = readWorkflow(".github/workflows/cloudflare-livekit-staging-frontend.yml");
+  assert.match(source, /confirm_staging_firestore_rules_deployment:[\s\S]*?default: "no"/);
+  const start = source.indexOf("- name: Deploy committed Firestore rules to the isolated staging project only");
+  assert.ok(start >= 0);
+  const next = source.indexOf("\n      - name:", start + 1);
+  assert.match(source.slice(start, next < 0 ? source.length : next), /github\.event_name == 'workflow_dispatch'.*inputs\.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'/);
+});
 test("Firebase deployment workflow does not assert Cloudflare build identity", () => {
   const source = readWorkflow(".github/workflows/firebase-deploy.yml");
   assert.match(source, /Verify live Firebase Hosting independently/);
