@@ -76,57 +76,118 @@ export function resolvePortalPolicyPaths(affectedPortals, exists = fs.existsSync
   return { ok: true, ...paths };
 }
 
-export function evaluatePolicy({ changedFiles, registry, windowState, record, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
-  const affected = new Set();
+export function evaluatePolicy({ changedFiles, registry, windowState, record, ownerPolicies = null, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
+  const sharedMatches = new Map();
+  const specificAffected = new Set();
   const protectedFiles = [];
   for (const file of changedFiles) {
-    let matched = false;
-    for (const [portal, entry] of Object.entries(registry.portals)) {
-      if (entry.paths.some((p) => isWithin(file, p))) { affected.add(portal); matched = true; }
-    }
+    const owners = new Set();
     for (const shared of registry.shared ?? []) {
       if (isWithin(file, shared.path)) {
-        for (const portal of shared.portals) affected.add(portal);
+        shared.portals.forEach(portal => owners.add(portal));
+      }
+    }
+    if (owners.size) {
+      sharedMatches.set(file, [...owners].sort());
+      protectedFiles.push(file);
+      continue;
+    }
+    let matched = false;
+    for (const [portal, entry] of Object.entries(registry.portals)) {
+      if (entry.paths.some(path => isWithin(file, path))) {
+        specificAffected.add(portal);
         matched = true;
       }
     }
     if (matched) protectedFiles.push(file);
   }
-  if (!protectedFiles.length) return { ok: true, affected: [], protectedFiles: [], reason: "No protected portal or shared dependency changed." };
 
-  const fail = (reason) => ({ ok: false, affected: [...affected].sort(), protectedFiles, reason });
-  if (affected.size > 1) return fail("Protected changes must be split into one-portal PRs; multi-portal changes are blocked.");
-  if (!record || record.status !== "complete") return fail("A completed Change Record is required.");
-  if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.");
+  const fail = (reason, affected = [...specificAffected].sort(), files = protectedFiles) =>
+    ({ ok: false, affected, protectedFiles: files, reason });
+  if (!protectedFiles.length) return { ok: true, affected: [], protectedFiles: [], sharedFiles: [], reason: "No protected portal or shared dependency changed." };
+
+  if (sharedMatches.size) {
+    if (specificAffected.size) {
+      return fail("A shared-file change cannot be combined with portal-specific source changes; split the shared change into its own PR.");
+    }
+    const owners = [...new Set([...sharedMatches.values()].flat())].sort();
+    const sharedFiles = [...sharedMatches.keys()].sort();
+    const ownerResults = [];
+    for (const portal of owners) {
+      const policy = ownerPolicies?.[portal] ?? (owners.length === 1 ? { windowState, record, activityTimestamps, latestActivityAt } : null);
+      if (!policy?.windowState || !policy?.record) {
+        return fail("Shared-file change is missing the dedicated repair window or Change Record for owner: " + portal, owners, sharedFiles);
+      }
+      const lockTests = registry.portals[portal]?.lockTests ?? registry.portals[portal]?.tests ?? [];
+      if (!Array.isArray(lockTests) || !lockTests.length) {
+        return fail("Shared-file owner has no registered lock tests: " + portal, owners, sharedFiles);
+      }
+      const ownedSharedFiles = sharedFiles.filter(file => sharedMatches.get(file).includes(portal));
+      const scopedRegistry = {
+        portals: {
+          [portal]: {
+            ...registry.portals[portal],
+            paths: [...new Set([...(registry.portals[portal].paths ?? []), ...ownedSharedFiles])]
+          }
+        },
+        shared: []
+      };
+      const result = evaluatePolicy({
+        changedFiles: ownedSharedFiles,
+        registry: scopedRegistry,
+        windowState: policy.windowState,
+        record: policy.record,
+        now,
+        latestActivityAt: policy.latestActivityAt ?? latestActivityAt,
+        activityTimestamps: policy.activityTimestamps ?? []
+      });
+      if (!result.ok) return fail("Shared-file owner " + portal + " failed its own protection checks: " + result.reason, owners, sharedFiles);
+      ownerResults.push({ portal, lockTests });
+    }
+    return {
+      ok: true,
+      affected: owners,
+      protectedFiles: sharedFiles,
+      sharedFiles,
+      ownerResults,
+      reason: "Shared-file change passed each owning portal's independent window, Change Record, scope, declaration and baseline-evidence checks."
+    };
+  }
+
+  const affected = [...specificAffected].sort();
+  if (affected.length > 1) return fail("Protected changes must be split into one-portal PRs; multi-portal changes are blocked.", affected);
+  const portal = affected[0];
+  if (!record || record.status !== "complete") return fail("A completed Change Record is required.", affected);
+  if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.", affected);
   const openedAt = Date.parse(windowState.openedAt);
   const expiresAt = Date.parse(windowState.expiresAt);
-  if (!Number.isFinite(openedAt) || !Number.isFinite(expiresAt) || expiresAt - openedAt !== HOURS_72) return fail("A valid 72-hour repair-window expiry is mandatory.");
-  if (now >= expiresAt) return fail("Repair window expired after 72 hours; an owner-approved renewal is required.");
+  if (!Number.isFinite(openedAt) || !Number.isFinite(expiresAt) || expiresAt - openedAt !== HOURS_72) return fail("A valid 72-hour repair-window expiry is mandatory.", affected);
+  if (now >= expiresAt) return fail("Repair window expired after 72 hours; an owner-approved renewal is required.", affected);
   const activities = [...new Set([...(activityTimestamps ?? []), ...(latestActivityAt ? [latestActivityAt] : [])])]
-    .map(Date.parse).filter((time) => Number.isFinite(time) && time >= openedAt).sort((a, b) => a - b);
-  if (!activities.length) return fail("No repair activity is recorded after the current window declaration.");
+    .map(Date.parse).filter(time => Number.isFinite(time) && time >= openedAt).sort((a, b) => a - b);
+  if (!activities.length) return fail("No repair activity is recorded after the current window declaration.", affected);
   let previousActivity = openedAt;
   for (const activityTime of activities) {
-    if (activityTime - previousActivity >= HOURS_72) return fail("Repair window automatically closed after a 72-hour inactivity gap; a new owner-approved renewal is required.");
+    if (activityTime - previousActivity >= HOURS_72) return fail("Repair window automatically closed after a 72-hour inactivity gap; a new owner-approved renewal is required.", affected);
     previousActivity = activityTime;
   }
-  if (now - previousActivity >= HOURS_72) return fail("Repair window automatically closed after 72 consecutive hours without activity.");
+  if (now - previousActivity >= HOURS_72) return fail("Repair window automatically closed after 72 consecutive hours without activity.", affected);
   if (windowState.emergency === true) {
     const emergencyExpiresAt = Date.parse(windowState.emergencyExpiresAt);
-    if (!Number.isFinite(emergencyExpiresAt) || emergencyExpiresAt - openedAt > BREAK_GLASS_24 || now >= emergencyExpiresAt) return fail("The 24-hour break-glass window is expired or invalid.");
+    if (!Number.isFinite(emergencyExpiresAt) || emergencyExpiresAt - openedAt > BREAK_GLASS_24 || now >= emergencyExpiresAt) return fail("The 24-hour break-glass window is expired or invalid.", affected);
   }
   const scope = windowState.scope ?? [];
-  const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
-  if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
+  const outOfScope = protectedFiles.filter(file => !scope.some(path => isWithin(file, path)));
+  if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "), affected);
   const declaredFiles = [...(record.declaration?.files ?? []), ...(record.activeAmendment?.files ?? [])];
-  const missingDeclarations = protectedFiles.filter((file) => !declaredFiles.some((p) => isWithin(file, p)));
-  if (missingDeclarations.length) return fail("Change Record omits changed files: " + missingDeclarations.join(", "));
+  const missingDeclarations = protectedFiles.filter(file => !declaredFiles.some(path => isWithin(file, path)));
+  if (missingDeclarations.length) return fail("Change Record omits changed files: " + missingDeclarations.join(", "), affected);
   const declaredPortals = new Set(record.declaration?.affectedPortals ?? []);
-  const missingPortals = [...affected].filter((portal) => !declaredPortals.has(portal));
-  if (missingPortals.length) return fail("Change Record omits affected portals: " + missingPortals.join(", "));
-  if (!record.declaration?.reason || !record.declaration?.expectedEffect || !Array.isArray(record.declaration?.prohibitedChanges) || !record.declaration.prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.");
-  if (!record.baseline?.commit || !record.baseline?.rollbackCommit) return fail("Baseline and rollback commits are mandatory.");
-  if (record.validation?.baselineSmoke !== "PASS" || record.validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.");
+  const missingPortals = affected.filter(portalName => !declaredPortals.has(portalName));
+  if (missingPortals.length) return fail("Change Record omits affected portals: " + missingPortals.join(", "), affected);
+  if (!record.declaration?.reason || !record.declaration?.expectedEffect || !Array.isArray(record.declaration?.prohibitedChanges) || !record.declaration.prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.", affected);
+  if (!record.baseline?.commit || !record.baseline?.rollbackCommit) return fail("Baseline and rollback commits are mandatory.", affected);
+  if (record.validation?.baselineSmoke !== "PASS" || record.validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.", affected);
   const evidence = record.validation?.evidence;
   const runLink = /https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+\/job\/\d+/;
   const hasRunEvidence = label => Array.isArray(evidence) && evidence.some(item =>
@@ -134,25 +195,19 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
     String(item).includes(record.baseline.commit) &&
     runLink.test(String(item))
   );
-  if (!hasRunEvidence("baseline smoke") || !hasRunEvidence("full regression")) {
-    return fail("Baseline smoke and full regression require real-run links tied to this portal baseline commit.");
-  }
+  if (!hasRunEvidence("baseline smoke") || !hasRunEvidence("full regression")) return fail("Baseline smoke and full regression require real-run links tied to this portal baseline commit.", affected);
   const smoke = record.validation?.portalSmoke ?? {};
-  const missingSmoke = [...affected].filter((portal) => smoke[portal] !== "PASS");
-  if (missingSmoke.length) return fail("Missing passing smoke evidence for: " + missingSmoke.join(", "));
-  const missingPortalRunEvidence = [...affected].filter(portal => !Array.isArray(evidence) || !evidence.some(item =>
-    String(item).includes(portal) &&
-    /portal smoke/i.test(String(item)) &&
-    String(item).includes(record.baseline.commit) &&
-    runLink.test(String(item))
+  const missingSmoke = affected.filter(portalName => smoke[portalName] !== "PASS");
+  if (missingSmoke.length) return fail("Missing passing smoke evidence for: " + missingSmoke.join(", "), affected);
+  const missingPortalRunEvidence = affected.filter(portalName => !Array.isArray(evidence) || !evidence.some(item =>
+    String(item).includes(portalName) && /portal smoke/i.test(String(item)) &&
+    String(item).includes(record.baseline.commit) && runLink.test(String(item))
   ));
-  if (missingPortalRunEvidence.length) return fail("Missing portal-specific real-run smoke links for: " + missingPortalRunEvidence.join(", "));
-  if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
+  if (missingPortalRunEvidence.length) return fail("Missing portal-specific real-run smoke links for: " + missingPortalRunEvidence.join(", "), affected);
+  if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).", affected);
   const remainingMs = expiresAt - now;
-  const warning = remainingMs < WARNING_12
-    ? `Repair window expires in less than 12 hours (expires at ${windowState.expiresAt}); obtain owner renewal before expiry.`
-    : null;
-  return { ok: true, affected: [...affected].sort(), protectedFiles, warning, reason: "Protected changes are declared and within the active 72-hour repair window." };
+  const warning = remainingMs < WARNING_12 ? \`Repair window expires in less than 12 hours (expires at \${windowState.expiresAt}); obtain owner renewal before expiry.\` : null;
+  return { ok: true, affected, protectedFiles, warning, reason: "Protected changes are declared and within the active 72-hour repair window." };
 }
 
 async function main() {
