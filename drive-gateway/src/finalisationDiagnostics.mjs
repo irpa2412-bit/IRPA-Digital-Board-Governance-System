@@ -36,12 +36,12 @@ export async function diagnoseFinalisation(ctx,user,envelopeId){
   const expectedHash=String(envelope.documentHash||document.sha256||document.hash||"").toLowerCase();
   if(expectedHash&&await sha256Hex(originalBytes)!==expectedHash)throw error("The source PDF hash does not match its recorded value.","SOURCE_HASH_MISMATCH");
   finalBytes=await buildSignedPdf(originalBytes,{envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title,originalHash:envelope.documentHash,chainHead:envelope.events?.at(-1)?.hash||"GENESIS",events:envelope.events||[],completedAt:ctx.now().toISOString(),signers:(envelope.signers||[]).map(s=>({id:s.id,uid:s.uid,name:s.name,email:s.email,signedAt:s.signedAt,ip:s.ip,signatureType:s.signatureType,signatureValue:s.signatureValue,fieldValues:s.fieldValues||{},signerDeclarations:s.signerDeclarations||{},declarationDiscrepancy:s.declarationDiscrepancy||null})),fields:envelope.fields||[]});
-  report.steps.push(pass("PDF_BUILD",{byteLength:finalBytes.byteLength},fields));
+  report.steps.push(pass("PDF_BUILD",{byteLength:finalBytes.byteLength,stampingPages:[1,3],timestampTimezone:"EAT"},fields));
  }catch(cause){report.steps.push(fail("PDF_BUILD",cause,fields));}
- if(finalBytes){try{finalHash=await sha256Hex(finalBytes);report.steps.push(pass("HASH",{byteLength:finalBytes.byteLength,sha256:finalHash}));}catch(cause){report.steps.push(fail("HASH",cause));}}
+ if(finalBytes){try{finalHash=await sha256Hex(finalBytes);report.steps.push(pass("HASH",{byteLength:finalBytes.byteLength,sha256:finalHash},fields));}catch(cause){report.steps.push(fail("HASH",cause,fields));}}
  else report.steps.push(fail("HASH",error("PDF build did not produce bytes.","PDF_BUILD_FAILED")));
- if(finalBytes&&finalHash){try{const evidence=await buildEvidence(envelope,finalBytes,ctx);report.steps.push(pass("CERTIFICATE",{cryptographicEvidenceChecked:evidence.count,cryptographicEvidenceRequired:evidence.required,completionCertificatePageBuilt:true}));}catch(cause){report.steps.push(fail("CERTIFICATE",cause));}}
- else report.steps.push(fail("CERTIFICATE",error("Certificate check requires a successful PDF build and hash.","PDF_BUILD_FAILED")));
+ if(finalBytes&&finalHash){try{const evidence=await buildEvidence(envelope,finalBytes,ctx);report.steps.push(pass("CERTIFICATE",{cryptographicEvidenceChecked:evidence.count,cryptographicEvidenceRequired:evidence.required,completionCertificatePageBuilt:true},fields));}catch(cause){report.steps.push(fail("CERTIFICATE",cause,fields));}}
+ else report.steps.push(fail("CERTIFICATE",error("Certificate check requires a successful PDF build and hash.","PDF_BUILD_FAILED"),fields));
  try{
   const targets=Array.isArray(envelope.archiveTargets)?envelope.archiveTargets:[];
   if(!targets.length)throw error("No archive targets are configured.","ARCHIVE_TARGETS_MISSING");
@@ -49,14 +49,14 @@ export async function diagnoseFinalisation(ctx,user,envelopeId){
   const paths=targets.map(key=>archivePath({archiveKey:key,classification:envelope.classification,documentId:envelope.documentId,fileName:"diagnostic-no-write.pdf"}));
   const result=await ctx.storage.probeWritePermission(paths);
   if(result===false||(Array.isArray(result)&&result.some(value=>value!==true)))throw error("Archive write permission probe denied at least one destination.","ARCHIVE_PERMISSION_DENIED");
-  report.steps.push(pass("ARCHIVE",{permission:"CONFIRMED_WITHOUT_WRITE",targets:paths.length}));
- }catch(cause){report.steps.push(fail("ARCHIVE",cause));}
+  report.steps.push(pass("ARCHIVE",{permission:"CONFIRMED_WITHOUT_WRITE",targets:paths.length},fields));
+ }catch(cause){report.steps.push(fail("ARCHIVE",cause,fields));}
  try{
   const recipients=[envelope.ownerEmail||envelope.createdByEmail,...(envelope.signers||[]).filter(s=>s.status==="Signed").map(s=>s.email)].filter(Boolean);
   if(!recipients.length)throw error("No completion-email recipients are available.","DISTRIBUTION_RECIPIENTS_MISSING");
   if(typeof ctx.sendCompletionEmail!=="function")throw error("Completion-email transport is not configured.","DISTRIBUTION_TRANSPORT_UNAVAILABLE");
-  report.steps.push(pass("DISTRIBUTION",{recipients:recipients.length,emailsSent:0,delivery:"NOT_SENT_DRY_RUN"}));
- }catch(cause){report.steps.push(fail("DISTRIBUTION",cause));}
+  report.steps.push(pass("DISTRIBUTION",{recipients:recipients.length,emailsSent:0,delivery:"NOT_SENT_DRY_RUN"},fields));
+ }catch(cause){report.steps.push(fail("DISTRIBUTION",cause,fields));}
  report.summary.passed=report.steps.filter(step=>step.status==="PASS").length;
  report.summary.failed=report.steps.filter(step=>step.status==="FAILED").length;
  report.summary.firstFailedStage=report.steps.find(step=>step.status==="FAILED")?.stageCode||null;
