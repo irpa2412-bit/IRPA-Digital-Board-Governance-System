@@ -15,8 +15,8 @@ async function fixture({tamperFieldHash=false}={}){
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
   await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:sourceHash});
-  const signatureValue="Test Signer";
-  const fieldValue="Test Signer";
+  const signatureValue="Original signature specimen";
+  const fieldValue="Verified stamp specimen";
   let events=[];
   events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1","SIG-2"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(fieldValue)},{fieldId:"SIG-2",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
@@ -73,6 +73,8 @@ test("reassignment moves only a selected non-verified stamp and sends a new sign
   assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-1").signerId,"S1");
   assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-2").signerId,"S2");
   assert.equal(envelope.signers.find(signer=>signer.id==="S1").status,"Signed");
+  assert.equal(envelope.signers.find(signer=>signer.id==="S1").signatureValue,"Original signature specimen");
+  assert.equal(envelope.signers.find(signer=>signer.id==="S1").certificateSignatureValue,"Verified stamp specimen");
   assert.equal(envelope.signers.find(signer=>signer.id==="S2").status,"Pending");
   assert.ok(envelope.events.some(event=>event.type==="recovery.stamp.reassigned"&&event.fieldIds.includes("SIG-2")));
 });
