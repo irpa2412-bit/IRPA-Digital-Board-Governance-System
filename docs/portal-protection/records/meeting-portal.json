@@ -53,5 +53,26 @@
       "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
     ]
   },
-  "renewals": []
+  "renewals": [],
+  "activeAmendment": {
+    "status": "open",
+    "operation": "category-aware-meeting-read-boundary-and-invitation-revocation",
+    "affectedPortals": [
+      "Meeting Portal"
+    ],
+    "reason": "Owner-directed Live YES pathway: close the broad signed-in meeting read boundary; route list/get reads through the server-authorized Cloudflare Gateway; enforce category, initiator, participant and invitation scopes; add invitation access only after successful dispatch and revoke it on removal/reissue. This amendment covers source and test changes only; it does not authorize publication of Firestore rules or production deployment.",
+    "files": [
+      "drive-gateway/src/meetingPortal.mjs",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json"
+    ],
+    "expectedEffect": "Meeting Portal reads are limited by server-enforced category/participant/invitation policy, including dispatch-before-grant and revocation behavior, while preserving existing invitation token, SMTP, signer identity, attendance, quorum, deletion, retention and audit controls.",
+    "prohibitedChanges": [
+      "Do not weaken or bypass any CI, portal-protection, Firestore approval, administrator, research, data-gate, deletion, retention or audit checks.",
+      "Do not change invitation token format/hash custody, SMTP settings or credentials, secrets, environment variables, Worker bindings, signing sessions, signer identity, PDF stamping, certificates, archives or completed documents.",
+      "Do not publish Firestore rules, change Firebase claims or grant live individual permissions without the required separate approvals.",
+      "Do not deploy production resources before staging acceptance, independent review and explicit production release."
+    ],
+    "ownerInstruction": "Owner instruction in ChatGPT on 2026-11-22: “Please take the pathway to Live: YES as per your recommendations.”"
+  }
 }
