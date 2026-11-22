@@ -9,10 +9,11 @@ export async function persistSignerProgressMirror({envelope, getDocument, update
   if (!existing) throw new Error("The portal signature envelope was not found for signer progress.");
   const priorSigners = Array.isArray(existing.signers) ? existing.signers : [];
   const signers = (envelope.signers || []).map(s => {
-    const prior = priorSigners.find(p =>
-      (s.id && p.signerId === s.id) ||
-      (s.uid && p.uid === s.uid) ||
-      (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase())
+    const prior = priorSigners.find(p => s.id
+      ? p.signerId === s.id
+      : s.uid
+        ? p.uid === s.uid
+        : s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()
     );
     return {
       ...(prior || {}),
@@ -29,10 +30,11 @@ export async function persistSignerProgressMirror({envelope, getDocument, update
     };
   });
   const changed = signers.some(signer => {
-    const prior = priorSigners.find(item =>
-      (signer.signerId && item.signerId === signer.signerId) ||
-      (signer.uid && item.uid === signer.uid) ||
-      (signer.email && String(item.email || "").toLowerCase() === String(signer.email).toLowerCase())
+    const prior = priorSigners.find(item => signer.signerId
+      ? item.signerId === signer.signerId
+      : signer.uid
+        ? item.uid === signer.uid
+        : signer.email && String(item.email || "").toLowerCase() === String(signer.email).toLowerCase()
     );
     return !prior || prior.status !== signer.status || (prior.signedAt || null) !== (signer.signedAt || null);
   });
