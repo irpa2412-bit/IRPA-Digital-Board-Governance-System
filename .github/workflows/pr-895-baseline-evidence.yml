@@ -1,0 +1,133 @@
+name: PR 895 immutable baseline evidence
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/pr-895-baseline-evidence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-smoke:
+    name: baseline-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout immutable production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build baseline application
+        run: npm run build
+      - name: Install Playwright Chromium without changing lockfile
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Run production-browser smoke and startup checks against built app
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawn } from "node:child_process";
+          import { chromium } from "playwright";
+          import { setTimeout as delay } from "node:timers/promises";
+          const server = spawn("npm", ["run", "preview", "--", "--host", "127.0.0.1", "--port", "4173", "--strictPort"], { stdio: ["ignore", "pipe", "pipe"] });
+          let serverOutput = "";
+          server.stdout.on("data", chunk => serverOutput += chunk);
+          server.stderr.on("data", chunk => serverOutput += chunk);
+          let browser;
+          try {
+            let ready = false;
+            for (let attempt = 0; attempt < 60; attempt++) {
+              if (server.exitCode !== null) throw new Error("Vite preview exited before startup: " + serverOutput);
+              try { const response = await fetch("http://127.0.0.1:4173/"); if (response.status === 200) { ready = true; break; } } catch {}
+              await delay(1000);
+            }
+            if (!ready) throw new Error("Built app did not start on localhost:4173. " + serverOutput);
+            browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+            const pageErrors = [];
+            page.on("pageerror", error => pageErrors.push(error.message));
+            const response = await page.goto("http://127.0.0.1:4173/", { waitUntil: "domcontentloaded", timeout: 30000 });
+            if (!response || response.status() !== 200) throw new Error("Built app startup HTTP status was not 200.");
+            await page.waitForFunction(() => { const root = document.querySelector("#root"); return Boolean(root && root.children.length > 0); }, { timeout: 30000 });
+            const widths = [360, 390, 768, 1024, 1366, 1920];
+            const viewportResults = [];
+            for (const width of widths) {
+              await page.setViewportSize({ width, height: 900 });
+              const audit = await page.evaluate(() => ({
+                viewportWidth: window.innerWidth,
+                documentWidth: document.documentElement.scrollWidth,
+                bodyWidth: document.body.scrollWidth,
+                viewportMeta: document.querySelector('meta[name="viewport"]')?.content ?? null
+              }));
+              viewportResults.push({ requestedWidth: width, ...audit });
+              if (audit.documentWidth > audit.viewportWidth) throw new Error("Horizontal overflow at viewport " + width + ": " + JSON.stringify(audit));
+              if (!audit.viewportMeta?.includes("width=device-width")) throw new Error("Missing viewport meta at width " + width);
+            }
+            const startup = await page.evaluate(() => ({
+              title: document.title,
+              rootChildren: document.querySelector("#root")?.children.length ?? 0,
+              visibleTextLength: document.querySelector("#root")?.innerText?.trim().length ?? 0,
+              buildVersion: document.querySelector('meta[name="irpa-build-version"]')?.content ?? null
+            }));
+            if (!startup.title.toLowerCase().includes("irpa")) throw new Error("Unexpected document title: " + startup.title);
+            if (!startup.rootChildren || !startup.visibleTextLength) throw new Error("React application did not render visible content.");
+            if (pageErrors.length) throw new Error("Uncaught browser errors: " + pageErrors.join(" | "));
+            console.log(JSON.stringify({ result: "PASS", startup, viewportResults, pageErrors }));
+          } finally {
+            if (browser) await browser.close();
+            server.kill("SIGTERM");
+          }
+          NODE
+
+  full-regression:
+    name: full-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout immutable production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install locked application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install gateway dependencies
+        run: npm ci --prefix drive-gateway
+      - name: Run complete test:all suite on immutable baseline
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
+
+  signature-portal-smoke:
+    name: signature-portal-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout immutable production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run seven-portal protection smoke runner (includes Signature Portal)
+        run: node scripts/portal-protection-smoke.mjs
