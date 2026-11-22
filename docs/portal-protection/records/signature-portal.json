@@ -90,7 +90,8 @@
       "Signature Portal portal smoke PASS — run 45041822594, job 137267972941, seven-portal registry Signature Portal tests plus PR-head read-only panel and Gateway owner/admin route tests — exact baseline commit 908b314ab0de566d057b4093f4addb11ca434ff3 — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45041822594/job/137267972941",
       "PR-head owner-panel GET-only, bilingual report, owner-envelope entry point and Gateway evidence no-mutation tests PASS in run 45041822594 job 137267972941; 16 baseline portal tests and 5 owner-panel tests passed; 13 Gateway recovery tests passed.",
       "Initial workflow attempt run 45040868515 job 137264791722 FAIL — subtest 'owner recovery panel exposes only evidence and non-authoritative preview reads' failed because the test still expected a preview endpoint after PR A intentionally removed preview from the report-only panel. The test was corrected to assert evidence-only reads; final run 45041822594 job 137267972941 PASS.",
-      "Earlier PR-head required checks on commit 82bbcd1ba3dd1677cba4a6a28f19e7571619d550 initially failed only because the Change Record was incomplete: security-baseline run 45041828957, integrity run 45041828867, and Readability Checker/Independent Verifier run 45041828955. All three are to be rerun on the completed Change Record commit."
+      "Earlier PR-head required checks on commit 82bbcd1ba3dd1677cba4a6a28f19e7571619d550 initially failed only because the Change Record was incomplete: security-baseline run 45041828957, integrity run 45041828867, and Readability Checker/Independent Verifier run 45041828955. All three are to be rerun on the completed Change Record commit.",
+      "Existing production browser smoke workflow PASS — run 45040135800, job 137262500759; Chromium checked the exact deployed baseline commit 908b314ab0de566d057b4093f4addb11ca434ff3 on Firebase Hosting and Cloudflare production, including responsive viewports, startup and lazy Documents asset integrity — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45040135800/job/137262500759"
     ],
     "behaviourDifferences": [
       "Owner self-service is generalised from one fixed envelope to every non-Completed envelope created by the owner; administrator assessment is permitted for any envelope.",
@@ -98,8 +99,136 @@
       "Bilingual English/Kiswahili report includes the four required sections, audit-chain and source-hash verification, per-stamp PASS/FAILED/MISSING/UNVERIFIABLE with page and field number, safe failing stage/error code, and Copy report.",
       "Assessment GETs do not mutate envelope/signing evidence; access telemetry remains in the separate recoveryAccessEvents collection."
     ],
-    "prHeadCommit": "82bbcd1ba3dd1677cba4a6a28f19e7571619d550",
+    "prHeadCommit": "06b8fa48a4a5b2fda70d31337b0e7f215c15e899",
     "prHeadRuns": [
+      {
+        "name": "IRPA Security Baseline Gate",
+        "runId": 45042195025,
+        "result": "PASS."
+      },
+      {
+        "name": "Firebase Functions Entrypoint Integrity Test",
+        "runId": 45042194943,
+        "result": "PASS."
+      },
+      {
+        "name": "IRPA-DBGS Readability Release Gate",
+        "runId": 45042195035,
+        "result": "PASS."
+      },
+      {
+        "name": "email-signing-contract",
+        "runId": 45042195015,
+        "result": "PASS."
+      },
+      {
+        "name": "Portal protection guard-only checks",
+        "runId": 45042194905,
+        "result": "PASS."
+      },
+      {
+        "name": "Signature Portal Migration Build Test",
+        "runId": 45042195020,
+        "result": "PASS."
+      },
+      {
+        "name": "IRPA Release Build",
+        "runId": 45042195028,
+        "result": "PASS."
+      },
+      {
+        "name": "Firebase-free governance migration checks",
+        "runId": 45042195064,
+        "result": "PASS."
+      },
+      {
+        "name": "PDF E-Signature Tests",
+        "runId": 45042194945,
+        "result": "PASS."
+      },
+      {
+        "name": "Cloudflare E-Signature Runtime Tests",
+        "runId": 45042195038,
+        "result": "PASS."
+      },
+      {
+        "name": "Signature security regression",
+        "runId": 45042195031,
+        "result": "PASS."
+      },
+      {
+        "name": "Signature Envelope Refresh and Delivery Regression",
+        "runId": 45042195024,
+        "result": "PASS."
+      },
+      {
+        "name": "Signature PDF Page Diagnostics",
+        "runId": 45042194957,
+        "result": "PASS."
+      },
+      {
+        "name": "Authentication and Identity Parity Tests",
+        "runId": 45042195012,
+        "result": "PASS."
+      },
+      {
+        "name": "Authorization Functions Integration Gate",
+        "runId": 45042195150,
+        "result": "PASS."
+      },
+      {
+        "name": "Build IRPA Android APK",
+        "runId": 45042194902,
+        "result": "PASS."
+      },
+      {
+        "name": "IRPA web PWA validation",
+        "runId": 45042194934,
+        "result": "PASS."
+      },
+      {
+        "name": "Readability CI",
+        "runId": 45042195001,
+        "result": "PASS."
+      },
+      {
+        "name": "Communication Website Integration Verification",
+        "runId": 45042195009,
+        "result": "PASS."
+      },
+      {
+        "name": "Meeting Cloudflare Migration Tests",
+        "runId": 45042194963,
+        "result": "PASS."
+      },
+      {
+        "name": "Mail Invitation Tests",
+        "runId": 45042195019,
+        "result": "PASS."
+      },
+      {
+        "name": "Firestore Rules Change Approval",
+        "runId": 45042195050,
+        "result": "PASS; no Firestore rules changed."
+      },
+      {
+        "name": "Firestore Deployment Trigger Guard",
+        "runId": 45042194984,
+        "result": "PASS."
+      },
+      {
+        "name": "Production Promotion Gate",
+        "runId": 45042194989,
+        "result": "PASS."
+      },
+      {
+        "name": "Staging Gateway E2E and Deploy",
+        "runId": 45042194983,
+        "result": "SKIPPED."
+      }
+    ],
+    "priorPrHeadCommit": "82bbcd1ba3dd1677cba4a6a28f19e7571619d550",
+    "priorPrHeadRuns": [
       {
         "name": "Firestore Rules Change Approval",
         "runId": 45041828979,
