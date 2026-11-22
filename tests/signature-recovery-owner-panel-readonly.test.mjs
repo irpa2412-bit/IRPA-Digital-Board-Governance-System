@@ -29,5 +29,29 @@ test("owner recovery panel contains no signature or envelope persistence API", (
 test("owner recovery panel cannot directly change envelope completion state", () => {
   assert.doesNotMatch(source, /\.status\s*=\s*["']Completed["']/);
   assert.doesNotMatch(source, /status\s*:\s*["']Completed["']/);
-  assert.match(source, /No reassignment, retry, completion or signature overwrite is available/);
+  assert.match(source, /All assessment and preview requests from this screen use GET/);
+});
+
+test("owner recovery panel distinguishes a missing evidence route from authentication and ownership failures",()=>{
+  assert.match(source,/EVIDENCE_ROUTE_MISSING/);
+  assert.match(source,/The recovery service is unavailable \(route missing\)/);
+  assert.match(source,/AUTH_REQUIRED/);
+  assert.match(source,/OWNER_FORBIDDEN/);
+});
+
+test("owner recovery panel displays partial evidence and provides copy and text download",()=>{
+  for(const value of ["auditChain","sourceHashStatus","stampSlots","finalisationStage","Copy report","Download plain-text report","Preview: not available because"])assert.ok(source.includes(value),"Missing partial evidence/report feature: "+value);
+});
+
+test("owner recovery panel sends queue, evidence and preview reads only",()=>{
+  assert.match(source,/method:"GET"/);
+  assert.match(source,/\/api\/recovery\/envelopes\//);
+  assert.match(source,/\/evidence/);
+  assert.match(source,/\/preview\.pdf/);
+  assert.doesNotMatch(source,/method\s*:\s*["'](?:POST|PUT|PATCH|DELETE)["']/i);
+});
+test("the Gateway source registers the authenticated evidence and preview GET routes",()=>{
+  const router=fs.readFileSync(new URL("../drive-gateway/src/router.mjs",import.meta.url),"utf8");
+  assert.ok(router.includes("pathname.match(/^\\/api\\/recovery\\/envelopes\\/([A-Za-z0-9_-]{3,64})\\/evidence$/)"));
+  assert.ok(router.includes("buildRecoveryPreview"));
 });
