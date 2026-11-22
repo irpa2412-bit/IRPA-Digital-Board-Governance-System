@@ -29,7 +29,12 @@ jobs:
             base="${item#*|}"
             file="$RUNNER_TEMP/$label-index.html"
             curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/?__irpa_probe=$GITHUB_SHA" -o "$file"
-            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.argv[1],"utf8");const read=n=>s.match(new RegExp("<meta\\s+name=[\"']"+n+"[\"']\\s+content=[\"']([^\"']+)", "i"))?.[1]||"MISSING";console.log(process.argv[2].toUpperCase()+"_BUILD_STAMP="+JSON.stringify({version:read("irpa-build-version"),time:read("irpa-build-time")}));' "$file" "$label"
+            node - "$file" "$label" <<'NODE'
+          const fs = require("node:fs");
+          const html = fs.readFileSync(process.argv[2], "utf8");
+          const read = name => html.match(new RegExp('name="' + name + '" content="([^"]+)"', "i"))?.[1] || "MISSING";
+          console.log(process.argv[3].toUpperCase() + "_BUILD_STAMP=" + JSON.stringify({version: read("irpa-build-version"), time: read("irpa-build-time")}));
+          NODE
           done
       - name: Probe production recovery routes without credentials or envelope access
         shell: bash
