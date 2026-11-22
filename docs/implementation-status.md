@@ -46,3 +46,16 @@ Safety boundary: no Firestore rules or indexes have been published by this work.
 **Functions integrity:** [workflow run #44987305636](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44987305636), job `137100588224`. `node --check functions/index.js`, `functions/bootstrap.js`, and `functions/authorizationFunctions.js` all completed successfully. `node scripts/verify-functions-entrypoint-integrity.js` also completed successfully and reported the trial-only reset safety markers and retained legacy meeting callables. The subsequent `node scripts/portal-protection-check.mjs` failed with the same `ownerApproved: false` exact-owner-approval message and exit code 1. Thus the Functions job failure was the shared protection gate, not a Functions syntax/entrypoint defect.
 
 **Cause and correction:** the runner did not find the required exact owner-account guard-maintenance approval at the time of those initial attempts. The existing owner-approved guard-core text was subsequently posted verbatim by the owner on [PR #857](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/857#issuecomment-7074491811). Failed jobs were rerun without changing source code or gate logic. Subsequent results are recorded only by GitHub Actions; this report does not manually record a PASS.
+
+
+## 2026-11-22 — reported live baseline and canary execution status
+
+Read-only verification run: [GitHub Actions #45005579517](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45005579517), reported successful before the canary request.
+
+- Gateway Worker Version ID: `aa5e131b-752e-4b30-b2f9-d28907d3eee7`.
+- Frontend Worker Version ID: `762271dc-73a1-4a1a-9d75-dd7b0946fda5`.
+- Firebase Hosting build stamp: `57368a8c2ceb418178aa28e5707b02605851dc83`.
+- Firestore ruleset: `00ebeb44-e151-415c-9616-b94c215c2589` (read-only; no rules published).
+- Canary: NOT RUN because manual `workflow_dispatch` is unavailable through the connected GitHub action interface. Meeting ID: NOT CREATED. Delete, purge, environment mutation, and read-back checks: NOT TESTED.
+- Gateway version `dd4637ea-0804-4b85-a455-1e691f1f0d72`: **pre-#845, unsafe, do not roll back to it**.
+- No rollback, Worker deployment, or Firestore rules publication was performed.
