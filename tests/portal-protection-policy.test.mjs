@@ -1,8 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE, resolveApprovalPullRequestNumbers } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 
+const mainSha = "5366d2566e269607836b559e83c5eea16099886e";
+test("push approval lookup accepts only the merged main PR associated with the exact commit", () => {
+  const associatedPullRequests = [
+    { number: 885, merged_at: "2026-11-22T09:53:33Z", merge_commit_sha: mainSha, base: { ref: "main" } },
+    { number: 886, merged_at: null, merge_commit_sha: mainSha, base: { ref: "main" } },
+    { number: 887, merged_at: "2026-11-22T09:53:33Z", merge_commit_sha: mainSha, base: { ref: "release" } },
+    { number: 888, merged_at: "2026-11-22T09:53:33Z", merge_commit_sha: "different", base: { ref: "main" } }
+  ];
+  assert.deepEqual(resolveApprovalPullRequestNumbers({ event: {}, eventName: "push", sha: mainSha, associatedPullRequests, baseRef: "main" }), [885]);
+});
+test("pull request events retain direct pull request approval lookup", () => {
+  assert.deepEqual(resolveApprovalPullRequestNumbers({ event: { pull_request: { number: 901 } }, eventName: "pull_request" }), [901]);
+});
+test("unrelated push commits cannot borrow another pull request's owner approval", () => {
+  assert.deepEqual(resolveApprovalPullRequestNumbers({ event: {}, eventName: "push", sha: "unrelated", associatedPullRequests: [{ number: 885, merged_at: "2026-11-22T09:53:33Z", merge_commit_sha: mainSha, base: { ref: "main" } }] }), []);
+});
 const protectionCheckerSource = fs.readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
 test("PR base fetch preserves ancestry for the three-dot changed-file comparison", () => {
   assert.ok(protectionCheckerSource.includes('execFileSync("git", ["fetch", "origin", base], { stdio: "inherit" });'));
