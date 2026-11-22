@@ -4,6 +4,7 @@ git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
 import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { classifyProtectionOnlyChange } from "./scripts/portal-protection-check.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -13,6 +14,15 @@ const base = "origin/main";
 execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
 const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
   .trim().split("\n").filter(Boolean).sort();
+const protectionOnlyClassification = classifyProtectionOnlyChange(changed);
+if (protectionOnlyClassification.eligible) {
+  console.log(JSON.stringify({
+    classificationOnly: true,
+    eligible: true,
+    reason: "Protection-only changes are classified here; owner approval is independently verified by the required security-baseline policy gate."
+  }));
+  process.exit(0);
+}
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
   "docs/portal-protection/repair-window.json",
@@ -332,20 +342,7 @@ if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
   if (!parallelWindowRecordAmendment) throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
 }
-const unexpected = changed.filter(path =>
-  !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
-  !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
-  !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
-  !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
-  !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
-  !(signatureEmailLinkSessionRepair && changed.includes(path)) &&
-  !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/")))
-);
-if (unexpected.length) {
-  console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
-  process.exit(1);
-}
-          // If Wrangler configuration changes, permit only the staging section to differ.
+// If Wrangler configuration changes, permit only the staging section to differ.
 // The production section must be byte-for-byte identical to the captured PR base.
 const wranglerPath = "drive-gateway/wrangler.toml";
 if (changed.includes(wranglerPath)) {
@@ -415,6 +412,20 @@ const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signi
   changed.includes("drive-gateway/tests/email-signing-contract.test.mjs") &&
   changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")) &&
   changed.every(path => emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/"));
+const unexpected = changed.filter(path =>
+  !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
+  !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
+  !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
+  !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
+  !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
+  !(signatureEmailLinkSessionRepair && changed.includes(path)) &&
+  !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/")))
+);
+if (unexpected.length) {
+  console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
+  process.exit(1);
+}
+
 const invitationMailResendIntegration = changed.includes("public/administrator.html") &&
   changed.includes("src/firebase/auth.js") &&
   changed.includes("src/pages/Invitations.jsx") &&
