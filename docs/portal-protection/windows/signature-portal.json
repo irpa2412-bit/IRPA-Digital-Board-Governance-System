@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "portal": "Signature Portal",
-  "status": "closed",
+  "status": "open",
   "durationHours": 72,
   "inactivityCloseHours": 72,
   "warningHours": 12,
-  "openedAt": null,
-  "expiresAt": null,
-  "lastActivityAt": null,
+  "openedAt": "2026-11-22T16:00:57.118Z",
+  "expiresAt": "2026-11-25T16:00:57.118Z",
+  "lastActivityAt": "2026-11-22T16:00:57.118Z",
   "emergency": false,
   "emergencyLimitHours": 24,
   "reason": "PR A has its own 72-hour Signature Portal repair window. Window remains closed until an owner APPROVE comment references PR A.",
@@ -22,6 +22,18 @@
     "docs/portal-protection/windows/signature-portal.json",
     "src/pages/SignatureRecoveryOwnerEnvelopes.jsx"
   ],
-  "activityLog": [],
+  "activityLog": [
+    {
+      "at": "2026-11-22T16:00:57.118Z",
+      "expiresAt": "2026-11-25T16:00:57.118Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 896 The PR A change set now touches only Signature Portal paths; the shared Meeting Portal SignaturePlatform.jsx is unchanged. Authorise the separate 72-hour Signature Portal repair window for the owner-created envelope list, per-envelope Check this document button, bilingual read-only report, and Gateway 401/403/admin authorization. No recovery actions or signing changes.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/896#issuecomment-7081732872",
+      "command": "approve",
+      "reason": "The PR A change set now touches only Signature Portal paths; the shared Meeting Portal SignaturePlatform.jsx is unchanged. Authorise the separate 72-hour Signature Portal repair window for the owner-created envelope list, per-envelope Check this document button, bilingual read-only report, and Gateway 401/403/admin authorization. No recovery actions or signing changes.",
+      "prNumber": 896,
+      "action": "owner-approved 72-hour renewal"
+    }
+  ],
   "emergencyExpiresAt": null
 }
