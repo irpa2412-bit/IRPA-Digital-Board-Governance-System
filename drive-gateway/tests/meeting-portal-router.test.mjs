@@ -82,7 +82,7 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   assert.match(ctx.sentEmail.text, /meetingToken=/);
   assert.ok(committed.writes.some(write => write.update?.fields?.meetingAccessDispatched?.booleanValue === true && write.update?.fields?.meetingAccessRevoked?.booleanValue === false));
   assert.ok(committed.writes.some(write => write.update?.fields?.participantEmails?.arrayValue?.values?.some(value => value.stringValue === "participant@example.org")));
-  assert.ok(calls.some(call => call.url.pathname.endsWith("/documents:audit")));
+  assert.ok(calls.some(call => call.url.pathname.endsWith("/documents/audit")));
 });
 
 
