@@ -1,0 +1,31 @@
+name: Meeting Authority Unit Tests
+
+on:
+  push:
+    branches:
+      - feat/meeting-authority-20261122
+    paths:
+      - "drive-gateway/src/meetingAuthority.mjs"
+      - "src/firebase/meetingAuthority.js"
+      - "drive-gateway/tests/meeting-authority.test.mjs"
+      - "tests/meeting-authority.test.mjs"
+      - ".github/workflows/meeting-authority-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  meeting-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test Firebase-facing Meeting authority resolver
+        run: node --test tests/meeting-authority.test.mjs
+      - name: Test Worker Meeting authority resolver
+        working-directory: drive-gateway
+        run: node --test tests/meeting-authority.test.mjs
