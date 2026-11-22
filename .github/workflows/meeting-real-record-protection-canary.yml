@@ -1,0 +1,128 @@
+name: Live Meeting REAL Record Protection Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/meeting-real-record-protection-canary.yml"
+  workflow_dispatch:
+    inputs:
+      CANARY:
+        description: "READ_ONLY only, or type RUN CANARY after the owner separately authorizes the canary in chat"
+        required: true
+        type: choice
+        options:
+          - READ_ONLY
+          - RUN CANARY
+        default: READ_ONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irpa-live-meeting-real-record-protection
+  cancel-in-progress: false
+
+jobs:
+  live-read-only:
+    name: Read-only production version and rules inspection
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    outputs:
+      canary_credential_available: \${{ steps.inspect.outputs.canary_credential_available }}
+      rollback_version_available: \${{ steps.inspect.outputs.rollback_version_available }}
+    steps:
+      - name: Checkout full history for build ancestry verification
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install existing Firebase Admin SDK dependency
+        run: npm --prefix functions install --omit=dev --no-audit --no-fund
+
+      - name: Syntax-check live verification scripts
+        run: |
+          node --check scripts/live-meeting-real-readonly.cjs
+          node --check scripts/live-meeting-real-canary.cjs
+
+      - name: Read live Worker versions, web build stamp and Firestore Rules release
+        id: inspect
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: \${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+          GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          FRONTEND_URL: "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          WEB_URL: "https://irpa-digital-board-governance.web.app"
+        run: NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node scripts/live-meeting-real-readonly.cjs
+
+  canary:
+    name: One-record REAL meeting protection canary (manual only)
+    needs: [live-read-only]
+    if: github.event_name == 'workflow_dispatch' && inputs.CANARY == 'RUN CANARY' && needs.live-read-only.result == 'success' && needs.live-read-only.outputs.canary_credential_available == 'true' && needs.live-read-only.outputs.rollback_version_available == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Checkout production revision
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install existing Firebase Admin SDK dependency
+        run: npm --prefix functions install --omit=dev --no-audit --no-fund
+
+      - name: Syntax-check canary script
+        run: node --check scripts/live-meeting-real-canary.cjs
+
+      - name: Create one missing-environment canary and test REAL protections
+        id: canary
+        env:
+          FIREBASE_SERVICE_ACCOUNT: \${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+          GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          WEB_ORIGIN: "https://irpa-digital-board-governance.web.app"
+        run: NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node scripts/live-meeting-real-canary.cjs
+
+      - name: Roll back Gateway Worker immediately after a failed live guard check
+        if: failure() && steps.canary.outputs.live_check_failed == 'true'
+        working-directory: drive-gateway
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ROLLBACK_VERSION_ID: "dd4637ea-0804-4b85-a455-1e691f1f0d72"
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx wrangler versions deploy "$ROLLBACK_VERSION_ID" --name irpa-google-drive-gateway
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            "https://irpa-google-drive-gateway.irpa-governance.workers.dev/health" \
+            -H "Cache-Control: no-cache" -o "$RUNNER_TEMP/rollback-health.json"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway/deployments" \
+            -o "$RUNNER_TEMP/rollback-deployments.json"
+          node - "$RUNNER_TEMP/rollback-deployments.json" "$ROLLBACK_VERSION_ID" <<'NODE'
+          const fs = require("node:fs");
+          const body = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const expected = process.argv[3];
+          const current = body?.result?.deployments?.[0]?.versions?.find(x => Number(x.percentage) === 100)?.version_id;
+          if (current !== expected) {
+            console.error("Gateway rollback verification failed; active version does not match the approved rollback version.");
+            process.exit(1);
+          }
+          console.log("GATEWAY_ROLLBACK_VERSION_VERIFIED=" + current);
+          NODE
