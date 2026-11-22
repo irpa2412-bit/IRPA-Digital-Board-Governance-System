@@ -6,7 +6,7 @@ const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/p
 
 const portal = "Signature Portal";
 const now = Date.parse("2026-11-19T20:00:00Z");
-const file = "src/pages/SignaturePlatform.jsx";
+const file = "src/pages/GatewaySigningPortal.jsx";
 const valid = {
   status: "complete",
   declaration: { affectedPortals: [portal], files: [file], reason: "controlled portal repair", expectedEffect: "preserve protected behavior", prohibitedChanges: ["no unrelated portal source"], baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" } },
