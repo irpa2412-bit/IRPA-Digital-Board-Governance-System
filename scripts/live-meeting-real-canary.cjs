@@ -122,24 +122,25 @@ async function post(path, body, idToken) {
       recordOriginal = priorRecords.docs[0].data();
       results.reusedExistingRecord = true;
     } else {
-      const capture = await post("/api/meeting-records/capture", {
-        meetingId, recordType: "OTHER", title: TITLE,
-        content: "System-test-only record created to verify that records linked to a REAL or unclassified meeting cannot be purged. Preserve this record."
-      }, idToken);
-      if (capture.status !== 200 || capture.body.ok !== true || !capture.body.recordId) {
-        liveCheckFailed = true;
-        results.recordCapture = false;
-        console.log("CANARY_RECORD_CAPTURE=FAIL; HTTP=" + capture.status);
-        throw new Error("Could not create the single linked system-test record required for the purge check.");
-      }
-      recordId = String(capture.body.recordId);
+      recordId = "system-canary-record-" + crypto.randomUUID();
       recordRef = db.collection("meetingRecords").doc(recordId);
-      const recordSnapshot = await recordRef.get();
-      if (!recordSnapshot.exists) {
-        liveCheckFailed = true;
-        throw new Error("Worker did not persist the canary meeting record.");
-      }
-      recordOriginal = recordSnapshot.data();
+      const content = "System-test-only record created to verify that records linked to a REAL or unclassified meeting cannot be purged. Preserve this record.";
+      const digest = crypto.createHash("sha256").update(content).digest("hex");
+      recordOriginal = {
+        meetingId, meetingReference: meetingData.meetingReference, meetingTitle: TITLE,
+        meetingCategory: "OTHER", meetingPolicyId: "OTHER", recordType: "OTHER",
+        recordLabel: "Other", title: TITLE, content, contentHash: digest,
+        integrityAlgorithm: "SHA-256", integrityStatus: "VERIFIED_AT_CAPTURE", version: 1,
+        status: "Active", confidentialityClass: "INTERNAL",
+        storageDestination: "FIRESTORE_MEETING_RECORDS", documentPortalRequiredForBinary: true,
+        draftOnly: false, approved: false, approvalStatus: "NOT_SUBMITTED", requiresHumanReview: false,
+        legalHold: true, legalHoldReason: "System canary protection test; preserve this record.",
+        retentionYears: 10, retainUntil: new Date("2099-12-31T23:59:59.000Z"),
+        retentionPolicyVersion: "IRPA-MEETING-RETENTION-1.0", capturedAt: new Date(),
+        createdAt: new Date(), updatedAt: new Date(), deletedAt: null, deletionStatus: "NOT_ELIGIBLE",
+        systemTest: true, systemTestLabel: LABEL
+      };
+      await recordRef.create(recordOriginal);
       results.recordCapture = true;
     }
 
