@@ -98,12 +98,15 @@ test("owner A receives 403 for owner B; administrator can assess any owner; sign
   await assert.rejects(()=>getRecoveryQueue(f.ctx,null),{status:401});
 });
 
-test("tampered audit chain blocks recovery assessment and preview",async()=>{
+test("tampered audit chain is reported as unverifiable and blocks preview",async()=>{
   const f=await fixture();
   const env=await f.ctx.meta.get("envelopes","ENV-REC-1");
   env.events[0].type="signer.changed";
   await f.ctx.meta.update("envelopes","ENV-REC-1",env);
-  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1"),{status:409});
+  const report=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(report.auditChainValid,false);
+  assert.ok(report.stampSlots.every(row=>row.status==="UNVERIFIABLE"));
+  await assert.rejects(()=>buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1"),{status:409});
 });
 
 test("reassignment moves only a selected non-verified stamp and sends a new signer invitation",async()=>{
