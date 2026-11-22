@@ -168,3 +168,43 @@ export async function buildRecoveryPreview(ctx,user,id){
   }
   const bytes=await pdf.save({useObjectStreams:false});await appendRecoveryAccessEvent(ctx,user,id,"recovery.preview.generated",{verifiedStampCount:assessment.summary.verified});return {bytes,assessment};
 }
+
+
+export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFirestoreDocument,buildContext,json,corsHeaders}={}) {
+  return async function signatureRecoveryRouter(request,env,pathname) {
+    if(!pathname.startsWith("/api/recovery/envelopes"))return null;
+    if(request.method!=="GET")return json({ok:false,error:"Recovery evidence endpoints are read-only GET operations."},405,corsHeaders(request));
+    let claims;
+    try { claims=await authenticateFirebaseRequest(request,env); }
+    catch { return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request)); }
+    const uid=String(claims?.user_id||"").trim();
+    if(!uid)return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request));
+    const profile=await getFirestoreDocument(env,"adminProfiles/"+uid,claims.token).catch(()=>null);
+    const isAdmin=claims.admin===true||String(claims.email||"").trim().toLowerCase()==="irpa2412@gmail.com"||profile?.fields?.active?.booleanValue===true;
+    const user={uid,isAdmin};
+    const ctx=buildContext(env,claims,user);
+    try {
+      if(pathname==="/api/recovery/envelopes") {
+        const url=new URL(request.url);
+        const limit=url.searchParams.get("limit");
+        const offset=url.searchParams.get("offset");
+        const result=await getRecoveryQueue(ctx,user,{limit,offset});
+        return json(result,200,corsHeaders(request));
+      }
+      const evidence=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/evidence$/);
+      if(evidence) {
+        const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]));
+        return json(result,200,corsHeaders(request));
+      }
+      const preview=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/preview\.pdf$/);
+      if(preview) {
+        const result=await buildRecoveryPreview(ctx,user,decodeURIComponent(preview[1]));
+        return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf","cache-control":"no-store","content-disposition":"inline; filename=\\\"recovery-preview.pdf\\\""}});
+      }
+      return json({ok:false,error:"Not found."},404,corsHeaders(request));
+    } catch(error) {
+      const status=Number(error?.status)||500;
+      return json({ok:false,error:status>=400&&status<500?String(error.message||"Recovery request denied."):"Recovery assessment is temporarily unavailable."},status,corsHeaders(request));
+    }
+  };
+}
