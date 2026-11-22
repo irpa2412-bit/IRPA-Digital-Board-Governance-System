@@ -31,7 +31,9 @@ jobs:
         run: node --check functions/authorizationFunctions.js
       - name: Verify reset gate remains trial-only
         run: node scripts/verify-functions-entrypoint-integrity.js
-      - name: Enforce protected portal repair policy
+      - name: Enforce protected portal repair policy with live run verification
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/portal-protection-check.mjs
       - name: Test protected portal policy scenarios
         run: node --test tests/portal-protection-policy.test.mjs
