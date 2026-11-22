@@ -11,6 +11,48 @@ export function parseActivityTimestamps(history) {
   return String(history || "").split(/\r?\n/).filter(Boolean);
 }
 
+export function parseGitHubJobEvidence(value) {
+  const match = String(value ?? "").match(/https:\/\/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)\/job\/(\d+)/);
+  return match ? { repository: match[1], runId: Number(match[2]), jobId: Number(match[3]) } : null;
+}
+
+export function newPortalWarningUntil(entry) {
+  if (entry?.guardMode !== "warning") return null;
+  const registeredAt = Date.parse(entry.registeredAt);
+  return Number.isFinite(registeredAt) ? registeredAt + 7 * 24 * 60 * 60 * 1000 : null;
+}
+
+async function verifyRealRunEvidence(record, affected) {
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!token || !repository) return { ok: false, reason: "GitHub Actions token/repository context is required to verify real baseline runs." };
+  const labels = ["baseline smoke", "full regression", ...affected.map(portal => portal + " portal smoke")];
+  const evidence = record.validation?.evidence ?? [];
+  const api = process.env.GITHUB_API_URL || "https://api.github.com";
+  const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
+  for (const label of labels) {
+    const candidates = evidence.filter(item => String(item).toLowerCase().includes(label.toLowerCase()) && String(item).includes(record.baseline.commit));
+    let verified = false;
+    for (const item of candidates) {
+      const ref = parseGitHubJobEvidence(item);
+      if (!ref || ref.repository.toLowerCase() !== repository.toLowerCase()) continue;
+      const [runResponse, jobResponse] = await Promise.all([
+        fetch(`${api}/repos/${repository}/actions/runs/${ref.runId}`, { headers }),
+        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers })
+      ]);
+      if (!runResponse.ok || !jobResponse.ok) continue;
+      const [run, job] = await Promise.all([runResponse.json(), jobResponse.json()]);
+      if (run.head_sha === record.baseline.commit && run.status === "completed" && run.conclusion === "success" &&
+          job.run_id === ref.runId && job.status === "completed" && job.conclusion === "success") {
+        verified = true;
+        break;
+      }
+    }
+    if (!verified) return { ok: false, reason: `No completed successful GitHub Actions job verifies ${label} on baseline ${record.baseline.commit}.` };
+  }
+  return { ok: true };
+}
+
 export function portalPolicyPaths(affectedPortals) {
   if (!Array.isArray(affectedPortals) || affectedPortals.length !== 1) return null;
   const slug = affectedPortals[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -111,7 +153,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   return { ok: true, affected: [...affected].sort(), protectedFiles, warning, reason: "Protected changes are declared and within the active 72-hour repair window." };
 }
 
-function main() {
+async function main() {
   const event = process.env.GITHUB_EVENT_NAME ?? "pull_request";
   const base = process.env.GITHUB_BASE_REF || "main";
   let changedFiles;
@@ -130,9 +172,7 @@ function main() {
   const portalSelection = resolvePortalPolicyPaths(discovery.affected);
   if (!portalSelection.ok) {
     const portal = discovery.affected.length === 1 ? registry.portals[discovery.affected[0]] : null;
-    const warningUntil = portal?.guardMode === "warning" && portal.registeredAt
-      ? Date.parse(portal.registeredAt) + 7 * 24 * 60 * 60 * 1000
-      : NaN;
+    const warningUntil = newPortalWarningUntil(portal);
     if (Number.isFinite(warningUntil) && Date.now() < warningUntil) {
       console.warn(`::warning::New portal ${discovery.affected[0]} is in its seven-day protection warning period until ${new Date(warningUntil).toISOString()}; create its dedicated window, Change Record and lock tests.`);
       console.log(JSON.stringify({ ...discovery, ok: true, warning: "New portal seven-day warning period; no protection exemption after expiry." }, null, 2));
@@ -151,7 +191,11 @@ function main() {
   }
   const history = execFileSync("git", ["log", "--format=%cI", "--", ...initial.protectedFiles], { encoding: "utf8" }).trim();
   const activityTimestamps = parseActivityTimestamps(history);
-  const result = evaluatePolicy({ changedFiles, registry, windowState, record, activityTimestamps });
+  let result = evaluatePolicy({ changedFiles, registry, windowState, record, activityTimestamps });
+  if (result.ok && result.protectedFiles.length) {
+    const evidenceCheck = await verifyRealRunEvidence(record, result.affected);
+    if (!evidenceCheck.ok) result = { ...result, ok: false, reason: evidenceCheck.reason };
+  }
   if (result.warning) console.warn(`::warning::${result.warning}`);
   console.log(JSON.stringify(result, null, 2));
   if (!result.ok) process.exitCode = 1;
