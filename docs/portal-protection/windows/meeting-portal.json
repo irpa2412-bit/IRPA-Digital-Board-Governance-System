@@ -4,7 +4,7 @@
   "status": "open",
   "openedAt": "2026-11-21T20:23:03Z",
   "lastActivityAt": "2026-11-21T20:23:03Z",
-  "inactivityCloseHours": 24,
+  "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-approved Tier 1 REAL/TRIAL meeting deletion protection, approved 21 November 2026. REAL and unclassified meetings must never be deleted; only an explicitly created TRIAL meeting may be deleted by an administrator under existing safeguards. Approval is conditional on every required check on the final PR head being green and the protected portal repair policy failure being investigated and fixed without bypass or manually recorded PASS.",
   "scope": [
@@ -31,5 +31,8 @@
   "baseline": {
     "commit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c",
     "rollbackCommit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c"
-  }
+  },
+  "durationHours": 72,
+  "warningHours": 12,
+  "expiresAt": "2026-11-24T20:23:03.000Z"
 }
