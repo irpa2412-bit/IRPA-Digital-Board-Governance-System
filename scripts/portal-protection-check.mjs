@@ -16,6 +16,66 @@ export function parseGitHubJobEvidence(value) {
   return match ? { repository: match[1], runId: Number(match[2]), jobId: Number(match[3]) } : null;
 }
 
+export const MAINTENANCE_APPROVAL_QUOTE = "Guard-core (#853): evaluate the guard-maintenance exception first, but only as a classification: it applies only when EVERY changed file is a protection file (scripts/portal-*, protection workflows and their tests, docs, per-portal window and record files, the register, the PR template), no portal source file, no Worker route, no Firestore rule and no deploy workflow is touched, and my approval is quoted by the owner account. If any file falls outside that list, the multi-portal rejection applies as before. Add and show four tests: a guard-only PR across seven portals passes with approval, the same PR fails without approval, a PR touching two portals' SOURCE files fails even with approval, and a PR mixing one protection file with one portal source file across two portals fails.";
+
+export function isProtectionFile(path) {
+  return [
+    /^scripts\/portal-[^/]+\.mjs$/,
+    /^scripts\/meeting-portal-fixture-isolation-guard\.sh$/,
+    /^tests\/portal-(?:protection|repair-window)[^/]*\.test\.mjs$/,
+    /^tests\/meeting-isolation-guard\.test\.mjs$/,
+    /^docs\/(?:approvals\.md|implementation-status\.md)$/,
+    /^docs\/portal-protection\/.+$/,
+    /^\.github\/pull_request_template\.md$/,
+    /^\.github\/workflows\/(?:portal-protection-guard-only|portal-repair-window-renewal|security-baseline|readability-release-gate|functions-entrypoint-integrity-test)\.yml$/
+  ].some(pattern => pattern.test(path));
+}
+
+export function classifyProtectionOnlyChange(changedFiles, approval = null) {
+  const files = [...new Set(changedFiles ?? [])];
+  const hasPortalSource = files.some(path => /^(?:src|drive-gateway)\/.*\.(?:jsx?|mjs|cjs|ts|tsx)$/.test(path));
+  const hasWorkerRoute = files.some(path => /^drive-gateway\/src\//.test(path));
+  const hasFirestoreRule = files.some(path => /(?:^|\/)firestore\.rules$/.test(path));
+  const hasDeployWorkflow = files.some(path => /^\.github\/workflows\/.*(?:deploy|publish|production)/i.test(path));
+  const allProtectionFiles = files.length > 0 && files.every(isProtectionFile);
+  const eligible = allProtectionFiles && !hasPortalSource && !hasWorkerRoute && !hasFirestoreRule && !hasDeployWorkflow;
+  const ownerApproved = approval?.authorLogin && approval.authorLogin === approval.ownerLogin &&
+    String(approval.body ?? "").includes(MAINTENANCE_APPROVAL_QUOTE);
+  return {
+    eligible,
+    ownerApproved: Boolean(ownerApproved),
+    ok: eligible && Boolean(ownerApproved),
+    reason: !eligible
+      ? "Maintenance exception rejected: every changed file must be an allowlisted protection file and no portal source, Worker route, Firestore rule or deploy workflow may change."
+      : !ownerApproved
+        ? "Protection-only maintenance requires the exact quoted approval from the repository owner account."
+        : "Protection-only maintenance exception applies as classification only; no portal-source or deployment change is exempted."
+  };
+}
+
+async function findOwnerMaintenanceApproval() {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const repository = process.env.GITHUB_REPOSITORY;
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!token || !repository || !eventPath || !fs.existsSync(eventPath)) return null;
+  const event = readJson(eventPath);
+  const pullNumber = event.pull_request?.number;
+  if (!pullNumber) return null;
+  const api = process.env.GITHUB_API_URL || "https://api.github.com";
+  const headers = { authorization: \`Bearer \${token}\`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
+  const [repoResponse, commentsResponse] = await Promise.all([
+    fetch(\`\${api}/repos/\${repository}\`, { headers }),
+    fetch(\`\${api}/repos/\${repository}/issues/\${pullNumber}/comments?per_page=100\`, { headers })
+  ]);
+  if (!repoResponse.ok || !commentsResponse.ok) return null;
+  const ownerLogin = (await repoResponse.json()).owner?.login;
+  const comments = await commentsResponse.json();
+  const ownerComment = comments.find(comment =>
+    comment.user?.login === ownerLogin && String(comment.body ?? "").includes(MAINTENANCE_APPROVAL_QUOTE)
+  );
+  return ownerComment ? { authorLogin: ownerComment.user.login, ownerLogin, body: ownerComment.body } : null;
+}
+
 export function newPortalWarningUntil(entry) {
   if (entry?.guardMode !== "warning") return null;
   const registeredAt = Date.parse(entry.registeredAt);
@@ -89,6 +149,20 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
     }
     if (owners.size) {
       sharedMatches.set(file, [...owners].sort());
+      protectedFiles.push(file);
+      continue;
+    }
+    const portalPolicyFile = file.match(/^docs\\/portal-protection\\/(?:windows|records)\\/([a-z0-9-]+)\\.json$/);
+    if (portalPolicyFile) {
+      const owner = Object.keys(registry.portals).find(name => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === portalPolicyFile[1]);
+      if (owner) {
+        specificAffected.add(owner);
+        protectedFiles.push(file);
+        continue;
+      }
+    }
+    if (isProtectionFile(file)) {
+      Object.keys(registry.portals).forEach(portal => specificAffected.add(portal));
       protectedFiles.push(file);
       continue;
     }
@@ -222,6 +296,13 @@ async function main() {
     changedFiles = execFileSync("git", ["diff", "--name-only", "HEAD^...HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   }
   const registry = readJson("docs/portal-protection/portal-register.json");
+  const maintenanceApproval = await findOwnerMaintenanceApproval();
+  const maintenanceClassification = classifyProtectionOnlyChange(changedFiles, maintenanceApproval);
+  if (maintenanceClassification.eligible) {
+    console.log(JSON.stringify({ ...maintenanceClassification, classificationOnly: true, changedFiles }, null, 2));
+    if (!maintenanceClassification.ok) process.exitCode = 1;
+    return;
+  }
   const discovery = evaluatePolicy({ changedFiles, registry, windowState: null, record: null });
   if (!discovery.protectedFiles.length) {
     console.log(JSON.stringify(discovery, null, 2));
