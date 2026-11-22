@@ -88,7 +88,7 @@ For each path, record the portal, exact screen/control or route/rule location, a
 - BREAK GLASS — emergency protection action, limited to the separately defined 24-hour break-glass window and its recorded controls.
 
 ## Rollback versions
-- Previous production Gateway Worker Version ID: dd4637ea-0804-4b85-a455-1e691f1f0d72 (previous deployment run 44897446502, commit 352d8b36718a3b88173934c607e6c7834f72a71b).
+- `dd4637ea-0804-4b85-a455-1e691f1f0d72` is **pre-#845, unsafe, do not roll back to it**. It predates the deletion-protection release.
 - Current production Gateway Worker Version ID: 1e25f147-e89d-44ba-8f17-80e7e7a75563.
 - Previous Cloudflare frontend Worker Version ID: b2430948-c116-4ba9-b08c-d8e2a6c9bba1.
 - Previous Firebase Hosting build stamp: commit 40c7cfa33a53871a48c8568a5ff3f876f2df5ac5; built 2026-11-22T04:06:59Z.
@@ -101,3 +101,13 @@ For each path, record the portal, exact screen/control or route/rule location, a
 3. Split #863 into one-portal PRs, diagnose and repair the failing gates at their causes, and prepare rollback evidence. Stop at APPROVE 863 ... and DEPLOY RULES.
 
 Do not treat skipped staging WordPress/cPanel jobs as failures for this rebuild. Do not publish Firestore rules.
+
+
+## 2026-11-22 — TASK 2 canary hold and live baseline
+
+- Owner explicitly issued `RUN CANARY`, but this session's connected GitHub actions do not expose a manual `workflow_dispatch` operation. No workflow dispatch, rerun, API workaround, or direct meeting creation was substituted.
+- Canary status: **NOT RUN**. Canary meeting ID: **NOT CREATED**. Delete refusal: NOT TESTED. Purge refusal: NOT TESTED. Environment-to-TRIAL refusal: NOT TESTED. Record read-back/persistence: NOT TESTED. No meeting record was created or modified.
+- The prerequisite read-only verification remains the previously reported successful run [#45005579517](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45005579517). It is prior evidence, not a canary result.
+- Current reported production baseline: Gateway Worker `aa5e131b-752e-4b30-b2f9-d28907d3eee7`; frontend Worker `762271dc-73a1-4a1a-9d75-dd7b0946fda5`; Firebase Hosting build `57368a8c2ceb418178aa28e5707b02605851dc83`; Firestore ruleset `00ebeb44-e151-415c-9616-b94c215c2589`.
+- **Rollback prohibition:** Gateway Worker version `dd4637ea-0804-4b85-a455-1e691f1f0d72` is **pre-#845, unsafe, do not roll back to it**. Do not use it as a canary failure response.
+- No rollback, Worker deployment, or Firestore rules publication occurred. Since the canary did not run, no live protection failure was observed; equally, no canary protection PASS is claimed.
