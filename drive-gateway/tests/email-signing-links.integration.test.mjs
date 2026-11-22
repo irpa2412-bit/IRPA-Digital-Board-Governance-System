@@ -58,7 +58,7 @@ test("email-link signer progress is mirrored immediately without completing or d
   assert.equal(mirrored.status,"InProgress");
   assert.equal(mirrored.signers.find(item=>item.id==="S1").status,"Signed");
   assert.equal(mirrored.signers.find(item=>item.id==="S2").status,"Pending");
-  assert.equal(mirrored.completion,undefined,"no completion record is created for a partially signed envelope");
+  assert.equal(mirrored.completion,null,"no completion record is created for a partially signed envelope");
 });
 
 test("a) IRPA-account owner at position 1 signs and automatically emails Gmail X at position 2",async()=>{
