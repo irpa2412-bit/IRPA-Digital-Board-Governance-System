@@ -139,11 +139,9 @@ async function main() {
   console.log("WEB_BUILD_TIME=" + buildTime);
   console.log("FIRESTORE_RULES_VERSION=" + rulesVersion);
   console.log("CANARY_CREDENTIAL_PATH=" + (credentialAvailable ? "AVAILABLE" : "UNAVAILABLE"));
-  console.log("ROLLBACK_VERSION_AVAILABLE=" + (rollbackAvailable ? "YES" : "NO"));
 }
 main().catch(error => {
   output("canary_credential_available", "false");
-  output("rollback_version_available", "false");
   summary(["## Live read-only verification", "FAILED: " + String(error?.message || "Read-only inspection failed."), "No write request was made."]);
   console.error("READ_ONLY_VERIFICATION_FAILED: " + String(error?.message || "unknown error"));
   process.exitCode = 1;
