@@ -124,6 +124,18 @@ test("meeting reads enforce category-aware access instead of allowing every sign
   await assertSucceeds(adminDb.doc("meetings/governance-record").get());
 });
 
+test("role claims without an active member or employee record do not grant category access", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/governance-record").set(meeting({
+      meetingCategory:"GOVERNANCE", meetingPolicyId:"GOVERNANCE", meetingType:"Board Meeting"
+    }));
+  });
+  const staleClaimDb = testEnv.authenticatedContext("stale-role-user", {
+    email:"stale@example.test", irpaRoles:["Board Member"]
+  }).firestore();
+  await assertFails(staleClaimDb.doc("meetings/governance-record").get());
+});
+
 test("meeting queries must prove category authorization and cannot enumerate all categories", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
