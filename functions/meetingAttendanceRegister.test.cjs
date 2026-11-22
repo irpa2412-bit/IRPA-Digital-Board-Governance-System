@@ -10,6 +10,7 @@ const rows = name => {
 };
 const refFor = (collection, id) => ({
   id,
+  collection,
   async get() {
     const value = rows(collection).get(id);
     return { id, exists: value !== undefined, data: () => value && structuredClone(value) };
@@ -53,9 +54,8 @@ const db = {
         rows(ref.collection).set(ref.id, value);
       },
       update(ref, value) {
-        const collection = [...state.collections.entries()].find(([, docs]) => docs.has(ref.id))?.[0];
-        if (!collection) throw new Error("missing transaction document");
-        rows(collection).set(ref.id, { ...rows(collection).get(ref.id), ...value });
+        if (!rows(ref.collection).has(ref.id)) throw new Error("missing transaction document");
+        rows(ref.collection).set(ref.id, { ...rows(ref.collection).get(ref.id), ...value });
       }
     };
     return callback(tx);
