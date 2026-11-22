@@ -20,6 +20,13 @@ test("workflow listens only to newly created issue comments", () => {
   assert.match(workflow, /issue_comment:\s*\n\s*types:\s*\[created\]/);
   assert.doesNotMatch(workflow, /issue_comment:[\s\S]{0,80}edited/);
 });
+
+test("comment-triggered canary checkout fetches full history for the live build ancestry gate", () => {
+  const canaryJob = workflow.split("  canary:")[1];
+  const checkout = canaryJob.split("      - name: Setup Node.js")[0];
+  assert.match(checkout, /ref: main/);
+  assert.match(checkout, /fetch-depth: 0/);
+});
 test("workflow limits the job to the dedicated issue; the payload guard enforces owner identity", () => {
   assert.match(workflow, /github\.event\.issue\.number == 876/);
   assert.doesNotMatch(workflow, /github\.event\.issue\.pull_request == null/);
