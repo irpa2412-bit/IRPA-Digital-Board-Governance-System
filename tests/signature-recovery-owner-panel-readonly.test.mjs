@@ -4,8 +4,8 @@ import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/pages/SignatureRecoveryOwnerPanel.jsx", import.meta.url), "utf8");
 
-test("owner recovery panel performs only authenticated GET requests", () => {
-  assert.match(source, /fetch\(gateway\+path,\{method:"GET"/);
+test("owner recovery panel uses authenticated read-only assessment and a dedicated dry-run POST", () => {
+  assert.match(source, /fetch\(gateway\+path,\{method,headers/);\n  assert.match(source, /method==="POST"\?\{body:"\\{\\}"\}:\{\}/);\n  assert.match(source, /diagnose-finalisation/);\n  assert.match(source, /DIAGNOSTIC_RESPONSE_INVALID/);\n  assert.match(source, /No envelope, signer, field, signature, hash, certificate, archive, Drive file or email record is changed by diagnosis/);
   assert.doesNotMatch(source, /method\s*:\s*["'](?:POST|PUT|PATCH|DELETE)["']/i);
   assert.doesNotMatch(source, /fetch\([^\n]*method\s*:\s*(?!["']GET["'])/i);
 });

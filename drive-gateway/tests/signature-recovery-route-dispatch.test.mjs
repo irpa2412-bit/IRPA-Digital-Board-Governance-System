@@ -28,7 +28,7 @@ test("screen-generated evidence URL uses the queue envelopeId and matches the ro
   assert.notEqual(item.title, item.envelopeId);
 });
 
-test("recovery evidence route is GET-only and invalid paths are not dispatched", () => {
+test("recovery evidence remains GET-only and finalisation diagnostics use a separate POST route", () => {
   assert.equal(matchRecoveryEvidenceRoute("POST", "/api/recovery/envelopes/ENV-0000000000000000/evidence"), null);
   assert.equal(matchRecoveryEvidenceRoute("GET", "/api/recovery/envelopes/x/evidence"), null);
   assert.equal(matchRecoveryEvidenceRoute("GET", "/api/recovery/envelopes/ENV-0000000000000000/evidence/extra"), null);
