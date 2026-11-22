@@ -18,7 +18,6 @@ import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 
 import { route as esignRoute } from "./router.mjs";
-import { isEsignPath } from "./esignPathPolicy.mjs";
 import { maskEmailForConfirmation, formatEmailLinkExpiryEAT } from "./emailSigning/index.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
@@ -58,6 +57,8 @@ import { diagnoseControlledDocument } from "./controlledDocumentDiagnostics.mjs"
 import { createLoginContextRoute } from "./loginContext.mjs";
 import { createBootstrapPrimaryAdministratorRoute } from "./adminIdentity.mjs";
 import { createPasswordRecoveryRouter } from "./passwordRecovery.mjs";
+import { createSignatureRecoveryRouter } from "./signatureRecovery.mjs";
+import { isEsignPath } from "./esignPathPolicy.mjs";
 
 function getFirebaseProjectId(env) {
   const projectId = String(env?.FIREBASE_PROJECT_ID || "").trim();
@@ -192,6 +193,20 @@ const smtpSelfcheckRoute = async (request, env) => {
     return json({ok:false,error:"SMTP self-check failed.",to,stageCode,smtpReplyCategory,smtpReply:String(error?.message||"").match(/IRPA SMTP error \d{3}/i)?.[0]||null,messageId,stages},502,corsHeaders(request));
   }
 };
+const signatureRecoveryRouter = createSignatureRecoveryRouter({
+  authenticateFirebaseRequest,
+  getFirestoreDocument,
+  buildContext: (env,claims,user) => buildEsignContext({
+    env,
+    verifyUser: async () => user,
+    sendInvitation: async () => { throw new Error("Read-only recovery routes do not send invitations."); },
+    logger: console,
+    driveHelpers: { getDriveAccessToken, driveFetch }
+  }),
+  json,
+  corsHeaders
+});
+
 const passwordRecoveryRouter = createPasswordRecoveryRouter({
   authenticateFirebaseRequest,
   getFirebaseAuthAdminAccessToken,
@@ -366,6 +381,9 @@ export default {
       if (pathname === "/api/system/release-readiness") return await createReleaseReadinessRoute({ authenticateFirebaseRequest, getFirestoreDocument, systemDiagnosticsRoute, actualDataAccessRoute, reconcileSignatureDocumentIds, corsHeaders })(request, env);
       if (pathname === "/api/signature-pathway/emergency-storage") return await emergencyStorageDiscoveryRoute(request, env);
       if (pathname === "/api/signature-pathway/drive-health") return await signatureDriveHealthRoute(request, env);
+
+      const signatureRecoveryResponse = await signatureRecoveryRouter(request, env, pathname);
+      if (signatureRecoveryResponse) return signatureRecoveryResponse;
 
       const meetingPortalResponse = await meetingPortalRouter(request, env, pathname);
       if (meetingPortalResponse) return meetingPortalResponse;
