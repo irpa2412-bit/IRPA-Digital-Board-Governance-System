@@ -36,3 +36,20 @@ test("recovery evidence route is GET-only and invalid paths are not dispatched",
   assert.equal(isEsignPath("/api/recovery/envelopes/ENV-0000000000000000/evidence"), true);
   assert.equal(isEsignPath("/__not_a_recovery_route__"), false);
 });
+
+test("recovery dispatch repair changes only its six approved files from the immutable baseline", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const changed = execFileSync("git", [
+    "diff", "--name-only",
+    "605cc913b442bc4e28716937a549aee1d6766cb8",
+    "HEAD"
+  ], { encoding: "utf8" }).trim().split("\n").filter(Boolean).sort();
+  assert.deepEqual(changed, [
+    "docs/signature-recovery/route-dispatch-change-record-2026-11-22.md",
+    "drive-gateway/src/esignPathPolicy.mjs",
+    "drive-gateway/src/index.js",
+    "drive-gateway/src/router.mjs",
+    "drive-gateway/tests/signature-recovery-route-dispatch.test.mjs",
+    "tests/signature-workflow-policy.test.mjs"
+  ].sort(), "the repair must not touch signing, envelope, Firestore, secrets, deployment settings, or branch-protection files");
+});
