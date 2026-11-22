@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T16:34:38Z",
-  "lastActivityAt": "2026-11-22T16:41:21Z",
+  "lastActivityAt": "2026-11-22T16:56:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner instruction, 22 November 2026: implement permanent full Meeting Portal access for the Internal Oversight Director, Executive Director and every head of department, resolved only from active registered authority in Members and Employees; access remains until owner revocation. The one-hour reference described the repair-window period, not an access expiry. Preserve PR #863 duty-based access for everyone else and deny by default. Repair scope is limited to Meeting Portal policy, screen, Worker, shared permission helpers and tests. No secrets, environment variables, SMTP, signing/PDF/hash/certificate/archive logic or branch protection changes.",
@@ -33,6 +33,11 @@
       "at": "2026-11-22T16:34:38Z",
       "action": "owner instruction — repair window opened",
       "description": "Owner instruction: permanent full Meeting Portal access for the Internal Oversight Director, Executive Director and every head of department, based only on active registered authority in Members and Employees; revoke/inactive denies on next request. One hour was repair time, not grant expiry. Preserve PR #863 duty-based policy for all others. This 72-hour window authorizes implementation and validation only; merge, rules publication and production release remain subject to protected gates."
+    },
+    {
+      "at": "2026-11-22T16:56:00Z",
+      "actor": "repository-maintenance",
+      "description": "Updated repair-window duration to 72 hours after owner clarification; added shared active-register authority resolver, Worker and screen integration, seeded regression tests, and preserved Firestore rules unchanged. Access grant remains permanent until owner revocation."
     }
   ],
   "baseline": {
