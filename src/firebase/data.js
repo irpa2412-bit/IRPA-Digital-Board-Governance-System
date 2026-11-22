@@ -4,6 +4,7 @@ import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { sendEmployeeRegistrationEmail } from "./employeeRegistrationEmail";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
+import { resolveMeetingAuthority } from "../../shared/meetingAuthority.mjs";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
 import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
 import { callMeetingService as callMeetingGateway } from "./meetingGatewayApi";
@@ -197,6 +198,22 @@ function mergeInstitutionalRecords(records=[]){
 
 export async function getCurrentMemberProfile(){const uid=auth.currentUser?.uid;const email=String(auth.currentUser?.email||"").trim().toLowerCase();if(!uid)return null;const records=[];const direct=await getRecord(COLLECTIONS.members,uid).catch(()=>null);if(direct)records.push(direct);const queries=[];if(email)queries.push(query(collection(db,COLLECTIONS.members),where("email","==",email)));if(email)queries.push(query(collection(db,COLLECTIONS.members),where("firebaseAuthEmail","==",email)));queries.push(query(collection(db,COLLECTIONS.members),where("uid","==",uid)));const snaps=await Promise.all(queries.map(q=>getDocs(q).catch(()=>null)));snaps.forEach(s=>s?.docs?.forEach(x=>records.push({id:x.id,...x.data()})));return mergeInstitutionalRecords(records);}
 export async function getCurrentEmployeeProfile(options={}){const uid=auth.currentUser?.uid;const email=String(auth.currentUser?.email||"").trim().toLowerCase();if(!uid)return null;const records=[];const collect=(snap)=>{if(snap?.docs?.length)snap.docs.forEach(x=>records.push({id:x.id,...x.data()}));};const direct=await getRecord(COLLECTIONS.employees,uid).catch(()=>null);if(direct)records.push(direct);const identityQueries=[];if(email)identityQueries.push(query(collection(db,COLLECTIONS.employees),where("email","==",email)));if(email)identityQueries.push(query(collection(db,COLLECTIONS.employees),where("firebaseAuthEmail","==",email)));identityQueries.push(query(collection(db,COLLECTIONS.employees),where("uid","==",uid)));const identitySnaps=await Promise.all(identityQueries.map(q=>getDocs(q).catch(()=>null)));identitySnaps.forEach(collect);const administratorUid=String(options?.administratorUid||"").trim();if(!records.length&&administratorUid){for(const field of ["administratorUid","adminUid","linkedAdministratorUid"]){const snap=await getDocs(query(collection(db,COLLECTIONS.employees),where(field,"==",administratorUid))).catch(()=>null);collect(snap);if(records.length)break;}}if(!records.length&&options?.fallbackName){const name=String(options.fallbackName||"").trim();if(name){const snap=await getDocs(query(collection(db,COLLECTIONS.employees),where("name","==",name))).catch(()=>null);if(snap?.docs?.length===1)records.push({id:snap.docs[0].id,...snap.docs[0].data()});else if(!snap||snap.empty){const all=await getDocs(collection(db,COLLECTIONS.employees)).catch(()=>null);const normalizedName=name.toLowerCase().replace(/\\s+/g," ").trim();const matches=all?.docs?.map(x=>({id:x.id,...x.data()})).filter(x=>String(x.name||"").toLowerCase().replace(/\\s+/g," ").trim()===normalizedName)||[];if(matches.length===1)records.push(matches[0]);}}}return mergeInstitutionalRecords(records);}
+export async function getCurrentMeetingAuthority(){
+  const user=auth.currentUser;
+  if(!user?.uid)return {active:false,fullMeetingAccess:false,roles:[],registers:[]};
+  const [memberSnap,employeeSnap,departmentSnap]=await Promise.all([
+    getDocs(collection(db,COLLECTIONS.members)),
+    getDocs(collection(db,COLLECTIONS.employees)),
+    getDocs(collection(db,"institutionalDepartments")).catch(()=>({docs:[]}))
+  ]);
+  const members=memberSnap.docs.map(item=>({id:item.id,...item.data()}));
+  const employees=employeeSnap.docs.map(item=>({id:item.id,...item.data()}));
+  const departments=departmentSnap.docs.map(item=>({id:item.id,...item.data()}));
+  const memberNumbers=members.filter(record=>[record.uid,record.authUid,record.userUid,record.email,record.firebaseAuthEmail].some(value=>String(value||"").trim().toLowerCase()===String(user.uid||"").toLowerCase()||String(value||"").trim().toLowerCase()===String(user.email||"").toLowerCase())).map(record=>record.memberNumber||record.registrationNumber).filter(Boolean);
+  const employeeNumbers=employees.filter(record=>[record.uid,record.authUid,record.userUid,record.email,record.firebaseAuthEmail].some(value=>String(value||"").trim().toLowerCase()===String(user.uid||"").toLowerCase()||String(value||"").trim().toLowerCase()===String(user.email||"").toLowerCase())).map(record=>record.employeeNumber).filter(Boolean);
+  return resolveMeetingAuthority({uid:user.uid,email:user.email,memberNumbers,employeeNumbers},{members,employees,departments});
+}
+
 export async function getCurrentAuditorProfile(){
  const uid=auth.currentUser?.uid;
  const email=String(auth.currentUser?.email||"").trim().toLowerCase();
