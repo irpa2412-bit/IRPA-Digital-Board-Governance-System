@@ -95,6 +95,17 @@ export class EsignRecordDurableObject {
       }
 
 
+      if(body.operation==="signer-key-read"){
+        const keyId=String(body.keyId||"");
+        const envelopeId=String(body.envelopeId||"");
+        const signerId=String(body.signerId||"");
+        const emailHash=String(body.emailHash||"").toLowerCase();
+        if(body.key!=="email-signer-key:"+keyId||!/^EMAIL-[0-9a-f]{64}$/.test(keyId)||!/^S\\d{1,2}$/.test(signerId)||!envelopeId||!/^[0-9a-f]{64}$/.test(emailHash))return Response.json({ok:false,error:"Invalid signer-key identity."},{status:400});
+        const record=await this.state.storage.get("emailSignerKey:"+keyId);
+        if(!record||record.envelopeId!==envelopeId||record.signerId!==signerId||record.emailHash!==emailHash)return Response.json({ok:false,error:"Signer key is not provisioned."},{status:404});
+        return Response.json({ok:true,keyId,publicKeyJwk:record.publicKeyJwk});
+      }
+
       if(body.operation==="signer-key-ensure"){
         const keyId=String(body.keyId||"");
         const envelopeId=String(body.envelopeId||"");
@@ -162,6 +173,7 @@ function mockMeta() {
 function mockStorage() {
   return {
     async put(x){ const id="mock-"+(++mockSeq); mockObjects.set(id,{...x,bytes:new Uint8Array(x.bytes)}); return {id,link:"mock://"+id}; },
+    async probeWritePermission(){return true;},
     async get(id){ const x=mockObjects.get(id); return x ? new Uint8Array(x.bytes) : null; },
     async delete(id){ mockObjects.delete(id); }
   };
@@ -192,6 +204,11 @@ async function driveFolder(env, accessToken, path, driveFetchImpl) {
   for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent,driveFetchImpl);
   return parent;
 }
+async function findExistingFolder(env,token,name,parent,driveFetchImpl) {
+  const q=[`name='${name.replaceAll("'","\\\\'")}'`, "mimeType='application/vnd.google-apps.folder'", "trashed=false", parent?`'${parent}' in parents`:null].filter(Boolean).join(" and ");
+  const result=await driveFetchImpl(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
+  return result.files?.[0]?.id||null;
+}
 async function findFolder(env,token,name,parent,driveFetchImpl) {
   const q=[`name='${name.replaceAll("'","\\'")}'`,"mimeType='application/vnd.google-apps.folder'","trashed=false",parent?`'${parent}' in parents`:null].filter(Boolean).join(" and ");
   const x=await driveFetchImpl(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
@@ -213,6 +230,7 @@ function driveStorage(env, helpers) {
       return {id:x.id,link:x.webViewLink||`https://drive.google.com/file/d/${x.id}/view`};
     },
     async get(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`,{headers:{Authorization:`Bearer ${token}`}}); return r.ok?new Uint8Array(await r.arrayBuffer()):null;},
+    async probeWritePermission(paths){const token=await helpers.getDriveAccessToken(env);for(const path of paths||[]){const parts=String(path).split("/").filter(Boolean);parts.pop();let parent=await findExistingFolder(env,token,getDriveRootFolderName(env),null,helpers.driveFetch);if(!parent)return false;for(const part of parts){parent=await findExistingFolder(env,token,part,parent,helpers.driveFetch);if(!parent)return false;}const folder=await helpers.driveFetch(env,token,"/drive/v3/files/"+encodeURIComponent(parent)+"?fields=id,capabilities(canAddChildren)");if(folder?.capabilities?.canAddChildren!==true)return false;}return true;},
     async delete(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}); if(!r.ok&&r.status!==404) throw new Error("Google Drive deletion failed.");}
   };
 }
@@ -221,6 +239,20 @@ export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInv
   const baseKeyProvider=env.DRIVE_MOCK==="true"?null:createCloudflareSignerKeyProvider(env);
   const keyProvider=baseKeyProvider?{
     getSignerKey:uid=>baseKeyProvider.getSignerKey(uid),
+    async getSignerKeyForSignerReadOnly(signer){
+      if(!env.ESIGN_DO)throw new Error("Gateway Durable Object key custody is not configured.");
+      if(!signer?.envelopeId||!signer?.id||!signer?.emailHash)throw new Error("Email-link signer key identity is incomplete.");
+      const keyId="EMAIL-"+await sha256Hex(String(signer.envelopeId)+"|"+String(signer.id)+"|"+String(signer.emailHash).toLowerCase());
+      const objectName="email-signer-key:"+keyId,stub=env.ESIGN_DO.get(env.ESIGN_DO.idFromName(objectName));
+      const response=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-read",keyId,envelopeId:signer.envelopeId,signerId:signer.id,emailHash:String(signer.emailHash).toLowerCase()})});
+      const result=await response.json();if(!response.ok||!result.ok||!result.publicKeyJwk)throw new Error("Existing Gateway signer key is not available for a read-only diagnostic.");
+      const publicKey=await importPublicKeyJwk(result.publicKeyJwk);
+      return{keyId,publicKey,publicKeyJwk:result.publicKeyJwk,signCanonicalPayload:async canonicalPayload=>{
+        const signed=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-sign",keyId,canonicalPayload})});
+        const output=await signed.json();if(!signed.ok||!output.ok||!output.signature)throw new Error("Gateway signer key could not verify diagnostic certificate evidence.");
+        return output.signature;
+      }};
+    },
     async getSignerKeyForSigner(signer){
       if(!env.ESIGN_DO)throw new Error("Gateway Durable Object key custody is not configured.");
       if(!signer?.envelopeId||!signer?.id||!signer?.emailHash)throw new Error("Email-link signer key identity is incomplete.");
