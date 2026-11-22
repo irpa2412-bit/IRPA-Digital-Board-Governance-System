@@ -49,5 +49,6 @@
       "Full regression PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981099; npm run test:all completed in the Firestore emulator with exit code 0.",
       "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
     ]
-  }
+  },
+  "renewals": []
 }
