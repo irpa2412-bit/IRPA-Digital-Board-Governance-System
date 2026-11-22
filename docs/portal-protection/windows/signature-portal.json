@@ -25,7 +25,9 @@
     "drive-gateway/src/signatureRecovery.mjs",
     "drive-gateway/tests/signature-recovery.test.mjs",
     "tests/signature-recovery-owner-panel-readonly.test.mjs",
-    ".github/workflows/baseline-evidence.yml"
+    ".github/workflows/baseline-evidence.yml",
+    "docs/portal-protection/records/signature-portal.json",
+    "docs/portal-protection/windows/signature-portal.json"
   ],
   "activityLog": [
     {
