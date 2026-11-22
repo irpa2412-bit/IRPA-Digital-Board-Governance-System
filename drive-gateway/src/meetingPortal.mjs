@@ -170,12 +170,18 @@ export function createMeetingPortalRouter(ctx) {
         const idsArray = Array.isArray(meeting.invitedParticipantIds) ? meeting.invitedParticipantIds.map(String) : [];
         const nextIds = [...new Set([...idsArray, ids.participantId])];
         const participantEmail = lower(participant.participantEmail || participant.email);
+        const participantUid = clean(participant.participantUid || participant.uid || participant.userId);
         const patch = {
           invitedParticipantIds: nextIds,
           invitedParticipantCount: nextIds.length,
+          invitedEmails:(Array.isArray(meeting.invitedEmails)?meeting.invitedEmails:[]).filter(value=>lower(value)!==participantEmail),
+          participantEmails:(Array.isArray(meeting.participantEmails)?meeting.participantEmails:[]).filter(value=>lower(value)!==participantEmail),
           updatedAt: new Date()
         };
-        const participantUid = clean(participant.participantUid || participant.uid || participant.userId);
+        if(participantUid){
+          patch.invitedUids=(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]).filter(value=>clean(value)!==participantUid);
+          patch.participantUids=(Array.isArray(meeting.participantUids)?meeting.participantUids:[]).filter(value=>clean(value)!==participantUid);
+        }
         const tokenDocName = `projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/meetingAccessTokens/${accessId}`;
         const meetingDocName = meetingDoc.name;
         const passFields = fieldsToFirestore({
@@ -191,9 +197,11 @@ export function createMeetingPortalRouter(ctx) {
         });
         try {
           logStage("CREATE_ACCESS_PASS_AND_UPDATE_INVITEE_TALLY", "START", ids);
+          const participantAccessReset={meetingAccessDispatched:false,meetingAccessRevoked:true,meetingAccessDispatchStatus:"Pending",meetingAccessRevokedAt:new Date(),updatedAt:new Date()};
           const writes = [
             { update: { name: tokenDocName, fields: passFields }, currentDocument: { exists: false } },
-            { update: { name: meetingDocName, fields: fieldsToFirestore(patch) }, updateMask: { fieldPaths: Object.keys(patch) }, currentDocument: { updateTime: meetingDoc.updateTime } }
+            { update: { name: meetingDocName, fields: fieldsToFirestore(patch) }, updateMask: { fieldPaths: Object.keys(patch) }, currentDocument: { updateTime: meetingDoc.updateTime } },
+            { update: { name: participantDoc.name, fields: fieldsToFirestore(participantAccessReset) }, updateMask: { fieldPaths: Object.keys(participantAccessReset) }, currentDocument: { updateTime: participantDoc.updateTime } }
           ];
           for (const priorPass of activePriorPasses) {
             writes.push({ update: { name: `projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/meetingAccessTokens/${priorPass.id}`, fields: fieldsToFirestore({ status: "Revoked", revokedByUid: uid, revokedAt: new Date(), revocationReason: "Superseded by a newly issued meeting access pass" }) }, updateMask: { fieldPaths: ["status", "revokedByUid", "revokedAt", "revocationReason"] }, currentDocument: { updateTime: priorPass.updateTime } });
