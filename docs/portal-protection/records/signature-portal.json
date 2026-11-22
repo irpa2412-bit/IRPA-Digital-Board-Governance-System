@@ -108,6 +108,16 @@
       "command": "approve",
       "reason": "Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
       "prNumber": 895
+    },
+    {
+      "at": "2026-11-22T16:00:57.118Z",
+      "expiresAt": "2026-11-25T16:00:57.118Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 896 The PR A change set now touches only Signature Portal paths; the shared Meeting Portal SignaturePlatform.jsx is unchanged. Authorise the separate 72-hour Signature Portal repair window for the owner-created envelope list, per-envelope Check this document button, bilingual read-only report, and Gateway 401/403/admin authorization. No recovery actions or signing changes.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/896#issuecomment-7081732872",
+      "command": "approve",
+      "reason": "The PR A change set now touches only Signature Portal paths; the shared Meeting Portal SignaturePlatform.jsx is unchanged. Authorise the separate 72-hour Signature Portal repair window for the owner-created envelope list, per-envelope Check this document button, bilingual read-only report, and Gateway 401/403/admin authorization. No recovery actions or signing changes.",
+      "prNumber": 896
     }
   ],
   "repairWindow": {
