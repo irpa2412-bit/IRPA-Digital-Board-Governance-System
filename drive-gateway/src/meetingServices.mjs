@@ -177,8 +177,6 @@ async function context(ctx,env,token,claims,meetingId){
   listByField(ctx,env,token,"participants","meetingId",meetingId)
  ]);
  const authority=resolveMeetingAuthority({uid,email,memberNumber:claims.memberNumber,employeeNumber:claims.employeeNumber},{members,employees,departments});
- const member=members.find(record=>authority.registers.includes("Members")&&[record.uid,record.authUid,record.userUid,record.email,record.firebaseAuthEmail].some(value=>clean(value)===uid||lower(value)===email))||null;
- const employee=employees.find(record=>authority.registers.includes("Employees")&&[record.uid,record.authUid,record.userUid,record.email,record.firebaseAuthEmail].some(value=>clean(value)===uid||lower(value)===email))||null;
  const isAdmin=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;
  const listed=meetingParticipantListed(meeting,uid,email);
  const subscribed=subscriptions.some(item=>!denied.has(lower(item.status))&&([item.uid,item.subscriberUid,item.userId,item.memberUid,item.participantUid].map(clean).includes(uid)||email&&[item.email,item.subscriberEmail,item.participantEmail].some(value=>lower(value)===email)));
@@ -188,8 +186,8 @@ async function context(ctx,env,token,claims,meetingId){
  const secretary=lower(meeting.secretaryEmail)===email||clean(meeting.secretaryUid)===uid;
  const canManage=isAdmin||authority.fullMeetingAccess||chair||secretary||clean(meeting.meetingHostUid)===uid||clean(meeting.hostUid)===uid||clean(meeting.organizerUid)===uid||clean(meeting.organiserUid)===uid||clean(meeting.createdByUid)===uid||clean(meeting.initiatorUid)===uid||clean(meeting.ownerUid)===uid;
  const authorityIdentity={active:authority.active,roles:authority.roles.map(item=>item.role),role:authority.roles[0]?.role,uid};
- const authorityRecord={status:"Active",roles:authorityIdentity.roles};
- const categoryAccess=meetingCategoryRoleAllowed(meeting,member||authorityRecord,employee,authorityIdentity);
+ const authorityRecord={status:authority.active?"Active":"Inactive",roles:authorityIdentity.roles};
+ const categoryAccess=meetingCategoryRoleAllowed(meeting,authorityRecord,null,{irpaRoles:authorityIdentity.roles});
  const canRead=canManage||participant||categoryAccess||isAdmin||authority.fullMeetingAccess;
  if(!isAdmin&&!authority.active&&!participant)throw Object.assign(new Error("An active IRPA identity or authorised meeting participant is required."),{status:403});
  return {uid,email,meeting,participant,canManage,canRead,isAdmin,categoryAccess,authority,fullMeetingAccess:authority.fullMeetingAccess,category:categoryOf(meeting),confidentiality:clean(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
