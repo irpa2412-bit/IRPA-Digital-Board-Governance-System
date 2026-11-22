@@ -1,0 +1,50 @@
+name: Read-only Signature Recovery Route Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/signature-recovery-route-probe.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/signature-recovery-route-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe production health and recovery route without authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          health_status="$(curl --silent --show-error --max-time 15 --output "$RUNNER_TEMP/health.json" --write-out '%{http_code}' "$base/health")"
+          evidence_status="$(curl --silent --show-error --max-time 15 --output "$RUNNER_TEMP/evidence.body" --write-out '%{http_code}' "$base/api/recovery/envelopes/test-id/evidence" || true)"
+          nonsense_status="$(curl --silent --show-error --max-time 15 --output "$RUNNER_TEMP/nonsense.body" --write-out '%{http_code}' "$base/api/route-probe-nonsense-20261122" || true)"
+          echo "HEALTH_HTTP_STATUS=$health_status"
+          node -e 'const h=require(process.argv[1]); console.log(JSON.stringify({ok:h.ok,environment:h.environment,commit:h.commit}));' "$RUNNER_TEMP/health.json"
+          echo "EVIDENCE_HTTP_STATUS=$evidence_status"
+          echo "NONSENSE_HTTP_STATUS=$nonsense_status"
+          evidence_body="$(tr -d '\r\n' < "$RUNNER_TEMP/evidence.body")"
+          nonsense_body="$(tr -d '\r\n' < "$RUNNER_TEMP/nonsense.body")"
+          if [[ "$evidence_status" == "401" || "$evidence_status" == "403" ]]; then
+            echo "EVIDENCE_ROUTE=DEPLOYED (unauthenticated request rejected by route handler)"
+          elif [[ "$evidence_status" == "404" && "$nonsense_status" == "404" && "$evidence_body" == "$nonsense_body" ]]; then
+            echo "EVIDENCE_ROUTE=NOT_DEPLOYED (same 404 body as nonsense path)"
+            exit 1
+          else
+            echo "EVIDENCE_ROUTE=INDETERMINATE"
+            echo "EVIDENCE_BODY=$evidence_body"
+            echo "NONSENSE_BODY=$nonsense_body"
+            exit 1
+          fi
+          test "$health_status" = "200"
+          test "$nonsense_status" = "404"
