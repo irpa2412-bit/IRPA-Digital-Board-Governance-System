@@ -11,7 +11,7 @@
   1. `drive-gateway/src/esignPathPolicy.mjs` — new shared route matcher and e-signature dispatch allowlist, including recovery queue, evidence, preview and stamp-reassignment routes.
   2. `drive-gateway/src/index.js` — delegates top-level e-signature dispatch matching to the shared policy; removes the duplicated local allowlist.
   3. `drive-gateway/src/router.mjs` — delegates evidence-path matching to the shared GET matcher; preserves `requireUser` and the existing owner-only evidence authorization.
-  4. `drive-gateway/tests/signature-recovery-route-dispatch.test.mjs` — route-ID, queue-to-screen URL, GET-only, malformed-path and dispatch regression tests; also enforces the six-file change boundary against the baseline.
+  4. `drive-gateway/tests/signature-recovery-route-dispatch.test.mjs` — route-ID, queue-to-screen URL, GET-only, malformed-path and dispatch regression tests; also enforces the seven-file change boundary against the baseline.
   5. `tests/signature-workflow-policy.test.mjs` — updates the existing distribution-retry dispatch assertion to inspect the shared policy module.
   6. `drive-gateway/src/signatureRecovery.mjs` — applies the shared GET evidence matcher to the main-branch recovery router while retaining its existing authentication and owner-only assessment.
   7. `docs/signature-recovery/route-dispatch-change-record-2026-11-22.md` — this audit record.

@@ -55,3 +55,10 @@ test("recovery dispatch repair changes only its seven approved files relative to
     "tests/signature-workflow-policy.test.mjs"
   ].sort(), "the repair must not touch signing, envelope, Firestore, secrets, deployment settings, or branch-protection files");
 });
+
+test("isolated recovery router uses the shared bounded GET evidence matcher", async () => {
+  const recovery = await readFile(new URL("../src/signatureRecovery.mjs", import.meta.url), "utf8");
+  assert.match(recovery, /import \{ matchRecoveryEvidenceRoute \} from "\.\/esignPathPolicy\.mjs"/);
+  assert.match(recovery, /matchRecoveryEvidenceRoute\(request\.method,pathname\)/);
+  assert.match(recovery, /assessRecoveryEvidence\(ctx,user,decodeURIComponent\(evidence\[1\]\)\)/);
+});
