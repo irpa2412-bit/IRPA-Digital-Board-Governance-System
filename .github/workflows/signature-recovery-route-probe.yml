@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Probe public Worker routes without credentials
+      - name: Probe production Worker routes without credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -30,6 +30,7 @@ jobs:
             printf '\n'
             rm -f "$body_file"
           }
-          probe "health" "/health"
-          probe "recovery-evidence" "/api/recovery/envelopes/test-id/evidence"
+          probe "evidence-envelope-id" "/api/recovery/envelopes/ENV-0000000000000000/evidence"
+          probe "evidence-document-reference-id" "/api/recovery/envelopes/IRPA-ENV-2026-00000000/evidence"
+          probe "recovery-queue" "/api/recovery/envelopes"
           probe "nonsense" "/__signature_recovery_route_probe_not_a_real_route__"
