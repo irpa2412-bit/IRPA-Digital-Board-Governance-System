@@ -64,44 +64,39 @@ async function post(path, body, idToken) {
     const idToken = signInBody.idToken;
     db = getFirestore();
 
-    const prior = await db.collection("meetings").where("systemTestLabel", "==", LABEL).get();
-    if (!prior.empty) throw new Error("A canary with this system-test label already exists; refusing to create a duplicate.");
-
-    meetingId = "system-canary-" + crypto.randomUUID();
-    meetingRef = db.collection("meetings").doc(meetingId);
-    const now = new Date();
-    meetingData = {
-      title: TITLE,
-      meetingType: "SYSTEM_CANARY",
-      meetingCategory: "OTHER",
-      meetingPolicyId: "OTHER",
-      meetingReference: "SYSTEM-CANARY-" + meetingId.slice(-12).toUpperCase(),
-      meetingIdentity: "IRPA-SYSTEM-CANARY-" + meetingId.slice(-12).toUpperCase(),
-      date: now.toISOString().slice(0, 10),
-      meetingDate: now.toISOString().slice(0, 10),
-      status: "Cancelled",
-      registerStatus: "Registered",
-      initiatorUid: admin.uid,
-      meetingHostUid: admin.uid,
-      createdByUid: admin.uid,
-      confidentialityClass: "INTERNAL",
-      systemTest: true,
-      systemTestLabel: LABEL,
-      systemTestStatus: "CREATED",
-      canary: true,
-      legalHold: true,
-      legalHoldReason: "System canary protection test; preserve this record.",
-      createdAt: FieldValue.serverTimestamp(),
-      registeredAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
-      // Deliberately omit environment: absence must classify as REAL.
-    };
-    await meetingRef.create(meetingData);
+    const prior = await db.collection("meetings").where("systemTestLabel", "==", LABEL).limit(2).get();
+    if (prior.size > 1) throw new Error("Multiple labelled canary meetings exist; refusing to choose or create another.");
+    if (!prior.empty) {
+      const existing = prior.docs[0];
+      meetingId = existing.id;
+      meetingRef = existing.ref;
+      meetingData = existing.data();
+      if (meetingData.title !== TITLE) throw new Error("Existing labelled canary has an unexpected title; refusing to mutate it.");
+      results.reusedExistingMeeting = true;
+    } else {
+      meetingId = "system-canary-" + crypto.randomUUID();
+      meetingRef = db.collection("meetings").doc(meetingId);
+      const now = new Date();
+      meetingData = {
+        title: TITLE, meetingType: "SYSTEM_CANARY", meetingCategory: "OTHER", meetingPolicyId: "OTHER",
+        meetingReference: "SYSTEM-CANARY-" + meetingId.slice(-12).toUpperCase(),
+        meetingIdentity: "IRPA-SYSTEM-CANARY-" + meetingId.slice(-12).toUpperCase(),
+        date: now.toISOString().slice(0, 10), meetingDate: now.toISOString().slice(0, 10),
+        status: "Cancelled", registerStatus: "Registered", initiatorUid: admin.uid,
+        meetingHostUid: admin.uid, createdByUid: admin.uid, confidentialityClass: "INTERNAL",
+        systemTest: true, systemTestLabel: LABEL, systemTestStatus: "CREATED", canary: true,
+        legalHold: true, legalHoldReason: "System canary protection test; preserve this record.",
+        createdAt: FieldValue.serverTimestamp(), registeredAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+        // Deliberately omit environment: absence must classify as REAL.
+      };
+      await meetingRef.create(meetingData);
+    }
     const initialMeeting = await meetingRef.get();
-    results.missingEnvironment = initialMeeting.get("environment") === undefined;
+    results.missingEnvironment = initialMeeting.exists && initialMeeting.get("environment") === undefined;
     if (!results.missingEnvironment) {
       liveCheckFailed = true;
-      throw new Error("Canary creation unexpectedly wrote an environment field.");
+      throw new Error("Canary meeting is absent or has an environment field; refusing unsafe checks.");
     }
 
     const deletion = await post("/api/meeting-register/delete", { meetingId }, idToken);
@@ -115,28 +110,38 @@ async function post(path, body, idToken) {
       await meetingRef.set({ ...meetingData, environment: FieldValue.delete() }, { merge: true });
     }
 
-    const capture = await post("/api/meeting-records/capture", {
-      meetingId,
-      recordType: "OTHER",
-      title: TITLE,
-      content: "System-test-only record created to verify that records linked to a REAL or unclassified meeting cannot be purged. Preserve this record."
-    }, idToken);
-    if (capture.status !== 200 || capture.body.ok !== true || !capture.body.recordId) {
-      liveCheckFailed = true;
-      results.recordCapture = false;
-      console.log("CANARY_RECORD_CAPTURE=FAIL; HTTP=" + capture.status);
-      throw new Error("Could not create the single linked system-test record required for the purge check.");
+    const priorRecords = await db.collection("meetingRecords")
+      .where("systemTestLabel", "==", LABEL)
+      .where("meetingId", "==", meetingId)
+      .limit(2)
+      .get();
+    if (priorRecords.size > 1) throw new Error("Multiple labelled canary records exist for this meeting; refusing to create another.");
+    if (!priorRecords.empty) {
+      recordRef = priorRecords.docs[0].ref;
+      recordId = priorRecords.docs[0].id;
+      recordOriginal = priorRecords.docs[0].data();
+      results.reusedExistingRecord = true;
+    } else {
+      const capture = await post("/api/meeting-records/capture", {
+        meetingId, recordType: "OTHER", title: TITLE,
+        content: "System-test-only record created to verify that records linked to a REAL or unclassified meeting cannot be purged. Preserve this record."
+      }, idToken);
+      if (capture.status !== 200 || capture.body.ok !== true || !capture.body.recordId) {
+        liveCheckFailed = true;
+        results.recordCapture = false;
+        console.log("CANARY_RECORD_CAPTURE=FAIL; HTTP=" + capture.status);
+        throw new Error("Could not create the single linked system-test record required for the purge check.");
+      }
+      recordId = String(capture.body.recordId);
+      recordRef = db.collection("meetingRecords").doc(recordId);
+      const recordSnapshot = await recordRef.get();
+      if (!recordSnapshot.exists) {
+        liveCheckFailed = true;
+        throw new Error("Worker did not persist the canary meeting record.");
+      }
+      recordOriginal = recordSnapshot.data();
+      results.recordCapture = true;
     }
-
-    results.recordCapture = true;
-    recordId = String(capture.body.recordId);
-    recordRef = db.collection("meetingRecords").doc(recordId);
-    const recordSnapshot = await recordRef.get();
-    if (!recordSnapshot.exists) {
-      liveCheckFailed = true;
-      throw new Error("Worker did not persist the canary meeting record.");
-    }
-    recordOriginal = recordSnapshot.data();
 
     // The isolated canary is eligible for purge only if the REAL-meeting guard is bypassed.
     await recordRef.update({
@@ -175,7 +180,7 @@ async function post(path, body, idToken) {
       try {
         await meetingRef.set({
           ...meetingData,
-          environment: FieldValue.delete(),
+          ...(Object.prototype.hasOwnProperty.call(meetingData, "environment") ? { environment: meetingData.environment } : { environment: FieldValue.delete() }),
           legalHold: true,
           legalHoldReason: "System canary protection test; preserve this record.",
           protectedRecord: true,
@@ -214,10 +219,36 @@ async function post(path, body, idToken) {
     }
   }
 
+  if (db && meetingRef) {
+    try {
+      const finalMeeting = await meetingRef.get();
+      results.finalMeetingExists = finalMeeting.exists;
+      results.finalEnvironmentUnchanged = finalMeeting.exists && finalMeeting.get("environment") === undefined;
+      if (!results.finalMeetingExists || !results.finalEnvironmentUnchanged) liveCheckFailed = true;
+    } catch {
+      results.finalMeetingExists = false;
+      results.finalEnvironmentUnchanged = false;
+      liveCheckFailed = true;
+    }
+  }
+  if (db && recordRef) {
+    try {
+      const finalRecord = await recordRef.get();
+      results.finalRecordExists = finalRecord.exists;
+      if (!finalRecord.exists) liveCheckFailed = true;
+    } catch {
+      results.finalRecordExists = false;
+      liveCheckFailed = true;
+    }
+  }
+
   const passed = results.missingEnvironment === true &&
     results.realMeetingDelete === true &&
     results.realMeetingPurge === true &&
     results.trialEnvironmentMutationBlocked === true &&
+    results.finalMeetingExists === true &&
+    results.finalEnvironmentUnchanged === true &&
+    results.finalRecordExists === true &&
     !fatalError;
   if (!passed && !fatalError && !liveCheckFailed) liveCheckFailed = true;
   output("live_check_failed", liveCheckFailed ? "true" : "false");
@@ -227,6 +258,8 @@ async function post(path, body, idToken) {
     "## REAL meeting protection canary",
     "Meeting ID: " + meetingId,
     "Meeting-record ID: " + recordId,
+    "Existing meeting reused: " + (results.reusedExistingMeeting === true ? "YES" : "NO"),
+    "Existing meeting-record reused: " + (results.reusedExistingRecord === true ? "YES" : "NO"),
     "Missing environment retained: " + (results.missingEnvironment === true ? "YES" : "NO / NOT VERIFIED"),
     "REAL meeting delete refusal: " + (results.realMeetingDelete === true ? "PASS" : "FAIL / NOT VERIFIED"),
     "REAL meeting-record purge refusal: " + (results.realMeetingPurge === true ? "PASS" : "FAIL / NOT VERIFIED"),
