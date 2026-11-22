@@ -88,6 +88,8 @@ export async function buildRecoveryPreview(ctx,user,id){
     signers:safeSigners,fields:safeFields
   });
   const pdf=await PDFDocument.load(preview);
+  pdf.setTitle("RECOVERY PREVIEW - NOT COMPLETED");
+  pdf.setSubject("Non-authoritative recovery preview; not a completed or archived document.");
   const font=await pdf.embedFont(StandardFonts.HelveticaBold);
   for(const page of pdf.getPages()){
     const {width,height}=page.getSize();
