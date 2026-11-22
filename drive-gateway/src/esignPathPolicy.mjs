@@ -10,7 +10,7 @@ export function isEsignPath(pathname) {
   const path = String(pathname || "");
   return path === "/api/documents/next-reference" ||
     /^\/api\/documents(?:\/.*)?$/.test(path) ||
-    /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void|distribution\/retry|diagnose-finalisation)|\/invitations\/S\d+\/(?:resend|revoke))?)?$/.test(path) ||
+    /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|retry-finalisation|undo-finalisation-retry|void|distribution\/retry|diagnose-finalisation)|\/invitations\/S\d+\/(?:resend|revoke))?)?$/.test(path) ||
     /^\/api\/sign\/.*$/.test(path) ||
     /^\/api\/document-lifecycle\/.*$/.test(path) ||
     /^\/api\/auth\/.*$/.test(path) ||

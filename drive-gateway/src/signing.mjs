@@ -6,7 +6,7 @@ import {
   rollbackEmailSigningResend, commitEmailSigningResend, updateEmailSignerContact, markEmailSignerSigned
 } from "./emailSigning/index.mjs";
 import {distributeCompletedSignatureDocument,getSignatureDistributionSummary,retryFailedSignatureDistributions} from "./signatureDistribution.mjs";
-import {recordFinalisationStage} from "./finalisationStages.mjs";
+import {createFinalisationAttemptRecord,recordFinalisationStage} from "./finalisationStages.mjs";
 import {SIGNATURE_FIELD_COORDINATE_SPACE,normalizeSignatureField} from "../../src/utils/signatureFieldCoordinates.mjs";
 export async function chainEvents(events,e){const body={...e,prevHash:events.length?events.at(-1).hash:"GENESIS"};return[...events,{...body,hash:await sha256Hex(canonicalJson(body))}]}
 export async function verifyChain(events){if(!Array.isArray(events))return false;let p="GENESIS";for(const e of events){const {hash,...b}=e;if(b.prevHash!==p||await sha256Hex(canonicalJson(b))!==hash)return false;p=hash}return true}
@@ -438,9 +438,176 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   return done.completed?{ok:true,status:"Completed",completed:true,distribution:done.distribution||null}:{ok:true,status:"CompletionFailed",completed:false};
 }
 export async function declineSigning(ctx,{token,reason,ip,user}){const{env,signer}=await load(ctx,token);active(ctx,env,signer);assertSignerAuthentication(signer,user);await mutate(ctx,env.id,async cur=>{const s=cur.signers.find(x=>x.id===signer.id);if(s.status!=="Pending")throw new HttpError(409,"This envelope can no longer be declined.");const at=ctx.now().toISOString();const emailLink=s.identityType==="email-link";s.status="Declined";if(emailLink){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"revoked_by_signer",revokedAt:at}].slice(-10);s.emailLinkStatus="revoked";s.emailLinkSessionStatus="revoked";s.emailLinkSessionHash=null;}return{patch:{signers:cur.signers,status:"Declined",events:await chainEvents(cur.events,{type:emailLink?"email_link.revoked_by_signer":"signer.declined",signerId:s.id,at,ip:ip||null,reason:cleanText(reason||"",300),identityType:s.identityType||"firebase-uid"})}}});return{ok:true,status:"Declined",revoked:signer.identityType==="email-link"}}
-export async function finalizeEnvelope(ctx,id){const e=await ctx.meta.get("envelopes",id);if(!e)throw new HttpError(404,"Envelope not found.");if(e.status==="Completed"){let distribution=null;try{distribution=await distributeCompletedSignatureDocument(ctx,e,e.completion)}catch(error){ctx.logger?.error?.("SIGNATURE_DISTRIBUTION_RECONCILIATION_FAILED",{envelopeId:id,errorType:String(error?.name||"Error")})}return{ok:true,completed:true,completion:e.completion,distribution}}if(!["Completing","CompletionFailed"].includes(e.status))return{ok:false,completed:false};await ctx.meta.update("envelopes",id,{status:"Finalizing",completionFailure:null},{ifVersion:e._v});const cur=await ctx.meta.get("envelopes",id),stored=[];let completionStage="READ_ORIGINAL";try{const{bytes:orig}=await original(ctx,cur);completionStage="BUILD_SIGNED_PDF";const completedAt=ctx.now().toISOString(),finalBytes=await recordFinalisationStage(ctx,cur.id,"PDF_BUILD",()=>buildSignedPdf(orig,{envelopeId:cur.id,documentId:cur.documentId,title:cur.title,originalHash:cur.documentHash,chainHead:cur.events.at(-1).hash,events:cur.events,completedAt,signers:cur.signers.map(s=>({id:s.id,uid:s.uid,name:s.name,email:s.email,signedAt:s.signedAt,ip:s.ip,signatureType:s.signatureType,signatureValue:s.signatureValue,fieldValues:s.fieldValues||{},signerDeclarations:s.signerDeclarations||{},declarationDiscrepancy:s.declarationDiscrepancy||null})),fields:cur.fields||[]})),finalHash=await recordFinalisationStage(ctx,cur.id,"HASH",()=>sha256Hex(finalBytes)),fileName=`${cleanSegment(cur.fileName.replace(/\.pdf$/i,""),80)}-signed-${finalHash.slice(0,12)}.pdf`;completionStage="WRITE_ARCHIVE_COPIES";await recordFinalisationStage(ctx,cur.id,"ARCHIVE",async()=>{for(const k of cur.archiveTargets){const path=archivePath({archiveKey:k,classification:cur.classification,documentId:cur.documentId,fileName});const r=await ctx.storage.put({path,bytes:finalBytes,contentType:"application/pdf",metadata:{envelopeId:cur.id,documentId:cur.documentId,finalHash,state:"Final Completed Document",archive:k}});stored.push({kind:"archive",archiveKey:k,id:r.id,path})}completionStage="WRITE_RECIPIENT_COPIES";for(const c of[{kind:"owner-copy",ownerKey:cur.createdBy,recipientUid:cur.createdBy,recipientEmailHash:cur.ownerEmail?await sha256Hex(cur.ownerEmail):null},...cur.signers.map(s=>({kind:"signer-copy",ownerKey:s.profileUid||s.uid||`${cur.id}-${s.id}`,signerId:s.id,recipientUid:s.profileUid||s.uid||null,recipientEmailHash:s.emailHash||null}))]){const path=signerCopyPath({ownerKey:c.ownerKey,fileName});const r=await ctx.storage.put({path,bytes:finalBytes,contentType:"application/pdf",metadata:{envelopeId:cur.id,documentId:cur.documentId,recipientUid:c.recipientUid||"",recipientSignerId:c.signerId||"",recipientEmailHash:c.recipientEmailHash||"",copyKind:c.kind,finalHash,state:"Final Completed Document",archive:"my-documents"}});stored.push({kind:c.kind,signerId:c.signerId,recipientUid:c.recipientUid||null,id:r.id,path})}});completionStage="SEAL_CRYPTOGRAPHIC_EVIDENCE";const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);if(cryptoRequired&&!ctx.crypto?.keyProvider)throw new Error("Cryptographic signer key custody is not configured.");const cryptoResult=await recordFinalisationStage(ctx,cur.id,"CERTIFICATE",()=>ctx.crypto?.keyProvider?sealAndPersist({meta:ctx.meta,storage:ctx.storage,keyProvider:ctx.crypto.keyProvider,envelope:{...cur,chainHead:cur.events.at(-1).hash},document:{id:cur.documentId,bytes:finalBytes}}):Promise.resolve(null));if(cryptoRequired&&(!cryptoResult?.sealed||cryptoResult.documentHash!==finalHash||cryptoResult.evidenceIds?.length!==cur.signers.length))throw new Error("Cryptographic evidence does not bind every authenticated signer to the exact completed PDF.");const cryptoEvents=cryptoResult ? cryptoResult.auditEvents : [];const cryptographicEvidenceIds=cryptoResult ? cryptoResult.evidenceIds : [];let events=cur.events;for(const event of cryptoEvents)events=await chainEvents(events,event);const lastSigner=[...cur.signers].sort((a,b)=>Date.parse(b.signedAt||0)-Date.parse(a.signedAt||0))[0];const completion={finalHash,fileName,completedAt,lastSignedByUid:lastSigner?.uid||null,primaryStorageId:stored[0].id,files:stored,cryptographicEvidenceIds,signerEvidence:(cryptoResult?.evidence||[]).map(e=>({signerId:e.signerId,evidenceId:e.evidenceId,identityType:e.signerIdentityType||"firebase-uid"}))};completionStage="PERSIST_COMPLETION_RECORD";const beforeCompleted=await ctx.meta.get("envelopes",id);await ctx.meta.update("envelopes",id,{status:"Completed",completion,completionFailure:null,events:await chainEvents(events,{type:"envelope.completed",at:completedAt,finalHash,fileCount:stored.length,cryptographicEvidenceCount:cryptographicEvidenceIds.length})},{ifVersion:beforeCompleted._v});if(cur.externalReference&&typeof ctx.persistCompletedSignatureEnvelope==="function"){completionStage="SYNC_FIREBASE_MIRROR";await persistMirrorWithStatus(ctx,{...cur,status:"Completed",completion,events},completion)}let distribution=null;try{distribution=await recordFinalisationStage(ctx,id,"DISTRIBUTION",()=>distributeCompletedSignatureDocument(ctx,{...cur,status:"Completed"},completion,{bytes:finalBytes}))}catch(error){ctx.logger?.error?.("SIGNATURE_DISTRIBUTION_RECONCILIATION_FAILED",{envelopeId:id,errorType:String(error?.name||"Error")})}return{ok:true,completed:true,completion,distribution}}catch(err){const failure={code:"COMPLETION_FAILED",stage:completionStage,errorType:String(err?.name||"Error").slice(0,60),failedAt:ctx.now().toISOString(),retryable:true};ctx.logger?.error?.("SIGNATURE_COMPLETION_FAILED",{envelopeId:id,stage:completionStage,errorType:failure.errorType,message:String(err?.message||err).replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").slice(0,180)});try{await rollbackCryptographicEvidence(ctx.meta,id)}catch{}for(const f of stored){try{await ctx.storage.delete(f.id)}catch{}}const latest=await ctx.meta.get("envelopes",id);await ctx.meta.update("envelopes",id,{status:"CompletionFailed",completionFailure:failure},{ifVersion:latest._v});return{ok:false,completed:false,error:"COMPLETION_FAILED",failure}}}
-const owner=(e,u)=>e.createdBy===u.uid||u.isAdmin===true;
-export async function retryCompletion(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");return finalizeEnvelope(ctx,id)}
+export async function finalizeEnvelope(ctx,id,{attemptId:requestedAttemptId}={}){
+ const e=await ctx.meta.get("envelopes",id);
+ if(!e)throw new HttpError(404,"Envelope not found.");
+ if(e.status==="Completed"){
+  let distribution=null;
+  try{distribution=await distributeCompletedSignatureDocument(ctx,e,e.completion);}
+  catch(error){ctx.logger?.error?.("SIGNATURE_DISTRIBUTION_RECONCILIATION_FAILED",{envelopeId:id,errorType:String(error?.name||"Error")});}
+  return{ok:true,completed:true,completion:e.completion,distribution};
+ }
+ if(!["Completing","CompletionFailed"].includes(e.status))return{ok:false,completed:false};
+ const attemptId=String(requestedAttemptId||"FINAL-"+randomHex(8));
+ const startedAt=ctx.now().toISOString();
+ const finalisationRecord=createFinalisationAttemptRecord(e.finalisationRecord||{},attemptId,startedAt);
+ await ctx.meta.update("envelopes",id,{status:"Finalizing",completionFailure:null,finalisationRecord},{ifVersion:e._v});
+ const cur=await ctx.meta.get("envelopes",id),stored=[];
+ let completionStage="READ_ORIGINAL";
+ try{
+  const {bytes:orig}=await recordFinalisationStage(ctx,cur.id,"READ_ORIGINAL",()=>original(ctx,cur));
+  completionStage="PDF_BUILD";
+  const completedAt=ctx.now().toISOString();
+  const finalBytes=await recordFinalisationStage(ctx,cur.id,"PDF_BUILD",()=>buildSignedPdf(orig,{
+   envelopeId:cur.id,documentId:cur.documentId,title:cur.title,originalHash:cur.documentHash,
+   chainHead:cur.events.at(-1).hash,events:cur.events,completedAt,
+   signers:cur.signers.map(s=>({id:s.id,uid:s.uid,name:s.name,email:s.email,signedAt:s.signedAt,ip:s.ip,signatureType:s.signatureType,signatureValue:s.signatureValue,fieldValues:s.fieldValues||{},signerDeclarations:s.signerDeclarations||{},declarationDiscrepancy:s.declarationDiscrepancy||null})),
+   fields:cur.fields||[]
+  }));
+  completionStage="HASH";
+  const finalHash=await recordFinalisationStage(ctx,cur.id,"HASH",()=>sha256Hex(finalBytes));
+  const fileName=`${cleanSegment(cur.fileName.replace(/\.pdf$/i,""),80)}-signed-${finalHash.slice(0,12)}.pdf`;
+  completionStage="ARCHIVE";
+  await recordFinalisationStage(ctx,cur.id,"ARCHIVE",async()=>{
+   for(const k of cur.archiveTargets){
+    const path=archivePath({archiveKey:k,classification:cur.classification,documentId:cur.documentId,fileName});
+    const r=await ctx.storage.put({path,bytes:finalBytes,contentType:"application/pdf",metadata:{envelopeId:cur.id,documentId:cur.documentId,finalHash,state:"Final Completed Document",archive:k}});
+    stored.push({kind:"archive",archiveKey:k,id:r.id,path});
+   }
+  });
+  completionStage="RECIPIENT_COPIES";
+  await recordFinalisationStage(ctx,cur.id,"RECIPIENT_COPIES",async()=>{
+   for(const c of [{kind:"owner-copy",ownerKey:cur.createdBy,recipientUid:cur.createdBy,recipientEmailHash:cur.ownerEmail?await sha256Hex(cur.ownerEmail):null},...cur.signers.map(s=>({kind:"signer-copy",ownerKey:s.profileUid||s.uid||`${cur.id}-${s.id}`,signerId:s.id,recipientUid:s.profileUid||s.uid||null,recipientEmailHash:s.emailHash||null}))]){
+    const path=signerCopyPath({ownerKey:c.ownerKey,fileName});
+    const r=await ctx.storage.put({path,bytes:finalBytes,contentType:"application/pdf",metadata:{envelopeId:cur.id,documentId:cur.documentId,recipientUid:c.recipientUid||"",recipientSignerId:c.signerId||"",recipientEmailHash:c.recipientEmailHash||"",copyKind:c.kind,finalHash,state:"Final Completed Document",archive:"my-documents"}});
+    stored.push({kind:c.kind,signerId:c.signerId,recipientUid:c.recipientUid||null,id:r.id,path});
+   }
+  });
+  completionStage="CERTIFICATE";
+  const cryptoRequired=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
+  const cryptoResult=await recordFinalisationStage(ctx,cur.id,"CERTIFICATE",async()=>{
+   if(cryptoRequired&&!ctx.crypto?.keyProvider)throw Object.assign(new Error("Cryptographic signer key custody is not configured."),{code:"CERTIFICATE_KEY_PROVIDER_MISSING"});
+   return ctx.crypto?.keyProvider?sealAndPersist({meta:ctx.meta,storage:ctx.storage,keyProvider:ctx.crypto.keyProvider,envelope:{...cur,chainHead:cur.events.at(-1).hash},document:{id:cur.documentId,bytes:finalBytes}}):null;
+  });
+  if(cryptoRequired&&(!cryptoResult?.sealed||cryptoResult.documentHash!==finalHash||cryptoResult.evidenceIds?.length!==cur.signers.length)){
+   throw Object.assign(new Error("Cryptographic evidence does not bind every authenticated signer to the exact completed PDF."),{code:"CERTIFICATE_EVIDENCE_INCOMPLETE"});
+  }
+  const cryptoEvents=cryptoResult?cryptoResult.auditEvents:[];
+  const cryptographicEvidenceIds=cryptoResult?cryptoResult.evidenceIds:[];
+  let events=cur.events;
+  for(const event of cryptoEvents)events=await chainEvents(events,event);
+  const lastSigner=[...cur.signers].sort((a,b)=>Date.parse(b.signedAt||0)-Date.parse(a.signedAt||0))[0];
+  const completion={finalHash,fileName,completedAt,lastSignedByUid:lastSigner?.uid||null,primaryStorageId:stored[0].id,files:stored,cryptographicEvidenceIds,signerEvidence:(cryptoResult?.evidence||[]).map(e=>({signerId:e.signerId,evidenceId:e.evidenceId,identityType:e.signerIdentityType||"firebase-uid"}))};
+  completionStage="PERSIST_COMPLETION_RECORD";
+  await recordFinalisationStage(ctx,id,"PERSIST_COMPLETION_RECORD",async()=>{
+   const beforeCompleted=await ctx.meta.get("envelopes",id);
+   await ctx.meta.update("envelopes",id,{status:"Completed",completion,completionFailure:null,events:await chainEvents(events,{type:"envelope.completed",at:completedAt,finalHash,fileCount:stored.length,cryptographicEvidenceCount:cryptographicEvidenceIds.length})},{ifVersion:beforeCompleted._v});
+  });
+  if(cur.externalReference&&typeof ctx.persistCompletedSignatureEnvelope==="function"){
+   completionStage="SYNC_FIREBASE_MIRROR";
+   await recordFinalisationStage(ctx,id,"SYNC_FIREBASE_MIRROR",()=>persistMirrorWithStatus(ctx,{...cur,status:"Completed",completion,events},completion));
+  }
+  let distribution=null;
+  try{distribution=await recordFinalisationStage(ctx,id,"DISTRIBUTION",()=>distributeCompletedSignatureDocument(ctx,{...cur,status:"Completed"},completion,{bytes:finalBytes}));}
+  catch(error){ctx.logger?.error?.("SIGNATURE_DISTRIBUTION_RECONCILIATION_FAILED",{envelopeId:id,errorType:String(error?.name||"Error")});}
+  return{ok:true,completed:true,completion,distribution};
+ }catch(err){
+  const failure={code:"COMPLETION_FAILED",stage:completionStage,stageCode:completionStage,errorType:String(err?.name||"Error").slice(0,60),errorCode:String(err?.code||err?.name||"STAGE_FAILED").replace(/[^A-Z0-9_-]/gi,"").slice(0,48),failedAt:ctx.now().toISOString(),retryable:true};
+  ctx.logger?.error?.("SIGNATURE_COMPLETION_FAILED",{envelopeId:id,stage:completionStage,errorType:failure.errorType,message:String(err?.message||err).replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").slice(0,180)});
+  try{await rollbackCryptographicEvidence(ctx.meta,id);}catch{}
+  for(const file of stored){try{await ctx.storage.delete(file.id);}catch{}}
+  const latest=await ctx.meta.get("envelopes",id);
+  await ctx.meta.update("envelopes",id,{status:"CompletionFailed",completion:null,completionFailure:failure},{ifVersion:latest._v});
+  return{ok:false,completed:false,error:"COMPLETION_FAILED",failure};
+ }
+}
+const owner=(e,u)=>Boolean(u?.uid)&&[e.createdBy,e.createdByUid,e.ownerUid].includes(u.uid)||u?.isAdmin===true||u?.isOwner===true;
+function stripFinalisationRetrySecrets(value){
+ if(Array.isArray(value))return value.map(stripFinalisationRetrySecrets);
+ if(value&&typeof value==="object"){
+  const safe={};
+  for(const [key,item] of Object.entries(value)){
+   if(/token|secret|signatureValue|signatureImage|signatureData|sessionHash|ipAttempts|link$|url$|uri$/i.test(key))continue;
+   const cleaned=stripFinalisationRetrySecrets(item);
+   if(cleaned!==undefined)safe[key]=cleaned;
+  }
+  return safe;
+ }
+ if(typeof value==="string"&&/^data:image\//i.test(value))return undefined;
+ return value;
+}
+function finalisationRetryBackupSnapshot(envelope){
+ const snapshot=stripFinalisationRetrySecrets(envelope);
+ delete snapshot._v;
+ return snapshot;
+}
+async function reserveFinalisationRetryRateLimit(ctx,user,now){
+ const id="retry-rate-"+String(user.uid).replace(/[^A-Za-z0-9_-]/g,"_").slice(0,100);
+ for(let attempt=0;attempt<5;attempt++){
+  const current=await ctx.meta.get("finalisationRetryRateLimits",id);
+  if(!current){
+   try{await ctx.meta.create("finalisationRetryRateLimits",id,{actorUid:user.uid,windowStartedAt:now.toISOString(),count:1});return;}
+   catch(error){if(error instanceof Conflict)continue;throw error;}
+  }
+  const started=Date.parse(String(current.windowStartedAt||""));
+  const active=Number.isFinite(started)&&now.getTime()>=started&&now.getTime()-started<3600000;
+  const count=active?Number(current.count||0):0;
+  if(count>=3)throw new HttpError(429,"The finalisation retry limit is three attempts per hour.");
+  try{
+   await ctx.meta.update("finalisationRetryRateLimits",id,{actorUid:user.uid,windowStartedAt:active?current.windowStartedAt:now.toISOString(),count:count+1},{ifVersion:current._v});
+   return;
+  }catch(error){if(error instanceof VersionConflict)continue;throw error;}
+ }
+ throw new HttpError(409,"The retry rate-limit reservation conflicted; no finalisation was started.");
+}
+export async function retryCompletion(ctx,user,id,{confirmOneRetry=false}={}){
+ if(!user?.uid)throw new HttpError(401,"Authentication required.");
+ if(confirmOneRetry!==true)throw new HttpError(400,"Explicit confirmation for exactly one finalisation retry is required.");
+ const envelope=await ctx.meta.get("envelopes",id);
+ if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+ if(envelope.status!=="CompletionFailed")throw new HttpError(409,"Only a failed-completion envelope can be retried.");
+ if(envelope.completion)throw new HttpError(409,"A completion record already exists; retry is blocked.");
+ if(!await verifyChain(envelope.events))throw new HttpError(409,"Signing audit chain failed verification; retry is blocked.");
+ if(await ctx.meta.get("finalisationRetryAttempts",id))throw new HttpError(409,"The one permitted finalisation retry has already been used.");
+ const cryptoRows=await ctx.meta.list("cryptographicEvidence");
+ if((cryptoRows||[]).some(row=>row?.envelopeId===id))throw new HttpError(409,"Existing cryptographic evidence is present; retry is blocked to preserve it.");
+ const now=ctx.now(),startedAt=now.toISOString();
+ await reserveFinalisationRetryRateLimit(ctx,user,now);
+ const backupSnapshot=finalisationRetryBackupSnapshot(envelope);
+ await ctx.meta.create("finalisationRetryBackups",id,{envelopeId:id,actorUid:user.uid,createdAt:startedAt,originalVersion:envelope._v,originalEnvelopeHash:await sha256Hex(canonicalJson(envelope)),envelopeSnapshot:backupSnapshot});
+ const attemptId="FRT-"+randomHex(10),undoUntil=new Date(now.getTime()+7*86400000).toISOString();
+ await ctx.meta.create("finalisationRetryAttempts",id,{envelopeId:id,attemptId,actorUid:user.uid,startedAt,undoUntil,status:"STARTED",stageCode:null});
+ const current=await ctx.meta.get("envelopes",id);
+ try{
+  await ctx.meta.update("envelopes",id,{events:await chainEvents(current.events,{type:"envelope.finalisation.retry.started",actor:user.uid,at:startedAt,attemptId,action:"retry-finalisation"}),finalisationRetry:{attemptId,status:"STARTED",actorUid:user.uid,startedAt,undoUntil}},{ifVersion:current._v});
+ }catch(error){
+  const attempt=await ctx.meta.get("finalisationRetryAttempts",id);
+  if(attempt)await ctx.meta.update("finalisationRetryAttempts",id,{status:"ABORTED",finishedAt:ctx.now().toISOString(),stageCode:"RETRY_RESERVATION_FAILED"},{ifVersion:attempt._v});
+  throw error;
+ }
+ const result=await finalizeEnvelope(ctx,id,{attemptId});
+ const finishedAt=ctx.now().toISOString(),latest=await ctx.meta.get("envelopes",id);
+ const status=result.completed?"COMPLETED":"FAILED";
+ const stageCode=result.failure?.stageCode||result.failure?.stage||latest.completionFailure?.stageCode||latest.completionFailure?.stage||null;
+ const event={type:result.completed?"envelope.finalisation.retry.completed":"envelope.finalisation.retry.failed",actor:user.uid,at:finishedAt,attemptId,action:"retry-finalisation",result:status,...(stageCode?{stageCode}:{})};
+ await ctx.meta.update("envelopes",id,{events:await chainEvents(latest.events,event),finalisationRetry:{...(latest.finalisationRetry||{}),status,finishedAt,stageCode,undoUntil}},{ifVersion:latest._v});
+ const attempt=await ctx.meta.get("finalisationRetryAttempts",id);
+ await ctx.meta.update("finalisationRetryAttempts",id,{status,finishedAt,stageCode},{ifVersion:attempt._v});
+ return {...result,retry:{attemptId,status,stageCode,undoUntil}};
+}
+export async function undoFinalisationRetry(ctx,user,id){
+ const envelope=await ctx.meta.get("envelopes",id);
+ if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");
+ const attempt=await ctx.meta.get("finalisationRetryAttempts",id),backup=await ctx.meta.get("finalisationRetryBackups",id);
+ if(!attempt||!backup)throw new HttpError(404,"No finalisation retry backup was found.");
+ if(attempt.status!=="FAILED"||envelope.status==="Completed")throw new HttpError(409,"Undo is available only for a failed retry; completed documents are immutable.");
+ const now=ctx.now(),deadline=Date.parse(String(attempt.undoUntil||""));
+ if(!Number.isFinite(deadline)||now.getTime()>deadline)throw new HttpError(410,"The seven-day undo window has expired.");
+ const snapshot=backup.envelopeSnapshot||{},at=now.toISOString();
+ await ctx.meta.update("envelopes",id,{status:snapshot.status||"CompletionFailed",completion:snapshot.completion??null,completionFailure:snapshot.completionFailure??null,finalisationRetry:{...(envelope.finalisationRetry||{}),status:"UNDONE",undoneAt:at},events:await chainEvents(envelope.events,{type:"envelope.finalisation.retry.undone",actor:user.uid,at,attemptId:attempt.attemptId,action:"undo-failed-finalisation-retry"})},{ifVersion:envelope._v});
+ await ctx.meta.update("finalisationRetryAttempts",id,{status:"UNDONE",undoneAt:at},{ifVersion:attempt._v});
+ return{ok:true,status:"UNDONE",undoAt:at,stageCode:attempt.stageCode||null};
+}
 export async function retryCompletedDocumentDistribution(ctx,user,id){return retryFailedSignatureDistributions(ctx,user,id)}
 export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");for(const signer of c.signers||[])if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="used"){signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);signer.emailLinkStatus="revoked";signer.emailLinkSessionStatus="revoked";signer.emailLinkSessionHash=null;}return{patch:{status:"Voided",signers:c.signers,events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
 

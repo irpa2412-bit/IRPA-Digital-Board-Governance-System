@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Owner-authorised Signature Portal finalisation recovery for IRPA-ENV-2026-11501354. Record each finalisation stage and provide a zero-write sandbox diagnosis before any controlled retry.",
+    "reason": "Owner-authorised Signature Portal recovery tooling: per-attempt stage records, masked evidence report and backup-first one-shot owner/admin retry. The target production envelope remains untouched until the owner reviews the Diagnose finalisation report and separately approves retry.",
     "files": [
       "docs/portal-protection/records/signature-portal.json",
       "docs/portal-protection/windows/signature-portal.json",
@@ -22,9 +22,16 @@
       "drive-gateway/src/signing.mjs",
       "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
       "tests/signature-recovery-owner-panel-finalisation.test.mjs",
-      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md"
+      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+      "drive-gateway/src/finalisationStages.mjs",
+      "drive-gateway/src/router.mjs",
+      "drive-gateway/src/esignPathPolicy.mjs",
+      "drive-gateway/tests/signature-finalisation-stages.test.mjs",
+      "drive-gateway/tests/signature-finalisation-retry.test.mjs",
+      "drive-gateway/tests/signature-recovery-route-dispatch.test.mjs",
+      "docs/signature-recovery/controlled-retry-change-record-2026-11-23.md"
     ],
-    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment.",
+    "expectedEffect": "The recovery panel provides a read-only evidence report and Diagnose finalisation, plus an explicitly confirmed owner/admin-only one-shot retry with a restricted backup, audit event, per-stage failure code, three-per-hour limit and seven-day undo for failed attempts. Completed remains controlled by the normal finalisation flow and independent of email delivery.",
     "prohibitedChanges": [
       "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
       "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
@@ -38,7 +45,7 @@
       "tests/signature-field-assignment-setup.test.mjs",
       "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
       "tests/signature-firestore-diagnostics.test.mjs",
-      "tests/signature-recovery-owner-panel-readonly.test.mjs — GET-only, endpoint allowlist, no persistence/action API, no direct completion.",
+      "tests/signature-recovery-owner-panel-readonly.test.mjs — evidence/preview remain GET; retry is explicit, owner/admin-only, one-shot and backup-first; no direct Completed assignment.",
       "drive-gateway/tests/signature-recovery.test.mjs — queue/evidence/preview preserve the complete envelope and signing evidence snapshot; access telemetry is stored separately."
     ],
     "fileEffects": [
@@ -85,6 +92,30 @@
       {
         "path": "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md",
         "expectedEffect": "Records exact request sequence, source findings, scope, prohibited changes, baseline/rollback, validation limitations and deployment evidence status for SR-2026-11-22-01."
+      },
+      {
+        "path": "drive-gateway/src/finalisationStages.mjs",
+        "expectedEffect": "Records per-attempt stage IDs and sanitised PASS/FAILED outcomes across every finalisation stage while retaining bounded prior-attempt history."
+      },
+      {
+        "path": "drive-gateway/src/signing.mjs",
+        "expectedEffect": "Adds backup-first, explicitly confirmed, one-shot owner/admin retry; actor rate limit; chained retry audit events; and failed-retry undo without rewriting signer evidence or assigning Completed directly."
+      },
+      {
+        "path": "drive-gateway/src/signatureRecovery.mjs",
+        "expectedEffect": "Adds masked signer addresses, EAT signing timestamps and retry status to the read-only evidence response."
+      },
+      {
+        "path": "src/pages/SignatureRecoveryOwnerPanel.jsx",
+        "expectedEffect": "Adds Download evidence report, explicit one-retry confirmation, retry stage result and seven-day undo for failed retries; diagnostic remains zero-write."
+      },
+      {
+        "path": "drive-gateway/tests/signature-finalisation-retry.test.mjs",
+        "expectedEffect": "Covers authorization, backup redaction, one attempt, rate limit, failure-stage reporting, undo and evidence preservation."
+      },
+      {
+        "path": "docs/signature-recovery/controlled-retry-change-record-2026-11-23.md",
+        "expectedEffect": "Records the owner-approved single-PR scope, 72-hour window, safety boundaries and deployment gates."
       }
     ]
   },
@@ -228,7 +259,13 @@
         "runId": 45039448775,
         "result": "IN_PROGRESS at retrieval."
       }
-    ]
+    ],
+    "controlledRetryTests": "PENDING",
+    "prCi": "PENDING",
+    "workerDeployment": "NOT_STARTED",
+    "firebaseHosting": "NOT_STARTED",
+    "cloudflareFrontend": "NOT_STARTED",
+    "productionEnvelopeMutation": "NONE"
   },
   "renewals": [
     {
@@ -409,15 +446,61 @@
         "rateLimitPerHour": 3,
         "neverSetCompletedDirectly": true
       }
+    },
+    {
+      "changeId": "SR-2026-11-23-01",
+      "status": "implementation-in-progress",
+      "approvedAt": "2026-11-22T21:49:37Z",
+      "ownerDecision": "One PR must include per-attempt stage recording, a masked downloadable evidence report, and backup-first one-shot owner/admin retry. Do not touch the target envelope until the owner supplies the Diagnose finalisation report and separately approves the one retry.",
+      "repairWindow": {
+        "openedAt": "2026-11-22T18:06:00.000Z",
+        "expiresAt": "2026-11-25T18:06:00.000Z",
+        "durationHours": 72
+      },
+      "files": [
+        "drive-gateway/src/finalisationStages.mjs",
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/signatureRecovery.mjs",
+        "drive-gateway/src/router.mjs",
+        "drive-gateway/src/esignPathPolicy.mjs",
+        "drive-gateway/tests/signature-finalisation-stages.test.mjs",
+        "drive-gateway/tests/signature-finalisation-retry.test.mjs",
+        "drive-gateway/tests/signature-recovery-route-dispatch.test.mjs",
+        "src/pages/SignatureRecoveryOwnerPanel.jsx",
+        "tests/signature-recovery-owner-panel-readonly.test.mjs",
+        "docs/signature-recovery/controlled-retry-change-record-2026-11-23.md",
+        "docs/portal-protection/records/signature-portal.json",
+        "docs/portal-protection/windows/signature-portal.json"
+      ],
+      "expectedEffect": "The normal finalisation flow runs once only after explicit confirmation; failures retain signer evidence and show the failing stage; retry rate limit is three per actor per hour; failed retry undo is available for seven days; Completed remains independent of email delivery.",
+      "prohibitedChanges": [
+        "No production envelope mutation before the separate approval",
+        "No environment/protection/reviewer/secret/permission changes",
+        "No bypass of required checks or deployment approval",
+        "No direct Completed assignment",
+        "No edits to signing rules, tokens, signer identities, field assignments, PDF builder, hash algorithm, certificate generation, archive or distribution logic"
+      ]
     }
   ],
   "activeAmendment": {
-    "ownerDecision": "Do not move Completed after distribution. Completed is independent of email delivery; implement envelope-level distribution status and failed-recipient-only resend in its own PR.",
+    "changeId": "SR-2026-11-23-01",
+    "status": "implementation-in-progress",
+    "ownerDecision": "One PR for per-attempt stage recording, masked evidence report and backup-first one-shot retry. Retry execution remains held until owner reviews the Diagnose report and separately approves.",
     "files": [
-      "drive-gateway/src/signatureDistribution.mjs",
+      "drive-gateway/src/finalisationStages.mjs",
       "drive-gateway/src/signing.mjs",
-      "src/pages/SignatureRecoveryOwnerPanel.jsx"
+      "drive-gateway/src/signatureRecovery.mjs",
+      "drive-gateway/src/router.mjs",
+      "drive-gateway/src/esignPathPolicy.mjs",
+      "drive-gateway/tests/signature-finalisation-stages.test.mjs",
+      "drive-gateway/tests/signature-finalisation-retry.test.mjs",
+      "drive-gateway/tests/signature-recovery-route-dispatch.test.mjs",
+      "src/pages/SignatureRecoveryOwnerPanel.jsx",
+      "tests/signature-recovery-owner-panel-readonly.test.mjs",
+      "docs/signature-recovery/controlled-retry-change-record-2026-11-23.md",
+      "docs/portal-protection/records/signature-portal.json",
+      "docs/portal-protection/windows/signature-portal.json"
     ],
-    "expectedEffect": "First PR stage recording and zero-write dry run; second PR envelope-level distribution status and failed-recipient-only resend; third PR backup-first audited retry. Completed remains independent of email delivery."
+    "expectedEffect": "Controlled retry with backup, audit event, one attempt per envelope, three-per-hour limit, seven-day failed-retry undo, and no direct Completed assignment."
   }
 }
