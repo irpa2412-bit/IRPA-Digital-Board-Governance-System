@@ -12,9 +12,11 @@ test("Meeting Portal is independently registered against the production rollback
 });
 
 test("Meeting Portal protection covers its UI, Worker, policy, attendance and signature dependencies", () => {
+  const pendingPaths = new Set(meeting.pendingPaths ?? []);
   for (const path of meeting.paths) {
-    assert.ok(fs.existsSync(path), `registered Meeting Portal path must exist: ${path}`);
+    assert.ok(fs.existsSync(path) || pendingPaths.has(path), `registered Meeting Portal path must exist or be explicitly pending in its approved implementation PR: ${path}`);
   }
+  for (const path of pendingPaths) assert.ok(meeting.paths.includes(path), `pending path must remain registered: ${path}`);
   for (const path of meeting.sharedDependencies) {
     assert.ok(fs.existsSync(path), `registered shared dependency must exist: ${path}`);
   }

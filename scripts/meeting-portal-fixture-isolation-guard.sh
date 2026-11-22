@@ -4,6 +4,7 @@ git fetch origin main:refs/remotes/origin/main
 EVENT_NAME="${EVENT_NAME:-}" node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
 import { evaluateSignatureWindowAmendment, evaluateSignatureWindowRepair, evaluateSignatureWindowClosure, evaluateSignatureWindowReopen } from "./scripts/portal-repair-window-guard-policy.mjs";
+import { classifyProtectionOnlyChange } from "./scripts/portal-protection-check.mjs";
 // Compare against the fetched main snapshot for both PR and push runs.
 // Keep the path allowlist strict while excluding main-only files added after
 // this feature branch diverged; no portal source or workflow is exempted.
@@ -13,9 +14,22 @@ const base = "origin/main";
 execFileSync("git", ["cat-file", "-e", `${base}^{commit}`]);
 const changed = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { encoding: "utf8" })
   .trim().split("\n").filter(Boolean).sort();
+const protectionOnlyClassification = classifyProtectionOnlyChange(changed);
+if (protectionOnlyClassification.eligible) {
+  console.log(JSON.stringify({
+    classificationOnly: true,
+    eligible: true,
+    reason: "Protection-only changes are classified here; owner approval is independently verified by the required security-baseline policy gate."
+  }));
+  process.exit(0);
+}
 const allowed = new Set([
   ".github/workflows/meeting-portal-fixture-browser.yml",
   "docs/portal-protection/repair-window.json",
+  "docs/portal-protection/records/meeting-portal.json",
+  "docs/portal-protection/windows/meeting-portal.json",
+  "scripts/portal-protection-check.mjs",
+  "tests/portal-protection-policy.test.mjs",
   "docs/portal-protection/change-record.json",
   "scripts/meeting-portal-fixture-isolation-guard.sh",
   "scripts/portal-repair-window-guard-policy.mjs",
@@ -31,6 +45,7 @@ const allowed = new Set([
   "tests/firestore.rules.test.cjs",
   "tests/research-portal-security.test.mjs",
   "tests/meeting-isolation-guard.test.mjs",
+  "tests/meeting-trial-delete-ui.test.mjs",
   "tests/invitation-removal-policy.test.mjs",
   "tests/meeting-invitation-resend-quorum.test.mjs",
 "tests/signature-signer-picker-regression.test.mjs",
@@ -56,6 +71,11 @@ const allowed = new Set([
   "drive-gateway/src/index.js",
   "drive-gateway/src/meetingPortal.mjs",
   "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/src/meetingEnvironment.mjs",
+  "drive-gateway/src/meetingDeletion.mjs",
+  "drive-gateway/tests/meeting-environment.test.mjs",
+  "drive-gateway/tests/meeting-trial-deletion.test.mjs",
+  "docs/implementation-status.md",
   "src/firebase/meetingAttendanceSigning.js",
   "src/firebase/meetingAttendanceSignerIdentity.js",
   "tests/meeting-daily-attendance-email-signing.test.mjs",
@@ -322,20 +342,7 @@ if (changed.includes("docs/portal-protection/repair-window.json") ||
     changed.includes("docs/portal-protection/change-record.json")) {
   if (!parallelWindowRecordAmendment) throw new Error(signatureWindowReopenDecision.reason || signatureWindowClosureDecision.reason || parallelWindowDecision.reason);
 }
-const unexpected = changed.filter(path =>
-  !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
-  !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
-  !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
-  !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
-  !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
-  !(signatureEmailLinkSessionRepair && changed.includes(path)) &&
-  !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/")))
-);
-if (unexpected.length) {
-  console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
-  process.exit(1);
-}
-          // If Wrangler configuration changes, permit only the staging section to differ.
+// If Wrangler configuration changes, permit only the staging section to differ.
 // The production section must be byte-for-byte identical to the captured PR base.
 const wranglerPath = "drive-gateway/wrangler.toml";
 if (changed.includes(wranglerPath)) {
@@ -405,6 +412,20 @@ const emailSigningRebuildIntegration = changed.includes("drive-gateway/src/signi
   changed.includes("drive-gateway/tests/email-signing-contract.test.mjs") &&
   changed.some(path => path.startsWith("drive-gateway/src/emailSigning/")) &&
   changed.every(path => emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/"));
+const unexpected = changed.filter(path =>
+  !allowed.has(path) && !(path === ".github/workflows/firebase-deploy.yml" && (signatureGatewayIntegration || actualDataGateIntegration || controlledDocumentTrialUploadFix)) &&
+  !(communicationMediaIntegration && communicationMediaPaths.has(path)) &&
+  !(communicationMediaArchiveIntegration && communicationMediaArchivePaths.has(path)) &&
+  !(path === "drive-gateway/tests/esign-storage-multipart.test.mjs" && signatureGatewayIntegration) &&
+  !(grantAssistantPersistence && ["src/pages/GrantIntelligencePortal.jsx", "src/styles/app.css"].includes(path)) &&
+  !(signatureEmailLinkSessionRepair && changed.includes(path)) &&
+  !(emailSigningRebuildIntegration && (emailSigningRebuildPaths.has(path) || path.startsWith("drive-gateway/src/emailSigning/")))
+);
+if (unexpected.length) {
+  console.error("Unexpected files changed outside the isolated meeting repair:", unexpected);
+  process.exit(1);
+}
+
 const invitationMailResendIntegration = changed.includes("public/administrator.html") &&
   changed.includes("src/firebase/auth.js") &&
   changed.includes("src/pages/Invitations.jsx") &&
@@ -472,11 +493,38 @@ const readabilityOnlyChange = changed.includes("src/styles/portal-readability-st
   changed.every(path => readabilityOnlyFiles.has(path)) && packageJsonReadabilityOnly;
 // A manual dispatch on an already-merged ref is a regression rerun, not a PR diff.
 // Keep the changed-path isolation guard, but require a source/test delta only for event diffs.
+const meetingTrialDeletionFiles = new Set([
+  "docs/implementation-status.md",
+  "docs/portal-protection/records/meeting-portal.json",
+  "docs/portal-protection/windows/meeting-portal.json",
+  "drive-gateway/src/meetingEnvironment.mjs",
+  "drive-gateway/src/meetingDeletion.mjs",
+  "drive-gateway/src/meetingServices.mjs",
+  "drive-gateway/tests/meeting-trial-deletion.test.mjs",
+  "drive-gateway/tests/meeting-environment.test.mjs",
+  "scripts/meeting-portal-fixture-isolation-guard.sh",
+  "scripts/portal-protection-check.mjs",
+  "tests/meeting-isolation-guard.test.mjs",
+  "tests/meeting-trial-delete-ui.test.mjs",
+  "tests/portal-protection-policy.test.mjs",
+  "src/pages/Meetings.jsx"
+]);
+const meetingTrialDeletionGuard =
+  changed.includes("drive-gateway/src/meetingServices.mjs") &&
+  changed.includes("drive-gateway/src/meetingEnvironment.mjs") &&
+  changed.includes("drive-gateway/src/meetingDeletion.mjs") &&
+  changed.includes("drive-gateway/tests/meeting-environment.test.mjs") &&
+  changed.includes("drive-gateway/tests/meeting-trial-deletion.test.mjs") &&
+  changed.includes("src/pages/Meetings.jsx") &&
+  changed.includes("tests/meeting-trial-delete-ui.test.mjs") &&
+  changed.includes("tests/meeting-isolation-guard.test.mjs") &&
+  changed.includes("tests/portal-protection-policy.test.mjs") &&
+  changed.every(path => meetingTrialDeletionFiles.has(path));
 if (!isMainPush && eventName !== "workflow_dispatch" &&
     !changed.includes("src/pages/Meetings.jsx") &&
     !changed.includes("src/pages/OperationalGatewaysParticipants.jsx") &&
     !testOnlySignatureNavigation && !testOnlyRegisterScope && !invitationRemovalIntegration && !invitationMailResendIntegration &&
-    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
+    !signatureGatewayIntegration && !signaturePathwayContractRepair && !actualDataGateIntegration && !controlledDocumentTrialUploadFix && !signatureSignerPickerRepair && !signatureSignerListVisibilityRepair && !signaturePdfPaletteRepair && !signaturePaletteDirectAssignmentRepair && !signaturePdfUrlHandoffRepair && !signatureDocumentPaletteAssignmentRepair && !signaturePaletteLifecycleSourceRepair && !signaturePdfArchivePaletteRepair && !signatureEmailLinkIdentityRepair && !guardOnlyWorkflowRepair && !communicationMediaOnly && !readabilityOnlyChange && !grantAssistantPersistence && !meetingTrialDeletionGuard && !parallelWindowRecordAmendment && !signatureEmailLinkSessionRepair && !emailSigningRebuildIntegration) {
   throw new Error("Meeting/participant source change or an explicitly paired isolated regression/guard test is missing.");
 }
 console.log(JSON.stringify({ result: "PASS", changedFiles: changed, unrelatedPortalSourceChanges: 0 }));

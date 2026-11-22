@@ -13,6 +13,11 @@
       ],
       "tests": [
         "tests/meeting-invitation-resend-quorum.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
+        "tests/meeting-invitation-resend-quorum.test.mjs"
       ]
     },
     "Grants Intelligence and Funding Opportunities Portal": {
@@ -22,6 +27,11 @@
         "src/grantPipeline/"
       ],
       "tests": [
+        "tests/fundraising-source-registry.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
         "tests/fundraising-source-registry.test.mjs"
       ]
     },
@@ -41,6 +51,13 @@
         "tests/signature-field-assignment-setup.test.mjs",
         "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
         "tests/signature-firestore-diagnostics.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
+        "tests/signature-field-assignment-setup.test.mjs",
+        "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+        "tests/signature-firestore-diagnostics.test.mjs"
       ]
     },
     "Board Members Portal": {
@@ -48,6 +65,12 @@
         "src/pages/BoardMembers.jsx"
       ],
       "tests": [
+        "tests/org-structure-portal-alignment.test.mjs",
+        "tests/signature-authority-matrix.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
         "tests/org-structure-portal-alignment.test.mjs",
         "tests/signature-authority-matrix.test.mjs"
       ]
@@ -62,6 +85,12 @@
       "tests": [
         "tests/org-structure-authority.test.mjs",
         "tests/job-description-intranet-workflow.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
+        "tests/org-structure-authority.test.mjs",
+        "tests/job-description-intranet-workflow.test.mjs"
       ]
     },
     "Communication and Media Portal": {
@@ -73,6 +102,12 @@
         "src/pages/SocialMediaAccounts.jsx"
       ],
       "tests": [
+        "tests/communication-media-policy.test.mjs",
+        "tests/social-studio-policy.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
         "tests/communication-media-policy.test.mjs",
         "tests/social-studio-policy.test.mjs"
       ]
@@ -90,7 +125,10 @@
         "src/firebase/meetingAttendanceSigning.js",
         "src/firebase/meetingRecords.js",
         "drive-gateway/src/meetingPortal.mjs",
-        "drive-gateway/src/meetingServices.mjs"
+        "drive-gateway/src/meetingServices.mjs",
+        "drive-gateway/src/meetingDeletion.mjs",
+        "drive-gateway/src/meetingEnvironment.mjs",
+        "drive-gateway/tests/meeting-environment.test.mjs"
       ],
       "sharedDependencies": [
         "src/App.jsx",
@@ -139,6 +177,16 @@
       },
       "tests": [
         "tests/meeting-portal-protection.test.mjs"
+      ],
+      "registeredAt": "2026-11-21T00:00:00Z",
+      "guardMode": "protected",
+      "lockTests": [
+        "tests/meeting-portal-protection.test.mjs"
+      ],
+      "pendingPaths": [
+        "drive-gateway/src/meetingDeletion.mjs",
+        "drive-gateway/src/meetingEnvironment.mjs",
+        "drive-gateway/tests/meeting-environment.test.mjs"
       ]
     }
   },
@@ -153,7 +201,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/main.jsx",
@@ -165,7 +214,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/auth.js",
@@ -177,7 +227,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/components/",
@@ -189,7 +240,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/styles/",
@@ -201,49 +253,56 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/pages/SignaturePlatform.jsx",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/signaturePlatform.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/signatureStorage.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/signatureWorkflowPolicy.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/components/ControlledDocumentUpload.jsx",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/meetingAttendanceSigning.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     }
   ],
   "exclusions": [

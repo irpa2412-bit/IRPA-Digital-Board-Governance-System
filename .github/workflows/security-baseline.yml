@@ -1,5 +1,10 @@
 name: IRPA Security Baseline Gate
 
+permissions:
+  actions: read
+  contents: read
+  issues: read
+
 on:
   push:
     branches: [main]
@@ -18,7 +23,9 @@ jobs:
           node-version: 20
       - name: Verify security baseline
         run: node scripts/security-baseline-check.js
-      - name: Enforce protected portal repair policy
+      - name: Enforce protected portal repair policy with live run verification
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/portal-protection-check.mjs
       - name: Test protected portal policy scenarios
         run: node --test tests/portal-protection-policy.test.mjs

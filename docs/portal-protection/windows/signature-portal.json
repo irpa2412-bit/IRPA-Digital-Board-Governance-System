@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "portal": "Signature Portal",
+  "status": "closed",
+  "durationHours": 72,
+  "inactivityCloseHours": 72,
+  "warningHours": 12,
+  "openedAt": null,
+  "expiresAt": null,
+  "lastActivityAt": null,
+  "emergency": false,
+  "emergencyLimitHours": 24,
+  "reason": "No active repair authorization. An owner-approved APPROVE or RENEW comment opens one 72-hour window for this portal only.",
+  "scope": [
+    "src/pages/SignaturePlatform.jsx",
+    "src/pages/SignaturePlatformWithUpload.jsx",
+    "src/pages/GatewaySigningPortal.jsx",
+    "src/styles/signature-portal.css",
+    "src/components/SignatureFieldConfirmationPad.jsx",
+    "src/components/SignatureImagePreview.jsx",
+    "src/components/SignaturePathwaySelfTest.jsx",
+    "src/firebase/signature/",
+    "src/utils/signature/"
+  ],
+  "activityLog": []
+}
