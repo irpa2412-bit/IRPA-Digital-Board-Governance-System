@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T16:34:38Z",
-  "lastActivityAt": "2026-11-22T16:34:38Z",
+  "lastActivityAt": "2026-11-22T16:41:21Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner instruction, 22 November 2026: implement permanent full Meeting Portal access for the Internal Oversight Director, Executive Director and every head of department, resolved only from active registered authority in Members and Employees; access remains until owner revocation. The one-hour reference described the repair-window period, not an access expiry. Preserve PR #863 duty-based access for everyone else and deny by default. Repair scope is limited to Meeting Portal policy, screen, Worker, shared permission helpers and tests. No secrets, environment variables, SMTP, signing/PDF/hash/certificate/archive logic or branch protection changes.",
@@ -32,7 +32,7 @@
     {
       "at": "2026-11-22T16:34:38Z",
       "action": "owner instruction — repair window opened",
-      "description": "Owner instruction: permanent full Meeting Portal access for the Internal Oversight Director, Executive Director and every head of department, based only on active registered authority in Members and Employees; revoke/inactive denies on next request. One hour was repair time, not grant expiry. Preserve PR #863 duty-based policy for all others. This 48-hour window authorizes implementation and validation only; merge, rules publication and production release remain subject to protected gates."
+      "description": "Owner instruction: permanent full Meeting Portal access for the Internal Oversight Director, Executive Director and every head of department, based only on active registered authority in Members and Employees; revoke/inactive denies on next request. One hour was repair time, not grant expiry. Preserve PR #863 duty-based policy for all others. This 72-hour window authorizes implementation and validation only; merge, rules publication and production release remain subject to protected gates."
     }
   ],
   "baseline": {
@@ -40,7 +40,7 @@
     "rollbackCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
     "note": "Owner-referenced production-running build baseline; production health/version confirmation still required before release."
   },
-  "durationHours": 48,
+  "durationHours": 72,
   "warningHours": 12,
-  "expiresAt": "2026-11-24T16:34:38Z"
+  "expiresAt": "2026-11-25T16:34:38Z"
 }
