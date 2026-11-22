@@ -20,10 +20,10 @@ const recordRoles = record => [
 ].flatMap(value => typeof value === "string" ? value.split(",") : value && typeof value === "object" ? [value.role,value.title,value.authority,value.category] : [])
  .map(clean).filter(Boolean);
 const identifiers = record => ({
-  uids:[record.uid,record.authUid,record.userUid,record.firebaseUid,record.firebaseAuthUid,record.linkedUid,record.administratorUid,record.adminUid,record.linkedAdministratorUid].map(clean).filter(Boolean),
+  uids:[record.uid,record.authUid,record.userUid,record.firebaseUid,record.firebaseAuthUid,record.linkedUid,record.administratorUid,record.adminUid,record.linkedAdministratorUid,...(!/^IRPA-(?:MEM|EMP)-/i.test(clean(record.id))?[record.id]:[])].map(clean).filter(Boolean),
   emails:[record.email,record.emailAddress,record.contactEmail,record.firebaseAuthEmail,record.officialEmail].map(value=>clean(value).toLowerCase()).filter(Boolean),
-  memberNumbers:[record.memberNumber,record.registrationNumber,record.membershipNumber].map(clean).filter(Boolean),
-  employeeNumbers:[record.employeeNumber,record.employeeId,record.staffNumber].map(clean).filter(Boolean)
+  memberNumbers:[record.memberNumber,record.registrationNumber,record.membershipNumber,...(/^IRPA-MEM-/i.test(clean(record.id))?[record.id]:[])].map(clean).filter(Boolean),
+  employeeNumbers:[record.employeeNumber,record.employeeId,record.staffNumber,...(/^IRPA-EMP-/i.test(clean(record.id))?[record.id]:[])].map(clean).filter(Boolean)
 });
 const headRole = role => {const value=normalize(role);return ["head of department","department head","head of the department"].includes(value)||/^head of .+ department$/.test(value)||/^department head of .+$/.test(value);};
 const grantRole = role => {
