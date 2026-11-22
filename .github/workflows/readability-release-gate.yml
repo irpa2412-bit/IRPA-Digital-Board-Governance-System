@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -33,7 +34,9 @@ jobs:
         run: npm ci
       - name: Syntax-check checker and verifier
         run: node --check scripts/check-production-readability.mjs && node --check scripts/verify-production-readability.mjs
-      - name: Enforce protected portal repair policy
+      - name: Enforce protected portal repair policy with live run verification
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/portal-protection-check.mjs
       - name: Test protected portal policy scenarios
         run: node --test tests/portal-protection-policy.test.mjs
