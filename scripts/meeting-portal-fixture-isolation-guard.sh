@@ -45,7 +45,6 @@ const allowed = new Set([
   "tests/firestore.rules.test.cjs",
   "tests/research-portal-security.test.mjs",
   "tests/meeting-isolation-guard.test.mjs",
-  "tests/meeting-browser-concurrency.test.mjs",
   "tests/meeting-trial-delete-ui.test.mjs",
   "tests/invitation-removal-policy.test.mjs",
   "tests/meeting-invitation-resend-quorum.test.mjs",
@@ -371,11 +370,7 @@ if (changed.includes(wranglerPath)) {
 }
 const guardOnlyWorkflowRepair = changed.includes(".github/workflows/meeting-portal-fixture-browser.yml") &&
   changed.includes("tests/meeting-isolation-guard.test.mjs") &&
-  changed.every(path => [
-    ".github/workflows/meeting-portal-fixture-browser.yml",
-    "tests/meeting-isolation-guard.test.mjs",
-    "tests/meeting-browser-concurrency.test.mjs"
-  ].includes(path));
+  changed.every(path => path === ".github/workflows/meeting-portal-fixture-browser.yml" || path === "tests/meeting-isolation-guard.test.mjs");
 const testOnlySignatureNavigation = changed.includes("tests/meeting-portal-browser.test.mjs") &&
   changed.includes("tests/fixtures/meeting-portal-fixture.jsx");
 const testOnlyRegisterScope = changed.includes("src/firebase/data.js") &&
