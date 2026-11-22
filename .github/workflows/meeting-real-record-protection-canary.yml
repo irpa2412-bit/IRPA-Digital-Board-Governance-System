@@ -10,11 +10,15 @@ on:
     types: [completed]
   schedule:
     - cron: "17 3 * * *"
+  issue_comment:
+    types: [created]
   pull_request:
     paths:
       - ".github/workflows/meeting-real-record-protection-canary.yml"
       - "scripts/live-meeting-real-readonly.cjs"
       - "scripts/live-meeting-real-canary.cjs"
+      - "scripts/canary-comment-authorized.cjs"
+      - "tests/canary-comment-trigger.test.cjs"
   workflow_dispatch:
     inputs:
       CANARY:
@@ -30,8 +34,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: irpa-live-meeting-real-record-protection
-  cancel-in-progress: true
+  group: irpa-live-meeting-real-record-protection-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -45,10 +49,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Syntax-check both verification scripts
+      - name: Syntax-check verification scripts and run owner-comment trigger tests
         run: |
           node --check scripts/live-meeting-real-readonly.cjs
           node --check scripts/live-meeting-real-canary.cjs
+          node --check scripts/canary-comment-authorized.cjs
+          node --test tests/canary-comment-trigger.test.cjs
 
   live-read-only:
     if: >-
@@ -61,7 +67,6 @@ jobs:
     timeout-minutes: 15
     outputs:
       canary_credential_available: ${{ steps.inspect.outputs.canary_credential_available }}
-      rollback_version_available: ${{ steps.inspect.outputs.rollback_version_available }}
     steps:
       - name: Checkout full history for build ancestry verification
         uses: actions/checkout@v4
@@ -94,9 +99,15 @@ jobs:
         run: NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node scripts/live-meeting-real-readonly.cjs
 
   canary:
-    name: One-record REAL meeting protection canary (manual only)
-    needs: [live-read-only]
-    if: github.event_name == 'workflow_dispatch' && inputs.CANARY == 'RUN CANARY' && needs.live-read-only.result == 'success' && needs.live-read-only.outputs.canary_credential_available == 'true' && needs.live-read-only.outputs.rollback_version_available == 'true'
+    name: One-record REAL meeting protection canary
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.CANARY == 'RUN CANARY') ||
+      (github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.number == 876 && github.event.issue.pull_request == null && github.event.comment.user.id == 319164319 && github.event.comment.user.login == 'irpa2412-bit')
+    concurrency:
+      group: irpa-live-meeting-real-protection-canary
+      cancel-in-progress: false
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 20
@@ -112,11 +123,32 @@ jobs:
       - name: Install existing Firebase Admin SDK dependency
         run: npm --prefix functions install --omit=dev --no-audit --no-fund
 
+      - name: Authorize owner comment or exact manual input without shell interpolation
+        id: authorize
+        env:
+          CANARY_MANUAL_INPUT: ${{ inputs.CANARY }}
+        run: node scripts/canary-comment-authorized.cjs
+
+      - name: Fresh read-only production preflight
+        id: preflight
+        if: steps.authorize.outputs.authorized == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
+          GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          FRONTEND_URL: "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          WEB_URL: "https://irpa-digital-board-governance.web.app"
+        run: NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node scripts/live-meeting-real-readonly.cjs
+
       - name: Syntax-check canary script
+        if: steps.authorize.outputs.authorized == 'true' && steps.preflight.outputs.canary_credential_available == 'true'
         run: node --check scripts/live-meeting-real-canary.cjs
 
       - name: Create one missing-environment canary and test REAL protections
         id: canary
+        if: steps.authorize.outputs.authorized == 'true' && steps.preflight.outputs.canary_credential_available == 'true'
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
@@ -124,35 +156,9 @@ jobs:
           WEB_ORIGIN: "https://irpa-digital-board-governance.web.app"
         run: NODE_PATH="$GITHUB_WORKSPACE/functions/node_modules" node scripts/live-meeting-real-canary.cjs
 
-      - name: Roll back Gateway Worker immediately after a failed live guard check
-        if: failure() && steps.canary.outputs.live_check_failed == 'true'
-        working-directory: drive-gateway
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ROLLBACK_VERSION_ID: "dd4637ea-0804-4b85-a455-1e691f1f0d72"
+      - name: Preserve canary failure evidence; never use the pre-#845 Gateway version
+        if: failure()
         run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx wrangler versions deploy "$ROLLBACK_VERSION_ID" --name irpa-google-drive-gateway
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
-            "https://irpa-google-drive-gateway.irpa-governance.workers.dev/health" \
-            -H "Cache-Control: no-cache" -o "$RUNNER_TEMP/rollback-health.json"
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Accept: application/json" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/irpa-google-drive-gateway/deployments" \
-            -o "$RUNNER_TEMP/rollback-deployments.json"
-          node - "$RUNNER_TEMP/rollback-deployments.json" "$ROLLBACK_VERSION_ID" <<'NODE'
-          const fs = require("node:fs");
-          const body = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          const expected = process.argv[3];
-          const current = body?.result?.deployments?.[0]?.versions?.find(x => Number(x.percentage) === 100)?.version_id;
-          if (current !== expected) {
-            console.error("Gateway rollback verification failed; active version does not match the approved rollback version.");
-            process.exit(1);
-          }
-          console.log("GATEWAY_ROLLBACK_VERSION_VERIFIED=" + current);
-          NODE
+          echo "CANARY_FAILED_OR_PREFLIGHT_FAILED"
+          echo "Gateway dd4637ea-0804-4b85-a455-1e691f1f0d72 is pre-#845, unsafe, do not roll back to it."
+          echo "Do not claim live protection; fail-closed delete/purge route remediation and approved deployment are required."
