@@ -98,3 +98,21 @@ test("meeting register retrieval avoids an unscoped collection read", () => {
   assert.match(source, /query\(ref,where\("initiatorUid","==",uid\)\)/);
   assert.match(source, /for\(const field of \["participantUids"/);
 });
+
+test("active Meeting Portal attendance screens never call undeployed Firebase attendance callables",()=>{
+ const room=readFileSync(new URL("../src/pages/MeetingRoom.jsx",import.meta.url),"utf8");
+ const access=readFileSync(new URL("../src/meeting/MeetingAccessControl.jsx",import.meta.url),"utf8");
+ const records=readFileSync(new URL("../src/firebase/meetingRecords.js",import.meta.url),"utf8");
+ const signing=readFileSync(new URL("../src/firebase/meetingAttendanceSigning.js",import.meta.url),"utf8");
+ const legacy=readFileSync(new URL("../src/components/MeetingAccessControl.jsx",import.meta.url),"utf8");
+ assert.doesNotMatch(room,/httpsCallable|getFunctions|signMeetingAttendance/);
+ assert.doesNotMatch(access,/httpsCallable|getFunctions|listMeetingEntryRequests|resolveMeetingEntryRequest/);
+ assert.match(room,/\.\.\/meeting\/MeetingAccessControl/);
+ assert.doesNotMatch(room,/\.\.\/components\/MeetingAccessControl/);
+ for(const route of ["/api/meeting-attendance/mark","/api/meeting-attendance/register","/api/meeting-attendance/daily/register","/api/meeting-attendance/daily/mark","/api/meeting-attendance/daily/dispatch"])assert.ok(records.includes(route),route);
+ assert.match(access,/\/api\/meeting-entry-requests\/list/);
+ assert.match(access,/\/api\/meeting-entry-requests\/resolve/);
+ assert.match(signing,/callMeetingService/);
+ assert.match(legacy,/listMeetingEntryRequests/);
+ assert.match(legacy,/resolveMeetingEntryRequest/);
+});
