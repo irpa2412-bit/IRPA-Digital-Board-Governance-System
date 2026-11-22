@@ -579,6 +579,7 @@ export async function getEnvelopeStatus(ctx,user,id){
    }
   }else mirrorSync={status:"unavailable",documentStatus:e.status};
  }
+ if(mirrorSync.status==="failed")throw new HttpError(502,"Gateway status was retrieved, but Firebase status synchronization failed. Retry the document refresh.");
  const last=e.events?.at(-1)||null;const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorSync,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>{
   const signerEvents=(e.events||[]).filter(event=>event.signerId===s.id);
   const stages=signerEvents.filter(event=>event.type==="email_link.stage");
