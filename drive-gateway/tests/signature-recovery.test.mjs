@@ -9,7 +9,7 @@ async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
   return [...events,{...body,hash:await sha256Hex(canonicalJson(body))}];
 }
-async function fixture({tamperFieldHash=false}={}){
+async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false}={}){
   const sent=[],meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
   pdf.addPage([612,792]);
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
@@ -18,7 +18,7 @@ async function fixture({tamperFieldHash=false}={}){
   const signatureValue="Original signature specimen";
   const fieldValue="Verified stamp specimen";
   let events=[];
-  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1","SIG-2"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(fieldValue)},{fieldId:"SIG-2",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
+  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1","SIG-2"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(tamperAllFieldHashes?"different":fieldValue)},{fieldId:"SIG-2",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
@@ -86,4 +86,17 @@ test("reassignment refuses a verified stamp and leaves assignments unchanged",as
   const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
   assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-1").signerId,"S1");
   assert.equal(envelope.signers.length,1);
+});
+
+test("reassignment supports a signed signer with no verified stamps without rendering the unverified specimen",async()=>{
+  const f=await fixture({tamperFieldHash:true,tamperAllFieldHashes:true});
+  const result=await (await import("../src/signatureRecovery.mjs")).reassignRecoveryStampSlots(f.ctx,f.user,"ENV-REC-1",{
+    signerId:"S1",fieldIds:["SIG-1","SIG-2"],email:"replacement@example.test",name:"Replacement Signer",reason:"Neither original signature stamp has verifiable field evidence."
+  });
+  assert.equal(result.replacementSignerId,"S2");
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const originalSigner=envelope.signers.find(signer=>signer.id==="S1");
+  assert.equal(originalSigner.signatureValue,"Original signature specimen");
+  assert.equal(originalSigner.certificateSignatureValue,"Stamp not verified — reassigned");
+  assert.ok(envelope.fields.filter(field=>field.signerId==="S2").length===2);
 });
