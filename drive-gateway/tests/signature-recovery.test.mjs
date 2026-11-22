@@ -31,6 +31,7 @@ async function fixture({tamperFieldHash=false}={}){
 test("recovery queue is owner-scoped and paginated",async()=>{
   const f=await fixture();
   assert.equal((await getRecoveryQueue(f.ctx,f.user)).total,1);
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"recovery.queue.viewed");
   assert.equal((await getRecoveryQueue(f.ctx,f.other)).total,0);
   await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-REC-1"),{status:404});
 });
@@ -39,6 +40,7 @@ test("field-level stamp is verified only when signer event and chained field has
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.auditChainValid,true);
   assert.equal(result.stampSlots[0].status,"VERIFIED_EXISTING");
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"recovery.evidence.assessed");
   const bad=await fixture({tamperFieldHash:true});
   assert.equal((await assessRecoveryEvidence(bad.ctx,bad.user,"ENV-REC-1")).stampSlots[0].status,"UNVERIFIABLE");
 });
@@ -49,6 +51,7 @@ test("recovery preview is a valid PDF and contains only verified stamps with non
   assert.equal(doc.getPageCount(),2);
   assert.equal(result.assessment.summary.verified,1);
   assert.equal(doc.getTitle(),"RECOVERY PREVIEW - NOT COMPLETED");
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"recovery.preview.generated");
 });
 test("tampered audit chain blocks recovery assessment and preview",async()=>{
   const f=await fixture();
