@@ -48,7 +48,7 @@ test("recovery preview is a valid PDF and contains only verified stamps with non
   const doc=await PDFDocument.load(result.bytes);
   assert.equal(doc.getPageCount(),2);
   assert.equal(result.assessment.summary.verified,1);
-  assert.ok(new TextDecoder().decode(result.bytes).includes("RECOVERY PREVIEW - NOT COMPLETED"));
+  assert.equal(doc.getTitle(),"RECOVERY PREVIEW - NOT COMPLETED");
 });
 test("tampered audit chain blocks recovery assessment and preview",async()=>{
   const f=await fixture();
