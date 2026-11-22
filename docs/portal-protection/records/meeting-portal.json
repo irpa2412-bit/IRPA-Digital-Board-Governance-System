@@ -55,24 +55,66 @@
   },
   "renewals": [],
   "activeAmendment": {
-    "status": "open",
-    "operation": "category-aware-meeting-read-boundary-and-invitation-revocation",
-    "affectedPortals": [
-      "Meeting Portal"
+    "status": "implementation-in-progress",
+    "changeId": "MP-2026-11-22-OWNER-FULL-ACCESS",
+    "relatedPullRequest": 863,
+    "branch": "fix/meeting-operational-access-implementation-20261122",
+    "ownerInstruction": "owner instruction",
+    "repairWindow": {
+      "openedAt": "2026-11-22T16:34:38Z",
+      "expiresAt": "2026-11-24T16:34:38Z",
+      "durationHours": 48
+    },
+    "baselineCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
+    "rollbackCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
+    "grantedRoles": [
+      "Internal Oversight Director",
+      "Executive Director",
+      "Every Head of Department"
     ],
-    "reason": "Owner-directed Live YES pathway: close the broad signed-in meeting read boundary; route list/get reads through the server-authorized Cloudflare Gateway; enforce category, initiator, participant and invitation scopes; add invitation access only after successful dispatch and revoke it on removal/reissue. This amendment covers source and test changes only; it does not authorize publication of Firestore rules or production deployment.",
-    "files": [
-      "drive-gateway/src/meetingPortal.mjs",
-      "docs/portal-protection/records/meeting-portal.json",
-      "docs/portal-protection/windows/meeting-portal.json"
+    "grantDuration": "Permanent until owner revokes; inactive/revoked authority denied on next request.",
+    "identitySource": "Active registered authority in Members and Employees; same authoritative source as governance tool and Authorized User Access Categories card. No free-text role inference.",
+    "duties": [
+      "view",
+      "create",
+      "schedule",
+      "edit",
+      "cancel",
+      "invite",
+      "admit entry requests",
+      "record attendance",
+      "agenda",
+      "working documents",
+      "minutes",
+      "resolutions",
+      "voting control and voting",
+      "decisions",
+      "actions",
+      "close meeting",
+      "export records",
+      "sign minutes"
     ],
-    "expectedEffect": "Meeting Portal reads are limited by server-enforced category/participant/invitation policy, including dispatch-before-grant and revocation behavior, while preserving existing invitation token, SMTP, signer identity, attendance, quorum, deletion, retention and audit controls.",
+    "preserveExistingPolicy": "PR #863 duty-based access remains in force for everyone else; deny by default.",
+    "validation": {
+      "implementation": "IN_PROGRESS",
+      "tests": "NOT_RUN",
+      "requiredChecks": "PENDING",
+      "sevenPortalSmoke": "PENDING",
+      "emailSigningContract": "PENDING",
+      "fullRegression": "PENDING",
+      "productionDeployment": "NOT_AUTHORIZED_UNTIL_MERGE_AND_RELEASE_GATES"
+    },
     "prohibitedChanges": [
-      "Do not weaken or bypass any CI, portal-protection, Firestore approval, administrator, research, data-gate, deletion, retention or audit checks.",
-      "Do not change invitation token format/hash custody, SMTP settings or credentials, secrets, environment variables, Worker bindings, signing sessions, signer identity, PDF stamping, certificates, archives or completed documents.",
-      "Do not publish Firestore rules, change Firebase claims or grant live individual permissions without the required separate approvals.",
-      "Do not deploy production resources before staging acceptance, independent review and explicit production release."
-    ],
-    "ownerInstruction": "Owner instruction in ChatGPT on 2026-11-22: “Please take the pathway to Live: YES as per your recommendations.”"
-  }
+      "secrets",
+      "environment variables",
+      "SMTP settings",
+      "signing rules",
+      "PDF logic",
+      "hash logic",
+      "certificate logic",
+      "archive logic",
+      "branch protection"
+    ]
+  },
+  "ownerInstruction": "Owner instruction — 22 November 2026: grant permanent full Meeting Portal access (view, create, schedule, edit, cancel, invite, admit entry requests, record attendance, agenda, working documents, minutes, resolutions, voting control and voting, decisions, actions, close meeting, export records, sign minutes) to the Internal Oversight Director, Executive Director and every head of department. Resolve each person only from their ACTIVE registered authority in the Members and Employees registers, the same source used by the governance tool and Authorized User Access Categories card. Access remains permanent until owner revocation; inactive or revoked authority is denied on the next request. The one-hour period referred to the repair-window time frame, not access expiry. Everyone else retains PR #863's duty-based policy; default deny."
 }
