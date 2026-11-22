@@ -180,7 +180,7 @@ async function post(path, body, idToken) {
       try {
         await meetingRef.set({
           ...meetingData,
-          environment: FieldValue.delete(),
+          ...(Object.prototype.hasOwnProperty.call(meetingData, "environment") ? { environment: meetingData.environment } : { environment: FieldValue.delete() }),
           legalHold: true,
           legalHoldReason: "System canary protection test; preserve this record.",
           protectedRecord: true,
