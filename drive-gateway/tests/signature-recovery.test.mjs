@@ -174,7 +174,7 @@ test("missing source bytes do not hide audit and stamp evidence",async()=>{
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.auditChain.status,"VERIFIED");
   assert.equal(result.sourceHashStatus,"SOURCE_FILE_MISSING");
-  assert.equal(result.stampSlots[0].status,"PASS");
+  assert.equal(result.stampSlots[0].status,"VERIFIED_EXISTING");
   await assert.rejects(()=>buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1"),{status:409});
 });
 
@@ -184,7 +184,7 @@ test("a missing stamp value is reported without failing the complete assessment"
   await f.ctx.meta.update("envelopes","ENV-REC-1",{signers:envelope.signers.map(s=>({...s,fieldValues:{"SIG-2":s.fieldValues["SIG-2"]}}))});
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.stampSlots.find(row=>row.fieldId==="SIG-1").status,"UNVERIFIABLE");
-  assert.equal(result.stampSlots.find(row=>row.fieldId==="SIG-2").status,"PASS");
+  assert.equal(result.stampSlots.find(row=>row.fieldId==="SIG-2").status,"VERIFIED_EXISTING");
 });
 
 test("a failed audit chain is reported as partial evidence, not a global not-found error",async()=>{
