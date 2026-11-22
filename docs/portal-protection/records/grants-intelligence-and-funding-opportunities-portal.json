@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "portal": "Grants Intelligence and Funding Opportunities Portal",
+  "status": "incomplete",
+  "declaration": {
+    "affectedPortals": [
+      "Grants Intelligence and Funding Opportunities Portal"
+    ],
+    "reason": "Complete this portal-specific declaration before protected changes.",
+    "files": [],
+    "expectedEffect": "To be declared for the specific repair.",
+    "prohibitedChanges": [
+      "Do not change another portal's internals.",
+      "Do not weaken authentication, signing, invitation, deletion or deployment controls."
+    ],
+    "lockTests": [
+      "tests/fundraising-source-registry.test.mjs"
+    ]
+  },
+  "baseline": {
+    "commit": "433727282012c75cdaebca21dcdadcb28dba59fb",
+    "rollbackCommit": "433727282012c75cdaebca21dcdadcb28dba59fb"
+  },
+  "validation": {
+    "baselineSmoke": "PENDING",
+    "portalSmoke": {},
+    "fullRegression": "PENDING",
+    "evidence": [],
+    "behaviourDifferences": []
+  },
+  "renewals": []
+}
