@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const HOURS_24 = 24 * 60 * 60 * 1000;
+const HOURS_72 = 72 * 60 * 60 * 1000;
+const WARNING_12 = 12 * 60 * 60 * 1000;
+const BREAK_GLASS_24 = 24 * 60 * 60 * 1000;
 const isWithin = (file, path) => file === path || (path.endsWith("/") && file.startsWith(path));
 const readJson = (path) => JSON.parse(fs.readFileSync(path, "utf8"));
 
@@ -53,15 +55,22 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   if (!record || record.status !== "complete") return fail("A completed Change Record is required.");
   if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.");
   const openedAt = Date.parse(windowState.openedAt);
+  const expiresAt = Date.parse(windowState.expiresAt);
+  if (!Number.isFinite(openedAt) || !Number.isFinite(expiresAt) || expiresAt - openedAt !== HOURS_72) return fail("A valid 72-hour repair-window expiry is mandatory.");
+  if (now >= expiresAt) return fail("Repair window expired after 72 hours; an owner-approved renewal is required.");
   const activities = [...new Set([...(activityTimestamps ?? []), ...(latestActivityAt ? [latestActivityAt] : [])])]
     .map(Date.parse).filter((time) => Number.isFinite(time) && time >= openedAt).sort((a, b) => a - b);
-  if (!Number.isFinite(openedAt) || !activities.length) return fail("No repair activity is recorded after the current window declaration.");
+  if (!activities.length) return fail("No repair activity is recorded after the current window declaration.");
   let previousActivity = openedAt;
   for (const activityTime of activities) {
-    if (activityTime - previousActivity >= HOURS_24) return fail("Repair window automatically closed after a 24-hour inactivity gap; a new declaration is required.");
+    if (activityTime - previousActivity >= HOURS_72) return fail("Repair window automatically closed after a 72-hour inactivity gap; a new owner-approved renewal is required.");
     previousActivity = activityTime;
   }
-  if (now - previousActivity >= HOURS_24) return fail("Repair window automatically closed after 24 consecutive hours without activity.");
+  if (now - previousActivity >= HOURS_72) return fail("Repair window automatically closed after 72 consecutive hours without activity.");
+  if (windowState.emergency === true) {
+    const emergencyExpiresAt = Date.parse(windowState.emergencyExpiresAt);
+    if (!Number.isFinite(emergencyExpiresAt) || emergencyExpiresAt - openedAt > BREAK_GLASS_24 || now >= emergencyExpiresAt) return fail("The 24-hour break-glass window is expired or invalid.");
+  }
   const scope = windowState.scope ?? [];
   const outOfScope = protectedFiles.filter((file) => !scope.some((p) => isWithin(file, p)));
   if (outOfScope.length) return fail("Out-of-scope protected files: " + outOfScope.join(", "));
@@ -95,7 +104,11 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   ));
   if (missingPortalRunEvidence.length) return fail("Missing portal-specific real-run smoke links for: " + missingPortalRunEvidence.join(", "));
   if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
-  return { ok: true, affected: [...affected].sort(), protectedFiles, reason: "Protected changes are declared and within the active repair window." };
+  const remainingMs = expiresAt - now;
+  const warning = remainingMs < WARNING_12
+    ? `Repair window expires in less than 12 hours (expires at ${windowState.expiresAt}); obtain owner renewal before expiry.`
+    : null;
+  return { ok: true, affected: [...affected].sort(), protectedFiles, warning, reason: "Protected changes are declared and within the active 72-hour repair window." };
 }
 
 function main() {
@@ -116,6 +129,15 @@ function main() {
   }
   const portalSelection = resolvePortalPolicyPaths(discovery.affected);
   if (!portalSelection.ok) {
+    const portal = discovery.affected.length === 1 ? registry.portals[discovery.affected[0]] : null;
+    const warningUntil = portal?.guardMode === "warning" && portal.registeredAt
+      ? Date.parse(portal.registeredAt) + 7 * 24 * 60 * 60 * 1000
+      : NaN;
+    if (Number.isFinite(warningUntil) && Date.now() < warningUntil) {
+      console.warn(`::warning::New portal ${discovery.affected[0]} is in its seven-day protection warning period until ${new Date(warningUntil).toISOString()}; create its dedicated window, Change Record and lock tests.`);
+      console.log(JSON.stringify({ ...discovery, ok: true, warning: "New portal seven-day warning period; no protection exemption after expiry." }, null, 2));
+      return;
+    }
     console.log(JSON.stringify({ ...discovery, ok: false, reason: portalSelection.reason }, null, 2));
     process.exitCode = 1;
     return;
@@ -130,6 +152,7 @@ function main() {
   const history = execFileSync("git", ["log", "--format=%cI", "--", ...initial.protectedFiles], { encoding: "utf8" }).trim();
   const activityTimestamps = parseActivityTimestamps(history);
   const result = evaluatePolicy({ changedFiles, registry, windowState, record, activityTimestamps });
+  if (result.warning) console.warn(`::warning::${result.warning}`);
   console.log(JSON.stringify(result, null, 2));
   if (!result.ok) process.exitCode = 1;
   if (result.ok && result.protectedFiles.length) {
