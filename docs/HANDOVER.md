@@ -20,6 +20,20 @@ The live member-register read and live deletion-path probes were not available i
 - **Role-title confirmation (OPEN DECISION):** the retention policy records the role as "Director of Internal Oversight", while repository records show "Director of International Oversight"; the owner must confirm the correct title before the disposal workflow is built.
 
 
+**Repository title inventory (read-only; 22 November 2026; no code changed):**
+
+| File | Existing use of "Director of International Oversight" |
+|---|---|
+| `src/App.jsx` | Legacy role-to-department mapping assigns the title to Executive Office. |
+| `config/org-structure-authority.json` | Role-register entry and volunteer status use this title. |
+| `docs/org-structure/PORTAL_WORKFLOW_ALIGNMENT_GAPS.md` | Owner-confirmed volunteer baseline lists this title. |
+| `docs/org-structure/ROLE_JOB_DESCRIPTION_REVIEW_PACK.md` | Volunteer-role baseline lists this title. |
+| `docs/governance/IRPA-Governance-Management-Signature-Authority-Matrix.md` | Confirmed interim personnel/volunteer section lists this title. |
+| `docs/HANDOVER.md` | This open-decision entry records the policy/repository discrepancy. |
+
+The inventory records occurrences only; it does not rename the volunteer role, change application routing, or resolve the owner's title decision.
+
+
 # IRPA-DBGS handover — 22 November 2026
 
 ## Live and verified
