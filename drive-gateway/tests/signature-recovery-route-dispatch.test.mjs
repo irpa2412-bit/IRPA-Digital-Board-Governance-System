@@ -42,8 +42,18 @@ test("recovery dispatch repair changes only its seven approved files relative to
   const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).trim() === "true";
   if (shallow) execFileSync("git", ["fetch", "--no-tags", "--unshallow", "origin", "main"]);
   else execFileSync("git", ["fetch", "--no-tags", "origin", "main"]);
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const main = execFileSync("git", ["rev-parse", "origin/main"], { encoding: "utf8" }).trim();
+  const subject = execFileSync("git", ["show", "-s", "--format=%s", "HEAD"], { encoding: "utf8" }).trim();
+  const refName = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || "";
+  const isRecoveryRepairPr = refName === "fix/signature-recovery-route-dispatch-20261122";
+  const isMergedRecoveryRepair = head === main && /^Merge pull request #905\b/.test(subject);
+  // Enforce the seven-file boundary on #905's PR head and first main merge only.
+  // Later unrelated PRs and main pushes must not re-compare this historical file list.
+  if (!isRecoveryRepairPr && !isMergedRecoveryRepair) return;
+  const baseRef = isMergedRecoveryRepair ? "HEAD^1" : "origin/main";
   const changed = execFileSync("git", [
-    "diff", "--name-only", "origin/main...HEAD"
+    "diff", "--name-only", baseRef + "...HEAD"
   ], { encoding: "utf8" }).trim().split("\n").filter(Boolean).sort();
   assert.deepEqual(changed, [
     "docs/signature-recovery/route-dispatch-change-record-2026-11-22.md",
