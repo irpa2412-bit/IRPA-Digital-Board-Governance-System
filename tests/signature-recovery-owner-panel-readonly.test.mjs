@@ -50,3 +50,8 @@ test("owner recovery panel sends queue, evidence and preview reads only",()=>{
   assert.match(source,/\/preview\.pdf/);
   assert.doesNotMatch(source,/method\s*:\s*["'](?:POST|PUT|PATCH|DELETE)["']/i);
 });
+test("the Gateway source registers the authenticated evidence and preview GET routes",()=>{
+  const router=fs.readFileSync(new URL("../drive-gateway/src/router.mjs",import.meta.url),"utf8");
+  assert.match(router,/m==="GET"&&\(g=pathname\.match\(\/\^\\\/api\\\/recovery\\\/envelopes\\\/\(\[A-Za-z0-9_-\]\{3,64\}\)\\\/evidence\$\/\)\)/);
+  assert.match(router,/buildRecoveryPreview/);
+});
