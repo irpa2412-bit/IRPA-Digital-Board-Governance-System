@@ -169,22 +169,13 @@ export function createMeetingPortalRouter(ctx) {
         const tokenHash = await sha256(raw), passwordHash = await sha256(password);
         const idsArray = Array.isArray(meeting.invitedParticipantIds) ? meeting.invitedParticipantIds.map(String) : [];
         const nextIds = [...new Set([...idsArray, ids.participantId])];
-        const invitedEmails = new Set(Array.isArray(meeting.invitedEmails) ? meeting.invitedEmails.map(lower).filter(Boolean) : []);
-        const participantEmails = new Set(Array.isArray(meeting.participantEmails) ? meeting.participantEmails.map(lower).filter(Boolean) : []);
         const participantEmail = lower(participant.participantEmail || participant.email);
-        if (participantEmail) { invitedEmails.add(participantEmail); participantEmails.add(participantEmail); }
         const patch = {
           invitedParticipantIds: nextIds,
           invitedParticipantCount: nextIds.length,
-          invitedEmails: [...invitedEmails],
-          participantEmails: [...participantEmails],
           updatedAt: new Date()
         };
         const participantUid = clean(participant.participantUid || participant.uid || participant.userId);
-        if (participantUid) {
-          patch.invitedUids = [...new Set([...(Array.isArray(meeting.invitedUids) ? meeting.invitedUids : []), participantUid])];
-          patch.participantUids = [...new Set([...(Array.isArray(meeting.participantUids) ? meeting.participantUids : []), participantUid])];
-        }
         const tokenDocName = `projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/meetingAccessTokens/${accessId}`;
         const meetingDocName = meetingDoc.name;
         const passFields = fieldsToFirestore({
@@ -285,6 +276,8 @@ export function createMeetingPortalRouter(ctx) {
           invitationStatus: "Invitation Requested",
           meetingAccessDispatched: true,
           meetingAccessDispatchStatus: "Confirmed",
+          meetingAccessRevoked: false,
+          meetingAccessRevokedAt: null,
           meetingAccessId: accessId,
           meetingAccessTokenReference: accessId,
           meetingAccessExpiresAt: pass.expiresAt,
@@ -298,9 +291,19 @@ export function createMeetingPortalRouter(ctx) {
         };
         let participantStatusPersisted = true, auditPersisted = true;
         try {
-          await firestoreRequest(ctx, env, adminToken, "participants/" + encodeURIComponent(pass.participantId) + "?updateMask.fieldPaths=" + Object.keys(participantPatch).map(encodeURIComponent).join("&updateMask.fieldPaths="), {
-            method: "PATCH", body: JSON.stringify({ fields: fieldsToFirestore(participantPatch) })
-          });
+          const invitedEmails = new Set(Array.isArray(meeting.invitedEmails) ? meeting.invitedEmails.map(lower).filter(Boolean) : []);
+          const participantEmails = new Set(Array.isArray(meeting.participantEmails) ? meeting.participantEmails.map(lower).filter(Boolean) : []);
+          if (recipient) { invitedEmails.add(recipient); participantEmails.add(recipient); }
+          const accessPatch = { invitedEmails:[...invitedEmails], participantEmails:[...participantEmails], updatedAt:dispatchedAt };
+          const participantUid = clean(participant.participantUid || participant.uid || participant.userId);
+          if (participantUid) {
+            accessPatch.invitedUids = [...new Set([...(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]),participantUid])];
+            accessPatch.participantUids = [...new Set([...(Array.isArray(meeting.participantUids)?meeting.participantUids:[]),participantUid])];
+          }
+          await commitWrites(ctx, env, adminToken, [
+            { update:{name:participantDoc.name,fields:fieldsToFirestore(participantPatch)}, updateMask:{fieldPaths:Object.keys(participantPatch)}, currentDocument:{updateTime:participantDoc.updateTime} },
+            { update:{name:meetingDoc.name,fields:fieldsToFirestore(accessPatch)}, updateMask:{fieldPaths:Object.keys(accessPatch)}, currentDocument:{updateTime:meetingDoc.updateTime} }
+          ]);
         } catch (persistError) {
           participantStatusPersisted = false;
           console.error("MEETING_INVITATION_SMTP_ACCEPTED_PARTICIPANT_STATUS_PENDING", { meetingId: pass.meetingId, participantId: pass.participantId, accessId, status: persistError.status || null });
@@ -326,27 +329,54 @@ export function createMeetingPortalRouter(ctx) {
         const passDoc = await getDoc(ctx, env, adminToken, "meetingAccessTokens", accessId);
         if (!passDoc) return errorResponse(ctx, request, "Meeting access pass was not found.", 404);
         const pass = docToPlain(passDoc);
-        const meetingDoc = await getDoc(ctx, env, adminToken, "meetings", clean(pass.meetingId));
+        const [meetingDoc,participantDoc,priorPasses] = await Promise.all([
+          getDoc(ctx, env, adminToken, "meetings", clean(pass.meetingId)),
+          getDoc(ctx, env, adminToken, "participants", clean(pass.participantId)),
+          listByField(ctx, env, adminToken, "meetingAccessTokens", "participantId", clean(pass.participantId))
+        ]);
         const meeting = meetingDoc ? docToPlain(meetingDoc) : {};
+        const participant = participantDoc ? docToPlain(participantDoc) : {};
         const [admin, chair, secretary] = await Promise.all([
           isAdmin(ctx, env, adminToken, uid, claims),
           Promise.resolve(lower(meeting.chairpersonEmail) === email),
           Promise.resolve(lower(meeting.secretaryEmail) === email)
         ]);
         if (!admin && clean(pass.createdByUid) !== uid && !chair && !secretary) return errorResponse(ctx, request, "Only the issuer or an authorised meeting administrator may revoke this pass.", 403);
+        const now = new Date();
+        const otherActivePass = priorPasses.some(row => row.id !== accessId && row.status === "Active" && row.expiresAt && new Date(row.expiresAt).getTime() > now.getTime());
+        const writes = [];
         if (pass.status !== "Revoked") {
-          await firestoreRequest(ctx, env, adminToken, `meetingAccessTokens/${encodeURIComponent(accessId)}?updateMask.fieldPaths=status&updateMask.fieldPaths=revokedByUid&updateMask.fieldPaths=revokedAt`, {
-            method: "PATCH", body: JSON.stringify({ fields: fieldsToFirestore({ status: "Revoked", revokedByUid: uid, revokedAt: new Date() }) })
-          });
-          const auditId = crypto.randomUUID();
-          await firestoreRequest(ctx, env, adminToken, "audit", {
-            method: "POST", body: JSON.stringify({ fields: fieldsToFirestore({
-              action: "MEETING_ACCESS_INVITATION_REVOKED", collection: "meetingAccessTokens", recordId: accessId,
-              details: { meetingId: pass.meetingId, participantId: pass.participantId }, actorUid: uid, actorEmail: email || null, createdAt: new Date()
-            }) })
-          });
+          writes.push({update:{name:passDoc.name,fields:fieldsToFirestore({status:"Revoked",revokedByUid:uid,revokedAt:now})},updateMask:{fieldPaths:["status","revokedByUid","revokedAt"]},currentDocument:{updateTime:passDoc.updateTime}});
         }
-        return ctx.json({ ok: true, accessId, status: "Revoked" }, 200, ctx.corsHeaders(request));
+        if (!otherActivePass && meetingDoc) {
+          const recipient = lower(pass.participantEmail || participant.participantEmail || participant.email);
+          const participantUid = clean(pass.participantUid || participant.participantUid || participant.uid || participant.userId);
+          const nextEmails = values => (Array.isArray(values)?values:[]).filter(value=>lower(value)!==recipient);
+          const meetingPatch = {
+            invitedEmails:nextEmails(meeting.invitedEmails),
+            participantEmails:nextEmails(meeting.participantEmails),
+            updatedAt:now
+          };
+          if (participantUid) {
+            meetingPatch.invitedUids=(Array.isArray(meeting.invitedUids)?meeting.invitedUids:[]).filter(value=>clean(value)!==participantUid);
+            meetingPatch.participantUids=(Array.isArray(meeting.participantUids)?meeting.participantUids:[]).filter(value=>clean(value)!==participantUid);
+          }
+          writes.push({update:{name:meetingDoc.name,fields:fieldsToFirestore(meetingPatch)},updateMask:{fieldPaths:Object.keys(meetingPatch)},currentDocument:{updateTime:meetingDoc.updateTime}});
+          if (participantDoc) {
+            const participantPatch={meetingAccessRevoked:true,meetingAccessDispatched:false,meetingAccessDispatchStatus:"Revoked",meetingAccessRevokedAt:now,updatedAt:now};
+            writes.push({update:{name:participantDoc.name,fields:fieldsToFirestore(participantPatch)},updateMask:{fieldPaths:Object.keys(participantPatch)},currentDocument:{updateTime:participantDoc.updateTime}});
+          }
+        }
+        if (writes.length) {
+          const auditId=crypto.randomUUID();
+          writes.push({update:{name:`projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/audit/${auditId}`,fields:fieldsToFirestore({
+            action:"MEETING_ACCESS_INVITATION_REVOKED",collection:"meetingAccessTokens",recordId:accessId,
+            details:{meetingId:pass.meetingId,participantId:pass.participantId,participantAccessRemoved:!otherActivePass},
+            actorUid:uid,actorEmail:email||null,createdAt:now
+          })},currentDocument:{exists:false}});
+          await commitWrites(ctx,env,adminToken,writes);
+        }
+        return ctx.json({ok:true,accessId,status:"Revoked",participantAccessRemoved:!otherActivePass},200,ctx.corsHeaders(request));
       }
 
       const token = clean(data.accessToken), suppliedMeetingId = clean(data.meetingId), suppliedPassword = clean(data.meetingPassword);
