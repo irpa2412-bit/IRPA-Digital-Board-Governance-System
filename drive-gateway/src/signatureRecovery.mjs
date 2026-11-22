@@ -34,7 +34,6 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
   const current=await ctx.meta.get("envelopes",id);
   if(!current||!isOwner(current,user)||current.status!=="CompletionFailed")throw new HttpError(409,"Recovery record changed; refresh before continuing.");
-  if(!await validChain(current.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
   const at=ctx.now().toISOString();
   const eventId="recovery-"+id+"-"+Date.parse(at)+"-"+randomHex(8);
   await ctx.meta.create("recoveryAccessEvents",eventId,{envelopeId:id,type,actor:user.uid,at,...details});
