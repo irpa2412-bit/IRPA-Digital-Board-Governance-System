@@ -15,6 +15,11 @@ Create a small, separate implementation PR based on [the Records Retention and D
 The live member-register read and live deletion-path probes were not available in the 22 November wind-up. Keep those items explicitly NOT VERIFIED until safe, authoritative evidence is obtained.
 
 
+## Open decisions
+
+- **Role-title confirmation (OPEN DECISION):** the retention policy records the role as "Director of Internal Oversight", while repository records show "Director of International Oversight"; the owner must confirm the correct title before the disposal workflow is built.
+
+
 # IRPA-DBGS handover — 22 November 2026
 
 ## Live and verified
