@@ -8,6 +8,35 @@
     ],
     "reason": "Add the owner-facing read-only recovery assessment for IRPA-ENV-2026-11501354 and enforce that queue, evidence and watermarked-preview GET requests do not mutate envelope or signing evidence. Recovery access telemetry is stored separately in recoveryAccessEvents.",
     "files": [
+      "docs/portal-protection/records/signature-portal.json",
+      "docs/portal-protection/windows/signature-portal.json",
+      "docs/signature-recovery/owner-self-service-generalisation.md",
+      "docs/signature-recovery/pr-895-verification-2026-11-22.md",
+      ".github/workflows/baseline-evidence.yml",
+      "drive-gateway/src/signatureRecovery.mjs",
+      "drive-gateway/tests/signature-recovery.test.mjs",
+      "src/pages/SignaturePlatformWithUpload.jsx",
+      "src/pages/SignatureRecoveryOwnerPanel.jsx",
+      "tests/signature-recovery-owner-panel-readonly.test.mjs"
+    ],
+    "expectedEffect": "The affected owner can inspect recovery evidence and a watermarked non-authoritative preview. GET assessment operations preserve the entire envelope and signing evidence unchanged; access telemetry is isolated in recoveryAccessEvents.",
+    "prohibitedChanges": [
+      "Do not change, reassign, delete, overwrite or recreate any existing signature, signer evidence or signing audit event.",
+      "Do not automatically retry signing, finalisation, sending, PDF generation, hashing, certificate creation or archiving.",
+      "Do not set an envelope to Completed or change any envelope status.",
+      "Do not write to or mutate any envelope, signer, field, token, hash, certificate or archive record during queue, evidence assessment or preview GET requests.",
+      "Do not change signing rules, token or link formats, sessions, signer identity, field assignment, stamping, PDF generation, hash logic, certificate logic or archive logic.",
+      "Do not change Firestore rules, secrets, environment variables, SMTP settings, deployment credentials or branch protection.",
+      "Do not modify the affected production envelope IRPA-ENV-2026-11501354."
+    ],
+    "lockTests": [
+      "tests/signature-field-assignment-setup.test.mjs",
+      "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+      "tests/signature-firestore-diagnostics.test.mjs",
+      "tests/signature-recovery-owner-panel-readonly.test.mjs — GET-only, endpoint allowlist, no persistence/action API, no direct completion.",
+      "drive-gateway/tests/signature-recovery.test.mjs — queue/evidence/preview preserve the complete envelope and signing evidence snapshot; access telemetry is stored separately."
+    ],
+    "fileEffects": [
       {
         "path": "docs/portal-protection/records/signature-portal.json",
         "expectedEffect": "Declares exact one-portal repair scope, immutable baseline, prohibitions, lock tests and verified evidence."
@@ -48,23 +77,6 @@
         "path": "tests/signature-recovery-owner-panel-readonly.test.mjs",
         "expectedEffect": "Enforces GET-only requests, read-only endpoint allowlist, absence of persistence/action APIs and absence of direct Completed status changes."
       }
-    ],
-    "expectedEffect": "The affected owner can inspect recovery evidence and a watermarked non-authoritative preview. GET assessment operations preserve the entire envelope and signing evidence unchanged; access telemetry is isolated in recoveryAccessEvents.",
-    "prohibitedChanges": [
-      "Do not change, reassign, delete, overwrite or recreate any existing signature, signer evidence or signing audit event.",
-      "Do not automatically retry signing, finalisation, sending, PDF generation, hashing, certificate creation or archiving.",
-      "Do not set an envelope to Completed or change any envelope status.",
-      "Do not write to or mutate any envelope, signer, field, token, hash, certificate or archive record during queue, evidence assessment or preview GET requests.",
-      "Do not change signing rules, token or link formats, sessions, signer identity, field assignment, stamping, PDF generation, hash logic, certificate logic or archive logic.",
-      "Do not change Firestore rules, secrets, environment variables, SMTP settings, deployment credentials or branch protection.",
-      "Do not modify the affected production envelope IRPA-ENV-2026-11501354."
-    ],
-    "lockTests": [
-      "tests/signature-field-assignment-setup.test.mjs",
-      "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
-      "tests/signature-firestore-diagnostics.test.mjs",
-      "tests/signature-recovery-owner-panel-readonly.test.mjs — GET-only, endpoint allowlist, no persistence/action API, no direct completion.",
-      "drive-gateway/tests/signature-recovery.test.mjs — queue/evidence/preview preserve the complete envelope and signing evidence snapshot; access telemetry is stored separately."
     ]
   },
   "baseline": {
