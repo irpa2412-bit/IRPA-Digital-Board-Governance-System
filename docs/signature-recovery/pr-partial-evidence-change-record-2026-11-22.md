@@ -74,3 +74,9 @@ The final UI test commit above includes a corrected literal matcher for the expl
 - The assessor now returns `auditChain: FAILED` and per-stamp `UNVERIFIABLE` while preserving the signed envelope and audit events. Preview remains fail-closed for invalid audit chains.
 - Worker source commit: `ec065bd37d32d96d0821d5b492ac7db8e7f4dc90`.
 - Seeded Worker test commit: `3937ffe65325c262fa4817e9d085d797cbea9d4b`.
+## Final assessment-summary correction — 2026-11-22
+
+- Commit: `659bd4dc1404927b834c4074adf21138194804d8`.
+- Seeded recovery preview test exposed a summary-count mismatch: verified stamp rows were represented by `resultStatus: "PASS"` or the preserved internal `status: "VERIFIED_EXISTING"`, while the summary counted only `status: "PASS"`. The result was a zero verified count despite two verified rows (test 498, `drive-gateway/tests/signature-recovery.test.mjs:49-54`).
+- Corrected only the read-only assessment summary counter. No stamp records, stamp states, signature placement, PDF, signing flow or envelope data are changed.
+- PR #900 remains subject to its required checks and update-from-main requirement. Merge and deployment remain **NOT VERIFIED**.
