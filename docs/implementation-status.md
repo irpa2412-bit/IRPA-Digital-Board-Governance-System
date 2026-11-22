@@ -38,3 +38,18 @@ Safety boundary: no Firestore rules or indexes have been published by this work.
 - REAL meeting delete refusal: NOT TESTED live. Missing environment treated as REAL: NOT TESTED live. REAL meeting-record purge refusal: NOT TESTED live. These endpoints are destructive and no read-only live probe was available; corresponding code-level tests passed in the final PR/Gateway test runs. Do not claim live refusal verification.
 - Rollback identifiers: previous Gateway Worker Version ID dd4637ea-0804-4b85-a455-1e691f1f0d72 (run 44897446502, prior commit 352d8b36718a3b88173934c607e6c7834f72a71b); previous Cloudflare frontend Worker Version ID b2430948-c116-4ba9-b08c-d8e2a6c9bba1; previous Firebase Hosting build stamp 40c7cfa33a53871a48c8568a5ff3f876f2df5ac5, built 2026-11-22T04:06:59Z. Current Firestore rules version NOT RETRIEVED; unchanged.
 - No scheduled workflow or crawler schedule was changed. See docs/HANDOVER.md for parked work and next-session tasks.
+
+
+## 2026-11-22 wind-up continuation — current rollback references
+
+**Read-only evidence and limitations (04:42 UTC):**
+- PR #845 final head `ada73c51f3bade9fd58c7986f9f0193ee5a19287` is merged at `57368a8c2ceb418178aa28e5707b02605851dc83`.
+- The latest recorded successful production release evidence is from the deployment runs recorded in PR #855's handover (04:23 UTC). A fresh live read at 04:42 UTC was attempted against the production Gateway Worker health endpoint, Cloudflare frontend health endpoint and Firebase Hosting origin, but DNS resolution was unavailable in this execution environment. Therefore the following are **latest recorded deployment versions**, not a newly confirmed live-at-04:42 reading.
+- Current production Gateway Worker Version ID (latest recorded): `1e25f147-e89d-44ba-8f17-80e7e7a75563`; deployed commit `57368a8c2ceb418178aa28e5707b02605851dc83`; previous rollback version `dd4637ea-0804-4b85-a455-1e691f1f0d72` (run `44897446502`, prior commit `352d8b36718a3b88173934c607e6c7834f72a71b`).
+- Current Cloudflare frontend Worker Version ID (latest recorded): `2a55c255-cb66-4e1e-aa78-9c219a1ab06d`; previous rollback version `b2430948-c116-4ba9-b08c-d8e2a6c9bba1`.
+- Current Firebase Hosting build stamp (latest recorded): commit `57368a8c2ceb418178aa28e5707b02605851dc83`, built `2026-11-22T04:23:07Z`; previous rollback build stamp: commit `40c7cfa33a53871a48c8568a5ff3f876f2df5ac5`, built `2026-11-22T04:06:59Z`.
+- These version identifiers are recorded as rollback references, not proof that the live deployment still serves them at 04:42 UTC. Re-read live version/build stamps before any rollback or release decision.
+- REAL meeting delete refusal, missing-environment-as-REAL, and REAL meeting-record purge refusal remain **NOT TESTED live**. The available endpoints perform potentially irreversible writes and no authenticated read-only probe was available. Do not issue destructive requests against real records.
+- Firestore rules were not published or changed.
+
+**PR #855 evidence:** its retrieved check suite had 15 runs: 8 successful, 3 skipped and 4 failed (`integrity`, `isolated-meeting-browser`, `security-baseline`, and `Readability Checker and Independent Verifier`). PR #855 must remain unmerged until its checks are green; do not weaken, skip or manually mark checks.
