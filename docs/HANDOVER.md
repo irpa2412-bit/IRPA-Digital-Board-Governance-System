@@ -20,6 +20,21 @@ The live member-register read and live deletion-path probes were not available i
 - **Role title:** Director of Internal Oversight. The owner has settled this title; it is not an open decision. Do not substitute “Director of International Oversight”.
 
 
+## Legacy role-title reference inventory (read-only; 22 November 2026)
+
+The owner has settled the oversight role title as **Director of Internal Oversight**. The following legacy “Director of International Oversight” occurrences were inventoried; this is a reference inventory, not a role assignment or a decision to preserve the legacy title:
+
+| File | Existing occurrence |
+|---|---|
+| `src/App.jsx` | Legacy role-to-department mapping assigns the title to Executive Office. |
+| `config/org-structure-authority.json` | Role-register entry and volunteer status use this title. |
+| `docs/org-structure/PORTAL_WORKFLOW_ALIGNMENT_GAPS.md` | Owner-confirmed volunteer baseline lists this title. |
+| `docs/org-structure/ROLE_JOB_DESCRIPTION_REVIEW_PACK.md` | Volunteer-role baseline lists this title. |
+| `docs/governance/IRPA-Governance-Management-Signature-Authority-Matrix.md` | Confirmed interim personnel/volunteer section lists this title. |
+| `docs/HANDOVER.md` | Earlier open-decision wording is superseded by the owner's confirmed title. |
+
+No application routing, personnel record, role assignment, or runtime permission is changed by this inventory. The volunteer position's distinct title/status must be assessed separately; do not infer that it is the oversight role.
+
 # IRPA-DBGS handover — 22 November 2026
 
 ## Live and verified
