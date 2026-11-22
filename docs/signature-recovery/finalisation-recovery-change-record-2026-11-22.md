@@ -54,3 +54,36 @@ Merge each PR only after normal required branch-protection checks pass. Deploy t
 - Dry-run implementation and zero-write proof: NOT STARTED.
 - Retry implementation: DEFERRED TO PR 2.
 - Required PR checks, merge and deployment: PENDING.
+
+
+## Owner decision amendment — 2026-11-22 18:13Z (approved scope)
+
+The owner accepts the source finding at `drive-gateway/src/signing.mjs:440` (the envelope is persisted as `Completed` before the distribution call) and `drive-gateway/src/signatureDistribution.mjs:67–131` (individual recipient delivery failures are caught and represented only in the distribution subsystem). The owner explicitly rejects moving the `Completed` transition after distribution. No change to existing finalisation code is authorised by this finding alone.
+
+### Authoritative meaning of Completed
+
+`Completed` means that signatures are verified, the completed PDF is built, its byte length and hash are recorded, the certificate is built, and the archive write succeeds. Email delivery is independent and must never block or revert `Completed`.
+
+### Newly approved distribution-status change (separate PR)
+
+- Add an envelope-level distribution status: `NotStarted`, `Sent`, `PartiallyFailed`, or `Failed`.
+- Record each recipient outcome with a masked address, whether the mail server accepted the message, and a sanitised failure stage code and reply category.
+- Propagate individual delivery failures into the envelope distribution status. Do not swallow them without recording their recipient outcome.
+- The owner UI must show “Completed, but N emails failed” and offer “Resend completion emails” for failed recipients only, using existing resend rules and signed copies; no new tokens.
+- This change must not alter the `Completed` status semantics or the existing signing rules, token/link/session model, signer identity, field assignment, SMTP settings or secrets.
+
+### Revised implementation order
+
+1. **PR 1 (recovery PR #911 remains the repair-window/Change Record PR):** stage recorder and zero-write Diagnose finalisation dry run first. No retry implementation in this PR. The dry run must exercise sandbox adapters and prove zero writes to envelope, audit chain, archive and Drive. Stop and report exact source line plus proposed change if a defect is found inside existing PDF build, hashing, certificate or archive logic; distribution delivery failures are reported without changing delivery implementation in PR 1.
+2. **PR 2:** independent distribution status and failed-recipient resend UI, as approved above. Do not move completion after distribution.
+3. **PR 3:** owner/admin retry control, backup-first and once-only normal finalisation, audit event, safe failure, seven-day undo and 3/hour rate limit. Never set `Completed` directly.
+
+### Dry-run and retry requirements reaffirmed
+
+The dry run reports each of `PDF_BUILD`, `HASH`, `ARCHIVE`, `CERTIFICATE`, and `DISTRIBUTION` as PASS/FAILED with sanitised stage/error code and page/field diagnostics. It explicitly checks pages 1 and 3, rotations, EAT date/time, placed positions, PDF byte length/hash, certificate build, archive write permission and distribution. “Copy report” is required. It must make no writes to the envelope, signing audit chain, archive or Google Drive.
+
+Retry is owner/admin only and enabled after an all-PASS dry run or explicit owner confirmation. It creates a signature-image/token-free envelope backup first, runs the existing normal finalisation exactly once, records actor/time/action/result in a new audit event, and on failure changes no existing envelope/signature/audit evidence. Undo is available for seven days; rate limit is three attempts per hour. `Completed` is never assigned by the recovery UI or retry wrapper.
+
+### Immutable boundaries
+
+No envelope is to be modified during this work or its diagnosis. Do not touch, redo, reassign or delete any existing signature, audit event or stored hash. Do not modify PDF building, hashing, certificate or archive logic. Do not change signing rules, tokens, link format, sessions, signer identity, field assignment, secrets, environment variables, SMTP settings, Firestore rules or branch protection.
