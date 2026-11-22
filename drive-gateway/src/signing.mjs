@@ -563,10 +563,12 @@ export async function getEnvelopeStatus(ctx,user,id){
    if(!signedPdf||await sha256Hex(signedPdf)!==completion.finalHash)throw new HttpError(409,"The completed signed PDF failed its integrity check.");
    const signerCopies=e.signers.every(signer=>(completion.files||[]).some(file=>file?.kind==="signer-copy"&&file.signerId===signer.id&&file.id));
    if(!signerCopies)throw new HttpError(409,"A required completed signer archive copy is missing.");
-   if(typeof ctx.persistCompletedSignatureEnvelope!=="function")throw new HttpError(503,"Firebase signature status synchronization is not configured.");
-   const mirrored=await persistMirrorWithStatus(ctx,e,completion,{force:true});
-   e=await ctx.meta.get("envelopes",id)||e;
-   mirrorSync={status:e.mirrorStatus==="Completed"?(mirrored?"updated":"unchanged"):"failed",documentStatus:e.status};
+   if(typeof ctx.persistCompletedSignatureEnvelope!=="function")mirrorSync={status:"unavailable",documentStatus:e.status};
+   else{
+    const mirrored=await persistMirrorWithStatus(ctx,e,completion,{force:true});
+    e=await ctx.meta.get("envelopes",id)||e;
+    mirrorSync={status:e.mirrorStatus==="Completed"?(mirrored?"updated":"unchanged"):"failed",documentStatus:e.status};
+   }
   }else if(typeof ctx.persistSignerProgress==="function"){
    try{
     const mirrored=await ctx.persistSignerProgress({envelope:e});
