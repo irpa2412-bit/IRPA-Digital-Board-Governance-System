@@ -12,3 +12,15 @@ async function fixture(){
 test("diagnostic is owner-only and denies a non-owner with 403",async()=>{const{ctx}=await fixture();await assert.rejects(()=>diagnoseFinalisation(ctx,{uid:"other-user"}, "ENV-DRYRUN-001"),e=>e.status===403);});
 test("dry run builds PDF and hash without envelope, audit, archive, Drive or email writes",async()=>{const{ctx,getWrites}=await fixture();const report=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");assert.equal(report.readOnly,true);assert.equal(report.steps.find(x=>x.stageCode==="PDF_BUILD").status,"PASS");assert.equal(report.steps.find(x=>x.stageCode==="HASH").status,"PASS");assert.equal(report.steps.find(x=>x.stageCode==="ARCHIVE").status,"PASS");assert.equal(report.steps.find(x=>x.stageCode==="DISTRIBUTION").status,"PASS");assert.equal(report.fieldChecks.length,2);assert.equal(report.fieldChecks.find(x=>x.fieldId==="F3").rotation,90);assert.equal(getWrites(),0);});
 test("diagnostic marks archive permission unavailable without attempting a write",async()=>{const{ctx,getWrites}=await fixture();delete ctx.storage.probeWritePermission;const report=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");assert.equal(report.steps.find(x=>x.stageCode==="ARCHIVE").errorCode,"ARCHIVE_PERMISSION_PROBE_UNAVAILABLE");assert.equal(getWrites(),0);});
+
+test("finalisation dry-run accepts the three supported owner identity fields and still denies outsiders",async()=>{
+ const {ctx}=await fixture();
+ const env=await ctx.meta.get("envelopes","ENV-DRYRUN-001");
+ await ctx.meta.update("envelopes","ENV-DRYRUN-001",{createdBy:undefined,createdByUid:"owner-1"});
+ const ownerReport=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");
+ assert.equal(ownerReport.readOnly,true);
+ await ctx.meta.update("envelopes","ENV-DRYRUN-001",{createdBy:undefined,createdByUid:undefined,ownerUid:"owner-1"});
+ const aliasReport=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");
+ assert.equal(aliasReport.readOnly,true);
+ await assert.rejects(()=>diagnoseFinalisation(ctx,{uid:"intruder"},"ENV-DRYRUN-001"),e=>e.status===403);
+});
