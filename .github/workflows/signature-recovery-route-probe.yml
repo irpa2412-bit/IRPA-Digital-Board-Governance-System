@@ -14,7 +14,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Probe production Worker routes without credentials
+      - name: Read production Gateway health version
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "https://irpa-google-drive-gateway.irpa-governance.workers.dev/health?probe=$GITHUB_SHA" -o "$RUNNER_TEMP/gateway-health.json"
+          node -e 'const h=require(process.argv[1]); console.log("GATEWAY_HEALTH="+JSON.stringify({ok:h.ok,environment:h.environment,commit:h.commit,workerCommit:h.workerCommit,version:h.version,workerVersion:h.workerVersion}));' "$RUNNER_TEMP/gateway-health.json"
+      - name: Read public build stamps from Firebase and Cloudflare
+        shell: bash
+        run: |
+          set -euo pipefail
+          for item in "firebase|https://irpa-digital-board-governance.web.app" "cloudflare|https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"; do
+            label="${item%%|*}"
+            base="${item#*|}"
+            file="$RUNNER_TEMP/$label-index.html"
+            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/?__irpa_probe=$GITHUB_SHA" -o "$file"
+            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.argv[1],"utf8");const read=n=>s.match(new RegExp("<meta\\s+name=[\"']"+n+"[\"']\\s+content=[\"']([^\"']+)", "i"))?.[1]||"MISSING";console.log(process.argv[2].toUpperCase()+"_BUILD_STAMP="+JSON.stringify({version:read("irpa-build-version"),time:read("irpa-build-time")}));' "$file" "$label"
+          done
+      - name: Probe production recovery routes without credentials or envelope access
         shell: bash
         run: |
           set -euo pipefail
@@ -34,5 +51,3 @@ jobs:
           probe "evidence-document-reference-id" "/api/recovery/envelopes/IRPA-ENV-2026-00000000/evidence"
           probe "recovery-queue" "/api/recovery/envelopes"
           probe "nonsense" "/__signature_recovery_route_probe_not_a_real_route__"
-
-# Re-probe trigger: authenticated-route boundary verification only.
