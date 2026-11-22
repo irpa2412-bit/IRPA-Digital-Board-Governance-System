@@ -9,7 +9,7 @@ const gatewayWorkflow = readFileSync(new URL("../../.github/workflows/cloudflare
 
 test("meeting transcript translation is served by the authenticated Cloudflare Gateway route", () => {
   assert.match(gateway, /\/api\/meeting-transcripts\/translate/);
-  assert.match(gateway, /if\(!c\.canRead\)return fail\(ctx,request,"Only an authorised meeting participant or subscriber may translate these proceedings\.",403\)/);
+  assert.match(gateway, /if\(!c\.canRead\)return denyDuty\(ctx,request,c,"access and translate meeting proceedings"/);
   assert.match(gateway, /content\.length>30000/);
   assert.match(gateway, /new Set\(\["sw","en","fr","es","pt","ar","hi","zh","de","it","ja"\]\)/);
   assert.match(gateway, /https:\/\/translation\.googleapis\.com\/language\/translate\/v2/);
