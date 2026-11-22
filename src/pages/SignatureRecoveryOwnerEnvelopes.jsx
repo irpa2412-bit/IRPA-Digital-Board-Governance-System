@@ -3,14 +3,15 @@ import{getIdToken,onAuthStateChanged}from"firebase/auth";
 import{auth}from"../firebase/config";
 import{getGoogleDriveGatewayUrl}from"../firebase/gatewayUrl";
 import SignatureRecoveryOwnerPanel from"./SignatureRecoveryOwnerPanel";
-async function loadRecoveryPage(offset){
+import{formatRecoveryRouteError}from"../utils/recoveryRouteError.mjs";
+async function loadRecoveryPage(offset,button="Load recovery queue"){
  if(!auth.currentUser)throw new Error("Sign in to view your recovery assessment queue. (AUTH_REQUIRED)");
  const gateway=String(getGoogleDriveGatewayUrl()||"").replace(/\/$/,"");
  if(!gateway)throw new Error("The recovery service is not configured. (RECOVERY_SERVICE_URL_MISSING)");
  const token=await getIdToken(auth.currentUser);
  const response=await fetch(gateway+"/api/recovery/envelopes?limit=50&offset="+offset,{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
  const body=await response.json().catch(()=>({}));
- if(!response.ok||body?.ok!==true)throw new Error(body?.error||"Unable to load the authorised recovery queue (HTTP "+response.status+").");
+ if(!response.ok||body?.ok!==true)throw new Error(formatRecoveryRouteError({status:response.status,body,button,route:"/api/recovery/envelopes"}));
  return body;
 }
 export default function SignatureRecoveryOwnerEnvelopes(){
@@ -18,7 +19,7 @@ export default function SignatureRecoveryOwnerEnvelopes(){
  const load=useCallback(async(reset=true)=>{
   if(!auth.currentUser){setRows([]);setTotal(0);setSelected(null);return}
   setBusy(true);setError("");
-  try{const nextOffset=reset?0:offset;const page=await loadRecoveryPage(nextOffset);const items=Array.isArray(page.items)?page.items:[];setRows(current=>reset?items:[...current,...items]);setTotal(Number(page.total)||0);setOffset(nextOffset+items.length);if(reset)setSelected(null)}
+  try{const nextOffset=reset?0:offset;const page=await loadRecoveryPage(nextOffset,reset?"Refresh recovery queue":"Load more recovery queue");const items=Array.isArray(page.items)?page.items:[];setRows(current=>reset?items:[...current,...items]);setTotal(Number(page.total)||0);setOffset(nextOffset+items.length);if(reset)setSelected(null)}
   catch(err){setError(err?.message||"Unable to load recovery assessments.")}
   finally{setBusy(false)}
  },[offset]);

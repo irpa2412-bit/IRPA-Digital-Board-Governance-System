@@ -3,8 +3,9 @@ import{getIdToken}from"firebase/auth";
 import{auth}from"../firebase/config";
 import{getGoogleDriveGatewayUrl}from"../firebase/gatewayUrl";
 import{normalizeFinalisationDiagnostic}from"../utils/finalisationDiagnosticResponse.mjs";
+import{formatRecoveryRouteError}from"../utils/recoveryRouteError.mjs";
 
-async function recoveryRequest(path,{pdf=false,method="GET"}={}){
+async function recoveryRequest(path,{pdf=false,method="GET",button="Recovery action"}={}){
  if(!auth.currentUser)throw new Error("Sign in with your authorised IRPA account. (AUTH_REQUIRED)");
  const gateway=String(getGoogleDriveGatewayUrl()||"").replace(/\/$/,"");
  if(!gateway)throw new Error("The recovery service is not configured. (RECOVERY_SERVICE_URL_MISSING)");
@@ -12,7 +13,8 @@ async function recoveryRequest(path,{pdf=false,method="GET"}={}){
  const response=await fetch(gateway+path,{method,headers:{Authorization:"Bearer "+token,Accept:pdf?"application/pdf":"application/json",...(method==="POST"?{"Content-Type":"application/json"}:{})},...(method==="POST"?{body:"{}"}:{}),cache:"no-store"});
  if(!response.ok){
   const result=pdf?{}:await response.json().catch(()=>({}));
-  const error=new Error(result.error||"Recovery request failed (HTTP "+response.status+").");
+  const route=path.split("?")[0];
+  const error=new Error(formatRecoveryRouteError({status:response.status,body:result,button,route}));
   error.status=response.status;error.code=result.code||"RECOVERY_REQUEST_FAILED";throw error;
  }
  return pdf?response.blob():response.json();
@@ -36,13 +38,13 @@ function diagnosticText(diagnostic){
 function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
  const[evidence,setEvidence]=useState(null),[diagnostic,setDiagnostic]=useState(null),[loading,setLoading]=useState(false),[diagnosticLoading,setDiagnosticLoading]=useState(false),[previewLoading,setPreviewLoading]=useState(false),[copyLoading,setCopyLoading]=useState(false),[copyHash,setCopyHash]=useState(""),[copyMatch,setCopyMatch]=useState(""),[copyLabel,setCopyLabel]=useState(""),[copyError,setCopyError]=useState(""),[error,setError]=useState(""),[previewReason,setPreviewReason]=useState(""),[notice,setNotice]=useState(""),[previewUrl,setPreviewUrl]=useState("");
  useEffect(()=>{let active=true;setLoading(true);setEvidence(null);setDiagnostic(null);setError("");setPreviewReason("");setNotice("");if(previewUrl){URL.revokeObjectURL(previewUrl);setPreviewUrl("");}
-  recoveryRequest("/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/evidence").then(value=>{if(active)setEvidence(value)}).catch(err=>{if(active)setError(err?.message||"Evidence could not be retrieved.")}).finally(()=>{if(active)setLoading(false)});
+  recoveryRequest("/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/evidence",{button:"Check this document"}).then(value=>{if(active)setEvidence(value)}).catch(err=>{if(active)setError(err?.message||"Evidence could not be retrieved.")}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[envelopeId]);
  useEffect(()=>()=>{if(previewUrl)URL.revokeObjectURL(previewUrl)},[previewUrl]);
  async function diagnose(){
   setDiagnosticLoading(true);setDiagnostic(null);setError("");
-  try{const raw=await recoveryRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/diagnose-finalisation",{method:"POST"});const normalized=normalizeFinalisationDiagnostic(raw);if(!normalized||normalized.readOnly!==true)throw new Error("The diagnostic response was invalid or did not confirm read-only mode. (DIAGNOSTIC_RESPONSE_INVALID)");setDiagnostic(normalized);setNotice("Finalisation dry-run completed. No records or files were written.");}
+  try{const raw=await recoveryRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/diagnose-finalisation",{method:"POST",button:"Diagnose finalisation (read-only)"});const normalized=normalizeFinalisationDiagnostic(raw);if(!normalized||normalized.readOnly!==true)throw new Error("The diagnostic response was invalid or did not confirm read-only mode. (DIAGNOSTIC_RESPONSE_INVALID)");setDiagnostic(normalized);setNotice("Finalisation dry-run completed. No records or files were written.");}
   catch(err){setError(err?.message||"Finalisation diagnostic could not be retrieved.");}
   finally{setDiagnosticLoading(false);}
  }
@@ -54,7 +56,7 @@ function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
    if(!gateway)throw new Error("The recovery service is not configured. (RECOVERY_SERVICE_URL_MISSING)");
    const token=await getIdToken(auth.currentUser);
    const response=await fetch(gateway+"/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/completed-copy.pdf",{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/pdf"},cache:"no-store"});
-   if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body?.error||("Unarchived copy unavailable (HTTP "+response.status+"). ("+(body?.code||"COPY_DOWNLOAD_FAILED")+")"));}
+   if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(formatRecoveryRouteError({status:response.status,body,button:"Download completed copy",route:"/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/completed-copy.pdf"}));}
    const type=String(response.headers.get("content-type")||"").toLowerCase();
    if(!type.includes("application/pdf"))throw new Error("The recovery service returned an invalid file type. (COPY_RESPONSE_NOT_PDF)");
    const bytes=await response.arrayBuffer();
@@ -75,7 +77,7 @@ function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
  }
  async function loadPreview(){
   setPreviewLoading(true);setPreviewReason("");
-  try{const blob=await recoveryRequest("/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/preview.pdf",{pdf:true});setPreviewUrl(current=>{if(current)URL.revokeObjectURL(current);return URL.createObjectURL(blob)});}
+  try{const blob=await recoveryRequest("/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/preview.pdf",{pdf:true,button:"Generate watermarked preview"});setPreviewUrl(current=>{if(current)URL.revokeObjectURL(current);return URL.createObjectURL(blob)});}
   catch(err){setPreviewReason(err?.message||"Preview is not available. (PREVIEW_UNAVAILABLE)");}
   finally{setPreviewLoading(false);}
  }
