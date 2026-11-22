@@ -61,6 +61,21 @@ test("email-link signer progress is mirrored immediately without completing or d
   assert.equal(mirrored.completion,null,"no completion record is created for a partially signed envelope");
 });
 
+test("refreshing a partially signed email-link envelope reconciles a stale signer mirror",async()=>{
+  const f=await fixture();
+  const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const signer={...stored.signers[0],status:"Signed",signedAt:"2026-11-22T10:00:00.000Z"};
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[signer],status:"InProgress"});
+  let reconciled=null;
+  f.ctx.persistSignerProgress=async({envelope})=>{reconciled=structuredClone(envelope);};
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
+  assert.equal(status.status,"InProgress");
+  assert.equal(status.signers[0].status,"Signed");
+  assert.ok(reconciled,"status refresh attempts reconciliation of a previously stale mirror");
+  assert.equal(reconciled.signers[0].status,"Signed");
+  assert.equal(reconciled.status,"InProgress");
+});
+
 test("a) IRPA-account owner at position 1 signs and automatically emails Gmail X at position 2",async()=>{
   const sent=[];let now=NOW;
   const ctx=buildEsignContext({
