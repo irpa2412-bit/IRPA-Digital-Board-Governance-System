@@ -291,7 +291,7 @@ async function main() {
   const base = process.env.GITHUB_BASE_REF || "main";
   let changedFiles;
   if (event === "pull_request" || event === "pull_request_target") {
-    execFileSync("git", ["fetch", "origin", base, "--depth=1"], { stdio: "inherit" });
+    execFileSync("git", ["fetch", "origin", base], { stdio: "inherit" });
     changedFiles = execFileSync("git", ["diff", "--name-only", `origin/${base}...HEAD`], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   } else {
     changedFiles = execFileSync("git", ["diff", "--name-only", "HEAD^...HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
