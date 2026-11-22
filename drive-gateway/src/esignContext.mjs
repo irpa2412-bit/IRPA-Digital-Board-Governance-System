@@ -172,7 +172,8 @@ function mockMeta() {
 }
 function mockStorage() {
   return {
-    async put(x){ const id="mock-"+(++mockSeq); mockObjects.set(id,{...x,bytes:new Uint8Array(x.bytes)}); return {id,link:"mock://"+id}; },\n    async probeWritePermission(){return true;},
+    async put(x){ const id="mock-"+(++mockSeq); mockObjects.set(id,{...x,bytes:new Uint8Array(x.bytes)}); return {id,link:"mock://"+id}; },
+    async probeWritePermission(){return true;},
     async get(id){ const x=mockObjects.get(id); return x ? new Uint8Array(x.bytes) : null; },
     async delete(id){ mockObjects.delete(id); }
   };
@@ -228,7 +229,8 @@ function driveStorage(env, helpers) {
       const x=await r.json(); if(!r.ok) throw new Error(x.error?.message||"Google Drive upload failed.");
       return {id:x.id,link:x.webViewLink||`https://drive.google.com/file/d/${x.id}/view`};
     },
-    async get(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`,{headers:{Authorization:`Bearer ${token}`}}); return r.ok?new Uint8Array(await r.arrayBuffer()):null;},\n    async probeWritePermission(paths){const token=await helpers.getDriveAccessToken(env);for(const path of paths||[]){const parts=String(path).split("/").filter(Boolean);parts.pop();let parent=await findExistingFolder(env,token,getDriveRootFolderName(env),null,helpers.driveFetch);if(!parent)return false;for(const part of parts){parent=await findExistingFolder(env,token,part,parent,helpers.driveFetch);if(!parent)return false;}const folder=await helpers.driveFetch(env,token,"/drive/v3/files/"+encodeURIComponent(parent)+"?fields=id,capabilities(canAddChildren)");if(folder?.capabilities?.canAddChildren!==true)return false;}return true;},
+    async get(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`,{headers:{Authorization:`Bearer ${token}`}}); return r.ok?new Uint8Array(await r.arrayBuffer()):null;},
+    async probeWritePermission(paths){const token=await helpers.getDriveAccessToken(env);for(const path of paths||[]){const parts=String(path).split("/").filter(Boolean);parts.pop();let parent=await findExistingFolder(env,token,getDriveRootFolderName(env),null,helpers.driveFetch);if(!parent)return false;for(const part of parts){parent=await findExistingFolder(env,token,part,parent,helpers.driveFetch);if(!parent)return false;}const folder=await helpers.driveFetch(env,token,"/drive/v3/files/"+encodeURIComponent(parent)+"?fields=id,capabilities(canAddChildren)");if(folder?.capabilities?.canAddChildren!==true)return false;}return true;},
     async delete(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}); if(!r.ok&&r.status!==404) throw new Error("Google Drive deletion failed.");}
   };
 }
