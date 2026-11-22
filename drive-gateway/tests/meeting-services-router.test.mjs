@@ -42,6 +42,8 @@ test("LiveKit token issuance also requires an authenticated identity", async () 
 test("meeting register, decision, and voting control routes require authenticated identity", async () => {
   const router = createMeetingServicesRouter(ctx);
   for (const path of [
+    "/api/meeting-register/list",
+    "/api/meeting-register/get",
     "/api/meeting-register/create",
     "/api/meeting-register/update",
     "/api/meeting-register/delete",
@@ -74,4 +76,56 @@ test("meeting register, decision, and voting control routes require authenticate
 
 test("direct attendance signature endpoint is retired in favour of Signature Portal email-link envelopes", async () => {
   assert.equal(await post(createMeetingServicesRouter(ctx), "/api/meeting-attendance/sign", { meetingId: "test-meeting" }), null);
+});
+
+
+const fsValue = value => {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return { integerValue: String(value) };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(fsValue) } };
+  return { stringValue: String(value) };
+};
+const fsDocument = (collection, id, data) => ({
+  document: {
+    name: `projects/test-project/databases/(default)/documents/${collection}/${id}`,
+    fields: Object.fromEntries(Object.entries(data).map(([key,value]) => [key,fsValue(value)]))
+  }
+});
+
+test("server-side meeting register returns only category-authorized, initiator and invited meetings", async () => {
+  const previousFetch = globalThis.fetch;
+  const meetings = [
+    fsDocument("meetings","governance",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user"}),
+    fsDocument("meetings","staff",{meetingCategory:"STAFF",meetingPolicyId:"STAFF",meetingType:"Staff Meeting",initiatorUid:"other-user"}),
+    fsDocument("meetings","own",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"staff-user"}),
+    fsDocument("meetings","invited",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user",invitedEmails:["staff@example.test"]}),
+    fsDocument("meetings","private",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user"})
+  ];
+  globalThis.fetch = async (url, init = {}) => {
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith(":runQuery")) {
+      const collection = JSON.parse(init.body).structuredQuery.from[0].collectionId;
+      const rows = collection === "meetings" ? meetings : [];
+      return new Response(JSON.stringify(rows), { status:200, headers:{"content-type":"application/json"} });
+    }
+    if (parsed.pathname.endsWith("/members/staff-user")) {
+      return new Response(JSON.stringify({fields:{uid:fsValue("staff-user"),status:fsValue("Active"),role:fsValue("Staff")}}), {status:200,headers:{"content-type":"application/json"}});
+    }
+    return new Response(JSON.stringify({error:{message:"NOT_FOUND"}}), {status:404,headers:{"content-type":"application/json"}});
+  };
+  const authed = {
+    ...ctx,
+    authenticateFirebaseRequest: async () => ({user_id:"staff-user",email:"staff@example.test",admin:false})
+  };
+  try {
+    const response = await post(createMeetingServicesRouter(authed), "/api/meeting-register/list");
+    assert.equal(response.status,200);
+    const body = await response.json();
+    assert.equal(body.ok,true);
+    assert.deepEqual(body.meetings.map(row=>row.id).sort(),["invited","own","staff"]);
+    assert.equal(body.accessMode,"SERVER_AUTHORIZED_CATEGORY_AND_PARTICIPANT_SCOPE");
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
 });
