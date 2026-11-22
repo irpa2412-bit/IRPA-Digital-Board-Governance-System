@@ -71,12 +71,14 @@ test("queue, evidence assessment and preview leave envelope, signer, field and s
   ]);
 });
 
-test("tampered audit chain blocks recovery assessment and preview",async()=>{
+test("tampered audit chain is reported as partial evidence while preview remains fail-closed",async()=>{
   const f=await fixture();
   const env=await f.ctx.meta.get("envelopes","ENV-REC-1");
   env.events[0].type="signer.changed";
   await f.ctx.meta.update("envelopes","ENV-REC-1",env);
-  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1"),{status:409});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.auditChain.status,"FAILED");
+  await assert.rejects(()=>buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1"),{status:409});
 });
 
 test("reassignment moves only a selected non-verified stamp and sends a new signer invitation",async()=>{
@@ -203,4 +205,14 @@ test("a mismatch against any stored source hash is reported without suppressing 
   assert.equal(result.sourceHashStatus,"MISMATCH");
   assert.equal(result.auditChain.status,"VERIFIED");
   assert.equal(result.stampSlots[0].status,"VERIFIED_EXISTING");
+});
+test("owner queue still exposes an envelope when its signing audit chain is invalid",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{events:envelope.events.map((event,index)=>index===0?{...event,type:"tampered.event"}:event)});
+  const queue=await getRecoveryQueue(f.ctx,f.user);
+  assert.equal(queue.total,1);
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.auditChain.status,"FAILED");
+  assert.equal(result.stampSlots.every(row=>row.status==="UNVERIFIABLE"),true);
 });
