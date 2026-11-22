@@ -20,6 +20,21 @@ The live member-register read and live deletion-path probes were not available i
 - **Role title:** Director of Internal Oversight. The owner has settled this title; it is not an open decision. Do not substitute “Director of International Oversight”.
 
 
+## Legacy role-title reference inventory (read-only; 22 November 2026)
+
+The owner has settled the oversight role title as **Director of Internal Oversight**. The following legacy “Director of International Oversight” occurrences were inventoried; this is a reference inventory, not a role assignment or a decision to preserve the legacy title:
+
+| File | Existing occurrence |
+|---|---|
+| `src/App.jsx` | Legacy role-to-department mapping assigns the title to Executive Office. |
+| `config/org-structure-authority.json` | Role-register entry and volunteer status use this title. |
+| `docs/org-structure/PORTAL_WORKFLOW_ALIGNMENT_GAPS.md` | Owner-confirmed volunteer baseline lists this title. |
+| `docs/org-structure/ROLE_JOB_DESCRIPTION_REVIEW_PACK.md` | Volunteer-role baseline lists this title. |
+| `docs/governance/IRPA-Governance-Management-Signature-Authority-Matrix.md` | Confirmed interim personnel/volunteer section lists this title. |
+| `docs/HANDOVER.md` | Earlier open-decision wording is superseded by the owner's confirmed title. |
+
+No application routing, personnel record, role assignment, or runtime permission is changed by this inventory. The volunteer position's distinct title/status must be assessed separately; do not infer that it is the oversight role.
+
 # IRPA-DBGS handover — 22 November 2026
 
 ## Live and verified
@@ -46,7 +61,10 @@ The live member-register read and live deletion-path probes were not available i
 - #859 — 824e08582841d511948dfbe5a5a8786352d4aebd.
 - #585 — 7778e95b81b19b8d06c18090abae17646c73da86.
 
-## Verified open PRs — GitHub state checked 22 November 2026
+## Verified PR state — GitHub state checked 22 November 2026
+- #867 merged: 955e5288219de04684003e27123e43e39cd2c4cb.
+- #866 closed as superseded; corrected inventory preserved in PR #870.
+- #869 closed and split because docs/approvals.md is a cross-portal protection file and must not be combined with ordinary docs/HANDOVER.md.
 - #863 (head c276e350365e1147d0e65766de1e523ade5c3db9); four required gates failing. Staging Gateway E2E/Deploy is skipped and is not counted as a failure.
 - #593, #826, #827, #815, #812, #813, #793, #789 and #830 remain open. A non-null merge_commit_sha in stale metadata does not override state=open and merged=false.
 - PR checks are commit-specific. Do not infer current branch or production state from a prior run.
@@ -96,8 +114,8 @@ For each path, record the portal, exact screen/control or route/rule location, a
 - Current Firestore rules version: NOT RETRIEVED; rules were unchanged and not published in this wind-up.
 
 ## Next tasks after this handover
-1. Complete the documentation reconciliation PRs #867 and #868 only after their required checks and exact protection approval are satisfied.
-2. Run the fresh read-only #845 production proof through GitHub Actions. Prepare, but do not run, the canary until the owner writes exactly RUN CANARY.
-3. Split #863 into one-portal PRs, diagnose and repair the failing gates at their causes, and prepare rollback evidence. Stop at APPROVE 863 ... and DEPLOY RULES.
+1. #867 merged (955e5288219de04684003e27123e43e39cd2c4cb); #866 closed as superseded; its inventory is carried in a separate corrected docs-only PR.
+2. Add deployment-completion and daily triggers to the read-only #845 proof. Canary remains workflow_dispatch-only and is run once only after read-only proof passes.
+3. Split #863 into one-portal PRs, diagnose the four failed gates at their causes, and prepare a tested rollback. Do not publish rules unless every owner condition is evidenced.
 
 Do not treat skipped staging WordPress/cPanel jobs as failures for this rebuild. Do not publish Firestore rules.
