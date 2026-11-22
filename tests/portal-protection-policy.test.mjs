@@ -140,6 +140,7 @@ test("new portals receive a seven-day warning period and then require full prote
   const until = newPortalWarningUntil(entry);
   assert.equal(until, Date.parse("2026-11-29T00:00:00Z"));
   assert.equal(newPortalWarningUntil({ guardMode: "protected", registeredAt: entry.registeredAt }), null);
+  assert.equal(until - Date.parse(entry.registeredAt), 7 * 24 * 60 * 60 * 1000);
 });
 
 test("real evidence URLs must identify an exact repository, run and job", () => {
