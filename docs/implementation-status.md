@@ -1,61 +1,17 @@
-# IRPA-DBGS implementation status
+# Meeting Portal implementation status
 
-Updated: 2026-11-22 (GitHub-verified reconciliation)
+Updated: 2026-11-21
 
-| Workstream | State | Evidence / PR | Next action |
-|---|---|---|---|
-| Portal protection guard | MERGED | #843 — 5fa8d46deeeb96c3172a1798411c18f57991855d; #853 — 61fe8f360021bea5692f06c99d7ce5cc770a58ae | Preserve per-portal controls and evidence verification. |
-| REAL/TRIAL meeting safeguards | MERGED; live behaviour NOT VERIFIED | #845 — 57368a8c2ceb418178aa28e5707b02605851dc83; #855 — 368b9781dca0817daed082720ecfdffe908ddd82 | Fresh read-only production proof; no destructive live probes absent canary approval. |
-| Firestore rules publishing protection | MERGED | #851 — 40c7cfa33a53871a48c8568a5ff3f876f2df5ac5 | Do not publish rules without exact DEPLOY RULES. |
-| Governance/docs and offline work | MERGED | #846 — 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c; #578 — ffe701e93665b63e6f4a6ee32fb643adee795bca; #579 — f72efc45820d3e399151ff9bff252a47528ed892; #585 — 7778e95b81b19b8d06c18090abae17646c73da86 | #585 docs baseline merged; do not infer live grant-analysis behaviour. |
-| Grants | Core merged; follow-up OPEN | #588 — 8f65e2a38bb4e2ad6ef9e5f32dc0570d61ef196a; #591 — 3a0d6d21d610a5fc729daeb063ebeda16d62fa1c; #592 — fe4e3de45c718e5c0aa7df8cb46a6f800a9c873f; #593 OPEN | Verify live Analyse separately; #593 remains open. |
-| Meeting operational access | OPEN / BLOCKED | #863 OPEN, head c276e350365e1147d0e65766de1e523ade5c3db9 | Split into portal-scoped changes; four failing gates require cause-level repair. |
-| Signature portal adjustments | OPEN | #826, #793, #789, #830 OPEN | Resolve assigned-field envelope text defect first; then scoped cancellation, cleanup audit and responsive action-bar work. |
-| Attendance and quorum | OPEN | #827, #815, #812, #813 OPEN | Resolve individually without bundling portal scope. |
-| Finance/procurement retention | DRAFT / OWNER DECISION OPEN | Policy section remains draft | Determine period only after donor and Tanzanian legal review; do not implement a guessed duration. |
-
-## Verified merged PR register (22 November 2026)
-| PR | Merge commit |
-|---|---|
-| #843 | 5fa8d46deeeb96c3172a1798411c18f57991855d |
-| #853 | 61fe8f360021bea5692f06c99d7ce5cc770a58ae |
-| #851 | 40c7cfa33a53871a48c8568a5ff3f876f2df5ac5 |
-| #845 | 57368a8c2ceb418178aa28e5707b02605851dc83 |
-| #846 | 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c |
-| #855 | 368b9781dca0817daed082720ecfdffe908ddd82 |
-| #588 | 8f65e2a38bb4e2ad6ef9e5f32dc0570d61ef196a |
-| #591 | 3a0d6d21d610a5fc729daeb063ebeda16d62fa1c |
-| #592 | fe4e3de45c718e5c0aa7df8cb46a6f800a9c873f |
-| #578 | ffe701e93665b63e6f4a6ee32fb643adee795bca |
-| #579 | f72efc45820d3e399151ff9bff252a47528ed892 |
-| #857 | af787e71492930ad28a31e278c02d13dc8c68778 |
-| #858 | c4c5abc05e0b8f11b61ad5e993b36fed274f7f7b |
-| #859 | 824e08582841d511948dfbe5a5a8786352d4aebd |
-| #585 | 7778e95b81b19b8d06c18090abae17646c73da86 |
-
-## Current open PR register (22 November 2026)
-- #863 — four failed checks; head c276e350365e1147d0e65766de1e523ade5c3db9.
-- #593, #826, #827, #815, #812, #813, #793, #789 and #830 — OPEN.
-- Treat state=open and merged=false as authoritative over stale non-null merge_commit_sha metadata.
-
-## #863 failure status
-Latest PR-head workflow snapshot: four failures: Firestore Rules Change Approval; Staging Administrator Access Preservation Emulator Gate; Organisational Structure and Signature Matrix Validation; Meeting Portal Isolated Browser Regression. Staging Gateway E2E and Deploy is SKIPPED, not a failing gate. Retrieve exact failing assertions/log causes from the latest run before editing; do not infer causes from job names or weaken checks.
-
-## Production evidence boundary for #845
-Previously recorded Worker version IDs and Firebase Hosting build stamp are historical deployment evidence, not a fresh live read. Fresh read-only production proof is pending. Firestore rules version remains NOT RETRIEVED. No Firestore rules or indexes have been published by this work.
-
-## Owner-controlled boundaries
-- APPROVE <PR> <reason>: exact owner approval for the named PR and scope; all required checks remain mandatory.
-- RENEW <portal> <reason>: renews one portal repair window only; does not waive checks.
-- DEPLOY RULES: exact approval required before publishing Firestore rules.
-- RUN CANARY: exact approval required before any destructive or state-changing live canary.
-- No secret values in logs or chat. No production release without relevant explicit approval.
-
-## 2026-11-22 repair-window and guard policy
-- Repair window: 72 hours; warning at 12 hours; break-glass remains 24 hours.
-- Cross-portal adapters are feature-flagged OFF with a kill switch.
-- New portals may run warning mode for seven days after registration; existing portals are protected immediately.
-- Evidence URLs must resolve to completed successful GitHub Actions jobs whose run head SHA matches the portal baseline commit.
+| Consolidated phase | Inserted workstream | State | PR | Commit SHA | Run link | Next step |
+|---|---|---|---|---|---|---|
+| 1. Deploy safeguard | — | OPEN; check rerun requested after scanner correction; prior guard failure was a scanner false-positive plus syntax error, both corrected in the latest code | [#843](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/843) | 8fd2452eff62bd573037ac4906a65ab2ce8fe23f | Awaiting GitHub Actions run retrieval | Verify all required checks, especially the production-only trigger guard; merge only when green. |
+| — | 1A. Urgent REAL/TRIAL deletion hotfix | NOT STARTED; queued immediately after Phase 1 merge | — | — | — | Restrict meeting deletion and record purge to explicitly TRIAL meetings; missing/invalid environment is REAL; creation-only immutable environment; preserve audit; add requested tests; deploy Worker after green merge. |
+| 2. Inventory | — | NOT STARTED | — | — | — | Administrator-only, paginated, read-only inventory with explicit TRIAL, explicit REAL, and missing/invalid-as-REAL classifications. |
+| 3. Access | — | NOT STARTED | — | — | — | Central role resolution, role-based Meeting Portal visibility, and logged Administrator grants with optional expiry. |
+| 4. Protection | — | NOT STARTED | — | — | — | Complete deletion safeguards, append-only audit, versioned SHA-256 records, protected exports and emulator rules tests; prepare rules diff without publishing. |
+| 5. Rules approval | — | WAITING FOR OWNER APPROVAL | — | — | — | Stop here until the exact owner instruction: DEPLOY RULES. No rules publication before approval. |
+| 6. Dependencies | — | NOT STARTED | — | — | — | Repair and test all portal handoffs, EAT/quorum, and full chain role-by-role; reconcile PRs #826, #827, #815, #812 and #813 follow-up. |
+| 7. Signature adjustments | — | NOT STARTED | — | — | — | Implement cancellation/removal safeguards and responsive fixed action bar without changing signing order, explicit confirmation, email-link rules or signing protocol. |
 
 Safety boundary: no Firestore rules or indexes have been published by this work. Production rules remain blocked unless a manual workflow is dispatched with the exact input DEPLOY, and the separate Phase 5 owner approval is still required.
 
