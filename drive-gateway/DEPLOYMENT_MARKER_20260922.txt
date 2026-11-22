@@ -1,3 +1,0 @@
-Deployment marker only. No runtime logic.
-Purpose: retrigger the gateway deployment so the current controlled-document upload route /api/upload-controlled-document is live in the existing production Google Drive gateway.
-Timestamp: 2026-09-29T16:50Z

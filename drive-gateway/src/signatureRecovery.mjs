@@ -4,7 +4,7 @@ import { resendInvitation } from "./signing.mjs";
 import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
 
-const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||user.isAdmin===true);
+const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function validChain(events){
   if(!Array.isArray(events))return false;
   let previous="GENESIS";
@@ -24,7 +24,7 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
   const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
   const rows=await ctx.meta.list("envelopes");
-  const eligible=(rows||[]).filter(row=>row.status==="CompletionFailed"&&isOwner(row,user))
+  const eligible=(rows||[]).filter(row=>row.status!=="Completed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
   const page=eligible.slice(safeOffset,safeOffset+safeLimit);for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed");return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
     envelopeId:e.id,documentId:e.documentId,title:e.title||"",status:e.status,
@@ -34,23 +34,27 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
 }
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
   const current=await ctx.meta.get("envelopes",id);
-  if(!current||!isOwner(current,user)||current.status!=="CompletionFailed")throw new HttpError(409,"Recovery record changed; refresh before continuing.");
+  if(!current||!isOwner(current,user)||current.status==="Completed")throw new HttpError(409,"Recovery record changed or is no longer eligible; refresh before continuing.");
   const at=ctx.now().toISOString();
   const eventId="recovery-"+id+"-"+Date.parse(at)+"-"+randomHex(8);
   await ctx.meta.create("recoveryAccessEvents",eventId,{envelopeId:id,type,actor:user.uid,at,...details});
 }
-async function loadOwnedFailedEnvelope(ctx,user,id){
+async function loadOwnedIncompleteEnvelope(ctx,user,id){
+  if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const envelope=await ctx.meta.get("envelopes",id);
-  if(!envelope||!isOwner(envelope,user))throw new HttpError(404,"Recovery record not found.");
-  if(envelope.status!=="CompletionFailed")throw new HttpError(409,"Only failed-completion envelopes can enter recovery.");
+  if(!envelope)throw new HttpError(404,"Recovery record not found.");
+  if(!isOwner(envelope,user))throw new HttpError(403,"This envelope belongs to another owner.");
+  if(envelope.status==="Completed")throw new HttpError(409,"Completed envelopes do not require recovery assessment.");
+  return envelope;
+}
+async function loadOwnedFailedEnvelope(ctx,user,id){
+  const envelope=await loadOwnedIncompleteEnvelope(ctx,user,id);
+  if(envelope.status!=="CompletionFailed")throw new HttpError(409,"Only failed-completion envelopes can enter a recovery action.");
   if(!await validChain(envelope.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
   return envelope;
 }
 export async function assessRecoveryEvidence(ctx,user,id){
-  if(!user?.uid)throw new HttpError(401,"Authentication required.");
-  const envelope=await ctx.meta.get("envelopes",id);
-  if(!envelope||!isOwner(envelope,user))throw new HttpError(404,"Recovery record not found.");
-  if(envelope.status!=="CompletionFailed")throw new HttpError(409,"Only failed-completion envelopes can enter recovery.");
+  const envelope=await loadOwnedIncompleteEnvelope(ctx,user,id);
   const events=Array.isArray(envelope.events)?envelope.events:[];
   const auditChainStatus=events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
   const document=await ctx.meta.get("documents",envelope.documentId);
