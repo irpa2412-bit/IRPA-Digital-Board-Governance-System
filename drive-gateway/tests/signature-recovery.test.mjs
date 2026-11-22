@@ -184,3 +184,22 @@ test("complete recovery lifecycle signs the replacement slot and finalizes only 
   assert.equal(envelope.signers.find(signer=>signer.id==="S2").status,"Signed");
   assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-2").signerId,"S2");
 });
+
+test("Gateway evidence route enforces 401, owner 403 and administrator access",async()=>{
+  const f=await fixture();
+  const otherEnvelope={...(await f.ctx.meta.get("envelopes","ENV-REC-1")),id:"ENV-OWNER-B",createdBy:"owner-2",status:"Sent"};
+  await f.ctx.meta.create("envelopes","ENV-OWNER-B",otherEnvelope);
+  const {route}=await import("../src/router.mjs");
+  const ctx={...f.ctx,verifyUser:async request=>{
+    const auth=request.headers.get("authorization");
+    if(auth==="Bearer owner-a")return f.user;
+    if(auth==="Bearer admin")return{uid:"admin-1",isAdmin:true};
+    return null;
+  }};
+  const ownerResponse=await route(new Request("https://gateway.test/api/recovery/envelopes/ENV-OWNER-B/evidence",{headers:{Authorization:"Bearer owner-a"}}),ctx);
+  assert.equal(ownerResponse.status,403);
+  const adminResponse=await route(new Request("https://gateway.test/api/recovery/envelopes/ENV-OWNER-B/evidence",{headers:{Authorization:"Bearer admin"}}),ctx);
+  assert.equal(adminResponse.status,200);
+  const signedOutResponse=await route(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/evidence"),ctx);
+  assert.equal(signedOutResponse.status,401);
+});
