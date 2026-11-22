@@ -54,27 +54,51 @@ export function classifyProtectionOnlyChange(changedFiles, approval = null) {
   };
 }
 
+export function resolveApprovalPullRequestNumbers({ event, eventName, sha, associatedPullRequests = [], baseRef = "main" }) {
+  const directNumber = Number(event?.pull_request?.number);
+  if (Number.isInteger(directNumber) && directNumber > 0) return [directNumber];
+  if (eventName !== "push" || !sha || !Array.isArray(associatedPullRequests)) return [];
+  return associatedPullRequests
+    .filter(pr => pr?.merged_at && pr?.base?.ref === baseRef && pr?.merge_commit_sha === sha && Number.isInteger(pr?.number))
+    .map(pr => pr.number);
+}
+
 async function findOwnerMaintenanceApproval() {
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
   const eventPath = process.env.GITHUB_EVENT_PATH;
   if (!token || !repository || !eventPath || !fs.existsSync(eventPath)) return null;
   const event = readJson(eventPath);
-  const pullNumber = event.pull_request?.number;
-  if (!pullNumber) return null;
+  const eventName = process.env.GITHUB_EVENT_NAME ?? "";
   const api = process.env.GITHUB_API_URL || "https://api.github.com";
   const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
-  const [repoResponse, commentsResponse] = await Promise.all([
-    fetch(`${api}/repos/${repository}`, { headers }),
-    fetch(`${api}/repos/${repository}/issues/${pullNumber}/comments?per_page=100`, { headers })
-  ]);
-  if (!repoResponse.ok || !commentsResponse.ok) return null;
+  const repoResponse = await fetch(`${api}/repos/${repository}`, { headers });
+  if (!repoResponse.ok) return null;
   const ownerLogin = (await repoResponse.json()).owner?.login;
-  const comments = await commentsResponse.json();
-  const ownerComment = comments.find(comment =>
-    comment.user?.login === ownerLogin && String(comment.body ?? "").includes(MAINTENANCE_APPROVAL_QUOTE)
-  );
-  return ownerComment ? { authorLogin: ownerComment.user.login, ownerLogin, body: ownerComment.body } : null;
+  let associatedPullRequests = [];
+  const sha = process.env.GITHUB_SHA || event.after;
+  if (eventName === "push" && sha) {
+    const associatedResponse = await fetch(`${api}/repos/${repository}/commits/${sha}/pulls?per_page=100`, { headers });
+    if (!associatedResponse.ok) return null;
+    associatedPullRequests = await associatedResponse.json();
+  }
+  const pullNumbers = resolveApprovalPullRequestNumbers({
+    event,
+    eventName,
+    sha,
+    associatedPullRequests,
+    baseRef: process.env.GITHUB_BASE_REF || "main"
+  });
+  for (const pullNumber of pullNumbers) {
+    const commentsResponse = await fetch(`${api}/repos/${repository}/issues/${pullNumber}/comments?per_page=100`, { headers });
+    if (!commentsResponse.ok) continue;
+    const comments = await commentsResponse.json();
+    const ownerComment = comments.find(comment =>
+      comment.user?.login === ownerLogin && String(comment.body ?? "").includes(MAINTENANCE_APPROVAL_QUOTE)
+    );
+    if (ownerComment) return { authorLogin: ownerComment.user.login, ownerLogin, body: ownerComment.body };
+  }
+  return null;
 }
 
 export function newPortalWarningUntil(entry) {
