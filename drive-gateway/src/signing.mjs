@@ -552,6 +552,7 @@ export async function revokeInvitation(ctx,user,id,signerId){
 export async function getEnvelopeStatus(ctx,user,id){
  let e=await ctx.meta.get("envelopes",id);
  if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");
+ if(e.status==="CompletionFailed"){const failure=e.completionFailure||{};const stage=String(failure.stage||"NOT_RECORDED").replace(/[^A-Z0-9_]/g,"").slice(0,48);const errorType=String(failure.errorType||"UnknownError").replace(/[^A-Za-z0-9_]/g,"").slice(0,48);const failedAt=typeof failure.failedAt==="string"?failure.failedAt:"time not recorded";const retryable=failure.retryable===true?"A controlled owner retry is available.":"A controlled retry is not confirmed as safe.";throw new HttpError(409,`Document completion failed at stage ${stage} (${errorType}) at ${failedAt}. ${retryable} Signer records have been retained.`);}
  let mirrorSync={status:"not-linked",documentStatus:e.status};
  if(e.externalReference){
   if(!await verifyChain(e.events))throw new HttpError(409,"Signing audit chain failed verification.");
