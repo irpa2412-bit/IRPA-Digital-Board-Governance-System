@@ -1,4 +1,4 @@
-import { resolveMeetingAuthority } from "../../shared/meetingAuthority.mjs";
+import { resolveMeetingAuthority } from "../../src/firebase/meetingPolicy.js";
 const sha256 = async value => {
   const bytes = new TextEncoder().encode(String(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
