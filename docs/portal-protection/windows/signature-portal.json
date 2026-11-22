@@ -5,9 +5,9 @@
   "durationHours": 72,
   "inactivityCloseHours": 72,
   "warningHours": 12,
-  "openedAt": "2026-11-22T15:05:20.559Z",
-  "expiresAt": "2026-11-25T15:05:20.559Z",
-  "lastActivityAt": "2026-11-22T15:05:20.559Z",
+  "openedAt": "2026-11-22T15:35:28.470Z",
+  "expiresAt": "2026-11-25T15:35:28.470Z",
+  "lastActivityAt": "2026-11-22T15:35:28.470Z",
   "emergency": false,
   "emergencyLimitHours": 24,
   "reason": "No active repair authorization. An owner-approved APPROVE or RENEW comment opens one 72-hour window for this portal only.",
@@ -31,6 +31,17 @@
       "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081030720",
       "command": "approve",
       "reason": "Add the owner-facing read-only recovery assessment screen for IRPA-ENV-2026-11501354; preserve existing signatures and do not mutate the envelope.",
+      "prNumber": 895,
+      "action": "owner-approved 72-hour renewal"
+    },
+    {
+      "at": "2026-11-22T15:35:28.470Z",
+      "expiresAt": "2026-11-25T15:35:28.470Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 895 Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081418969",
+      "command": "approve",
+      "reason": "Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
       "prNumber": 895,
       "action": "owner-approved 72-hour renewal"
     }
