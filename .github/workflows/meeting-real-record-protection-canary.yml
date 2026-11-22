@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/meeting-real-record-protection-canary.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/meeting-real-record-protection-canary.yml"
+      - "scripts/live-meeting-real-readonly.cjs"
+      - "scripts/live-meeting-real-canary.cjs"
   workflow_dispatch:
     inputs:
       CANARY:
@@ -24,7 +29,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    name: Validate canary scripts without production credentials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax-check both verification scripts
+        run: |
+          node --check scripts/live-meeting-real-readonly.cjs
+          node --check scripts/live-meeting-real-canary.cjs
+
   live-read-only:
+    if: github.event_name != 'pull_request'
     name: Read-only production version and rules inspection
     runs-on: ubuntu-latest
     environment: production
