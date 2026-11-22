@@ -9,12 +9,11 @@ const now = Date.parse("2026-11-19T20:00:00Z");
 const file = "src/pages/SignaturePlatform.jsx";
 const valid = {
   status: "complete",
-  declaration: { affectedPortals: [portal, "Meeting Portal"], reason: "Repair", files: [file], expectedEffect: "Fix scoped defect", prohibitedChanges: ["No signing rule changes"] },
-  baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" },
+  declaration: { affectedPortals: [portal], files: [file], baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" } },
   validation: {
     baselineSmoke: "PASS",
     fullRegression: "PASS",
-    portalSmoke: { [portal]: "PASS", "Meeting Portal": "PASS" },
+    portalSmoke: { [portal]: "PASS" },
     evidence: [
       "Baseline smoke PASS for 433727282012c75cdaebca21dcdadcb28dba59fb https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/11",
       "Full regression PASS for 433727282012c75cdaebca21dcdadcb28dba59fb https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/12",
