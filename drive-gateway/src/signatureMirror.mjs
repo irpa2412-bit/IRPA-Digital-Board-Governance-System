@@ -1,5 +1,57 @@
 const clean = value => String(value ?? "").trim();
 
+export async function persistSignerProgressMirror({envelope, getDocument, updateDocument, now = () => new Date().toISOString()}) {
+  if (!envelope?.externalReference) return;
+  if (envelope.status === "Completed") throw new Error("Completed envelopes must use the verified completion mirror.");
+  if (typeof getDocument !== "function" || typeof updateDocument !== "function") throw new Error("Firestore signature mirror dependencies are not configured.");
+  const envelopeId = clean(envelope.externalReference);
+  const path = "signatureEnvelopes/" + envelopeId;
+  const existing = await getDocument(path);
+  if (!existing) throw new Error("The portal signature envelope was not found for signer progress.");
+  const priorSigners = Array.isArray(existing.signers) ? existing.signers : [];
+  const signers = (envelope.signers || []).map(s => {
+    const prior = priorSigners.find(p => s.id
+      ? p.signerId === s.id
+      : s.uid
+        ? p.uid === s.uid
+        : s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase()
+    );
+    return {
+      ...(prior || {}),
+      uid: s.uid || null,
+      profileUid: s.profileUid || s.uid || null,
+      signerId: s.id || null,
+      identityType: s.identityType || "account",
+      name: s.name || "",
+      email: s.email || "",
+      status: s.status || "Pending",
+      signedAt: s.signedAt || null,
+      role: s.role || prior?.role || prior?.action || "",
+      action: s.action || prior?.action || prior?.role || ""
+    };
+  });
+  const changed = signers.some(signer => {
+    const prior = priorSigners.find(item => signer.signerId
+      ? item.signerId === signer.signerId
+      : signer.uid
+        ? item.uid === signer.uid
+        : signer.email && String(item.email || "").toLowerCase() === String(signer.email).toLowerCase()
+    );
+    return !prior || prior.status !== signer.status || (prior.signedAt || null) !== (signer.signedAt || null);
+  }) || existing.status !== (envelope.status || "InProgress") || existing.gatewayStatus !== (envelope.status || "InProgress") || existing.gatewaySigningStatus !== (envelope.status || "InProgress");
+  if (!changed) return false;
+  const timestamp = now();
+  await updateDocument(path, {
+    status: envelope.status || "InProgress",
+    signers,
+    gatewayStatus: envelope.status || "InProgress",
+    gatewaySigningStatus: envelope.status || "InProgress",
+    gatewayStatusUpdatedAt: timestamp,
+    updatedAt: timestamp
+  });
+  return true;
+}
+
 export async function persistCompletedSignatureEnvelope({envelope, completion, getDocument, updateDocument, now = () => new Date().toISOString()}) {
   if (!envelope?.externalReference) return;
   if (typeof getDocument !== "function" || typeof updateDocument !== "function") throw new Error("Firestore signature mirror dependencies are not configured.");

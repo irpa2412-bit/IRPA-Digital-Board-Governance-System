@@ -41,7 +41,7 @@ import { createInductionMatchingRouter } from "./inductionMatching.mjs";
 import { createInvitationRemovalRouter } from "./invitationRemoval.mjs";
 import { createReleaseReadinessRoute } from "./releaseReadinessRoutes.mjs";
 import { createEmergencyStorageDiscoveryRoute } from "./emergencyStorageDiscovery.mjs";
-import { persistCompletedSignatureEnvelope as persistSignatureMirror } from "./signatureMirror.mjs";
+import { persistCompletedSignatureEnvelope as persistSignatureMirror, persistSignerProgressMirror } from "./signatureMirror.mjs";
 import {
   getEnvelopeStatus as getGatewayEnvelopeStatus,
   previewEmailSigning as previewGatewayEmailSigning,
@@ -571,9 +571,32 @@ export default {
             );
             return persistSignatureMirror({envelope,completion,getDocument,updateDocument});
           };
+          const persistSignerProgress = async ({envelope}) => {
+            const token = await getFirestoreAdminAccessToken(env);
+            const encode = value => {
+              if (value === null || value === undefined) return {nullValue:null};
+              if (typeof value === "boolean") return {booleanValue:value};
+              if (typeof value === "number" && Number.isInteger(value)) return {integerValue:String(value)};
+              if (typeof value === "number") return {doubleValue:value};
+              if (Array.isArray(value)) return {arrayValue:{values:value.map(encode)}};
+              if (typeof value === "object") return {mapValue:{fields:Object.fromEntries(Object.entries(value).map(([k,v])=>[k,encode(v)]))}};
+              return {stringValue:String(value)};
+            };
+            const getDocument = async path => {
+              const raw = await getFirestoreDocument(env,path,token);
+              return firestoreDocumentToPlain(raw);
+            };
+            const updateDocument = async (path,fields) => updateFirestoreDocument(
+              env,path,token,
+              Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,encode(v)])),
+              Object.keys(fields)
+            );
+            return persistSignerProgressMirror({envelope,getDocument,updateDocument});
+          };
           const ctx = buildEsignContext({
             env,
             persistCompletedSignatureEnvelope,
+            persistSignerProgress,
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
               const adminToken = await getFirestoreAdminAccessToken(env);

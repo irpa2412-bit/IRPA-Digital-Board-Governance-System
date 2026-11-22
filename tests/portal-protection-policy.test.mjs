@@ -2,6 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
+
+const protectionCheckerSource = fs.readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
+test("PR base fetch preserves ancestry for the three-dot changed-file comparison", () => {
+  assert.ok(protectionCheckerSource.includes('execFileSync("git", ["fetch", "origin", base], { stdio: "inherit" });'));
+  assert.equal(protectionCheckerSource.includes('execFileSync("git", ["fetch", "origin", base, "--depth=1"]'), false);
+});
 const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/portal-register.json", import.meta.url), "utf8"));
 
 const portal = "Signature Portal";

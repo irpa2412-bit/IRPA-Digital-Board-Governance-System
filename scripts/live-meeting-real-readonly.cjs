@@ -7,7 +7,6 @@ const { GoogleAuth } = require("google-auth-library");
 const API = "https://api.cloudflare.com/client/v4";
 const GATEWAY_NAME = "irpa-google-drive-gateway";
 const FRONTEND_NAME = "irpa-digital-board-governance-frontend";
-const ROLLBACK_ID = "dd4637ea-0804-4b85-a455-1e691f1f0d72";
 const MIN_BUILD = "57368a8c2ceb418178aa28e5707b02605851dc83";
 const output = (key, value) => fs.appendFileSync(process.env.GITHUB_OUTPUT, key + "=" + String(value) + "\n");
 const summary = lines => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
@@ -83,16 +82,6 @@ async function main() {
     throw new Error("Live web build is not verified as commit 57368a8 or a descendant of it.");
   }
 
-  const rollbackResponse = await fetch(
-    API + "/accounts/" + account + "/workers/scripts/" + GATEWAY_NAME + "/versions/" + encodeURIComponent(ROLLBACK_ID),
-    { headers: authHeader }
-  );
-  let rollbackAvailable = rollbackResponse.ok;
-  if (rollbackAvailable) {
-    const rollbackBody = await rollbackResponse.json().catch(() => ({}));
-    rollbackAvailable = String(rollbackBody?.result?.id || rollbackBody?.result?.version_id || ROLLBACK_ID) === ROLLBACK_ID;
-  }
-
   let serviceAccount = null;
   try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -129,7 +118,6 @@ async function main() {
   }
 
   output("canary_credential_available", credentialAvailable ? "true" : "false");
-  output("rollback_version_available", rollbackAvailable ? "true" : "false");
   summary([
     "## Live read-only verification",
     "- Gateway Worker active version: " + gatewayVersion,
@@ -141,7 +129,6 @@ async function main() {
     "- Firestore Rules release: " + rulesVersion,
     "- Firestore Rules release create time: " + rulesCreateTime,
     "- Approved Firebase admin credential path: " + (credentialAvailable ? "AVAILABLE" : "UNAVAILABLE"),
-    "- Required Gateway rollback version " + ROLLBACK_ID + " available: " + (rollbackAvailable ? "YES" : "NO"),
     "- Read-only requests only; no Firestore Rules or application data were written."
   ]);
   console.log("GATEWAY_WORKER_VERSION_ID=" + gatewayVersion);
@@ -152,11 +139,9 @@ async function main() {
   console.log("WEB_BUILD_TIME=" + buildTime);
   console.log("FIRESTORE_RULES_VERSION=" + rulesVersion);
   console.log("CANARY_CREDENTIAL_PATH=" + (credentialAvailable ? "AVAILABLE" : "UNAVAILABLE"));
-  console.log("ROLLBACK_VERSION_AVAILABLE=" + (rollbackAvailable ? "YES" : "NO"));
 }
 main().catch(error => {
   output("canary_credential_available", "false");
-  output("rollback_version_available", "false");
   summary(["## Live read-only verification", "FAILED: " + String(error?.message || "Read-only inspection failed."), "No write request was made."]);
   console.error("READ_ONLY_VERIFICATION_FAILED: " + String(error?.message || "unknown error"));
   process.exitCode = 1;

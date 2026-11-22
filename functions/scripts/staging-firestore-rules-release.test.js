@@ -37,10 +37,11 @@ test("staging publisher captures and stores the backup before publish and rolls 
   const rollbackStart = workflow.indexOf("Roll back staging rules to saved backup", verifyStart);
   assert.ok(verifyStart >= 0 && rollbackStart > verifyStart);
   assert.match(workflow.slice(verifyStart, rollbackStart), /NODE_PATH=.*functions\/node_modules/);
-  assert.match(workflow, /branches:\s*\n\s*- fix\/signature-trail-20261024/);
-  assert.match(workflow, /paths:\s*\n\s*- "firestore\.staging\.rules"\s*\n\s*- "\.github\/workflows\/publish-staging-firestore-rules-only\.yml"/);
-  assert.doesNotMatch(workflow, /workflow_dispatch|confirm_staging_rules_publication/);
+  assert.match(workflow, /workflow_dispatch:\s*\n\s*inputs:/);
+  assert.match(workflow, /confirm_staging_firestore_rules_deployment:/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/fix\/signature-trail-20261024'/);
+  assert.match(workflow, /inputs\.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'/);
 });
 
 test("backup captures the exact active staging ruleset and content hash", () => {
