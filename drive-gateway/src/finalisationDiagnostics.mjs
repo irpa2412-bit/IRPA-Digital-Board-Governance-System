@@ -1,5 +1,4 @@
 import {buildSignedPdf} from "./pdf.mjs";
-import {createCryptographicEvidence} from "./cryptographicGate.mjs";
 import {archivePath} from "./archives.mjs";
 import {HttpError,sha256Hex} from "./util.mjs";
 const safeCode=value=>String(value?.code||value?.name||"DIAGNOSTIC_FAILED").replace(/[^A-Z0-9_-]/gi,"").slice(0,48)||"DIAGNOSTIC_FAILED";
