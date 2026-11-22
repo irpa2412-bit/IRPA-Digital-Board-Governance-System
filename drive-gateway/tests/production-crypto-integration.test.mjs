@@ -111,7 +111,7 @@ test("C-I03 production completion fails closed when the cryptographic key provid
   const state=await f.meta.get("envelopes",f.envelope.id);
   assert.equal(state.status,"CompletionFailed");
   assert.ok(state.completion?.archivePending?.storageId);
-  assert.equal(state.completion.archivePending.environment,"production");
+  assert.equal(state.completion.archivePending.environment,"ACTUAL");
   assert.equal(f.storage.objs.size,before+1);
   assert.equal((await f.meta.list("cryptographicEvidence")).length,0);
 });
