@@ -1,10 +1,15 @@
 name: Live Meeting REAL Record Protection Verification
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - "Deploy IRPA Gateway to Cloudflare Production"
+      - "Deploy IRPA Governance Frontend to Cloudflare Workers"
+      - "Deploy IRPA Governance to Firebase"
     branches: [main]
-    paths:
-      - ".github/workflows/meeting-real-record-protection-canary.yml"
+    types: [completed]
+  schedule:
+    - cron: "17 3 * * *"
   pull_request:
     paths:
       - ".github/workflows/meeting-real-record-protection-canary.yml"
@@ -26,7 +31,7 @@ permissions:
 
 concurrency:
   group: irpa-live-meeting-real-record-protection
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -46,7 +51,10 @@ jobs:
           node --check scripts/live-meeting-real-canary.cjs
 
   live-read-only:
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.CANARY == 'READ_ONLY' || inputs.CANARY == 'RUN CANARY'))
     name: Read-only production version and rules inspection
     runs-on: ubuntu-latest
     environment: production
