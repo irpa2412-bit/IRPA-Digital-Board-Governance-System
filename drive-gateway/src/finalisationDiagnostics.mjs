@@ -15,7 +15,7 @@ async function buildEvidence(envelope,bytes,ctx){
  if(!/^[0-9a-f]{64}$/.test(String(chainHead||"")))throw error("The audit-chain head is unavailable for certificate verification.","CERTIFICATE_CHAIN_HEAD_MISSING");
  let count=0;
  for(const signer of envelope.signers||[]){
-  const key=signer.uid?await provider.getSignerKey(signer.uid):await provider.getSignerKeyForSigner?.({...signer,envelopeId:envelope.id});
+  const key=signer.uid?await provider.getSignerKey(signer.uid):await provider.getSignerKeyForSignerReadOnly?.({...signer,envelopeId:envelope.id});
   if(!key)throw error("Signer cryptographic key custody is unavailable.","CERTIFICATE_SIGNER_KEY_MISSING");
   await createCryptographicEvidence({keyId:key.keyId,signer:{uid:signer.uid||null,identityType:signer.identityType||"account",emailHash:signer.emailHash||null,signerId:signer.id,envelopeId:envelope.id,signatureHash:await sha256Hex(String(signer.signatureValue||"")),signatureType:signer.signatureType,authorityVerification:signer.authorityVerification||null,privateKey:key.privateKey,publicKey:key.publicKey,signCanonicalPayload:key.signCanonicalPayload},publicKeyJwk:key.publicKeyJwk,documentHash,chainHead,signedAt:signer.signedAt});
   count++;
