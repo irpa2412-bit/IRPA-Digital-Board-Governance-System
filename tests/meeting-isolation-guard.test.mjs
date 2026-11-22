@@ -218,8 +218,24 @@ test("workflow delegates its source-isolation gate to the extracted guard script
 });
 
 test("only stale runs for the same pull request are cancelled", () => {
-  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
-  assert.ok(workflow.includes("cancel-in-progress: true"));
+  assert.match(workflow, /group: meeting-portal-browser-\\$\\{\\{\\s*github\\.event\\.pull_request\\.number\\s*&&\\s*format\\('pr-\\{0\\}',\\s*github\\.event\\.pull_request\\.number\\)\\s*\\|\\|\\s*format\\('ref-\\{0\\}-sha-\\{1\\}',\\s*github\\.ref,\\s*github\\.sha\\)\\s*\\}\\}/);
+  assert.match(workflow, /cancel-in-progress: true/);
+  const groupFor = ({ eventName, pullRequestNumber, ref, sha }) =>
+    `meeting-portal-browser-${pullRequestNumber ? `pr-${pullRequestNumber}` : `ref-${ref}-sha-${sha}`}`;
+  assert.equal(groupFor({ eventName: "pull_request", pullRequestNumber: 101, ref: "refs/pull/101/merge", sha: "a" }), "meeting-portal-browser-pr-101");
+  assert.equal(groupFor({ eventName: "pull_request", pullRequestNumber: 202, ref: "refs/pull/202/merge", sha: "b" }), "meeting-portal-browser-pr-202");
+  assert.notEqual(
+    groupFor({ eventName: "pull_request", pullRequestNumber: 101, ref: "refs/pull/101/merge", sha: "a" }),
+    groupFor({ eventName: "pull_request", pullRequestNumber: 202, ref: "refs/pull/202/merge", sha: "b" }),
+    "different PR numbers must never share a concurrency group"
+  );
+  assert.equal(groupFor({ eventName: "push", ref: "refs/heads/main", sha: "abc" }), "meeting-portal-browser-ref-refs/heads/main-sha-abc");
+  assert.equal(groupFor({ eventName: "push", ref: "refs/heads/main", sha: "def" }), "meeting-portal-browser-ref-refs/heads/main-sha-def");
+  assert.notEqual(
+    groupFor({ eventName: "push", ref: "refs/heads/main", sha: "abc" }),
+    groupFor({ eventName: "push", ref: "refs/heads/main", sha: "def" }),
+    "different push commits on the same branch must not share a concurrency group"
+  );
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
 
