@@ -3,6 +3,7 @@ name: Firebase Functions Entrypoint Integrity Test
 permissions:
   actions: read
   contents: read
+  issues: read
 
 on:
   push:
