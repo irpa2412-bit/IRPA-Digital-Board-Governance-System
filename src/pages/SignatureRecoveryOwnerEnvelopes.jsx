@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useState}from"react";
+import{onAuthStateChanged}from"firebase/auth";
 import{auth}from"../firebase/config";
 import{getSignatureEnvelopes}from"../firebase/signaturePlatform";
 import SignatureRecoveryOwnerPanel from"./SignatureRecoveryOwnerPanel";
@@ -19,7 +20,7 @@ export default function SignatureRecoveryOwnerEnvelopes(){
     }catch(err){setError(err?.message||"Unable to load owner envelopes.")}
     finally{setBusy(false)}
   },[]);
-  useEffect(()=>{load();const unsubscribe=auth.onAuthStateChanged?.(()=>load());return()=>unsubscribe?.()},[load]);
+  useEffect(()=>{const unsubscribe=onAuthStateChanged(auth,()=>load());return()=>unsubscribe()},[load]);
   return <section className="panel signature-owner-envelopes" aria-labelledby="owner-envelopes-heading" style={{margin:"14px 0",padding:18,border:"1px solid var(--border-color,#cbd5e1)",borderRadius:12}}>
     <div className="panel-heading"><div><span className="eyebrow">OWNER SELF-SERVICE</span><h2 id="owner-envelopes-heading">My Created Envelopes / Bahasha Nilizounda</h2><p className="muted">Check any envelope you created before it reaches Completed. Administrators may assess any envelope. The Gateway enforces access on every request.</p></div><button type="button" className="secondary-button" onClick={load} disabled={busy}>Refresh</button></div>
     {busy&&<p role="status">Loading envelopes… / Inapakia bahasha…</p>}
