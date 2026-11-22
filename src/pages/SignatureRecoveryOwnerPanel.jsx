@@ -27,8 +27,13 @@ export default function SignatureRecoveryOwnerPanel(){
     setLoading(true);setError("");setNotice("");setEvidence(null);setSelected(null);
     if(previewUrl){URL.revokeObjectURL(previewUrl);setPreviewUrl("")}
     try{
-      const result=await recoveryRequest("/api/recovery/envelopes?limit=50&offset=0");
-      const items=Array.isArray(result.items)?result.items:[];
+      const items=[];let offset=0,total=0;
+      do{
+        const result=await recoveryRequest("/api/recovery/envelopes?limit=50&offset="+offset);
+        const page=Array.isArray(result.items)?result.items:[];
+        items.push(...page);total=Number(result.total||0);offset+=page.length;
+        if(!page.length||offset>=total||offset>=10000)break;
+      }while(true);
       setQueue(items);
       const match=items.find(item=>item.documentId===TARGET_DOCUMENT_ID);
       if(!match){setNotice("The target document is not present in the authenticated owner's failed-completion queue. No document changes were made.");return}
@@ -39,6 +44,7 @@ export default function SignatureRecoveryOwnerPanel(){
     }catch(err){setError(err?.message||"Unable to retrieve the recovery assessment.");}
     finally{setLoading(false)}
   }
+  useEffect(()=>{void loadAssessment()},[]);
   async function loadPreview(){
     if(!selected)return;setPreviewLoading(true);setError("");
     try{
