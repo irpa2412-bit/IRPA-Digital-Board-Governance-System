@@ -11,10 +11,9 @@ test("owner recovery panel performs only authenticated GET requests", () => {
   assert.doesNotMatch(source, /fetch\([^\n]*method\s*:\s*(?!["']GET["'])/i);
 });
 
-test("owner recovery panel exposes only evidence and non-authoritative preview reads", () => {
+test("owner recovery panel exposes only the authenticated evidence read", () => {
   assert.match(source, /\/api\/recovery\/envelopes\//);
   assert.match(source, /\/evidence/);
-  assert.match(source, /\/preview\.pdf/);
   assert.doesNotMatch(source, /\/stamps\/reassign|\/retry(?:\/|["'])|\/complete(?:\/|["'])|\/repair(?:\/|["'])|\/send-link/i);
 });
 
