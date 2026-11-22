@@ -16,22 +16,22 @@ test("rejects edited comments", () => { const e = ownerComment(); e.action = "ed
 test("rejects pull-request conversation comments", () => { const e = ownerComment(); e.issue.pull_request = { url: "not-an-issue" }; assert.equal(isAuthorizedComment(e), false); });
 test("manual input must match exact text", () => { assert.equal(isAuthorizedManualInput("RUN CANARY"), true); assert.equal(isAuthorizedManualInput("RUN CANARY "), false); });
 test("workflow listens only to newly created issue comments", () => {
-  assert.match(workflow, /issue_comment:\\s*\\n\\s*types:\\s*\\[created\\]/);
-  assert.doesNotMatch(workflow, /issue_comment:[\\s\\S]{0,80}edited/);
+  assert.match(workflow, /issue_comment:\s*\n\s*types:\s*\[created\]/);
+  assert.doesNotMatch(workflow, /issue_comment:[\s\S]{0,80}edited/);
 });
 test("workflow pins the dedicated issue and both owner identity fields", () => {
-  assert.match(workflow, /github\\.event\\.issue\\.number == 876/);
-  assert.match(workflow, /github\\.event\\.comment\\.user\\.id == 319164319/);
-  assert.match(workflow, /github\\.event\\.comment\\.user\\.login == 'irpa2412-bit'/);
+  assert.match(workflow, /github\.event\.issue\.number == 876/);
+  assert.match(workflow, /github\.event\.comment\.user\.id == 319164319/);
+  assert.match(workflow, /github\.event\.comment\.user\.login == 'irpa2412-bit'/);
 });
 test("comment body is checked in a file-based guard, never interpolated into a shell command", () => {
-  assert.match(guard, /event\\.comment\\.body === EXACT_BODY/);
-  assert.doesNotMatch(workflow, /github\\.event\\.comment\\.body/);
-  assert.doesNotMatch(workflow, /run:.*github\\.event\\.comment/);
+  assert.match(guard, /event\.comment\.body === EXACT_BODY/);
+  assert.doesNotMatch(workflow, /github\.event\.comment\.body/);
+  assert.doesNotMatch(workflow, /run:.*github\.event\.comment/);
 });
 test("automatic read-only triggers remain separate from issue_comment", () => {
   const readOnly = workflow.split("  live-read-only:")[1].split("  canary:")[0];
-  assert.match(readOnly, /github\\.event_name == 'schedule'/);
-  assert.match(readOnly, /github\\.event_name == 'workflow_run'/);
+  assert.match(readOnly, /github\.event_name == 'schedule'/);
+  assert.match(readOnly, /github\.event_name == 'workflow_run'/);
   assert.doesNotMatch(readOnly, /issue_comment/);
 });
