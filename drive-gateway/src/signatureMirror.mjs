@@ -2,6 +2,7 @@ const clean = value => String(value ?? "").trim();
 
 export async function persistSignerProgressMirror({envelope, getDocument, updateDocument, now = () => new Date().toISOString()}) {
   if (!envelope?.externalReference) return;
+  if (envelope.status === "Completed") throw new Error("Completed envelopes must use the verified completion mirror.");
   if (typeof getDocument !== "function" || typeof updateDocument !== "function") throw new Error("Firestore signature mirror dependencies are not configured.");
   const envelopeId = clean(envelope.externalReference);
   const path = "signatureEnvelopes/" + envelopeId;
@@ -37,10 +38,11 @@ export async function persistSignerProgressMirror({envelope, getDocument, update
         : signer.email && String(item.email || "").toLowerCase() === String(signer.email).toLowerCase()
     );
     return !prior || prior.status !== signer.status || (prior.signedAt || null) !== (signer.signedAt || null);
-  });
+  }) || existing.status !== (envelope.status || "InProgress") || existing.gatewayStatus !== (envelope.status || "InProgress") || existing.gatewaySigningStatus !== (envelope.status || "InProgress");
   if (!changed) return false;
   const timestamp = now();
   await updateDocument(path, {
+    status: envelope.status || "InProgress",
     signers,
     gatewayStatus: envelope.status || "InProgress",
     gatewaySigningStatus: envelope.status || "InProgress",
