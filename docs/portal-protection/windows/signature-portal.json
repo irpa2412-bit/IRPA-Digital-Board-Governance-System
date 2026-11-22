@@ -20,7 +20,12 @@
     "src/components/SignatureImagePreview.jsx",
     "src/components/SignaturePathwaySelfTest.jsx",
     "src/firebase/signature/",
-    "src/utils/signature/"
+    "src/utils/signature/",
+    "src/pages/SignatureRecoveryOwnerPanel.jsx",
+    "drive-gateway/src/signatureRecovery.mjs",
+    "drive-gateway/tests/signature-recovery.test.mjs",
+    "tests/signature-recovery-owner-panel-readonly.test.mjs",
+    ".github/workflows/baseline-evidence.yml"
   ],
   "activityLog": [
     {
