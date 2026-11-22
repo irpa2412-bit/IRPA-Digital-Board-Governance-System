@@ -327,7 +327,8 @@ test("Gateway completed-PDF verification requires the invited UID even for a val
 
 test("Production-mode Gateway signing does not require Member/Employee authority verification", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
-  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};\n  fixture.envelope.dataEnvironment="TRIAL";
+  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
+  fixture.envelope.dataEnvironment="TRIAL";
   const result=await sign(fixture.ctx,{
     declarations:{name:"Institutional Signer",occupation:"Board Member"},
     token:fixture.token,
