@@ -9,12 +9,12 @@ async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
   return [...events,{...body,hash:await sha256Hex(canonicalJson(body))}];
 }
-async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false}={}){
+async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,tamperSourceHash=false}={}){
   const sent=[],meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
   pdf.addPage([612,792]);
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
-  await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:sourceHash});
+  await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:tamperSourceHash?"0".repeat(64):sourceHash});
   const signatureValue="Original signature specimen";
   const fieldValue="Verified stamp specimen";
   let events=[];
@@ -34,27 +34,38 @@ test("recovery queue is owner-scoped and paginated",async()=>{
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"signer.signed");
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).at(-1).type,"recovery.queue.viewed");
   assert.equal((await getRecoveryQueue(f.ctx,f.other)).total,0);
-  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-REC-1"),{status:404});
+  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-REC-1"),{status:403});
 });
 test("field-level stamp is verified only when signer event and chained field hash agree",async()=>{
   const f=await fixture();
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.auditChainValid,true);
-  assert.equal(result.stampSlots[0].status,"VERIFIED_EXISTING");
+  assert.equal(result.stampSlots[0].status,"PASS");
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"signer.signed");
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).at(-1).type,"recovery.evidence.assessed");
   const bad=await fixture({tamperFieldHash:true});
   assert.equal((await assessRecoveryEvidence(bad.ctx,bad.user,"ENV-REC-1")).stampSlots[1].status,"UNVERIFIABLE");
 });
+
+test("assessment reports source-hash mismatch and a safe finalisation stage code",async()=>{
+  const f=await fixture({tamperSourceHash:true});
+  const report=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(report.sourceHashValid,false);
+  assert.equal(report.completionFailure.stage,"ARCHIVE");
+  assert.equal(report.completionFailure.errorCode,"ERROR");
+  assert.match(report.sourceHashReason,/does not match/);
+});
+
 test("recovery preview is a valid PDF and contains only verified stamps with non-authoritative watermark",async()=>{
   const f=await fixture();
   const result=await buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1");
   const doc=await PDFDocument.load(result.bytes);
   assert.equal(doc.getPageCount(),2);
-  assert.equal(result.assessment.summary.verified,2);
+  assert.equal(result.assessment.summary.pass,2);
   assert.equal(doc.getTitle(),"RECOVERY PREVIEW - NOT COMPLETED");
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"signer.signed");
-  assert.ok((await f.ctx.meta.list("recoveryAccessEvents")).some(event=>event.type==="recovery.preview.generated"));
+  const previewEvent=(await f.ctx.meta.list("recoveryAccessEvents")).find(event=>event.type==="recovery.preview.generated");
+  assert.equal(previewEvent.verifiedStampCount,2);
 });
 
 test("queue, evidence assessment and preview leave envelope, signer, field and signing audit records unchanged",async()=>{
@@ -71,12 +82,42 @@ test("queue, evidence assessment and preview leave envelope, signer, field and s
   ]);
 });
 
-test("tampered audit chain blocks recovery assessment and preview",async()=>{
+
+test("assessment is available for every non-completed owner envelope; completed envelopes are excluded",async()=>{
+  const f=await fixture();
+  const base=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  for(const status of ["Sent","Opened","Signing","Stuck"]){
+    await f.ctx.meta.create("envelopes","ENV-"+status,{...base,id:"ENV-"+status,createdBy:"owner-1",status});
+  }
+  await f.ctx.meta.create("envelopes","ENV-DONE",{...base,id:"ENV-DONE",createdBy:"owner-1",status:"Completed"});
+  const queue=await getRecoveryQueue(f.ctx,f.user);
+  assert.equal(queue.total,5);
+  assert.equal(queue.items.some(item=>item.envelopeId==="ENV-DONE"),false);
+  const sent=await assessRecoveryEvidence(f.ctx,f.user,"ENV-Sent");
+  assert.equal(sent.envelopeStatus,"Sent");
+  assert.equal(sent.auditChainValid,true);
+});
+
+test("owner A receives 403 for owner B; administrator can assess any owner; signed-out receives 401",async()=>{
+  const f=await fixture();
+  await f.ctx.meta.create("envelopes","ENV-OTHER",{...(await f.ctx.meta.get("envelopes","ENV-REC-1")),id:"ENV-OTHER",createdBy:"owner-2",status:"Sent"});
+  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-OTHER"),{status:403});
+  const admin={uid:"admin-1",isAdmin:true};
+  const result=await assessRecoveryEvidence(f.ctx,admin,"ENV-OTHER");
+  assert.equal(result.envelopeId,"ENV-OTHER");
+  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,null,"ENV-REC-1"),{status:401});
+  await assert.rejects(()=>getRecoveryQueue(f.ctx,null),{status:401});
+});
+
+test("tampered audit chain is reported as unverifiable and blocks preview",async()=>{
   const f=await fixture();
   const env=await f.ctx.meta.get("envelopes","ENV-REC-1");
   env.events[0].type="signer.changed";
   await f.ctx.meta.update("envelopes","ENV-REC-1",env);
-  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1"),{status:409});
+  const report=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(report.auditChainValid,false);
+  assert.ok(report.stampSlots.every(row=>row.status==="UNVERIFIABLE"));
+  await assert.rejects(()=>buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1"),{status:409});
 });
 
 test("reassignment moves only a selected non-verified stamp and sends a new signer invitation",async()=>{
@@ -143,4 +184,23 @@ test("complete recovery lifecycle signs the replacement slot and finalizes only 
   assert.ok(envelope.completion?.finalHash);
   assert.equal(envelope.signers.find(signer=>signer.id==="S2").status,"Signed");
   assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-2").signerId,"S2");
+});
+
+test("Gateway evidence route enforces 401, owner 403 and administrator access",async()=>{
+  const f=await fixture();
+  const otherEnvelope={...(await f.ctx.meta.get("envelopes","ENV-REC-1")),id:"ENV-OWNER-B",createdBy:"owner-2",status:"Sent"};
+  await f.ctx.meta.create("envelopes","ENV-OWNER-B",otherEnvelope);
+  const {route}=await import("../src/router.mjs");
+  const ctx={...f.ctx,verifyUser:async request=>{
+    const auth=request.headers.get("authorization");
+    if(auth==="Bearer owner-a")return f.user;
+    if(auth==="Bearer admin")return{uid:"admin-1",isAdmin:true};
+    return null;
+  }};
+  const ownerResponse=await route(new Request("https://gateway.test/api/recovery/envelopes/ENV-OWNER-B/evidence",{headers:{Authorization:"Bearer owner-a"}}),ctx);
+  assert.equal(ownerResponse.status,403);
+  const adminResponse=await route(new Request("https://gateway.test/api/recovery/envelopes/ENV-OWNER-B/evidence",{headers:{Authorization:"Bearer admin"}}),ctx);
+  assert.equal(adminResponse.status,200);
+  const signedOutResponse=await route(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/evidence"),ctx);
+  assert.equal(signedOutResponse.status,401);
 });
