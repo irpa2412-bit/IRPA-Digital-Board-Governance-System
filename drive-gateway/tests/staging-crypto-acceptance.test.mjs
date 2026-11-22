@@ -167,6 +167,7 @@ test("C-G14 through C-G20 staging transaction persists and independently verifie
   const result = await finalizeEnvelope({
     meta: f.meta,
     storage: f.storage,
+    env: { IRPA_ENVIRONMENT: "staging", DRIVE_MOCK: "false" },
     now: () => new Date("2026-10-07T20:00:00.000Z"),
     config: { ttlDays: 14 },
     crypto: { keyProvider: provider },
@@ -225,6 +226,7 @@ test("C-G19 staging transaction rejects tampered persisted cryptographic payload
   const result = await finalizeEnvelope({
     meta: f.meta,
     storage: f.storage,
+    env: { IRPA_ENVIRONMENT: "staging", DRIVE_MOCK: "false" },
     now: () => new Date("2026-10-07T20:00:00.000Z"),
     config: { ttlDays: 14 },
     crypto: { keyProvider: provider },
@@ -254,6 +256,7 @@ test("C-G21 authenticated Gateway status and evidence retrieval bind the complet
   const ctx = {
     meta:f.meta,
     storage:f.storage,
+    env:{IRPA_ENVIRONMENT:"staging",DRIVE_MOCK:"false"},
     now:()=>new Date("2026-10-07T20:00:00.000Z"),
     config:{ttlDays:14},
     crypto:{keyProvider:provider}
@@ -282,6 +285,7 @@ test("C-G22 evidence retrieval fails closed when persisted cryptographic evidenc
   const ctx = {
     meta:f.meta,
     storage:f.storage,
+    env:{IRPA_ENVIRONMENT:"staging",DRIVE_MOCK:"false"},
     now:()=>new Date("2026-10-07T20:00:00.000Z"),
     config:{ttlDays:14},
     crypto:{keyProvider:provider}
