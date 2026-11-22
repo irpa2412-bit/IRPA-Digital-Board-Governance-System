@@ -116,3 +116,101 @@ test("screen grant is derived by the same resolver and does not infer from depar
   const noGrant=resolveMeetingAuthorityForIdentity({uid:"staff"},{employees:[{uid:"staff",status:"Active",department:"Executive Director Office"}]});
   assert.equal(noGrant.fullMeetingAccess,false);
 });
+
+
+// Seeded register-resolution cases are kept in the existing Meeting Portal policy suite.
+
+const activeRegister = { status:"Active" };
+
+test("resolves Internal Oversight Director by UID, email, member number and employee number",()=>{
+  for (const [identity,record] of [
+    [{uid:"u1"},{...activeRegister,uid:"u1",role:"Internal Oversight Director"}],
+    [{email:"person@example.test"},{...activeRegister,email:"person@example.test",role:"Director Internal Oversight"}],
+    [{memberNumber:"IRPA-MEM-0001"},{...activeRegister,memberNumber:"IRPA-MEM-0001",role:"Internal Oversight Director"}],
+    [{employeeNumber:"IRPA-EMP-0001"},{...activeRegister,employeeNumber:"IRPA-EMP-0001",role:"Internal Oversight Director"}]
+  ]) {
+    const result=resolveMeetingAuthorityForIdentity(identity,{members:[record],employees:[]});
+    assert.equal(result.fullMeetingAccess,true);
+  }
+});
+
+test("resolves Executive Director from employee-only record and preserves multiple registered roles",()=>{
+  const result=resolveMeetingAuthorityForIdentity({uid:"ed-uid"},{members:[],employees:[{...activeRegister,uid:"ed-uid",employeeNumber:"IRPA-EMP-0002",roles:["Executive Director","Head of Department","Programme Officer"]}]});
+  assert.equal(result.fullMeetingAccess,true);
+  assert.deepEqual(result.roles.map(item=>item.role),["Executive Director","Head of Department","Programme Officer"]);
+});
+
+test("resolves a head of every department from department-head register references",()=>{
+  const departments=["Executive Office","Human Resources","Finance & Administration","Internal Oversight","Programmes","Procurement","Operations","Information Technology","Community Development","Livestock","Environment","Outreach","Field Operations","Research, Statistics and Knowledge Department"];
+  for (const [index,department] of departments.entries()) {
+    const uid="head-"+index;
+    const result=resolveMeetingAuthorityForIdentity({uid},{members:[],employees:[],departments:[{...activeRegister,id:"dept-"+index,name:department,headOfDepartmentUid:uid}]});
+    assert.equal(result.fullMeetingAccess,true,department);
+    assert.equal(result.roles[0].department,department);
+  }
+});
+
+test("joins a member record and employee record by shared email and derives active roles across both",()=>{
+  const result=resolveMeetingAuthorityForIdentity({uid:"u",email:"shared@example.test"},{members:[{...activeRegister,memberNumber:"IRPA-MEM-0003",email:"shared@example.test",role:"Board Member"}],employees:[{...activeRegister,employeeNumber:"IRPA-EMP-0003",email:"shared@example.test",role:"Executive Director"}]});
+  assert.equal(result.fullMeetingAccess,true);
+  assert.deepEqual(new Set(result.registers),new Set(["Members","Employees"]));
+  assert.equal(result.roles.length,2);
+});
+
+test("inactive, revoked, suspended and expired authority entries deny the grant",()=>{
+  const records=[
+    {...activeRegister,uid:"u",role:"Executive Director",status:"Inactive"},
+    {...activeRegister,uid:"u",role:"Executive Director",revoked:true},
+    {...activeRegister,uid:"u",role:"Executive Director",status:"Suspended"},
+    {...activeRegister,uid:"u",role:"Executive Director",expiresAt:"2020-01-01T00:00:00.000Z"}
+  ];
+  for(const record of records)assert.equal(resolveMeetingAuthorityForIdentity({uid:"u"},{members:[record]}).fullMeetingAccess,false);
+});
+
+test("an active member-only or employee-only person is resolved without requiring the other register",()=>{
+  assert.equal(resolveMeetingAuthorityForIdentity({uid:"m"},{members:[{...activeRegister,uid:"m",role:"Member"}],employees:[]}).active,true);
+  assert.equal(resolveMeetingAuthorityForIdentity({uid:"e"},{members:[],employees:[{...activeRegister,uid:"e",role:"Employee"}]}).active,true);
+});
+
+test("Authorized User Access Categories data is treated as a registered authority source",()=>{
+  const result=resolveMeetingAuthorityForIdentity({uid:"u"},{members:[],employees:[],accessCategories:[{...activeRegister,uid:"u",categories:["Executive Director"]}]});
+  assert.equal(result.fullMeetingAccess,true);
+});
+
+test("department text alone never creates a head-of-department grant",()=>{
+  const result=resolveMeetingAuthorityForIdentity({uid:"u"},{members:[],employees:[{...activeRegister,uid:"u",department:"Livestock"}]});
+  assert.equal(result.fullMeetingAccess,false);
+});
+
+test("resolves register documents whose document IDs are IRPA member or employee numbers",()=>{
+  assert.equal(resolveMeetingAuthorityForIdentity({memberNumber:"IRPA-MEM-00991"},{members:[{id:"IRPA-MEM-00991",status:"Active",role:"Executive Director"}]}).fullMeetingAccess,true);
+  assert.equal(resolveMeetingAuthorityForIdentity({employeeNumber:"IRPA-EMP-00991"},{employees:[{id:"IRPA-EMP-00991",status:"Active",title:"Internal Oversight Director"}]}).fullMeetingAccess,true);
+});
+
+test("revoked or expired nested role assignments do not grant authority",()=>{
+  const result=resolveMeetingAuthorityForIdentity({uid:"u"},{members:[{uid:"u",status:"Active",roleAssignments:[{role:"Executive Director",status:"Revoked"},{role:"Head of Department",status:"Expired"}]}]});
+  assert.equal(result.fullMeetingAccess,false);
+});
+
+test("structured job title and position fields resolve authority without free-text department inference",()=>{
+  assert.equal(resolveMeetingAuthorityForIdentity({uid:"ed"},{employees:[{uid:"ed",status:"Active",jobTitle:"Executive Director"}]}).fullMeetingAccess,true);
+  assert.equal(resolveMeetingAuthorityForIdentity({uid:"staff"},{employees:[{uid:"staff",status:"Active",department:"Executive Director's Office"}]}).fullMeetingAccess,false);
+});
+
+test("accepts canonical and historical Internal Oversight Director titles",()=>{
+  for(const role of ["Director of Internal Oversight","Internal Oversight Director","Director of International Oversight","Director Internal Oversight"]){
+    const result=resolveMeetingAuthorityForIdentity({uid:"oversight-"+role},{members:[{...activeRegister,uid:"oversight-"+role,role}],employees:[]});
+    assert.equal(result.fullMeetingAccess,true,role);
+  }
+});
+
+test("normalizes repeated whitespace in register role titles",()=>{
+  const result=resolveMeetingAuthorityForIdentity({uid:"spacing"},{members:[{...activeRegister,uid:"spacing",role:"Director   of   Internal Oversight"}],employees:[]});
+  assert.equal(result.fullMeetingAccess,true);
+});
+
+test("missing register status defaults to deny while nested roles inherit an explicitly active parent",()=>{
+  assert.equal(resolveMeetingAuthorityForIdentity({uid:"missing"},{employees:[{uid:"missing",role:"Executive Director"}]}).fullMeetingAccess,false);
+  assert.equal(resolveMeetingAuthorityForIdentity({uid:"active"},{employees:[{uid:"active",status:"Active",roleAssignments:[{role:"Executive Director"}]}]}).fullMeetingAccess,true);
+});
+
