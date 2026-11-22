@@ -45,10 +45,12 @@ test("recovery dispatch repair changes only its seven approved files relative to
   const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   const main = execFileSync("git", ["rev-parse", "origin/main"], { encoding: "utf8" }).trim();
   const subject = execFileSync("git", ["show", "-s", "--format=%s", "HEAD"], { encoding: "utf8" }).trim();
-  const isMergedRecoveryRepair = head === main && /^Merge pull request #905\\b/.test(subject);
-  // The boundary is enforced on the PR head and once again on its main merge.
-  // Later main pushes must not re-compare the historical PR against the new main tip.
-  if (head === main && !isMergedRecoveryRepair) return;
+  const refName = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || "";
+  const isRecoveryRepairPr = refName === "fix/signature-recovery-route-dispatch-20261122";
+  const isMergedRecoveryRepair = head === main && /^Merge pull request #905\b/.test(subject);
+  // Enforce the seven-file boundary on #905's PR head and first main merge only.
+  // Later unrelated PRs and main pushes must not re-compare this historical file list.
+  if (!isRecoveryRepairPr && !isMergedRecoveryRepair) return;
   const baseRef = isMergedRecoveryRepair ? "HEAD^1" : "origin/main";
   const changed = execFileSync("git", [
     "diff", "--name-only", baseRef + "...HEAD"
