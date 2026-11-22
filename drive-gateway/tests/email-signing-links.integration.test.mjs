@@ -4,6 +4,7 @@ import fs from "node:fs";
 import {buildEsignContext} from "../src/esignContext.mjs";
 import {createEnvelope,openEmailSigning,previewEmailSigning,getSigningPdf,resendInvitation,resendAllUnsignedInvitations,revokeInvitation,getEnvelopeStatus,recordEmailLinkStage} from "../src/signing.mjs";
 import {sha256Hex} from "../src/util.mjs";
+import {persistSignerProgressMirror} from "../src/signatureMirror.mjs";
 import {buildSmtpRecipientEnvelope} from "../src/invitationEmail.mjs";
 import {genericEmailSigningFailure,createEmailSigningToken,inspectEmailSigningToken,markEmailSigningTokenOpened,consumeEmailSigningToken,revokeEmailSigningToken} from "../src/emailSigningLinks.mjs";
 import {PDFDocument} from "pdf-lib";
@@ -769,4 +770,44 @@ test("f) the owner's IRPA address at a later signer position is not deduplicated
   assert.equal(sent.length,2);
   assert.equal(sent[1].signerId,"S2");
   assert.equal(sent[1].to,"owner@irpa.or.tz","the owner's address is still the assigned recipient for that signer position");
+});
+
+test("owner refresh synchronizes overall in-progress document status even when signer assignments are unchanged",async()=>{
+  const writes=[];
+  const envelope={id:"ENV-STATUS-REFRESH",externalReference:"IRPA-STATUS-REFRESH",status:"InProgress",signers:[{id:"S1",uid:"owner-uid",profileUid:"owner-uid",identityType:"account",name:"Document Owner",email:"owner@example.org",status:"Pending",signedAt:null}]};
+  const existing={documentId:"DOC-STATUS-REFRESH",status:"Completed",gatewayStatus:"Completed",gatewaySigningStatus:"Completed",signers:[{signerId:"S1",uid:"owner-uid",status:"Pending",signedAt:null}]};
+  const changed=await persistSignerProgressMirror({envelope,getDocument:async()=>existing,updateDocument:async(path,fields)=>writes.push({path,fields}),now:()=>"2026-11-22T11:30:00.000Z"});
+  assert.equal(changed,true);
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].path,"signatureEnvelopes/IRPA-STATUS-REFRESH");
+  assert.equal(writes[0].fields.status,"InProgress");
+  assert.equal(writes[0].fields.gatewayStatus,"InProgress");
+  assert.equal(writes[0].fields.gatewaySigningStatus,"InProgress");
+  assert.equal(writes[0].fields.signers[0].status,"Pending");
+});
+
+test("owner refresh retries completed Firebase mirror and validates signed PDF and signer evidence",async()=>{
+  const f=await fixture();
+  const signedBytes=new Uint8Array([1,2,3,4,5]);
+  const signedFile=await f.ctx.storage.put({path:"completed/refresh.pdf",bytes:signedBytes,contentType:"application/pdf",metadata:{}});
+  const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const signer={...stored.signers[0],status:"Signed",signedAt:"2026-11-22T10:00:00.000Z"};
+  const completion={primaryStorageId:signedFile.id,finalHash:await sha256Hex(signedBytes),completedAt:"2026-11-22T10:00:00.000Z",files:[{kind:"signer-copy",signerId:signer.id,id:"signer-copy-file"}]};
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{status:"Completed",signers:[signer],completion,mirrorStatus:"Completed"});
+  let calls=0;
+  f.ctx.persistCompletedSignatureEnvelope=async()=>{calls++;};
+  const status=await getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId);
+  assert.equal(calls,1);
+  assert.equal(status.status,"Completed");
+  assert.equal(status.mirrorSync.status,"updated");
+  assert.equal(status.mirrorStatus,"Completed");
+});
+
+test("owner refresh refuses to mirror Completed while any required signer remains pending",async()=>{
+  const f=await fixture();
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{status:"Completed",completion:{primaryStorageId:"missing",finalHash:"invalid",completedAt:"2026-11-22T10:00:00.000Z",files:[]}});
+  let calls=0;
+  f.ctx.persistCompletedSignatureEnvelope=async()=>{calls++;};
+  await assert.rejects(()=>getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId),/every required signer as signed/);
+  assert.equal(calls,0);
 });
