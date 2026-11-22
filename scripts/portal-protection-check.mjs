@@ -24,6 +24,7 @@ export function isProtectionFile(path) {
     /^scripts\/meeting-portal-fixture-isolation-guard\.sh$/,
     /^tests\/portal-(?:protection|repair-window)[^/]*\.test\.mjs$/,
     /^tests\/meeting-isolation-guard\.test\.mjs$/,
+    /^tests\/meeting-portal-protection\.test\.mjs$/,
     /^docs\/(?:approvals\.md|implementation-status\.md)$/,
     /^docs\/portal-protection\/.+$/,
     /^\.github\/pull_request_template\.md$/,
