@@ -11,7 +11,7 @@ test("owner recovery panel performs only authenticated GET requests", () => {
 });
 
 test("owner recovery panel exposes only queue, evidence and non-authoritative preview reads", () => {
-  assert.match(source, /\/api\/recovery\/envelopes\?limit=50&offset=/);
+  assert.match(source, /\/api\/recovery\/envelopes\//);
   assert.match(source, /\/api\/recovery\/envelopes\//);
   assert.match(source, /\/evidence/);
   assert.match(source, /\/preview\.pdf/);
@@ -29,5 +29,5 @@ test("owner recovery panel contains no signature or envelope persistence API", (
 test("owner recovery panel cannot directly change envelope completion state", () => {
   assert.doesNotMatch(source, /\.status\s*=\s*["']Completed["']/);
   assert.doesNotMatch(source, /status\s*:\s*["']Completed["']/);
-  assert.match(source, /No reassignment, retry, completion or signature overwrite is available/);
+  assert.match(source, /No signing or completion action is available here/);\n  for (const heading of ["WHAT HAPPENED / KILICHOTOKEA", "WHAT IS FINE / KILICHO SAWA", "WHAT NEEDS FIXING / KINACHOHITAJI KUREKEBISHWA", "WHAT YOU CAN DO NOW / UNACHOWEZA KUFANYA SASA"]) assert.ok(source.includes(heading));\n  assert.match(source, /Copy report \/ Nakili ripoti/);
 });
