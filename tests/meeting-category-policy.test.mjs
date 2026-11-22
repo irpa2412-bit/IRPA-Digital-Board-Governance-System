@@ -88,13 +88,13 @@ test("category capabilities keep voting and resolutions disabled outside governa
 });
 
 const meetingDataSource = readFileSync(new URL("../src/firebase/data.js", import.meta.url), "utf8");
-test("meeting register retrieval avoids an unscoped collection read", () => {
+test("meeting reads use the server-authorized Cloudflare gateway", () => {
   const start = meetingDataSource.indexOf("export async function getAccessibleMeetingRecords");
   const end = meetingDataSource.indexOf("function meetingCreatedAt", start);
   assert.ok(start >= 0 && end > start, "meeting retrieval function must be present");
   const source = meetingDataSource.slice(start, end);
-  assert.doesNotMatch(source, /if\s*\(user\.uid\)\s*\{\s*const all\s*=\s*await getDocs\(ref\)/);
-  assert.match(source, /for\(const policy of Object\.values\(MEETING_CATEGORIES\)\)/);
-  assert.match(source, /query\(ref,where\("initiatorUid","==",uid\)\)/);
-  assert.match(source, /for\(const field of \["participantUids"/);
+  assert.match(source, /callMeetingGateway\("\/api\/meeting-register\/list"/);
+  assert.doesNotMatch(source, /getDocs|collection\(db/);
+  assert.match(meetingDataSource, /collectionName===COLLECTIONS\.meetings\)return getAccessibleMeetingRecords\(\)/);
+  assert.match(meetingDataSource, /collectionName===COLLECTIONS\.meetings\)\{const result=await callMeetingGateway\("\/api\/meeting-register\/get"/);
 });
