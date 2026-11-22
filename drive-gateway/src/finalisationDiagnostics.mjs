@@ -26,7 +26,8 @@ export async function diagnoseFinalisation(ctx,user,envelopeId){
  const envelope=await ctx.meta.get("envelopes",envelopeId);
  if(!envelope)throw new HttpError(404,"Envelope not found.");
  const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
- if(["staging","production"].includes(runtimeEnvironment)&&envelope.dataEnvironment!==runtimeEnvironment)throw new HttpError(409,"Finalisation diagnostics are blocked because the envelope environment does not match the active data environment.");
+ const dataEnvironment=String(envelope.dataEnvironment||"").trim().toUpperCase();
+ if(!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment)||(runtimeEnvironment==="staging"&&dataEnvironment==="ACTUAL"))throw new HttpError(409,"Finalisation diagnostics are blocked because the recorded envelope data environment is invalid for this Gateway.");
  if(!user?.uid)throw new HttpError(401,"Authentication required.");
  const isEnvelopeOwner=[envelope.createdBy,envelope.createdByUid,envelope.ownerUid].includes(user.uid);
  if(!isEnvelopeOwner&&user?.isAdmin!==true&&user?.isOwner!==true)throw new HttpError(403,"Not authorized.");
