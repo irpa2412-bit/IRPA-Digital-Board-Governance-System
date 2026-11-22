@@ -40,5 +40,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Install Firebase Admin SDK for emulator-only startup fixture
+        run: npm --prefix functions install --omit=dev
+      - name: Install Playwright browser for startup smoke
+        run: |
+          npm install --no-save --package-lock=false @playwright/test
+          npx playwright install --with-deps chromium
+      - name: Run startup smoke and 500-document self-test stress test
+        run: |
+          node --test tests/signature-self-test-safety.test.mjs
+          npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/startup-smoke.spec.mjs --workers=1"
       - name: Run Firestore security rules regression tests
         run: npx firebase emulators:exec --only firestore "node tests/firestore.rules.test.cjs && node --test --test-concurrency=1 tests/meeting-category-policy.test.mjs tests/meeting-category-firestore-rules.test.cjs tests/finance-portal-policy.test.cjs"
