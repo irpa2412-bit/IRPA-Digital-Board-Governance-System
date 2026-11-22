@@ -403,8 +403,8 @@ test("envelope refresh keeps signer rows readable and separates invitation deliv
 });
 
 test("completed-document distribution retry is admitted by the Gateway e-signature route allowlist", () => {
-  const worker = fs.readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
-  assert.ok(worker.includes("distribution\\/retry"), "the Worker must route distribution retries into the e-signature router");
+  const dispatchPolicy = fs.readFileSync(new URL("../drive-gateway/src/esignPathPolicy.mjs", import.meta.url), "utf8");
+  assert.ok(dispatchPolicy.includes("distribution\\/retry"), "the shared Worker dispatch policy must route distribution retries into the e-signature router");
 });
 
 
