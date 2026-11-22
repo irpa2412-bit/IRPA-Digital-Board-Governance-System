@@ -9,6 +9,27 @@ export function parseActivityTimestamps(history) {
   return String(history || "").split(/\r?\n/).filter(Boolean);
 }
 
+export function portalPolicyPaths(affectedPortals) {
+  if (!Array.isArray(affectedPortals) || affectedPortals.length !== 1) return null;
+  const slug = affectedPortals[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return {
+    windowPath: `docs/portal-protection/windows/${slug}.json`,
+    recordPath: `docs/portal-protection/records/${slug}.json`
+  };
+}
+
+
+export function resolvePortalPolicyPaths(affectedPortals, exists = fs.existsSync) {
+  const paths = portalPolicyPaths(affectedPortals);
+  if (!paths) {
+    return { ok: false, reason: "Protected changes must be split into one-portal PRs; multi-portal changes are blocked." };
+  }
+  if (!exists(paths.windowPath) || !exists(paths.recordPath)) {
+    return { ok: false, reason: "A dedicated, portal-specific repair window and Change Record are required; shared records cannot substitute." };
+  }
+  return { ok: true, ...paths };
+}
+
 export function evaluatePolicy({ changedFiles, registry, windowState, record, now = Date.now(), latestActivityAt = null, activityTimestamps = [] }) {
   const affected = new Set();
   const protectedFiles = [];
@@ -28,6 +49,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   if (!protectedFiles.length) return { ok: true, affected: [], protectedFiles: [], reason: "No protected portal or shared dependency changed." };
 
   const fail = (reason) => ({ ok: false, affected: [...affected].sort(), protectedFiles, reason });
+  if (affected.size > 1) return fail("Protected changes must be split into one-portal PRs; multi-portal changes are blocked.");
   if (!record || record.status !== "complete") return fail("A completed Change Record is required.");
   if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.");
   const openedAt = Date.parse(windowState.openedAt);
@@ -70,9 +92,19 @@ function main() {
     changedFiles = execFileSync("git", ["diff", "--name-only", "HEAD^...HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   }
   const registry = readJson("docs/portal-protection/portal-register.json");
-  const windowState = readJson("docs/portal-protection/repair-window.json");
-  const recordPath = "docs/portal-protection/change-record.json";
-  const record = fs.existsSync(recordPath) ? readJson(recordPath) : null;
+  const discovery = evaluatePolicy({ changedFiles, registry, windowState: null, record: null });
+  if (!discovery.protectedFiles.length) {
+    console.log(JSON.stringify(discovery, null, 2));
+    return;
+  }
+  const portalSelection = resolvePortalPolicyPaths(discovery.affected);
+  if (!portalSelection.ok) {
+    console.log(JSON.stringify({ ...discovery, ok: false, reason: portalSelection.reason }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+  const windowState = readJson(portalSelection.windowPath);
+  const record = readJson(portalSelection.recordPath);
   const initial = evaluatePolicy({ changedFiles, registry, windowState, record });
   if (!initial.protectedFiles.length) {
     console.log(JSON.stringify(initial, null, 2));

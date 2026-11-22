@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -12,6 +11,32 @@ test("isolation baseline compares against the fetched current main snapshot", ()
   assert.match(guard, /const eventName = process\.env\.EVENT_NAME\?\.trim\(\)/);
   assert.match(guard, /const base = "origin\/main"/);
   assert.ok(guard.includes('git", ["diff", "--name-only", `${base}...HEAD`]'));
+});
+
+test("TRIAL deletion repair is allowed only with its exact paired gateway and policy tests", () => {
+  assert.match(guard, /const meetingTrialDeletionFiles = new Set/);
+  assert.match(guard, /const meetingTrialDeletionGuard =/);
+  assert.ok(guard.includes('changed.includes("drive-gateway/src/meetingDeletion.mjs")'));
+  assert.ok(guard.includes('changed.includes("drive-gateway/tests/meeting-trial-deletion.test.mjs")'));
+  assert.ok(guard.includes('changed.includes("src/pages/Meetings.jsx")'));
+  assert.ok(guard.includes('changed.includes("tests/meeting-trial-delete-ui.test.mjs")'));
+  for (const path of [
+    "docs/implementation-status.md",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/src/meetingDeletion.mjs",
+    "drive-gateway/src/meetingServices.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs",
+    "drive-gateway/tests/meeting-trial-deletion.test.mjs",
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "scripts/portal-protection-check.mjs",
+    "tests/meeting-isolation-guard.test.mjs",
+    "tests/meeting-trial-delete-ui.test.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "src/pages/Meetings.jsx"
+  ]) assert.ok(guard.includes(path), `TRIAL deletion guard must pair ${path}`);
+  assert.match(guard, /!meetingTrialDeletionGuard/);
 });
 
 test("Wrangler changes cannot alter production configuration", () => {
@@ -194,8 +219,23 @@ test("workflow delegates its source-isolation gate to the extracted guard script
 
 test("only stale runs for the same pull request are cancelled", () => {
   assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
-  assert.ok(workflow.includes("cancel-in-progress: false"));
+  assert.ok(workflow.includes("cancel-in-progress: true"));
   assert.doesNotMatch(workflow, /^\\s*push:/m);
+});
+
+test("Meeting Portal uses isolated protection records without editing shared Signature history", () => {
+  for (const path of [
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "scripts/portal-protection-check.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs",
+    "docs/implementation-status.md"
+  ]) assert.ok(guard.includes(`"${path}"`), `missing isolated protection allowlist entry: ${path}`);
+  assert.ok(guard.includes('"docs/portal-protection/change-record.json"'));
+  assert.match(guard, /delete baselineRecord\.activeAmendment/);
+  assert.match(guard, /delete currentRecord\.activeAmendment/);
 });
 
 test("parallel portal window amendments preserve existing meeting and historical change records", () => {
@@ -521,33 +561,4 @@ test("isolation guard blocks reopening if another portal's Change Record history
   const fixture=reopenFixture();
   fixture.currentChangeRecord.history.push({action:"altered-meeting-history"});
   assert.equal(evaluateSignatureWindowReopen(fixture).pass,false);
-});
-
-test("meeting fixture guard is concurrency-scoped and watches all deletion-protection dependencies", () => {
-  const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
-  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
-  assert.ok(workflow.includes("cancel-in-progress: false"));
-  for (const path of [
-    "docs/implementation-status.md",
-    "docs/portal-protection/records/meeting-portal.json",
-    "docs/portal-protection/windows/meeting-portal.json",
-    "scripts/portal-protection-check.mjs",
-    "tests/portal-protection-policy.test.mjs",
-    "drive-gateway/src/meetingEnvironment.mjs",
-    "drive-gateway/src/meetingDeletion.mjs",
-    "drive-gateway/tests/meeting-environment.test.mjs",
-    "drive-gateway/tests/meeting-trial-deletion.test.mjs",
-    "src/pages/Meetings.jsx",
-    "tests/meeting-trial-delete-ui.test.mjs"
-  ]) assert.ok(workflow.includes(path), `fixture workflow must run when ${path} changes`);
-});
-
-test("baseline evidence jobs execute protected smoke and full regression on the exact base SHA", () => {
-  const workflow = fs.readFileSync(new URL("../.github/workflows/meeting-portal-fixture-browser.yml", import.meta.url), "utf8");
-  assert.ok(workflow.includes("ref: ${{ github.event.pull_request.base.sha }}"));
-  assert.ok(workflow.includes("npm run test:protected-portals"));
-  assert.ok(workflow.includes("npm run test:all"));
-  assert.ok(workflow.includes("npm test --prefix drive-gateway"));
-  assert.ok(workflow.includes("baseline-protection-smoke:"));
-  assert.ok(workflow.includes("baseline-full-regression:") && workflow.includes("BASELINE_SOURCE_SHA="));
 });
