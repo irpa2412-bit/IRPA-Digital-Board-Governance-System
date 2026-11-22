@@ -45,7 +45,7 @@ on:
   workflow_dispatch: {}
 concurrency:
   group: meeting-portal-browser-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('ref-{0}-sha-{1}', github.ref, github.sha) }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
