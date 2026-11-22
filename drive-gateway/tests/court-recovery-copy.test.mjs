@@ -35,7 +35,11 @@ test("download fails closed when no archive-pending PDF was preserved",async()=>
  assert.equal(f.getReads(),0);
  assert.equal(f.getWrites(),0);
 });
-test("download rejects a mismatched runtime environment without reading storage",async()=>{\n const f=await fixture();f.ctx.env.IRPA_ENVIRONMENT="production";\n await assert.rejects(()=>buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id),e=>e.status===409);\n assert.equal(f.getReads(),0);assert.equal(f.getWrites(),0);\n});\ntest("download rejects bytes that do not match the preserved final hash",async()=>{
+test("download rejects a mismatched runtime environment without reading storage",async()=>{
+ const f=await fixture();f.ctx.env.IRPA_ENVIRONMENT="production";
+ await assert.rejects(()=>buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id),e=>e.status===409);
+ assert.equal(f.getReads(),0);assert.equal(f.getWrites(),0);
+});\ntest("download rejects bytes that do not match the preserved final hash",async()=>{
  const f=await fixture();
  f.ctx.storage.get=async()=>new TextEncoder().encode("%PDF-1.7\nwrong bytes\n%%EOF");
  await assert.rejects(()=>buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id),e=>e.status===409);
