@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { canonicalJson, sha256Hex, HttpError } from "./util.mjs";
 import { resendInvitation } from "./signing.mjs";
 import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
+import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||user.isAdmin===true);
 async function validChain(events){
@@ -191,7 +192,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
         const result=await getRecoveryQueue(ctx,user,{limit,offset});
         return json(result,200,corsHeaders(request));
       }
-      const evidence=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/evidence$/);
+      const evidence=matchRecoveryEvidenceRoute(request.method,pathname);
       if(evidence) {
         const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]));
         return json(result,200,corsHeaders(request));
