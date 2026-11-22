@@ -62,8 +62,8 @@
     "ownerInstruction": "owner instruction",
     "repairWindow": {
       "openedAt": "2026-11-22T16:34:38Z",
-      "expiresAt": "2026-11-24T16:34:38Z",
-      "durationHours": 48
+      "expiresAt": "2026-11-25T16:34:38Z",
+      "durationHours": 72
     },
     "baselineCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
     "rollbackCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
@@ -102,7 +102,8 @@
       "sevenPortalSmoke": "PENDING",
       "emailSigningContract": "PENDING",
       "fullRegression": "PENDING",
-      "productionDeployment": "NOT_AUTHORIZED_UNTIL_MERGE_AND_RELEASE_GATES"
+      "productionDeployment": "NOT_AUTHORIZED_UNTIL_MERGE_AND_RELEASE_GATES",
+      "window": "72-hour repair window corrected; owner instruction unchanged"
     },
     "prohibitedChanges": [
       "secrets",
