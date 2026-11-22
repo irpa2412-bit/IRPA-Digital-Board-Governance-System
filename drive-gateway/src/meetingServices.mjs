@@ -187,7 +187,8 @@ async function context(ctx,env,token,claims,meetingId){
  const secretary=lower(meeting.secretaryEmail)===email||clean(meeting.secretaryUid)===uid;
  const canManage=isAdmin||authority.fullMeetingAccess||chair||secretary||clean(meeting.meetingHostUid)===uid||clean(meeting.hostUid)===uid||clean(meeting.organizerUid)===uid||clean(meeting.organiserUid)===uid||clean(meeting.createdByUid)===uid||clean(meeting.initiatorUid)===uid||clean(meeting.ownerUid)===uid;
  const authorityIdentity={active:authority.active,roles:authority.roles.map(item=>item.role),role:authority.roles[0]?.role,uid};
- const authorityRecord={status:"Active",roles:authorityIdentity.roles};\n const categoryAccess=meetingCategoryRoleAllowed(meeting,member||authorityRecord,employee,authorityIdentity);
+ const authorityRecord={status:"Active",roles:authorityIdentity.roles};
+ const categoryAccess=meetingCategoryRoleAllowed(meeting,member||authorityRecord,employee,authorityIdentity);
  const canRead=canManage||participant||categoryAccess||isAdmin;
  if(!isAdmin&&!authority.active&&!participant)throw Object.assign(new Error("An active IRPA identity or authorised meeting participant is required."),{status:403});
  return {uid,email,meeting,participant,canManage,canRead,isAdmin,categoryAccess,authority,fullMeetingAccess:authority.fullMeetingAccess,category:categoryOf(meeting),confidentiality:clean(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
