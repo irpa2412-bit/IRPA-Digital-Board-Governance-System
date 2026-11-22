@@ -90,3 +90,8 @@ test("normalizes repeated whitespace in register role titles",()=>{
   const result=resolveMeetingAuthority({uid:"spacing"},{members:[{...active,uid:"spacing",role:"Director   of   Internal Oversight"}],employees:[]});
   assert.equal(result.fullMeetingAccess,true);
 });
+
+test("missing register status defaults to deny while nested roles inherit an explicitly active parent",()=>{
+  assert.equal(resolveMeetingAuthority({uid:"missing"},{employees:[{uid:"missing",role:"Executive Director"}]}).fullMeetingAccess,false);
+  assert.equal(resolveMeetingAuthority({uid:"active"},{employees:[{uid:"active",status:"Active",roleAssignments:[{role:"Executive Director"}]}]}).fullMeetingAccess,true);
+});
