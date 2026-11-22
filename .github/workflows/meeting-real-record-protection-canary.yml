@@ -52,8 +52,8 @@ jobs:
     environment: production
     timeout-minutes: 15
     outputs:
-      canary_credential_available: \${{ steps.inspect.outputs.canary_credential_available }}
-      rollback_version_available: \${{ steps.inspect.outputs.rollback_version_available }}
+      canary_credential_available: ${{ steps.inspect.outputs.canary_credential_available }}
+      rollback_version_available: ${{ steps.inspect.outputs.rollback_version_available }}
     steps:
       - name: Checkout full history for build ancestry verification
         uses: actions/checkout@v4
@@ -76,9 +76,9 @@ jobs:
       - name: Read live Worker versions, web build stamp and Firestore Rules release
         id: inspect
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FIREBASE_SERVICE_ACCOUNT: \${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
           GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
           FRONTEND_URL: "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
@@ -110,7 +110,7 @@ jobs:
       - name: Create one missing-environment canary and test REAL protections
         id: canary
         env:
-          FIREBASE_SERVICE_ACCOUNT: \${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
           FIREBASE_WEB_API_KEY: "AIzaSyC2aMdxHD14nMnGiRyf4mSL1ixXdzBoOtE"
           GATEWAY_URL: "https://irpa-google-drive-gateway.irpa-governance.workers.dev"
           WEB_ORIGIN: "https://irpa-digital-board-governance.web.app"
@@ -120,8 +120,8 @@ jobs:
         if: failure() && steps.canary.outputs.live_check_failed == 'true'
         working-directory: drive-gateway
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ROLLBACK_VERSION_ID: "dd4637ea-0804-4b85-a455-1e691f1f0d72"
         run: |
           set -euo pipefail
