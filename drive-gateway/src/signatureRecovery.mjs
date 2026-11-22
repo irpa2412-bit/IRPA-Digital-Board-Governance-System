@@ -1,6 +1,8 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { canonicalJson, sha256Hex, HttpError } from "./util.mjs";
 import { VersionConflict } from "./adapters.mjs";
+import { resendInvitation } from "./signing.mjs";
+import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||user.isAdmin===true);
 async function validChain(events){
@@ -84,6 +86,49 @@ export async function assessRecoveryEvidence(ctx,user,id){
     invalid:rows.filter(x=>x.status==="INVALID").length,
     unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length
   }};
+}
+export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,email,name,reason}={}){
+  const envelope=await loadOwnedFailedEnvelope(ctx,user,id);
+  if(envelope.emailSigningModule!=="v2")throw new HttpError(409,"Targeted recovery reassignment requires the verified email-link signing module.");
+  if(typeof ctx.sendInvitation!=="function"||!ctx.config?.appUrl)throw new HttpError(503,"The protected recovery invitation service is not configured.");
+  const assessment=await assessRecoveryEvidence(ctx,user,id);
+  const requested=[...new Set(Array.isArray(fieldIds)?fieldIds.map(value=>String(value)):[])];
+  if(!requested.length||requested.length>20||requested.some(value=>!value||value.length>100))throw new HttpError(400,"Select one or more specific signature fields for reassignment.");
+  const target=(await ctx.meta.get("envelopes",id))?.signers?.find(item=>item.id===String(signerId||""));
+  if(!target||target.status!=="Signed")throw new HttpError(409,"Only a previously signed assignment can be reassigned in this recovery path.");
+  const rows=new Map(assessment.stampSlots.map(row=>[row.fieldId,row]));
+  for(const fieldId of requested){
+    const row=rows.get(fieldId);
+    if(!row||row.signerId!==target.id||row.status==="VERIFIED_EXISTING")throw new HttpError(409,"A selected field is not an eligible failed stamp slot for this signer.");
+  }
+  const retainedVerified=assessment.stampSlots.some(row=>row.signerId===target.id&&row.status==="VERIFIED_EXISTING"&&!requested.includes(row.fieldId));
+  if(!retainedVerified)throw new HttpError(409,"This signer has no independently verified stamp to retain. Reassignment is blocked pending the separate full-signer recovery path.");
+  const replacementEmail=validateEmail(email).trim().toLowerCase();
+  if(replacementEmail===String(target.email||"").trim().toLowerCase())throw new HttpError(400,"Use a different email identity for the replacement signer.");
+  const replacementName=validateName(name);
+  const cleanReason=cleanText(reason||"",300);
+  if(cleanReason.length<10)throw new HttpError(400,"Provide a recovery reason of at least 10 characters.");
+  const current=await ctx.meta.get("envelopes",id);
+  if(!current||!isOwner(current,user)||current.status!=="CompletionFailed"||!await validChain(current.events))throw new HttpError(409,"The recovery record changed; refresh and reassess before reassignment.");
+  const fieldsToMove=(current.fields||[]).filter(field=>requested.includes(field.fieldId)&&field.signerId===target.id);
+  if(fieldsToMove.length!==requested.length)throw new HttpError(409,"A selected stamp field changed assignment; no reassignment was made.");
+  const roleIndexes=[...new Set(fieldsToMove.map(field=>Number(field.roleAssignmentIndex||0)))].sort((a,b)=>a-b);
+  const replacementRoles=roleIndexes.map(index=>({...((target.roleAssignments||[])[index]||{role:"Signer"})}));
+  const nextNumber=Math.max(0,...(current.signers||[]).map(item=>Number(String(item.id||"").match(/^S(\\d+)$/)?.[1]||0)))+1;
+  const newSignerId="S"+nextNumber;
+  if((current.signers||[]).some(item=>item.id===newSignerId))throw new HttpError(409,"A replacement signer identifier already exists.");
+  const now=ctx.now(),ttlDays=Math.max(1,Math.min(30,Number(ctx.config.emailLinkTtlDays)||7)),expiresAt=new Date(now.getTime()+ttlDays*86400000).toISOString();
+  const replacement={id:newSignerId,email:replacementEmail,emailHash:await sha256Hex(replacementEmail),profileUid:null,name:replacementName,title:"",declaredParticulars:{name:replacementName,title:"",occupation:"",capacity:""},roleAssignments:replacementRoles,order:target.order,uid:null,status:"Pending",identityType:"email-link",tokenHash:await sha256Hex(randomHex(32)),tokenExpiresAt:expiresAt,emailLinkExpiresAt:expiresAt,emailLinkStatus:"issued",emailLinkSessionStatus:"revoked",emailLinkSessionHash:null,emailLinkTokenHistory:[],emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{},invitation:"Pending"};
+  const mappedFields=(current.fields||[]).map(field=>{
+    if(!requested.includes(field.fieldId))return field;
+    return {...field,signerId:newSignerId,signerUid:null,roleAssignmentIndex:roleIndexes.indexOf(Number(field.roleAssignmentIndex||0))};
+  });
+  const at=now.toISOString();
+  const eventBody={type:"recovery.stamp.reassigned",actor:user.uid,at,previousSignerId:target.id,replacementSignerId:newSignerId,fieldIds:requested,reason:cleanReason,replacementEmailHash:replacement.emailHash,prevHash:current.events.length?current.events.at(-1).hash:"GENESIS"};
+  const event={...eventBody,hash:await sha256Hex(canonicalJson(eventBody))};
+  await ctx.meta.update("envelopes",id,{signers:[...(current.signers||[]),replacement],fields:mappedFields,events:[...(current.events||[]),event],updatedAt:at},{ifVersion:current._v});
+  const delivery=await resendInvitation(ctx,user,id,newSignerId,{invitationKind:"recovery-reassignment"});
+  return {ok:true,envelopeId:id,previousSignerId:target.id,replacementSignerId:newSignerId,reassignedFieldIds:requested,deliveryStatus:delivery.deliveryStatus,expiresAt:delivery.expiresAt};
 }
 export async function buildRecoveryPreview(ctx,user,id){
   const envelope=await loadOwnedFailedEnvelope(ctx,user,id);
