@@ -421,7 +421,18 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
-  if(!out.winner){const nextInvitations=await inviteNextPosition(ctx,e0.id);return{ok:true,status:"InProgress",completed:false,nextInvitations};}
+  if(!out.winner){
+    if(s0.identityType==="email-link"&&typeof ctx.persistSignerProgress==="function"){
+      try{
+        const progressEnvelope=await ctx.meta.get("envelopes",e0.id);
+        if(progressEnvelope)await ctx.persistSignerProgress({envelope:progressEnvelope});
+      }catch(error){
+        ctx.logger?.error?.("EMAIL_SIGNER_PROGRESS_MIRROR_FAILED",{envelopeId:e0.id,signerId:s0.id,errorType:String(error?.name||"Error").slice(0,60)});
+      }
+    }
+    const nextInvitations=await inviteNextPosition(ctx,e0.id);
+    return{ok:true,status:"InProgress",completed:false,nextInvitations};
+  }
   const done=await finalizeEnvelope(ctx,e0.id);
   return done.completed?{ok:true,status:"Completed",completed:true,distribution:done.distribution||null}:{ok:true,status:"CompletionFailed",completed:false};
 }
