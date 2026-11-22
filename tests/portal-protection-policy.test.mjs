@@ -9,7 +9,8 @@ const now = Date.parse("2026-11-19T20:00:00Z");
 const file = "src/pages/SignaturePlatform.jsx";
 const valid = {
   status: "complete",
-  declaration: { affectedPortals: [portal], files: [file], baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" } },
+  declaration: { affectedPortals: [portal], files: [file], reason: "controlled portal repair", expectedEffect: "preserve protected behavior", prohibitedChanges: ["no unrelated portal source"], baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" } },
+  baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" },
   validation: {
     baselineSmoke: "PASS",
     fullRegression: "PASS",
@@ -34,11 +35,79 @@ test("active amendment file declarations extend the original change record", () 
 });
 test("72-hour inactivity closes the window", () => assert.equal(run([file], valid, windowState, "2026-11-18T19:59:00Z").ok, false));
 test("out-of-scope protected change fails", () => assert.equal(run([file], valid, { ...windowState, scope: ["src/pages/Invitations.jsx"] }).ok, false));
-test("multi-portal shared dependency changes fail even with a complete shared record", () => {
-  const result = run(["src/App.jsx"], { ...valid, declaration: { ...valid.declaration, affectedPortals: Object.keys(registry.portals), files: ["src/App.jsx"] }, validation: { ...valid.validation, portalSmoke: Object.fromEntries(Object.keys(registry.portals).map(p => [p, "PASS"])) } }, { ...windowState, scope: ["src/App.jsx"] });
-  assert.equal(result.affected.length, 7);
+const sharedPath = "src/pages/SignaturePlatform.jsx";
+const sharedOwners = ["Signature Portal", "Meeting Portal"];
+const sharedOwnerPolicies = () => Object.fromEntries(sharedOwners.map((owner, index) => {
+  const baselineCommit = "433727282012c75cdaebca21dcdadcb28dba59fb";
+  const record = {
+    status: "complete",
+    declaration: {
+      affectedPortals: [owner], files: [sharedPath],
+      reason: "shared dependency maintenance",
+      expectedEffect: "preserve both owning portals",
+      prohibitedChanges: ["no portal-specific source changes"]
+    },
+    baseline: { commit: baselineCommit, rollbackCommit: baselineCommit },
+    validation: {
+      baselineSmoke: "PASS", fullRegression: "PASS",
+      portalSmoke: { [owner]: "PASS" },
+      evidence: [
+        `Baseline smoke PASS for ${baselineCommit} https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/11`,
+        `Full regression PASS for ${baselineCommit} https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/12`,
+        `${owner} portal smoke PASS for ${baselineCommit} https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/${13 + index}`
+      ],
+      behaviourDifferences: []
+    }
+  };
+  return [owner, {
+    record,
+    windowState: {
+      status: "open", openedAt: "2026-11-19T18:00:00Z",
+      expiresAt: "2026-11-22T18:00:00Z", durationHours: 72,
+      scope: [sharedPath]
+    },
+    activityTimestamps: ["2026-11-19T19:59:00Z"]
+  }];
+}));
+
+test("shared file is classified once and requires each owning portal's independent protection", () => {
+  const result = evaluatePolicy({
+    changedFiles: [sharedPath],
+    registry,
+    ownerPolicies: sharedOwnerPolicies(),
+    now
+  });
+  assert.equal(result.ok, true, result.reason);
+  assert.deepEqual(result.affected, sharedOwners);
+  assert.deepEqual(result.sharedFiles, [sharedPath]);
+  assert.equal(result.ownerResults.length, 2);
+  assert.ok(result.ownerResults.every(owner => owner.lockTests.length > 0));
+});
+
+test("shared-file change fails when one owner's window or baseline evidence is missing", () => {
+  const missingWindow = sharedOwnerPolicies();
+  delete missingWindow["Meeting Portal"].windowState;
+  const windowResult = evaluatePolicy({ changedFiles: [sharedPath], registry, ownerPolicies: missingWindow, now });
+  assert.equal(windowResult.ok, false);
+  assert.match(windowResult.reason, /Meeting Portal/);
+
+  const missingEvidence = sharedOwnerPolicies();
+  missingEvidence["Meeting Portal"].record.validation.evidence =
+    missingEvidence["Meeting Portal"].record.validation.evidence.filter(item => !item.includes("Meeting Portal portal smoke"));
+  const evidenceResult = evaluatePolicy({ changedFiles: [sharedPath], registry, ownerPolicies: missingEvidence, now });
+  assert.equal(evidenceResult.ok, false);
+  assert.match(evidenceResult.reason, /Meeting Portal/);
+});
+
+test("shared-file change cannot include portal-specific source from another owner", () => {
+  const result = evaluatePolicy({
+    changedFiles: [sharedPath, "src/pages/Meetings.jsx"],
+    registry,
+    ownerPolicies: sharedOwnerPolicies(),
+    now
+  });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /one-portal PRs/);
+  assert.match(result.reason, /cannot be combined with portal-specific source changes/);
 });
 test("unrelated change passes without a repair window", () => assert.equal(run(["README.md"], null, null).ok, true));
 
