@@ -6,27 +6,27 @@
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Add an owner-facing, read-only signature recovery assessment screen for envelope IRPA-ENV-2026-11501354. The screen retrieves owner-scoped recovery queue/evidence and a watermarked non-authoritative preview; it does not execute recovery actions.",
+    "reason": "Add the owner-facing, read-only signature recovery assessment screen for IRPA-ENV-2026-11501354. Scope is limited to authenticated owner-scoped queue/evidence retrieval and a watermarked non-authoritative preview; it performs no recovery action.",
     "files": [
       {
-        "path": "docs/approvals.md",
-        "expectedEffect": "Records the owner-approved 72-hour Signature Portal repair window; governance evidence only."
-      },
-      {
         "path": "docs/portal-protection/records/signature-portal.json",
-        "expectedEffect": "Declares this repair's scope, prohibitions, baseline and validation evidence."
+        "expectedEffect": "Declares this single-portal repair scope, prohibitions, baseline and evidence; governance record only."
       },
       {
         "path": "docs/portal-protection/windows/signature-portal.json",
-        "expectedEffect": "Records the existing owner-approved 72-hour Signature Portal repair window; does not change signing behaviour."
+        "expectedEffect": "References the already-open owner-approved 72-hour Signature Portal repair window; no signing behaviour change."
+      },
+      {
+        "path": "docs/signature-recovery/owner-self-service-generalisation.md",
+        "expectedEffect": "Documents proposed owner self-service generalisation; documentation only, not implemented runtime behaviour."
       },
       {
         "path": "src/pages/SignaturePlatformWithUpload.jsx",
-        "expectedEffect": "Mounts the owner recovery panel only in the non-signer owner-facing Signature Portal view."
+        "expectedEffect": "Mounts the recovery assessment panel in the non-signer owner-facing Signature Portal view."
       },
       {
         "path": "src/pages/SignatureRecoveryOwnerPanel.jsx",
-        "expectedEffect": "Provides authenticated owner-scoped GET access to recovery queue, evidence and watermarked preview; no recovery mutation controls."
+        "expectedEffect": "Provides authenticated owner-scoped read-only recovery queue/evidence access and a watermarked preview; no recovery mutation controls."
       }
     ],
     "expectedEffect": "Owners can inspect protected recovery evidence and a watermarked preview without changing the affected envelope or its original signature evidence.",
@@ -43,7 +43,7 @@
       "tests/signature-field-assignment-setup.test.mjs",
       "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
       "tests/signature-firestore-diagnostics.test.mjs",
-      "Dedicated read-only recovery-screen tests for HTTP method allowlist, owner authorization, response sanitisation and absence of mutation controls are NOT YET PRESENT/VERIFIED."
+      "Dedicated recovery-screen tests asserting GET-only requests, owner 403/signed-out 401, sanitisation, malformed-response error boundary and absence of mutation controls are NOT PRESENT/NOT VERIFIED; prohibited behaviour is therefore declared but not yet test-enforced."
     ]
   },
   "baseline": {
@@ -51,9 +51,9 @@
     "rollbackCommit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe"
   },
   "validation": {
-    "baselineSmoke": "PENDING — exact successful main-branch baseline smoke run ID not retrieved",
+    "baselineSmoke": "NOT RETRIEVED — no exact successful main-branch baseline smoke run ID has been verified.",
     "portalSmoke": {},
-    "fullRegression": "PENDING — exact successful main-branch full-regression run ID not retrieved",
+    "fullRegression": "NOT RETRIEVED — no exact successful main-branch full-regression run ID has been verified.",
     "evidence": [
       {
         "kind": "Production Gateway deployment and live health gate",
@@ -68,40 +68,64 @@
         "result": "PASS"
       },
       {
-        "kind": "PR #895 Readability CI",
+        "kind": "PR #895 Readability CI (earlier head)",
         "runId": 45035699017,
         "commit": "d3f751474efbcb4af16fe0faaa58e8f19bd80d93",
         "result": "PASS"
       },
       {
-        "kind": "PR #895 IRPA Release Build",
+        "kind": "PR #895 IRPA Release Build (earlier head)",
         "runId": 45035698993,
         "commit": "d3f751474efbcb4af16fe0faaa58e8f19bd80d93",
         "result": "PASS"
       },
       {
-        "kind": "PR #895 Signature Portal Migration Build Test",
+        "kind": "PR #895 Signature Portal Migration Build Test (earlier head)",
         "runId": 45035698990,
         "commit": "d3f751474efbcb4af16fe0faaa58e8f19bd80d93",
         "result": "PASS"
       },
       {
-        "kind": "PR #895 Firebase Functions Entrypoint Integrity Test",
+        "kind": "PR #895 Firebase Functions Entrypoint Integrity Test (earlier head)",
         "runId": 45035698809,
         "commit": "d3f751474efbcb4af16fe0faaa58e8f19bd80d93",
-        "result": "FAIL — protected Change Record incomplete"
+        "result": "FAIL — Change Record incomplete"
       },
       {
-        "kind": "PR #895 IRPA Security Baseline Gate",
+        "kind": "PR #895 IRPA Security Baseline Gate (earlier head)",
         "runId": 45035698967,
         "commit": "d3f751474efbcb4af16fe0faaa58e8f19bd80d93",
         "result": "FAIL"
       },
       {
-        "kind": "PR #895 IRPA-DBGS Readability Release Gate",
+        "kind": "PR #895 Readability Release Gate (earlier head)",
         "runId": 45035698911,
         "commit": "d3f751474efbcb4af16fe0faaa58e8f19bd80d93",
-        "result": "FAIL — protected Change Record incomplete"
+        "result": "FAIL — Change Record incomplete"
+      },
+      {
+        "kind": "PR #895 IRPA Security Baseline Gate (current recorded head before this Change Record update)",
+        "runId": 45037721080,
+        "commit": "d37ac45fb9bbe9485696eee022e5d1a98b2b3bed",
+        "result": "FAIL — Change Record incomplete"
+      },
+      {
+        "kind": "PR #895 Firebase Functions Entrypoint Integrity Test",
+        "runId": 45037720877,
+        "commit": "d37ac45fb9bbe9485696eee022e5d1a98b2b3bed",
+        "result": "IN PROGRESS at retrieval"
+      },
+      {
+        "kind": "PR #895 Readability Release Gate",
+        "runId": 45037720936,
+        "commit": "d37ac45fb9bbe9485696eee022e5d1a98b2b3bed",
+        "result": "IN PROGRESS at retrieval"
+      },
+      {
+        "kind": "PR #895 email-signing-contract",
+        "runId": 45037721007,
+        "commit": "d37ac45fb9bbe9485696eee022e5d1a98b2b3bed",
+        "result": "IN PROGRESS at retrieval"
       }
     ],
     "behaviourDifferences": [
