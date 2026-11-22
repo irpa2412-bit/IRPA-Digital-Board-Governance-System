@@ -102,6 +102,6 @@ test("mixed environment: TRIAL envelope, ACTUAL link dispatch, TRIAL signing and
  assert.equal(envelope.dataEnvironment,"TRIAL");
  assert.equal(envelope.status,"Completed");
  assert.equal(envelope.completion.finalHash.length,64);
- assert.ok(envelope.completion.files.every(file=>file.path.includes("my-documents")||file.path.includes("Document Archives")));
+ assert.deepEqual(envelope.completion.files.map(file=>file.kind).sort(),["archive","owner-copy","signer-copy"]);
  assert.equal(dispatchEnvironments.at(-1),"actual");
 });
