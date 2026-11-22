@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Add the owner-facing read-only recovery assessment for IRPA-ENV-2026-11501354 and enforce that queue, evidence and watermarked-preview GET requests do not mutate envelope or signing evidence. Recovery access telemetry is stored separately in recoveryAccessEvents.",
+    "reason": "Owner-authorised Signature Portal finalisation recovery for IRPA-ENV-2026-11501354. Record each finalisation stage and provide a zero-write sandbox diagnosis before any controlled retry.",
     "files": [
       "docs/portal-protection/records/signature-portal.json",
       "docs/portal-protection/windows/signature-portal.json",
@@ -18,17 +18,21 @@
       "src/pages/SignaturePlatformWithUpload.jsx",
       "src/pages/SignatureRecoveryOwnerPanel.jsx",
       "tests/signature-recovery-owner-panel-readonly.test.mjs",
-      "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md"
+      "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md",
+      "drive-gateway/src/signing.mjs",
+      "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
+      "tests/signature-recovery-owner-panel-finalisation.test.mjs",
+      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md"
     ],
-    "expectedEffect": "The affected owner can inspect recovery evidence and a watermarked non-authoritative preview. GET assessment operations preserve the entire envelope and signing evidence unchanged; access telemetry is isolated in recoveryAccessEvents. The partial-evidence amendment returns audit-chain, source-hash, stamp and finalisation-stage results independently, with a separate preview-unavailable reason.",
+    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment.",
     "prohibitedChanges": [
-      "Do not change, reassign, delete, overwrite or recreate any existing signature, signer evidence or signing audit event.",
-      "Do not automatically retry signing, finalisation, sending, PDF generation, hashing, certificate creation or archiving.",
-      "Do not set an envelope to Completed or change any envelope status.",
-      "Do not write to or mutate any envelope, signer, field, token, hash, certificate or archive record during queue, evidence assessment or preview GET requests.",
-      "Do not change signing rules, token or link formats, sessions, signer identity, field assignment, stamping, PDF generation, hash logic, certificate logic or archive logic.",
-      "Do not change Firestore rules, secrets, environment variables, SMTP settings, deployment credentials or branch protection.",
-      "Do not modify the affected production envelope IRPA-ENV-2026-11501354."
+      "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
+      "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
+      "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
+      "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
+      "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
+      "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
+      "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
     ],
     "lockTests": [
       "tests/signature-field-assignment-setup.test.mjs",
@@ -296,6 +300,53 @@
         "branch protection",
         "production envelope mutation"
       ]
+    },
+    {
+      "changeId": "SR-2026-11-22-03",
+      "status": "implementation-in-progress",
+      "baselineCommit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe",
+      "rollbackCommit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe",
+      "repairWindow": {
+        "openedAt": "2026-11-22T18:06:00.000Z",
+        "closesAt": "2026-11-25T18:06:00.000Z",
+        "durationHours": 72,
+        "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+        "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
+      },
+      "files": [
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/signatureRecovery.mjs",
+        "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
+        "src/pages/SignatureRecoveryOwnerPanel.jsx",
+        "tests/signature-recovery-owner-panel-finalisation.test.mjs",
+        "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+        "docs/portal-protection/records/signature-portal.json",
+        "docs/portal-protection/windows/signature-portal.json"
+      ],
+      "ownerInstruction": "Owner approval: implement stage recording and write-isolated dry-run first; then retry UI and safe recovery as a separate PR. Preserve all existing signatures, signing audit events and source hashes. Stop if the dry run identifies a defect inside existing PDF/hash/certificate/archive/distribution logic and report exact line plus proposed change for approval.",
+      "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment.",
+      "prohibitedChanges": [
+        "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
+        "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
+        "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
+        "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
+        "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
+        "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
+        "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
+      ],
+      "validation": {
+        "baselineSmoke": "PASS",
+        "fullRegression": "PASS",
+        "portalSmoke": {
+          "Signature Portal": "PASS"
+        },
+        "implementationTests": "PENDING",
+        "prCi": "PENDING",
+        "workerDeployment": "NOT_STARTED",
+        "firebaseHosting": "NOT_STARTED",
+        "cloudflareFrontend": "NOT_STARTED",
+        "productionEnvelopeMutation": "NONE"
+      }
     }
   ]
 }
