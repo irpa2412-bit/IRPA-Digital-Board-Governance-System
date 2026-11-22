@@ -66,6 +66,8 @@ jobs:
             await browser.close();
           }
           NODE
+      - name: Enforce the owner recovery panel read-only boundary
+        run: node --test tests/signature-recovery-owner-panel-readonly.test.mjs
 
   full-regression:
     name: full-regression
