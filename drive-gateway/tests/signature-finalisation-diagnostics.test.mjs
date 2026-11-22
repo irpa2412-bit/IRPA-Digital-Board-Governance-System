@@ -21,3 +21,28 @@ test("finalisation dry-run accepts each supported owner identity field and denie
   await assert.rejects(()=>diagnoseFinalisation(ctx,{uid:"intruder"},"ENV-DRYRUN-001"),e=>e.status===403);
  }
 });
+
+test("certificate diagnostics inspect signer-key presence without signing or creating evidence",async()=>{
+ const {ctx,getWrites}=await fixture();
+ let signingCalls=0;
+ ctx.crypto={keyProvider:{async getSignerKey(){return{keyId:"KEY-1",publicKeyJwk:{kty:"EC",crv:"P-256",x:"x",y:"y"},signCanonicalPayload:async()=>{signingCalls++;throw Error("signing forbidden");}};}}};
+ const report=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");
+ const certificate=report.steps.find(step=>step.stageCode==="CERTIFICATE");
+ assert.equal(certificate.status,"PASS");
+ assert.equal(certificate.readOnly,true);
+ assert.equal(certificate.signingPerformed,false);
+ assert.equal(certificate.cryptographicEvidenceCreated,false);
+ assert.deepEqual(certificate.signerKeyChecks.map(check=>check.signerKey),["PRESENT"]);
+ assert.equal(signingCalls,0);
+ assert.equal(getWrites(),0);
+});
+test("certificate diagnostics report missing signer keys without attempting key creation",async()=>{
+ const {ctx,getWrites}=await fixture();
+ ctx.crypto={keyProvider:{async getSignerKey(){throw Error("No cryptographic signing key is provisioned.");}}};
+ const report=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");
+ const certificate=report.steps.find(step=>step.stageCode==="CERTIFICATE");
+ assert.equal(certificate.status,"FAILED");
+ assert.deepEqual(certificate.signerKeyChecks.map(check=>check.signerKey),["MISSING"]);
+ assert.equal(certificate.signingPerformed,false);
+ assert.equal(getWrites(),0);
+});
