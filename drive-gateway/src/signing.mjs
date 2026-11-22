@@ -161,6 +161,10 @@ export async function createEnvelope(ctx,user,body){
   await verifySourceDocumentIntegrity(sourceBytes,{},doc);
   const externalReference=String(body?.externalReference||"").trim();
   if(externalReference&&!ID_RE.test(externalReference))throw new HttpError(400,"Invalid external envelope reference.");
+  const resolvedDataEnvironment=externalReference&&ctx.resolveEnvelopeDataEnvironment?await ctx.resolveEnvelopeDataEnvironment(externalReference,user.uid):null;
+  const dataEnvironment=resolvedDataEnvironment||(ctx.env?.DRIVE_MOCK==="true"?"TEST":null);
+  if(!["TRIAL","ACTUAL","TEST"].includes(String(dataEnvironment||"")))throw new HttpError(409,"The source signing draft environment could not be verified safely.");
+  if(ctx.env?.IRPA_ENVIRONMENT==="staging"&&dataEnvironment!=="TRIAL"&&dataEnvironment!=="TEST")throw new HttpError(409,"The staging Gateway cannot create an ACTUAL-data envelope.");
   const id=`ENV-${randomHex(8)}`,emailSigningModule=EMAIL_SIGNING_REBUILD_ENABLED?"v2":"legacy",seenUids=new Set(),signers=[],secrets=[];
   for(let i=0;i<input.length;i++){
     const s=input[i],email=validateEmail(s?.email).trim().toLowerCase(),uid=s?.uid?cleanSegment(s.uid,128):null;
@@ -206,7 +210,7 @@ export async function createEnvelope(ctx,user,body){
     }
   }
   const sourceHash=doc.sha256||doc.hash||await sha256Hex(sourceBytes),sourceSize=doc.fileSize??doc.byteLength??doc.size??sourceBytes.byteLength;
-  const dataEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"test").trim().toLowerCase();if(ctx.env?.DRIVE_MOCK==="false"&&!["staging","production"].includes(dataEnvironment))throw new HttpError(503,"The envelope environment could not be recorded safely.");const e={id,dataEnvironment,environmentRecordedAt:ctx.now().toISOString(),emailSigningModule,externalReference:externalReference||null,documentId:doc.id,documentHash:sourceHash,sha256:sourceHash,byteLength:sourceSize,documentSize:sourceSize,title:doc.title,fileName:doc.fileName,classification:doc.classification,ownerName:String(user.name||user.email||"IRPA Document Owner"),ownerEmail:String(user.email||"").trim().toLowerCase(),createdByEmail:String(user.email||"").trim().toLowerCase(),createdBy:user.uid,status:"Sent",signingMode,signers,fields,archiveTargets:archives,createdAt:ctx.now().toISOString(),expiresAt:new Date(ctx.now().getTime()+ctx.config.ttlDays*86400000).toISOString(),events:[],completion:null};
+  const e={id,dataEnvironment,environmentRecordedAt:ctx.now().toISOString(),emailSigningModule,externalReference:externalReference||null,documentId:doc.id,documentHash:sourceHash,sha256:sourceHash,byteLength:sourceSize,documentSize:sourceSize,title:doc.title,fileName:doc.fileName,classification:doc.classification,ownerName:String(user.name||user.email||"IRPA Document Owner"),ownerEmail:String(user.email||"").trim().toLowerCase(),createdByEmail:String(user.email||"").trim().toLowerCase(),createdBy:user.uid,status:"Sent",signingMode,signers,fields,archiveTargets:archives,createdAt:ctx.now().toISOString(),expiresAt:new Date(ctx.now().getTime()+ctx.config.ttlDays*86400000).toISOString(),events:[],completion:null};
   for(const signer of e.signers){const ttlDays=signer.identityType==="email-link"?(ctx.config.emailLinkTtlDays||7):(ctx.config.ttlDays||14);signer.tokenExpiresAt=new Date(ctx.now().getTime()+ttlDays*86400000).toISOString();if(signer.identityType==="email-link")signer.emailLinkExpiresAt=signer.tokenExpiresAt;}
   e.events=await chainEvents([],{type:"envelope.created",at:e.createdAt,actor:user.uid,documentHash:sourceHash,signerCount:signers.length});
   let reservationKey=null;
