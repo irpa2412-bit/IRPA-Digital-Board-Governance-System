@@ -16,7 +16,7 @@ const recordRoles = record => [
   ...values(record.roles),record.role,...values(record.assignedRoles),...values(record.selectedRoles),
   ...values(record.roleAssignments),...values(record.authorities),...values(record.accessAuthorities),
   ...values(record.accessCategories),...values(record.authorityCategories),record.accessCategory,
-  record.authorizedRole,record.boardPosition
+  record.authorizedRole,record.boardPosition,...(record.isHeadOfDepartment===true||record.isDepartmentHead===true||record.headOfDepartment===true?["Head of Department"]:[])
 ].flatMap(value => typeof value === "string" ? value.split(",") : value && typeof value === "object" ? [value.role,value.title,value.authority,value.category] : [])
  .map(clean).filter(Boolean);
 const identifiers = record => ({
@@ -25,7 +25,7 @@ const identifiers = record => ({
   memberNumbers:[record.memberNumber,record.registrationNumber,record.membershipNumber].map(clean).filter(Boolean),
   employeeNumbers:[record.employeeNumber,record.employeeId,record.staffNumber].map(clean).filter(Boolean)
 });
-const headRole = role => ["head of department","department head","head of the department"].includes(normalize(role));
+const headRole = role => {const value=normalize(role);return ["head of department","department head","head of the department"].includes(value)||/^head of .+ department$/.test(value)||/^department head of .+$/.test(value);};
 const grantRole = role => {
   const roleName=normalize(role);
   return roleName==="internal oversight director" || roleName==="director internal oversight" ||
