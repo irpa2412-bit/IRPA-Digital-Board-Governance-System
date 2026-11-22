@@ -64,7 +64,8 @@ test("recovery preview is a valid PDF and contains only verified stamps with non
   assert.equal(result.assessment.summary.pass,2);
   assert.equal(doc.getTitle(),"RECOVERY PREVIEW - NOT COMPLETED");
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"signer.signed");
-  assert.ok((await f.ctx.meta.list("recoveryAccessEvents")).some(event=>event.type==="recovery.preview.generated"));
+  const previewEvent=(await f.ctx.meta.list("recoveryAccessEvents")).find(event=>event.type==="recovery.preview.generated");
+  assert.equal(previewEvent.verifiedStampCount,2);
 });
 
 test("queue, evidence assessment and preview leave envelope, signer, field and signing audit records unchanged",async()=>{
