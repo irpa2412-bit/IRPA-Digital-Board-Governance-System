@@ -1,5 +1,5 @@
 import {buildSignedPdf} from "./pdf.mjs";
-import {archivePath} from "./archives.mjs";
+import {archivePath,signerCopyPath} from "./archives.mjs";
 import {HttpError,sha256Hex} from "./util.mjs";
 const safeCode=value=>String(value?.code||value?.name||"DIAGNOSTIC_FAILED").replace(/[^A-Z0-9_-]/gi,"").slice(0,48)||"DIAGNOSTIC_FAILED";
 const safeMessage=value=>String(value?.message||"Diagnostic step failed.").replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").replace(/https?:\/\/\S+/gi,"[URL REDACTED]").slice(0,180);
@@ -54,11 +54,24 @@ export async function diagnoseFinalisation(ctx,user,envelopeId){
  try{
   const targets=Array.isArray(envelope.archiveTargets)?envelope.archiveTargets:[];
   if(!targets.length)throw error("No archive targets are configured.","ARCHIVE_TARGETS_MISSING");
-  if(typeof ctx.storage.probeWritePermission!=="function")throw error("Storage provider does not expose a non-writing archive permission probe.","ARCHIVE_PERMISSION_PROBE_UNAVAILABLE");
-  const paths=targets.map(key=>archivePath({archiveKey:key,classification:envelope.classification,documentId:envelope.documentId,fileName:"diagnostic-no-write.pdf"}));
-  const result=await ctx.storage.probeWritePermission(paths);
-  if(result===false||(Array.isArray(result)&&result.some(value=>value!==true)))throw error("Archive write permission probe denied at least one destination.","ARCHIVE_PERMISSION_DENIED");
-  report.steps.push(pass("ARCHIVE",{permission:"CONFIRMED_WITHOUT_WRITE",targets:paths.length},fields));
+  const fileName=envelope.fileName||"diagnostic-no-write.pdf";
+  const destinations=targets.map(archiveKey=>({name:archiveKey,destinationType:"archive",archiveKey,path:archivePath({archiveKey,classification:envelope.classification,documentId:envelope.documentId,fileName})}));
+  const ownerKey=String(envelope.createdBy||envelope.createdByUid||envelope.ownerUid||"");
+  if(ownerKey)destinations.push({name:"Owner copy",destinationType:"owner-copy",path:signerCopyPath({ownerKey,fileName})});
+  for(const signer of envelope.signers||[]){
+   const signerKey=String(signer.profileUid||signer.uid||`${envelope.id}-${signer.id}`);
+   destinations.push({name:"Signer copy "+String(signer.id||"UNKNOWN"),destinationType:"signer-copy",path:signerCopyPath({ownerKey:signerKey,fileName})});
+  }
+  if(typeof ctx.storage.probeWritePermissionDetailed==="function"){
+   const detail=await ctx.storage.probeWritePermissionDetailed(destinations);
+   const denied=(detail.destinations||[]).some(destination=>destination.probe!=="PASS");
+   report.steps.push({...pass("ARCHIVE",{permission:denied?"DENIED":"CONFIRMED_WITHOUT_WRITE",tokenRefreshResult:detail.tokenRefreshResult,oauthScopes:detail.oauthScopes,quota:detail.quota,destinations:detail.destinations||[]},fields),status:denied?"FAILED":"PASS",errorCode:denied?"ARCHIVE_PERMISSION_DENIED":null,message:denied?"One or more archive or recipient-copy destinations failed the read-only Drive probe.":null});
+  }else{
+   if(typeof ctx.storage.probeWritePermission!=="function")throw error("Storage provider does not expose a non-writing archive permission probe.","ARCHIVE_PERMISSION_PROBE_UNAVAILABLE");
+   const result=await ctx.storage.probeWritePermission(destinations.map(destination=>destination.path));
+   if(result===false||(Array.isArray(result)&&result.some(value=>value!==true)))throw error("Archive write permission probe denied at least one destination.","ARCHIVE_PERMISSION_DENIED");
+   report.steps.push(pass("ARCHIVE",{permission:"CONFIRMED_WITHOUT_WRITE",destinations:destinations.map(destination=>({...destination,probe:"PASS",httpStatus:null,reasonCode:null,folderIdMasked:null,matchedByName:null,creator:"NOT_RETRIEVED"}))},fields));
+  }
  }catch(cause){report.steps.push(fail("ARCHIVE",cause,fields));}
  try{
   const recipients=[envelope.ownerEmail||envelope.createdByEmail,...(envelope.signers||[]).filter(s=>s.status==="Signed").map(s=>s.email)].filter(Boolean);
