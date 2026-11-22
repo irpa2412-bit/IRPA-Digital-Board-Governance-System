@@ -9,12 +9,12 @@ async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
   return [...events,{...body,hash:await sha256Hex(canonicalJson(body))}];
 }
-async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false}={}){
+async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,tamperSourceHash=false}={}){
   const sent=[],meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
   pdf.addPage([612,792]);
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
-  await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:sourceHash});
+  await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:tamperSourceHash?"0".repeat(64):sourceHash});
   const signatureValue="Original signature specimen";
   const fieldValue="Verified stamp specimen";
   let events=[];
@@ -46,6 +46,16 @@ test("field-level stamp is verified only when signer event and chained field has
   const bad=await fixture({tamperFieldHash:true});
   assert.equal((await assessRecoveryEvidence(bad.ctx,bad.user,"ENV-REC-1")).stampSlots[1].status,"UNVERIFIABLE");
 });
+
+test("assessment reports source-hash mismatch and a safe finalisation stage code",async()=>{
+  const f=await fixture({tamperSourceHash:true});
+  const report=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(report.sourceHashValid,false);
+  assert.equal(report.completionFailure.stage,"ARCHIVE");
+  assert.equal(report.completionFailure.errorCode,"ERROR");
+  assert.match(report.sourceHashReason,/does not match/);
+});
+
 test("recovery preview is a valid PDF and contains only verified stamps with non-authoritative watermark",async()=>{
   const f=await fixture();
   const result=await buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1");
