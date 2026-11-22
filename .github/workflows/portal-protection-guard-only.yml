@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 concurrency:
   group: portal-guard-only-pr-${{ github.event.pull_request.number || github.ref }}
@@ -43,7 +44,7 @@ jobs:
       - name: Syntax-check portal guard and renewal logic
         run: node --check scripts/portal-protection-check.mjs && node --check scripts/portal-repair-window-renewal.mjs
       - name: Test per-portal policy and owner renewal commands
-        run: npm run test:portal-protection-guard
+        run: node --test tests/portal-protection-policy.test.mjs tests/portal-repair-window-renewal.test.mjs
       - name: Validate every registered portal has isolated window and Change Record files
         run: |
           node --input-type=module <<'NODE'
