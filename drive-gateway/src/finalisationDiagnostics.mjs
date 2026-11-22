@@ -1,6 +1,5 @@
 import {buildSignedPdf} from "./pdf.mjs";
-import {createCryptographicEvidence} from "./cryptographicGate.mjs";
-import {archivePath} from "./archives.mjs";
+import {archivePath,signerCopyPath} from "./archives.mjs";
 import {HttpError,sha256Hex} from "./util.mjs";
 const safeCode=value=>String(value?.code||value?.name||"DIAGNOSTIC_FAILED").replace(/[^A-Z0-9_-]/gi,"").slice(0,48)||"DIAGNOSTIC_FAILED";
 const safeMessage=value=>String(value?.message||"Diagnostic step failed.").replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").replace(/https?:\/\/\S+/gi,"[URL REDACTED]").slice(0,180);
@@ -8,19 +7,23 @@ const fail=(stage,error,fields=[])=>({stageCode:stage,status:"FAILED",errorCode:
 const pass=(stage,details={},fields=[])=>({stageCode:stage,status:"PASS",errorCode:null,message:null,...details,fields});
 const fieldsFor=envelope=>(Array.isArray(envelope?.fields)?envelope.fields:[]).filter(field=>[1,3].includes(Number(field?.page))).map(field=>({page:Number(field.page),fieldId:String(field.fieldId||"UNKNOWN_FIELD").slice(0,100),type:String(field.type||"Unknown"),rotation:Number(field.rotation||0),position:{x:Number(field.x),y:Number(field.y),width:Number(field.width),height:Number(field.height)}}));
 const error=(message,code)=>Object.assign(new Error(message),{code});
-async function buildEvidence(envelope,bytes,ctx){
+async function inspectCertificateKeys(envelope,ctx){
  const provider=ctx.crypto?.keyProvider,required=["staging","production"].includes(ctx.env?.IRPA_ENVIRONMENT)||(ctx.env?.DRIVE_MOCK==="false"&&ctx.allowReturnTokens!==true);
- if(!provider){if(required)throw error("Cryptographic signer key custody is not configured.","CERTIFICATE_KEY_PROVIDER_MISSING");return{count:0,required:false};}
- const documentHash=await sha256Hex(bytes),chainHead=envelope.events?.at(-1)?.hash;
- if(!/^[0-9a-f]{64}$/.test(String(chainHead||"")))throw error("The audit-chain head is unavailable for certificate verification.","CERTIFICATE_CHAIN_HEAD_MISSING");
- let count=0;
- for(const signer of envelope.signers||[]){
-  const key=signer.uid?await provider.getSignerKey(signer.uid):await provider.getSignerKeyForSignerReadOnly?.({...signer,envelopeId:envelope.id});
-  if(!key)throw error("Signer cryptographic key custody is unavailable.","CERTIFICATE_SIGNER_KEY_MISSING");
-  await createCryptographicEvidence({keyId:key.keyId,signer:{uid:signer.uid||null,identityType:signer.identityType||"account",emailHash:signer.emailHash||null,signerId:signer.id,envelopeId:envelope.id,signatureHash:await sha256Hex(String(signer.signatureValue||"")),signatureType:signer.signatureType,authorityVerification:signer.authorityVerification||null,privateKey:key.privateKey,publicKey:key.publicKey,signCanonicalPayload:key.signCanonicalPayload},publicKeyJwk:key.publicKeyJwk,documentHash,chainHead,signedAt:signer.signedAt});
-  count++;
+ const signers=Array.isArray(envelope.signers)?envelope.signers:[];
+ if(!provider){
+  if(required)throw error("Cryptographic signer key custody is not configured.","CERTIFICATE_KEY_PROVIDER_MISSING");
+  return{required:false,signerKeyChecks:signers.map(signer=>({signerId:String(signer.id||"UNKNOWN"),signerKey:"MISSING",errorCode:"CERTIFICATE_KEY_PROVIDER_MISSING"}))};
  }
- return{count,required};
+ const signerKeyChecks=[];
+ for(const signer of signers){
+  try{
+   const key=signer.uid?await provider.getSignerKey(signer.uid):await provider.getSignerKeyForSignerReadOnly?.({...signer,envelopeId:envelope.id});
+   signerKeyChecks.push({signerId:String(signer.id||"UNKNOWN"),signerKey:key?.publicKey||key?.publicKeyJwk?"PRESENT":"MISSING",keyId:key?.keyId||null,errorCode:key?null:"CERTIFICATE_SIGNER_KEY_MISSING"});
+  }catch(cause){
+   signerKeyChecks.push({signerId:String(signer.id||"UNKNOWN"),signerKey:"MISSING",keyId:null,errorCode:safeCode(cause)});
+  }
+ }
+ return{required,signerKeyChecks};
 }
 export async function diagnoseFinalisation(ctx,user,envelopeId){
  const envelope=await ctx.meta.get("envelopes",envelopeId);
@@ -46,16 +49,29 @@ export async function diagnoseFinalisation(ctx,user,envelopeId){
  }catch(cause){report.steps.push(fail("PDF_BUILD",cause,fields));}
  if(finalBytes){try{finalHash=await sha256Hex(finalBytes);report.steps.push(pass("HASH",{byteLength:finalBytes.byteLength,sha256:finalHash},fields));}catch(cause){report.steps.push(fail("HASH",cause,fields));}}
  else report.steps.push(fail("HASH",error("PDF build did not produce bytes.","PDF_BUILD_FAILED")));
- if(finalBytes&&finalHash){try{const evidence=await buildEvidence(envelope,finalBytes,ctx);report.steps.push(pass("CERTIFICATE",{cryptographicEvidenceChecked:evidence.count,cryptographicEvidenceRequired:evidence.required,completionCertificatePageBuilt:true},fields));}catch(cause){report.steps.push(fail("CERTIFICATE",cause,fields));}}
- else report.steps.push(fail("CERTIFICATE",error("Certificate check requires a successful PDF build and hash.","PDF_BUILD_FAILED"),fields));
+ if(finalBytes&&finalHash){try{const certificate=await inspectCertificateKeys(envelope,ctx),missing=certificate.signerKeyChecks.filter(check=>check.signerKey!=="PRESENT");report.steps.push({...pass("CERTIFICATE",{readOnly:true,signingPerformed:false,cryptographicEvidenceCreated:false,cryptographicEvidenceRequired:certificate.required,signerKeyChecks:certificate.signerKeyChecks,signerKeyPresent:certificate.signerKeyChecks.length-missing.length,signerKeyMissing:missing.length},fields),status:missing.length?"FAILED":"PASS",errorCode:missing.length?"CERTIFICATE_SIGNER_KEY_MISSING":null,message:missing.length?"One or more signer keys are missing.":null});}catch(cause){report.steps.push(fail("CERTIFICATE",cause,fields));}}
+ else report.steps.push(fail("CERTIFICATE",error("Certificate key check requires a successful PDF build and hash.","PDF_BUILD_FAILED"),fields));
  try{
   const targets=Array.isArray(envelope.archiveTargets)?envelope.archiveTargets:[];
   if(!targets.length)throw error("No archive targets are configured.","ARCHIVE_TARGETS_MISSING");
-  if(typeof ctx.storage.probeWritePermission!=="function")throw error("Storage provider does not expose a non-writing archive permission probe.","ARCHIVE_PERMISSION_PROBE_UNAVAILABLE");
-  const paths=targets.map(key=>archivePath({archiveKey:key,classification:envelope.classification,documentId:envelope.documentId,fileName:"diagnostic-no-write.pdf"}));
-  const result=await ctx.storage.probeWritePermission(paths);
-  if(result===false||(Array.isArray(result)&&result.some(value=>value!==true)))throw error("Archive write permission probe denied at least one destination.","ARCHIVE_PERMISSION_DENIED");
-  report.steps.push(pass("ARCHIVE",{permission:"CONFIRMED_WITHOUT_WRITE",targets:paths.length},fields));
+  const fileName=envelope.fileName||"diagnostic-no-write.pdf";
+  const destinations=targets.map(archiveKey=>({name:archiveKey,destinationType:"archive",archiveKey,path:archivePath({archiveKey,classification:envelope.classification,documentId:envelope.documentId,fileName})}));
+  const ownerKey=String(envelope.createdBy||envelope.createdByUid||envelope.ownerUid||"");
+  if(ownerKey)destinations.push({name:"Owner copy",destinationType:"owner-copy",path:signerCopyPath({ownerKey,fileName})});
+  for(const signer of envelope.signers||[]){
+   const signerKey=String(signer.profileUid||signer.uid||`${envelope.id}-${signer.id}`);
+   destinations.push({name:"Signer copy "+String(signer.id||"UNKNOWN"),destinationType:"signer-copy",path:signerCopyPath({ownerKey:signerKey,fileName})});
+  }
+  if(typeof ctx.storage.probeWritePermissionDetailed==="function"){
+   const detail=await ctx.storage.probeWritePermissionDetailed(destinations);
+   const denied=(detail.destinations||[]).some(destination=>destination.probe!=="PASS");
+   report.steps.push({...pass("ARCHIVE",{permission:denied?"DENIED":"CONFIRMED_WITHOUT_WRITE",tokenRefreshResult:detail.tokenRefreshResult,oauthScopes:detail.oauthScopes,quota:detail.quota,destinations:detail.destinations||[]},fields),status:denied?"FAILED":"PASS",errorCode:denied?"ARCHIVE_PERMISSION_DENIED":null,message:denied?"One or more archive or recipient-copy destinations failed the read-only Drive probe.":null});
+  }else{
+   if(typeof ctx.storage.probeWritePermission!=="function")throw error("Storage provider does not expose a non-writing archive permission probe.","ARCHIVE_PERMISSION_PROBE_UNAVAILABLE");
+   const result=await ctx.storage.probeWritePermission(destinations.map(destination=>destination.path));
+   if(result===false||(Array.isArray(result)&&result.some(value=>value!==true)))throw error("Archive write permission probe denied at least one destination.","ARCHIVE_PERMISSION_DENIED");
+   report.steps.push(pass("ARCHIVE",{permission:"CONFIRMED_WITHOUT_WRITE",destinations:destinations.map(destination=>({...destination,probe:"PASS",httpStatus:null,reasonCode:null,folderIdMasked:null,matchedByName:null,creator:"NOT_RETRIEVED"}))},fields));
+  }
  }catch(cause){report.steps.push(fail("ARCHIVE",cause,fields));}
  try{
   const recipients=[envelope.ownerEmail||envelope.createdByEmail,...(envelope.signers||[]).filter(s=>s.status==="Signed").map(s=>s.email)].filter(Boolean);
