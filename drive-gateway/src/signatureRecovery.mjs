@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { canonicalJson, sha256Hex, HttpError } from "./util.mjs";
+import { VersionConflict } from "./adapters.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||user.isAdmin===true);
 async function validChain(events){
@@ -23,11 +24,25 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
   const rows=await ctx.meta.list("envelopes");
   const eligible=(rows||[]).filter(row=>row.status==="CompletionFailed"&&isOwner(row,user))
     .sort((a,b)=>String(b.updatedAt||b.createdAt||"").localeCompare(String(a.updatedAt||a.createdAt||"")));
-  return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:eligible.slice(safeOffset,safeOffset+safeLimit).map(e=>({
+  const page=eligible.slice(safeOffset,safeOffset+safeLimit);for(const envelope of page)await appendRecoveryAccessEvent(ctx,user,envelope.id,"recovery.queue.viewed");return {ok:true,total:eligible.length,limit:safeLimit,offset:safeOffset,items:page.map(e=>({
     envelopeId:e.id,documentId:e.documentId,title:e.title||"",status:e.status,
     failedAt:e.completionFailure?.failedAt||null,stage:e.completionFailure?.stage||"NOT_RECORDED",
     signerCount:Array.isArray(e.signers)?e.signers.length:0
   }))};
+}
+async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
+  for(let attempt=0;attempt<5;attempt++){
+    const current=await ctx.meta.get("envelopes",id);
+    if(!current||!isOwner(current,user)||current.status!=="CompletionFailed")throw new HttpError(409,"Recovery record changed; refresh before continuing.");
+    if(!await validChain(current.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
+    const at=ctx.now().toISOString();
+    const body={type,actor:user.uid,at,...details,prevHash:current.events.length?current.events.at(-1).hash:"GENESIS"};
+    const event={...body,hash:await sha256Hex(canonicalJson(body))};
+    try{
+      await ctx.meta.update("envelopes",id,{events:[...(current.events||[]),event],updatedAt:at},{ifVersion:current._v});
+      return;
+    }catch(error){if(!(error instanceof VersionConflict)||attempt===4)throw error;}
+  }
 }
 async function loadOwnedFailedEnvelope(ctx,user,id){
   const envelope=await ctx.meta.get("envelopes",id);
@@ -62,6 +77,7 @@ export async function assessRecoveryEvidence(ctx,user,id){
     if(!roleEvidence||roleEvidence.hash!==expected){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"UNVERIFIABLE",reason:"The audit chain does not contain a matching field-level signature hash."});continue;}
     rows.push({fieldId:field.fieldId,signerId:signer.id,status:"VERIFIED_EXISTING",reason:"Field value, signer action, and chained field-level hash agree."});
   }
+  await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="VERIFIED_EXISTING").length});
   return {ok:true,envelopeId:id,sourceHash,auditChainValid:true,stampSlots:rows,summary:{
     verified:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,
     missing:rows.filter(x=>x.status==="MISSING").length,
@@ -96,5 +112,5 @@ export async function buildRecoveryPreview(ctx,user,id){
     page.drawText("RECOVERY PREVIEW — NOT COMPLETED",{x:Math.max(18,width*0.12),y:height*0.48,size:Math.max(18,Math.min(30,width/18)),font,color:rgb(0.78,0.12,0.12),opacity:0.42,rotate:{type:"degrees",angle:32}});
     page.drawText("NON-AUTHORITATIVE COPY",{x:24,y:18,size:9,font,color:rgb(0.65,0.08,0.08),opacity:0.8});
   }
-  return {bytes:await pdf.save({useObjectStreams:false}),assessment};
+  const bytes=await pdf.save({useObjectStreams:false});await appendRecoveryAccessEvent(ctx,user,id,"recovery.preview.generated",{verifiedStampCount:assessment.summary.verified});return {bytes,assessment};
 }
