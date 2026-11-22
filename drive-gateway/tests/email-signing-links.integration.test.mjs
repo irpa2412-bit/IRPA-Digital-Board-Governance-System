@@ -811,3 +811,10 @@ test("owner refresh refuses to mirror Completed while any required signer remain
   await assert.rejects(()=>getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId),/every required signer as signed/);
   assert.equal(calls,0);
 });
+
+
+test("owner refresh reports a Firebase mirror failure instead of silently claiming a successful refresh",async()=>{
+  const f=await fixture();
+  f.ctx.persistSignerProgress=async()=>{throw new Error("private Firestore transport detail");};
+  await assert.rejects(()=>getEnvelopeStatus(f.ctx,{uid:"owner-uid",isAdmin:false},f.created.envelopeId),/Firebase status synchronization failed/);
+});
