@@ -12,27 +12,39 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Probe production Worker routes without credentials
+      - name: Probe production Worker health and recovery routes without valid credentials
         shell: bash
         run: |
           set -euo pipefail
           BASE="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
-          probe() {
-            local label="$1"
-            local path="$2"
-            local body_file status
-            body_file="$(mktemp)"
-            status="$(curl --silent --show-error --max-time 20 --output "$body_file" --write-out '%{http_code}' "$BASE$path" || true)"
-            printf '%s status=%s body=' "$label" "${status:-000}"
-            head -c 100 "$body_file" | tr '\n' ' '
-            printf '\n'
-            rm -f "$body_file"
-          }
-          probe "evidence-envelope-id" "/api/recovery/envelopes/ENV-0000000000000000/evidence"
-          probe "evidence-document-reference-id" "/api/recovery/envelopes/IRPA-ENV-2026-00000000/evidence"
-          probe "recovery-queue" "/api/recovery/envelopes"
-          probe "nonsense" "/__signature_recovery_route_probe_not_a_real_route__"
+          body_file="$(mktemp)"
+          status="$(curl --silent --show-error --max-time 20 --output "$body_file" --write-out '%{http_code}' "$BASE/health" || true)"
+          printf 'health status=%s body=' "${status:-000}"
+          head -c 100 "$body_file" | tr '\n' ' '
+          printf '\n'
+          node -e 'const fs=require("fs");try{const h=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));console.log("health version="+(h.workerCommit||h.commit||h.version||"NOT_REPORTED"));}catch{console.log("health version=NOT_REPORTED")}' "$body_file"
+          rm -f "$body_file"
 
-# Re-probe trigger: authenticated-route boundary verification only.
+          probe() {
+            local label="$1" method="$2" path="$3" body="${4:-}"
+            local file status
+            file="$(mktemp)"
+            if [[ "$method" == "POST" ]]; then
+              status="$(curl --silent --show-error --max-time 20 --request POST --header 'Authorization: Bearer invalid-route-probe-token' --header 'Content-Type: application/json' --data "$body" --output "$file" --write-out '%{http_code}' "$BASE$path" || true)"
+            else
+              status="$(curl --silent --show-error --max-time 20 --header 'Authorization: Bearer invalid-route-probe-token' --output "$file" --write-out '%{http_code}' "$BASE$path" || true)"
+            fi
+            printf '%s status=%s body=' "$label" "${status:-000}"
+            head -c 100 "$file" | tr '\n' ' '
+            printf '\n'
+            rm -f "$file"
+          }
+
+          ID="ENV-0000000000000000"
+          probe "queue" GET "/api/recovery/envelopes?limit=50&offset=0"
+          probe "evidence" GET "/api/recovery/envelopes/$ID/evidence"
+          probe "diagnose-finalisation" POST "/api/envelopes/$ID/diagnose-finalisation" "{}"
+          probe "completed-copy" GET "/api/recovery/envelopes/$ID/completed-copy.pdf"
+          probe "preview" GET "/api/recovery/envelopes/$ID/preview.pdf"
