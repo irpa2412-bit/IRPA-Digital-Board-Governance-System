@@ -1,0 +1,423 @@
+{
+  "schemaVersion": 1,
+  "portal": "Signature Portal",
+  "status": "complete",
+  "declaration": {
+    "affectedPortals": [
+      "Signature Portal"
+    ],
+    "reason": "Owner-authorised Signature Portal finalisation recovery for IRPA-ENV-2026-11501354. Record each finalisation stage and provide a zero-write sandbox diagnosis before any controlled retry.",
+    "files": [
+      "docs/portal-protection/records/signature-portal.json",
+      "docs/portal-protection/windows/signature-portal.json",
+      "docs/signature-recovery/owner-self-service-generalisation.md",
+      "docs/signature-recovery/pr-895-verification-2026-11-22.md",
+      ".github/workflows/baseline-evidence.yml",
+      "drive-gateway/src/signatureRecovery.mjs",
+      "drive-gateway/tests/signature-recovery.test.mjs",
+      "src/pages/SignaturePlatformWithUpload.jsx",
+      "src/pages/SignatureRecoveryOwnerPanel.jsx",
+      "tests/signature-recovery-owner-panel-readonly.test.mjs",
+      "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md",
+      "drive-gateway/src/signing.mjs",
+      "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
+      "tests/signature-recovery-owner-panel-finalisation.test.mjs",
+      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md"
+    ],
+    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment.",
+    "prohibitedChanges": [
+      "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
+      "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
+      "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
+      "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
+      "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
+      "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
+      "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
+    ],
+    "lockTests": [
+      "tests/signature-field-assignment-setup.test.mjs",
+      "drive-gateway/tests/signature-field-assignment-regression.test.mjs",
+      "tests/signature-firestore-diagnostics.test.mjs",
+      "tests/signature-recovery-owner-panel-readonly.test.mjs — GET-only, endpoint allowlist, no persistence/action API, no direct completion.",
+      "drive-gateway/tests/signature-recovery.test.mjs — queue/evidence/preview preserve the complete envelope and signing evidence snapshot; access telemetry is stored separately."
+    ],
+    "fileEffects": [
+      {
+        "path": "docs/portal-protection/records/signature-portal.json",
+        "expectedEffect": "Declares exact one-portal repair scope, immutable baseline, prohibitions, lock tests and verified evidence."
+      },
+      {
+        "path": "docs/portal-protection/windows/signature-portal.json",
+        "expectedEffect": "Records the owner-approved 72-hour Signature Portal window and explicitly scoped owner recovery screen and read-only Gateway assessment correction."
+      },
+      {
+        "path": "docs/signature-recovery/owner-self-service-generalisation.md",
+        "expectedEffect": "Documents future owner/admin recovery work as separate follow-up PRs; no unrelated features are included in this PR."
+      },
+      {
+        "path": "docs/signature-recovery/pr-895-verification-2026-11-22.md",
+        "expectedEffect": "Records baseline workflow runs, job-level evidence, initial failed attempt and PR-head verification IDs."
+      },
+      {
+        "path": ".github/workflows/baseline-evidence.yml",
+        "expectedEffect": "Manual and workflow-file push triggers run three separately named jobs against immutable baseline commit 25ddcc6; additionally runs PR-head read-only recovery tests."
+      },
+      {
+        "path": "drive-gateway/src/signatureRecovery.mjs",
+        "expectedEffect": "Writes recovery access telemetry to separate recoveryAccessEvents records; GET queue, evidence and preview do not update envelope records or signing audit chain."
+      },
+      {
+        "path": "drive-gateway/tests/signature-recovery.test.mjs",
+        "expectedEffect": "Verifies queue, assessment and preview preserve the complete envelope record, including signers, fields, hashes, certificate values, archive metadata, updatedAt and signing audit events."
+      },
+      {
+        "path": "src/pages/SignaturePlatformWithUpload.jsx",
+        "expectedEffect": "Mounts the authenticated recovery assessment panel in the owner-facing Signature Portal view only."
+      },
+      {
+        "path": "src/pages/SignatureRecoveryOwnerPanel.jsx",
+        "expectedEffect": "Calls only authenticated GET queue/evidence/preview endpoints; provides no retry, reassignment, repair or completion action."
+      },
+      {
+        "path": "tests/signature-recovery-owner-panel-readonly.test.mjs",
+        "expectedEffect": "Enforces GET-only requests, read-only endpoint allowlist, absence of persistence/action APIs and absence of direct Completed status changes."
+      },
+      {
+        "path": "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md",
+        "expectedEffect": "Records exact request sequence, source findings, scope, prohibited changes, baseline/rollback, validation limitations and deployment evidence status for SR-2026-11-22-01."
+      }
+    ]
+  },
+  "baseline": {
+    "commit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe",
+    "rollbackCommit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe"
+  },
+  "validation": {
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Signature Portal": "PASS"
+    },
+    "fullRegression": "PASS",
+    "evidence": [
+      "baseline smoke PASS — run 45039296254, job 137259916753, baseline commit 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45039296254/job/137259916753",
+      "full regression PASS — run 45039296254, job 137259917115, npm run test:all executed inside Firestore emulator, baseline commit 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45039296254/job/137259917115",
+      "Signature Portal portal smoke PASS — run 45039296254, job 137259917010, baseline commit 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45039296254/job/137259917010",
+      "PR-head owner panel GET-only guard PASS — run 45039296254, job 137259917010, code-bearing PR head 09a13716cc64f42a033eac662d40a3406b6ad45b",
+      "PR-head Gateway no-mutation regression PASS — run 45039296254, job 137259917010, code-bearing PR head 09a13716cc64f42a033eac662d40a3406b6ad45b",
+      "Initial evidence attempt FAIL — run 45038527520, job 137257570674: 15 subtests in tests/meeting-category-firestore-rules.test.cjs failed to initialise because Firestore emulator host/port was not started. Corrected workflow now starts the Firestore emulator; complete rerun 45039296254 job 137259917115 PASS.",
+      "Earlier uncorrected attempt run 45038527520: baseline smoke PASS (job 137257570878); Signature Portal smoke PASS (job 137257570841); full regression FAIL (job 137257570674). This failed attempt is retained for transparency."
+    ],
+    "behaviourDifferences": [
+      "Owner-facing, read-only recovery assessment panel is mounted in Signature Portal.",
+      "Recovery access telemetry is separated from envelope records; assessment GETs preserve the original envelope and signing audit chain."
+    ],
+    "prHeadCommit": "25afb42da83ead7f33719792fe93dbac8130c0b2",
+    "prHeadRuns": [
+      {
+        "name": "IRPA Security Baseline Gate",
+        "runId": 45039448865,
+        "result": "FAIL — completed Change Record was not yet present at this head; expected to be rerun after this Change Record commit."
+      },
+      {
+        "name": "Firebase Functions Entrypoint Integrity Test",
+        "runId": 45039448795,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "IRPA-DBGS Readability Release Gate",
+        "runId": 45039448772,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "email-signing-contract",
+        "runId": 45039448821,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Portal protection guard-only checks",
+        "runId": 45039448884,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Signature Portal Migration Build Test",
+        "runId": 45039448786,
+        "result": "PENDING at retrieval."
+      },
+      {
+        "name": "PDF E-Signature Tests",
+        "runId": 45039448862,
+        "result": "PASS."
+      },
+      {
+        "name": "Cloudflare E-Signature Runtime Tests",
+        "runId": 45039448846,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Signature security regression",
+        "runId": 45039448774,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Signature Envelope Refresh and Delivery Regression",
+        "runId": 45039448969,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "IRPA Release Build",
+        "runId": 45039448861,
+        "result": "QUEUED at retrieval."
+      },
+      {
+        "name": "Authorization Functions Integration Gate",
+        "runId": 45039448901,
+        "result": "PASS."
+      },
+      {
+        "name": "Firebase-free governance migration checks",
+        "runId": 45039448848,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Firestore Rules Change Approval",
+        "runId": 45039448818,
+        "result": "PASS; no Firestore rules changed."
+      },
+      {
+        "name": "Firestore Deployment Trigger Guard",
+        "runId": 45039448756,
+        "result": "PASS."
+      },
+      {
+        "name": "Mail Invitation Tests",
+        "runId": 45039448796,
+        "result": "PASS."
+      },
+      {
+        "name": "IRPA web PWA validation",
+        "runId": 45039448873,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Readability CI",
+        "runId": 45039448858,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Authentication and Identity Parity Tests",
+        "runId": 45039448863,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Build IRPA Android APK",
+        "runId": 45039448960,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Production Promotion Gate",
+        "runId": 45039448942,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Meeting Cloudflare Migration Tests",
+        "runId": 45039448785,
+        "result": "IN_PROGRESS at retrieval."
+      },
+      {
+        "name": "Communication Website Integration Verification",
+        "runId": 45039448775,
+        "result": "IN_PROGRESS at retrieval."
+      }
+    ]
+  },
+  "renewals": [
+    {
+      "at": "2026-11-22T15:05:20.559Z",
+      "expiresAt": "2026-11-25T15:05:20.559Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 895 Add the owner-facing read-only recovery assessment screen for IRPA-ENV-2026-11501354; preserve existing signatures and do not mutate the envelope.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081030720",
+      "command": "approve",
+      "reason": "Add the owner-facing read-only recovery assessment screen for IRPA-ENV-2026-11501354; preserve existing signatures and do not mutate the envelope.",
+      "prNumber": 895
+    },
+    {
+      "at": "2026-11-22T15:35:28.470Z",
+      "expiresAt": "2026-11-25T15:35:28.470Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 895 Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081418969",
+      "command": "approve",
+      "reason": "Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
+      "prNumber": 895
+    }
+  ],
+  "repairWindow": {
+    "portal": "Signature Portal",
+    "durationHours": 72,
+    "openedAt": "2026-11-22T15:35:28.470Z",
+    "expiresAt": "2026-11-25T15:35:28.470Z",
+    "approvalComment": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081418969"
+  },
+  "amendments": [
+    {
+      "changeId": "SR-2026-11-22-01",
+      "status": "implementation-in-progress",
+      "baselineCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
+      "rollbackCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
+      "repairWindowApproval": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081418969",
+      "changeRecord": "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md",
+      "files": [
+        "drive-gateway/src/signatureRecovery.mjs",
+        "drive-gateway/tests/signature-recovery.test.mjs",
+        "src/pages/SignatureRecoveryOwnerPanel.jsx",
+        "tests/signature-recovery-owner-panel-readonly.test.mjs"
+      ],
+      "validation": {
+        "sourceReview": "PASS",
+        "localTests": "NOT_RUN",
+        "prCi": "PENDING",
+        "workerDeployment": "NOT_VERIFIED",
+        "firebaseHosting": "NOT_VERIFIED",
+        "cloudflareFrontend": "NOT_VERIFIED",
+        "productionEnvelopeMutation": "NONE"
+      },
+      "prohibitedChanges": [
+        "signing rules",
+        "tokens and link format",
+        "sessions",
+        "signer identity",
+        "field assignment",
+        "stamping",
+        "PDF generation",
+        "hash algorithm",
+        "certificate logic",
+        "archive logic",
+        "Firestore rules",
+        "secrets",
+        "environment variables",
+        "SMTP settings",
+        "branch protection",
+        "production envelope mutation"
+      ]
+    },
+    {
+      "changeId": "SR-2026-11-22-03",
+      "status": "implementation-in-progress",
+      "baselineCommit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe",
+      "rollbackCommit": "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe",
+      "repairWindow": {
+        "openedAt": "2026-11-22T18:06:00.000Z",
+        "closesAt": "2026-11-25T18:06:00.000Z",
+        "durationHours": 72,
+        "rollbackCommit": "eb04405e4ec2d64e45d016b6ed3adbc2e8136fbd",
+        "frontendRollbackCommit": "eb68a06fdd04454b0e73d2dc9c010eae5519f458"
+      },
+      "files": [
+        "drive-gateway/src/signing.mjs",
+        "drive-gateway/src/signatureRecovery.mjs",
+        "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
+        "src/pages/SignatureRecoveryOwnerPanel.jsx",
+        "tests/signature-recovery-owner-panel-finalisation.test.mjs",
+        "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+        "docs/portal-protection/records/signature-portal.json",
+        "docs/portal-protection/windows/signature-portal.json"
+      ],
+      "ownerInstruction": "Owner approval: implement stage recording and write-isolated dry-run first; then retry UI and safe recovery as a separate PR. Preserve all existing signatures, signing audit events and source hashes. Stop if the dry run identifies a defect inside existing PDF/hash/certificate/archive/distribution logic and report exact line plus proposed change for approval.",
+      "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment.",
+      "prohibitedChanges": [
+        "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
+        "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
+        "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
+        "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
+        "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
+        "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
+        "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
+      ],
+      "validation": {
+        "baselineSmoke": "PASS",
+        "fullRegression": "PASS",
+        "portalSmoke": {
+          "Signature Portal": "PASS"
+        },
+        "implementationTests": "PENDING",
+        "prCi": "PENDING",
+        "workerDeployment": "NOT_STARTED",
+        "firebaseHosting": "NOT_STARTED",
+        "cloudflareFrontend": "NOT_STARTED",
+        "productionEnvelopeMutation": "NONE"
+      }
+    },
+    {
+      "changeId": "SR-2026-11-22-04",
+      "status": "owner-approved-scope-amendment",
+      "approvedAt": "2026-11-22T18:13:01Z",
+      "ownerDecision": "Do not move Completed after distribution. Completed means signatures verified, completed PDF built, byte length and hash recorded, certificate built and archive written. Email delivery is independent.",
+      "acceptedSourceFinding": {
+        "file": "drive-gateway/src/signing.mjs",
+        "line": 440,
+        "detail": "Completed is persisted before distribution.",
+        "distributionFile": "drive-gateway/src/signatureDistribution.mjs",
+        "lines": "67-131",
+        "detail2": "Individual recipient delivery failures are caught and not propagated to envelope-level distribution status."
+      },
+      "distributionScope": {
+        "statusValues": [
+          "NotStarted",
+          "Sent",
+          "PartiallyFailed",
+          "Failed"
+        ],
+        "perRecipient": [
+          "maskedAddress",
+          "mailServerAccepted",
+          "sanitisedFailureStageCode",
+          "replyCategory"
+        ],
+        "ownerUi": "Completed, but N emails failed; Resend completion emails for failed recipients only using existing signed copies and existing resend rules; no new tokens.",
+        "completedIndependentOfEmail": true
+      },
+      "sequence": [
+        "PR #911 remains the repair-window and Change Record PR; stage recorder and zero-write dry run first",
+        "Separate PR for distribution status and failed-recipient resend UI",
+        "Separate PR for owner/admin retry control"
+      ],
+      "immutable": [
+        "No envelope mutation",
+        "No signatures, signer records, audit events or stored hashes touched",
+        "No changes to PDF building, hashing, certificate or archive logic",
+        "No change to signing rules, tokens, link format, sessions, signer identity, field assignment, secrets, env vars, SMTP settings, Firestore rules or branch protection"
+      ],
+      "retry": {
+        "ownerAdminOnly": true,
+        "enableAfter": "all-PASS dry run or explicit owner confirmation",
+        "backupBefore": true,
+        "exclude": [
+          "signature images",
+          "tokens",
+          "links"
+        ],
+        "runNormalFinalisationOnce": true,
+        "auditEvent": [
+          "actor",
+          "time",
+          "action",
+          "result"
+        ],
+        "failure": "No changes to existing envelope, signatures or audit evidence",
+        "undoDays": 7,
+        "rateLimitPerHour": 3,
+        "neverSetCompletedDirectly": true
+      }
+    }
+  ],
+  "activeAmendment": {
+    "ownerDecision": "Do not move Completed after distribution. Completed is independent of email delivery; implement envelope-level distribution status and failed-recipient-only resend in its own PR.",
+    "files": [
+      "drive-gateway/src/signatureDistribution.mjs",
+      "drive-gateway/src/signing.mjs",
+      "src/pages/SignatureRecoveryOwnerPanel.jsx"
+    ],
+    "expectedEffect": "First PR stage recording and zero-write dry run; second PR envelope-level distribution status and failed-recipient-only resend; third PR backup-first audited retry. Completed remains independent of email delivery."
+  }
+}

@@ -1,0 +1,20 @@
+Add these rules inside match /databases/{database}/documents in firestore-v2.rules, alongside the existing signature rules.
+
+match /signatureEnvelopes/{id} {
+  allow read: if admin() || (signedIn() && resource.data.participantUids is list && resource.data.participantUids.hasAny([request.auth.uid]));
+  allow create: if admin() || (activeMember() && validEnvelopeCreate());
+  allow update: if admin() || (activeMember() && resource.data.participantUids is list && resource.data.participantUids.hasAny([request.auth.uid]) && request.resource.data.envelopeReference == resource.data.envelopeReference && request.resource.data.senderUid == resource.data.senderUid && request.resource.data.documentId == resource.data.documentId && request.resource.data.lastSignedByUid == request.auth.uid);
+  allow delete: if false;
+}
+
+match /signatureEvents/{id} {
+  allow read: if admin() || (signedIn() && resource.data.actorUid == request.auth.uid);
+  allow create: if activeMember() && request.resource.data.actorUid == request.auth.uid;
+  allow update, delete: if false;
+}
+
+match /signatures/{id} {
+  allow read: if admin() || (signedIn() && resource.data.signerUid == request.auth.uid);
+  allow create: if admin() || (activeMember() && request.resource.data.signerUid == request.auth.uid);
+  allow update, delete: if false;
+}

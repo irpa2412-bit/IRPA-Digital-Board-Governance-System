@@ -1,0 +1,196 @@
+name: Deploy IRPA Governance Frontend to Cloudflare Workers
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "functions/**"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "storage.rules"
+      - "drive-gateway/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # Dedicated serialization group for irpa-cloudflare-frontend-worker.
+  group: irpa-cloudflare-frontend-worker
+  cancel-in-progress: false
+jobs:
+  build-and-deploy:
+    # Production frontend deployment requires protected Environment approval.
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Mandatory full-source readability and contrast check
+        run: npm run check:production-readability
+      - name: Build production application
+        env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
+          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
+          VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
+        run: VITE_BUILD_TIME="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" npm run build
+
+      - name: Independent production readability verification
+        run: npm run verify:production-readability
+      - name: Verify build output
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          grep -qi '<html' dist/index.html
+          test -d dist/assets
+          if ! grep -R -Fq "Policies and Strategic Plans" dist/assets --include="*.js"; then
+            echo "Production frontend bundle is missing the Policies and Strategic Plans portal." >&2
+            exit 1
+          fi
+          echo "PASS: production frontend bundle contains the Policies and Strategic Plans portal."
+          grep -Fq "content=\"$GITHUB_SHA\"" dist/index.html
+          grep -Eq '<meta name="irpa-build-time" content="[0-9]{4}-[0-9]{2}-[0-9]{2}T' dist/index.html
+          if ! grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
+            echo 'Production frontend bundle does not reference the production D1 crawler Worker.' >&2
+            exit 1
+          fi
+          if ! grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
+            echo 'Production frontend bundle does not reference the dedicated AI assistant Worker.' >&2
+            exit 1
+          fi
+          echo "Production bundle routes grant scans to the isolated D1 crawler and AI drafting to its dedicated assistant-capable Worker."
+          if ! grep -R -q 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle does not reference the canonical Cloudflare Google Drive Gateway.' >&2
+            exit 1
+          fi
+          echo "Production bundle references the canonical Cloudflare Google Drive Gateway."
+      - name: Upload immutable production frontend artifact for browser verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-frontend-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: application/json" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify > "$RUNNER_TEMP/cf-token.json"
+          node -e 'const x=require(process.argv[1]); if(!x.success) process.exit(1);' "$RUNNER_TEMP/cf-token.json"
+      - name: Deploy frontend as an isolated Cloudflare Worker with static assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler deploy --config wrangler.jsonc
+      - name: Verify live Gateway CORS for the production frontend
+        run: |
+          set -euo pipefail
+          gateway="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          origin="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          curl --fail --silent --show-error --max-time 20 -X OPTIONS "$gateway/api/download" \
+            -H "Origin: $origin" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: authorization,content-type" \
+            -D "$RUNNER_TEMP/gateway-cors-headers.txt" -o /dev/null
+          grep -Fqi "access-control-allow-origin: $origin" "$RUNNER_TEMP/gateway-cors-headers.txt" || { cat "$RUNNER_TEMP/gateway-cors-headers.txt"; echo "Production Gateway rejected the Cloudflare frontend origin." >&2; exit 1; }
+          grep -qi "^access-control-allow-methods:.*POST" "$RUNNER_TEMP/gateway-cors-headers.txt"
+          grep -qi "^access-control-allow-headers:.*authorization" "$RUNNER_TEMP/gateway-cors-headers.txt"
+          echo "Live Gateway preflight accepts the production frontend origin and required authenticated POST headers."
+      - name: Verify Cloudflare Workers production endpoint
+        run: |
+          set -euo pipefail
+          url="https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev"
+          live_html="$RUNNER_TEMP/cloudflare-live.html"
+
+          echo "Checking deployed frontend HTML and build identity..."
+          curl --fail --silent --show-error --retry 8 --retry-delay 3 --max-time 30 \
+            -H "Cache-Control: no-cache" "$url/?__irpa_verify=$GITHUB_SHA" -o "$live_html"
+          if ! grep -qi '<html' "$live_html"; then
+            echo "FAIL: production frontend root did not return HTML." >&2
+            head -c 500 "$live_html" >&2 || true
+            exit 1
+          fi
+          if ! grep -Fq "content=\"$GITHUB_SHA\"" "$live_html"; then
+            echo "FAIL: live frontend HTML does not identify expected commit $GITHUB_SHA." >&2
+            grep -Eo 'name="irpa-build-version"[^>]*' "$live_html" >&2 || true
+            exit 1
+          fi
+          if ! grep -Eq 'name="irpa-build-time" content="[0-9]{4}-[0-9]{2}-[0-9]{2}T' "$live_html"; then
+            echo "FAIL: live frontend HTML is missing its UTC build-time marker." >&2
+            exit 1
+          fi
+          echo "PASS: live frontend HTML identifies expected build $GITHUB_SHA."
+
+          echo "Checking every emitted static asset against the build output..."
+          asset_count=0
+          while IFS= read -r -d '' local_asset; do
+            name="${local_asset##*/}"
+            remote_asset="$RUNNER_TEMP/cloudflare-$name"
+            if ! curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 30 \
+              "$url/assets/$name?__irpa_verify=$GITHUB_SHA" -o "$remote_asset"; then
+              echo "FAIL: production asset request failed: /assets/$name" >&2
+              exit 1
+            fi
+            local_hash="$(sha256sum "$local_asset" | cut -d ' ' -f 1)"
+            matched=false
+            for attempt in 1 2 3 4 5 6; do
+              if ! curl --fail --silent --show-error --max-time 30 \
+                "$url/assets/$name?__irpa_verify=$GITHUB_SHA&attempt=$attempt" -o "$remote_asset"; then
+                echo "Asset fetch attempt $attempt of 6 failed: /assets/$name" >&2
+              else
+                remote_hash="$(sha256sum "$remote_asset" | cut -d ' ' -f 1)"
+                if [ "$local_hash" = "$remote_hash" ]; then
+                  matched=true
+                  break
+                fi
+                echo "Asset hash mismatch on attempt $attempt of 6: /assets/$name" >&2
+                echo "Local SHA-256:  $local_hash" >&2
+                echo "Remote SHA-256: $remote_hash" >&2
+              fi
+              if [ "$attempt" -lt 6 ]; then
+                echo "Waiting 30 seconds before retrying exact SHA-256 comparison..."
+                sleep 30
+              fi
+            done
+            if [ "$matched" != true ]; then
+              echo "FAIL: production asset did not match this build after 6 attempts: /assets/$name" >&2
+              exit 1
+            fi
+            asset_count=$((asset_count + 1))
+          done < <(find dist/assets -maxdepth 1 -type f -print0)
+          if [ "$asset_count" -eq 0 ]; then
+            echo "FAIL: no built static assets were found to verify." >&2
+            exit 1
+          fi
+          echo "PASS: all $asset_count emitted static assets exactly match the build output."
+
+          echo "Checking frontend Worker health endpoint..."
+          health="$(curl --fail --silent --show-error --retry 5 --retry-delay 2 --max-time 20 \
+            "$url/__irpa_health?__irpa_verify=$GITHUB_SHA")"
+          echo "$health"
+          node -e 'const h=JSON.parse(process.argv[1]); if(h.ok!==true || h.service!=="IRPA-DBGS frontend static assets") process.exit(1);' "$health" || {
+            echo "FAIL: frontend Worker health response was not the expected healthy service payload." >&2
+            exit 1
+          }
+          echo "PASS: Cloudflare frontend endpoint, deployed build identity, static assets and Worker health."
+      - name: Publish migration boundary
+        run: |
+          echo "Cloudflare Pages hosts the frontend. Firebase Authentication and Firestore remain the authoritative identity/data services during this safe migration."
+          echo "No DNS cutover, Firebase data deletion, or Firebase Auth-domain change is performed by this workflow."

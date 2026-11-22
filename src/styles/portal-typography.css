@@ -1,0 +1,80 @@
+/* IRPA-DBGS enterprise portal typography
+   Increase portal navigation and working-area text for clear, consistent use.
+   Intentionally excludes Access Categories sizing, colors, authorization, and data bindings.
+*/
+.desktop-webapp-navigation-roller {
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.desktop-webapp-navigation-roller select,
+.desktop-webapp-navigation-roller button {
+  min-height: 48px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.page-back-next-button,
+.page-back-next-button button {
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.4;
+  min-height: 46px;
+}
+
+.topbar h2,
+.page-header h1,
+.module-header h1 {
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.panel-header h2 {
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.form-field label,
+.form-field > span,
+.signature-authority-field label {
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .desktop-webapp-navigation-roller,
+  .desktop-webapp-navigation-roller select,
+  .desktop-webapp-navigation-roller button,
+  .mobile-global-nav button,
+  .mobile-nav-sheet button {
+    font-size: 17px;
+  }
+
+  .topbar h2,
+  .page-header h1,
+  .module-header h1 {
+    font-size: 22px;
+  }
+
+  .panel-header h2 {
+    font-size: 19px;
+  }
+}
+
+
+/* Apply mobile readability to the active global navigation, not the retired
+   in-portal roller, which is intentionally hidden by the existing design. */
+@media (max-width: 760px) {
+  .mobile-global-nav button,
+  .mobile-nav-sheet button {
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 750;
+    min-height: 48px;
+  }
+  .mobile-nav-sheet-header strong {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+}

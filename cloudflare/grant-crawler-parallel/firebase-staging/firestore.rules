@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function crawlerIdentity() {
+      return request.auth != null
+        && request.auth.token.email == "irpa-grant-crawler@irpa.or.tz"
+        && request.auth.token.email_verified == true;
+    }
+
+    function validOpportunity(data) {
+      return data.keys().hasOnly([
+          "title", "description", "url", "publishedAt", "sourceUrl",
+          "firstSeenAt", "lastSeenAt", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll(["title", "description", "url", "sourceUrl"])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 500
+        && data.description is string && data.description.size() <= 5000
+        && data.url is string && data.url.matches("^https://[^ ]+$")
+        && data.sourceUrl is string && data.sourceUrl.matches("^https://[^ ]+$")
+        && (!("publishedAt" in data) || data.publishedAt == null || data.publishedAt is string)
+        && (!("firstSeenAt" in data) || data.firstSeenAt is timestamp)
+        && (!("lastSeenAt" in data) || data.lastSeenAt is timestamp)
+        && (!("createdAt" in data) || data.createdAt is timestamp)
+        && (!("updatedAt" in data) || data.updatedAt is timestamp);
+    }
+
+    function validRun(data) {
+      return data.keys().hasOnly([
+          "status", "itemsSeen", "itemsChanged", "errorMessage", "finishedAt", "createdAt"
+        ])
+        && data.keys().hasAll(["status", "itemsSeen", "itemsChanged", "finishedAt"])
+        && data.status in ["success", "failed"]
+        && data.itemsSeen is int && data.itemsSeen >= 0 && data.itemsSeen <= 3000
+        && data.itemsChanged is int && data.itemsChanged >= 0 && data.itemsChanged <= data.itemsSeen
+        && data.finishedAt is timestamp
+        && (!("errorMessage" in data) || (data.errorMessage is string && data.errorMessage.size() <= 500))
+        && (!("createdAt" in data) || data.createdAt is timestamp);
+    }
+
+    match /grantOpportunities/{opportunityId} {
+      allow read: if crawlerIdentity();
+      allow create: if crawlerIdentity() && validOpportunity(request.resource.data);
+      allow update: if crawlerIdentity()
+        && validOpportunity(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["title", "description", "url", "publishedAt", "sourceUrl", "lastSeenAt", "updatedAt"]);
+      allow delete: if false;
+    }
+
+    match /grantCrawlerRuns/{runId} {
+      allow read: if crawlerIdentity();
+      allow create: if crawlerIdentity() && validRun(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Explicit deny-all fallback: no governance, finance, membership, meeting,
+    // document, administrator, or other collection is accessible to this identity.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,27 @@
+name: Research Portal Security Gate
+# Research security gate: dependency, Java, Firestore authorization tests, and production build.
+
+on:
+  push:
+    branches:
+      - repair/research-portal-access-control-20261008
+  pull_request:
+    branches:
+      - feat/signature-trust-platform-20261007
+
+jobs:
+  research-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npx firebase emulators:exec --only firestore --project demo-irpa-research-security "node --test tests/research-portal-security.test.mjs"
+      - run: npm run build

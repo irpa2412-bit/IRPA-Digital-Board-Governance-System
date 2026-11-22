@@ -1,0 +1,373 @@
+import React,{Component,useEffect,useState} from "react";
+import {auth} from "../firebase/config";
+import {getGoogleDriveGatewayUrl} from "../firebase/gatewayUrl";
+const GATEWAY=getGoogleDriveGatewayUrl();
+const SECRETS=["WORDPRESS_BASE_URL","WORDPRESS_USERNAME","WORDPRESS_APPLICATION_PASSWORD"];
+// CI retrigger: administrator maintenance navigation remains independent of read-only health probes.
+class MaintenanceErrorBoundary extends Component{constructor(props){super(props);this.state={failed:false};}static getDerivedStateFromError(){return {failed:true};}render(){if(this.state.failed)return <section role="alert" style={{border:"1px solid #dc2626",borderRadius:12,padding:14}}>Website Maintenance encountered a display error. The tab remains available; reload the panel or contact the system administrator. No maintenance action was performed.</section>;return this.props.children;}}
+const styles={panel:{border:"1px solid var(--border-color,#d5dce5)",borderRadius:12,padding:14,display:"grid",gap:10,background:"var(--surface,#fff)"},field:{width:"100%",boxSizing:"border-box",padding:10,border:"1px solid var(--border-color,#cbd5e1)",borderRadius:8,font:"inherit",background:"var(--input-bg,#fff)",color:"var(--text-primary,#172033)"},button:{padding:"10px 12px",borderRadius:8,border:"1px solid var(--border-color,#cbd5e1)",font:"inherit",fontWeight:650,background:"var(--surface-elevated,#f8fafc)",color:"var(--text-primary,#172033)"},primary:{padding:"10px 12px",borderRadius:8,border:"1px solid #1d4ed8",font:"inherit",fontWeight:700,background:"#1d4ed8",color:"#fff"}};
+export default function CommunicationsWebsiteStudio({initialTab="pages",isAdmin=false}){
+ const [maintenanceAllowed,setMaintenanceAllowed]=useState(false),[maintenanceError,setMaintenanceError]=useState(""),[maintenanceDir,setMaintenanceDir]=useState(""),[maintenanceEntries,setMaintenanceEntries]=useState([]),[maintenancePath,setMaintenancePath]=useState(""),[maintenanceOriginal,setMaintenanceOriginal]=useState(""),[maintenanceContent,setMaintenanceContent]=useState(""),[maintenanceReason,setMaintenanceReason]=useState(""),[maintenanceBackup,setMaintenanceBackup]=useState(""),[maintenanceHistory,setMaintenanceHistory]=useState([]),[maintenanceConfirmation,setMaintenanceConfirmation]=useState(""),[maintenanceDiff,setMaintenanceDiff]=useState(false),[maintenanceHealth,setMaintenanceHealth]=useState(null),[maintenanceUpdates,setMaintenanceUpdates]=useState(null);
+ const LOCAL_DRAFT_KEY="irpaWebsiteStudioDraft:v1";
+ const [status,setStatus]=useState(null),[type,setType]=useState("pages"),[items,setItems]=useState([]),[edit,setEdit]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(LOCAL_DRAFT_KEY)||"null")?.edit||null}catch{return null}}),[newPost,setNewPost]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(LOCAL_DRAFT_KEY)||"null")?.newPost||null}catch{return null}}),[taxonomies,setTaxonomies]=useState({categories:[],tags:[]}),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[uploadProgress,setUploadProgress]=useState([]),[approvalReady,setApprovalReady]=useState(null),[seoCapabilities,setSeoCapabilities]=useState(null),[mediaDestination,setMediaDestination]=useState("media-library"),[mediaParentId,setMediaParentId]=useState(""),[mediaParentType,setMediaParentType]=useState("posts"),[mediaFolder,setMediaFolder]=useState("uploads/irpa-media"),[mediaResults,setMediaResults]=useState([]),[acceptanceReport,setAcceptanceReport]=useState(null),[captionDiagnostic,setCaptionDiagnostic]=useState(false),[activeTab,setActiveTab]=useState(initialTab);
+ useEffect(()=>{try{if(newPost||edit)sessionStorage.setItem(LOCAL_DRAFT_KEY,JSON.stringify({newPost,edit,savedAt:Date.now()}));else sessionStorage.removeItem(LOCAL_DRAFT_KEY)}catch{}},[newPost,edit]);
+ async function call(path,method="GET",payload,withStatus=false){if(!auth.currentUser)throw Error("Sign in to use Website Studio.");let tokenTimer;const token=await Promise.race([auth.currentUser.getIdToken(),new Promise((_,reject)=>{tokenTimer=setTimeout(()=>reject(new Error("Sign-in token request timed out. Please sign in again.")),8000)})]).finally(()=>clearTimeout(tokenTimer));let r;try{r=await fetch(GATEWAY+path,{method,headers:{Authorization:"Bearer "+token,Accept:"application/json",...(payload?{"Content-Type":"application/json"}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:AbortSignal.timeout(32000)})}catch(e){if(e?.name==="TimeoutError"||e?.name==="AbortError")throw Error("The gateway did not respond within 32 seconds. The request was stopped; retry once and inspect the gateway health if it repeats.");throw Error("Could not reach the Cloudflare gateway: "+(e?.message||"network error"))}const data=await r.json().catch(()=>({}));if(withStatus)return {httpStatus:r.status,data,error:r.ok?"":data.error||"Request failed ("+r.status+")."};if(!r.ok){const error=new Error(data.error||"Request failed ("+r.status+").");error.data=data;error.httpStatus=r.status;throw error;}return data}
+ async function connect(){setBusy(true);setMessage("");try{const d=await call("/api/communications/site/status");const connections=d.connections||{};let cpanelDiagnostics=null;if(connections.cpanel==="connected"){try{cpanelDiagnostics=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(connections.configuredWordPressHost||"irpa.or.tz"));}catch(error){cpanelDiagnostics={readOnly:true,error:error.message||"cPanel diagnostics unavailable."};}}setStatus({...connections,cpanelDiagnostics});const website=String(connections.website||"unavailable");const cpanel=String(connections.cpanel||"unavailable");setMessage("Connection diagnostics received. WordPress: "+website.replace(/_/g," ")+". cPanel: "+cpanel.replace(/_/g," ")+".");}catch(e){setStatus(null);setMessage(e.message||"Connection check failed.")}finally{setBusy(false)}}
+ useEffect(()=>{void connect()},[]);
+ useEffect(()=>{let alive=true;call("/api/communications/cpanel/maintenance/files").then(data=>{if(alive){setMaintenanceAllowed(true);setMaintenanceError("");setMaintenanceEntries(data.entries||[]);}}).catch(error=>{if(alive){setMaintenanceAllowed(false);setMaintenanceEntries([]);setMaintenanceError(error?.message||"Maintenance file listing is unavailable. Check the gateway and configured document root; the tab remains available.");}});return()=>{alive=false}},[]);
+ async function maintenanceList(dir=maintenanceDir){setBusy(true);try{const data=await call("/api/communications/cpanel/maintenance/files?dir="+encodeURIComponent(dir));setMaintenanceAllowed(true);setMaintenanceError("");setMaintenanceDir(dir);setMaintenanceEntries(data.entries||[]);setMaintenancePath("");setMaintenanceContent("");setMaintenanceOriginal("");}catch(error){setMaintenanceAllowed(false);setMaintenanceError(error?.message||"The staging document root could not be read.");setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceRead(path){setBusy(true);try{const data=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(path));if(data.truncated)throw Error("File exceeds the 512 KiB editor limit.");setMaintenancePath(path);setMaintenanceContent(data.content||"");setMaintenanceOriginal(data.content||"");setMaintenanceBackup("");setMaintenanceDiff(false);const history=await call("/api/communications/cpanel/maintenance/history?path="+encodeURIComponent(path));setMaintenanceHistory(history.history||[]);}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceSave(){if(maintenanceReason.trim().length<10||maintenanceReason.trim().length>500){setMessage("Change reason must be 10 to 500 characters.");return;}setMaintenanceDiff(true);setBusy(true);try{const result=await call("/api/communications/cpanel/maintenance/files","PUT",{path:maintenancePath,content:maintenanceContent,reason:maintenanceReason.trim()});setMaintenanceBackup(result.backupId||"");setMaintenanceOriginal(maintenanceContent);const history=await call("/api/communications/cpanel/maintenance/history?path="+encodeURIComponent(maintenancePath));setMaintenanceHistory(history.history||[]);setMessage("Saved. Snapshot created before write; rollback is available.");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceRollback(){if(!maintenanceBackup)return;setBusy(true);try{await call("/api/communications/cpanel/maintenance/rollback","POST",{path:maintenancePath,backupId:maintenanceBackup,reason:maintenanceReason.trim()});await maintenanceRead(maintenancePath);setMessage("Rollback completed; exact snapshot bytes restored.");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenancePromote(){if(maintenanceConfirmation!=="PROMOTE TO LIVE"){setMessage("Type PROMOTE TO LIVE exactly.");return;}if(maintenanceReason.trim().length<10||maintenanceReason.trim().length>500){setMessage("Change reason must be 10 to 500 characters.");return;}setBusy(true);try{const result=await call("/api/communications/cpanel/maintenance/promote","POST",{path:maintenancePath,reason:maintenanceReason.trim(),confirmation:maintenanceConfirmation});setMessage(result.message||"Promoted to live.");setMaintenanceConfirmation("");}catch(error){setMessage(error.message)}finally{setBusy(false)}}
+ async function maintenanceLoadHealth(){setBusy(true);try{const domain=status?.configuredWordPressHost||"irpa.or.tz";const [healthResult,updatesResult]=await Promise.allSettled([call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain)),call("/api/communications/website/maintenance/updates")]);if(healthResult.status==="fulfilled")setMaintenanceHealth(healthResult.value);else{const reason=healthResult.reason?.message||"cPanel health diagnostics could not be loaded.";setMaintenanceHealth({error:reason,phpVersion:{value:null,status:"not exposed",reason},ssl:{status:"not exposed",reason},diskUsage:{value:null,status:"not exposed",reason},errorLog:{lines:[],status:"not exposed",reason},phpLimits:{status:"not exposed",reason}});}if(updatesResult.status==="fulfilled")setMaintenanceUpdates(updatesResult.value);else{const reason=updatesResult.reason?.message||"WordPress update metadata could not be read.";setMaintenanceUpdates({readOnly:true,core:{status:"not exposed",reason},plugins:{status:"not exposed",reason},themes:{status:"not exposed",reason}});}}finally{setBusy(false)}}
+
+ async function runProductionAcceptance(){
+  setBusy(true);setMessage("");setAcceptanceReport(null);
+  const rows=[];
+  const add=(label,status,httpStatus,error="",detail="")=>rows.push({label,status,httpStatus,error,detail});
+  let connections=null;
+  try{
+   const health=await call("/health","GET",undefined,true);
+   add("TEST Worker health",health.httpStatus>=200&&health.httpStatus<300?"PASS":"FAIL",health.httpStatus,health.error||health.data?.status||"");
+   try{
+    const root=await call("/api/communications/cpanel/maintenance/live-root-status","GET",undefined,true);
+    const rootData=root.data||{};
+    const configured=root.httpStatus===200&&rootData.configured===true;
+    const safelyUnset=root.httpStatus===409&&rootData.reason==="Live root not configured";
+    add("TEST live document-root configuration gate",configured||safelyUnset?"PASS":"FAIL",root.httpStatus,configured||safelyUnset?"":root.error||rootData.reason||"Unexpected live-root status.",configured?"Explicit live root confirmed by a read-only check.":"Fail-closed HTTP 409 confirmed; set CPANEL_LIVE_DOCUMENT_ROOT before live promotion.");
+   }catch(error){add("TEST live document-root configuration gate","FAIL",error.httpStatus||0,error.message||"Live-root check failed.");}
+   try{
+    const updates=await call("/api/communications/website/maintenance/updates","GET",undefined,true);
+    const updateData=updates.data||{};
+    const valid=updates.httpStatus===200&&updateData.readOnly===true&&["core","plugins","themes"].every(key=>Boolean(updateData[key]?.status));
+    add("TEST read-only WordPress core/plugin/theme update checks",valid?"PASS":"FAIL",updates.httpStatus,valid?"":updates.error||"Update metadata response is incomplete.","Authenticated GET probes only; no WordPress update, installation or modification was run.");
+   }catch(error){add("TEST read-only WordPress core/plugin/theme update checks","FAIL",error.httpStatus||0,error.message||"Read-only update check failed.","No update action was invoked.");}
+   const socialPlatforms=[
+    ["facebook","Facebook"],["instagram","Instagram"],["linkedin","LinkedIn"],
+    ["x","X"],["youtube","YouTube"],["whatsapp","WhatsApp Business"]
+   ];
+   let socialStatus={httpStatus:0,data:{}};
+   try{socialStatus=await call("/api/communications/social/status","GET",undefined,true);}
+   catch(error){socialStatus={httpStatus:error.httpStatus||0,data:{},error:error.message||"Social status request failed."};}
+   const socialData=socialStatus.data||{};
+   const platformRows=Array.isArray(socialData.platforms)?socialData.platforms:[];
+   for(let index=0;index<socialPlatforms.length;index++){
+    const [platform,label]=socialPlatforms[index];
+    const row=platformRows.find(item=>item.platform===platform);
+    try{
+     const exported=await call("/api/communications/social/export","POST",{
+      platform,content:{text:"TEST — IRPA Social Studio self-test",url:"https://irpa.or.tz",hashtags:["#IRPA"]}
+     },true);
+     const data=exported.data||{};
+     const passed=socialStatus.httpStatus===200&&Boolean(row&&row.mode==="manual-export"&&row.automaticPublishing===false)&&
+      exported.httpStatus===200&&data.ok===true&&data.mode==="manual-export"&&data.platform===platform;
+     const detail="Detail: status HTTP "+socialStatus.httpStatus+"; "+
+      (row?"adapter mode="+String(row.mode)+"; automaticPublishing="+String(row.automaticPublishing)+"; connection="+String(row.status):"platform status missing")+
+      "; export="+String(data.reason||data.error||"No export detail returned.")+
+      "; no external post was sent.";
+     add("Step "+(index+1)+"/6 TEST Social Studio "+label,passed?"PASS":"FAIL",exported.httpStatus,
+      passed?"":String(data.error||socialStatus.error||"Platform manual-export self-test failed."),detail);
+    }catch(error){
+     add("Step "+(index+1)+"/6 TEST Social Studio "+label,"FAIL",error.httpStatus||0,error.message||"Social export test failed.","Detail: authenticated manual-export route could not be verified.");
+    }
+   }
+   const pausePassed=socialStatus.httpStatus===200&&socialData.pauseAllPublishing===true;
+   add("TEST Social Studio global publishing pause",pausePassed?"PASS":"FAIL",socialStatus.httpStatus,
+    pausePassed?"":String(socialStatus.error||"Publishing pause is not confirmed."),
+    "Detail: pauseAllPublishing="+String(socialData.pauseAllPublishing)+"; no external publishing request was made.");
+   const reads=[
+    ["TEST WordPress connection and capability read","/api/communications/site/status"],
+    ["TEST WordPress pages read","/api/communications/website/content?type=pages"],
+    ["TEST WordPress posts read","/api/communications/website/content?type=posts"],
+    ["TEST WordPress categories and tags read","/api/communications/website/taxonomies"],
+    ["TEST WordPress SEO capability read","/api/communications/website/seo-capabilities"],
+    ["TEST cPanel root directory read","/api/communications/cpanel/maintenance/files"]
+   ];
+   let cpanelEntries=[];
+   for(const [label,path] of reads){
+    try{
+     const result=await call(path,"GET",undefined,true);
+     add(label,result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");
+     if(path.endsWith("/site/status")){
+      connections=result.data?.connections||null;
+      const capability=connections?.websiteAccount?.uploadFilesCapability;
+      add("TEST WordPress upload_files capability",capability==="granted"?"PASS":"FAIL",connections?.websiteHttpStatus??result.httpStatus,capability==="granted"?"":"upload_files is missing or unverified; media uploads must be blocked.");
+     }
+     if(path.endsWith("/cpanel/files"))cpanelEntries=result.data?.entries||[];
+    }catch(error){add(label,"FAIL",error.httpStatus||0,error.message||"Read route failed.");}
+   }
+   const readableFile=cpanelEntries.find(entry=>entry.type==="file");
+   if(readableFile){
+    try{const result=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);add("TEST cPanel website file content read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    catch(error){add("TEST cPanel website file content read","FAIL",error.httpStatus||0,error.message||"File read failed.");}
+   }else add("TEST cPanel website file content read","FAIL",null,"No safe HTML/CSS/TXT/JSON file was returned by the read-only directory listing.");
+   const maintenanceTestPath="portal-test/TEST-IRPA-MAINTENANCE.txt";
+   let maintenanceBackupId="";
+   if(readableFile){
+    try{
+     const read=await call("/api/communications/cpanel/maintenance/files?path="+encodeURIComponent(readableFile.name),"GET",undefined,true);
+     add("Step 1/5 TEST read staging file",read.httpStatus>=200&&read.httpStatus<300?"PASS":"FAIL",read.httpStatus,read.error||read.data?.error||"", "Read staging/"+readableFile.name);
+    }catch(error){add("Step 1/5 TEST read staging file","FAIL",error.httpStatus||0,error.message||"Staging read failed.","Read-only request.");}
+   }else add("Step 1/5 TEST read staging file","FAIL",null,"No safe staging file was listed.","Read-only request.");
+   try{
+    const edited=await call("/api/communications/cpanel/maintenance/files","PUT",{path:maintenanceTestPath,content:"TEST ONLY — Website Maintenance acceptance file; retained after rollback.",reason:"TEST acceptance: verify snapshot, write and rollback workflow."},true);
+    maintenanceBackupId=edited.data?.backupId||"";
+    add("Step 2/5 TEST edit staging/portal-test file",edited.httpStatus===200&&Boolean(maintenanceBackupId)?"PASS":"FAIL",edited.httpStatus,edited.error||edited.data?.error||"", "TEST file written; snapshot ID returned="+String(Boolean(maintenanceBackupId)));
+   }catch(error){add("Step 2/5 TEST edit staging/portal-test file","FAIL",error.httpStatus||0,error.message||"TEST edit failed.");}
+   if(maintenanceBackupId){
+    try{
+     const snapshot=await call("/api/communications/cpanel/maintenance/snapshot?path="+encodeURIComponent(maintenanceTestPath)+"&backupId="+encodeURIComponent(maintenanceBackupId),"GET",undefined,true);
+     add("Step 3/5 TEST snapshot exists",snapshot.httpStatus===200&&snapshot.data?.exists===true?"PASS":"FAIL",snapshot.httpStatus,snapshot.error||snapshot.data?.error||"", "Snapshot exists="+String(snapshot.data?.exists));
+    }catch(error){add("Step 3/5 TEST snapshot exists","FAIL",error.httpStatus||0,error.message||"Snapshot verification failed.");}
+    try{
+     const rolled=await call("/api/communications/cpanel/maintenance/rollback","POST",{path:maintenanceTestPath,backupId:maintenanceBackupId,reason:"TEST acceptance: verify exact rollback."},true);
+     add("Step 4/5 TEST roll back staging file",rolled.httpStatus===200?"PASS":"FAIL",rolled.httpStatus,rolled.error||rolled.data?.error||"", "Rollback restores the pre-edit bytes; no file deletion.");
+    }catch(error){add("Step 4/5 TEST roll back staging file","FAIL",error.httpStatus||0,error.message||"Rollback failed.");}
+   }else{
+    add("Step 3/5 TEST snapshot exists","FAIL",null,"No snapshot ID was returned.");
+    add("Step 4/5 TEST roll back staging file","FAIL",null,"Skipped because no snapshot was created.");
+   }
+   try{
+    const listed=await call("/api/communications/cpanel/maintenance/files?dir=portal-test","GET",undefined,true);
+    const testFiles=(listed.data?.entries||[]).filter(entry=>entry.type==="file"&&/^TEST/i.test(entry.name));
+    add("Step 5/5 TEST list TEST files",listed.httpStatus===200&&testFiles.some(entry=>entry.name==="TEST-IRPA-MAINTENANCE.txt")?"PASS":"FAIL",listed.httpStatus,listed.error||listed.data?.error||"", "TEST files returned="+testFiles.map(entry=>entry.name).join(", "));
+   }catch(error){add("Step 5/5 TEST list TEST files","FAIL",error.httpStatus||0,error.message||"TEST file listing failed.");}
+   try{
+    const domain=connections?.configuredWordPressHost||"irpa.or.tz";
+    const probe=await call("/api/communications/cpanel/diagnostics?domain="+encodeURIComponent(domain),"GET",undefined,true);
+    add("TEST cPanel diagnostics route",probe.httpStatus>=200&&probe.httpStatus<300?"PASS":"FAIL",probe.httpStatus,probe.error||probe.data?.error||"");
+    const diag=probe.data||{};
+    add("TEST cPanel email accounts list",diag.emailAccounts?.status==="PASS"?"PASS":"FAIL",diag.emailAccounts?.httpStatus??probe.httpStatus,diag.emailAccounts?.error||"");
+    add("TEST cPanel SSL status",diag.ssl?.status==="PASS"?"PASS":"FAIL",diag.ssl?.httpStatus??probe.httpStatus,diag.ssl?.error||diag.ssl?.status||"",diag.ssl?.detail||"");
+    add("TEST PHP upload_max_filesize and post_max_size",diag.phpLimits?.status==="PASS"?"PASS":diag.phpLimits?.status==="INFO"?"INFO":"FAIL",diag.phpLimits?.httpStatus??probe.httpStatus,diag.phpLimits?.error||diag.phpLimits?.diagnostic||"The configured cPanel UAPI did not expose both PHP upload limits.",diag.phpLimits?.detail||"");
+   }catch(error){add("TEST cPanel diagnostics route","FAIL",error.httpStatus||0,error.message||"cPanel diagnostics failed.");}
+   let acceptance=null;
+   try{
+    const result=await call("/api/communications/website/production-acceptance","POST",{diagnosticMode:captionDiagnostic},true);
+    add("TEST draft lifecycle and destination upload suite",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||"");
+    acceptance=result.data||null;
+    for(const row of acceptance?.report||[])rows.push(row);
+    if(Array.isArray(acceptance?.cleanupItems))rows.push({label:"TEST cleanup inventory",status:"INFO",httpStatus:null,error:"Retained test drafts and media; remove manually if no longer needed.",detail:"See cleanup list below.",cleanupItems:acceptance.cleanupItems});
+   }catch(error){add("TEST draft lifecycle and destination upload suite","FAIL",error.httpStatus||0,error.message||"Acceptance run failed.");}
+   for(const [type,id] of [["pages",acceptance?.createdDrafts?.pageId],["posts",acceptance?.createdDrafts?.postId]]){
+    if(!id)continue;
+    try{const result=await call("/api/communications/website/content/"+type+"/"+id,"GET",undefined,true);add("TEST WordPress "+type+" single-item read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    catch(error){add("TEST WordPress "+type+" single-item read","FAIL",error.httpStatus||0,error.message||"Single-item read failed.");}
+    try{const result=await call("/api/communications/website/revisions?type="+type+"&id="+id,"GET",undefined,true);add("TEST WordPress "+type+" revision-route read",result.httpStatus>=200&&result.httpStatus<300?"PASS":"FAIL",result.httpStatus,result.error||result.data?.error||"");}
+    catch(error){add("TEST WordPress "+type+" revision-route read","FAIL",error.httpStatus||0,error.message||"Revision read failed.");}
+   }
+   setAcceptanceReport(rows);setMessage("Production acceptance finished: "+rows.filter(x=>x.status==="PASS").length+" PASS, "+rows.filter(x=>x.status==="FAIL").length+" FAIL. TEST drafts and uploaded files are retained; nothing was published or deleted.");
+  }catch(error){add("TEST production acceptance runner","FAIL",0,error.message);setAcceptanceReport(rows);setMessage(error.message||"Production acceptance failed.");}
+  finally{setBusy(false)}
+ }
+ async function createSiteStructure(){setBusy(true);setMessage("");try{const data=await call("/api/communications/website/structure","POST",{});const r=data.result||{};setMessage("Draft site structure complete. Pages: "+(r.pages||[]).filter(x=>x.status==="CREATED_DRAFT").length+" created, "+(r.pages||[]).filter(x=>x.status==="SKIPPED_EXISTS").length+" skipped; categories: "+(r.categories||[]).length+" checked; tags: "+(r.tags||[]).length+" checked; menu: "+(r.menu?.status||"not reported")+". Live menu unchanged.");}catch(error){setMessage(error.message||"Draft site structure could not be created.")}finally{setBusy(false)}}
+ async function load(nextType=type){setBusy(true);setMessage("");try{const d=await call("/api/communications/website/content?type="+nextType);setItems(d.items||[]);setType(nextType);setMessage("Loaded "+(d.items||[]).length+" WordPress "+nextType+".")}catch(e){setMessage(e.message||"WordPress content could not be loaded.")}finally{setBusy(false)}}
+ async function loadTaxonomies(){
+  const data=await call("/api/communications/website/taxonomies");
+  setTaxonomies({categories:data.categories||[],tags:data.tags||[]});
+ }
+ async function loadSeoCapabilities(){
+  const data=await call("/api/communications/website/seo-capabilities");
+  setSeoCapabilities(data.yoast||{metaDescription:false,focusKeyphrase:false,verified:false});
+ }
+ async function openNewPost(){
+  setBusy(false);setMessage("");setApprovalReady(null);
+  setNewPost({title:"",content:"",excerpt:"",language:"English",categories:[],tags:[],featuredMedia:0,uploadedImages:[],videoUrl:"",seoMetaDescription:"",seoFocusKeyphrase:""});
+  setType("posts");
+  try{
+   await loadTaxonomies();
+   await loadSeoCapabilities().catch(()=>setSeoCapabilities({verified:false,metaDescription:false,focusKeyphrase:false}));
+  }catch(e){
+   setSeoCapabilities({verified:false,metaDescription:false,focusKeyphrase:false});
+   setMessage("WordPress is currently unavailable. Your new draft is open and will be retained in this browser tab while you work. Reconnect to WordPress to save it to the website. "+(e.message||""));
+  }
+ }
+ async function uploadPhoto(file,target,altText,caption){
+  const dataBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("Could not read the selected image."));reader.onload=()=>resolve(String(reader.result||"").split(",")[1]||"");reader.readAsDataURL(file)});
+  const result=await call("/api/communications/website/media","POST",{filename:file.name,contentType:file.type,dataBase64,altText,caption});
+  const media=result.media;
+  const escape=value=>String(value||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const figure='<figure class="wp-block-image"><img src="'+escape(media.url)+'" alt="'+escape(altText)+'" />'+(caption?'<figcaption>'+escape(caption)+'</figcaption>':"")+'</figure>';
+  if(target==="new")setNewPost(current=>({...current,content:String(current?.content||"")+(current?.content?"\n\n":"")+figure,featuredMedia:Number(current?.featuredMedia||media.id),uploadedImages:[...(current?.uploadedImages||[]),{id:Number(media.id),url:media.url,altText}]}));
+  else setEdit(current=>({...current,content:String(current?.content||"")+(current?.content?"\n\n":"")+figure,featuredMedia:Number(current?.featuredMedia||media.id),uploadedImages:[...(current?.uploadedImages||[]),{id:Number(media.id),url:media.url,altText}]}));
+ }
+ async function uploadPhotos(files,target){
+  const selected=Array.from(files||[]);
+  if(!selected.length)return;
+  const rows=selected.map((file,index)=>({key:target+"-"+Date.now()+"-"+index,name:file.name,status:"Queued"}));
+  setUploadProgress(rows);setBusy(true);setMessage("");
+  const update=(index,status)=>setUploadProgress(current=>current.map((row,i)=>i===index?{...row,status}:row));
+  const errors=[];let uploaded=0,skipped=0;
+  try{
+   for(let index=0;index<selected.length;index++){
+    const file=selected[index];
+    if(file.size<1){update(index,"Rejected · empty file");errors.push(file.name+": file is empty.");continue;}
+    if(!["image/jpeg","image/png","image/webp"].includes(String(file.type||"").toLowerCase())){update(index,"Rejected · unsupported type");errors.push(file.name+": only JPEG, PNG and WebP are accepted.");continue;}
+    const altText=window.prompt("Required descriptive alt text for: "+file.name,"");
+    if(altText===null){update(index,"Skipped · alt text cancelled");skipped++;continue;}
+    if(!String(altText).trim()){update(index,"Rejected · alt text required");errors.push(file.name+": descriptive alt text is required.");continue;}
+    const caption=window.prompt("Optional image caption for: "+file.name,"");
+    if(caption===null){update(index,"Skipped · caption cancelled");skipped++;continue;}
+    try{update(index,"Uploading");await uploadPhoto(file,target,String(altText).trim(),String(caption||"").trim());update(index,"Uploaded");uploaded++;}
+    catch(error){update(index,"Failed");errors.push(file.name+": "+(error.message||"upload failed"));}
+   }
+   setMessage("Image batch complete: "+uploaded+" uploaded, "+skipped+" skipped, "+errors.length+" failed."+ (errors.length?" "+errors.join(" | "):" Review the inserted figures and save the update as a draft."));
+  }finally{setBusy(false)}
+ }
+ async function uploadGeneralFiles(fileList){
+  const selected=Array.from(fileList||[]);if(!selected.length)return;
+  const cpanelLimit=50*1024*1024; if(mediaDestination==="cpanel-folder"&&selected.some(file=>file.size>cpanelLimit)){setMessage("cPanel uploads are limited to 50 MB per file. Upload larger videos to YouTube or Vimeo and insert the HTTPS link into the draft.");return;}
+  setBusy(true);setMessage("");setMediaResults([]);
+  const rows=selected.map((file,index)=>({key:"asset-"+Date.now()+"-"+index,name:file.name,status:"Queued",file}));
+  setUploadProgress(rows);
+  const update=(index,status)=>setUploadProgress(current=>current.map((row,i)=>i===index?{...row,status}:row));
+  const results=[];
+  try{
+   for(let index=0;index<selected.length;index++){
+    const file=selected[index];
+    try{
+     if(!file.size)throw Error("Empty files are not accepted.");
+     const title=window.prompt("File title:",file.name);if(title===null){update(index,"Skipped");continue;}
+     const altText=window.prompt("Alt text (required for images):","");if(altText===null){update(index,"Skipped");continue;}
+     const caption=window.prompt("Caption (optional):","");if(caption===null){update(index,"Skipped");continue;}
+     const category=window.prompt("Media category:","General");if(category===null){update(index,"Skipped");continue;}
+     const tags=window.prompt("Comma-separated tags:","");if(tags===null){update(index,"Skipped");continue;}
+     const common={filename:file.name,title,altText,caption,category,tags:tags.split(",").map(x=>x.trim()).filter(Boolean),contentType:file.type||"application/octet-stream"};
+     update(index,"Reading");
+     const buffer=await file.arrayBuffer();
+     let result;
+     if(mediaDestination==="cpanel-folder"){
+      const uploadId=crypto.randomUUID(),chunkSize=240*1024,total=Math.ceil(buffer.byteLength/chunkSize);
+      if(total>512)throw Error("File exceeds the chunked upload limit.");
+      for(let part=0;part<total;part++){
+       const bytes=new Uint8Array(buffer,part*chunkSize,Math.min(chunkSize,buffer.byteLength-part*chunkSize));
+       let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+       await call("/api/communications/cpanel/media/chunk","POST",{uploadId,index:part,total,dataBase64:btoa(binary)});
+       update(index,"Uploading "+Math.round((part+1)/total*90)+"%");
+      }
+      result=await call("/api/communications/cpanel/media/complete","POST",{...common,uploadId,total,path:mediaFolder.replace(/\/$/,"")+"/"+file.name});
+      result.url=result.url||"";
+     }else{
+      let binary="";const bytes=new Uint8Array(buffer);for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+      update(index,"Uploading");
+      result=await call("/api/communications/website/media","POST",{...common,dataBase64:btoa(binary),destination:mediaDestination,parentId:Number(mediaParentId),parentType:mediaParentType});
+      result=result.media||result;
+     }
+     update(index,"Uploaded");
+     results.push({name:file.name,status:"PASS",url:result.url||"",sha256:result.sha256||"",size:result.size||file.size});
+    }catch(error){update(index,"Failed");results.push({name:file.name,file,status:"FAIL",error:error.message||"Upload failed.",mediaId:error.data?.media?.id||null,url:error.data?.media?.url||""});}
+   }
+   setMediaResults(results);
+   setMessage("Media batch finished: "+results.filter(x=>x.status==="PASS").length+" uploaded; "+results.filter(x=>x.status==="FAIL").length+" failed. Uploads remain in the selected media destination.");
+  }finally{setBusy(false)}
+ }
+ async function createNewPost(){
+  if(!newPost)return;
+  setBusy(true);setMessage("");
+  const editorialId=crypto.randomUUID();
+  const editorialSlug="irpa-"+editorialId.toLowerCase();
+  try{
+   const selectedTagNames=taxonomies.tags.filter(term=>newPost.tags.includes(term.id)).map(term=>term.name);
+   await call("/api/communications/records","POST",{
+    collection:"communicationMediaItems",action:"create",id:editorialId,
+    data:{title:newPost.title,type:"Website Article",channel:"IRPA Website",summary:newPost.excerpt||"",body:newPost.content,slug:editorialSlug,language:newPost.language,tags:selectedTagNames.join(", ")}
+   });
+   try{
+    const data=await call("/api/communications/website/posts","POST",{
+     title:newPost.title,content:newPost.content,excerpt:newPost.excerpt,
+     categories:newPost.categories,tags:newPost.tags,featuredMedia:Number(newPost.featuredMedia||0),slug:editorialSlug+(newPost.language==="Kiswahili"?"-sw":"-en"),seoMetaDescription:newPost.seoMetaDescription||"",seoFocusKeyphrase:newPost.seoFocusKeyphrase||""
+    });
+    const item=data.item;
+    setItems(current=>[item,...current.filter(existing=>existing.id!==item.id)]);
+    setType("posts");setNewPost(null);
+    setMessage("WordPress draft created and linked to editorial draft "+editorialId+". Submit that item from the Communications Library for independent approval before publication.");
+   }catch(error){
+    setMessage("Editorial draft "+editorialId+" was saved, but the WordPress draft could not be created: "+(error.message||"unknown error")+". The editorial draft remains available for the existing approval workflow.");
+   }
+  }catch(e){setMessage(e.message||"The editorial draft could not be created. No WordPress post was created.")}
+  finally{setBusy(false)}
+ }
+ async function submitForApproval(){
+  if(!approvalReady||approvalReady.status!=="Draft")return;
+  setBusy(true);setMessage("");
+  try{
+   await call("/api/communications/records","POST",{collection:"communicationMediaItems",action:"submit",id:approvalReady.editorialId});
+   setApprovalReady(current=>({...current,status:"Pending Approval"}));
+   setMessage("Submitted to the existing independent approval workflow. Publication remains blocked until a separate authorised reviewer approves it.");
+  }catch(error){setMessage(error.message||"The editorial draft could not be submitted for approval.");}
+  finally{setBusy(false)}
+ }
+ async function save(){if(!edit)return;setBusy(true);setMessage("");try{const d=await call("/api/communications/website/content","PUT",{type,id:edit.id,title:edit.title,content:edit.content,excerpt:edit.excerpt||"",featuredMedia:Number(edit.featuredMedia||0),status:"draft"});setEdit(d.item||null);await load(type);setMessage("Draft saved to WordPress. Submit the matching item for independent approval before any publication.");}catch(e){setMessage(e.message||"Draft save failed.")}finally{setBusy(false)}}
+ const connected=status?.website==="connected";
+ const connectionLabel=value=>({not_checked:"Not checked",connected:"Connected",authentication_failed:"Authentication failed",wrong_account_role:"Wrong account role",not_configured:"Not configured",unavailable:"Unavailable",credentials_missing:"Credentials missing",authentication_rejected:"Authentication rejected",permission_denied:"Permission denied",unavailable_or_denied:"Unavailable or denied"})[String(value||"not_checked")]||String(value||"Not checked").replace(/_/g," ");
+ return <section style={{display:"grid",gap:12,minWidth:0}}>
+  {isAdmin&&<div style={{display:"flex",justifyContent:"flex-end"}}><button type="button" style={styles.primary} onClick={()=>setActiveTab("maintenance")}>Open Website Maintenance</button></div>}
+  <nav aria-label="Website Studio sections" style={{display:"flex",gap:8,flexWrap:"wrap",padding:4,borderBottom:"1px solid var(--border-color,#d5dce5)"}}>
+   {[["pages","Pages and Posts"],["media","Upload Media"],["structure","Site Structure"],["acceptance","Production Acceptance"],...(isAdmin?[["maintenance","Website Maintenance"]]:[])].map(([id,label])=><button key={id} type="button" aria-pressed={activeTab===id} style={activeTab===id?styles.primary:styles.button} onClick={()=>setActiveTab(id)}>{label}</button>)}
+  </nav>
+
+  {activeTab==="maintenance"&&isAdmin&&<MaintenanceErrorBoundary><>
+   {maintenanceError&&<section role="alert" style={{...styles.panel,borderColor:"#dc2626"}}><strong>Website Maintenance is available, but its initial read-only check failed.</strong><p style={{margin:0}}>{maintenanceError}</p><button type="button" style={styles.button} disabled={busy} onClick={()=>void maintenanceList("")}>Retry staging-root check</button></section>}
+   {!maintenanceAllowed&&!maintenanceError&&<section role="status" style={styles.panel}>Checking the staging document root. The maintenance controls remain visible while this check completes.</section>}
+   <section style={styles.panel}>
+    <h3 style={{margin:0}}>Website Maintenance · staging-first</h3>
+    <p style={{margin:0}}>Administrator-only static-file editor. The browser is limited to the configured staging document root and permitted folders. PHP, configuration files, WordPress core folders, uploads and executables are blocked. Maximum file size: 512 KiB.</p>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" style={styles.button} disabled={busy||!maintenanceDir} onClick={()=>void maintenanceList("")}>Staging root</button>
+     <button type="button" style={styles.button} disabled={busy||!maintenanceDir} onClick={()=>void maintenanceList(maintenanceDir.split("/").slice(0,-1).join("/"))}>Up one folder</button>
+     <button type="button" style={styles.button} disabled={busy} onClick={()=>void maintenanceLoadHealth()}>Refresh read-only health</button>
+    </div>
+    <strong>Staging folder: /{maintenanceDir||""}</strong>
+    <div style={{display:"grid",gap:6}}>
+     {maintenanceEntries.map(row=><div key={row.name} style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",borderTop:"1px solid var(--border-color,#d5dce5)",paddingTop:6}}>
+      <span>{row.type==="dir"?"📁":"📄"} {row.name} {row.size?("· "+row.size+" bytes"):""}</span>
+      {row.type==="dir"?<button type="button" style={styles.button} onClick={()=>void maintenanceList(maintenanceDir?maintenanceDir+"/"+row.name:row.name)}>Open</button>:<button type="button" style={styles.button} onClick={()=>void maintenanceRead(maintenanceDir?maintenanceDir+"/"+row.name:row.name)}>Edit</button>}
+     </div>)}
+     {!maintenanceEntries.length&&<p>No permitted files or folders found.</p>}
+    </div>
+   </section>
+   {maintenancePath&&<section style={styles.panel}>
+    <h3 style={{margin:0}}>Editing staging/{maintenancePath}</h3>
+    <label>File content<textarea style={{...styles.field,minHeight:220,fontFamily:"monospace"}} value={maintenanceContent} onChange={e=>{setMaintenanceContent(e.target.value);setMaintenanceDiff(true)}}/></label>
+    <label>Change reason (10–500 characters)<textarea style={styles.field} value={maintenanceReason} maxLength={500} onChange={e=>setMaintenanceReason(e.target.value)} placeholder="Explain why this change is necessary"/></label>
+    <p style={{margin:0}}>Diff preview · {maintenanceOriginal.length} original characters → {maintenanceContent.length} proposed characters</p>
+    {maintenanceDiff&&<pre style={{whiteSpace:"pre-wrap",maxHeight:240,overflow:"auto",padding:10,background:"var(--surface-elevated,#f8fafc)"}}>{maintenanceOriginal===maintenanceContent?"No content changes.": "BEFORE:\n"+maintenanceOriginal+"\n\nAFTER:\n"+maintenanceContent}</pre>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button type="button" style={styles.primary} disabled={busy||maintenanceContent===maintenanceOriginal} onClick={()=>void maintenanceSave()}>Save staging file</button>
+     <button type="button" style={styles.button} disabled={busy||!maintenanceBackup} onClick={()=>void maintenanceRollback()}>Rollback last save</button>
+    </div>
+    <label>Promote confirmation — type PROMOTE TO LIVE<input style={styles.field} value={maintenanceConfirmation} onChange={e=>setMaintenanceConfirmation(e.target.value)}/></label>
+    <button type="button" style={styles.button} disabled={busy||maintenanceConfirmation!=="PROMOTE TO LIVE"} onClick={()=>void maintenancePromote()}>Promote to live (snapshot first)</button>
+    <h4>Edit history</h4>{maintenanceHistory.map((row,index)=><div key={row.updatedAt||index} style={{borderTop:"1px solid var(--border-color,#d5dce5)",paddingTop:6}}>{row.updatedAt||"Time not exposed"} · {row.updatedByUid||"User not exposed"} · {row.reason||"Reason not recorded"} · Snapshot {row.rollbackBackupId||"not exposed"}</div>)}
+   </section>}
+   <section style={styles.panel}>
+    <h3 style={{margin:0}}>Read-only website health</h3>
+    <p>WordPress update status uses authenticated read-only GET requests. No core, plugin or theme updates are installed or initiated from this panel.</p>
+    <h4>WordPress update availability</h4>
+    <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{JSON.stringify(maintenanceUpdates||{readOnly:true,core:{status:"not exposed",reason:"Read-only update check has not been run."},plugins:{status:"not exposed",reason:"Read-only update check has not been run."},themes:{status:"not exposed",reason:"Read-only update check has not been run."}},null,2)}</pre>
+    <h4>cPanel and website health</h4>
+    <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{JSON.stringify({phpVersion:maintenanceHealth?.phpVersion||{value:null,status:"not exposed",reason:"Health check has not been run."},ssl:maintenanceHealth?.ssl||{status:"not exposed",reason:"Health check has not been run."},diskUsage:maintenanceHealth?.diskUsage||{value:null,status:"not exposed",reason:"Health check has not been run."},errorLog:maintenanceHealth?.errorLog||{lines:[],status:"not exposed",reason:"Health check has not been run."},phpLimits:maintenanceHealth?.phpLimits||{status:"not exposed",reason:"Health check has not been run."},error:maintenanceHealth?.error||null},null,2)}</pre>
+   </section>
+  </></MaintenanceErrorBoundary>}
+  {activeTab==="media"&&<>
+  <section style={styles.panel}><h3 style={{margin:0}}>Media upload and register</h3><p style={{margin:0}}>WordPress upload_files capability: {status?.websiteAccount?.uploadFilesCapability||"not yet checked"} · PHP upload_max_filesize: {status?.cpanelDiagnostics?.phpLimits?.upload_max_filesize||"not readable"} · post_max_size: {status?.cpanelDiagnostics?.phpLimits?.post_max_size||"not readable"}</p><p style={{margin:0}}>Permitted: JPG, PNG, WebP, GIF, sanitised SVG, MP4, MOV, WebM, MP3, PDF, DOCX, XLSX and PPTX. cPanel limit: 50 MB per file; larger videos must use a YouTube/Vimeo HTTPS link. Executables are rejected. Large files are sent in chunks to the cPanel upload route.</p><label>Required destination<select style={styles.field} value={mediaDestination} onChange={e=>setMediaDestination(e.target.value)}><option value="media-library">WordPress Media Library</option><option value="attach">Attach to selected page/post</option><option value="featured">Set as featured image</option><option value="cpanel-folder">cPanel folder</option></select></label>{mediaDestination==="attach"||mediaDestination==="featured"? <><label>Target type<select style={styles.field} value={mediaParentType} onChange={e=>setMediaParentType(e.target.value)}><option value="posts">Post</option><option value="pages">Page</option></select></label><label>Existing WordPress page/post ID<input style={styles.field} inputMode="numeric" value={mediaParentId} onChange={e=>setMediaParentId(e.target.value)} placeholder="Enter existing ID"/></label></>:null}{mediaDestination==="cpanel-folder"?<label>Relative cPanel folder and filename parent<input style={styles.field} value={mediaFolder} onChange={e=>setMediaFolder(e.target.value)} placeholder="uploads/irpa-media"/></label>:null}<label>Select multiple files<input style={styles.field} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,.mov,.webm,.mp3,.pdf,.docx,.xlsx,.pptx" disabled={busy} onChange={e=>{void uploadGeneralFiles(e.target.files);e.target.value=""}}/></label>{uploadProgress.map(row=><div key={row.key} role="status" style={{fontSize:12}}>{row.name}: {row.status}</div>)}{mediaResults.map((row,i)=><div key={row.name+"-"+i} style={{borderTop:"1px solid var(--border-color,#d5dce5)",paddingTop:6,display:"grid",gap:4}}><strong>{row.name} · {row.status}</strong>{row.url?<><a href={row.url} target="_blank" rel="noreferrer">{row.url}</a><button style={styles.button} type="button" onClick={()=>navigator.clipboard.writeText(row.url)}>Copy link</button></>:null}{row.sha256?<small>SHA-256: {row.sha256} · {row.size} bytes</small>:null}{row.mediaId?<strong>WordPress media ID: {row.mediaId}</strong>:null}{row.error?<><span>{row.error}</span><button style={styles.button} type="button" disabled={busy} onClick={()=>void uploadGeneralFiles([row.file])}>Retry upload</button></>:null}</div>)}</section>
+  </>}
+  {activeTab==="acceptance"&&<>
+  <section style={styles.panel}><h3 style={{margin:0}}>Production acceptance · TEST only</h3><p style={{margin:0}}>Runs Worker health, WordPress/cPanel read routes, upload_files verification, TEST draft create/edit/revision checks, and small image, MP4, PDF and DOCX uploads to each configured destination. Every created item is labelled TEST and retained. Nothing is published or deleted.</p><label style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={captionDiagnostic} onChange={e=>setCaptionDiagnostic(e.target.checked)} disabled={busy}/><span>Run opt-in WordPress caption encoding diagnostic (one retained test image; three metadata updates)</span></label><button style={styles.primary} type="button" disabled={busy} onClick={runProductionAcceptance}>{busy?"Running acceptance checks…":"Run production acceptance"}</button><button style={styles.button} type="button" disabled={!acceptanceReport} onClick={()=>navigator.clipboard.writeText(["TEST\tResult\tHTTP\tError\tDetail",...acceptanceReport.map(row=>[row.label,row.status,row.httpStatus??"N/A",row.error||"",row.detail?(typeof row.detail==="string"?row.detail:JSON.stringify(row.detail)):""].join("\t"))].join("\n")+"\n\nCREATED TEST ITEMS\n"+acceptanceReport.flatMap(row=>row.cleanupItems||[]).map(item=>[item.kind,item.title,item.id,item.url||"URL unavailable"].join("\t")).join("\n"))}>Copy Report</button>{acceptanceReport&&<><div role="status"><strong>{acceptanceReport.filter(row=>row.status==="PASS").length} PASS · {acceptanceReport.filter(row=>row.status==="FAIL").length} FAIL</strong></div><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr><th style={{textAlign:"left",padding:6}}>TEST</th><th style={{textAlign:"left",padding:6}}>Result</th><th style={{textAlign:"left",padding:6}}>HTTP</th><th style={{textAlign:"left",padding:6}}>Error</th><th style={{textAlign:"left",padding:6}}>Detail</th></tr></thead><tbody>{acceptanceReport.map((row,index)=><tr key={row.label+"-"+index}><td style={{padding:6,borderTop:"1px solid var(--border-color,#d5dce5)"}}>{row.label}</td><td style={{padding:6,borderTop:"1px solid var(--border-color,#d5dce5)"}}>{row.status}</td><td style={{padding:6,borderTop:"1px solid var(--border-color,#d5dce5)"}}>{row.httpStatus??"N/A"}</td><td style={{padding:6,borderTop:"1px solid var(--border-color,#d5dce5)"}}>{row.error||"—"}</td><td style={{padding:6,borderTop:"1px solid var(--border-color,#d5dce5)",whiteSpace:"pre-wrap"}}>{row.detail?(typeof row.detail==="string"?row.detail:JSON.stringify(row.detail)):"—"}</td></tr>)}</tbody></table></div>{acceptanceReport.some(row=>row.cleanupItems?.length)&&<div><h4>TEST cleanup list</h4><ul>{acceptanceReport.flatMap(row=>row.cleanupItems||[]).map((item,index)=><li key={item.id||index}>{item.kind}: {item.title} · ID {item.id} · {item.url||"URL unavailable"}</li>)}</ul></div>}</>}</section>
+  </>}
+  {activeTab==="structure"&&<>
+  <section style={styles.panel}><h3 style={{margin:0}}>Draft site structure creator</h3><p style={{margin:0}}>Creates only missing WordPress draft pages, categories, tags and a separate draft navigation record. Existing content is skipped; the live menu is never changed.</p><button style={styles.primary} type="button" disabled={busy||!connected} onClick={createSiteStructure}>Create missing draft site structure</button></section>
+  </>}
+  {activeTab==="pages"&&<>
+  <section style={styles.panel}><h3 style={{margin:0}}>Website Studio</h3><p style={{margin:0}}>Edit existing WordPress pages and posts as drafts, preview on a phone, and inspect revision history. Public publishing remains gated by independent approval.</p><div role="status" aria-live="polite"><strong>{status?.website==="connected"?"Connected":status?.website?"WordPress "+connectionLabel(status.website).toLowerCase():busy?"Checking WordPress connection…":"WordPress not checked"}</strong></div><p style={{margin:0}}>If WordPress is not configured, an authorised administrator should verify these existing Worker secrets (do not share their values):</p><ul>{SECRETS.map(x=><li key={x}><code>{x}</code></li>)}</ul><button style={styles.primary} type="button" disabled={busy} onClick={connect}>{busy?"Checking connection…":"Check WordPress connection"}</button>{status&&<section style={{display:"grid",gap:10,border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:12}}><h4 style={{margin:0}}>Connection diagnostics</h4><div><strong>Worker environment: {status.workerEnvironment||"unknown"} · {status.workerName||"unknown"}</strong><ul style={{marginTop:4}}><li>Configured WordPress host: {status.configuredWordPressHost||"not supplied"}</li><li>Diagnostic classification: {status.websiteHostGuardBlocked?"Blocked by IRPA host guard":status.websiteDiagnosticCategory==="wordpress_http_response"?"Response received from WordPress/HTTP intermediary":status.websiteDiagnosticCategory||"not checked"}</li><li>Secrets bound to this Worker: {String(status.secretChecks?.boundToServingWorkerEnvironment??"not verified")}</li>{status.secretChecks?.format&&<><li>Base URL: HTTPS {String(status.secretChecks.format.baseUrl.https)}; trailing /wp-json: {String(status.secretChecks.format.baseUrl.hasWpJsonSuffix)}; origin-only after normalization: {String(status.secretChecks.format.baseUrl.canonicalOriginOnly)}</li><li>Username: {status.secretChecks.format.username.present?"set":"missing"}, {status.secretChecks.format.username.length} characters</li><li>Application Password: {status.secretChecks.format.applicationPassword.present?"set":"missing"}, {status.secretChecks.format.applicationPassword.length} characters after whitespace removal; contains spaces: {String(status.secretChecks.format.applicationPassword.containsSpaces)}; expected 24 characters: {String(status.secretChecks.format.applicationPassword.expectedLength)}</li></>}</ul></div><div><strong>WordPress: {connectionLabel(status.website)}</strong><ul style={{marginTop:4}}><li>HTTP status: {status.websiteHttpStatus??"Not available"}</li><li>Final URL: {status.websiteFinalUrl||"Not available"}</li><li>Redirect count: {status.websiteRedirectCount??"Not available"}</li>{status.websiteRedirectTarget&&<li>Redirect target: {status.websiteRedirectTarget}</li>}{status.websiteRedirectFinding&&<li>Redirect finding: {status.websiteRedirectFinding}</li>}<li>WordPress error code: {status.websiteErrorCode||"Not supplied"}</li><li>WordPress error message: {status.websiteErrorMessage||"Not supplied"}</li>{status.websiteTimingMs&&<li>Probe timing: {status.websiteTimingMs.total??"—"} ms total · {status.websiteTimingMs.attempts??"—"} attempt(s) · headers {status.websiteTimingMs.responseHeaders??"not received"} ms · body {status.websiteTimingMs.bodyRead??"not read"} ms · DNS/connect/TLS timings not exposed by Cloudflare Workers</li>}{status.websiteDiagnosticMessage&&<li>Finding: {status.websiteDiagnosticMessage}</li>}<li>Response type: {status.websiteResponseType||"Not supplied"}</li><li>WWW-Authenticate present: {String(status.websiteWwwAuthenticatePresent??"unknown")}</li><li>Cloudflare auth-bridge diagnostic: {status.websiteAuthBridgeDiagnostic||"Not supplied"}</li><li>Cloudflare Ray ID: {status.websiteCloudflareRay||"Not supplied"}</li>{status.websiteAccount&&<li>Account role: {status.websiteAccount.role||"unverified"}; can edit posts: {String(status.websiteAccount.canEditPosts??"unknown")}; can edit pages: {String(status.websiteAccount.canEditPages??"unknown")}; upload_files: {status.websiteAccount.uploadFilesCapability||"unknown"}</li>}</ul></div>{status.websitePublicRest&&<div><strong>Unauthenticated GET /wp-json/</strong><ul style={{marginTop:4}}><li>HTTP status: {status.websitePublicRest.status??status.websitePublicRest.error??"Not available"}</li><li>Final URL: {status.websitePublicRest.finalUrl||"Not available"}</li><li>Redirect count: {status.websitePublicRest.redirectCount??"Not available"}</li><li>Content type: {status.websitePublicRest.contentType||"Not supplied"}</li><li>WWW-Authenticate present: {String(status.websitePublicRest.wwwAuthenticatePresent??"unknown")}</li><li>WordPress error: {status.websitePublicRest.errorCode||"none"} {status.websitePublicRest.errorMessage||""}</li></ul></div>}{status.cpanelDiagnostics&&<div><strong>Read-only cPanel probes</strong><ul style={{marginTop:4}}><li>Email accounts: {status.cpanelDiagnostics.emailAccounts?.status||"not available"} · {status.cpanelDiagnostics.emailAccounts?.count??"—"} listed · {status.cpanelDiagnostics.emailAccounts?.accounts?.join(", ")||"no account names returned"}</li><li>SSL: {status.cpanelDiagnostics.ssl?.status||"not available"} · {status.cpanelDiagnostics.ssl?.hosts?.map(host=>host.domain+" ("+host.status+")").join(", ")||"no matching host record"}</li><li>upload_max_filesize: {status.cpanelDiagnostics.phpLimits?.upload_max_filesize||"not readable"}</li><li>post_max_size: {status.cpanelDiagnostics.phpLimits?.post_max_size||"not readable"}</li>{status.cpanelDiagnostics.error&&<li>{status.cpanelDiagnostics.error}</li>}</ul></div>}<div><strong>cPanel: {connectionLabel(status.cpanel)}</strong><ul style={{marginTop:4}}><li>Diagnostic code: {status.cpanelDiagnostic||"Not supplied"}</li><li>HTTP status: {status.cpanelHttpStatus??"Not available"}</li>{status.cpanelUapiStatus!==undefined&&<li>cPanel API status: {String(status.cpanelUapiStatus)}</li>}{status.cpanelApiErrorCount!==undefined&&<li>API error count: {status.cpanelApiErrorCount}</li>}{status.cpanelDiagnosticMessage&&<li>Finding: {status.cpanelDiagnosticMessage}</li>}</ul></div><details><summary>Raw connection response (sanitized, maximum 1 KB per response)</summary><pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontSize:12}}>{status.websiteRawResponse||"(no authenticated response body captured)"}{status.websitePublicRest?.rawResponse?"\n\nUnauthenticated /wp-json/ response:\n"+status.websitePublicRest.rawResponse:""}</pre></details></section>}</section>
+  <section style={styles.panel}><h3 style={{margin:0}}>Pages and posts</h3><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button style={type==="pages"?styles.primary:styles.button} type="button" onClick={()=>load("pages")} disabled={busy}>Pages</button><button style={type==="posts"?styles.primary:styles.button} type="button" onClick={()=>load("posts")} disabled={busy}>Posts</button><button style={styles.button} type="button" onClick={()=>load(type)} disabled={busy}>Refresh</button><button style={styles.primary} type="button" onClick={openNewPost} disabled={busy}>New update</button></div>{items.map(item=><article key={item.id} style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10,display:"grid",gap:6}}><strong>{item.title||"(Untitled)"} · #{item.id}</strong><span>{item.status||"draft"}{item.link?" · "+item.link:""}</span><button style={styles.button} type="button" onClick={()=>setEdit({...item,content:item.content||"",excerpt:item.excerpt||"",featuredMedia:item.featuredMedia||0,uploadedImages:[]})}>Edit draft</button></article>)}</section>
+  {newPost&&<section style={styles.panel}><h3 style={{margin:0}}>New website update · WordPress draft</h3><p style={{margin:0}}>This creates a new post with status fixed to Draft by the gateway. It does not publish or approve the update.</p><label>Title<input style={styles.field} maxLength={180} value={newPost.title} onChange={e=>setNewPost({...newPost,title:e.target.value})}/></label><label>Publication language<select style={styles.field} value={newPost.language||"English"} onChange={e=>setNewPost({...newPost,language:e.target.value})}><option value="English">English</option><option value="Kiswahili">Kiswahili</option></select></label><label>Body (HTML; headings, paragraphs, lists and image figures supported)<textarea style={{...styles.field,minHeight:220}} maxLength={30000} value={newPost.content} onChange={e=>setNewPost({...newPost,content:e.target.value})}/></label><label>Excerpt<textarea style={styles.field} maxLength={600} value={newPost.excerpt} onChange={e=>setNewPost({...newPost,excerpt:e.target.value})}/></label><section style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10,display:"grid",gap:8}}><strong>Yoast SEO metadata</strong>{seoCapabilities?.metaDescription?<label>Meta description<input style={styles.field} maxLength={160} value={newPost.seoMetaDescription||""} onChange={e=>setNewPost({...newPost,seoMetaDescription:e.target.value})}/></label>:<p style={{margin:0,fontSize:13}}>{seoCapabilities?.verified===false?"The WordPress REST schema could not be checked. Add the meta description in the WordPress editor after draft creation; Website Studio will not guess or bypass the REST API.":"Meta description is not exposed as writable WordPress REST meta on this site. Add it in the WordPress editor after draft creation; Website Studio will not bypass the REST API."}</p>}{seoCapabilities?.focusKeyphrase?<label>Focus keyphrase<input style={styles.field} maxLength={100} value={newPost.seoFocusKeyphrase||""} onChange={e=>setNewPost({...newPost,seoFocusKeyphrase:e.target.value})}/></label>:<p style={{margin:0,fontSize:13}}>{seoCapabilities?.verified===false?"The WordPress REST schema could not be checked. Add the focus keyphrase in the WordPress editor after draft creation; Website Studio will not guess or bypass the REST API.":"Focus keyphrase is not exposed as writable WordPress REST meta on this site. Add it in the WordPress editor after draft creation; no plugin or configuration change is made."}</p>}</section><label>Categories<select multiple size={Math.min(8,Math.max(3,taxonomies.categories.length))} style={{...styles.field,minHeight:100}} value={newPost.categories.map(String)} onChange={e=>setNewPost({...newPost,categories:Array.from(e.target.selectedOptions).map(option=>Number(option.value))})}>{taxonomies.categories.map(term=><option key={term.id} value={term.id}>{term.name}</option>)}</select></label><label>Tags<select multiple size={Math.min(8,Math.max(3,taxonomies.tags.length))} style={{...styles.field,minHeight:100}} value={newPost.tags.map(String)} onChange={e=>setNewPost({...newPost,tags:Array.from(e.target.selectedOptions).map(option=>Number(option.value))})}>{taxonomies.tags.map(term=><option key={term.id} value={term.id}>{term.name}</option>)}</select></label><section style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10,display:"grid",gap:8}}><strong>Featured image and article photos</strong><p style={{margin:0,fontSize:13}}>Select multiple JPEG, PNG or WebP images (gateway-enforced per-file limit; default 5 MiB). You will be asked for required alt text and an optional caption for each image. The first uploaded image becomes the featured image unless you select another attachment in the editor.</p><label>Upload images<input style={styles.field} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={e=>{void uploadPhotos(e.target.files,"new");e.target.value=""}}/></label>{uploadProgress.map(row=><div key={row.key} role="status" style={{fontSize:12}}>{row.name}: {row.status}</div>)}<label>Featured image<select style={styles.field} value={String(newPost.featuredMedia||0)} onChange={e=>setNewPost({...newPost,featuredMedia:Number(e.target.value||0)})}><option value="0">No featured image</option>{(newPost.uploadedImages||[]).map(image=><option key={image.id} value={image.id}>#{image.id} · {image.altText}</option>)}</select></label></section><section style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10,display:"grid",gap:8}}><strong>Video embed</strong><label>YouTube or Vimeo URL<input style={styles.field} type="url" placeholder="https://www.youtube.com/watch?v=…" value={newPost.videoUrl||""} onChange={e=>setNewPost({...newPost,videoUrl:e.target.value})}/></label><button type="button" style={styles.button} onClick={()=>{try{const url=new URL(newPost.videoUrl);if(url.protocol!=="https:"||url.username||url.password||url.port||!["youtube.com","www.youtube.com","youtu.be","vimeo.com","www.vimeo.com","player.vimeo.com"].includes(url.hostname.toLowerCase()))throw new Error();setNewPost({...newPost,content:String(newPost.content||"")+(newPost.content?"\n\n":"")+"<p>"+url.href+"</p>",videoUrl:""})}catch{setMessage("Enter a valid HTTPS YouTube or Vimeo URL.")}}}>Insert video embed link</button><p style={{margin:0,fontSize:12}}>The standalone URL is saved for WordPress oEmbed rendering. Large video files are not uploaded to WordPress.</p></section><section style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10,display:"grid",gap:8}}><strong>Phone preview · unsaved</strong><div style={{width:"100%",maxWidth:390,margin:"0 auto",border:"8px solid #1f2937",borderRadius:24,overflow:"hidden",background:"#fff"}}><iframe title="New update phone preview" sandbox="" referrerPolicy="no-referrer" style={{width:"100%",height:560,border:0,background:"#fff"}} srcDoc={"<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{font:16px/1.55 system-ui,sans-serif;margin:16px;color:#172033}img{max-width:100%;height:auto}h1,h2,h3{line-height:1.2}</style></head><body><h1>"+String(newPost.title||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</h1>"+String(newPost.content||"")+"</body></html>"}/></div></section><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button style={styles.primary} type="button" disabled={busy||!newPost.title.trim()||!newPost.content.trim()} onClick={createNewPost}>{busy?"Saving…":"Create WordPress draft"}</button><button style={styles.button} type="button" disabled={busy} onClick={()=>setNewPost(null)}>Cancel</button></div></section>}
+  {approvalReady&&<section style={styles.panel}><h3 style={{margin:0}}>Approval-ready website draft</h3><p><strong>Status:</strong> {approvalReady.status}</p><p><strong>WordPress post:</strong> #{approvalReady.postId} · <strong>Editorial record:</strong> {approvalReady.editorialId}</p><h4 style={{margin:"4px 0"}}>Change summary</h4><ul style={{marginTop:0}}><li>Title: {approvalReady.title}</li><li>Excerpt: {approvalReady.excerpt||"Not supplied"}</li><li>Language: {approvalReady.language}</li><li>Selected categories: {approvalReady.categoryCount}; tags: {approvalReady.tagCount}</li><li>Images: {approvalReady.imageCount}; featured media ID: {approvalReady.featuredMedia||"None"}</li></ul><strong>Mobile preview</strong><div style={{width:"100%",maxWidth:390,margin:"0 auto",border:"8px solid #1f2937",borderRadius:24,overflow:"hidden",background:"#fff"}}><iframe title="Approval-ready update preview" sandbox="" referrerPolicy="no-referrer" style={{width:"100%",height:560,border:0,background:"#fff"}} srcDoc={"<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{font:16px/1.55 system-ui,sans-serif;margin:16px;color:#172033}img{max-width:100%;height:auto}</style></head><body><h1>"+String(approvalReady.title||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+"</h1>"+String(approvalReady.content||"")+"</body></html>"}/></div>{approvalReady.status==="Draft"?<button style={styles.primary} type="button" disabled={busy} onClick={submitForApproval}>{busy?"Submitting…":"Submit for approval"}</button>:<p role="status">This item is in the existing independent approval queue. Website Studio cannot publish it.</p>}</section>}
+  {edit&&<section style={styles.panel}><h3 style={{margin:0}}>Edit {type==="pages"?"page":"post"} #{edit.id}</h3><label>Title<input style={styles.field} value={edit.title||""} onChange={e=>setEdit({...edit,title:e.target.value})}/></label><section style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10,display:"grid",gap:8}}><strong>Article photos</strong><p style={{margin:0,fontSize:13}}>Upload multiple JPEG, PNG or WebP images (gateway-enforced per-file limit; default 5 MiB). Each image requires alt text and can have a caption.</p><label>Choose photos<input style={styles.field} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={e=>{void uploadPhotos(e.target.files,"edit");e.target.value=""}}/></label>{uploadProgress.map(row=><div key={row.key} role="status" style={{fontSize:12}}>{row.name}: {row.status}</div>)}</section><label>Content<textarea style={{...styles.field,minHeight:170}} value={edit.content||""} onChange={e=>setEdit({...edit,content:e.target.value})}/></label><label>Excerpt<textarea style={styles.field} value={edit.excerpt||""} onChange={e=>setEdit({...edit,excerpt:e.target.value})}/></label><div style={{border:"1px solid var(--border-color,#d5dce5)",borderRadius:8,padding:10}}><strong>Phone preview</strong><h4>{edit.title}</h4><div style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{String(edit.content||"").replace(/<[^>]*>/g," ")}</div></div><button style={styles.primary} type="button" disabled={busy} onClick={save}>Save as draft</button><button style={styles.button} type="button" onClick={()=>setEdit(null)}>Close editor</button></section>}
+  </>}
+  {message&&<div role="status" style={styles.panel} aria-live="polite">{message}</div>}
+ </section>
+}
+
+// Keep administrator Website Maintenance navigation independent of read-only health checks.

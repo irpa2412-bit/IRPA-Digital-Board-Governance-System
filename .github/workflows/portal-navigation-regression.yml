@@ -1,0 +1,50 @@
+# Isolated regression workflow for the portal destination-scroll repair.
+name: Portal Navigation Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "src/App.jsx"
+      - "src/pages/PoliciesStrategicPlanPortal.jsx"
+      - "tests/policies-strategic-plan-portal.test.mjs"
+      - "tests/portal-workspace-navigation.test.mjs"
+      - "tests/communication-media-policy.test.mjs"
+      - "src/pages/CommunicationMediaPortal.jsx"
+      - "functions/communicationMedia.js"
+      - "firestore.rules"
+      - "package.json"
+      - ".github/workflows/portal-navigation-regression.yml"
+  push:
+    branches:
+      - "fix/portal-worksheet-navigation-20261013"
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "src/App.jsx"
+      - "tests/portal-workspace-navigation.test.mjs"
+      - "package.json"
+      - ".github/workflows/portal-navigation-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-navigation-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portal-navigation-regression:
+    name: Portal navigation regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Run isolated navigation regression tests
+        run: npm run test:portal-navigation && npm run test:policies-strategic-plan-portal && npm run test:communication-media

@@ -1,0 +1,45 @@
+name: IRPA web PWA validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "src/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "tests/pwa-install-offline.test.mjs"
+      - "tests/offline-build-workflow-policy.test.mjs"
+      - ".github/workflows/offline-install-validation.yml"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+jobs:
+  web-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install exact root application dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test PWA and workflow isolation contracts
+        run: node --test tests/pwa-install-offline.test.mjs tests/offline-build-workflow-policy.test.mjs
+      - name: Build web application
+        run: npm run build
+      - name: Verify packaged offline assets
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/offline.html
+          test -f dist/manifest.webmanifest
+          test -f dist/install.js
+          test -f dist/icons/irpa-192.svg
+          test -f dist/icons/irpa-512.svg
+          test -f dist/icons/irpa-maskable.svg

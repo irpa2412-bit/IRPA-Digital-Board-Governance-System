@@ -1,0 +1,82 @@
+name: Deploy Signature Palette Fix to Isolated Staging
+on:
+  workflow_run:
+    workflows: ["Signature Palette Visibility and Full Regression"]
+    types: [completed]
+    branches: ["fix/signature-palette-visibility-20261031"]
+permissions:
+  contents: read
+jobs:
+  deploy-staging:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout the exact tested branch commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build against the isolated IRPA staging Firebase and Gateway
+        env:
+          VITE_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          VITE_IRPA_ENVIRONMENT: staging
+          VITE_FIREBASE_API_KEY: "AIzaSyA6UmHtP-mRr99rBw57_-qrD4_mFSBnZ38"
+          VITE_FIREBASE_AUTH_DOMAIN: "irpa-dbg-staging-a73ec.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "irpa-dbg-staging-a73ec"
+          VITE_FIREBASE_STORAGE_BUCKET: "irpa-dbg-staging-a73ec.firebasestorage.app"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1018976634858"
+          VITE_FIREBASE_APP_ID: "1:1018976634858:web:e73e9e09f55a76ade25493"
+          VITE_FIREBASE_MEASUREMENT_ID: ""
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_GATEWAY_ORIGIN: "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          VITE_LIVEKIT_TOKEN_WORKER_URL: "https://irpa-dgb-livekit-token-staging.irpa-governance.workers.dev"
+          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
+          VITE_GRANT_CRAWLER_WORKER_URL: "https://staging-disabled.invalid"
+          VITE_GRANT_ASSISTANT_WORKER_URL: "https://staging-disabled.invalid"
+        run: |
+          set -euo pipefail
+          test "$VITE_FIREBASE_PROJECT_ID" = "irpa-dbg-staging-a73ec"
+          test "$VITE_GOOGLE_DRIVE_GATEWAY_URL" = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev"
+          test "$VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED" = "false"
+          npm run build -- --mode staging
+          test -s dist/index.html
+          grep -R -Fq "$VITE_BUILD_COMMIT" dist/assets --include="*.js"
+          grep -R -Fq "irpa-dbg-staging-a73ec" dist
+          grep -R -Fq "irpa-google-drive-gateway-staging.irpa-governance.workers.dev" dist
+      - name: Verify Cloudflare deployment credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Accept: application/json" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify > "$RUNNER_TEMP/cf-token.json"
+          node -e 'const x=require(process.argv[1]); if(!x.success) process.exit(1);' "$RUNNER_TEMP/cf-token.json"
+      - name: Deploy isolated signature staging Worker only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler deploy --config wrangler.signature-staging.jsonc
+      - name: Verify isolated staging health and deployed build
+        env:
+          EXPECTED_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          url="https://irpa-digital-board-governance-signature-staging.irpa-governance.workers.dev"
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 3 --max-time 30 "$url/" -o "$RUNNER_TEMP/staging.html"
+          grep -qi '<html' "$RUNNER_TEMP/staging.html"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --max-time 20 "$url/__irpa_health" -o "$RUNNER_TEMP/staging-health.json"
+          grep -q '"ok":true' "$RUNNER_TEMP/staging-health.json"
+          grep -R -Fq "$EXPECTED_BUILD_COMMIT" dist/assets --include="*.js"
+          echo "Isolated signature staging Worker is healthy for tested commit $EXPECTED_BUILD_COMMIT."

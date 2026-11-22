@@ -1,0 +1,2902 @@
+%PDF-1.4
+%IRPA wireframe catalogue
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R 25 0 R 27 0 R 29 0 R 31 0 R 33 0 R 35 0 R 37 0 R 39 0 R 41 0 R 43 0 R 45 0 R 47 0 R 49 0 R 51 0 R 53 0 R 55 0 R 57 0 R 59 0 R 61 0 R 63 0 R 65 0 R 67 0 R 69 0 R 71 0 R 73 0 R 75 0 R 77 0 R 79 0 R 81 0 R 83 0 R 85 0 R 87 0 R 89 0 R 91 0 R 93 0 R 95 0 R 97 0 R 99 0 R 101 0 R 103 0 R 105 0 R 107 0 R 109 0 R 111 0 R 113 0 R 115 0 R 117 0 R 119 0 R 121 0 R 123 0 R 125 0 R 127 0 R 129 0 R 131 0 R 133 0 R 135 0 R 137 0 R 139 0 R 141 0 R 143 0 R 145 0 R 147 0 R] /Count 72 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 1735 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-01   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (IT Operations) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-01   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (1 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 1731 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-02   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Dashboard) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-02   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (2 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 1747 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-03   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Induction and Orientation) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-03   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (3 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 1744 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-04   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Induction Applications) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-04   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (4 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 1748 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-05   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Board Members Registration) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-05   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (5 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 1741 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-06   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Members & Personnel) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-06   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (6 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 1733 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-07   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Invitations) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-07   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (7 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 1730 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-08   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Meetings) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-08   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (8 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 1733 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-09   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Resolutions) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-09   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (9 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 1729 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-10   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Voting) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-10   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (10 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 22 0 R >>
+endobj
+24 0 obj
+<< /Length 1730 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-11   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Actions) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-11   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (11 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+25 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 24 0 R >>
+endobj
+26 0 obj
+<< /Length 1732 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-12   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Documents) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-12   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (12 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+27 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 26 0 R >>
+endobj
+28 0 obj
+<< /Length 1741 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-13   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Signature Platform) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-13   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (13 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+29 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 28 0 R >>
+endobj
+30 0 obj
+<< /Length 1732 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-14   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Decisions) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-14   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (14 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+31 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 30 0 R >>
+endobj
+32 0 obj
+<< /Length 1736 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-15   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Risk Register) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-15   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (15 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+33 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 32 0 R >>
+endobj
+34 0 obj
+<< /Length 1748 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-16   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Authorization & Approvals) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-16   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (16 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+35 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 34 0 R >>
+endobj
+36 0 obj
+<< /Length 1740 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-17   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Employee Payments) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-17   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (17 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+37 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 36 0 R >>
+endobj
+38 0 obj
+<< /Length 1757 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-18   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Research, Statistics and Knowledge) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-18   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (18 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+39 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 38 0 R >>
+endobj
+40 0 obj
+<< /Length 1740 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-19   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Finance Portfolio) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-19   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (19 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+41 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 40 0 R >>
+endobj
+42 0 obj
+<< /Length 1734 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-20   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Procurement) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-20   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (20 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+43 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 42 0 R >>
+endobj
+44 0 obj
+<< /Length 1730 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-21   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Reports) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-21   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (21 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+45 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 44 0 R >>
+endobj
+46 0 obj
+<< /Length 1734 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-22   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Audit Trail) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-22   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (22 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+47 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 46 0 R >>
+endobj
+48 0 obj
+<< /Length 1765 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-23   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Grant Intelligence & Funding Opportunities) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-23   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (23 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+49 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 48 0 R >>
+endobj
+50 0 obj
+<< /Length 1744 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-24   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Communication & Media) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-24   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (24 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+51 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 50 0 R >>
+endobj
+52 0 obj
+<< /Length 1732 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-25   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Downloads) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-25   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (25 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+53 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 52 0 R >>
+endobj
+54 0 obj
+<< /Length 1731 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-26   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Settings) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-26   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (26 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+55 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 54 0 R >>
+endobj
+56 0 obj
+<< /Length 1740 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-27   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Add Administrator) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-27   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (27 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+57 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 56 0 R >>
+endobj
+58 0 obj
+<< /Length 1754 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-28   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Department and Archive Registry) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-28   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (28 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+59 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 58 0 R >>
+endobj
+60 0 obj
+<< /Length 1748 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-29   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Department Portal Builder) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-29   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (29 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+61 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 60 0 R >>
+endobj
+62 0 obj
+<< /Length 1746 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-30   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (External Auditor Portal) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-30   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (30 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+63 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 62 0 R >>
+endobj
+64 0 obj
+<< /Length 1750 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (MOD-31   /   TOP-LEVEL MODULE) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Auditors & Special Invitees) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: MOD-31   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (31 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+65 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 64 0 R >>
+endobj
+66 0 obj
+<< /Length 1736 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-01   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Meeting Room) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-01   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (32 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+67 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 66 0 R >>
+endobj
+68 0 obj
+<< /Length 1736 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-02   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Participants) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-02   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (33 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+69 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 68 0 R >>
+endobj
+70 0 obj
+<< /Length 1735 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-03   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Resolutions) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-03   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (34 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+71 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 70 0 R >>
+endobj
+72 0 obj
+<< /Length 1730 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-04   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Voting) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-04   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (35 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+73 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 72 0 R >>
+endobj
+74 0 obj
+<< /Length 1731 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-05   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Actions) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-05   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (36 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+75 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 74 0 R >>
+endobj
+76 0 obj
+<< /Length 1733 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-06   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Decisions) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-06   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (37 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+77 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 76 0 R >>
+endobj
+78 0 obj
+<< /Length 1736 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-07   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (My Documents) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-07   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (38 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+79 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 78 0 R >>
+endobj
+80 0 obj
+<< /Length 1744 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-08   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Department Documents) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-08   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (39 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+81 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 80 0 R >>
+endobj
+82 0 obj
+<< /Length 1738 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-09   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Shared With Me) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-09   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (40 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+83 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 82 0 R >>
+endobj
+84 0 obj
+<< /Length 1741 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-10   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Signing Workspace) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-10   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (41 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+85 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 84 0 R >>
+endobj
+86 0 obj
+<< /Length 1743 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-11   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Post-Signature Work) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-11   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (42 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+87 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 86 0 R >>
+endobj
+88 0 obj
+<< /Length 1737 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-12   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Final Archive) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-12   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (43 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+89 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 88 0 R >>
+endobj
+90 0 obj
+<< /Length 1739 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-13   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Upload Document) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-13   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (44 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+91 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 90 0 R >>
+endobj
+92 0 obj
+<< /Length 1751 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-14   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Retrieve Archived Documents) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-14   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (45 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+93 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 92 0 R >>
+endobj
+94 0 obj
+<< /Length 1746 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SUB-15   /   NESTED SUB-PORTAL) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Induction Applications) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SUB-15   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (46 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+95 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 94 0 R >>
+endobj
+96 0 obj
+<< /Length 1762 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (STD-01   /   STANDALONE PORTAL — NAVIGATION PROPOSED) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Dataset Registry) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: STD-01   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (47 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+97 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 96 0 R >>
+endobj
+98 0 obj
+<< /Length 1770 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (STD-02   /   STANDALONE PORTAL — NAVIGATION PROPOSED) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Research Data Collection) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: STD-02   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (48 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+99 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 98 0 R >>
+endobj
+100 0 obj
+<< /Length 1763 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (STD-03   /   STANDALONE PORTAL — NAVIGATION PROPOSED) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Release Readiness) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: STD-03   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (49 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+101 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 100 0 R >>
+endobj
+102 0 obj
+<< /Length 1755 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-04   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Department Archive Registry) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-04   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (50 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+103 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 102 0 R >>
+endobj
+104 0 obj
+<< /Length 1763 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-05   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Department Portal Builder Workspace) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-05   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (51 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+105 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 104 0 R >>
+endobj
+106 0 obj
+<< /Length 1754 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-06   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Research Evidence Exchange) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-06   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (52 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+107 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 106 0 R >>
+endobj
+108 0 obj
+<< /Length 1759 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-07   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Research Information Governance) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-07   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (53 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+109 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 108 0 R >>
+endobj
+110 0 obj
+<< /Length 1758 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-08   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Statistical Analysis Workbench) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-08   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (54 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+111 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 110 0 R >>
+endobj
+112 0 obj
+<< /Length 1759 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-09   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Grant Opportunity Notifications) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-09   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (55 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+113 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 112 0 R >>
+endobj
+114 0 obj
+<< /Length 1750 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-10   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Donor Funder Relations) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-10   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (56 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+115 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 114 0 R >>
+endobj
+116 0 obj
+<< /Length 1753 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-11   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Finance Accounting Engine) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-11   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (57 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+117 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 116 0 R >>
+endobj
+118 0 obj
+<< /Length 1757 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-12   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Finance Donor Control Cockpit) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-12   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (58 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+119 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 118 0 R >>
+endobj
+120 0 obj
+<< /Length 1757 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-13   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Finance Technology Operations) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-13   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (59 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+121 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 120 0 R >>
+endobj
+122 0 obj
+<< /Length 1746 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-14   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Document Lifecycle) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-14   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (60 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+123 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 122 0 R >>
+endobj
+124 0 obj
+<< /Length 1758 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-15   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Document Translation Workspace) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-15   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (61 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+125 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 124 0 R >>
+endobj
+126 0 obj
+<< /Length 1754 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-16   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Controlled Document Upload) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-16   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (62 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+127 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 126 0 R >>
+endobj
+128 0 obj
+<< /Length 1759 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-17   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Document Retrieval Access Point) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-17   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (63 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+129 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 128 0 R >>
+endobj
+130 0 obj
+<< /Length 1756 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-18   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Signature Field Confirmation) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-18   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (64 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+131 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 130 0 R >>
+endobj
+132 0 obj
+<< /Length 1755 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-19   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Signature Pathway Self-Test) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-19   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (65 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+133 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 132 0 R >>
+endobj
+134 0 obj
+<< /Length 1750 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-20   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Meeting Access Control) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-20   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (66 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+135 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 134 0 R >>
+endobj
+136 0 obj
+<< /Length 1749 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (COMP-21   /   COMPONENT/SUBSYSTEM) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Field Entry Data Gate) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: COMP-21   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (67 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+137 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 136 0 R >>
+endobj
+138 0 obj
+<< /Length 1765 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SHARED-01   /   SHARED/WORKFLOW) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Secure Authentication and Access Gate) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SHARED-01   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (68 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+139 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 138 0 R >>
+endobj
+140 0 obj
+<< /Length 1768 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SHARED-02   /   SHARED/WORKFLOW) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Invitation Activation and Password Setup) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SHARED-02   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (69 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+141 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 140 0 R >>
+endobj
+142 0 obj
+<< /Length 1767 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SHARED-03   /   SHARED/WORKFLOW) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Application Shell and Global Navigation) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SHARED-03   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (70 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+143 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 142 0 R >>
+endobj
+144 0 obj
+<< /Length 1766 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SHARED-04   /   SHARED/WORKFLOW) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Loading Error Empty and Offline States) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SHARED-04   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (71 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+145 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 144 0 R >>
+endobj
+146 0 obj
+<< /Length 1765 >>
+stream
+BT
+/F1 10 Tf 1 0 0 1 44 790 Tm (IRPA  |  DIGITAL BOARD GOVERNANCE SYSTEM) Tj
+/F1 10 Tf 1 0 0 1 44 752 Tm (SHARED-05   /   SHARED/WORKFLOW) Tj
+/F1 24 Tf 1 0 0 1 44 720 Tm (Signer Invitation and Gateway Signing) Tj
+/F1 9 Tf 1 0 0 1 44 695 Tm (Illustrative portal wireframe - not a production screenshot) Tj
+/F1 10 Tf 1 0 0 1 44 644 Tm (PORTAL NAVIGATION) Tj
+/F1 9 Tf 1 0 0 1 44 622 Tm (Overview     Records     Workflow     System states) Tj
+/F1 12 Tf 1 0 0 1 44 575 Tm (OVERVIEW) Tj
+/F1 9 Tf 1 0 0 1 44 552 Tm (Role-scoped workspace. Protected reads and writes require server-side authorization.) Tj
+/F1 9 Tf 1 0 0 1 44 520 Tm (Primary action \(illustrative\)       View details) Tj
+/F1 12 Tf 1 0 0 1 44 465 Tm (RECORDS AND SUMMARY) Tj
+/F1 9 Tf 1 0 0 1 44 443 Tm (Authorized records appear here after successful retrieval.) Tj
+/F1 8 Tf 1 0 0 1 44 416 Tm (Record ID     Title     Owner     Status     Updated) Tj
+/F1 12 Tf 1 0 0 1 44 355 Tm (WORKFLOW AND ACTIVITY) Tj
+/F1 9 Tf 1 0 0 1 44 333 Tm (Show owner, status, timestamps, history and next permitted action.) Tj
+/F1 12 Tf 1 0 0 1 44 272 Tm (REQUIRED SYSTEM STATES) Tj
+/F1 9 Tf 1 0 0 1 44 246 Tm (EMPTY     No records; show safe next action.) Tj
+/F1 9 Tf 1 0 0 1 44 223 Tm (LOADING   Show progress; do not present stale data as current.) Tj
+/F1 9 Tf 1 0 0 1 44 200 Tm (ERROR     Explain failure and provide safe retry.) Tj
+/F1 9 Tf 1 0 0 1 44 177 Tm (OFFLINE   Mark cache stale; disable server-authorized actions.) Tj
+/F1 8 Tf 1 0 0 1 44 95 Tm (Acceptance reference: SHARED-05   |   Viewports: 390x844 and 1440x900) Tj
+/F1 8 Tf 1 0 0 1 44 30 Tm (72 / 72) Tj
+ET
+0.8 w 40 770 m 555 770 l S
+40 680 m 555 680 l S
+40 600 m 555 600 l S
+40 490 m 555 490 l S
+40 380 m 555 380 l S
+40 290 m 555 290 l S
+40 145 m 555 145 l S
+endstream
+endobj
+147 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 146 0 R >>
+endobj
+xref
+0 148
+0000000000 65535 f 
+0000000035 00000 n 
+0000000084 00000 n 
+0000000661 00000 n 
+0000000731 00000 n 
+0000002518 00000 n 
+0000002644 00000 n 
+0000004427 00000 n 
+0000004553 00000 n 
+0000006352 00000 n 
+0000006478 00000 n 
+0000008275 00000 n 
+0000008403 00000 n 
+0000010204 00000 n 
+0000010332 00000 n 
+0000012126 00000 n 
+0000012254 00000 n 
+0000014040 00000 n 
+0000014168 00000 n 
+0000015951 00000 n 
+0000016079 00000 n 
+0000017865 00000 n 
+0000017993 00000 n 
+0000019775 00000 n 
+0000019903 00000 n 
+0000021686 00000 n 
+0000021814 00000 n 
+0000023599 00000 n 
+0000023727 00000 n 
+0000025521 00000 n 
+0000025649 00000 n 
+0000027434 00000 n 
+0000027562 00000 n 
+0000029351 00000 n 
+0000029479 00000 n 
+0000031280 00000 n 
+0000031408 00000 n 
+0000033201 00000 n 
+0000033329 00000 n 
+0000035139 00000 n 
+0000035267 00000 n 
+0000037060 00000 n 
+0000037188 00000 n 
+0000038975 00000 n 
+0000039103 00000 n 
+0000040886 00000 n 
+0000041014 00000 n 
+0000042801 00000 n 
+0000042929 00000 n 
+0000044747 00000 n 
+0000044875 00000 n 
+0000046672 00000 n 
+0000046800 00000 n 
+0000048585 00000 n 
+0000048713 00000 n 
+0000050497 00000 n 
+0000050625 00000 n 
+0000052418 00000 n 
+0000052546 00000 n 
+0000054353 00000 n 
+0000054481 00000 n 
+0000056282 00000 n 
+0000056410 00000 n 
+0000058209 00000 n 
+0000058337 00000 n 
+0000060140 00000 n 
+0000060268 00000 n 
+0000062057 00000 n 
+0000062185 00000 n 
+0000063974 00000 n 
+0000064102 00000 n 
+0000065890 00000 n 
+0000066018 00000 n 
+0000067801 00000 n 
+0000067929 00000 n 
+0000069713 00000 n 
+0000069841 00000 n 
+0000071627 00000 n 
+0000071755 00000 n 
+0000073544 00000 n 
+0000073672 00000 n 
+0000075469 00000 n 
+0000075597 00000 n 
+0000077388 00000 n 
+0000077516 00000 n 
+0000079310 00000 n 
+0000079438 00000 n 
+0000081234 00000 n 
+0000081362 00000 n 
+0000083152 00000 n 
+0000083280 00000 n 
+0000085072 00000 n 
+0000085200 00000 n 
+0000087004 00000 n 
+0000087132 00000 n 
+0000088931 00000 n 
+0000089059 00000 n 
+0000090874 00000 n 
+0000091002 00000 n 
+0000092825 00000 n 
+0000092953 00000 n 
+0000094770 00000 n 
+0000094900 00000 n 
+0000096709 00000 n 
+0000096839 00000 n 
+0000098656 00000 n 
+0000098786 00000 n 
+0000100594 00000 n 
+0000100724 00000 n 
+0000102537 00000 n 
+0000102667 00000 n 
+0000104479 00000 n 
+0000104609 00000 n 
+0000106422 00000 n 
+0000106552 00000 n 
+0000108356 00000 n 
+0000108486 00000 n 
+0000110293 00000 n 
+0000110423 00000 n 
+0000112234 00000 n 
+0000112364 00000 n 
+0000114175 00000 n 
+0000114305 00000 n 
+0000116105 00000 n 
+0000116235 00000 n 
+0000118047 00000 n 
+0000118177 00000 n 
+0000119985 00000 n 
+0000120115 00000 n 
+0000121928 00000 n 
+0000122058 00000 n 
+0000123868 00000 n 
+0000123998 00000 n 
+0000125807 00000 n 
+0000125937 00000 n 
+0000127741 00000 n 
+0000127871 00000 n 
+0000129674 00000 n 
+0000129804 00000 n 
+0000131623 00000 n 
+0000131753 00000 n 
+0000133575 00000 n 
+0000133705 00000 n 
+0000135526 00000 n 
+0000135656 00000 n 
+0000137476 00000 n 
+0000137606 00000 n 
+0000139425 00000 n 
+trailer
+<< /Size 148 /Root 1 0 R >>
+startxref
+139555
+%%EOF

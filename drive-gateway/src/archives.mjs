@@ -1,0 +1,7 @@
+import {HttpError,cleanSegment} from "./util.mjs";
+export const ARCHIVES={"administrative-documents":"Administrative Documents","board-governance":"Board of Directors Governance Archive","legal-contracts":"Legal and Contracts","finance":"Finance Records","human-resources":"Human Resources","completed-signed":"Completed Signed Documents"};
+export const CLASSIFICATIONS=["Public","Internal","Restricted","Confidential"]; export const ARCHIVE_ROOT="IRPA Governance System/Document Archives";
+export function parseArchiveSelection(raw){let l=raw;if(typeof raw==="string"){try{l=JSON.parse(raw)}catch{l=raw.split(",").map(s=>s.trim())}}if(!Array.isArray(l)||l.length<1||l.length>4)throw new HttpError(400,"Select between 1 and 4 archives.");const u=[...new Set(l.map(String))];for(const k of u)if(!Object.hasOwn(ARCHIVES,k))throw new HttpError(400,"Unknown archive selected.");return u;}
+export function parseClassification(v){const x=v==null||v===""?"Restricted":String(v);if(!CLASSIFICATIONS.includes(x))throw new HttpError(400,"Unknown classification.");return x;}
+export function archivePath({archiveKey,classification,documentId,fileName}){return `${ARCHIVE_ROOT}/${ARCHIVES[archiveKey]}/${classification}/${cleanSegment(documentId,64)}/${cleanSegment(fileName,140)}`;}
+export function signerCopyPath({ownerKey,fileName}){return `My Documents/Completed Signed Documents/${cleanSegment(ownerKey,80)}/${cleanSegment(fileName,140)}`;}

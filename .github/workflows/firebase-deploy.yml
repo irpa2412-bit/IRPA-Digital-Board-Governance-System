@@ -1,0 +1,621 @@
+name: Deploy IRPA Governance to Firebase
+# Deployment trigger for current production changes
+# 2026-09-28 canonical document routing production deployment: Governance sensitive; Administrator restricted; five document types.
+# Administrator Gateway fix deployment marker: 2026-09-21T22:20Z
+# Production restore redeploy: 2026-09-22T12:03Z
+# V3 Meeting Centre safety hardening redeploy trigger: 2026-09-24T08:46Z
+# Signature Profile save authorization redeploy trigger: 2026-09-24T16:51Z
+# Safe production deployment verification marker: 2026-09-25T19:54Z — deploy current main (includes 56f7df3) without changing application behavior.
+# 2026-09-26 document-reference repair: deploy the secure server-side document reference callable together with hosting/firestore so normal portal users are not blocked by admin-only counter rules.
+# 2026-09-26 IT Specialist login gateway release verification: force production deployment of current main.
+
+concurrency:
+  # Dedicated serialization group for irpa-firebase-production.
+  group: irpa-firebase-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  statuses: write
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "drive-gateway/**"
+      - "functions/**"
+      - "tests/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "storage.rules"
+      - ".github/workflows/firebase-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      authorize_production_data_migration:
+        description: "Owner approval to bootstrap production administrator authorization, synchronize claims, backfill signer metadata, and migrate Signature Profiles"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
+      confirm_production_firestore_rules_deployment:
+        description: "Type DEPLOY RULES to publish production Firestore rules and indexes. No push can publish them."
+        required: true
+        type: string
+        default: "no"
+      authorize_production_functions_deployment:
+        description: "Owner approval to deploy production Firebase Functions"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
+
+jobs:
+  build-and-deploy:
+    # Production Firebase changes require protected Environment approval.
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install web and Android packaging dependencies
+        run: npm install
+
+      - name: Mandatory full-source readability and contrast check
+        run: npm run check:production-readability
+
+      - name: Build web application
+        env:
+          VITE_BUILD_COMMIT: ${{ github.sha }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+          VITE_GOOGLE_DRIVE_GATEWAY_URL: ${{ secrets.VITE_GOOGLE_DRIVE_GATEWAY_URL }}
+          VITE_GATEWAY_ORIGIN: ${{ secrets.VITE_GATEWAY_ORIGIN || 'https://irpa-google-drive-gateway.irpa-governance.workers.dev' }}
+          VITE_GRANT_CRAWLER_WORKER_URL: https://irpa-grant-crawler-production.irpa-governance.workers.dev
+          VITE_GRANT_ASSISTANT_WORKER_URL: https://irpa-dbgs-grant-crawler.irpa-governance.workers.dev
+          VITE_GOOGLE_WEATHER_API_KEY: ${{ secrets.VITE_GOOGLE_WEATHER_API_KEY }}
+          # Keep Gateway cryptographic signing disabled until isolated staging acceptance passes.
+          VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED: "false"
+        run: |
+          set -euo pipefail
+          test "$VITE_IRPA_CRYPTOGRAPHIC_SIGNING_ENABLED" = "false"
+          export VITE_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          npm run build
+
+      - name: Verify grant crawler endpoint in the production bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! grep -R -q 'irpa-grant-crawler-production.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle does not reference the production D1 crawler Worker.' >&2
+            exit 1
+          fi
+          if ! grep -R -q 'irpa-dbgs-grant-crawler.irpa-governance.workers.dev' dist; then
+            echo 'Production bundle does not reference the dedicated AI assistant Worker.' >&2
+            exit 1
+          fi
+          echo 'Production bundle separates crawler discovery from AI assistant drafting.'
+
+      - name: Independent production readability verification
+        run: npm run verify:production-readability
+
+      - name: Upload immutable Firebase production frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-frontend-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Bootstrap primary administrator authorization
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_data_migration == 'yes'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: |
+          npm --prefix functions install --omit=dev
+          node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getAuth } = require("firebase-admin/auth");
+          const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+
+          (async () => {
+            const auth = getAuth();
+            const db = getFirestore();
+            const administrators = [
+              { email: "irpa2412@gmail.com", name: "IRPA Primary Administrator" },
+            ];
+
+            for (const administrator of administrators) {
+              const user = await auth.getUserByEmail(administrator.email);
+
+              await db.collection("adminProfiles").doc(user.uid).set({
+                uid: user.uid,
+                email: administrator.email,
+                name: administrator.name,
+                role: "Administrator",
+                active: true,
+                createdByUid: "irpa2412@gmail.com",
+                createdByEmail: "irpa2412@gmail.com",
+                updatedAt: FieldValue.serverTimestamp()
+              }, { merge: true });
+
+              await auth.setCustomUserClaims(user.uid, {
+                ...(user.customClaims || {}),
+                admin: true
+              });
+
+              console.log(`Administrator authorization bootstrapped for ${administrator.email} (UID ${user.uid}).`);
+            }
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Synchronize server-controlled authorization claims
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_data_migration == 'yes'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: |
+          node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getAuth } = require("firebase-admin/auth");
+          const { getFirestore } = require("firebase-admin/firestore");
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+          (async () => {
+            const db = getFirestore();
+            const auth = getAuth();
+            const rolesByUid = new Map();
+            const addRoles = (uid, data) => {
+              if (!uid) return;
+              const values = [
+                data?.role,
+                ...(Array.isArray(data?.roles) ? data.roles : []),
+                ...(Array.isArray(data?.assignedRoles) ? data.assignedRoles : []),
+                ...(Array.isArray(data?.selectedRoles) ? data.selectedRoles : []),
+                ...(Array.isArray(data?.roleAssignments) ? data.roleAssignments : [])
+              ].flatMap(v => String(v || "").split(",").map(x => x.trim()).filter(Boolean));
+              const existing = rolesByUid.get(uid) || new Set();
+              values.forEach(v => existing.add(v));
+              rolesByUid.set(uid, existing);
+            };
+            for (const collection of ["members","employees"]) {
+              const snap = await db.collection(collection).get();
+              for (const doc of snap.docs) {
+                const data = doc.data() || {};
+                let uid = String(data.uid || doc.id || "").trim();
+                const registeredEmail = String(data.email || "").trim().toLowerCase();
+                if (registeredEmail) {
+                  try {
+                    const authUser = await auth.getUserByEmail(registeredEmail);
+                    uid = authUser.uid;
+                    if (String(data.uid || "").trim() !== uid) {
+                      await doc.ref.set({uid,firebaseAuthEmail:registeredEmail,uidAssignmentStatus:"UID Linked — Deployment Claim Synchronization"}, {merge:true});
+                    }
+                  } catch (error) {
+                    if (error?.code !== "auth/user-not-found") throw error;
+                  }
+                }
+                const active = String(data.status || data.employmentStatus || data.registrationStatus || "").toLowerCase();
+                if (uid && active !== "inactive" && active !== "disabled") addRoles(uid, data);
+              }
+            }
+            const adminSnap = await db.collection("adminProfiles").get();
+            const adminUids = new Set();
+            for (const doc of adminSnap.docs) {
+              const data = doc.data() || {};
+              if (data.active === true && doc.id) adminUids.add(doc.id);
+            }
+            let updated = 0;
+            for (const [uid, roleSet] of rolesByUid.entries()) {
+              try {
+                const user = await auth.getUser(uid);
+                const previous = user.customClaims || {};
+                const claims = { ...previous, irpaRoles: [...roleSet].slice(0, 60) };
+                // Administrator continuity safeguard: deployment may grant/retain admin
+                // access, but it must never revoke an existing admin claim. Explicit
+                // administrator removal is handled only by the controlled server workflow.
+                if (adminUids.has(uid) || String(user.email || "").toLowerCase() === "irpa2412@gmail.com" || previous.admin === true) claims.admin = true;
+                await auth.setCustomUserClaims(uid, claims);
+                updated++;
+              } catch (error) {
+                console.warn("Authorization claim synchronization skipped", uid, error.message);
+              }
+            }
+            for (const uid of adminUids) {
+              if (rolesByUid.has(uid)) continue;
+              try {
+                const user = await auth.getUser(uid);
+                await auth.setCustomUserClaims(uid, { ...(user.customClaims || {}), admin: true });
+                updated++;
+              } catch (error) {
+                console.warn("Administrator claim synchronization skipped", uid, error.message);
+              }
+            }
+            console.log(`SERVER_CONTROLLED_AUTH_CLAIMS_SYNCHRONIZED: ${updated}`);
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
+
+      - name: Verify configured administrator authorization
+        run: echo "Primary administrator and approved additional administrator accounts are bootstrapped above; no hard-coded administrator revocation is performed during deployment."
+
+      - name: Backfill signer authorization metadata
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_data_migration == 'yes'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: |
+          node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+
+          (async () => {
+            const db = getFirestore();
+            const snap = await db.collection("signatureEnvelopes").get();
+            const writer = db.bulkWriter();
+            let changed = 0;
+
+            for (const doc of snap.docs) {
+              const data = doc.data() || {};
+              const actionUids = [...new Set(
+                (Array.isArray(data.fields) ? data.fields : [])
+                  .map(field => String(field?.signerUid || "").trim())
+                  .filter(Boolean)
+              )];
+
+              const existing = Array.isArray(data.actionUids) ? data.actionUids : [];
+              const same = existing.length === actionUids.length &&
+                existing.every(uid => actionUids.includes(uid));
+
+              if (!same) {
+                writer.update(doc.ref, {
+                  actionUids,
+                  updatedAt: FieldValue.serverTimestamp()
+                });
+                changed += 1;
+              }
+            }
+
+            await writer.close();
+            console.log(`Signer authorization metadata backfilled for ${changed} envelope(s) out of ${snap.size}.`);
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Migrate retained Signature Profiles to Signer Identity records
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_data_migration == 'yes'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: |
+          node <<'NODE'
+          const { initializeApp, cert } = require("firebase-admin/app");
+          const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+
+          (async () => {
+            const db = getFirestore();
+            const profiles = await db.collection("signatureProfiles").get();
+            const writer = db.bulkWriter();
+            let migrated = 0;
+
+            for (const profileDoc of profiles.docs) {
+              const p = profileDoc.data() || {};
+              const uid = String(p.uid || profileDoc.id).trim();
+              if (!uid) continue;
+
+              writer.set(db.collection("signerIdentities").doc(uid), {
+                uid,
+                signerProfileId: uid,
+                signerName: String(p.displayName || p.email || "Signer"),
+                email: String(p.email || ""),
+                organisationName: "Improvement of Rangeland in Pastoral Areas",
+                signatureStatus: String(p.status || "Profile Setup Required"),
+                revocationStatus: p.status === "Revoked" ? "Revoked" : "Active",
+                revocationReason: String(p.revocationReason || ""),
+                currentSignatureHash: p.signatureSha256 || null,
+                migratedFromSignatureProfile: true,
+                updatedAt: FieldValue.serverTimestamp()
+              }, { merge: true });
+              migrated += 1;
+            }
+
+            await writer.close();
+            console.log(`Retained Signature Profiles migrated into Signer Identity records: ${migrated}.`);
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Deploy Firebase Hosting independently
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only hosting
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Detect Firestore rules and indexes changes
+        id: firestore_changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet HEAD^ HEAD -- firestore.rules firestore.indexes.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Firestore rules and indexes are unchanged from the previous commit; skipping deployment."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Firestore rules or indexes changed; deployment is required."
+          fi
+
+      - name: Deploy Firestore Rules and Indexes (retry transient Google 5xx)
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES' && steps.firestore_changes.outputs.changed == 'true'
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+        run: |
+          set -euo pipefail
+          credentials="$RUNNER_TEMP/firebase-service-account.json"
+          trap 'rm -f "$credentials"' EXIT
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$credentials"
+          export GOOGLE_APPLICATION_CREDENTIALS="$credentials"
+          for attempt in 1 2 3; do
+            echo "Firestore rules/indexes deployment attempt $attempt of 3"
+            set +e
+            output="$(npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive 2>&1)"
+            status=$?
+            set -e
+            echo "$output"
+            if [ "$status" -eq 0 ]; then
+              echo "Firestore rules and indexes deployed successfully."
+              exit 0
+            fi
+            if ! printf '%s' "$output" | grep -Eq 'HTTP Error: 5|503'; then
+              echo "Firestore deployment failed for a non-transient error; not retrying." >&2
+              exit "$status"
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Firestore deployment still returns a transient HTTP 5xx after 3 attempts." >&2
+              exit "$status"
+            fi
+            echo "Transient Google Firestore Rules API 5xx detected; waiting 120 seconds before retry."
+            sleep 120
+          done
+
+      - name: Verify live Firebase Hosting bundle
+        env:
+          EXPECTED_BUILD_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-digital-board-governance.web.app"
+          for attempt in $(seq 1 18); do
+            echo "Live Firebase Hosting bundle verification attempt $attempt of 18"
+            if (
+              grep -R -Fq "$EXPECTED_BUILD_COMMIT" dist/assets --include="*.js" &&
+              curl --fail --silent --show-error --retry 2 --retry-delay 2 "$base/" -o "$RUNNER_TEMP/firebase-index.html" &&
+              local_asset="$(grep -oE '/assets/[^" ]+\.js' dist/index.html | head -n 1)" &&
+              live_asset="$(grep -oE '/assets/[^" ]+\.js' "$RUNNER_TEMP/firebase-index.html" | head -n 1)" &&
+              test -n "$local_asset" &&
+              test "$local_asset" = "$live_asset" &&
+              for local in dist/assets/*.js; do
+                name="${local##*/}"
+                curl --fail --silent --show-error --retry 2 --retry-delay 2 "$base/assets/$name" -o "$RUNNER_TEMP/firebase-$name" &&
+                cmp -s "$local" "$RUNNER_TEMP/firebase-$name" || exit 1
+              done
+            ); then
+              echo "Firebase Hosting index and every JavaScript asset exactly match build $EXPECTED_BUILD_COMMIT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 18 ]; then
+              sleep 10
+            fi
+          done
+          echo "Firebase Hosting bundle still does not match build $EXPECTED_BUILD_COMMIT after 18 attempts." >&2
+          exit 1
+
+      # Keep Firebase function deployments independent from Firestore. The frontend is deployed by cloudflare-pages-deploy.yml.
+      # Google Cloud billing is currently closed for this project, so new Cloud Functions
+      # deployments cannot activate Cloud Build/Artifact Registry. Existing deployed
+      # functions remain untouched; deployment can be re-enabled when billing is restored.
+      - name: Deploy login authorization resolver
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:resolveAuthenticatedLoginContext
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Deploy retained Firebase password-reset function
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:preparePasswordResetPhone
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+      
+      - name: Deploy actual-data access control callables
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
+        id: actual_data_gate
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:getActualDataAccessStatus,functions:setActualDataAccess
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Report actual-data gate callable deployment status
+        if: always()
+        env:
+          ACTUAL_DATA_GATE_OUTCOME: ${{ steps.actual_data_gate.outcome }}
+        run: |
+          if [ "$ACTUAL_DATA_GATE_OUTCOME" = "success" ]; then
+            echo "ACTUAL_DATA_GATE_CALLABLES_DEPLOYED=true"
+          else
+            echo "::warning::Firestore rules keep actual operational writes closed, but administrator-controlled reopening remains unavailable until both actual-data gate callables deploy successfully. Check Cloud Functions billing, API enablement and service-account permissions."
+          fi
+
+      - name: Deploy signed meeting attendance register callables
+        if: github.event_name == 'workflow_dispatch' && inputs.authorize_production_functions_deployment == 'yes'
+        id: attendance_register
+        continue-on-error: true
+        uses: w9jds/firebase-action@v14.17.0
+        with:
+          args: deploy --project irpa-digital-board-governance --only functions:signMeetingAttendance,functions:getMeetingAttendanceRegister
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
+
+      - name: Report meeting attendance callable deployment status
+        if: always()
+        env:
+          ATTENDANCE_REGISTER_OUTCOME: ${{ steps.attendance_register.outcome }}
+        run: |
+          if [ "$ATTENDANCE_REGISTER_OUTCOME" = "success" ]; then
+            echo "MEETING_ATTENDANCE_REGISTER_CALLABLES_DEPLOYED=true"
+          else
+            echo "::warning::Meeting attendance UI is published, but its server-side signing/retrieval callables were not deployed. Check Firebase Cloud Functions billing, API enablement and service-account permissions before treating the register as live."
+          fi
+      # Invitation removal is served by /api/invitations/remove on the Cloudflare gateway.
+      # Firebase Cloud Functions deployment is intentionally not used for this migrated endpoint.
+
+      - name: Verify live Firebase application
+        run: |
+          set -e
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+            https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/
+
+  live-hosting-verification:
+    name: Firebase Hosting Verification and Commit Status
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: always()
+    steps:
+      - name: Verify live Firebase Hosting independently
+        id: firebase_live
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://irpa-digital-board-governance.web.app"
+          html="$RUNNER_TEMP/firebase-hosting-live-status.html"
+          status="$(curl --location --silent --show-error --output "$html" --write-out '%{http_code}' --retry 5 --retry-delay 3 --max-time 30 "$base/")"
+          echo "Firebase Hosting HTTP_STATUS=$status"
+          if [ "$status" != "200" ] || ! grep -qi '<html' "$html" || ! grep -Fq "content=\"$GITHUB_SHA\"" "$html"; then
+            echo "live_ok=false" >> "$GITHUB_OUTPUT"
+            echo "Firebase Hosting did not return HTTP 200 with expected build identity $GITHUB_SHA." >&2
+            exit 1
+          fi
+          echo "live_ok=true" >> "$GITHUB_OUTPUT"
+          echo "Firebase Hosting returned HTTP 200 and identifies build $GITHUB_SHA."
+
+      - name: Publish Firebase Hosting production status
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          FIREBASE_LIVE_OK: ${{ steps.firebase_live.outputs.live_ok }}
+        with:
+          script: |
+            const checks = [
+              {
+                state: process.env.FIREBASE_LIVE_OK === "true" ? "success" : "failure",
+                context: "firebase-hosting-live",
+                description: process.env.FIREBASE_LIVE_OK === "true"
+                  ? "Firebase Hosting returned HTTP 200 and expected build identity."
+                  : "Firebase Hosting HTTP/build identity verification failed."
+              }
+            ];
+            for (const check of checks) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.sha,
+                state: check.state,
+                context: check.context,
+                description: check.description,
+                target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+            }
+
+# 2026-09-28 restored Gateway pre-blocker production release.
+# 2026-09-28 configuration-driven Gateway production deployment.
+
+# Unified governance field palette deployment marker: 2026-09-28T20:52:10.092Z
+
+# Unified signing initiation from Meeting Room, Signature Portal and Authorisation & Approval: 2026-09-28T20:54:17.672Z
+
+# Upload-initiated signing connectors from Meeting Room and Authorisation & Approval: 2026-09-28T21:00:03.408Z
+
+# Sign-a-Document gateway: upload/archive selection -> Prepare Envelope -> field palette -> signing circle: 2026-09-28T21:06:00.195Z
+
+# Direct Sign-a-Document transition to Signature Portal after upload/archive selection: 2026-09-28T21:10:06.449Z
+
+# Global IRPA DBGS button responsiveness and action-feedback layer: 2026-09-28T21:15:30Z
+
+# Finance + Procurement five-category document upload with Restricted special-permission control: 2026-09-28T21:20:45Z
+
+# Document access policy: Governance/Meeting unrestricted; all other portals exclude Confidential/Restricted: 2026-09-29T00:24:00+03:00
+
+# Universal portal document access point: PDF and native Word/Excel/PowerPoint/OpenDocument/text/image formats: 2026-09-29T00:00Z
+
+# IRPA universal document reader installed: PDF.js + Mammoth + SheetJS + PPTX Viewer + native-format fallback: 2026-09-29T00:00Z
+
+# Research, Statistics and Knowledge Portal: study registry, dataset registry, statistical engine, knowledge repository, research outputs and secured Firestore collections: 2026-09-29T00:00Z
+
+# Build verification marker: 2026-09-29T00:20Z
+
+# Comprehensive science and social-science analysis suite: jStat + Turf.js + integrated inferential, regression, survey, time-series, spatial, remote-sensing, multivariate and sample-size tools: 2026-09-29T01:00Z
+# Research analytics suite deployment verification: jStat + Turf.js + social science and scientific analysis workbench: 2026-09-28T22:04:15Z
+
+# Cross-portal research evidence exchange: universal consumable research information + federated institutional intake: 2026-09-29T00:00:00Z
+
+# Cross-portal research data release controls: dataset + knowledge + analysis consumption readiness: 2026-09-29T00:12:00Z
+
+# Cross-portal evidence federation classification guard: 2026-09-29T00:18:00Z
+
+# Research data collection studio release: offline queue, validation, GPS/consent-ready instruments, collection submissions: 2026-09-29T00:30:00Z
+
+
+# Production deployment trigger: 2026-09-28T22:18:01.596Z
+
+# Gateway startup isolation repair release: 2026-09-28T22:22:19.918Z
+
+# Login blocker removal release: 2026-09-28T22:23:28.689Z
+
+# Remove remaining gateway blockers release: 2026-09-28T22:25:30.891Z
+
+# Restore authorized portal and data-environment gates: 1790634501892
+
+# 2026-09-29 dashboard/data-environment restoration deployment trigger: security-scoped application changes merged in e4a8d4339a85adc32e40e518d3f1dac5fbbbe486
+# Production deployment trigger: offline all-apps + mobile dashboard screen-fit

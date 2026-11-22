@@ -1,0 +1,289 @@
+import { createCloudflareSignerKeyProvider, importPublicKeyJwk } from "./cryptographicGate.mjs";
+import { sha256Hex } from "./util.mjs";
+import { Conflict, VersionConflict } from "./adapters.mjs";
+
+const mockRecords = new Map();
+const mockObjects = new Map();
+let mockSeq = 0;
+
+export class EsignRecordDurableObject {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+  async fetch(request) {
+    const body = await request.json();
+    return this.state.blockConcurrencyWhile(async () => {
+      const key = String(body.key || "");
+      if (!key) return Response.json({ ok:false, error:"Missing record key." }, {status:400});
+
+      if (key === "__index__") {
+        const keys = (await this.state.storage.get("keys")) || {};
+        if (body.op === "add") { keys[body.recordKey] = true; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
+        if (body.op === "remove") { delete keys[body.recordKey]; await this.state.storage.put("keys",keys); return Response.json({ok:true}); }
+        if (body.op === "list") return Response.json({ok:true,keys:Object.keys(keys)});
+      }
+
+      if (body.operation === "auth-get") {
+        return Response.json({ok:true,state:await this.state.storage.get("authState") || {}});
+      }
+
+      if (body.operation === "auth-window-consume") {
+        const now = Number(body.now) || Date.now();
+        const limit = Math.max(1, Math.min(100, Number(body.limit) || 3));
+        const windowMs = Math.max(1000, Math.min(24 * 60 * 60 * 1000, Number(body.windowMs) || 15 * 60 * 1000));
+        const result = await this.state.storage.transaction(async transaction => {
+          const current = await transaction.get("authState") || {};
+          const attempts = (Array.isArray(current.recoveryAttempts) ? current.recoveryAttempts : [])
+            .map(Number).filter(timestamp => Number.isFinite(timestamp) && timestamp > now - windowMs);
+          if (attempts.length >= limit) {
+            return { allowed:false, retryAfterSeconds:Math.max(1,Math.ceil((attempts[0] + windowMs - now) / 1000)) };
+          }
+          attempts.push(now);
+          await transaction.put("authState",{recoveryAttempts:attempts,updatedAt:now});
+          return { allowed:true, retryAfterSeconds:0 };
+        });
+        return Response.json({ok:true,...result});
+      }
+
+      if (body.operation === "auth-set") {
+        await this.state.storage.put("authState", body.state || {});
+        return Response.json({ok:true});
+      }
+
+      if (body.operation === "auth-expire-lock") {
+        const current = await this.state.storage.get("authState") || {};
+        await this.state.storage.put("authState",{stage:"SECOND",failedAttempts:0,lockUntilMs:0,updatedAt:Date.now()});
+        return Response.json({ok:true,previousStage:current.stage || null});
+      }
+
+      if (body.operation === "auth-clear") {
+        await this.state.storage.put("authState",{stage:"FIRST",failedAttempts:0,lockUntilMs:0,updatedAt:Date.now()});
+        return Response.json({ok:true});
+      }
+
+      if (body.operation === "auth-record-failure") {
+        const current = await this.state.storage.get("authState") || {};
+        const now = Date.now();
+        if (current.stage === "SUSPENDED") return Response.json({ok:true,status:"SUSPENDED",resetRequired:true,remainingAttempts:0});
+        if (current.stage === "LOCKED" && Number(current.lockUntilMs || 0) > now) {
+          return Response.json({ok:true,status:"LOCKED",retryAfterSeconds:Math.ceil((current.lockUntilMs-now)/1000),remainingAttempts:0,resetRequired:false});
+        }
+        const stage = String(current.stage || "FIRST");
+        const limit = stage === "SECOND" ? 3 : 3;
+        const failedAttempts = Number(current.failedAttempts || 0) + 1;
+        if (failedAttempts < limit) {
+          await this.state.storage.put("authState",{stage,failedAttempts,lockUntilMs:0,updatedAt:now});
+          return Response.json({ok:true,status:stage,remainingAttempts:limit-failedAttempts,resetRequired:false});
+        }
+        if (stage === "FIRST") {
+          await this.state.storage.put("authState",{stage:"LOCKED",failedAttempts:0,lockUntilMs:now+5*60*1000,updatedAt:now});
+          return Response.json({ok:true,status:"LOCKED",retryAfterSeconds:300,remainingAttempts:0,resetRequired:false});
+        }
+        await this.state.storage.put("authState",{stage:"SUSPENDED",failedAttempts,lockUntilMs:0,updatedAt:now});
+        return Response.json({ok:true,status:"SUSPENDED",remainingAttempts:0,resetRequired:true});
+      }
+
+      if (body.operation === "next-reference") {
+        const current = await this.state.storage.get("documentReferenceCounter") || {};
+        const year = new Date().getUTCFullYear();
+        const currentYear = Number(current.year || 0);
+        const nextNumber = currentYear === year ? Number(current.nextNumber || 1) : 1;
+        const reference = "IRPA-DOC-" + year + "-" + String(nextNumber).padStart(5,"0");
+        await this.state.storage.put("documentReferenceCounter",{year,nextNumber:nextNumber+1,updatedAt:Date.now()});
+        return Response.json({ok:true,reference,year});
+      }
+
+
+      if(body.operation==="signer-key-read"){
+        const keyId=String(body.keyId||"");
+        const envelopeId=String(body.envelopeId||"");
+        const signerId=String(body.signerId||"");
+        const emailHash=String(body.emailHash||"").toLowerCase();
+        if(body.key!=="email-signer-key:"+keyId||!/^EMAIL-[0-9a-f]{64}$/.test(keyId)||!/^S\\d{1,2}$/.test(signerId)||!envelopeId||!/^[0-9a-f]{64}$/.test(emailHash))return Response.json({ok:false,error:"Invalid signer-key identity."},{status:400});
+        const record=await this.state.storage.get("emailSignerKey:"+keyId);
+        if(!record||record.envelopeId!==envelopeId||record.signerId!==signerId||record.emailHash!==emailHash)return Response.json({ok:false,error:"Signer key is not provisioned."},{status:404});
+        return Response.json({ok:true,keyId,publicKeyJwk:record.publicKeyJwk});
+      }
+
+      if(body.operation==="signer-key-ensure"){
+        const keyId=String(body.keyId||"");
+        const envelopeId=String(body.envelopeId||"");
+        const signerId=String(body.signerId||"");
+        const emailHash=String(body.emailHash||"").toLowerCase();
+        if(body.key!=="email-signer-key:"+keyId||!/^EMAIL-[0-9a-f]{64}$/.test(keyId)||!/^S\d{1,2}$/.test(signerId)||!envelopeId||!/^[0-9a-f]{64}$/.test(emailHash))return Response.json({ok:false,error:"Invalid signer-key identity."},{status:400});
+        const recordKey="emailSignerKey:"+keyId;
+        let record=await this.state.storage.get(recordKey);
+        if(record&&(record.envelopeId!==envelopeId||record.signerId!==signerId||record.emailHash!==emailHash))return Response.json({ok:false,error:"Signer-key identity conflict."},{status:409});
+        if(!record){
+          const pair=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
+          const publicKeyJwk=await crypto.subtle.exportKey("jwk",pair.publicKey);
+          const privatePkcs8=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
+          record={keyId,envelopeId,signerId,emailHash,privatePkcs8:new Uint8Array(privatePkcs8),publicKeyJwk:{kty:publicKeyJwk.kty,crv:publicKeyJwk.crv,x:publicKeyJwk.x,y:publicKeyJwk.y,ext:true},createdAt:new Date().toISOString()};
+          await this.state.storage.put(recordKey,record);
+        }
+        return Response.json({ok:true,keyId,publicKeyJwk:record.publicKeyJwk});
+      }
+
+      if(body.operation==="signer-key-sign"){
+        const keyId=String(body.keyId||"");
+        const record=await this.state.storage.get("emailSignerKey:"+keyId);
+        const canonicalPayload=String(body.canonicalPayload||"");
+        if(body.key!=="email-signer-key:"+keyId||!record||!canonicalPayload||canonicalPayload.length>100000)return Response.json({ok:false,error:"Signer key is unavailable."},{status:404});
+        let payload;
+        try{payload=JSON.parse(canonicalPayload)}catch{return Response.json({ok:false,error:"Invalid canonical signer payload."},{status:400})}
+        if(payload.envelopeId!==record.envelopeId||payload.signerId!==record.signerId||payload.signerIdentityType!=="email-link"||payload.signerIdentityHash!==record.emailHash||payload.keyId!==keyId)return Response.json({ok:false,error:"Signer-key identity mismatch."},{status:403});
+        const privateKey=await crypto.subtle.importKey("pkcs8",record.privatePkcs8,{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+        const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},privateKey,new TextEncoder().encode(canonicalPayload));
+        const bytes=new Uint8Array(signature);let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+        return Response.json({ok:true,signature:btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")});
+      }
+
+      if (body.op === "get") return Response.json({ok:true, value:await this.state.storage.get("record") || null});
+      if (body.op === "create") {
+        if (await this.state.storage.get("record")) return Response.json({ok:false,error:"exists"},{status:409});
+        await this.state.storage.put("record",{...body.value,_v:1});
+        return Response.json({ok:true});
+      }
+      if (body.op === "update") {
+        const current = await this.state.storage.get("record");
+        if (!current) return Response.json({ok:false,error:"not found"},{status:404});
+        if (body.ifVersion !== undefined && current._v !== body.ifVersion) return Response.json({ok:false,error:"version conflict"},{status:409});
+        await this.state.storage.put("record",{...current,...body.patch,_v:current._v+1});
+        return Response.json({ok:true});
+      }
+      if (body.op === "delete") {
+        await this.state.storage.delete("record");
+        return Response.json({ok:true});
+      }
+      return Response.json({ok:false,error:"Unsupported operation."},{status:400});
+    });
+  }
+}
+
+function mockMeta() {
+  return {
+    async get(c,id){ return structuredClone(mockRecords.get(c+"/"+id) || null); },
+    async create(c,id,d){ const k=c+"/"+id; if(mockRecords.has(k)) throw new Conflict(); mockRecords.set(k,{...structuredClone(d),_v:1}); },
+    async update(c,id,p,{ifVersion}={}){ const k=c+"/"+id,r=mockRecords.get(k); if(!r) throw new Error("not found"); if(ifVersion!==undefined&&r._v!==ifVersion) throw new VersionConflict(); mockRecords.set(k,{...r,...structuredClone(p),_v:r._v+1}); },
+    async delete(c,id){ mockRecords.delete(c+"/"+id); },
+    async list(c){ return [...mockRecords.entries()].filter(([k])=>k.startsWith(c+"/")).map(([k,v])=>({id:k.slice(c.length+1),...structuredClone(v)})); }
+  };
+}
+function mockStorage() {
+  return {
+    async put(x){ const id="mock-"+(++mockSeq); mockObjects.set(id,{...x,bytes:new Uint8Array(x.bytes)}); return {id,link:"mock://"+id}; },
+    async probeWritePermission(){return true;},
+    async get(id){ const x=mockObjects.get(id); return x ? new Uint8Array(x.bytes) : null; },
+    async delete(id){ mockObjects.delete(id); }
+  };
+}
+async function doCall(ns,name,body) {
+  const r=await ns.get(ns.idFromName(name)).fetch("https://esign.internal",{method:"POST",body:JSON.stringify(body),headers:{"content-type":"application/json"}});
+  const x=await r.json(); if(!r.ok) { if(x.error==="exists") throw new Conflict(); if(x.error==="version conflict") throw new VersionConflict(); throw new Error(x.error||"Durable Object error"); } return x;
+}
+function doMeta(env) {
+  return {
+    async get(c,id){ const r=await doCall(env.ESIGN_DO,c+"/"+id,{op:"get",key:c+"/"+id}); return r.value; },
+    async create(c,id,d){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"create",key:c+"/"+id,value:d}); await doCall(env.ESIGN_DO,"__index__",{op:"add",recordKey:c+"/"+id,key:"__index__"}); },
+    async update(c,id,p,o={}){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"update",key:c+"/"+id,patch:p,ifVersion:o.ifVersion}); },
+    async delete(c,id){ await doCall(env.ESIGN_DO,c+"/"+id,{op:"delete",key:c+"/"+id}); await doCall(env.ESIGN_DO,"__index__",{op:"remove",recordKey:c+"/"+id,key:"__index__"}); },
+    async list(c){ const keys=(await doCall(env.ESIGN_DO,"__index__",{op:"list",key:"__index__"})).keys.filter(k=>k.startsWith(c+"/")); const out=[]; for(const k of keys){const r=await doCall(env.ESIGN_DO,k,{op:"get",key:k}); if(r.value) out.push({id:k.slice(c.length+1),...r.value});} return out; }
+  };
+}
+export function getDriveRootFolderName(env) {
+  const name=String(env?.DRIVE_ROOT_FOLDER_NAME||"IRPA Governance System").trim();
+  if(!name) throw new Error("DRIVE_ROOT_FOLDER_NAME must be configured.");
+  if(env?.IRPA_ENVIRONMENT==="staging" && name==="IRPA Governance System") {
+    throw new Error("Staging Drive storage must use a dedicated staging root folder.");
+  }
+  return name;
+}
+async function driveFolder(env, accessToken, path, driveFetchImpl) {
+  let parent=await findFolder(env,accessToken,getDriveRootFolderName(env),null,driveFetchImpl);
+  for(const part of path.split("/").filter(Boolean)) parent=await findFolder(env,accessToken,part,parent,driveFetchImpl);
+  return parent;
+}
+async function findExistingFolder(env,token,name,parent,driveFetchImpl) {
+  const q=[`name='${name.replaceAll("'","\\\\'")}'`, "mimeType='application/vnd.google-apps.folder'", "trashed=false", parent?`'${parent}' in parents`:null].filter(Boolean).join(" and ");
+  const result=await driveFetchImpl(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
+  return result.files?.[0]?.id||null;
+}
+async function findFolder(env,token,name,parent,driveFetchImpl) {
+  const q=[`name='${name.replaceAll("'","\\'")}'`,"mimeType='application/vnd.google-apps.folder'","trashed=false",parent?`'${parent}' in parents`:null].filter(Boolean).join(" and ");
+  const x=await driveFetchImpl(env,token,"/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=drive&pageSize=10&fields=files(id)");
+  if(x.files?.[0]?.id) return x.files[0].id;
+  return (await driveFetchImpl(env,token,"/drive/v3/files",{method:"POST",body:JSON.stringify({name,mimeType:"application/vnd.google-apps.folder",...(parent?{parents:[parent]}:{})})})).id;
+}
+function driveStorage(env, helpers) {
+  if(env.DRIVE_MOCK==="true") return mockStorage();
+  return {
+    async put({path,bytes,contentType,metadata}) {
+      const parts=path.split("/"); const name=parts.pop(); const token=await helpers.getDriveAccessToken(env); const folder=await driveFolder(env,token,parts.join("/"),helpers.driveFetch);
+      const meta={name,parents:[folder],mimeType:contentType,description:JSON.stringify(metadata||{})};
+      const boundary="esign-"+crypto.randomUUID(), enc=new TextEncoder();
+      const head=enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`);
+      const tail=enc.encode(`\r\n--${boundary}--`), body=new Uint8Array(head.length+bytes.length+tail.length);
+      body.set(head); body.set(bytes,head.length); body.set(tail,head.length+bytes.length);
+      const r=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":`multipart/related; boundary=${boundary}`},body});
+      const x=await r.json(); if(!r.ok) throw new Error(x.error?.message||"Google Drive upload failed.");
+      return {id:x.id,link:x.webViewLink||`https://drive.google.com/file/d/${x.id}/view`};
+    },
+    async get(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`,{headers:{Authorization:`Bearer ${token}`}}); return r.ok?new Uint8Array(await r.arrayBuffer()):null;},
+    async probeWritePermission(paths){const token=await helpers.getDriveAccessToken(env);for(const path of paths||[]){const parts=String(path).split("/").filter(Boolean);parts.pop();let parent=await findExistingFolder(env,token,getDriveRootFolderName(env),null,helpers.driveFetch);if(!parent)return false;for(const part of parts){parent=await findExistingFolder(env,token,part,parent,helpers.driveFetch);if(!parent)return false;}const folder=await helpers.driveFetch(env,token,"/drive/v3/files/"+encodeURIComponent(parent)+"?fields=id,capabilities(canAddChildren)");if(folder?.capabilities?.canAddChildren!==true)return false;}return true;},
+    async delete(id){const token=await helpers.getDriveAccessToken(env); const r=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}); if(!r.ok&&r.status!==404) throw new Error("Google Drive deletion failed.");}
+  };
+}
+export function buildEsignContext({env,verifyUser,verifySigningAuthority,sendInvitation,sendCompletionEmail,resolveEmailLinkProfileUid,logger,now,driveHelpers,...rest}) {
+  const meta=env.DRIVE_MOCK==="true"?mockMeta():doMeta(env);
+  const baseKeyProvider=env.DRIVE_MOCK==="true"?null:createCloudflareSignerKeyProvider(env);
+  const keyProvider=baseKeyProvider?{
+    getSignerKey:uid=>baseKeyProvider.getSignerKey(uid),
+    async getSignerKeyForSignerReadOnly(signer){
+      if(!env.ESIGN_DO)throw new Error("Gateway Durable Object key custody is not configured.");
+      if(!signer?.envelopeId||!signer?.id||!signer?.emailHash)throw new Error("Email-link signer key identity is incomplete.");
+      const keyId="EMAIL-"+await sha256Hex(String(signer.envelopeId)+"|"+String(signer.id)+"|"+String(signer.emailHash).toLowerCase());
+      const objectName="email-signer-key:"+keyId,stub=env.ESIGN_DO.get(env.ESIGN_DO.idFromName(objectName));
+      const response=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-read",keyId,envelopeId:signer.envelopeId,signerId:signer.id,emailHash:String(signer.emailHash).toLowerCase()})});
+      const result=await response.json();if(!response.ok||!result.ok||!result.publicKeyJwk)throw new Error("Existing Gateway signer key is not available for a read-only diagnostic.");
+      const publicKey=await importPublicKeyJwk(result.publicKeyJwk);
+      return{keyId,publicKey,publicKeyJwk:result.publicKeyJwk,signCanonicalPayload:async canonicalPayload=>{
+        const signed=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-sign",keyId,canonicalPayload})});
+        const output=await signed.json();if(!signed.ok||!output.ok||!output.signature)throw new Error("Gateway signer key could not verify diagnostic certificate evidence.");
+        return output.signature;
+      }};
+    },
+    async getSignerKeyForSigner(signer){
+      if(!env.ESIGN_DO)throw new Error("Gateway Durable Object key custody is not configured.");
+      if(!signer?.envelopeId||!signer?.id||!signer?.emailHash)throw new Error("Email-link signer key identity is incomplete.");
+      const keyId="EMAIL-"+await sha256Hex(String(signer.envelopeId)+"|"+String(signer.id)+"|"+String(signer.emailHash).toLowerCase());
+      const objectName="email-signer-key:"+keyId;
+      const stub=env.ESIGN_DO.get(env.ESIGN_DO.idFromName(objectName));
+      const ensure=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-ensure",keyId,envelopeId:signer.envelopeId,signerId:signer.id,emailHash:String(signer.emailHash).toLowerCase()})});
+      const ensured=await ensure.json();if(!ensure.ok||!ensured.ok)throw new Error("Gateway signer key could not be provisioned.");
+      const publicKey=await importPublicKeyJwk(ensured.publicKeyJwk);
+      return{keyId,publicKey,publicKeyJwk:ensured.publicKeyJwk,signCanonicalPayload:async canonicalPayload=>{
+        const response=await stub.fetch("https://esign.internal",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:objectName,operation:"signer-key-sign",keyId,canonicalPayload})});
+        const result=await response.json();if(!response.ok||!result.ok||!result.signature)throw new Error("Gateway signer key could not seal the signing evidence.");
+        return result.signature;
+      }};
+    }
+  }:null;
+  return {
+    ...rest,
+    env,
+    meta,
+    storage:driveStorage(env,driveHelpers),
+    verifyUser,
+    verifySigningAuthority,
+    sendInvitation,
+    sendCompletionEmail,
+    resolveEmailLinkProfileUid,
+    logger:logger||console,
+    now:now||(()=>new Date()),
+    config:{appUrl:String(env.IRPA_APP_URL||"https://irpa-digital-board-governance.web.app").replace(/\/$/,""),ttlDays:14,emailLinkTtlDays:Math.max(1,Math.min(30,Number(env.IRPA_EMAIL_SIGNING_LINK_TTL_DAYS)||7))},
+    crypto:env.DRIVE_MOCK==="true"?null:{keyProvider},
+    allowReturnTokens:env.DRIVE_MOCK==="true"||(env.IRPA_ENVIRONMENT==="staging"&&env.IRPA_STAGING_CRYPTO_TEST_MODE==="true"),
+    allowLegacyTestSigners:env.DRIVE_MOCK==="true"
+  };
+}

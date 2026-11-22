@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "portal": "Members and Employees Portal",
+  "status": "incomplete",
+  "declaration": {
+    "affectedPortals": [
+      "Members and Employees Portal"
+    ],
+    "reason": "Complete this portal-specific declaration before protected changes.",
+    "files": [],
+    "expectedEffect": "To be declared for the specific repair.",
+    "prohibitedChanges": [
+      "Do not change another portal's internals.",
+      "Do not weaken authentication, signing, invitation, deletion or deployment controls."
+    ],
+    "lockTests": [
+      "tests/org-structure-authority.test.mjs",
+      "tests/job-description-intranet-workflow.test.mjs"
+    ]
+  },
+  "baseline": {
+    "commit": "433727282012c75cdaebca21dcdadcb28dba59fb",
+    "rollbackCommit": "433727282012c75cdaebca21dcdadcb28dba59fb"
+  },
+  "validation": {
+    "baselineSmoke": "PENDING",
+    "portalSmoke": {},
+    "fullRegression": "PENDING",
+    "evidence": [],
+    "behaviourDifferences": []
+  },
+  "renewals": []
+}

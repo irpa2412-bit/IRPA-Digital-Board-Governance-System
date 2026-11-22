@@ -1,0 +1,74 @@
+# IRPA controlled deployment configuration
+# Production cutover explicitly authorized on 2026-10-04.
+# Deployment verification retriggered from main after controlled cutover merge.
+name = "irpa-google-drive-gateway"
+main = "src/index.js"
+compatibility_date = "2026-09-29"
+workers_dev = true
+keep_vars = true
+
+[vars]
+FIREBASE_PROJECT_ID = "irpa-digital-board-governance"
+AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
+IRPA_APP_URL = "https://irpa-digital-board-governance.web.app"
+SMTP_HOST = "mail.irpa.or.tz"
+SMTP_PORT = "465"
+SMTP_FROM = "info@irpa.or.tz"
+DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System"
+FIRESTORE_COLLECTION_PREFIX = ""
+DRIVE_MOCK = "false"
+LOCAL_TEST_MODE = "false"
+ESIGN_MODULE_ENABLED = "true"
+CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
+IRPA_PRODUCTION_CUTOVER = "true"
+IRPA_WORKER_NAME = "irpa-google-drive-gateway"
+IRPA_WORKER_ENVIRONMENT = "production"
+IRPA_ENVIRONMENT = "production"
+
+[[kv_namespaces]]
+binding = "DRIVE_KV"
+id = "ccdbffa662ac48bfbdf7f4b1f62ca941"
+
+[[durable_objects.bindings]]
+name = "ESIGN_DO"
+class_name = "EsignRecordDurableObject"
+
+[[migrations]]
+tag = "esign-do-v1"
+new_sqlite_classes = ["EsignRecordDurableObject"]
+
+[env.staging]
+name = "irpa-google-drive-gateway-staging"
+workers_dev = true
+
+[env.staging.vars]
+IRPA_WORKER_NAME = "irpa-google-drive-gateway-staging"
+IRPA_WORKER_ENVIRONMENT = "staging"
+IRPA_ENVIRONMENT = "staging"
+FIREBASE_PROJECT_ID = "irpa-dbg-staging-a73ec"
+AUTHORIZED_DRIVE_EMAIL = "irpa2412@gmail.com"
+IRPA_APP_URL = "https://irpa-dbg-staging-a73ec.web.app"
+SMTP_HOST = "mail.irpa.or.tz"
+SMTP_PORT = "465"
+SMTP_FROM = "info@irpa.or.tz"
+DRIVE_ROOT_FOLDER_NAME = "IRPA Governance System - STAGING"
+FIRESTORE_COLLECTION_PREFIX = ""
+DRIVE_MOCK = "false"
+LOCAL_TEST_MODE = "false"
+ESIGN_MODULE_ENABLED = "true"
+CLOUDFLARE_AUTH_FUNCTIONS_ENABLED = "true"
+IRPA_PRODUCTION_CUTOVER = "false"
+META_REDIRECT_URI = "https://irpa-google-drive-gateway-staging.irpa-governance.workers.dev/api/communications/meta/callback"
+META_GRAPH_API_VERSION = "v26.0"
+
+[[env.staging.kv_namespaces]]
+binding = "DRIVE_KV"
+id = "5ea76010553049a2b98c8493c37fbbc4"
+
+[[env.staging.durable_objects.bindings]]
+name = "ESIGN_DO"
+class_name = "EsignRecordDurableObject"
+
+[[env.staging.migrations]]
+tag = "esign-do-staging-v1"
+new_sqlite_classes = ["EsignRecordDurableObject"]

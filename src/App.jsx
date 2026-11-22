@@ -1,0 +1,1132 @@
+// Extensible portal hierarchy registry: add future sub-portals under their parent here.
+// Every registered child is kept out of the top-level Portals navigator and exposed in the in-portal navigator.
+const PORTAL_ROLLER_GROUPS=[["Meetings",["Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"]],["Documents",["My Documents","Department Documents","Shared With Me","Signing Workspace","Post-Signature Work","Final Archive","Upload Document","Retrieve Archived Documents"]],["Induction and Orientation",["Induction Applications"]]];
+function sortNavigationItems(items){return [...new Set(items)].filter(Boolean).sort((a,b)=>{const labelA=displayModuleName(a)||a;const labelB=displayModuleName(b)||b;return labelA.localeCompare(labelB,"en",{sensitivity:"base",numeric:true})||a.localeCompare(b,"en",{sensitivity:"base"});});}
+function getPortalGroupForModule(module){return PORTAL_ROLLER_GROUPS.find(([parent,children])=>module===parent||children.includes(module))||null;}
+function isRegisteredSubPortal(module){return PORTAL_ROLLER_GROUPS.some(([,children])=>children.includes(module));}
+function portalNavigationLabel(module){const label=PORTAL_LABELS[module]||displayModuleName(module);if(isRegisteredSubPortal(module))return "SUB-PORTAL · "+label;const group=getPortalGroupForModule(module);return group?"PARENT PORTAL · "+label:label;}
+function getPortalContentItems(active,modules){const group=getPortalGroupForModule(active);if(group){const [parent,children]=group;return [parent,...sortNavigationItems(children)].filter(item=>modules.includes(item));}return modules.includes(active)?[active]:[];}
+function getPageNavigationItems(active,modules){
+  // The whole-web-app Back/Next navigator lists parent portals only; sub-portals stay in in-portal navigation.
+  return sortNavigationItems(modules.filter(module=>!PORTAL_CHILDREN_SET.has(module)));
+}
+function PageBackNextNavigation({active,modules,onNavigate}){
+  const [timePadOpen,setTimePadOpen]=useState(false);
+  const [clockNow,setClockNow]=useState(()=>Date.now());
+  useEffect(()=>{if(!timePadOpen)return;const timer=window.setInterval(()=>setClockNow(Date.now()),1000);return()=>window.clearInterval(timer);},[timePadOpen]);
+  const items=getPageNavigationItems(active,modules);
+  if(!items.length)return null;
+  const activeGroup=getPortalGroupForModule(active);
+  const navigationActive=items.includes(active)?active:(activeGroup&&items.includes(activeGroup[0])?activeGroup[0]:active);
+  const index=Math.max(0,items.indexOf(navigationActive));
+  const previous=index>0?items[index-1]:null;
+  const next=index<items.length-1?items[index+1]:null;
+  const label=PORTAL_LABELS[active]||displayModuleName(active);
+  return <nav className="page-back-next-navigation" aria-label="Page Back and Next navigation">
+    <button type="button" className="page-back-next-button" disabled={!previous} onClick={()=>previous&&onNavigate(previous)} aria-label={previous?"Back to "+(PORTAL_LABELS[previous]||displayModuleName(previous)):"Back unavailable"}>
+      <span aria-hidden="true">←</span><span>Back</span>
+    </button>
+    <div className="page-back-next-status" aria-live="polite">
+      <button type="button" className="page-back-next-time-toggle" onClick={()=>setTimePadOpen(value=>!value)} aria-expanded={timePadOpen} aria-controls="irpa-international-time-pad">{timePadOpen?"Hide world time":"World time"}</button>
+      <span>PAGE NAVIGATION</span><strong>{label}</strong><small>{index+1} of {items.length}</small>
+    </div>
+    <button type="button" className="page-back-next-button" disabled={!next} onClick={()=>next&&onNavigate(next)} aria-label={next?"Next to "+(PORTAL_LABELS[next]||displayModuleName(next)):"Next unavailable"}>
+      <span>Next</span><span aria-hidden="true">→</span>
+    </button>
+    {timePadOpen&&<section className="page-back-next-time-pad" id="irpa-international-time-pad" role="region" aria-label="International time pad"><div className="live-weather-time-pad-heading"><div><strong>INTERNATIONAL TIME</strong><small>Live local times · updates every second</small></div><button type="button" onClick={()=>setTimePadOpen(false)} aria-label="Close international time pad">Close</button></div><div className="live-weather-time-grid">{[{city:"Dar es Salaam",zone:"Africa/Dar_es_Salaam"},{city:"Nairobi",zone:"Africa/Nairobi"},{city:"Dubai",zone:"Asia/Dubai"},{city:"London",zone:"Europe/London"},{city:"Geneva",zone:"Europe/Zurich"},{city:"New York",zone:"America/New_York"},{city:"Singapore",zone:"Asia/Singapore"},{city:"Tokyo",zone:"Asia/Tokyo"},{city:"Sydney",zone:"Australia/Sydney"}].map(place=><div className="live-weather-time-city" key={place.zone}><strong>{place.city}</strong><span>{new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",timeZone:place.zone}).format(new Date(clockNow))}</span><small>{new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric",timeZone:place.zone}).format(new Date(clockNow))}</small></div>)}</div></section>}
+  </nav>
+}
+
+function PortalNavigationFreeze(){useEffect(()=>{const main=document.querySelector("#root .app-shell .main-area");if(!main)return;const roller=main.querySelector(":scope > .desktop-webapp-navigation-roller");const update=()=>{const visible=Boolean(roller)&&window.getComputedStyle(roller).display!=="none";const style=visible?window.getComputedStyle(roller):null;const height=visible?roller.getBoundingClientRect().height+Number.parseFloat(style.marginBottom||"0"):0;main.style.setProperty("--irpa-portal-navigation-height",`${Math.ceil(height)}px`)};update();const observer=roller&&typeof ResizeObserver!=="undefined"?new ResizeObserver(update):null;if(observer&&roller)observer.observe(roller);window.addEventListener("resize",update,{passive:true});return()=>{observer?.disconnect();window.removeEventListener("resize",update);main.style.removeProperty("--irpa-portal-navigation-height")}},[]);return null}
+
+function WebAppNavigationRoller({active,modules,onNavigate,liveDay,liveDate,liveTime,mobileTimeFormat,onToggleTimeFormat}){const items=getPortalContentItems(active,modules);if(!items.length)return null;const label=portalNavigationLabel(active);return <div className="desktop-webapp-navigation-roller" aria-label="In-portal sub-portal navigation"><div className="webapp-navigation-live-clock" aria-label="Live date and time"><strong>{liveDay}</strong><span>{liveDate}</span><b>{liveTime}</b><button type="button" onClick={onToggleTimeFormat} aria-label={"Change time format. Current format: "+mobileTimeFormat}>{mobileTimeFormat==="24h"?"24H":"12H"}</button></div><span className="webapp-navigation-roller-kicker">IN-PORTAL NAVIGATION</span><strong>{label}</strong><select aria-label="Navigate to a sub-portal within the current portal" value={active} onChange={e=>onNavigate(e.target.value)}>{items.map((item,index)=><option key={item} value={item}>{index===0?portalNavigationLabel(item):"　↳ "+portalNavigationLabel(item)}</option>)}</select><span className="webapp-navigation-roller-chevron" aria-hidden="true">⌄</span></div>}
+
+import "./styles/portal-readability-standard.css";
+import React,{useEffect,useMemo,useState}from"react";const DocumentLifecycleModule=React.lazy(()=>import("./pages/DocumentLifecycleModule"));const PoliciesStrategicPlanPortal=React.lazy(()=>import("./pages/PoliciesStrategicPlanPortal"));import Invitations from"./pages/Invitations";import Employees from"./pages/Employees";import BoardMembers from"./pages/BoardMembers";import Members from"./pages/Members";import EmployeePayments from"./pages/EmployeePayments";import Meetings from"./pages/Meetings";import MeetingRoom from"./pages/MeetingRoom";import Resolutions from"./pages/Resolutions";import Voting from"./pages/Voting";import OperationalGateways from"./pages/OperationalGateways";import OperationalGatewaysParticipants from"./pages/OperationalGatewaysParticipants";import AuthorizationApprovals from"./pages/AuthorizationApprovals";import SignaturePlatformWithUpload from"./pages/SignaturePlatformWithUpload";import EmailSigningReadOnlyPage from"./pages/EmailSigningReadOnlyPage";import FinancePortfolio from"./pages/FinancePortfolio";import ProcurementPortal from"./pages/ProcurementPortal";import Settings from"./pages/Settings";import ITOperationsPortal from"./pages/ITOperationsPortal";import InductionOrientation from"./pages/InductionOrientation";import InductionAdmin from"./pages/InductionAdmin";import ExternalAuditorPortal from"./pages/ExternalAuditorPortal";import AuditorsSpecialInvitees from"./pages/AuditorsSpecialInvitees";const ResearchStatisticsKnowledgePortal=React.lazy(()=>import("./pages/ResearchStatisticsKnowledgePortal"));const GrantIntelligencePortal=React.lazy(()=>import("./pages/GrantIntelligencePortal"));import GrantOpportunityNotifications from "./components/GrantOpportunityNotifications";import CommunicationMediaPortal from "./pages/CommunicationMediaPortal";import AddAdministratorPortal from"./pages/AddAdministratorPortal";import DepartmentArchiveRegistry from"./components/DepartmentArchiveRegistry";import DepartmentPortalBuilder,{DepartmentPortalWorkspace}from"./components/DepartmentPortalBuilder";import MeetingEntryGateway from"./pages/MeetingEntryGateway";import ModuleInterlinkBar from"./components/ModuleInterlinkBar";import PortalDocumentAccessPoint from"./components/PortalDocumentAccessPoint";import DocumentRetrievalAccessPoint from"./components/DocumentRetrievalAccessPoint";import{ResearchPortalAlert,ResearchUpdatesPanel}from"./components/ResearchInformationGovernance";import{observeAuthState,loginWithEmail,loginWithGoogle,completeGoogleRedirect,registerWithEmail,sendPasswordReset,sendAdminMagicLink,isMagicLink,completeMagicLink,completeInvitationToken,configureInvitationPassword,getInvitationSessionState,logout,beginPasswordResetMobileVerification,verifyPasswordResetMobileOtp,clearPasswordAttemptState}from"./firebase/auth";import{getAdminProfile,getCurrentMemberProfile,getCurrentEmployeeProfile,getCurrentAuditorProfile,resolveAuthenticatedLoginContext,getCurrentInductionContext,getRecords,COLLECTIONS}from"./firebase/data";import{provisionCurrentMemberFromInvitationV2}from"./firebase/invitationWorkflow";import{collection,doc,getDoc,getDocs}from"firebase/firestore";import{auth,db}from"./firebase/config";import FieldEntryDataGate from "./FieldEntryDataGate";
+import authorityConfig from "../config/org-structure-authority.json";
+import GatewaySigningPortal from "./pages/GatewaySigningPortal";
+import RoleJobDescriptionPortal from "./pages/RoleJobDescriptionPortal";
+import JobDescriptionWorkflowPortal from "./pages/JobDescriptionWorkflowPortal";
+// TEMPORARY BUILD/STABILISATION CONTROL: preserve the gate implementation, but temporarily disconnect it from the gateway so the pre-gateway interface remains usable.
+const IRPA_TEMPORARY_DATA_GATE_ENABLED=true;
+// TEMPORARY GATEWAY DISCONNECT: newer gateway/security code remains in place; only its resolver communication is paused.
+const IRPA_GATEWAY_CONNECTED=false;
+function DataEnvironmentGate({target,onContinue}){const[choice,setChoice]=useState("");const[confirmed,setConfirmed]=useState(false);const label=target==="Dashboard"?"Dashboard":String(target||"Portal");useEffect(()=>{setChoice("");setConfirmed(false)},[target]);const continueGate=()=>{if(!choice)return;if(choice==="ACTUAL"&&!confirmed)return;try{window.sessionStorage.setItem("irpaIdentityDataEnvironment","ACTUAL");window.sessionStorage.setItem("irpaDataEnvironment",choice);window.sessionStorage.setItem("irpaDataEnvironmentTarget",label);window.sessionStorage.setItem("irpaDataEnvironmentSelectedAt",new Date().toISOString())}catch{}onContinue?.(choice)};return <div role="dialog" aria-modal="true" aria-labelledby="data-environment-gate-title" className="auth-screen" style={{position:"fixed",inset:0,zIndex:20000,overflowY:"auto"}}><section className="auth-card" style={{maxWidth:620}}><div className="auth-brand"><div className="brand-kicker">IRPA-DGBS DATA CONTROL</div><h1 id="data-environment-gate-title">Data Environment Gate</h1><p>Before entering <strong>{label}</strong>, select the operational data environment. <strong>Identity and security configuration always remain in ACTUAL DATA:</strong> members, employees, administrators, signer/signature profiles, auditor profiles and system settings are never routed to trial storage.</p></div><div className="auth-divider"><span>GATE ENTRY REQUIRED</span></div><div className="form-grid"><button type="button" className={choice==="TRIAL"?"":"secondary-button"} onClick={()=>{setChoice("TRIAL");setConfirmed(false)}} style={{minHeight:110,textAlign:"left"}}><strong>TRIAL DATA</strong><small style={{display:"block",marginTop:7}}>Testing, demonstrations, training and controlled trial records.</small></button><button type="button" className={choice==="ACTUAL"?"":"secondary-button"} onClick={()=>setChoice("ACTUAL")} style={{minHeight:110,textAlign:"left"}}><strong>ACTUAL DATA</strong><small style={{display:"block",marginTop:7}}>Live institutional records. Changes are subject to IRPA governance controls.</small></button></div>{choice==="ACTUAL"&&<label className="field" style={{display:"flex",gap:10,alignItems:"flex-start",marginTop:16}}><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>I understand that this gate opens the actual-data environment and that entries, approvals, signatures, financial records and other changes may affect IRPA's live institutional records.</span></label>}{choice==="TRIAL"&&<div className="auth-message" style={{marginTop:16}}><strong>TRIAL ENVIRONMENT SELECTED.</strong><br/>Use only designated test/trial records. Do not enter confidential live information into a trial record.</div>}{choice==="ACTUAL"&&confirmed&&<div className="auth-message" style={{marginTop:16}}><strong>ACTUAL DATA ENVIRONMENT SELECTED.</strong><br/>The system will continue to apply the user's existing role, authority and server-side controls.</div>}<button type="button" disabled={!choice||(choice==="ACTUAL"&&!confirmed)} onClick={continueGate} style={{marginTop:18}}>Enter {choice==="ACTUAL"?"Actual Data":"Trial Data"} Gate</button></section></div>}
+const RESEARCH_PORTAL_TARGET_BY_MODULE={"Members & Personnel":"Human Resources","Finance Portfolio":"Finance Portfolio","Procurement":"Procurement","Meetings":"Meetings","Livestock":"Livestock","Environment & Rangeland":"Environment & Rangeland","Outreach & Community Development":"Outreach & Community Development","Field Operations":"Field Operations","Operations":"Operations","Information Technology":"Information Technology","Risk Register":"Internal Oversight","Documents":"Documents","Reports":"Reports"};const displayModuleName=m=>({"IT Operations":"IT Operations Portal","Research, Statistics and Knowledge":"Research, Statistics and Knowledge Portal","Dashboard":"Dashboard","Induction and Orientation":"Induction & Orientation Portal","Induction Applications":"Induction Applications Portal","Board Members Registration":"Board Members Registration Portal","Members & Personnel":"Members & Personnel Portal","Invitations":"Invitations Portal","Meetings":"Meeting Portal","Meeting Room":"Meeting Room Portal","Participants":"Participants Portal","Resolutions":"Resolutions Portal","Voting":"Voting Portal","Actions":"Actions Portal","Documents":"Documents Portal","Signature Platform":"Signature Portal","Decisions":"Decisions Portal","Risk Register":"Risk Register Portal","Authorization & Approvals":"Authorization & Approvals Portal","Employee Payments":"Employee Payments Portal","Finance Portfolio":"Finance Portal","Procurement":"Procurement Portal","Reports":"Reports Portal","Audit Trail":"Audit Trail Portal","Downloads":"Downloads Portal","Settings":"Settings Portal","Add Administrator":"Add Administrator Portal","Department and Archive Registry":"Department and Archive Registry","Department Portal Builder":"Department Portal Builder","Grant Intelligence & Funding Opportunities":"Grant Intelligence & Funding Opportunities","Communication & Media":"Communication & Media Portal"}[m]||m);const roleValues=v=>Array.isArray(v)?v.flatMap(roleValues):String(v||"").split(",").map(x=>x.trim()).filter(Boolean);const hasRole=(p,roles)=>roleValues(p?.roles||p?.role).some(r=>roles.includes(r));
+const NAV={IT:["IT Operations"],GOVERNANCE:["Dashboard","Role Descriptions","Job Description Administration","Induction and Orientation","Induction Applications","Board Members Registration","Members & Personnel","Invitations","Meetings","Resolutions","Voting","Actions","Documents","Policies and Strategic Plans","Signature Platform","Decisions","Risk Register","Authorization & Approvals","Employee Payments","Research, Statistics and Knowledge"],FINANCE:["Finance Portfolio","Procurement"],EVIDENCE:["Reports","Audit Trail"],FUNDING:["Grant Intelligence & Funding Opportunities"],COMMUNICATIONS:["Communication & Media"],SYSTEM:["Downloads","Settings","Add Administrator","Department and Archive Registry","Department Portal Builder","External Auditor Portal","Auditors & Special Invitees"]};const PORTAL_CHILDREN=Object.fromEntries(PORTAL_ROLLER_GROUPS.map(([parent,children])=>[parent,children]));const PORTAL_CHILDREN_SET=new Set(Object.values(PORTAL_CHILDREN).flat());const PORTAL_LABELS={Meetings:"Meeting Portal",Documents:"Documents Portal","Policies and Strategic Plans":"Policies and Strategic Plan Portal","Induction and Orientation":"Induction & Orientation Portal"};const ALL_MODULES=[...new Set([...Object.values(NAV).flat(),...Object.values(PORTAL_CHILDREN).flat()])];
+const BASE_MEMBER_MODULES=["Dashboard","Role Descriptions","Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Documents","Policies and Strategic Plans","Signature Platform","Decisions","Authorization & Approvals","Procurement","Induction and Orientation","Downloads","Grant Intelligence & Funding Opportunities"];
+const FINANCE_ROLES=["Finance Personnel","Finance Manager","Accountant","Finance Officer","Executive Director","Director Finance & Administration"];
+const PROCUREMENT_ROLES=["Procurement Officer","Procurement Manager","Procurement Team Member"];
+const PROCUREMENT_APPROVAL_ROLES=["Executive Director","Director Livestock","Livestock Director","Director Internal Oversight","Internal Oversight Director","Director Finance & Administration","Director Human Resources","Director Outreach","Director Community Development","Director Environment","Director Operations","Outreach Director","Community Development Director","Environment Director",];
+const HR_ROLES=["Executive Director","Director Human Resources","HR Manager"];
+const IT_ROLES=["IT Specialist","Information Technology Officer"];
+const IT_OPERATIONS_MODULES=["IT Operations"];
+// The Executive Office is a central office, separate from the 13 directorates.
+// Directorate and department routing is navigation metadata only. It does not
+// replace server-enforced access checks or create signing authority.
+// grant server-side record permissions. Legacy department keys remain during
+// transition so existing member/employee profiles do not lose their portals.
+const DEPARTMENTAL_MODULES={
+  "Executive Office":["Members & Personnel","Participants","Risk Register","Reports"],
+  "Governance":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
+  "Board of Directors":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
+  "Board Secretariat":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
+  "Internal Oversight":["Risk Register","Reports","Audit Trail","Decisions","Actions"],
+  "Internal Audit and Assurance":["Risk Register","Reports","Audit Trail"],
+  "Finance and Administration":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
+  "Finance":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
+  "Procurement":["Procurement","Reports","Audit Trail"],
+  "Administration":["Reports","Documents"],
+  "Finance & Administration":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
+  "Human Resources":["Members & Personnel","Employee Payments","Reports"],
+  "Livestock Development":["Reports","Actions"],
+  "Livestock Production":["Reports","Actions"],
+  "Animal Health and Veterinary Services":["Reports","Actions"],
+  "Livestock":["Reports","Actions"],
+  "Sustainable Rangeland Management and Climate Resilience":["Risk Register","Reports","Actions"],
+  "Rangeland Management":["Risk Register","Reports","Actions"],
+  "Climate Resilience":["Risk Register","Reports","Actions"],
+  "Environment & Rangeland":["Risk Register","Reports","Actions"],
+  "Market Development":["Reports","Actions"],
+  "Livestock and Meat Markets":["Reports","Actions"],
+  "By-products and Enterprise Development":["Reports","Actions"],
+  "Cross-Cutting Themes":["Reports","Actions","Risk Register"],
+  "Gender, Youth and Inclusion":["Reports","Actions"],
+  "Monitoring, Evaluation and Learning":["Reports","Actions","Risk Register"],
+  "Climate and Safeguards":["Risk Register","Reports","Actions"],
+  "IRPA Capacity Building and Institutional Growth":["Reports","Actions"],
+  "Institutional Development":["Reports","Grant Intelligence & Funding Opportunities"],
+  "Digital Governance":["IT Operations"],
+  "Outreach":["Communication & Media","Reports","Actions"],
+  "Communications and Media":["Communication & Media","Reports","Actions"],
+  "Outreach & Community Development":["Reports","Actions"],
+  "Community Development":["Reports","Actions"],
+  "Community Mobilisation":["Reports","Actions"],
+  "Field Operations":["Reports","Actions"],
+  "Operations":["Reports","Actions"],
+  "Information Technology":["IT Operations"],
+  "Research, Statistics and Knowledge":["Research, Statistics and Knowledge"],
+  "Research Governance and Data Stewardship":["Research, Statistics and Knowledge"],
+  "Statistics and Analysis":["Research, Statistics and Knowledge"],
+  "Knowledge Management":["Research, Statistics and Knowledge"],
+  "Research, Statistics and Knowledge Department":["Research, Statistics and Knowledge"],
+  "Research & Knowledge":["Research, Statistics and Knowledge"],
+  "Research":["Research, Statistics and Knowledge"],
+  "Research Department":["Research, Statistics and Knowledge"],
+  "Research and Knowledge":["Research, Statistics and Knowledge"]
+,
+  "Rangeland Planning":["Risk Register","Reports","Actions"],
+  "Restoration and Rehabilitation":["Risk Register","Reports","Actions"],
+  "Grazing and Pasture Management":["Risk Register","Reports","Actions"],
+  "Climate Adaptation":["Risk Register","Reports","Actions"],
+  "Natural Resource Monitoring":["Risk Register","Reports","Actions"],
+  "Animal Breeding and Genetics":["Reports","Actions"],
+  "Animal Husbandry":["Reports","Actions"],
+  "Veterinary Coordination":["Reports","Actions"],
+  "Animal Health and Disease Surveillance":["Reports","Actions"],
+  "Meat Value Chains":["Reports","Actions"],
+  "Livestock Trading":["Reports","Actions"],
+  "Skins and Hides":["Reports","Actions"],
+  "Manure and Organic Fertiliser":["Reports","Actions"],
+  "Pastoral Enterprise Development":["Reports","Actions"],
+  "Women and Youth Empowerment":["Reports","Actions"],
+  "Monitoring and Evaluation":["Reports","Actions","Risk Register"],
+  "Learning and Knowledge":["Reports","Actions"],
+  "Safeguards and Resilience":["Risk Register","Reports","Actions"],
+  "Capacity Building":["Reports","Actions"],
+  "Partnerships and Resource Mobilisation":["Reports","Grant Intelligence & Funding Opportunities"],
+  "Digital Governance Systems":["IT Operations"],
+  "Data Governance":["IT Operations"],
+  "Accounting":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
+  "Budgeting and Financial Reporting":["Finance Portfolio","Reports","Audit Trail"],
+  "Payments and Treasury":["Finance Portfolio","Employee Payments","Reports","Audit Trail"],
+  "Procurement Planning":["Procurement","Reports","Audit Trail"],
+  "Sourcing and Evaluation":["Procurement","Reports","Audit Trail"],
+  "Contract Administration":["Procurement","Reports","Audit Trail"],
+  "Facilities and Logistics":["Reports","Documents"],
+  "Records Administration":["Reports","Documents"],
+  "Recruitment and Appointments":["Members & Personnel","Reports"],
+  "Personnel Records":["Members & Personnel","Reports"],
+  "Learning and Development":["Members & Personnel","Reports"],
+  "Audit Planning":["Risk Register","Reports","Audit Trail"],
+  "Audit and Compliance":["Risk Register","Reports","Audit Trail"],
+  "Risk Follow-up":["Risk Register","Reports","Audit Trail"],
+  "Board Meetings and Resolutions":["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions","Documents"],
+  "Governance Records":["Meetings","Participants","Resolutions","Actions","Decisions","Documents"],
+  "Field Coordination":["Reports","Actions"],
+  "Transport and Logistics":["Reports","Actions"],
+  "IT Operations":["IT Operations"],
+  "Information Security":["IT Operations"],
+  "Editorial and Content":["Communication & Media","Reports","Actions"],
+  "Website Publishing":["Communication & Media","Reports","Actions"],
+  "Media Relations":["Communication & Media","Reports","Actions"],
+  "Pastoral Groups":["Reports","Actions"],
+  "Community Partnerships":["Reports","Actions"],
+  "Research Ethics and Clearance":["Research, Statistics and Knowledge"],
+  "Restricted Research Records":["Research, Statistics and Knowledge"],
+  "Data Collection":["Research, Statistics and Knowledge"],
+  "Statistical Analysis":["Research, Statistics and Knowledge"],
+  "Research Outputs":["Research, Statistics and Knowledge"],
+  "Knowledge Products":["Research, Statistics and Knowledge"]
+};
+const UNRESOLVED_ROLE_TITLES=["Director Field","Field Director","Operations Director","Research Director","Communication Officer","Communication Manager","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer"];
+// Keep one routing map; legacy role labels are preserved as labels, never as administrator claims.
+const ROLE_DEPARTMENT={
+  "Administrator":"Executive Office","Executive Director":"Executive Office","Director of International Oversight":"Executive Office",
+  "Board Chairperson":"Governance","Board Vice Chairperson":"Governance","Board Secretary":"Governance","Board Treasurer":"Governance","Board Member":"Governance",
+  "Director Internal Oversight":"Internal Oversight","Internal Oversight Director":"Internal Oversight","Internal Oversight Officer":"Internal Oversight",
+  "Director Finance & Administration":"Finance and Administration","Finance Manager":"Finance and Administration","Finance Officer":"Finance and Administration","Accountant":"Finance and Administration","Finance Personnel":"Finance and Administration","Procurement Officer":"Finance and Administration","Procurement Manager":"Finance and Administration","Procurement Team Member":"Finance and Administration",
+  "Director Human Resources":"Human Resources","HR Manager":"Human Resources","HR Officer":"Human Resources",
+  "Director Livestock":"Livestock Development","Livestock Director":"Livestock Development","Livestock Officer":"Livestock Development",
+  "Director Environment":"Sustainable Rangeland Management and Climate Resilience","Environment Director":"Sustainable Rangeland Management and Climate Resilience","Environment Officer":"Sustainable Rangeland Management and Climate Resilience","Rangeland Officer":"Sustainable Rangeland Management and Climate Resilience",
+  "Director Outreach":"Outreach","Outreach Director":"Outreach","Outreach Officer":"Outreach","Director Community Development":"Community Development","Community Development Director":"Community Development","Community Development Officer":"Community Development",
+  "Director Field Operations":"Field Operations","Field Assistant":"Field Operations",
+  "Director Operations":"Operations","Operations Manager":"Operations","Driver":"Operations","Administrative Assistant":"Operations",
+  "IT Specialist":"Information Technology","Information Technology Officer":"Information Technology",
+  "Communications Officer":"Outreach","Communications Manager":"Outreach","Media Officer":"Outreach","Media Manager":"Outreach","Public Relations Officer":"Outreach","Communications & Media Officer":"Outreach",
+  "Director Research":"Research, Statistics and Knowledge","Director, Research, Statistics and Knowledge":"Research, Statistics and Knowledge","Research Directorate Director":"Research, Statistics and Knowledge","Research Manager":"Research, Statistics and Knowledge","Research Officer":"Research, Statistics and Knowledge","Research, Statistics & Knowledge Officer":"Research, Statistics and Knowledge",
+  "Programme/Technical Officer":"Cross-Cutting Themes","Programme Officer":"Cross-Cutting Themes","Monitoring & Evaluation Officer":"Cross-Cutting Themes","Project Officer":"Cross-Cutting Themes"
+};
+
+const RESEARCH_AUTHORITY_ROLES=["Director Research","Director, Research, Statistics and Knowledge","Research Directorate Director","Research Manager","Research Officer","Research, Statistics & Knowledge Officer"];const COMMUNICATIONS_ROLES=["Communications Officer","Communications Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communication & Media","Communications & Media","Communication and Media","Communications and Media","Director Outreach","Outreach Director","Director Community Development","Community Development Director","Executive Director"];const EXECUTIVE_DIRECTOR_MODULES=["Members & Personnel","Participants","Risk Register","Job Description Administration"];const CONFIGURED_MODULES=["Meeting Room","Actions","Documents","Decisions","Risk Register","Reports","Audit Trail"];const LOGIN_ROLE_OPTIONS=["Administrator","Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member","Executive Director","Director Internal Oversight","Director Livestock","Director Environment","Director Finance & Administration","Director Human Resources","Director Outreach","Director Community Development","Director Field Operations","HR Manager","HR Officer","Finance Manager","Finance Officer","Accountant","Internal Oversight Officer","Rangeland Officer","Livestock Officer","Environment Officer","Outreach Officer","Community Development Officer","Programme/Technical Officer","Procurement Officer","Operations Manager","IT Specialist","Information Technology Officer","Director Research","Research Director","Research Manager","Research Officer","Research, Statistics & Knowledge Officer","Driver","Field Assistant","Administrative Assistant","Communications Officer","Communication Officer","Communications Manager","Communication Manager","Media Officer","Media Manager","Public Relations Officer","Communications & Media Officer","Communications and Media Officer","Media and Communications Officer","Media & Communications Officer","Monitoring & Evaluation Officer","Project Officer","Management","Employee"];
+function isFinancePortalMember(p,e){return hasRole(p,FINANCE_ROLES)||hasRole(e,FINANCE_ROLES)||(["Finance & Administration","Finance and Administration"].includes(p?.department)&&["Finance Unit","Accounting Unit"].includes(p?.unit))||(["Finance & Administration","Finance and Administration"].includes(e?.department)&&["Finance Unit","Accounting Unit"].includes(e?.unit));}
+function isProcurementPortalMember(p,e){return hasRole(p,PROCUREMENT_ROLES)||hasRole(p,PROCUREMENT_APPROVAL_ROLES)||hasRole(e,PROCUREMENT_ROLES)||hasRole(e,PROCUREMENT_APPROVAL_ROLES)||(["Finance & Administration","Finance and Administration"].includes(p?.department)&&p?.unit==="Procurement Unit")||(["Finance & Administration","Finance and Administration"].includes(e?.department)&&e?.unit==="Procurement Unit");}
+function memberModules(p,e,selectedAuthority){
+  const selected=String(selectedAuthority||"").trim();
+  if(!selected)return["Dashboard"];
+  const roles=[selected];
+  const m=selected==="Administrator"?["Dashboard","Role Descriptions"]:(RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans","Research, Statistics and Knowledge","Grant Intelligence & Funding Opportunities"]:[...BASE_MEMBER_MODULES]);
+  const authorityProfile={...(p||{}),roles,role:selected};
+  const authorityEmployee=e?{...e,roles:[selected],role:selected}:null;
+  const department=String(authorityProfile?.department||authorityEmployee?.department||ROLE_DEPARTMENT[selected]||"").trim();
+  const departmental=DEPARTMENTAL_MODULES[department]||[];
+  m.push(...departmental);
+  // IT is a departmental extension, not a replacement for the common member gateway.
+  if(IT_ROLES.includes(selected))m.push(...IT_OPERATIONS_MODULES);
+  if(RESEARCH_AUTHORITY_ROLES.includes(selected))return[...new Set(m)].filter(Boolean);
+  // Preserve legacy Finance/HR role recognition where an older record lacks department metadata.
+  if(isFinancePortalMember(authorityProfile,authorityEmployee))m.push("Finance Portfolio","Employee Payments","Reports","Audit Trail");
+  if(roles.some(r=>HR_ROLES.includes(r)))m.push("Members & Personnel","Employee Payments","Reports");
+  if(roles.includes("Executive Director"))m.push(...EXECUTIVE_DIRECTOR_MODULES,"Reports");if(COMMUNICATIONS_ROLES.includes(selected))m.push("Communication & Media");
+  return[...new Set(m)].filter(Boolean);
+}
+function InvitationPasswordSetupScreen({user}){
+  const[password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[passwordPopup,setPasswordPopup]=useState(null);
+  const notifyPasswordPopup=(text,type="info")=>{setPasswordPopup({text,type});window.setTimeout(()=>setPasswordPopup(null),3600)};
+  async function save(e){
+    e.preventDefault(); setMessage("");
+    if(password.length<8){setMessage("Use a password with at least 8 characters.");return}
+    if(password!==confirm){setMessage("The passwords do not match.");return}
+    setBusy(true);
+    try{
+      await configureInvitationPassword(password);
+      notifyPasswordPopup("Permanent password configured. Opening the IRPA workspace.","success");
+      await new Promise(resolve=>window.setTimeout(resolve,700));
+      window.location.reload();
+    }catch(x){setMessage(x?.message||"Unable to configure the permanent password. Please try again.");}
+    finally{setBusy(false)}
+  }
+  return <main className="auth-screen"><section className="auth-card"><div className="auth-logo-wrap"><img className="auth-logo" src="/irpa-logo.svg" alt="IRPA" /></div><div className="auth-brand"><div className="brand-kicker">IRPA</div><h1>Configure Your IRPA Account</h1><p>Your invitation has been verified. Set your permanent password before entering the IRPA Digital Board Governance System.</p><p><strong>{user?.email||"Verified invitation account"}</strong></p></div><div className="auth-divider"><span>Account Configuration</span></div><form onSubmit={save}><PasswordEntryField label="Create permanent password" value={password} onChange={setPassword} minLength={8} autoComplete="new-password" notify={notifyPasswordPopup}/><PasswordEntryField label="Confirm permanent password" value={confirm} onChange={setConfirm} minLength={8} autoComplete="new-password" notify={notifyPasswordPopup}/><button type="submit" disabled={busy}>{busy?"Saving Password...":"Save Permanent Password"}</button></form>{message&&<div className="auth-message">{message}</div>}<PasswordEntryPopup notice={passwordPopup}/></section></main>
+}
+
+function MemberActivationScreen({invitationId}) {
+  const[email,setEmail]=useState(""),[password,setPassword]=useState(""),[confirm,setConfirm]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[passwordPopup,setPasswordPopup]=useState(null);const notifyPasswordPopup=(text,type="info")=>{setPasswordPopup({text,type});window.setTimeout(()=>setPasswordPopup(null),3600)};
+  async function activate(e){
+    e.preventDefault(); setMessage("");
+    const clean=email.trim().toLowerCase();
+    if(password.length<8){setMessage("Use a password with at least 8 characters.");return}
+    if(password!==confirm){setMessage("The passwords do not match.");return}
+    setBusy(true);
+    try{
+      const {loginWithEmail}=await import("./firebase/auth");
+      const signedIn=await loginWithEmail(clean,password);
+      if(!signedIn?.uid) throw new Error("IRPA account authentication did not return a valid user session.");
+      await provisionCurrentMemberFromInvitationV2(invitationId);
+      window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+      window.location.reload();
+    }catch(x){const code=String(x?.code||"");setMessage(code==="auth/invalid-credential"?"The email or password is incorrect. First complete the password setup from the IRPA invitation email, then enter the same email and the new permanent password here.":x.message||"Unable to activate the IRPA account.");}
+    finally{setBusy(false)}
+  }
+  return <main className="auth-screen"><section className="auth-card"><div className="auth-logo-wrap"><img className="auth-logo" src="/irpa-logo.svg" alt="IRPA" /></div><div className="auth-brand"><div className="brand-kicker">IRPA</div><h1>Activate Your IRPA Account</h1><p>Use the email address that received your invitation and create your permanent password for the IRPA Digital Board Governance System.</p></div><div className="auth-divider"><span>Invitation Activation</span></div><form onSubmit={activate}><label>Invited email address</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/><PasswordEntryField label="Create permanent password" value={password} onChange={setPassword} minLength={8} autoComplete="new-password" notify={notifyPasswordPopup}/><PasswordEntryField label="Confirm password" value={confirm} onChange={setConfirm} minLength={8} autoComplete="new-password" notify={notifyPasswordPopup}/><button type="submit" disabled={busy}>{busy?"Activating Account...":"Activate IRPA Account"}</button></form>{message&&<div className="auth-message">{message}</div>}<PasswordEntryPopup notice={passwordPopup}/><div className="auth-links"><button className="text-button" onClick={()=>window.location.href=window.location.origin} disabled={busy}>Return to Sign In</button></div></section></main>
+}
+
+function PasswordEntryPopup({notice}){if(!notice?.text)return null;const tone=notice.type==="warning"?"#f59e0b":notice.type==="success"?"#22c55e":"#60a5fa";return <div className="password-entry-popup" role="status" aria-live="polite" style={{"--popup-tone":tone}}><strong>{notice.type==="warning"?"PASSWORD CAUTION":notice.type==="success"?"PASSWORD ACCEPTED":"PASSWORD ENTRY"}</strong><span>{notice.text}</span></div>}
+
+function PasswordEntryField({label,value,onChange,minLength=6,autoComplete="current-password",notify,required=true}){const[caps,setCaps]=useState(false),[visible,setVisible]=useState(false);const checkCaps=e=>{const active=!!e?.getModifierState?.("CapsLock");setCaps(active);if(active)notify?.("Caps Lock appears to be ON. Passwords are case-sensitive; check your capital-letter setting before continuing.","warning")};const change=e=>{const next=e.target.value;onChange(next);if(next.length>=minLength&&value.length<minLength)notify?.("Password entry is complete. Review it before submitting.","info")};const blur=()=>setCaps(false);return <div className="password-entry-field form-field"><label>{label}</label><div className="password-entry-control"><input className="password-entry-input" type={visible?"text":"password"} value={value} onChange={change} onKeyDown={checkCaps} onKeyUp={checkCaps} onFocus={checkCaps} onBlur={blur} required={required} minLength={minLength} autoComplete={autoComplete}/><button className="password-visibility-toggle" type="button" onClick={()=>setVisible(v=>!v)} aria-label={visible?"Hide password":"Show password"} title={visible?"Hide password":"Show password"}><svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.5-5.5 9.5-5.5S21.5 12 21.5 12s-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z" stroke="currentColor" strokeWidth="1.8"/><circle cx="12" cy="12" r="2.8" stroke="currentColor" strokeWidth="1.8"/></svg></button></div>{caps&&<small className="password-caps-warning">⚠ Caps Lock appears to be ON — password case matters.</small>}</div>}
+function AuthScreen(){const params=new URLSearchParams(window.location.search);const inductionMode=params.get("induction")==="1";const[mode,setMode]=useState("login"),[email,setEmail]=useState(()=>params.get("adminEmail")||""),[password,setPassword]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[authCooldown,setAuthCooldown]=useState(0),[passwordPopup,setPasswordPopup]=useState(null),[resetOpen,setResetOpen]=useState(false),[resetStep,setResetStep]=useState("REQUEST"),[resetConfirmation,setResetConfirmation]=useState(null),[resetPhone,setResetPhone]=useState(""),[resetCode,setResetCode]=useState("");const notifyPasswordPopup=(text,type="info")=>{setPasswordPopup({text,type});window.setTimeout(()=>setPasswordPopup(null),3600)};useEffect(()=>{if(authCooldown<=0)return;const t=window.setInterval(()=>setAuthCooldown(v=>v>0?v-1:0),1000);return()=>window.clearInterval(t)},[authCooldown]);async function submit(e){e.preventDefault();if(authCooldown>0){setMessage("Password sign-in is temporarily unavailable. Wait for the displayed timer, or use Forgot password? to begin verified recovery.");return}setBusy(true);setMessage("");try{if(mode==="register"){await registerWithEmail(email.trim(),password);setMessage("Account created. Please verify your email before continuing")}else{const signedIn=await loginWithEmail(email.trim(),password);if(!signedIn.multiFactor?.enrolledFactors?.length){notifyPasswordPopup("Two-way verification reminder: no second verification factor is configured for this account. Complete the security configuration after entering the IRPA workspace. Notifications remain tied to the registered email and mobile particulars.","warning");await new Promise(resolve=>window.setTimeout(resolve,2200));}else{notifyPasswordPopup("Password accepted. Secure authentication completed; opening the IRPA workspace.","success");await new Promise(resolve=>window.setTimeout(resolve,700));}}}catch(x){console.error("IRPA authentication failed:",x);setMessage(x?.message||"Authentication failed. No dashboard has been opened.");const code=String(x?.code||"");if(x?.passwordAttemptStatus==="SECOND"&&Number(x?.passwordRemainingAttempts)>0){notifyPasswordPopup("Suspension-risk warning: you have "+x.passwordRemainingAttempts+" password trial"+(x.passwordRemainingAttempts===1?"":"s")+" remaining before password access is suspended. Stop and verify your password carefully.","warning");}else if(x?.passwordAttemptStatus==="FIRST"&&Number(x?.passwordRemainingAttempts)===1){notifyPasswordPopup("Accuracy warning: one password trial remains before the 5-minute security lock. Check your password carefully before trying again.","warning");}if(code==="auth/password-locked"){setAuthCooldown(Number(x?.retryAfterSeconds||300));setMessage("Three unsuccessful password trials have been reached. Password entry is locked for 5 minutes. Do not retry until the timer expires.");}else if(code==="auth/password-suspended"){setMessage("Password access is suspended after the second set of three unsuccessful trials. Use Forgot password? and complete the registered mobile OTP and email reset process.");}else if(code==="auth/too-many-requests"){setAuthCooldown(60);setMessage("Firebase has temporarily rate-limited password sign-in. Stop retrying and use verified password recovery if needed.");}else setMessage(x.message||"Authentication failed.")}finally{setBusy(false)}}async function beginReset(){if(!email.trim()){setMessage("Enter your registered IRPA email address first.");return}setBusy(true);setMessage("");try{const result=await beginPasswordResetMobileVerification(email.trim());setResetConfirmation(result.confirmation);setResetPhone(result.maskedPhone);setResetStep("OTP");setMessage("A six-digit verification code has been sent by SMS to the registered mobile number ending "+result.maskedPhone.slice(-3)+".");}catch(x){setMessage(x.message||"Unable to start mobile password recovery.");}finally{setBusy(false)}}async function verifyReset(){if(!resetConfirmation){setMessage("Start password recovery first.");return}setBusy(true);setMessage("");try{await verifyPasswordResetMobileOtp(resetConfirmation,resetCode);await sendPasswordReset(email.trim());await clearPasswordAttemptState(email.trim());setResetStep("SENT");setMessage("Mobile verification succeeded. The password reset link has been sent to the system-registered email address. Open the newest email to set your new password.");}catch(x){setMessage(x.message||"Mobile verification failed. Check the six-digit code and try again.");}finally{setBusy(false)}}function closeReset(){setResetOpen(false);setResetStep("REQUEST");setResetConfirmation(null);setResetCode("");setResetPhone("");setMessage("")}function returnToSignIn(){window.location.href=window.location.pathname}return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-kicker">IRPA</div><h1>Digital Board Governance</h1><p>Secure institutional governance, authorization, finance and employee management for Improvement of Rangeland in Pastoral Areas.</p></div><div className="auth-divider"><span>{inductionMode?"Induction and Orientation":mode==="login"?"Secure sign in":"Create account"}</span></div>{inductionMode&&<div className="auth-message" style={{marginBottom:16}}><strong>Induction and Orientation — Login Assistance</strong><br/>This is a parallel assistance pathway for registered IRPA Members and Employees. If a password blocker prevents access, use <strong>Forgot password?</strong> below.</div>}<div className="auth-security-instructions"><strong>SECURITY ENTRY INSTRUCTIONS</strong><span>Use only your system-registered email address. Enter your password carefully; the eye icon at the password-field edge reveals or hides the entry. After sign-in, configure your two-way verification factor. OTP/recovery notifications are sent only to registered contact particulars.</span></div><form onSubmit={submit}><label>Email address</label><input type="email"value={email}onChange={e=>setEmail(e.target.value)}required autoComplete="email"/><PasswordEntryField label="Password" value={password} onChange={setPassword} minLength={6} autoComplete="current-password" notify={notifyPasswordPopup}/><button type="submit"disabled={busy||authCooldown>0}>{busy?"Please wait...":authCooldown>0?"Password Sign In Locked ("+Math.ceil(authCooldown/60)+" min)":mode==="register"?"Create Account":"Sign In Securely"}</button></form><div className="auth-links"><button type="button"className="secondary-button"onClick={async()=>{setBusy(true);setMessage("");try{const signedIn=await loginWithGoogle("");if(signedIn&&!signedIn.multiFactor?.enrolledFactors?.length){notifyPasswordPopup("Two-way verification reminder: no second verification factor is configured for this account. Complete the security configuration after entering the IRPA workspace.","warning");}}catch(x){setMessage(x.message||"Google sign-in failed")}finally{setBusy(false)}}}disabled={busy}>Continue with Google</button><button type="button"className="text-button"onClick={()=>setResetOpen(true)}disabled={busy}>Forgot password?</button><button type="button"className="secondary-button"onClick={()=>{window.location.href=window.location.pathname+"?induction=1&applicant=1&route=assistance"}}disabled={busy}>Induction & Orientation — Start Application</button><button type="button"className="text-button"onClick={()=>{setMode(mode==="login"?"register":"login");setMessage("")}}disabled={busy}>{mode==="login"?"Create a member account":"Return to sign in"}</button></div>{message&&<div className="auth-message">{message}</div>}<PasswordEntryPopup notice={passwordPopup}/>{resetOpen&&<div className="authority-capacity-gate" role="dialog" aria-modal="true" aria-labelledby="password-reset-title"><section className="authority-capacity-card" style={{width:"min(560px,100%)"}}><div className="authority-capacity-kicker">IRPA-DBGS · VERIFIED PASSWORD RECOVERY</div><h2 id="password-reset-title">Reset Password</h2><div id="password-reset-recaptcha" style={{minHeight:1}}></div>{resetStep==="REQUEST"&&<><p>Step 1: confirm your registered email address. The system will then send a one-time code to the registered mobile number.</p><button type="button" onClick={beginReset} disabled={busy||!email.trim()}>Send Mobile OTP</button></>}{resetStep==="OTP"&&<><p>Step 2: enter the six-digit code sent to <strong>{resetPhone}</strong>. The code must be verified before the email reset link is issued.</p><input inputMode="numeric" pattern="[0-9]*" maxLength={6} value={resetCode} onChange={e=>setResetCode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="6-digit OTP" autoComplete="one-time-code"/><button type="button" onClick={verifyReset} disabled={busy||resetCode.length!==6}>Verify OTP &amp; Send Email Reset Link</button></>}{resetStep==="SENT"&&<><p>Two-step recovery completed: the registered mobile OTP was verified and the password reset link was sent to the system-registered email address.</p><button type="button" onClick={closeReset}>Return to Sign In</button></>}<button type="button" className="authority-capacity-signout" onClick={closeReset} disabled={busy}>Cancel</button></section></div>}</section></main>}
+function Loading({message}){const[slow,setSlow]=useState(false);useEffect(()=>{const t=setTimeout(()=>setSlow(true),4000);return()=>clearTimeout(t)},[]);return <div className="loading-screen" role="status" aria-live="polite"><div><strong>IRPA Digital Governance</strong><div className="loading-sub">{message||"Authentication accepted. Verifying your registered IRPA authorization..."}</div>{slow&&!message&&<div className="loading-sub">The authorization check is taking longer than expected. The system will show the exact result instead of silently ending the session.</div>}{(slow||message)&&<button type="button" onClick={()=>window.location.reload()}>Retry Secure Session</button>}</div></div>}
+function AccessDenied({user,reason}){return <main className="auth-screen"><section className="auth-card"><h1>Access Not Authorised</h1><p>{reason||"No active IRPA authorization profile was found."}</p><p className="muted">{user?.email}</p><button type="button" className="logout-button" onClick={logout} aria-label="Sign out of IRPA Digital Governance">Sign Out</button></section></main>}
+function profileLabel(admin,employee){return admin?"Administrator":employee?.employeeNumber?("Authorized employee • "+employee.employeeNumber):"Authorized IRPA user"}
+function resolveLoginCategories(profile,employee,admin){
+ const administratorAvailable=admin||profile?.administratorAvailable===true||profile?.authorizationType==="administrator_candidate";
+ const normalize=v=>String(v||"").trim();
+ const canonicalBoardPosition=v=>{
+  const n=normalize(v).toLowerCase();
+  const map={"chairperson":"Board Chairperson","board chairperson":"Board Chairperson","vice chairperson":"Board Vice Chairperson","board vice chairperson":"Board Vice Chairperson","secretary":"Board Secretary","board secretary":"Board Secretary","treasurer":"Board Treasurer","board treasurer":"Board Treasurer","board member":"Board Member"};
+  return map[n]||normalize(v);
+ };
+ const boardPosition=canonicalBoardPosition(profile?.boardPosition||employee?.boardPosition);
+ const boardRoles=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
+ const values=[
+  ...(Array.isArray(profile?.roles)?profile.roles:[]),
+  ...(Array.isArray(profile?.assignedRoles)?profile.assignedRoles:[]),
+  ...(Array.isArray(profile?.selectedRoles)?profile.selectedRoles:[]),
+  ...(Array.isArray(profile?.roleAssignments)?profile.roleAssignments:[]),
+  profile?.role,
+  ...(Array.isArray(employee?.roles)?employee.roles:[]),
+  ...(Array.isArray(employee?.assignedRoles)?employee.assignedRoles:[]),
+  ...(Array.isArray(employee?.selectedRoles)?employee.selectedRoles:[]),
+  ...(Array.isArray(employee?.roleAssignments)?employee.roleAssignments:[]),
+  employee?.role
+ ].flatMap(v=>String(v||"").split(",").map(normalize).filter(Boolean));
+ const filtered=values.filter(v=>!(boardRoles.includes(v)&&boardPosition&&v!==boardPosition));
+ // Institutional capacity may be stored in the Employee Register without being
+ // duplicated into the roles array. Reconcile the verified employment context
+ // so an IT Specialist who is also an Administrator is offered both capacities.
+ const identityContext=[
+  profile?.department,employee?.department,
+  profile?.unit,employee?.unit,
+  profile?.jobTitle,employee?.jobTitle,
+  profile?.position,employee?.position,
+  profile?.title,employee?.title,
+  profile?.designation,employee?.designation
+ ].map(normalize).filter(Boolean);
+ const itContext=identityContext.some(v=>{
+  const n=v.toLowerCase();
+  return n==="it"||n==="it unit"||n.includes("information technology")||n.includes("it specialist")||n.includes("information technology officer");
+ });
+ if(itContext&&!filtered.some(v=>["IT Specialist","Information Technology Officer"].includes(v)))filtered.push("IT Specialist");
+ if(boardPosition)filtered.unshift(boardPosition);
+ if(administratorAvailable)filtered.unshift("Administrator");
+ return [...new Set(filtered)];
+}
+function LoginCategoryBadges({profile,employee,admin,selectedAuthority}){let sessionAuthority="";try{sessionAuthority=window.sessionStorage.getItem("irpaActiveAccessAuthority")||""}catch{}const activeAuthority=String(selectedAuthority||sessionAuthority||"").trim();const categories=activeAuthority?[activeAuthority]:(admin?["Administrator"]:[]);const authorityKey=activeAuthority.toLowerCase();const memberAuthority=/board|member|chairperson|treasurer|secretary/.test(authorityKey);const employeeAuthority=/employee|staff|director|officer|manager|finance|human resources|operations|outreach|administrator/.test(authorityKey);const memberNumber=String(profile?.memberNumber||profile?.registrationNumber||"").trim();const employeeNumber=String(employee?.employeeNumber||profile?.employeeNumber||"").trim();const showMemberNumber=Boolean(memberNumber)&&(memberAuthority||(!employeeAuthority&&!employeeNumber));const showEmployeeNumber=Boolean(employeeNumber)&&(employeeAuthority||(!memberAuthority&&!memberNumber));return <div className="login-category-badges" aria-label="Authorized user access category"><span className="login-category-heading">AUTHORIZED USER · ACCESS CATEGORIES</span><div className="login-category-list">{categories.length?categories.map(category=><div className="login-category-item" key={category}><span className="login-category-pill">{category}</span></div>):<span className="login-category-empty">Authority not selected</span>}</div>{(showMemberNumber||showEmployeeNumber)&&<div className="login-category-identifiers">{showMemberNumber&&<div><small>MEMBER NUMBER</small><strong>{memberNumber}</strong></div>}{showEmployeeNumber&&<div><small>EMPLOYEE NUMBER</small><strong>{employeeNumber}</strong></div>}</div>}<p className="login-category-explanation">Access categories and institutional identifiers only — the current signing authority is selected separately in the Signing Identity · Registered Capacity panel.</p></div>}
+
+function PinnedRoleDuties({selectedAuthority,profile,employee}){
+ const candidates=[selectedAuthority,employee?.jobTitle,employee?.position,employee?.role,profile?.jobTitle,profile?.position,profile?.title,profile?.boardPosition,profile?.role,...(Array.isArray(employee?.roles)?employee.roles:[]),...(Array.isArray(profile?.roles)?profile.roles:[])].filter(Boolean).map(x=>String(x).trim().toLowerCase());
+ const matches=authorityConfig.roles.filter(role=>candidates.some(candidate=>candidate===role.title.toLowerCase()||candidate===role.id.toLowerCase()));
+ const isExecutiveDirector=matches.some(role=>role.id==="executive-director")||candidates.includes("executive director");
+ const roles=[...matches];
+ if(isExecutiveDirector&&!roles.some(role=>role.id==="board-secretary")){const secretary=authorityConfig.roles.find(role=>role.id==="board-secretary");if(secretary)roles.push(secretary);}
+ const unique=roles.filter((role,index,array)=>array.findIndex(item=>item.id===role.id)===index);
+ if(!unique.length)return null;
+ return <section className="panel" style={{margin:"18px 0",border:"2px solid #d7e3ed",borderRadius:14,padding:18}} aria-label="Pinned role and duties">
+  <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}><span aria-hidden="true" style={{fontSize:24}}>📌</span><div><span className="eyebrow">PERSONAL GOVERNANCE RECORD</span><h2 style={{margin:"2px 0"}}>Your Role & Assigned Duties</h2><p className="muted" style={{margin:0}}>Pinned to your profile from IRPA’s approved organisational role register.</p></div></div>
+  {unique.map(role=><article key={role.id} style={{marginTop:16,paddingTop:12,borderTop:"1px solid #d7e3ed"}}><h3 style={{margin:"0 0 6px",color:"#18352f",WebkitTextFillColor:"#18352f"}}>{role.title}{role.id==="board-secretary"&&isExecutiveDirector?" · Permanent employee office":""}</h3><p>{role.purpose}</p><ul>{(role.keyDuties||[]).map((duty,index)=><li key={index} style={{color:"#18352f",WebkitTextFillColor:"#18352f"}}>{duty}</li>)}</ul><small><strong>Appointment status:</strong> {role.appointmentStatus||"Not confirmed"}{role.engagementStatus?" · "+role.engagementStatus:""}</small></article>)}
+  {isExecutiveDirector&&<p className="muted" style={{marginTop:14}}>The Executive Director may initiate and approve role-description amendments through the controlled governance review process. Changes must retain version history and must not alter system permissions, bank mandates or signing authority by implication.</p>}
+  <p className="muted" style={{marginTop:10,fontSize:12}}>Role descriptions define duties and reporting. They do not independently confer system access, financial approval, procurement authority, signature authority or bank-signatory status.</p>
+ </section>;
+}
+function Dashboard({user,admin,employee,profile,onNavigate,selectedAuthority,authorityCategories}){
+ const[liveNow,setLiveNow]=useState(()=>new Date());
+ const[stats,setStats]=useState({employees:0,members:0,meetings:0,authorizations:0,actions:0,risks:0,payments:0,signatures:0,reports:0});
+ const[busy,setBusy]=useState(true);
+ const[activity,setActivity]=useState([]);
+ const effectiveRole=String(selectedAuthority||profile?.role||"").trim();
+ const role=effectiveRole.toLowerCase();
+ const isMember=!admin&&!employee?.employeeNumber&&/member|board/.test(role);
+ const displayName=profile?.name||employee?.name||employee?.fullName||user?.displayName||profile?.email||user?.email||"IRPA User";
+ const profileTitle=admin?"Administrator":(selectedAuthority||profile?.title||profile?.jobTitle||profile?.position||employee?.jobTitle||employee?.position||profile?.role||"Authorized User");
+ const boardAuthorityRoles=["Board Chairperson","Board Vice Chairperson","Board Secretary","Board Treasurer","Board Member"];
+ const selectedAuthorityName=String(selectedAuthority||"").trim();
+ const employeeAuthorityRoles=roleValues(employee?.roles||employee?.role);
+ const memberAuthorityRoles=roleValues(profile?.roles||profile?.role);
+ const authorityUsesMemberRegister=boardAuthorityRoles.includes(selectedAuthorityName)||(
+   selectedAuthorityName&&memberAuthorityRoles.includes(selectedAuthorityName)&&!employeeAuthorityRoles.includes(selectedAuthorityName)
+ );
+ const authorityUsesEmployeeRegister=Boolean(selectedAuthorityName)&&employeeAuthorityRoles.includes(selectedAuthorityName)&&!authorityUsesMemberRegister;
+ const[boardRegisterNumber,setBoardRegisterNumber]=useState("");
+ useEffect(()=>{
+   let active=true;
+   if(!authorityUsesMemberRegister){setBoardRegisterNumber("");return()=>{active=false};}
+   (async()=>{
+     try{
+       // Board capacities must always resolve against the Board Members Register.
+       // Never reuse an Employee Register number for a Board authority.
+       const memberRegister=await getCurrentMemberProfile();
+       const candidate=String(memberRegister?.memberNumber||memberRegister?.registrationNumber||"").trim();
+       if(active&&/^IRPA-MEM-\d{4,}$/i.test(candidate))setBoardRegisterNumber(candidate);
+       else if(active)setBoardRegisterNumber("");
+     }catch{
+       if(active)setBoardRegisterNumber("");
+     }
+   })();
+   return()=>{active=false};
+ },[authorityUsesMemberRegister,user?.uid]);
+ const registrationNo=admin?"":authorityUsesMemberRegister
+   ?boardRegisterNumber
+   :authorityUsesEmployeeRegister
+     ?String(employee?.employeeNumber||"").trim()
+     :"";
+ const photo=profile?.photoUrl||profile?.photoURL||profile?.avatarUrl||profile?.profilePhotoUrl||employee?.photoUrl||employee?.photoURL||employee?.avatarUrl||user?.photoURL||"";
+ const initials=displayName.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()||"IR";
+ useEffect(()=>{const clockId=setInterval(()=>setLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);
+ const liveDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",day:"2-digit",month:"long",year:"numeric"}).format(liveNow);
+ const liveDay=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",weekday:"long"}).format(liveNow);
+ const liveTime=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(liveNow);
+ useEffect(()=>{let live=true;(async()=>{
+   try{
+    if(admin){
+      const names=[COLLECTIONS.employees,COLLECTIONS.members,COLLECTIONS.meetings,COLLECTIONS.authorizationRequests,COLLECTIONS.actions,COLLECTIONS.risks,COLLECTIONS.reports];
+      const v=await Promise.all(names.map(n=>getRecords(n).catch(()=>[])));
+      if(live){
+       setStats({employees:v[0].length,members:v[1].length,meetings:v[2].length,authorizations:v[3].filter(x=>["Submitted","Under Review"].includes(x.status)).length,actions:v[4].filter(x=>!["Completed","Cancelled"].includes(x.status)).length,risks:v[5].filter(x=>!["Closed","Mitigated"].includes(x.status)).length,payments:0,signatures:0,reports:v[6].filter(x=>!["Archived"].includes(x.status)).length});
+       const rows=[...v[3].map(x=>({...x,_kind:"Authorization"})),...v[2].map(x=>({...x,_kind:"Meeting"})),...v[4].map(x=>({...x,_kind:"Action"}))];
+       setActivity(rows.sort((a,b)=>String(b.updatedAt||b.createdAt||b.date||"").localeCompare(String(a.updatedAt||a.createdAt||a.date||""))).slice(0,5));
+      }
+    }else{
+      const uid=auth.currentUser?.uid;const names=[COLLECTIONS.meetings,COLLECTIONS.actions,COLLECTIONS.authorizationRequests,COLLECTIONS.staffPaymentRequests,COLLECTIONS.signatures,COLLECTIONS.reports];
+      const v=await Promise.all(names.map(n=>getRecords(n).catch(()=>[])));
+      const mine=x=>x.uid===uid||x.employeeUid===uid||x.ownerUid===uid||x.requesterUid===uid||x.createdByUid===uid||x.assignedToUid===uid||x.signerUid===uid||x.recipientUid===uid||(Array.isArray(x.participantUids)&&x.participantUids.includes(uid));
+      if(live){
+       setStats({employees:0,members:0,meetings:v[0].filter(x=>mine(x)||x.status==="Scheduled"||x.status==="In Progress").length,authorizations:v[2].filter(x=>mine(x)&&["Submitted","Under Review"].includes(x.status)).length,actions:v[1].filter(x=>mine(x)&&!["Completed","Cancelled"].includes(x.status)).length,risks:0,payments:v[3].filter(x=>mine(x)&&!["Paid","Rejected","Cancelled"].includes(x.status)).length,signatures:v[4].filter(x=>mine(x)&&!["Completed","Signed","Declined"].includes(x.status)).length,reports:v[5].filter(x=>mine(x)&&!["Published","Archived"].includes(x.status)).length});
+       const rows=[...v[2].filter(mine).map(x=>({...x,_kind:"Authorization"})),...v[0].filter(mine).map(x=>({...x,_kind:"Meeting"})),...v[1].filter(mine).map(x=>({...x,_kind:"Action"})),...v[3].filter(mine).map(x=>({...x,_kind:"Payment"}))];
+       setActivity(rows.sort((a,b)=>String(b.updatedAt||b.createdAt||b.date||"").localeCompare(String(a.updatedAt||a.createdAt||a.date||""))).slice(0,5));
+      }
+    }
+   }finally{if(live)setBusy(false)}
+ })();return()=>{live=false}},[admin,employee?.employeeNumber,profile?.role,selectedAuthority]);
+ const go=target=>onNavigate?.(target);
+ const cards=admin?[["Members",stats.members,"Current register","Members & Personnel"],["Meetings",stats.meetings,"This month","Meetings"],["Pending Authorizations",stats.authorizations,"Awaiting action","Authorization & Approvals"],["Reports",stats.reports,"Available reports","Reports"]]:isMember?[["My Meetings",stats.meetings,"Meeting register","Meetings"],["My Actions",stats.actions,"Implementation control","Actions"],["Pending Authorizations",stats.authorizations,"Awaiting action","Authorization & Approvals"],["Pending Signatures",stats.signatures,"Signature platform","Signature Platform"]]:[["My Meetings",stats.meetings,"Meeting register","Meetings"],["Actions Assigned",stats.actions,"Implementation control","Actions"],["Pending Authorizations",stats.authorizations,"Awaiting action","Authorization & Approvals"],["My Payment Requests",stats.payments,"Payment workflow","Employee Payments"]];
+ const quick=admin?[["Create Authorization","Authorization & Approvals","Create and track governance authorizations","check"],["New Payment","Employee Payments","Start an employee payment workflow","finance"],["Upload Document","Documents","Upload and manage authorised documents","document"],["View Reports","Reports","Open governance reports and analytics","analytics"],["Meetings","Meetings","Schedule and manage governance meetings","calendar"],["Signatures","Signature Platform","Manage governance signatures","signature"]]:[["Meetings","Meetings","Schedule and manage assigned meetings","calendar"],["Documents","Documents","Access authorised governance documents","document"],["Finance","Finance Portfolio","Access authorised finance workflows","finance"],["Authorizations","Authorization & Approvals","Review assigned approvals","check"],["Signatures","Signature Platform","Complete assigned signatures","signature"],["Reports","Reports","View authorised reports","analytics"]];
+ const iconFor=label=>{const icons={Employees:"person",Members:"group",Meetings:"calendar","Pending Authorizations":"hourglass","My Actions":"list","Actions Assigned":"list","My Payment Requests":"payment","My Meetings":"calendar","Pending Signatures":"signature",groups:"group",calendar:"calendar",document:"folder",check:"shield",finance:"coins",analytics:"chart",risk:"alert",settings:"settings",signature:"signature","Create Authorization":"shield","New Payment":"payment","Upload Document":"upload","View Reports":"chart","Documents":"folder","Finance":"coins","Authorizations":"check","Reports":"chart"};const categories={Employees:"community",Members:"community",Meetings:"governance","Pending Authorizations":"pending","My Actions":"workflow","Actions Assigned":"workflow","My Payment Requests":"finance","My Meetings":"governance","Pending Signatures":"signature",groups:"community",calendar:"governance",document:"information",check:"approval",finance:"finance",analytics:"reports",risk:"risk",settings:"settings",signature:"signature","Create Authorization":"approval","New Payment":"finance","Upload Document":"information","View Reports":"reports","Documents":"information","Finance":"finance","Authorizations":"approval","Reports":"reports"};const category=categories[label]||"general";const paths={person:<><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></>,group:<><circle cx="9" cy="8" r="3.5"/><path d="M2 21v-2a7 7 0 0 1 12-4.9M16 5.5a3.5 3.5 0 0 1 0 6.8M17 15a6 6 0 0 1 5 6"/></>,calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 17h6"/></>,hourglass:<><path d="M6 2h12M6 22h12M7 2v5l5 5-5 5v5M17 2v5l-5 5 5 5v5"/></>,list:<><path d="M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01"/></>,payment:<><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h4M16 15h1"/></>,folder:<><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></>,shield:<><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/></>,coins:<><circle cx="8" cy="8" r="5"/><path d="M3 8v4a5 5 0 0 0 9 3M13 5h5a4 4 0 0 1 0 8h-5M13 17h5a3 3 0 0 0 0-6"/></>,chart:<><path d="M3 3v18h18M7 14l4-4 4 3 6-7"/></>,alert:<><path d="m12 3 10 18H2z"/><path d="M12 9v5M12 17h.01"/></>,settings:<><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a8 8 0 0 1-1.7 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.7-1l-1.7.7-1.4-2.4 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.7a8 8 0 0 1 1.7-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.7 1l1.7-.7 1.4 2.4-1.4 1.1a7 7 0 0 1 0 2z"/></>,signature:<><path d="M4 3h11l5 5v13H4zM15 3v5h5M7 16l2-2 2 2 5-5"/></>,upload:<><path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4"/></>,check:<><path d="m5 12 4 4L19 6"/></>};return <svg className={"dashboard-semantic-icon dashboard-semantic-icon--"+category} viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[icons[label]]||paths.list}</svg>}
+ const activityLabel=x=>x._kind==="Authorization"?(x.title||x.description||x.referenceNumber||"Authorization request"):x._kind==="Meeting"?(x.title||x.subject||"Meeting"):x._kind==="Payment"?(x.referenceNumber||x.type||"Payment request"):(x.title||x.description||"Action");
+ const activityStatus=x=>x.status||x.workflowStage||"Recorded";
+  const activityStatusClass=status=>{const v=String(status||"").toLowerCase();if(v.includes("reject")||v.includes("declin")||v.includes("cancel"))return "is-danger";if(v.includes("pend")||v.includes("review")||v.includes("await"))return "is-warning";if(v.includes("activ")||v.includes("approv")||v.includes("submit")||v.includes("complet"))return "is-success";return "is-neutral"};
+ return <div className="page dashboard-command">
+   <PinnedRoleDuties selectedAuthority={selectedAuthority} profile={profile} employee={employee}/>
+   <div className="dashboard-desktop-view">
+    <section className="desktop-quote4-hero">
+      <div className="desktop-quote4-hero-image"></div>
+      <div className="desktop-quote4-hero-overlay"></div>
+      <div className="desktop-quote4-hero-content">
+       <div className="desktop-profile-photo">{photo?<img src={photo} alt={displayName}/>:<span>{initials}</span>}</div>
+       <div><span className="eyebrow">GOOD DAY</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><span className="desktop-motto">Sustainable rangelands · resilient communities</span>{authorityCategories?.length>1&&<div className="dashboard-authority-context"><small>ACTIVE ACCESS AUTHORITY</small><strong>{selectedAuthority||"Select authority"}</strong></div>}</div>
+      </div>
+      
+    </section>
+    <div className="dashboard-live-date-slot"><div className="desktop-date-card open-portal-panel" aria-label="Live date and time"><div className="live-date-time-content"><span>LIVE DATE & TIME</span><strong>{liveDay}</strong><small>{liveDate} · {liveTime}</small><em className="desktop-date-workspace">IRPA Digital Governance Workspace</em></div><div className="live-date-stat-buttons" aria-label="Dashboard portal shortcuts">{cards.slice(2,4).map(([label,value,sub,target])=><button className="desktop-blue-nav-button" key={label} type="button" onClick={()=>go(target)}><span className="quote4-stat-icon">{iconFor(label)}</span><div><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small></div><i>›</i></button>)}</div></div></div><section className="dashboard-quote4-stats">{cards.slice(2).concat(cards.slice(0,2)).map(([label,value,sub,target])=><button className="desktop-blue-nav-button" key={label} type="button" onClick={()=>go(target)}><span className="quote4-stat-icon">{iconFor(label)}</span><div><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small></div><i>›</i></button>)}</section>
+    <section className="dashboard-quote4-main">
+      <div className="dashboard-quote4-activity panel">
+       <div className="quote4-heading"><div><span className="eyebrow">LIVE GOVERNANCE CONTROL</span><h2>Recent Activities</h2></div><button type="button" onClick={()=>go("Reports")}>View all activities ›</button></div>
+       <div className="quote4-activity-table"><div className="quote4-activity-header" aria-hidden="true"><span>Date</span><span>Activity</span><span>Reference</span><span>Status</span><span></span></div>{activity.length?activity.map((x,i)=>{const status=activityStatus(x);const target=x._kind==="Authorization"?"Authorization & Approvals":x._kind==="Meeting"?"Meetings":x._kind==="Payment"?"Employee Payments":"Actions";return <button type="button" key={x.id||i} aria-label={`Open ${activityLabel(x)}`} onClick={()=>go(target)}><span>{x.date||x.updatedAt||x.createdAt||"—"}</span><strong>{activityLabel(x)}</strong><small>{x.referenceNumber||x.reference||x.employeeNumber||x._kind}</small><em className={activityStatusClass(status)}>{status}</em><b>›</b></button>}):<div className="quote4-empty">Live governance activities will appear here as records are created.</div>}</div>
+      </div>
+      <div className="dashboard-quote4-quick panel">
+       <div className="quote4-heading"><div><span className="eyebrow">WORKSPACE</span><h2>Quick Access</h2></div></div>
+       <div className="quote4-quick-grid">{quick.slice(0,6).map(([label,target,desc,ico])=><button className="desktop-blue-nav-button" key={target} type="button" onClick={()=>go(target)}><span>{iconFor(ico)}</span><strong>{label}</strong><small>{desc}</small><b>›</b></button>)}</div>
+      </div>
+    </section>
+   </div>
+   <div className="dashboard-mobile-view" aria-label="Mobile IRPA governance dashboard">
+    <section className="mobile-quote1-hero">
+      <div className="mobile-quote1-image" aria-hidden="true"></div>
+      <svg className="mobile-quote1-silhouette" viewBox="0 0 800 280" preserveAspectRatio="none" aria-hidden="true">
+        <path fill="#2D5A45" d="M0 205 105 118 170 170 245 84 325 170 405 72 495 170 590 105 680 176 800 92V280H0Z"/>
+        <path fill="#234A38" d="M0 238 125 184 205 212 300 148 380 205 470 158 560 222 655 166 800 226V280H0Z" opacity=".92"/>
+        <path fill="#2D5A45" d="M0 248c70-19 121-19 185 0 55 17 112 17 171-1 72-22 132-20 202 3 74 24 152 20 242-5V280H0Z"/>
+        <path fill="#1B4332" d="M0 259c70-12 143-9 210 4 70 13 127 8 191-6 76-17 141-14 207 2 65 16 128 15 192-1v22H0Z"/>
+      </svg>
+      <div className="mobile-quote1-shade"></div>
+      <div className="mobile-quote1-user"><div className="mobile-quote1-photo">{photo?<img src={photo} alt={displayName}/>:<span>{initials}</span>}</div><div><span>GOOD DAY,</span><h1>{displayName}</h1><p>{profileTitle}{registrationNo?" · "+registrationNo:""}</p><em>{admin?"Administrator":selectedAuthority||profileTitle}</em></div></div>
+    </section>
+    <section className="mobile-quote1-stats">{cards.map(([label,value,sub,target])=><button className="mobile-blue-nav-button" style={{backgroundColor:"#0b5fa8",color:"#fff"}} key={label} type="button" onClick={()=>go(target)}><span>{iconFor(label)}</span><strong>{busy?"—":value}</strong><b>{label}</b><small>{sub}</small><i>›</i></button>)}</section>
+    <section className="mobile-quote1-quick"><div className="mobile-quote1-heading"><h2>Quick Access</h2><button className="mobile-blue-nav-button" style={{backgroundColor:"#0b5fa8",color:"#fff"}} type="button" onClick={()=>go("Meetings")}>View all ›</button></div><div className="mobile-quote1-grid">{quick.slice(0,6).map(([label,target,desc,ico])=><button className="mobile-blue-nav-button" style={{backgroundColor:"#0b5fa8",color:"#fff"}} key={target} type="button" onClick={()=>go(target)}><span>{iconFor(ico)}</span><strong>{label}</strong></button>)}</div></section>
+   </div>
+ </div>
+}function Downloads(){const[installEvent,setInstallEvent]=useState(null);const[message,setMessage]=useState("");useEffect(()=>{const handler=e=>{e.preventDefault();setInstallEvent(e)};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler)},[]);async function install(){if(installEvent){await installEvent.prompt();const choice=await installEvent.userChoice;setMessage(choice?.outcome==="accepted"?"IRPA Digital Governance was added to your PC.":"Installation was cancelled.");setInstallEvent(null);return}setMessage("Your browser does not expose the automatic install prompt. Use the browser menu and choose “Install this site as an app” or “Apps → Install this site as an app”.")}function shortcut(){const blob=new Blob(["[InternetShortcut]\\r\
+URL="+window.location.origin+"\\r\
+IconIndex=0\\r\
+"],{type:"application/internet-shortcut"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="IRPA-Digital-Governance.url";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}return <div className="page"><section className="welcome-panel"><div><span className="eyebrow">IRPA DIGITAL GOVERNANCE</span><h1>Downloads & PC Access</h1><p>Install or download access resources for the IRPA Digital Board Governance System.</p></div><div className="identity-card"><span>Application</span><strong>Live</strong></div></section><section className="panel"><div className="panel-heading"><div><span className="eyebrow">DOWNLOAD CENTRE</span><h2>IRPA Application Downloads</h2><p className="muted">Choose the option you need. The live application remains securely hosted online.</p></div></div><div className="dashboard-grid" style={{marginTop:18}}><div className="stat-card"><span>INSTALL ON PC</span><strong>App</strong><small>Desktop-style browser installation</small><button type="button" style={{marginTop:12}} onClick={install}>{installEvent?"Install IRPA App":"Install / Add to PC"}</button></div><div className="stat-card"><span>PC SHORTCUT</span><strong>.URL</strong><small>Download a Windows Internet Shortcut</small><button type="button" className="secondary-button" style={{marginTop:12}} onClick={shortcut}>Download PC Shortcut</button></div><div className="stat-card"><span>ANDROID APP</span><strong>.APK</strong><small>Download and install IRPA Digital Governance on Android</small><a className="secondary-button" style={{display:"inline-block",marginTop:12,textDecoration:"none"}} href="https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/35520435278" target="_blank" rel="noreferrer">Download Android APK</a></div><div className="stat-card"><span>SOURCE PACKAGE</span><strong>.ZIP</strong><small>Download the current GitHub source package</small><a className="secondary-button" style={{display:"inline-block",marginTop:12,textDecoration:"none"}} href="https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/archive/refs/heads/main.zip" target="_blank" rel="noreferrer">Download Source ZIP</a></div></div>{message&&<div className="auth-message" style={{marginTop:18}}>{message}</div>}<div className="form-actions" style={{marginTop:18}}><button type="button" onClick={()=>window.open(window.location.origin,"_blank","noopener,noreferrer")}>Open Live Application</button><button type="button" className="secondary-button" onClick={()=>{window.location.href=window.location.origin}}>Return to Application</button></div></section></div>}
+function SignerShell({user,profile,signingEnvelopeId}){
+  return <div className="app-shell">
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <div className="sidebar-brand-copy">
+          <strong>IRPA</strong>
+          <span>Digital Governance</span>
+          <small>Improvement of Rangeland in Pastoral Areas</small>
+        </div>
+      </div>
+      <div className="authority-card">
+        <span>SIGNING PARTICIPANT</span>
+        <strong>{profile?.name||profile?.email||user.email}</strong>
+        <small>Invitation-only access</small>
+      </div>
+      <nav>
+        <div className="nav-group">
+          <div className="nav-group-title">SIGNING</div>
+          <button className="nav-item active">
+            <span>Signature Invitation</span>
+            <i/>
+          </button>
+        </div>
+      </nav>
+      <div className="sidebar-footer">
+        <div className="secure-label">● Secure signing session</div>
+        <button className="logout-button" onClick={logout}>Sign Out</button>
+      </div>
+    </aside>
+    <section className="main-area">
+      <header className="topbar">
+        <div>
+          <span className="topbar-kicker">IMPROVEMENT OF RANGELAND<br/>IN PASTORAL AREAS</span>
+          <h2>Signature Invitation</h2>
+          <p>Secure Electronic Signing Ceremony</p>
+        </div>
+        <div className="user-info">
+          <div className="user-avatar">{(profile?.name||user.email||"S").slice(0,1).toUpperCase()}</div>
+          <div>
+            <strong>{profile?.name||"Signing Participant"}</strong>
+            <LoginCategoryBadges profile={profile} employee={null} admin={false}/>
+          </div>
+        </div>
+      </header>
+      <main className="content-area">
+        <SignaturePlatformWithUpload signerOnly={true} signingEnvelopeId={signingEnvelopeId}/>
+      </main>
+    </section>
+  </div>
+}
+
+
+function MobileGlobalNavigation({mobileNav,setMobileNav,active,setActive,modules,groups,admin}){const[expandedPortal,setExpandedPortal]=useState("");const go=target=>{setMobileNav("");setActive(target)};const portalItems=sortNavigationItems([...modules,...PORTAL_ROLLER_GROUPS.map(([parent])=>parent)].filter(target=>!PORTAL_CHILDREN_SET.has(target)).filter(target=>modules.includes(target)||(PORTAL_CHILDREN[target]||[]).some(child=>modules.includes(child)))).map(target=>[PORTAL_LABELS[target]||displayModuleName(target),target]);const menuItems=sortNavigationItems(groups.flatMap(([,items])=>items).filter(item=>!PORTAL_CHILDREN_SET.has(item)));return <><div className="mobile-global-nav" aria-label="Mobile navigation"><button className={active==="Dashboard"&&!mobileNav?"active":""} type="button" onClick={()=>go("Dashboard")}><span className="mobile-nav-icon"><i className="fa-solid fa-house" aria-hidden="true"></i></span><b>Home</b></button><button className={mobileNav==="portals"?"active":""} type="button" onClick={()=>setMobileNav(mobileNav==="portals"?"":"portals")}><span className="mobile-nav-icon"><i className="fa-solid fa-table-cells-large" aria-hidden="true"></i></span><b>Portals</b></button><button className={mobileNav==="alerts"?"active":""} type="button" onClick={()=>setMobileNav(mobileNav==="alerts"?"":"alerts")}><span className="mobile-nav-icon mobile-nav-bell"><i className="fa-solid fa-bell" aria-hidden="true"></i><b>1</b></span><b>Alerts</b></button><button className={mobileNav==="menu"?"active":""} type="button" onClick={()=>setMobileNav(mobileNav==="menu"?"":"menu")}><span className="mobile-nav-icon"><i className="fa-solid fa-bars" aria-hidden="true"></i></span><b>Menu</b></button></div>{mobileNav&&<div className="mobile-nav-sheet" role="dialog" aria-label="Mobile navigation"><div className="mobile-nav-sheet-header"><strong>{mobileNav==="portals"?"Portals":mobileNav==="alerts"?"Attention Required":"Navigation"}</strong><div style={{display:"flex",gap:8}}><button type="button" className="logout-button" onClick={logout}>Sign Out</button><button type="button" onClick={()=>setMobileNav("")}>Close</button></div></div>{mobileNav==="portals"&&<div className="mobile-nav-sheet-list">{portalItems.map(([label,target])=>{const children=sortNavigationItems((PORTAL_CHILDREN[target]||[]).filter(child=>modules.includes(child)));const expanded=expandedPortal===target||children.includes(active);return <React.Fragment key={target}><button type="button" onClick={()=>{if(children.length){setExpandedPortal(expandedPortal===target?"":target);setActive(target)}else go(target)}} aria-expanded={children.length?expanded:undefined}><span>{label}</span><b>{children.length?(expanded?"⌄":"›"):"›"}</b></button>{expanded&&children.map(child=><button className="mobile-nav-subportal" key={child} type="button" onClick={()=>go(child)}><span>SUB-PORTAL · {displayModuleName(child)}</span><b>›</b></button>)}</React.Fragment>})}</div>}{mobileNav==="alerts"&&<div className="mobile-nav-sheet-list"><button type="button" onClick={()=>go("Authorization & Approvals")}><span>Pending Authorizations</span><b>›</b></button><button type="button" onClick={()=>go("Actions")}><span>Open Actions</span><b>›</b></button>{admin&&<button type="button" onClick={()=>go("Induction Applications")}><span>Induction Applications</span><b>›</b></button>}</div>}{mobileNav==="menu"&&<div className="mobile-nav-sheet-list">{menuItems.map(x=><button key={x} type="button" onClick={()=>go(x)}><span>{PORTAL_LABELS[x]||displayModuleName(x)}</span><b>›</b></button>)}</div>}</div>}</>}
+function LiveWeatherPanel(){
+ const WEATHER_POINTS=[
+  {name:"Longido",region:"Arusha Region",latitude:-2.73319,longitude:36.69773},
+  {name:"Arusha",region:"Arusha Region",latitude:-3.3869,longitude:36.683},
+  {name:"Moshi",region:"Kilimanjaro Region",latitude:-3.3349,longitude:37.3404},
+  {name:"Monduli",region:"Arusha Region",latitude:-3.3,longitude:36.45},
+  {name:"Namanga",region:"Arusha Region",latitude:-2.55,longitude:36.78},
+  {name:"Kitumbeine",region:"Longido District",latitude:-2.7,longitude:36.25},
+  {name:"Engarenaibor",region:"Longido District",latitude:-2.65,longitude:36.5},
+  {name:"Dodoma",region:"Dodoma Region",latitude:-6.163,longitude:35.751},
+  {name:"Dar es Salaam",region:"Dar es Salaam Region",latitude:-6.7924,longitude:39.2083},
+  {name:"Mwanza",region:"Mwanza Region",latitude:-2.5164,longitude:32.9175},
+  {name:"Tanga",region:"Tanga Region",latitude:-5.067,longitude:39.098},
+  {name:"Singida",region:"Singida Region",latitude:-4.817,longitude:34.743}
+ ];
+ const apiKey=String(import.meta.env.VITE_GOOGLE_WEATHER_API_KEY||"").trim();
+ const[weatherByPlace,setWeatherByPlace]=useState({});const[forecastExpanded,setForecastExpanded]=useState(false);
+ const[activePlaceIndex,setActivePlaceIndex]=useState(0);
+ const[error,setError]=useState("");
+ const[loading,setLoading]=useState(true);
+ const[lastUpdated,setLastUpdated]=useState("");
+ useEffect(()=>{
+  let disposed=false;
+  const loadWeather=async()=>{
+   try{
+    const results=await Promise.allSettled(WEATHER_POINTS.map(async point=>{
+     if(!apiKey){
+      const params=new URLSearchParams({latitude:String(point.latitude),longitude:String(point.longitude),current:"temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",forecast_days:"4",timezone:"Africa/Dar_es_Salaam"});
+      const response=await fetch("https://api.open-meteo.com/v1/forecast?"+params.toString(),{cache:"no-store"});
+      if(!response.ok)throw new Error("Live forecast returned HTTP "+response.status+" for "+point.name);
+      const data=await response.json();
+      if(!data?.current||!data?.daily?.time?.length)throw new Error("No usable live forecast for "+point.name);
+      const types={0:["CLEAR","Clear sky"],1:["MOSTLY_CLEAR","Mainly clear"],2:["PARTLY_CLOUDY","Partly cloudy"],3:["CLOUDY","Overcast"],45:["FOG","Fog"],48:["FOG","Depositing rime fog"],51:["LIGHT_RAIN","Light drizzle"],53:["LIGHT_RAIN","Drizzle"],55:["RAIN","Dense drizzle"],61:["LIGHT_RAIN","Slight rain"],63:["RAIN","Moderate rain"],65:["HEAVY_RAIN","Heavy rain"],80:["SCATTERED_SHOWERS","Rain showers"],81:["RAIN","Rain showers"],82:["HEAVY_RAIN","Violent rain showers"],95:["THUNDERSTORM","Thunderstorm"],96:["THUNDERSTORM","Thunderstorm with hail"],99:["THUNDERSTORM","Thunderstorm with heavy hail"]};
+      const condition=code=>{const item=types[code]||["CLOUDY","Weather conditions"];return {type:item[0],description:{text:item[1]}};};
+      const daily=data.daily.time.map((date,index)=>({interval:{startTime:date+"T00:00:00+03:00"},maxTemperature:{degrees:data.daily.temperature_2m_max?.[index]},minTemperature:{degrees:data.daily.temperature_2m_min?.[index]},daytimeForecast:{weatherCondition:condition(data.daily.weather_code?.[index]),precipitation:{probability:{percent:data.daily.precipitation_probability_max?.[index]}}}}));
+      return {name:point.name,region:point.region,current:{currentTime:new Date().toISOString(),temperature:{degrees:data.current.temperature_2m},feelsLikeTemperature:{degrees:data.current.apparent_temperature},relativeHumidity:data.current.relative_humidity_2m,wind:{speed:{value:data.current.wind_speed_10m}},weatherCondition:condition(data.current.weather_code)},daily};
+     }
+     const params=new URLSearchParams({key:apiKey,"location.latitude":String(point.latitude),"location.longitude":String(point.longitude),unitsSystem:"METRIC"});
+     const currentUrl="https://weather.googleapis.com/v1/currentConditions:lookup?"+params.toString();
+     const dailyUrl="https://weather.googleapis.com/v1/forecast/days:lookup?"+params.toString()+"&days=4";
+     const [currentResponse,dailyResponse]=await Promise.all([
+      fetch(currentUrl,{cache:"no-store"}),
+      fetch(dailyUrl,{cache:"no-store"})
+     ]);
+     if(!currentResponse.ok||!dailyResponse.ok)throw new Error("Google Weather returned HTTP "+(!currentResponse.ok?currentResponse.status:dailyResponse.status)+" for "+point.name);
+     const [current,dailyPayload]=await Promise.all([currentResponse.json(),dailyResponse.json()]);
+     if(!current?.weatherCondition||!dailyPayload?.forecastDays?.length)throw new Error("Incomplete Google Weather response for "+point.name);
+     return {name:point.name,region:point.region,current,daily:dailyPayload.forecastDays};
+    }));
+    const next={};
+    results.forEach((result,index)=>{if(result.status==="fulfilled")next[WEATHER_POINTS[index].name]=result.value;});
+    if(!Object.keys(next).length)throw new Error("Google Weather returned no usable forecasts for the configured locations");
+    const updateTimes=Object.values(next).map(row=>row.current?.currentTime).filter(Boolean).sort();
+    if(!disposed){
+     setWeatherByPlace(previous=>({...previous,...next}));
+     setLastUpdated(updateTimes[updateTimes.length-1]||new Date().toISOString());
+     setError(results.some(result=>result.status==="rejected")?"Some locations could not refresh; showing their last available observations where available.":(!apiKey?"Using live public forecast fallback because the Google Weather API key is not configured.":""));
+     setLoading(false);
+    }
+   }catch(e){if(!disposed){setError(e?.message||"Google Weather is temporarily unavailable");setLoading(false);}}
+  };
+  loadWeather();
+  const refreshId=window.setInterval(loadWeather,15*60*1000);
+  return()=>{disposed=true;window.clearInterval(refreshId);};
+ },[apiKey]);
+ useEffect(()=>{
+  const rotationId=window.setInterval(()=>setActivePlaceIndex(index=>(index+1)%WEATHER_POINTS.length),8000);
+  return()=>window.clearInterval(rotationId);
+ },[]);
+ const icon=type=>({CLEAR:"☀️",MOSTLY_CLEAR:"🌤️",PARTLY_CLOUDY:"⛅",MOSTLY_CLOUDY:"☁️",CLOUDY:"☁️",FOG:"🌫️",LIGHT_RAIN:"🌦️",RAIN:"🌧️",HEAVY_RAIN:"🌧️",SCATTERED_SHOWERS:"🌦️",LIGHT_SNOW:"🌨️",SNOW:"❄️",HEAVY_SNOW:"❄️",THUNDERSTORM:"⛈️",HAIL:"🌨️"}[type]||"🌡️");
+ const activePlace=WEATHER_POINTS[activePlaceIndex]||WEATHER_POINTS[0];
+ const placeWeather=weatherByPlace[activePlace.name];
+ const current=placeWeather?.current,daily=placeWeather?.daily||[];
+ const temp=current?.temperature?.degrees,feels=current?.feelsLikeTemperature?.degrees;
+ const todayForecast=daily[0]?.daytimeForecast||daily[0]?.nighttimeForecast||{};
+ const rain=todayForecast?.precipitation?.probability?.percent??daily[0]?.precipitation?.probability?.percent;
+ const condition=current?.weatherCondition?.description?.text||"Conditions unavailable";
+ const fmt=(value,suffix="")=>Number.isFinite(value)?Math.round(value)+suffix:"—";
+ const changePlace=delta=>setActivePlaceIndex(index=>(index+delta+WEATHER_POINTS.length)%WEATHER_POINTS.length);
+ return <div className={"live-weather-content"+(forecastExpanded?" forecast-expanded":"")} aria-live="polite">
+  <div className="live-weather-location-bar">
+   <div className="live-weather-location-name"><strong>{activePlace.name}</strong><span>{icon(current?.weatherCondition?.type)} {Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")} · {placeWeather?condition:(error||"Live conditions loading")}</span></div>
+   <div className="live-weather-location-controls"><button type="button" onClick={()=>changePlace(-1)} aria-label="Previous weather location" title="Previous location">‹</button><button type="button" onClick={()=>changePlace(1)} aria-label="Next weather location" title="Next location">›</button><button type="button" className="live-weather-expand" onClick={()=>setForecastExpanded(value=>!value)} aria-expanded={forecastExpanded}>{forecastExpanded?"Less":"Forecast"}</button></div>
+  </div>
+  <div className="live-weather-current">
+    <div className="live-weather-current-main"><span className="live-weather-icon" aria-hidden="true">{icon(current?.weatherCondition?.type)}</span><div><strong>{Number.isFinite(temp)?fmt(temp,"°C"):(loading?"Loading…":"—")}</strong><small>{placeWeather?condition:(error||"Connecting to live weather…")} · feels like {fmt(feels,"°C")}</small></div></div>
+    <div className="live-weather-metrics"><span>💧 Humidity <b>{fmt(current?.relativeHumidity,"%")}</b></span><span>💨 Wind <b>{fmt(current?.wind?.speed?.value," km/h")}</b></span><span>🌧️ Rain chance <b>{fmt(rain,"%")}</b></span></div>
+   </div>
+   <>
+   <div className="live-weather-days">{Array.from({length:3},(_,index)=>daily[index]||{}).map((day,index)=>{const forecast=day.daytimeForecast||day.nighttimeForecast||{},high=day.maxTemperature?.degrees,low=day.minTemperature?.degrees,type=forecast.weatherCondition?.type,text=forecast.weatherCondition?.description?.text||"—",p=forecast.precipitation?.probability?.percent??day.precipitation?.probability?.percent;const date=day.interval?.startTime||day.interval?.startDate;return <div className="live-weather-day" key={date||index}><strong>{index===0?"Today":date?new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"2-digit",month:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(date)):"—"}</strong><span className="live-weather-day-icon" aria-label={text} title={text}>{icon(type)}</span><b>{fmt(high,"°")} / {fmt(low,"°")}</b><small>{text}</small><small>Rain {fmt(p,"%")}</small></div>})}</div>
+   <div className="live-weather-attribution"><span>LIVE FORECAST</span><small>{lastUpdated?"Updated "+new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Dar_es_Salaam"}).format(new Date(lastUpdated))+" · refreshes every 15 minutes · location rolls every 8 seconds":error||"Fetching live forecasts for 12 locations…"}</small></div>
+  </>
+ </div>;
+}
+const IRPA_SESSION_RECOVERY_KEY="irpaSessionRecovery";const IRPA_INACTIVITY_LIMIT_MS=5*60*1000;const IRPA_RECOVERY_MAX_AGE_MS=24*60*60*1000;function readIrpaRecovery(){try{const raw=window.localStorage.getItem(IRPA_SESSION_RECOVERY_KEY);if(!raw)return null;const value=JSON.parse(raw);if(!value||Date.now()-Number(value.savedAt||0)>IRPA_RECOVERY_MAX_AGE_MS){window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY);return null}const safe={uid:String(value.uid||"").slice(0,128),active:String(value.active||"").slice(0,120),authority:String(value.authority||"").slice(0,120),savedAt:Number(value.savedAt)||Date.now()};window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify(safe));return safe}catch{return null}}function writeIrpaRecovery(snapshot){try{const safe={uid:String(snapshot?.uid||"").slice(0,128),active:String(snapshot?.active||"").slice(0,120),authority:String(snapshot?.authority||"").slice(0,120),savedAt:Date.now()};window.localStorage.setItem(IRPA_SESSION_RECOVERY_KEY,JSON.stringify(safe))}catch{}}
+
+function AuthorityCapacityGate({authorities,categories,onConfirm,onSignOut}){const fallback=(Array.isArray(categories)?categories:[]).map(role=>({id:"IRPA-AUTH-"+String(role).toUpperCase().replace(/[^A-Z0-9]+/g,"-"),authorityId:"IRPA-AUTH-"+String(role).toUpperCase().replace(/[^A-Z0-9]+/g,"-"),role,pathway:"Institutional Governance Workspace",source:"Verified login context",active:true}));const normalizedAuthorities=[...new Map((Array.isArray(authorities)&&authorities.length?authorities:fallback).filter(a=>a?.active!==false&&a?.role).map(a=>[String(a.authorityId||a.id||a.role),a])).values()];const[selected,setSelected]=useState("");const[busy,setBusy]=useState(false);const[feedback,setFeedback]=useState("");const selectedAuthority=normalizedAuthorities.find(a=>String(a.authorityId||a.id)===selected);const choose=value=>{if(busy)return;const id=String(value||"");if(!normalizedAuthorities.some(a=>String(a.authorityId||a.id)===id))return;setSelected(id);setFeedback("")};const verify=async()=>{if(!selectedAuthority||busy)return;setBusy(true);setFeedback("");try{await Promise.resolve(onConfirm(selectedAuthority));}catch(error){console.error("IRPA access authority verification failed:",error);setFeedback(error?.message||"The selected access authority could not be verified. Select an available authority again.");setBusy(false)}};return <div className="authority-capacity-gate" role="dialog" aria-modal="true" aria-labelledby="authority-gate-title" aria-describedby="authority-gate-description"><section className="authority-capacity-card">{normalizedAuthorities.length===0?<><div className="authority-capacity-kicker">IRPA-DBGS · ACCESS GATEWAY</div><h1 id="authority-gate-title">Access Authority Unavailable</h1><p id="authority-gate-description">Authentication succeeded, but the server did not return a registered access authority. No internal pathway is opened.</p><div className="authority-capacity-feedback error" role="alert"><strong>ENTRY BLOCKED</strong><span>Sign out and contact the IRPA administrator to verify the institutional register.</span></div><button type="button" className="authority-capacity-signout" onClick={onSignOut}>Sign Out</button></>:<><div className="authority-capacity-kicker">IRPA-DBGS · SECURE ACCESS GATEWAY</div><h1 id="authority-gate-title">Select Your Access Authority</h1><p id="authority-gate-description">Your credentials have been authenticated and the IRPA authorization registry has returned the access authorities attached to this account. Select the authority for this session. Selection opens only the pathway already authorized for that authority.</p><div className="authority-capacity-status"><span className="authority-capacity-status-dot" aria-hidden="true"></span><div><strong>{selectedAuthority?"AUTHORITY SELECTED":"IDENTIFICATION VERIFIED · AUTHORITY SELECTION REQUIRED"}</strong><small>{selectedAuthority?selectedAuthority.authorityId:"Select one registered access authority below."}</small></div></div><div className="authority-capacity-options" role="radiogroup" aria-label="Verified access authorities">{normalizedAuthorities.map(a=>{const id=String(a.authorityId||a.id);return <button key={id} type="button" className={selected===id?"authority-capacity-option selected":"authority-capacity-option"} onClick={()=>choose(id)} aria-pressed={selected===id} role="radio" aria-checked={selected===id} disabled={busy}><span>{a.role}</span><small>{id} · {a.pathway||"Authorized pathway"}</small></button>})}</div>{selectedAuthority&&<div className="authority-capacity-feedback" role="status"><strong>PATHWAY READY</strong><span>{selectedAuthority.authorityId} → {selectedAuthority.pathway}</span></div>}{feedback&&<div className="authority-capacity-feedback error" role="alert" aria-live="assertive"><strong>AUTHORITY VERIFICATION MESSAGE</strong><span>{feedback}</span></div>}<button type="button" className="authority-capacity-confirm" disabled={!selectedAuthority||busy} onClick={verify}>{busy?"Verifying Authority…":"Enter Authorized Pathway"}</button><button type="button" className="authority-capacity-signout" onClick={onSignOut} disabled={busy}>Sign Out</button><small className="authority-capacity-note">This gateway does not grant permissions. It selects one server-verified access authority and routes the session into the corresponding internal or departmental workspace.</small></>}</section></div>}
+
+class ResearchPortalRuntimeBoundary extends React.Component{
+  constructor(props){super(props);this.state={error:null};}
+  static getDerivedStateFromError(error){return{error};}
+  componentDidCatch(error){console.error("IRPA Research Portal runtime load failure:",error);}
+  recoverResearchWorkspace=async()=>{
+    try{
+      if("caches" in window){
+        const names=await caches.keys();
+        await Promise.all(names.filter(name=>name.startsWith("irpa-dbgs-")).map(name=>caches.delete(name)));
+      }
+      if("serviceWorker" in navigator){
+        const registrations=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(registration=>registration.unregister()));
+      }
+    }catch(error){
+      console.warn("IRPA Research Portal cache recovery could not fully clear the browser cache:",error);
+    }finally{
+      window.location.reload();
+    }
+  };
+  render(){
+    if(this.state.error){
+      return <section className="panel" role="alert" style={{border:"1px solid rgba(245,158,11,.55)",marginBottom:16}}>
+        <div className="panel-header">
+          <div>
+            <span className="eyebrow">RESEARCH PORTAL RUNTIME RECOVERY</span>
+            <h2>The Research workspace could not be loaded.</h2>
+            <p className="panel-description">The Research frontend encountered a runtime or module-loading fault. Administrator authority and server-side security controls remain unchanged.</p>
+          </div>
+        </div>
+        <div className="auth-message" style={{marginBottom:12}}>
+          <strong>RESEARCH ACCESS REMAINS AUTHORISED</strong>
+          <div style={{marginTop:6}}>This recovery path only refreshes the Research frontend and its browser asset cache. It does not sign out the user, change the active access authority, or modify Firestore authorization.</div>
+        </div>
+        <div className="form-actions">
+          <button type="button" onClick={this.recoverResearchWorkspace}>Reload Research Workspace</button>
+          <button type="button" className="secondary-button" onClick={()=>this.props.onNavigate?.("Dashboard")}>Return to Dashboard</button>
+        </div>
+      </section>;
+    }
+    return this.props.children;
+  }
+}
+
+function Shell({user,profile,admin,employee,inductionComplete,onInductionComplete,buttonFeedback,setButtonFeedback,registeredPortals,setRegisteredPortals}){const authorityCategories=resolveLoginCategories(profile,employee,admin);const authorityRecords=Array.isArray(profile?.authorities)?profile.authorities:authorityCategories.map(role=>({id:"IRPA-AUTH-"+String(role).toUpperCase().replace(/[^A-Z0-9]+/g,"-"),authorityId:"IRPA-AUTH-"+String(role).toUpperCase().replace(/[^A-Z0-9]+/g,"-"),role,pathway:"Institutional Governance Workspace",active:true}));const[storedAuthority,setStoredAuthority]=useState(()=>{try{return window.sessionStorage.getItem("irpaActiveAccessAuthority")||""}catch{return""}});const sessionAdministrator=Boolean(admin||profile?.authorizationType==="administrator");useEffect(()=>{let disposed=false;if(!user){setRegisteredPortals([]);return()=>{disposed=true}}getDocs(collection(db,"portalDefinitions")).then(snapshot=>{if(!disposed)setRegisteredPortals(snapshot.docs.map(item=>({id:item.id,...item.data()})).filter(portal=>String(portal.status||"").toLowerCase()==="active"))}).catch(error=>{console.warn("Department portal registry unavailable.",error);if(!disposed)setRegisteredPortals([])});return()=>{disposed=true}},[user,sessionAdministrator]);const selectedAuthority=sessionAdministrator?"Administrator":(storedAuthority!=="Administrator"&&(authorityCategories.includes(storedAuthority)||authorityRecords.some(a=>a?.active!==false&&String(a.role||"").trim()===storedAuthority))?storedAuthority:"");const setSelectedAuthority=authority=>{if(sessionAdministrator||authority==="Administrator"||!(authorityCategories.includes(authority)||authorityRecords.some(a=>a?.active!==false&&String(a.role||"").trim()===authority))||authority===selectedAuthority)return;try{window.sessionStorage.setItem("irpaActiveAccessAuthority",authority);window.sessionStorage.removeItem("irpaPendingAccessAuthority")}catch{}setStoredAuthority(authority);setActiveAuthorityLoginRequired(false);setMobileNav("");setActive("Dashboard");};const confirmInitialAuthority=async authority=>{if(!authority)return;const authorityId=String(authority.authorityId||authority.id||"").trim();const role=String(authority.role||"").trim();if(!authorityId||!role)throw new Error("The selected access authority is incomplete.");let verifiedAuthority=null;if(IRPA_GATEWAY_CONNECTED){try{const context=await Promise.race([resolveAuthenticatedLoginContext(),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Server access authority verification timed out.")),6000))]);const serverAuthorities=Array.isArray(context?.authorities)?context.authorities:[];verifiedAuthority=serverAuthorities.find(a=>String(a.authorityId||a.id)===authorityId&&String(a.role)===role&&a.active!==false)||null;}catch(error){console.warn("IRPA authority resolver unavailable; using the already verified authenticated identity context.",error);}}
+if(!verifiedAuthority){const activeStatus=[profile?.status,profile?.employmentStatus,profile?.registrationStatus].map(v=>String(v||"").trim().toLowerCase());const activeIdentity=activeStatus.some(v=>["active","activated"].includes(v))||admin?.active===true;const roleDeclared=authorityCategories.includes(role)||authorityRecords.some(a=>a?.active!==false&&String(a.role||"").trim()===role)||roleValues(profile?.roles||profile?.role).includes(role)||roleValues(employee?.roles||employee?.role).includes(role)||role==="Administrator";if(!activeIdentity||!roleDeclared)throw new Error("This access authority could not be verified for the current authenticated IRPA identity. Please sign in again.");verifiedAuthority={...authority,authorityId,id:authorityId,role,active:true,verificationMode:"authenticated-identity-fallback"};}
+try{window.sessionStorage.setItem("irpaActiveAccessAuthority",role);window.sessionStorage.setItem("irpaActiveAccessAuthorityId",authorityId);window.sessionStorage.setItem("irpaActiveAccessAuthorityRecord",JSON.stringify(verifiedAuthority));window.sessionStorage.removeItem("irpaPendingAccessAuthority");window.sessionStorage.setItem("irpaAccessAuthoritySelectionState",verifiedAuthority.verificationMode==="authenticated-identity-fallback"?"IDENTITY_VERIFIED_FALLBACK":"SERVER_VERIFIED");}catch{}setStoredAuthority(role);setActiveAuthorityLoginRequired(false);};useEffect(()=>{if(sessionAdministrator||!selectedAuthority)return;try{window.sessionStorage.setItem("irpaActiveAccessAuthority",selectedAuthority);window.sessionStorage.removeItem("irpaPendingAccessAuthority")}catch{}},[admin,selectedAuthority]);const[activeAuthorityLoginRequired,setActiveAuthorityLoginRequired]=useState(false);const effectiveAuthority=sessionAdministrator?"ADMINISTRATOR":selectedAuthority;const authorityProfile=selectedAuthority?{roles:[selectedAuthority],role:selectedAuthority}:null;const authorityEmployee=selectedAuthority&&employee&&(roleValues(employee?.roles||employee?.role).includes(selectedAuthority)||IT_ROLES.includes(selectedAuthority))?{...employee,roles:[selectedAuthority],role:selectedAuthority}:null;const financePortalAccess=sessionAdministrator||isFinancePortalMember(authorityProfile,authorityEmployee);const meetingInviteSession=useMemo(()=>{try{const c=JSON.parse(window.sessionStorage.getItem("irpaMeetingEntryContext")||"null");return Boolean(c?.meetingId&&c?.participantId&&window.sessionStorage.getItem("irpaMeetingGatewayTarget")===c.meetingId)}catch{return false}},[]);const portalAccessFrozen=!sessionAdministrator&&!selectedAuthority&&!meetingInviteSession;const[gateBypassPortal,setGateBypassPortal]=useState("");const requestDataGate=target=>{if(!target)return;setGateBypassPortal("");setActive(target)};const navigateWithoutDataGate=target=>{if(!target)return;setGateBypassPortal(target);setActive(target)};const handlePortalDataEntryIntent=e=>{const target=e?.target;if(!target||!gateBypassPortal||gateBypassPortal!==active)return;const field=target.closest?.("input:not([type=button]):not([type=submit]):not([type=reset]),textarea,select,[contenteditable=true]");const button=target.closest?.("button");const actionLabel=(button?.getAttribute("aria-label")||button?.textContent||"").replace(/\s+/g," ").trim();const mutatingAction=/\b(add|create|save|submit|update|delete|remove|edit|upload|import|approve|reject|send|publish|register|record|confirm|issue|archive|restore|process|pay|transfer|sign|assign|invite|new)\b/i.test(actionLabel);if(field||mutatingAction)setGateBypassPortal("");};const navigateWithWorkflowContext=(target,context={})=>{try{const payload=context&&typeof context==="object"?Object.fromEntries(Object.entries(context).filter(([,value])=>value!==undefined&&value!==null&&String(value).trim()!=="")):{};if(Object.keys(payload).length)window.sessionStorage.setItem("irpaWorkflowContext",JSON.stringify({module:target,...payload,updatedAt:new Date().toISOString()}));else window.sessionStorage.removeItem("irpaWorkflowContext")}catch{}requestDataGate(target)};const[recoverySnapshot,setRecoverySnapshot]=useState(()=>readIrpaRecovery());const[recoveryMessage,setRecoveryMessage]=useState("");const[mobileNav,setMobileNav]=useState("");const[mobileTimeFormat,setMobileTimeFormat]=useState(()=>{try{return window.localStorage.getItem("irpa-mobile-time-format")==="12h"?"12h":"24h"}catch{return"24h"}});const[shellLiveNow,setShellLiveNow]=useState(()=>new Date());useEffect(()=>{const clockId=setInterval(()=>setShellLiveNow(new Date()),1000);return()=>clearInterval(clockId)},[]);const toggleMobileTimeFormat=()=>setMobileTimeFormat(previous=>{const next=previous==="24h"?"12h":"24h";try{window.localStorage.setItem("irpa-mobile-time-format",next)}catch{}return next});const liveDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",day:"2-digit",month:"long",year:"numeric"}).format(shellLiveNow);const liveDay=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",weekday:"long"}).format(shellLiveNow);const liveTime=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Nairobi",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:mobileTimeFormat==="12h"}).format(shellLiveNow);const itPortalAccess=sessionAdministrator||IT_ROLES.includes(selectedAuthority);const procurementPortalAccess=sessionAdministrator||Boolean(selectedAuthority);const portalRestrictedDocumentUpload=sessionAdministrator||[...(Array.isArray(profile?.specialPermissions)?profile.specialPermissions:[]),...(Array.isArray(profile?.permissions)?profile.permissions:[]),...(Array.isArray(employee?.specialPermissions)?employee.specialPermissions:[]),...(Array.isArray(employee?.permissions)?employee.permissions:[])].map(v=>String(v||"").trim().toUpperCase()).includes("RESTRICTED_DOCUMENT_UPLOAD");const signatureProfileAccess=!sessionAdministrator&&(profile?.status==="Active"||employee?.status==="Active"||employee?.employmentStatus==="Active"||employee?.registrationStatus==="Activated");const meetingProfileAccess=!sessionAdministrator&&(profile?.status==="Active"||employee?.status==="Active"||employee?.employmentStatus==="Active"||employee?.registrationStatus==="Activated");const[active,setActive]=useState(()=>{const params=new URLSearchParams(window.location.search);const requested=params.get("adminModule");const induction=params.get("induction")==="1";return sessionAdministrator&&requested&&ALL_MODULES.includes(requested)?requested:induction?"Induction and Orientation":meetingInviteSession?"Meeting Room":(IT_ROLES.includes(selectedAuthority)?"IT Operations":"Dashboard")});useEffect(()=>{if(!sessionAdministrator)return;const requested=new URLSearchParams(window.location.search).get("adminModule");if(requested&&(ALL_MODULES.includes(requested)||registeredPortals.some(portal=>portal.name===requested)))setActive(current=>current===requested?current:requested)},[sessionAdministrator,registeredPortals]);const meetingPortalModules=["Dashboard","Meetings","Meeting Room",...(selectedAuthority?memberModules(profile,employee,selectedAuthority).filter(module=>["Participants","Resolutions","Voting","Actions","Decisions"].includes(module)):authorityCategories.some(role=>["Board Member","Board Chairperson","Board Committee Member","Board Secretary","Board Treasurer","Board Vice Chairperson"].includes(role))?["Participants","Resolutions","Voting","Actions","Decisions"]:[])],registeredPortalModules=registeredPortals.filter(portal=>{if(sessionAdministrator)return true;if(!selectedAuthority)return false;const identityDepartment=String(employee?.department||profile?.department||"").toLocaleLowerCase("en").replace(/&/g,"and").replace(/[^a-z0-9]+/g," ").trim();const portalDepartment=String(portal.departmentName||"").toLocaleLowerCase("en").replace(/&/g,"and").replace(/[^a-z0-9]+/g," ").trim();if(!identityDepartment||identityDepartment!==portalDepartment)return false;const allowed=Array.isArray(portal.allowedRoles)?portal.allowedRoles:[];if(!allowed.length)return true;const identityRoles=[selectedAuthority,...roleValues(profile?.roles||profile?.role),...roleValues(employee?.roles||employee?.role)].map(role=>String(role).toLocaleLowerCase("en").trim());return allowed.some(role=>identityRoles.includes(String(role).toLocaleLowerCase("en").trim()))}).map(portal=>portal.name),modules=sessionAdministrator?[...ALL_MODULES,...registeredPortalModules]:(meetingInviteSession?meetingPortalModules:portalAccessFrozen?["Dashboard"]:[...memberModules(profile,employee,selectedAuthority),...registeredPortalModules]);
+// Keep portal navigation focused on the requested workspace instead of leaving the viewport at the global header.
+// This is presentation-only: it does not alter module authorization, workflow context, or data-gate decisions.
+useEffect(()=>{
+  let firstFrame=0;
+  let secondFrame=0;
+  let finalFrame=0;
+  let retryTimer1=0;
+  let retryTimer2=0;
+  let retryTimer3=0;
+  firstFrame=window.requestAnimationFrame(()=>{
+    secondFrame=window.requestAnimationFrame(()=>{
+      const workspace=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
+      if(!workspace)return;
+      const alignWorkspace=()=>{
+        const header=document.querySelector("#root .app-shell .main-area > header.topbar");
+        const headerBottom=header?.getBoundingClientRect().bottom||0;
+        const rect=workspace.getBoundingClientRect();
+        const delta=rect.top-headerBottom-8;
+        if(Math.abs(delta)<2)return;
+        let ancestor=workspace.parentElement;
+        while(ancestor&&ancestor!==document.body){
+          const style=window.getComputedStyle(ancestor);
+          if(/auto|scroll|overlay/.test(style.overflowY)&&ancestor.scrollHeight>ancestor.clientHeight+1){
+            ancestor.scrollTop+=delta;
+            return;
+          }
+          ancestor=ancestor.parentElement;
+        }
+        window.scrollBy({top:delta,left:0,behavior:"auto"});
+      };
+      workspace.scrollIntoView({block:"start",behavior:"auto"});
+      alignWorkspace();
+      // Run after portal mount effects so child controls cannot leave focus at the shared header.
+      const focusDestination=()=>{
+        const current=document.querySelector("#root .app-shell .main-area > .content-area [data-active-portal-content]");
+        if(!current||current.dataset.activePortalContent!==active)return;
+        alignWorkspace();
+        current.focus({preventScroll:true});
+      };
+      finalFrame=window.requestAnimationFrame(()=>{focusDestination();});
+      // Lazy portal mounts may apply their own focus after the first animation frame.
+      // Reassert focus after mount settles without changing navigation or access decisions.
+      retryTimer1=window.setTimeout(focusDestination,120);
+      retryTimer2=window.setTimeout(focusDestination,360);
+      // Some lazy portal descendants settle after the first mount cycle. Keep the
+      // final focus correction bounded and only for the current destination.
+      retryTimer3=window.setTimeout(focusDestination,1000);
+    });
+  });
+  return()=>{
+    window.cancelAnimationFrame(firstFrame);
+    window.cancelAnimationFrame(secondFrame);
+    window.cancelAnimationFrame(finalFrame);
+    window.clearTimeout(retryTimer1);
+    window.clearTimeout(retryTimer2);
+    window.clearTimeout(retryTimer3);
+  };
+},[active]);
+useEffect(()=>{
+  if(!user?.uid)return;
+  let lastActivity=Date.now();
+  let logoutInProgress=false;
+  const persist=()=>{lastActivity=Date.now();writeIrpaRecovery({uid:user.uid,active,authority:selectedAuthority});};
+  const activity=()=>{lastActivity=Date.now();};
+  const events=["pointerdown","keydown","touchstart","scroll","click","mousemove"];
+  events.forEach(type=>window.addEventListener(type,activity,{passive:true}));
+  const checkpoint=window.setInterval(()=>writeIrpaRecovery({uid:user.uid,active,authority:selectedAuthority}),30000);
+  const interval=window.setInterval(async()=>{
+    if(logoutInProgress||Date.now()-lastActivity<IRPA_INACTIVITY_LIMIT_MS)return;
+    logoutInProgress=true;persist();
+    try{await logout({preserveRecovery:true});}catch(error){console.error("IRPA inactivity logout:",error);logoutInProgress=false;}
+  },15000);
+  const interruption=()=>writeIrpaRecovery({uid:user.uid,active,authority:selectedAuthority});
+  window.addEventListener("beforeunload",interruption);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")interruption()});
+  return()=>{window.clearInterval(interval);window.clearInterval(checkpoint);events.forEach(type=>window.removeEventListener(type,activity));window.removeEventListener("beforeunload",interruption);};
+},[user?.uid,user?.email,active,selectedAuthority]);
+useEffect(()=>{const handler=()=>onInductionComplete?.();window.addEventListener("irpa:induction-completed",handler);return()=>window.removeEventListener("irpa:induction-completed",handler)},[onInductionComplete]);useEffect(()=>{if(portalAccessFrozen&&active!=="Dashboard")setActive("Dashboard");else if(!modules.includes(active))setActive(modules[0]||"Dashboard")},[modules,active,portalAccessFrozen]);useEffect(()=>{const navigate=e=>{const detail=e?.detail;const target=typeof detail==="string"?detail:detail?.module;if(target&&modules.includes(target))setActive(target)};window.addEventListener("irpa:navigate",navigate);return()=>window.removeEventListener("irpa:navigate",navigate)},[modules]);const groups=[...Object.entries(NAV).map(([title,items])=>[title,sortNavigationItems(items.filter(x=>modules.includes(x)))]).filter(([,items])=>items.length),...(registeredPortalModules.length?[["Department Portals",sortNavigationItems(registeredPortalModules.filter(x=>modules.includes(x)))]]:[])];const authoritySelectionRequired=!meetingInviteSession&&!sessionAdministrator&&authorityCategories.length>0&&!selectedAuthority;if(authoritySelectionRequired)return <AuthorityCapacityGate authorities={authorityRecords} categories={authorityCategories} onConfirm={confirmInitialAuthority} onSignOut={logout}/>;const NAV_ICONS={Dashboard:"home","Board Members Registration":"groups","Members & Personnel":"groups",Invitations:"mail",Meetings:"calendar",Resolutions:"check",Voting:"vote",Participants:"person-add","Authorization & Approvals":"check","Signature Platform":"signature","Induction and Orientation":"person-add","Induction Applications":"clipboard",Downloads:"download","Finance Portfolio":"finance",Procurement:"cart","Employee Payments":"finance",Reports:"analytics","Audit Trail":"audit",Settings:"settings","Add Administrator":"person-add","Department and Archive Registry":"document",Documents:"document",Actions:"list","Risk Register":"risk"};
+const NAV_ICON_PATHS={
+home:<><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/><path d="M9.5 21v-6h5v6"/></>,
+groups:<><circle cx="9" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M3 20c.8-4 3-6 6-6s5.2 2 6 6"/><path d="M14 14c3.4.2 5.4 2.1 6 5"/></>,
+mail:<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
+calendar:<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></>,
+check:<><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 2.5 2.5L16 9"/></>,
+vote:<><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2"/></>,
+"person-add":<><circle cx="9" cy="8" r="3.5"/><path d="M2.5 21c.8-4.5 3-6.5 6.5-6.5s5.7 2 6.5 6.5"/><path d="M18 8v6M15 11h6"/></>,
+signature:<><path d="M3 17c3.5-5 5.5-6 7-4s2 3 4 1 3-5 6-5"/><path d="M4 21h16"/></>,
+clipboard:<><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M8 9h8M8 13h8M8 17h5"/></>,
+download:<><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 21h16"/></>,
+finance:<><path d="M4 6h16M4 18h16"/><path d="M7 6v12M17 6v12"/><circle cx="12" cy="12" r="2.5"/></>,
+cart:<><path d="M3 4h2l2 11h10l3-8H6"/><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/></>,
+analytics:<><path d="M4 20V10M10 20V6M16 20V12M22 20V3"/></>,
+audit:<><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M8 17h8"/></>,
+settings:<><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4"/></>,
+document:<><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h5M9 12h6M9 16h6"/></>,
+list:<><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></>,
+risk:<><path d="M12 3 21 7v5c0 5-3.5 8.5-9 10-5.5-1.5-9-5-9-10V7z"/><path d="m9 12 2 2 4-4"/></>
+};
+const navIcon=x=><svg className="nav-svg-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">{NAV_ICON_PATHS[NAV_ICONS[x]]||NAV_ICON_PATHS.document}</svg>;return <><FieldEntryDataGate portal={active} bypassPortal={gateBypassPortal}/><div className="app-shell"><aside className="sidebar"><div className="sidebar-brand"><img className="quote4-sidebar-logo" src="/irpa-logo.svg" alt="IRPA"/><div className="sidebar-brand-copy"><strong>IRPA</strong><span>Digital Governance</span><small>Improvement of Rangeland in Pastoral Areas</small></div></div><nav>{groups.map(([title,items])=><div className="nav-group"key={title}><div className="nav-group-title">{title}</div>{sortNavigationItems(items.filter(x=>!PORTAL_CHILDREN_SET.has(x))).map(x=>{const children=sortNavigationItems((PORTAL_CHILDREN[x]||[]).filter(child=>modules.includes(child)));const portalOpen=active===x||children.includes(active);return <React.Fragment key={x}><button key={x} className={active===x?"nav-item active":"nav-item"} onClick={()=>requestDataGate(x)} aria-current={active===x?"page":undefined} aria-expanded={children.length?portalOpen:undefined}><span className="nav-item-content"><b className="nav-item-icon" aria-hidden="true">{navIcon(x)}</b><span>{PORTAL_LABELS[x]||displayModuleName(x)}</span></span>{children.length>0&&<span className="nav-branch-chevron" aria-hidden="true">{portalOpen?"⌄":"›"}</span>}{active===x&&<i/>}</button>{portalOpen&&children.map(child=><button key={child} className={active===child?"nav-item nav-child active":"nav-item nav-child"} onClick={()=>requestDataGate(child)} aria-current={active===child?"page":undefined}><span className="nav-item-content"><b className="nav-item-icon" aria-hidden="true">{navIcon(child)}</b><span>SUB-PORTAL · {displayModuleName(child)}</span></span>{active===child&&<i/>}</button>)}</React.Fragment>})}</div>)}</nav><div className="sidebar-footer"><div className="secure-label">● Secure IRPA workspace</div><button className="logout-button"onClick={logout}>Sign Out</button></div></aside><section className="main-area"><WebAppNavigationRoller active={active} modules={modules} onNavigate={requestDataGate} liveDay={liveDay} liveDate={liveDate} liveTime={liveTime} mobileTimeFormat={mobileTimeFormat} onToggleTimeFormat={toggleMobileTimeFormat}/><PageBackNextNavigation active={active} modules={modules} onNavigate={navigateWithoutDataGate}/><PortalNavigationFreeze/><header className={"topbar"+(active==="Dashboard"?" dashboard-topbar":"")}><div className="topbar-heading-row"><div className="topbar-title-block"><span className="topbar-kicker">IMPROVEMENT OF RANGELAND IN PASTORAL AREAS</span><div className="topbar-title-line"><h2>{displayModuleName(active)}</h2></div><p>Digital Board Governance Workspace</p></div><div className="topbar-access-category"><LoginCategoryBadges profile={profile} employee={employee} admin={sessionAdministrator} selectedAuthority={effectiveAuthority}/></div><section className="open-portal-panel google-weather-panel" aria-label="Live multi-location weather forecast"><span>LIVE WEATHER ☁️</span><LiveWeatherPanel/></section></div></header><main className={active==="Dashboard"?"content-area dashboard-content-area":"content-area"} onFocusCapture={handlePortalDataEntryIntent} onClickCapture={e=>{handlePortalDataEntryIntent(e);const button=e.target.closest?.("button");if(!button)return;const label=(button.getAttribute("aria-label")||button.textContent||"Button").replace(/\s+/g," ").trim();if(button.disabled){setButtonFeedback(`${label}: unavailable until the required information or authority is provided.`);return}setButtonFeedback(`${label}: action received. Processing…`);window.clearTimeout(window.__irpaButtonFeedbackTimer);window.__irpaButtonFeedbackTimer=window.setTimeout(()=>setButtonFeedback(""),2200)}}><button type="button" className="mobile-fixed-signout" onClick={logout} aria-label="Sign out of IRPA Digital Governance">Sign Out</button>{portalAccessFrozen&&<div className="auth-message" role="alert" style={{marginBottom:16,border:"1px solid rgba(245,158,11,.55)",background:"rgba(245,158,11,.10)"}}><strong>{activeAuthorityLoginRequired?"FRESH LOGIN REQUIRED":"ACCESS AUTHORITY REQUIRED"}</strong><div style={{marginTop:6}}>{activeAuthorityLoginRequired?"Your previous access-authority session has ended. Sign in again to activate the newly selected operating capacity.":"Select your operating capacity above. The selected access authority will apply across all IRPA portals and role-specific functions remain frozen until a valid capacity is selected."}</div></div>}{recoverySnapshot&&recoverySnapshot.uid===user?.uid&&<div className="auth-message" role="status" style={{marginBottom:16}}><strong>SESSION RECOVERY AVAILABLE</strong><div style={{marginTop:6}}>{recoveryMessage||"A protected recovery record from your previous session is available. It stores your last portal and access-authority context, not passwords or authentication secrets."}</div><div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}><button type="button" onClick={()=>{const canRecover=admin||!recoverySnapshot.authority||recoverySnapshot.authority===selectedAuthority;if(!canRecover){setRecoveryMessage("Select the same access authority category used by the interrupted session before recovery can continue.");return}if(recoverySnapshot.active&&modules.includes(recoverySnapshot.active))setActive(recoverySnapshot.active);setRecoveryMessage("Previous work context restored.");setRecoverySnapshot(null);try{window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY)}catch{}}}>Recover previous work</button><button type="button" onClick={()=>{setRecoverySnapshot(null);try{window.localStorage.removeItem(IRPA_SESSION_RECOVERY_KEY)}catch{}}}>Discard recovery</button></div></div>}{/* Removed: the mobile in-portal dropdown obscured dashboard and portal content. Navigation remains available through the Menu panel. */}{buttonFeedback&&<div className="action-feedback" role="status" aria-live="polite" style={{marginBottom:12}}><strong>BUTTON FEEDBACK:</strong> {buttonFeedback}</div>}<ModuleInterlinkBar active={active} onNavigate={setActive} admin={sessionAdministrator} role={effectiveAuthority} roles={resolveLoginCategories(profile,employee,admin)} modules={modules}/><DocumentRetrievalAccessPoint profile={profile} employee={employee} admin={sessionAdministrator}/>{active!=="Dashboard"&&<PortalDocumentAccessPoint portal={displayModuleName(active)} allowRestrictedUpload={portalRestrictedDocumentUpload}/>} {active==="Dashboard"&&<div data-active-portal-content="Dashboard" className="active-portal-content" tabIndex={-1}><Dashboard user={user} admin={sessionAdministrator} employee={employee} profile={profile} onNavigate={setActive} selectedAuthority={effectiveAuthority} authorityCategories={authorityCategories}/></div>} {active!=="Research, Statistics and Knowledge"&&active!=="Dashboard"&&<ResearchPortalAlert portal={RESEARCH_PORTAL_TARGET_BY_MODULE[active]||active}/>} {active!=="Research, Statistics and Knowledge"&&<ResearchUpdatesPanel limit={5}/>} <GrantOpportunityNotifications/> <div data-active-portal-content={active} className="active-portal-content" tabIndex={-1}>{active==="Grant Intelligence & Funding Opportunities"&&<React.Suspense fallback={<div className="panel" role="status"><strong>Grant Intelligence & Funding Opportunities</strong><p>Loading the funding opportunities portal…</p></div>}><GrantIntelligencePortal profile={profile} employee={employee} isAdmin={sessionAdministrator} onNavigate={setActive}/></React.Suspense>} {active==="Communication & Media"&&<CommunicationMediaPortal profile={profile} employee={employee} selectedAuthority={effectiveAuthority} isAdmin={sessionAdministrator}/>} {active==="Research, Statistics and Knowledge"&&<ResearchPortalRuntimeBoundary onNavigate={setActive}><React.Suspense fallback={<div className="panel" role="status"><strong>Research, Statistics and Knowledge Portal</strong><p>Loading the research workspace…</p></div>}><ResearchStatisticsKnowledgePortal profile={profile} employee={employee} admin={sessionAdministrator} onNavigate={setActive}/></React.Suspense></ResearchPortalRuntimeBoundary>} {active==="IT Operations"&&itPortalAccess&&<ITOperationsPortal user={user} profile={profile} employee={employee} selectedAuthority={selectedAuthority} onNavigate={setActive}/>} {active==="Board Members Registration"&&<BoardMembers/>} {active==="Invitations"&&<Invitations/>} {active==="Members & Personnel"&&<Employees/>} {active==="Meetings"&&<Meetings onNavigate={navigateWithWorkflowContext} admin={admin}/>} {active==="Meeting Room"&&<MeetingRoom onNavigate={navigateWithWorkflowContext}/>} {active==="Resolutions"&&<Resolutions/>} {active==="Voting"&&<Voting/>} {active==="Participants"&&<OperationalGatewaysParticipants/>} {active==="Authorization & Approvals"&&<AuthorizationApprovals/>} {active==="Documents"&&<React.Suspense fallback={<div className="panel" role="status"><strong>Documents Workspace</strong><p>Loading the document lifecycle module…</p></div>}><DocumentLifecycleModule profile={profile} employee={employee} admin={sessionAdministrator}/></React.Suspense>} {active==="Policies and Strategic Plans"&&<React.Suspense fallback={<div className="panel" role="status"><strong>Policies and Strategic Plan Portal</strong><p>Loading the institutional governance library…</p></div>}><PoliciesStrategicPlanPortal profile={profile} employee={employee} admin={sessionAdministrator}/></React.Suspense>} {active==="Signature Platform"&&<SignaturePlatformWithUpload/>} {active==="Role Descriptions"&&<><RoleJobDescriptionPortal selectedAuthority={effectiveAuthority} roles={authorityCategories} isAdmin={sessionAdministrator}/><JobDescriptionWorkflowPortal selectedAuthority={selectedAuthority} isAdmin={sessionAdministrator} user={user} profile={profile} employee={employee}/></> } {active==="Job Description Administration"&&(sessionAdministrator||selectedAuthority==="Executive Director")&&<JobDescriptionWorkflowPortal selectedAuthority={selectedAuthority} isAdmin={sessionAdministrator} user={user} profile={profile} employee={employee}/>} {active==="Induction and Orientation"&&<InductionOrientation profile={profile} employee={employee}/>} {active==="Induction Applications"&&sessionAdministrator&&<InductionAdmin/>} {active==="Downloads"&&<Downloads/>} {active==="Finance Portfolio"&&(financePortalAccess?<FinancePortfolio profile={profile} employee={employee} isAdmin={sessionAdministrator}/>:<AccessDenied user={user} reason="Finance Portal access is restricted to authorised Finance/Accounting personnel and designated approving officers."/>)} {active==="Procurement"&&(procurementPortalAccess?<ProcurementPortal profile={profile}/>:<AccessDenied user={user} reason="Procurement Portal access is restricted to authorised Procurement personnel and designated approving officers."/>)} {active==="External Auditor Portal"&&sessionAdministrator&&<ExternalAuditorPortal/>} {active==="Auditors & Special Invitees"&&sessionAdministrator&&<AuditorsSpecialInvitees/>} {active==="Settings"&&<Settings admin={sessionAdministrator} section="settings"/>} {active==="Add Administrator"&&<AddAdministratorPortal/>} {active==="Department and Archive Registry"&&sessionAdministrator&&<DepartmentArchiveRegistry/>} {active==="Department Portal Builder"&&sessionAdministrator&&<DepartmentPortalBuilder reservedNames={ALL_MODULES} onCreated={portal=>setRegisteredPortals(current=>[...current.filter(item=>item.id!==portal.id),portal])}/>} {modules.includes(active)&&registeredPortals.some(portal=>portal.name===active)&&<DepartmentPortalWorkspace portal={registeredPortals.find(portal=>portal.name===active)}/>} {CONFIGURED_MODULES.includes(active)&&<OperationalGateways module={active}/>} {active==="Employee Payments"&&<EmployeePayments profile={{...profile,...employee}}/>}</div></main><MobileGlobalNavigation mobileNav={mobileNav} setMobileNav={setMobileNav} active={active} setActive={setActive} modules={modules} groups={groups} admin={sessionAdministrator}/></section></div></>}
+
+function ExternalAuditorGateway(){const[email,setEmail]=useState(""),[password,setPassword]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[auditor,setAuditor]=useState(null);async function submit(e){e.preventDefault();setBusy(true);setMessage("");try{const clean=email.trim().toLowerCase();const u=await loginWithEmail(clean,password);const snap=await getDoc(doc(db,"auditorProfiles",clean));if(!snap.exists()||snap.data()?.active!==true)throw new Error("This email is not authorized as an active IRPA External Auditor. Contact the IRPA Administrator.");setAuditor({...snap.data(),uid:u.uid,email:clean});}catch(x){setMessage(x?.message||"External Auditor authentication failed.");}finally{setBusy(false)}}if(auditor)return <main className="content-area" style={{width:"100%"}}><ExternalAuditorPortal/></main>;return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-kicker">IRPA</div><h1>External Auditor Portal</h1><p>Read-only access to IRPA governance workflow evidence and reporting.</p></div><div className="auth-divider"><span>External Auditor Access</span></div><form onSubmit={submit}><label>Email address</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/><button type="submit" disabled={busy}>{busy?"Authenticating…":"Enter External Auditor Portal"}</button></form>{message&&<div className="auth-message">{message}</div>}<div className="auth-links"><button className="text-button" type="button" onClick={()=>window.location.href=window.location.pathname}>Return to IRPA Sign In</button><button className="text-button" type="button" onClick={async()=>{if(!email.trim()){setMessage("Enter your auditor email address first.");return}try{await sendPasswordReset(email.trim());setMessage("Password reset email sent.");}catch(x){setMessage(x?.message||"Unable to send password reset email.")}}}>Forgot password?</button></div></section></main>}
+
+export function MeetingGatewayRoute(){return <MeetingEntryGateway onEnter={(meetingId)=>{try{sessionStorage.setItem("irpaMeetingGatewayTarget",meetingId||"")}catch{} window.history.replaceState({},document.title,window.location.pathname);window.dispatchEvent(new CustomEvent("irpa:navigate",{detail:{module:"Meeting Room"}}));}}/>}
+
+export default function App(){
+  const[registeredPortals,setRegisteredPortals]=useState([]);
+  const params=new URLSearchParams(window.location.search);
+  const entryRoute=params.get("route")||"assistance";
+  const inductionMode=params.get("induction")==="1";
+  const activationMode=inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&Boolean(params.get("memberInvite"));
+  const applicantInductionMode=inductionMode&&params.get("applicant")==="1"&&entryRoute==="assistance";
+  const[buttonFeedback,setButtonFeedback]=useState(""),[user,setUser]=useState(undefined),
+    [profile,setProfile]=useState(undefined),
+    [employee,setEmployee]=useState(null),
+    [inductionComplete,setInductionComplete]=useState(false),
+    [error,setError]=useState(""),
+    [invitationSessionState,setInvitationSessionState]=useState(undefined),
+    [signingEnvelopeId,setSigningEnvelopeId]=useState(
+      ()=>window.sessionStorage.getItem("irpaSigningEnvelopeId")||
+        new URLSearchParams(window.location.search).get("signEnvelope")||null
+    );const[gatewaySigningToken,setGatewaySigningToken]=useState(()=>{const token=params.get("gatewayToken");try{if(token){window.sessionStorage.setItem("irpaGatewaySigningToken",token);return token;}return window.sessionStorage.getItem("irpaGatewaySigningToken")||null;}catch{return token||null;}});useEffect(()=>{if(gatewaySigningToken){try{window.sessionStorage.setItem("irpaGatewaySigningToken",gatewaySigningToken)}catch{}}},[gatewaySigningToken]);useEffect(()=>{if(params.has("gatewayToken")){try{const cleanUrl=new URL(window.location.href);cleanUrl.searchParams.delete("gatewayToken");window.history.replaceState({},document.title,cleanUrl.pathname+cleanUrl.search+cleanUrl.hash)}catch{}}},[]);useEffect(()=>{
+  const handler=e=>{
+    const id=e?.detail?.envelopeId;
+    if(id)setSigningEnvelopeId(id);
+  };
+  window.addEventListener("irpa:signing-invitation",handler);
+  return()=>window.removeEventListener("irpa:signing-invitation",handler);
+},[]);
+
+useEffect(()=>{
+  let disposed=false;
+
+  // Resolve a Google redirect before relying on the auth-state callback.
+  // This prevents Android/mobile browsers from returning to the gateway
+  // without the application adopting the authenticated Firebase user.
+  const resolveGoogleRedirect=async()=>{
+    // Induction and Orientation is a parallel protocol. It must never adopt,
+    // inspect, or mutate the primary login session.
+    if(inductionMode&&!activationMode)return;
+    // Always ask Firebase for a pending redirect result. Do not depend on
+    // sessionStorage surviving the Google/Firebase cross-origin round trip.
+    // Some Android browsers partition or clear sessionStorage during redirects.
+    const expected=window.sessionStorage.getItem("irpaExpectedGoogleAdminEmail")||window.localStorage.getItem("irpaExpectedGoogleAdminEmail")||"irpa2412@gmail.com";
+    try{
+      const redirectedUser=await completeGoogleRedirect(expected);
+      window.sessionStorage.removeItem("irpaAdminRedirectPending");
+      window.localStorage.removeItem("irpaAdminRedirectPending");
+      if(redirectedUser&&!disposed){
+        setUser(redirectedUser);
+        window.sessionStorage.removeItem("irpaExpectedGoogleAdminEmail");
+        window.localStorage.removeItem("irpaExpectedGoogleAdminEmail");
+      }
+    }catch(x){
+      console.error("Google redirect completion:",x);
+      window.sessionStorage.removeItem("irpaAdminRedirectPending");
+      if(!disposed)setError(x.message||"Google administrator authentication could not be completed.");
+    }
+  };
+
+  resolveGoogleRedirect();
+
+  const unsubscribe=observeAuthState(async u=>{
+    if(disposed)return;
+    // The induction protocol is isolated from the primary authentication
+    // observer. Its only destination is the Administrator review/LINK stage.
+    if(inductionMode&&!activationMode)return;
+    setUser(u);
+    setProfile(undefined);
+    setEmployee(null);
+    setInductionComplete(false);
+    setInvitationSessionState(undefined);
+    setError("");
+    // Every new Firebase authentication-state session starts with no operating
+    // role declaration. A previous browser/session choice must never authorize
+    // the next login or allow the user to enter Shell without re-declaring.
+    if(u){
+      try{
+        window.sessionStorage.removeItem("irpaActiveAccessAuthority");
+        window.sessionStorage.removeItem("irpaAccessAuthoritySelectionState");
+        window.sessionStorage.removeItem("irpaPendingAccessAuthority");
+      }catch{}
+    }
+    if(!u){
+      // A Firebase auth session ending must also end the operating-role declaration.
+      // This prevents the previous login's IT/Administrator choice from being
+      // silently reused on the next authentication.
+      try{
+        window.sessionStorage.removeItem("irpaActiveAccessAuthority");
+        window.sessionStorage.removeItem("irpaAccessAuthoritySelectionState");
+      }catch{}
+      setProfile(null);
+      return;
+    }
+    try{
+      const invitationContext = window.sessionStorage.getItem("irpaInvitationId") || new URLSearchParams(window.location.search).get("memberInvite");
+      if (invitationContext) {
+        const sessionState = await getInvitationSessionState();
+        if (!disposed) {
+          setInvitationSessionState(sessionState);
+          if (sessionState?.invitationId) window.sessionStorage.setItem("irpaInvitationId", sessionState.invitationId);
+          if (sessionState?.state === "ACTIVATED") {
+            window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
+            window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
+            window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+          }
+        }
+      } else {
+        setInvitationSessionState(null);
+      }
+
+      // All standard users authenticate through one sign-in gateway. Verified registered roles are presented by the access-authority gate; IT is an assigned operating capacity, not a separate login gateway.
+      // Start every institutional identity lookup together. The previous flow waited
+      // up to 3 seconds for the Administrator profile before starting the server resolver,
+      // which could make the 7-second login watchdog fire before IT/Employee authorization
+      // had even been evaluated.
+      const adminDirectPromise=Promise.race([
+        getAdminProfile(u.uid),
+        new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Administrator authorization lookup timed out.")),3000))
+      ]).catch(error=>{
+        console.warn("Administrator authorization lookup unavailable.",error);
+        return null;
+      });
+      const tokenResult=await u.getIdTokenResult(true).catch(()=>null);
+      const tokenRoles=Array.isArray(tokenResult?.claims?.irpaRoles)?tokenResult.claims.irpaRoles:[];
+      // Resolve server identity and registered Member/Employee records concurrently.
+      // A slow callable must not block the complete client authorization path.
+      const loginContextPromise=IRPA_GATEWAY_CONNECTED?Promise.race([
+        resolveAuthenticatedLoginContext(),
+        new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Server login context timed out.")),4500))
+      ]).catch(error=>{
+        console.warn("Server login context unavailable; using registered identity fallback.",error);
+        return null;
+      }):Promise.resolve(null);
+      const registerContextPromise=Promise.all([
+        Promise.race([getCurrentMemberProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase member authorization lookup timed out.")),5000))]),
+        Promise.race([getCurrentEmployeeProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase employee authorization lookup timed out.")),5000))]),
+        Promise.race([getCurrentAuditorProfile().catch(()=>null),new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Firebase auditor authorization lookup timed out.")),5000))])
+      ]).catch(error=>{
+        console.warn("Registered identity lookup unavailable.",error);
+        return [null,null,null];
+      });
+      const [adminDirect,[loginContext,[memberDirect,employeeDirect,auditorDirect]]]=await Promise.all([
+        adminDirectPromise,
+        Promise.all([loginContextPromise,registerContextPromise])
+      ]);
+      const serverRoles=[...new Set([...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),...tokenRoles])];
+      if(adminDirect?.active===true){
+        // Reuse the already completed resolver/register results. Do not issue a
+        // second round of member/employee reads inside the Administrator branch.
+        // This is critical for dual-capacity accounts such as Administrator + IT.
+        const resolvedMember=loginContext?.member||memberDirect;
+        const adminEmployee=loginContext?.employee||employeeDirect;
+        const adminAuditor=loginContext?.auditor||auditorDirect;
+        const adminMemberAuthorized=Boolean(resolvedMember)&&(["active","activated"].includes(String(resolvedMember?.status||"").trim().toLowerCase())||String(resolvedMember?.registrationStatus||"").trim().toLowerCase()==="activated");
+        const adminEmployeeAuthorized=Boolean(adminEmployee)&&(["active","activated"].includes(String(adminEmployee?.status||"").trim().toLowerCase())||String(adminEmployee?.employmentStatus||"").trim().toLowerCase()==="active"||String(adminEmployee?.registrationStatus||"").trim().toLowerCase()==="activated");
+        const adminAuditorAuthorized=Boolean(adminAuditor)&&adminAuditor.active!==false&&(["active","activated"].includes(String(adminAuditor?.status||"").trim().toLowerCase())||String(adminAuditor?.registrationStatus||"").trim().toLowerCase()==="activated"||adminAuditor.accountActivated===true);
+        const verifiedProfile=adminMemberAuthorized?resolvedMember:null,verifiedEmployee=adminEmployeeAuthorized?adminEmployee:null,verifiedAuditor=adminAuditorAuthorized?adminAuditor:null;
+        const claimsProfile={roles:serverRoles};
+        const assignedRoles=[...new Set([...resolveLoginCategories(verifiedProfile,verifiedEmployee,false),...resolveLoginCategories(claimsProfile,null,false),...resolveLoginCategories(adminDirect,null,false),"Administrator"].filter(role=>String(role||"").trim()))];
+        setEmployee(verifiedEmployee);
+        if(verifiedAuditor)setProfile(prev=>({...prev,...verifiedAuditor}));
+        setProfile({... (verifiedProfile||verifiedEmployee||verifiedAuditor||adminDirect||{}),uid:u.uid,email:u.email||resolvedMember?.email||adminEmployee?.email||adminDirect?.email||"",role:assignedRoles[0]||"Administrator",roles:assignedRoles,serverAuthorizedRoles:serverRoles,authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],administratorAvailable:true,authorizationType:"administrator",enrollmentType:verifiedAuditor&&!verifiedProfile&&!verifiedEmployee?"auditor":verifiedEmployee&&!verifiedProfile?"employee":"member",identityResolution:loginContext?.identityResolution||null});
+        return;
+      }
+
+      // The concurrent register lookup above is the bounded fallback; do not issue
+      // the same Firestore reads a second time after the server resolver completes.
+      const memberAuthorized=Boolean(memberDirect)&&((String(memberDirect?.status||"").trim().toLowerCase()==="active")||(String(memberDirect?.status||"").trim().toLowerCase()==="activated")||(String(memberDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const auditorAuthorized=Boolean(auditorDirect)&&auditorDirect.active!==false&&((String(auditorDirect?.status||"").trim().toLowerCase()==="active")||(String(auditorDirect?.status||"").trim().toLowerCase()==="activated")||(String(auditorDirect?.registrationStatus||"").trim().toLowerCase()==="activated")||auditorDirect.accountActivated===true);
+      const employeeAuthorized=Boolean(employeeDirect)&&((String(employeeDirect?.status||"").trim().toLowerCase()==="active")||(String(employeeDirect?.employmentStatus||"").trim().toLowerCase()==="active")||(String(employeeDirect?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const administratorAuthorized=adminDirect?.active===true;
+      // If the browser lost invitation context, recover the authoritative state from
+      // the server before allowing an unauthorised authenticated session to continue.
+      // Established Member/Employee/Admin logins are not sent through this path.
+      if(!administratorAuthorized&&!memberAuthorized&&!employeeAuthorized&&!auditorAuthorized){
+        try{
+          const recoveredInvitationState=await getInvitationSessionState();
+          if(recoveredInvitationState?.state){
+            if(recoveredInvitationState.invitationId) window.sessionStorage.setItem("irpaInvitationId",recoveredInvitationState.invitationId);
+            if(!disposed){
+              setInvitationSessionState(recoveredInvitationState);
+              if(recoveredInvitationState.state==="ACTIVATED"){
+                window.sessionStorage.removeItem("irpaInvitationPasswordSetup");
+                window.sessionStorage.removeItem("irpaInvitationProvisioningPending");
+                window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+                window.location.reload();
+                return;
+              }else if(["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(recoveredInvitationState.state)){
+                window.sessionStorage.setItem("irpaInvitationPasswordSetup","1");
+                return;
+              }
+            }
+          }else if(!disposed){
+            setInvitationSessionState(null);
+          }
+        }catch(recoveryError){
+          console.warn("Invitation session-state recovery unavailable.",recoveryError);
+          if(!disposed)setInvitationSessionState(null);
+        }
+      }
+      const configuredGatewayAuthority=IRPA_GATEWAY_CONNECTED?Boolean(tokenResult?.claims?.admin===true)||
+        (Array.isArray(tokenRoles)&&tokenRoles.length>0)||
+        (Array.isArray(loginContext?.roles)&&loginContext.roles.length>0):Boolean(tokenResult?.claims?.admin===true)||
+        (Array.isArray(tokenRoles)&&tokenRoles.length>0)||memberAuthorized||employeeAuthorized||auditorAuthorized||administratorAuthorized;
+      if(!configuredGatewayAuthority){
+        // Authentication is complete. Gateway authority is an access-capacity concern,
+        // not a login blocker. Keep the authenticated session in the non-sensitive
+        // workspace; downstream portal/data authorization remains enforced.
+        setEmployee(null);
+        setProfile({...((auditorAuthorized&&auditorDirect)||{}),uid:u.uid,email:u.email||"",name:u.displayName||u.email||"Authenticated IRPA User",role:"",roles:[],serverAuthorizedRoles:[],authorities:[],administratorAvailable:false,authorizationType:"authenticated",identityResolution:"AUTHENTICATED_SESSION"});
+        setInductionComplete(false);
+        return;
+      }
+      const serverContextMember=loginContext?.member||null;
+      const serverContextEmployee=loginContext?.employee||null;
+      const serverContextRoles=[...new Set([
+        ...(Array.isArray(loginContext?.roles)?loginContext.roles:[]),
+        ...tokenRoles
+      ].flatMap(v=>String(v||"").split(",").map(x=>x.trim()).filter(Boolean)))];
+      // Configuration-only Gateway entry: if an authenticated account has a
+      // configured authority but no register record, it may still enter. The
+      // registers enrich the profile after entry; they do not decide entry.
+      const configuredAdminAuthority=tokenResult?.claims?.admin===true||serverContextRoles.includes("Administrator")||String(u.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
+      const configuredGatewayEntry=serverContextRoles.length>0||tokenResult?.claims?.admin===true;
+      // A verified server-issued Administrator claim/role must take precedence over a coexisting Employee record.
+      // This prevents an Administrator + Communication Officer identity from being downgraded to Employee navigation.
+      if(configuredGatewayEntry&&(configuredAdminAuthority||(!memberAuthorized&&!employeeAuthorized&&!administratorAuthorized))){
+        const configuredAuthorities=Array.isArray(loginContext?.authorities)?loginContext.authorities:[];
+        const configuredProfile={
+          uid:u.uid,
+          email:u.email||"",
+          name:u.displayName||u.email||"IRPA Authorized User",
+          role:serverContextRoles[0]||"Administrator",
+          roles:serverContextRoles,
+          serverAuthorizedRoles:serverContextRoles,
+          authorities:configuredAuthorities,
+          administratorAvailable:configuredAdminAuthority,
+          authorizationType:configuredAdminAuthority?"administrator":"member",
+          identityResolution:"GATEWAY_CONFIGURATION"
+        };
+        setEmployee(null);
+        setProfile(configuredProfile);
+        setInductionComplete(false);
+        return;
+      }
+      let m=memberDirect, activeEmployee=employeeDirect;
+      const invitationId=new URLSearchParams(window.location.search).get("memberInvite");
+      // An authenticated invitation activation must complete institutional
+      // enrollment before the normal authorization gate is evaluated. Do this
+      // for both Board Members and Employees; do not rely on the existence of
+      // an unactivated register record as proof of enrollment.
+      const memberIsAuthorized=Boolean(m)&&((String(m?.status||"").trim().toLowerCase()==="active")||(String(m?.status||"").trim().toLowerCase()==="activated")||(String(m?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const employeeIsAuthorized=Boolean(activeEmployee)&&((String(activeEmployee?.status||"").trim().toLowerCase()==="active")||(String(activeEmployee?.employmentStatus||"").trim().toLowerCase()==="active")||(String(activeEmployee?.registrationStatus||"").trim().toLowerCase()==="activated"));
+      const activeMember = memberIsAuthorized ? m : null;
+      if(!employeeIsAuthorized) activeEmployee=null;
+      if(!activeMember && !activeEmployee){
+        const authenticatedProfile={
+          uid:u.uid,
+          email:u.email||"",
+          name:u.displayName||u.email||"Authenticated IRPA User",
+          role:serverContextRoles[0]||"",
+          roles:serverContextRoles,
+          serverAuthorizedRoles:serverContextRoles,
+          authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],
+          administratorAvailable:false,
+          authorizationType:"authenticated",
+          enrollmentType:"authenticated-session",
+          identityResolution:loginContext?.identityResolution||"AUTHENTICATED_SESSION"
+        };
+        setEmployee(null);
+        setProfile(authenticatedProfile);
+        setInductionComplete(false);
+        return;
+      }
+      // Employees are enrolled from the Employees Register and do not require
+      // a duplicate members/{uid} authorization document. Use the employee
+      // record as the canonical application profile when no member profile exists.
+      const canonicalProfile = activeMember || activeEmployee;
+      const resolvedRegisteredRoles=[...new Set([
+        ...roleValues(canonicalProfile?.roles||canonicalProfile?.role),
+        ...roleValues(activeEmployee?.roles||activeEmployee?.role),
+        ...serverContextRoles
+      ])].filter(Boolean);
+      setProfile({
+        ...canonicalProfile,
+        authorizationType:"member",
+        enrollmentType:activeEmployee && !activeMember ? "employee" : "member",
+        role:resolvedRegisteredRoles[0]||canonicalProfile?.role||"",
+        roles:resolvedRegisteredRoles,
+        serverAuthorizedRoles:serverContextRoles,
+        authorities:Array.isArray(loginContext?.authorities)?loginContext.authorities:[],
+        identityResolution:loginContext?.identityResolution||null
+      });
+      setEmployee(activeEmployee);
+      try{
+        const induction=await Promise.race([
+          getDoc(doc(db,"inductionRecords",u.uid)),
+          new Promise((_,reject)=>window.setTimeout(()=>reject(new Error("Induction status check timed out.")),10000))
+        ]);
+        setInductionComplete(induction.exists()&&induction.data()?.status==="Completed");
+      }catch(inductionError){
+        console.warn("Induction status check unavailable",inductionError);
+        setInductionComplete(false);
+      }
+    }catch(x){
+      console.error(x);
+      setError(x.message||"Unable to verify IRPA authorization.");
+      setProfile(null);
+    }
+  });
+
+  return()=>{disposed=true;unsubscribe()};
+},[]);;
+
+// Login watchdog: authorization must never leave the application permanently
+// on the loading screen. The primary administrator is explicitly excluded:
+// member/employee/induction authorization must never log out the administrator.
+useEffect(()=>{
+  const isPrimaryAdmin=String(user?.email||"").trim().toLowerCase()==="irpa2412@gmail.com";
+  const isAdminGateway=new URLSearchParams(window.location.search).get("")==="1";
+  if(inductionMode||user===undefined||profile!==undefined||isPrimaryAdmin||isAdminGateway)return;
+  const timer=window.setTimeout(()=>{
+    if(profile!==undefined)return;
+    console.error("IRPA login watchdog: authorization did not complete.");
+    setError("Authentication completed, but IRPA authorization verification did not complete within the extended verification window. The session remains signed in and no dashboard has been opened. Retry Secure Session.");
+    setEmployee(null);
+    setProfile(null);
+  },20000);
+  return()=>window.clearTimeout(timer);
+},[user,profile]);
+useEffect(()=>{async function magic(){
+  if(inductionMode)return;
+  const invitationToken=new URL(window.location.href).searchParams.get("invitationToken");
+  if(invitationToken){
+    try{
+      await completeInvitationToken(invitationToken);
+      window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+    }catch(x){
+      console.error(x);
+      window.alert(x.message||"Unable to redeem the IRPA invitation.");
+    }
+    return;
+  }
+  if(!isMagicLink())return;
+
+  let e=window.localStorage.getItem("irpaEmailForSignIn")||window.localStorage.getItem("irpaMemberEmailForSignIn");
+  const url=new URL(window.location.href);
+  const signingEnvelopeId=url.searchParams.get("signEnvelope");
+  const gatewaySigningToken=url.searchParams.get("gatewayToken")||window.sessionStorage.getItem("irpaGatewaySigningToken");
+
+  if(!e){
+    const promptText=signingEnvelopeId||gatewaySigningToken
+      ?"Enter the email address that received this IRPA signing invitation:"
+      :"Enter the email address that received this IRPA sign-in link:";
+    e=window.prompt(promptText);
+    if(e){
+      e=e.trim().toLowerCase();
+      window.localStorage.setItem("irpaEmailForSignIn",e);
+    }
+  }
+
+  if(!e)return;
+
+  try{
+    const result=await completeMagicLink(e);
+
+    if(result?.signingEnvelopeId){
+      window.sessionStorage.setItem("irpaSigningEnvelopeId",result.signingEnvelopeId);
+      window.sessionStorage.setItem("irpaSigningRecipient",JSON.stringify(result.signingRecipient||{}));
+      window.history.replaceState({},document.title,window.location.pathname+window.location.hash);
+      window.dispatchEvent(new CustomEvent("irpa:signing-invitation",{detail:{
+        envelopeId:result.signingEnvelopeId,
+        recipient:result.signingRecipient
+      }}));
+    }
+
+    window.localStorage.removeItem("irpaEmailForSignIn");
+    window.localStorage.removeItem("irpaMemberEmailForSignIn");
+
+  }catch(x){
+    console.error(x);
+    window.alert(x.message||"Unable to open the signing invitation.");
+  }
+}magic()},[]);const emailSigningToken=params.get("emailSignToken");if(emailSigningToken)return <EmailSigningReadOnlyPage token={emailSigningToken}/>;const invitationId=params.get("memberInvite");if(!user)return <AuthScreen/>;if(applicantInductionMode&&!administratorSession)return <InductionOrientation/>;if(inductionMode&&params.get("applicant")==="1"&&entryRoute==="subscription"&&user===undefined)return <MemberActivationScreen invitationId={invitationId}/>;if(inductionMode&&user===undefined)return <AuthScreen/>;if(user===undefined)return <AuthScreen/>;if(profile===undefined)return <Loading message={error}/>;if(!user)return invitationId?<MemberActivationScreen invitationId={invitationId}/>:<AuthScreen/>;
+const administratorSession=profile?.authorizationType==="administrator";
+const invitationRouteState=invitationSessionState?.state;
+if(user&&invitationSessionState===undefined&&(window.sessionStorage.getItem("irpaInvitationId")||new URLSearchParams(window.location.search).get("memberInvite"))&&!administratorSession)return <Loading message="Verifying invitation session..."/>;
+if(user&&["PASSWORD_SETUP_PENDING","PROVISIONING_PENDING"].includes(invitationRouteState)&&!administratorSession)return <InvitationPasswordSetupScreen user={user}/>;
+if(!profile)return <AccessDenied user={user}reason={error}/>;
+if(gatewaySigningToken)return <GatewaySigningPortal token={gatewaySigningToken}/>;
+if(profile.authorizationType==="signer"){
+  return <SignerShell user={user} profile={profile} signingEnvelopeId={signingEnvelopeId}/>;
+}
+return <Shell buttonFeedback={buttonFeedback} setButtonFeedback={setButtonFeedback} user={user} profile={profile} admin={profile.authorizationType==="administrator"} employee={employee} inductionComplete={inductionComplete} onInductionComplete={()=>setInductionComplete(true)} registeredPortals={registeredPortals} setRegisteredPortals={setRegisteredPortals}/>;
+}

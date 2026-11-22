@@ -1,0 +1,9 @@
+{
+  "name": "irpa-grant-crawler",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/index.js && node --check src/assistant.js && node --check src/application-portal-handler.js && node --check scripts/staging-smoke-test.js && node --test test/worker.test.js"
+  }
+}

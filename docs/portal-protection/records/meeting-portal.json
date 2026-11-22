@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "portal": "Meeting Portal",
+  "status": "complete",
+  "declaration": {
+    "affectedPortals": [
+      "Meeting Portal"
+    ],
+    "reason": "Implement the owner-approved fail-closed REAL/TRIAL meeting deletion boundary. A meeting is REAL by default; only an administrator explicitly creating it with the exact TRIAL marker can mark it TRIAL. Environment is immutable after creation. Only administrators may delete explicitly TRIAL meetings, with all existing safeguards retained. REAL, missing, invalid, lowercase and whitespace-padded values are non-deletable.",
+    "files": [
+      "drive-gateway/src/meetingServices.mjs",
+      "drive-gateway/src/meetingDeletion.mjs",
+      "src/pages/Meetings.jsx",
+      "drive-gateway/src/meetingEnvironment.mjs",
+      "drive-gateway/tests/meeting-environment.test.mjs",
+      "docs/portal-protection/records/meeting-portal.json",
+      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/windows/meeting-portal.json"
+    ],
+    "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
+    "prohibitedChanges": [
+      "Never delete REAL or unclassified meetings.",
+      "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
+      "Do not change signing, sign-in, invitations, email-link rules, SMTP, secrets, Firestore rules or production deployment."
+    ]
+  },
+  "repairWindow": {
+    "openedAt": "2026-11-21T20:23:03Z",
+    "lastActivityAt": "2026-11-21T20:23:03Z",
+    "emergency": false
+  },
+  "baseline": {
+    "commit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c",
+    "rollbackCommit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c"
+  },
+  "validation": {
+    "baselineSmoke": "PASS",
+    "portalSmoke": {
+      "Meeting Portal": "PASS"
+    },
+    "fullRegression": "PASS",
+    "behaviourDifferences": [
+      "Environment is immutable after creation.",
+      "Only the exact TRIAL marker at creation qualifies; REAL, missing, invalid, lowercase or whitespace-padded values are non-deletable."
+    ],
+    "evidence": [
+      "Owner's exact conditional approval is recorded in PR #845 issue comment 7068716176.",
+      "Baseline smoke executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110084. npm run test:protected-portals reported PASS for all seven registered portals, including Meeting Portal.",
+      "Meeting Portal baseline smoke evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110084",
+      "Full regression executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110196. npm run test:all FAILED: tests/workflow-production-deploy-policy.test.mjs — production Firebase CLI rules and Worker deployments require explicit owner dispatch approval (8 passed, 1 failed).",
+      "Full regression failure evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110196",
+      "Baseline smoke and full regression were rerun after PR #846 was merged, both on the exact PR #845 base SHA 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c. Run 44952176019: baseline-protection-smoke job 136992981056 reported all seven registered portals PASS; baseline-full-regression job 136992981099 checked out the same SHA, ran npm run test:all inside the Firestore emulator, and exited successfully (code 0).",
+      "Baseline smoke PASS for Meeting Portal on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056",
+      "Full regression PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981099; npm run test:all completed in the Firestore emulator with exit code 0.",
+      "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
+    ]
+  },
+  "renewals": [],
+  "attendanceCallableAudit": {
+    "changeId": "MP-2026-11-22-ATTENDANCE-CALLABLE-GUARD",
+    "relatedPullRequest": 908,
+    "baselineCommit": "f07e880e5c8944d2cfb775fa620b2f492a46151b",
+    "rollbackCommit": "f07e880e5c8944d2cfb775fa620b2f492a46151b",
+    "status": "ACTIVE_SCREENS_USE_WORKER; LEGACY_UNDEPLOYED_CALLABLE_COMPONENT_UNREFERENCED",
+    "activeAttendanceActions": [
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "mark meeting attendance",
+        "helper": "markMeetingAttendance",
+        "workerRoute": "/api/meeting-attendance/mark"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "read meeting attendance register",
+        "helper": "getMeetingAttendanceRegister",
+        "workerRoute": "/api/meeting-attendance/register"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "read daily attendance",
+        "helper": "getDailyMeetingAttendance",
+        "workerRoute": "/api/meeting-attendance/daily/register"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "mark daily attendance",
+        "helper": "markDailyMeetingAttendance",
+        "workerRoute": "/api/meeting-attendance/daily/mark"
+      },
+      {
+        "screen": "src/pages/MeetingRoom.jsx",
+        "action": "dispatch or resume daily attendance signing",
+        "helper": "dispatchDailyAttendanceSigning/resumeDailyAttendanceSigning",
+        "workerRoute": "/api/meeting-attendance/daily/dispatch"
+      },
+      {
+        "screen": "src/meeting/MeetingAccessControl.jsx",
+        "action": "list pending entry requests",
+        "helper": "callMeetingService",
+        "workerRoute": "/api/meeting-entry-requests/list"
+      },
+      {
+        "screen": "src/meeting/MeetingAccessControl.jsx",
+        "action": "admit or decline entry requests",
+        "helper": "callMeetingService",
+        "workerRoute": "/api/meeting-entry-requests/resolve"
+      }
+    ],
+    "undeployedCallableFindings": [
+      {
+        "source": "functions/meetingAttendanceRegister.js",
+        "callable": "signMeetingAttendance",
+        "activeScreenCaller": false
+      },
+      {
+        "source": "functions/meetingAttendanceRegister.js",
+        "callable": "getMeetingAttendanceRegister",
+        "activeScreenCaller": false
+      },
+      {
+        "source": "src/components/MeetingAccessControl.jsx",
+        "action": "load pending entry requests",
+        "callable": "listMeetingEntryRequests",
+        "activeScreenCaller": false,
+        "workerEquivalent": "/api/meeting-entry-requests/list"
+      },
+      {
+        "source": "src/components/MeetingAccessControl.jsx",
+        "action": "resolve entry request",
+        "callable": "resolveMeetingEntryRequest",
+        "activeScreenCaller": false,
+        "workerEquivalent": "/api/meeting-entry-requests/resolve"
+      }
+    ],
+    "rules": "Active MeetingRoom uses the Worker-backed src/meeting/MeetingAccessControl.jsx component; the legacy callable-backed src/components/MeetingAccessControl.jsx is not imported by the active screen. No signer, guest, duplicate-signer, envelope, or signature behavior was changed.",
+    "test": "tests/meeting-category-policy.test.mjs — fails if active attendance screens import or call Firebase callable APIs or the undeployed attendance callables; verifies Worker route mapping.",
+    "prohibitedChanges": [
+      "signing rules",
+      "tokens",
+      "link format",
+      "sessions",
+      "signer identity",
+      "field assignment",
+      "stamping",
+      "PDF logic",
+      "hash logic",
+      "certificate logic",
+      "archive logic",
+      "Firestore rules",
+      "secrets",
+      "environment variables",
+      "SMTP settings",
+      "branch protection"
+    ],
+    "repairWindow": {
+      "openedAt": "2026-11-22T18:10:00Z",
+      "expiresAt": "2026-11-25T18:10:00Z",
+      "durationHours": 72
+    },
+    "files": [
+      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json"
+    ],
+    "expectedEffect": "Prevent active Meeting Portal attendance screens from invoking Firebase callables that are not deployed; preserve Worker-backed attendance and entry-request routes.",
+    "changeRecord": "The active MeetingRoom uses Worker routes for attendance read/write and daily dispatch. The active Meeting Access Control component uses Worker list/resolve routes. The callable-backed src/components/MeetingAccessControl.jsx is legacy and not imported by the active screen. Firebase attendance callable exports are not used by active screens.",
+    "validation": "Static regression guard added; required CI and live deployment verification pending."
+  }
+}

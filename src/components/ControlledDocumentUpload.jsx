@@ -1,0 +1,439 @@
+import React, { useRef, useState, useEffect } from "react";
+import { auth, db } from "../firebase/config";
+import { collection, doc } from "firebase/firestore";
+import { COLLECTIONS, getCurrentMemberProfile, getCurrentEmployeeProfile, nextDocumentReference } from "../firebase/data";
+import { readWorkflowContext, withWorkflowLinks } from "../firebase/workflowLinks";
+import { uploadControlledDocumentRouted, buildDocumentArchiveDestination, registerControlledDocumentRecord } from "../firebase/signatureStorage";
+import { validateControlledDocumentUpload } from "./controlledDocumentUploadValidation.mjs";
+import { describeUploadFailure } from "./uploadRuntimeDiagnostics.mjs";
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DOCUMENT_TYPES = ["Governance", "Administrative", "Finance", "Procurement", "Administrator", "Research Archive"];
+const ARCHIVE_CATEGORIES = { Governance: "Governance Documents", Administrative: "Administrative Documents", Finance: "Finance Documents", Procurement: "Procurement Documents", Administrator: "Administrator Documents", "Research Archive": "Research Documents" };
+const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.csv,.tsv,.md,.html,.epub,.json,.xml,.jpg,.jpeg,.png,.webp,.svg";
+const MIME_BY_EXTENSION = { pdf:"application/pdf", doc:"application/msword", docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls:"application/vnd.ms-excel", xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt:"application/vnd.ms-powerpoint", pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation", odt:"application/vnd.oasis.opendocument.text", ods:"application/vnd.oasis.opendocument.spreadsheet", odp:"application/vnd.oasis.opendocument.presentation", rtf:"application/rtf", txt:"text/plain", csv:"text/csv", tsv:"text/tab-separated-values", md:"text/markdown", html:"text/html", epub:"application/epub+zip", json:"application/json", xml:"application/xml", jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp", svg:"image/svg+xml" };
+
+function persistedOrigin(payload) { try { const environment=String(window.sessionStorage.getItem("irpaDataEnvironment")||"TRIAL").toUpperCase(); const authority=String(window.sessionStorage.getItem("irpaActiveAccessAuthority")||"").toUpperCase(); const verified=window.sessionStorage.getItem("irpaActualDataAccessVerified")==="true"; return environment!=="ACTUAL"||(authority==="ADMINISTRATOR"&&!verified)?"TRIAL":String(payload?.recordOrigin||"PRODUCTION"); } catch { return "TRIAL"; } }
+
+function resolveContentType(file) {
+  const reported = String(file?.type || "").trim().toLowerCase();
+  if (reported) return reported;
+  const ext = String(file?.name || "").split(".").pop()?.toLowerCase();
+  return MIME_BY_EXTENSION[ext] || "application/octet-stream";
+}
+
+export default function ControlledDocumentUpload({ purpose = "Controlled Document", onUploaded, allowRestrictedUpload = false, allowResearchArchiveUpload: allowResearchArchiveUploadProp = false, submitLabel = "Upload Document", compact = false, deferSave = false, showSaveButton = false, workflowContextOverride = {} }) {
+  const [file, setFile] = useState(null);
+  const [title, setTitle] = useState("");
+  const [generatedReference, setGeneratedReference] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [allowDualRoleDocumentTypes, setAllowDualRoleDocumentTypes] = useState(false);
+  const [allowResearchArchiveUpload, setAllowResearchArchiveUpload] = useState(allowResearchArchiveUploadProp);
+  const [version, setVersion] = useState("1.0");
+  const [archiveCategory, setArchiveCategory] = useState("");
+  const [classification, setClassification] = useState("Public");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [uploadReport, setUploadReport] = useState(null);
+  const [pendingDocument, setPendingDocument] = useState(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [member, employee] = await Promise.all([
+          getCurrentMemberProfile().catch(() => null),
+          getCurrentEmployeeProfile().catch(() => null)
+        ]);
+        const values = [
+          member?.role,
+          ...(Array.isArray(member?.roles) ? member.roles : []),
+          ...(Array.isArray(member?.assignedRoles) ? member.assignedRoles : []),
+          ...(Array.isArray(member?.selectedRoles) ? member.selectedRoles : []),
+          ...(Array.isArray(member?.roleAssignments) ? member.roleAssignments : []),
+          employee?.role,
+          ...(Array.isArray(employee?.roles) ? employee.roles : []),
+          ...(Array.isArray(employee?.assignedRoles) ? employee.assignedRoles : []),
+          ...(Array.isArray(employee?.selectedRoles) ? employee.selectedRoles : []),
+          ...(Array.isArray(employee?.roleAssignments) ? employee.roleAssignments : [])
+        ].flatMap(v => String(v || "").split(",").map(x => x.trim()).filter(Boolean));
+        const normalized = new Set(values.map(v => v.toLowerCase()));
+        const dualRole =
+          normalized.has("board secretary") &&
+          normalized.has("executive director");
+        const researchAuthority = [member, employee].some(record => {
+          if (!record) return false;
+          const active = ["Active", "Activated"].includes(String(record.status || record.employmentStatus || record.registrationStatus || ""));
+          if (!active) return false;
+          const department = String(record.department || "").toLowerCase();
+          const roles = [record.role, ...(Array.isArray(record.roles) ? record.roles : []),
+            ...(Array.isArray(record.assignedRoles) ? record.assignedRoles : []),
+            ...(Array.isArray(record.selectedRoles) ? record.selectedRoles : []),
+            ...(Array.isArray(record.roleAssignments) ? record.roleAssignments : [])]
+            .filter(Boolean).flatMap(value => String(value).split(",").map(item => item.trim().toLowerCase()));
+          return department.includes("research") || roles.some(role => role.includes("research"));
+        });
+        if (!cancelled) {
+          setAllowDualRoleDocumentTypes(dualRole);
+          setAllowResearchArchiveUpload(allowResearchArchiveUploadProp || researchAuthority);
+        }
+      } catch (_) {
+        if (!cancelled) setAllowDualRoleDocumentTypes(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  function chooseFile() {
+    setError("");
+    setMessage("Opening the document file selector…");
+    fileInputRef.current?.click();
+  }
+
+  async function savePendingDocument() {
+    if (!pendingDocument) return;
+    setBusy(true);
+    setError("");
+    setMessage("Saving document to the IRPA controlled-document register…");
+    try {
+      if (!auth.currentUser) throw new Error("You must be signed in.");
+      let documentId = "";
+      let persistedRecordOrigin = "TRIAL";
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const registration = await registerControlledDocumentRecord({documentId:pendingDocument.documentId,documentPayload:pendingDocument.documentPayload});
+          documentId = registration.documentId;
+          persistedRecordOrigin = registration.recordOrigin || "TRIAL";
+          break;
+        } catch (error) {
+          if (attempt === 2) throw new Error(`Document upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
+        }
+      }
+      const doc = {...pendingDocument.doc, id: documentId};
+      setUploadReport({documentId,driveFileId:pendingDocument.driveFileId||pendingDocument.doc.fileId||"Unavailable",destination:pendingDocument.doc.archivePath||pendingDocument.doc.archiveCategory||"Unavailable",origin:persistedRecordOrigin,steps:[["Drive file created","PASS"],["Archive destination assigned","PASS"],["Firestore documents record created and verified","PASS"],["Archive registry link stored","PASS"]]});
+      setGeneratedReference(pendingDocument.documentReference);
+      setMessage(`Document saved successfully. System reference ${pendingDocument.documentReference} is now registered in the IRPA controlled-document register.`);
+      setPendingDocument(null);
+      setFile(null);
+      setTitle("");
+      setDocumentType("");
+      setVersion("1.0");
+      setArchiveCategory("");
+      setClassification("Public");
+      fileInputRef.current?.form?.reset?.();
+      onUploaded?.(doc);
+    } catch (x) {
+      setUploadReport({documentId:pendingDocument.documentId||"Unavailable",driveFileId:pendingDocument.driveFileId||pendingDocument.doc.fileId||"Unavailable",destination:pendingDocument.doc.archivePath||pendingDocument.doc.archiveCategory||"Unavailable",origin:persistedOrigin(pendingDocument.documentPayload),steps:[["Drive file created","PASS"],["Archive destination assigned","PASS"],["Firestore documents record created and verified","FAIL: "+(x.message||"unknown error")],["Archive registry link stored","FAIL: Firestore record not verified"]]});
+      setError(x.message || "Unable to save document.");
+      setMessage("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    if (busy || pendingDocument) return;
+    setGeneratedReference("");
+    setUploadReport(null);
+    let uploadProgress = {documentId:"Not allocated",driveFileId:"Not created",destination:"Not assigned",origin:"Determined by active data mode",steps:[["Allocate document ID","PENDING"],["Create Drive file","PENDING"],["Assign archive destination","PENDING"],["Create Firestore documents record","PENDING"],["Store archive registry link","PENDING"]]};
+    const contentType = file ? resolveContentType(file) : "";
+    const validationError = validateControlledDocumentUpload({
+      authenticated: Boolean(auth.currentUser),
+      file,
+      documentType,
+      allowRestrictedUpload,
+      allowResearchArchiveUpload,
+      contentType,
+      maxBytes: MAX_UPLOAD_BYTES
+    });
+    if (validationError) {
+      setError(validationError);
+      setMessage("");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("Preparing document upload…");
+    setError("");
+
+    try {
+
+      const name = (title.trim() || file.name.replace(/\.pdf$/i, "")).slice(0, 160);
+      const documentReference = await nextDocumentReference();
+      const documentUid = doc(collection(db, COLLECTIONS.documents)).id;
+      const documentId = documentUid;
+      uploadProgress.documentId = documentId;
+      const uploadedAt = new Date().toISOString();
+      const effectiveArchiveCategory = ARCHIVE_CATEGORIES[documentType] || documentType;
+      const effectiveClassification = documentType === "Administrator" ? "Restricted" : classification;
+      if (effectiveClassification === "Restricted" && !allowRestrictedUpload) throw new Error("Restricted document upload requires special permission.");
+      const destination = buildDocumentArchiveDestination({documentType,uploadedAt,archiveCategory:effectiveArchiveCategory,classification:effectiveClassification});
+      setMessage("Routing the document into its selected document-type and upload-time destination…");
+      const routed = await uploadControlledDocumentRouted({
+        documentId: documentUid,
+        title: name,
+        reference: documentReference,
+        documentReference,
+        documentReferenceType: "Controlled Document",
+        documentType,
+        contentType,
+        archiveCategory: effectiveArchiveCategory,
+        classification: effectiveClassification,
+        uploadedAt,
+        file
+      });
+      const archive = routed.categoryArchive;
+      const governanceArchive = routed.governanceArchive;
+      uploadProgress.driveFileId = archive.file?.fileId || "Missing";
+      uploadProgress.destination = archive.archivePath || archive.archiveUidLink || effectiveArchiveCategory;
+      uploadProgress.steps = [["Allocate document ID","PASS"],["Create Drive file",archive.file?.fileId?"PASS":"FAIL: Worker returned no Drive file ID"],["Assign archive destination",archive.folderId?"PASS":"FAIL: Worker returned no archive folder"],["Create Firestore documents record","PENDING"],["Store archive registry link",archive.archiveUidLink?"PASS":"FAIL: Worker returned no archive link"]];
+      setUploadReport({...uploadProgress});
+      const now = new Date().toISOString();
+      const workflowContext = {...(readWorkflowContext() || {}), ...(workflowContextOverride || {})};
+      const documentPayload = withWorkflowLinks({
+        title: name,
+        reference: documentReference,
+        documentReference,
+        documentType,
+        documentTypeSelectedAt: uploadedAt,
+        documentUploadDestinationKey: destination.destinationKey,
+        documentUploadArchiveCategory: effectiveArchiveCategory,
+        documentUploadYear: destination.uploadYear,
+        documentUploadMonth: destination.uploadMonth,
+        documentUploadDay: destination.uploadDay,
+        version,
+        documentUid,
+        archiveCategory: effectiveArchiveCategory,
+        classification: effectiveClassification,
+        archiveFolderId: archive.folderId,
+        archiveUidLink: archive.archiveUidLink,
+        archivePath: archive.archivePath,
+        archiveAccess: archive.archiveAccess || (effectiveClassification === "Public" ? "Public" : "Restricted"),
+        archiveFileId: archive.file?.fileId || null,
+        archiveFileWebViewLink: archive.file?.webViewLink || null,
+        governanceArchiveFolderId: governanceArchive?.folderId || null,
+        governanceArchiveUidLink: governanceArchive?.archiveUidLink || null,
+        governanceArchivePath: governanceArchive?.archivePath || null,
+        governanceArchiveFileId: governanceArchive?.file?.fileId || null,
+        governanceArchiveFileWebViewLink: governanceArchive?.file?.webViewLink || null,
+        governanceArchiveStatus: governanceArchive ? "Routed" : "Not Required",
+        recordOrigin: "PRODUCTION",
+        fileName: file.name,
+        fileId: archive.file?.fileId || null,
+        storageProvider: "Google Drive",
+        storagePath: `document-archives/${effectiveArchiveCategory}/${effectiveClassification}/${documentUid}/${file.name}`,
+        webViewLink: archive.file?.webViewLink || null,
+        fileUrl: archive.file?.fileId ? `drive://${archive.file.fileId}` : null,
+        contentType,
+        fileSize: file.size,
+        purpose,
+        status: "Draft",
+        authorizationStatus: "Draft",
+        authorizedUids: [auth.currentUser.uid],
+        uploadedByUid: auth.currentUser.uid,
+        uploadedByEmail: auth.currentUser.email || null,
+        uploadedAt: uploadedAt,
+        uploadedAtDisplay: new Date(now).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", hour12: false })
+      }, workflowContext || {});
+      documentPayload.recordOrigin = persistedOrigin(documentPayload);
+      const documentRecord = {
+        id: null,
+        title: name,
+        reference: documentReference,
+        documentType,
+        documentTypeSelectedAt: uploadedAt,
+        documentUploadDestinationKey: destination.destinationKey,
+        documentUploadArchiveCategory: effectiveArchiveCategory,
+        documentUploadYear: destination.uploadYear,
+        documentUploadMonth: destination.uploadMonth,
+        documentUploadDay: destination.uploadDay,
+        uploadedAt,
+        version,
+        fileName: file.name,
+        fileId: archive.file?.fileId || null,
+        storageProvider: "Google Drive",
+        webViewLink: archive.file?.webViewLink || null,
+        fileUrl: archive.file?.fileId ? `drive://${archive.file.fileId}` : null,
+        purpose,
+        archiveCategory: effectiveArchiveCategory,
+        classification: effectiveClassification,
+        archiveFolderId: archive.folderId,
+        archiveUidLink: archive.archiveUidLink,
+        archivePath: archive.archivePath,
+        archiveAccess: archive.archiveAccess || (effectiveClassification === "Public" ? "Public" : "Restricted"),
+        governanceArchiveFolderId: governanceArchive?.folderId || null,
+        governanceArchiveUidLink: governanceArchive?.archiveUidLink || null,
+        governanceArchivePath: governanceArchive?.archivePath || null,
+        governanceArchiveFileId: governanceArchive?.file?.fileId || null,
+        governanceArchiveFileWebViewLink: governanceArchive?.file?.webViewLink || null,
+        governanceArchiveStatus: governanceArchive ? "Routed" : "Not Required",
+        status: "Draft",
+        authorizationStatus: "Draft",
+        authorizedUids: [auth.currentUser.uid]
+      };
+      if (deferSave) {
+        setPendingDocument({documentPayload,doc:documentRecord,documentReference,documentId,driveFileId:archive.file?.fileId||null});
+        setUploadReport({...uploadProgress,origin:persistedOrigin(documentPayload),steps:[["Allocate document ID","PASS"],["Create Drive file","PASS"],["Assign archive destination","PASS"],["Create Firestore documents record","PENDING: click Save Document"],["Store archive registry link","PENDING: click Save Document"]]});
+        setGeneratedReference(documentReference);
+        setMessage(`Document uploaded successfully to Google Drive: ${name}. Click “Save Document” to register it in the IRPA controlled-document archive.`);
+      } else {
+        let savedDocumentId = "";
+        let persistedRecordOrigin = "TRIAL";
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+          try {
+            const registration = await registerControlledDocumentRecord({documentId:documentUid,documentPayload});
+            savedDocumentId = registration.documentId;
+            persistedRecordOrigin = registration.recordOrigin || "TRIAL";
+            break;
+          } catch (error) {
+            if (attempt === 2) throw new Error(`Document archive upload completed, but the document could not be saved to the IRPA controlled-document register: ${error?.message || "Firestore registration failed."}`);
+          }
+        }
+        uploadProgress.origin=persistedRecordOrigin;
+        uploadProgress.steps=[["Allocate document ID","PASS"],["Create Drive file","PASS"],["Assign archive destination","PASS"],["Create Firestore documents record","PASS"],["Store archive registry link","PASS"]];
+        setUploadReport({...uploadProgress});
+        setGeneratedReference(documentReference);
+        setMessage(`Document uploaded successfully to Google Drive: ${name}. System reference ${documentReference} assigned. Archive routing completed.`);
+        setFile(null);
+        setTitle("");
+        setDocumentType("");
+        setVersion("1.0");
+        setArchiveCategory("");
+        setClassification("Public");
+        e.target.reset();
+        onUploaded?.({...documentRecord,id:savedDocumentId});
+      }
+    } catch (x) {
+      const {message:detail,stack}=describeUploadFailure(x);
+      const failedStep=/firestore|register|controlled-document register|permission-denied/i.test(detail)?"Create Firestore documents record":/archive|folder|destination|gateway/i.test(detail)?"Assign archive destination":"Create Drive file";
+      const failureDetail="FAIL: "+detail+(stack?"\nStack (first 5 lines):\n"+stack:"");
+      uploadProgress.steps=uploadProgress.steps.map(([name,status])=>name===failedStep?[name,failureDetail]:[name,status==="PENDING"?"NOT REACHED":status]);
+      uploadProgress.origin=persistedOrigin({recordOrigin:"PRODUCTION"});
+      setUploadReport({...uploadProgress});
+      setError(detail+" (upload diagnostics below identify completed and failed steps).");
+      setMessage("");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel controlled-document-upload-panel">
+      <div className="panel-header">
+        <div>
+          <span className="eyebrow">CONTROLLED DOCUMENT UPLOAD</span>
+          <h2>{purpose}</h2>
+          <p className="panel-description">
+            Upload PDF and other supported document formats into the controlled IRPA document register. Files retain their native format in the configured IRPA Google Drive account and governance metadata remains in Firestore.
+          </p>
+        </div>
+      </div>
+      {message && <div className="success-message action-feedback">{message}</div>}
+      {error && <div className="error-message action-feedback">{error}</div>}
+      {uploadReport && <div className="auth-message" role="status" aria-live="polite" style={{whiteSpace:"pre-wrap",marginBottom:16}}><strong>Upload step report</strong>{"\n"}Document ID: {uploadReport.documentId}{"\n"}Drive file ID: {uploadReport.driveFileId}{"\n"}Archive destination: {uploadReport.destination}{"\n"}Record environment: {uploadReport.origin}{"\n"}{uploadReport.steps.map(([name,status])=>`${status.startsWith("PASS")?"PASS":status.startsWith("FAIL")?"FAIL":"PENDING"} — ${name}${status.startsWith("PASS")?"":`: ${status.replace(/^(PASS|FAIL):?\s*/,"")}`}`).join("\n")}</div>}
+      {!compact && <div className="archive-routing-panel" style={{marginBottom:16}}>
+        <strong>Google Drive Archive Routing</strong>
+        <div style={{marginTop:6}}>Choose where this document will be stored:</div>
+        <ul style={{margin:"6px 0 0 20px"}}>
+          <li><strong>Finance Documents</strong> — finance records and supporting evidence.</li>
+          <li><strong>Procurement Documents</strong> — procurement records, quotations, evaluations and purchase documentation.</li>
+          <li><strong>Governance Documents</strong> — Board, committee, resolutions, decisions and other governance records.</li>
+          <li><strong>Administrative Documents</strong> — policies, governance, HR and general administrative records.</li>
+          <li><strong>Administrator Documents</strong> — restricted administrator records (special permission required).</li>
+          <li><strong>Research Documents</strong> — Research Archive records for authorised Research personnel.</li>
+        </ul>
+        <div style={{marginTop:6}}>Each archive is separated by <strong>Public, Internal, Confidential</strong> or <strong>Restricted</strong> classification. The selected route is recorded with the document UID and archive link.</div>
+      </div>}
+      {compact && <div className="identity-card" style={{marginBottom:14}}><span>Archive is selected before Save</span><small>Choose the document type and access classification, then select the file. The Save action commits the document to the selected archive.</small></div>}
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          <div className="form-field">
+            <label>Document Routing</label>
+            <div className="auth-message" role="status"><strong>{documentType ? `Final destination: ${documentType}` : "Select a document type first"}</strong><small style={{display:"block",marginTop:6}}>The selected document type determines the final archive destination at upload time.</small></div>
+          </div>
+          <div className="form-field">
+            <label>Access Classification</label>
+            {documentType === "Administrator" ? <div className="auth-message" role="status"><strong>Restricted</strong><small style={{display:"block",marginTop:6}}>{allowRestrictedUpload ? "Special permission active: Administrator/restricted documents may be uploaded." : "Administrator/restricted documents require special permission and are locked for this uploader."}</small></div> : <select value={classification} onChange={e => { const value=e.target.value; if(value === "Restricted" && !allowRestrictedUpload){setError("Restricted document upload requires special permission."); return;} if(documentType === "Research Archive" && value === "Public"){setError("Research Archive documents cannot be classified as Public."); return;} setClassification(value); }}><option disabled={documentType === "Research Archive"}>Public</option><option>Internal</option><option>Confidential</option><option value="Restricted" disabled={!allowRestrictedUpload}>Restricted</option></select>}
+            {documentType !== "Administrator" && !allowRestrictedUpload && <small className="muted" style={{display:"block",marginTop:6}}>Restricted classification is locked. Special permission is required to upload Restricted documents.</small>}
+            {documentType !== "Administrator" && allowRestrictedUpload && <small className="muted" style={{display:"block",marginTop:6}}>Special permission active: Restricted classification is available for this authorized uploader.</small>}
+          </div>
+          <div className="form-field">
+            <label>Document Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Enter document title" />
+          </div>
+          <div className="form-field"><label>Document Reference / Identification No.</label><div className="auth-message" role="status" aria-live="polite"><strong>{generatedReference || "Assigned automatically at upload"}</strong><small style={{display:"block",marginTop:6}}>The identifier is generated transactionally by IRPA-DBGS. There is no manual reference-entry field.</small></div></div>
+          <div className="form-field">
+            <label>Document Type</label>
+            <select value={documentType} onChange={e => { const value=e.target.value; setDocumentType(value); setArchiveCategory(ARCHIVE_CATEGORIES[value] || value); if(value === "Research Archive") setClassification("Confidential"); }} aria-label="Document Type">
+              <option value="">Select document type</option>
+              {DOCUMENT_TYPES.map(type => <option key={type} value={type} disabled={type === "Research Archive" && !allowResearchArchiveUpload}>{type}{type === "Governance" ? " — Sensitive" : type === "Administrator" ? " — Restricted" : type === "Research Archive" ? " — Research personnel only" : ""}</option>)}
+            </select>
+            <small className="muted" style={{display:"block",marginTop:6}}>Six canonical document types. Governance is sensitive; Administrator is restricted; Research Archive is limited to authorised Research personnel.</small>
+          </div>
+<div className="form-field"><label>Version</label><input value={version} onChange={e => setVersion(e.target.value)} placeholder="e.g. 1.0" />
+          </div>
+          <div className="form-field">
+            <label>Document File</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={DOCUMENT_ACCEPT}
+              onChange={e => {
+                const selected = e.target.files?.[0] || null;
+                setFile(selected);
+                setError("");
+                setMessage(selected ? `${selected.name} selected. Click “Upload Document” to continue.` : "No document selected.");
+              }}
+              aria-label="Select document file"
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={chooseFile}
+              disabled={busy}
+            >
+              Select a file
+            </button>
+            <div className="muted" style={{ marginTop: 8 }}>
+              {file ? `Selected: ${file.name} (${resolveContentType(file)})` : "Select a PDF or another supported document format directly from this device."}
+            </div>
+          </div>
+        </div>
+        <div className="form-actions" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          {!pendingDocument && !busy && (
+            <small className="muted" role="status" style={{flexBasis:"100%"}}>
+              {!documentType
+                ? "Choose a document type, select a file, then press Upload Document."
+                : documentType === "Administrator" && !allowRestrictedUpload
+                  ? "Administrator documents are restricted. This uploader needs special permission for that document type."
+                  : !file
+                    ? "Select a file to enable the upload transaction."
+                    : "Document type and file are ready. Press Upload Document to continue."}
+            </small>
+          )}
+          <button
+            type="submit"
+            disabled={busy || !!pendingDocument}
+            aria-busy={busy ? "true" : "false"}
+          >
+            {busy ? "Uploading…" : submitLabel}
+          </button>
+          {showSaveButton && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={savePendingDocument}
+              disabled={busy || !pendingDocument}
+              aria-busy={busy ? "true" : "false"}
+            >
+              Save Document
+            </button>
+          )}
+        </div>
+      </form>
+    </section>
+  );
+}

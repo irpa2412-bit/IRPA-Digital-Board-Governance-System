@@ -1,0 +1,80 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {SOCIAL_PLATFORMS,validateSocialDraft,validateSocialMediaUpload,inspectSocialText,canTransitionSocialStatus,socialCalendarCsv,socialCalendarRange,socialCalendarDocxXml} from "../src/utils/socialStudioPolicy.js";
+
+test("platform text and hashtag limits are enforced",()=>{
+ assert.ok(validateSocialDraft({title:"T",body:"x".repeat(281),platforms:["x"]}).some(x=>x.includes("280")));
+ assert.ok(validateSocialDraft({title:"T",body:"Update",hashtags:"#a #b #c #d #e #f",platforms:["linkedin"]}).some(x=>x.includes("5 hashtags")));
+ assert.equal(SOCIAL_PLATFORMS.instagram.imageBytes,30*1024*1024);
+});
+test("HTTPS links and mandatory media alt text are validated",()=>{
+ assert.ok(validateSocialDraft({title:"T",body:"Text",platforms:["facebook"],link:"http://example.org"}).some(x=>x.includes("HTTPS")));
+ assert.ok(validateSocialDraft({title:"T",body:"Text",platforms:["facebook"],mediaUrl:"https://example.org/a.jpg"}).some(x=>x.includes("Alternative text")));
+});
+test("sensitive content warnings detect credentials, private contacts and confidential markers",()=>{
+ assert.ok(inspectSocialText("password: abc").length);
+ assert.ok(inspectSocialText("Call +255 712 345 678").length);
+ assert.ok(inspectSocialText("Confidential project record").length);
+});
+test("status flow requires a different approver or administrator",()=>{
+ assert.equal(canTransitionSocialStatus("Draft","In review"),true);
+ assert.equal(canTransitionSocialStatus("In review","Approved",{isAuthor:true,secondApprover:true}),false);
+ assert.equal(canTransitionSocialStatus("In review","Approved",{isAdmin:true,isAuthor:true}),false);
+ assert.equal(canTransitionSocialStatus("In review","Approved",{secondApprover:true,isAuthor:false}),true);
+ assert.equal(canTransitionSocialStatus("Approved","Exported"),true);
+});
+test("calendar CSV quotes fields and preserves embedded commas",()=>{
+ const csv=socialCalendarCsv([{title:"A, B",platforms:["facebook"],status:"Draft"}]);
+ assert.match(csv,/"A, B"/);
+});
+
+test("day and week calendar views filter planned items and DOCX XML escapes content",()=>{
+ const items=[{title:"Monday",scheduledAt:"2026-11-09T09:00:00",updatedAt:"2026-11-09T10:00:00",platforms:["facebook"],status:"Draft",content:"A & B <C>"},{title:"Next week",scheduledAt:"2026-11-16T09:00:00"}];
+ assert.equal(socialCalendarRange(items,"2026-11-09","day").length,1);
+ assert.equal(socialCalendarRange(items,"2026-11-09","week").length,1);
+ const xml=socialCalendarDocxXml(items.slice(0,1),"2026-11-09","day");
+ assert.ok(xml.includes("A &amp; B &lt;C&gt;"));
+ assert.ok(xml.includes("Last modified: 2026-11-09T10:00:00"));
+});
+
+test("Social Studio media upload accepts only JPG PNG WebP MP4 and PDF with required alt text",()=>{
+ for(const file of [
+  {name:"photo.jpg",type:"image/jpeg",size:1024},
+  {name:"photo.png",type:"image/png",size:1024},
+  {name:"photo.webp",type:"image/webp",size:1024},
+  {name:"clip.mp4",type:"video/mp4",size:1024},
+  {name:"brief.pdf",type:"application/pdf",size:1024}
+ ])assert.deepEqual(validateSocialMediaUpload(file,"Accessible description"),[]);
+ assert.ok(validateSocialMediaUpload({name:"bad.exe",type:"application/octet-stream",size:100},"Description").length);
+ assert.ok(validateSocialMediaUpload({name:"photo.jpg",type:"image/jpeg",size:1024},"").some(x=>x.includes("Alternative text")));
+ assert.ok(validateSocialMediaUpload({name:"large.jpg",type:"image/jpeg",size:9*1024*1024},"Description").some(x=>x.includes("8 MB")));
+});
+test("Social Studio wires media upload to the authenticated WordPress Media Library route and attaches its URL to the draft",()=>{
+ const fsSource = readFileSync(new URL("../src/pages/CommunicationsSocialStudio.jsx", import.meta.url),"utf8");
+ assert.ok(fsSource.includes("/api/communications/website/media"));
+ assert.ok(fsSource.includes("destination:\"media-library\""));
+ assert.ok(fsSource.includes("setImageUrl(result.media.url)"));
+ assert.ok(fsSource.includes("validateSocialMediaUpload(mediaFile,altText)"));
+ assert.ok(fsSource.includes("disabled={mediaBusy||!altText.trim()}"));
+});
+
+test("six-platform Social Studio TEST self-test runs safe manual exports in Portal Self-Test and Production Acceptance",()=>{
+ const portalSelfTest=readFileSync(new URL("../src/components/ReleaseReadiness.jsx",import.meta.url),"utf8");
+ const productionAcceptance=readFileSync(new URL("../src/pages/CommunicationsWebsiteStudio.jsx",import.meta.url),"utf8");
+ const platforms=["facebook","instagram","linkedin","x","youtube","whatsapp"];
+ for(const platform of platforms){
+  assert.ok(portalSelfTest.includes('"'+platform+'"'),"Portal Self-Test must include "+platform);
+  assert.ok(productionAcceptance.includes('"'+platform+'"'),"Production Acceptance must include "+platform);
+ }
+ for(const source of [portalSelfTest,productionAcceptance]){
+  assert.ok(source.includes("/api/communications/social/status"),"read-only Social Studio status route is required");
+  assert.ok(source.includes("/api/communications/social/export"),"each platform must exercise manual export");
+  assert.ok(source.includes("manual-export"),"the test must verify manual-export mode");
+  assert.ok(source.includes("automaticPublishing"),"the test must verify automatic publishing remains disabled");
+  assert.ok(source.includes("pauseAllPublishing"),"the test must verify the global publishing pause");
+  assert.ok(source.includes("Step "),"each platform result must identify its step");
+  assert.ok(source.includes("/6 TEST Social Studio"),"each result must identify the six-step TEST sequence");
+ }
+ assert.ok(productionAcceptance.includes("no external post was sent"),"acceptance must explicitly confirm no external post is sent");
+});

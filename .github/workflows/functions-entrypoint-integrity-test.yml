@@ -1,0 +1,44 @@
+name: Firebase Functions Entrypoint Integrity Test
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: irpa-functions-integrity-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm install
+      - name: Validate shared Functions entrypoint syntax
+        run: node --check functions/index.js
+      - name: Validate Firebase Functions package entrypoint syntax
+        run: node --check functions/bootstrap.js
+      - name: Validate Authorization gateway syntax in isolation
+        run: node --check functions/authorizationFunctions.js
+      - name: Verify reset gate remains trial-only
+        run: node scripts/verify-functions-entrypoint-integrity.js
+      - name: Enforce protected portal repair policy with live run verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/portal-protection-check.mjs
+      - name: Test protected portal policy scenarios
+        run: node --test tests/portal-protection-policy.test.mjs

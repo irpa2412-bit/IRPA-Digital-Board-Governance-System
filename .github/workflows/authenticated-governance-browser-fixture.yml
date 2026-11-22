@@ -1,0 +1,84 @@
+name: Authenticated Cross-Portal Browser Fixture
+
+on:
+  pull_request:
+    paths:
+      - "src/styles/portal-readability-standard.css"
+      - "src/firebase/config.js"
+      - "public/install.js"
+      - "src/App.jsx"
+      - "src/pages/GrantIntelligencePortal.jsx"
+      - "src/pages/SignaturePlatform.jsx"
+      - "src/firebase/signaturePlatform.js"
+      - "src/firebase/signatureStorage.js"
+      - "src/pages/grant-fundraising/**"
+      - "src/styles/app.css"
+      - "tests/browser/**"
+      - "scripts/seed-authenticated-browser-fixture.cjs"
+      - "playwright.authenticated-governance.config.mjs"
+      - ".github/workflows/authenticated-governance-browser-fixture.yml"
+      - "firebase.json"
+      - "firebase.emulator.test.json"
+      - "firestore.rules"
+permissions:
+  contents: read
+
+concurrency:
+  group: authenticated-cross-portal-fixture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authenticated-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GCLOUD_PROJECT: demo-irpa-dgbs
+    steps:
+      - name: Checkout isolated pull request
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install locked application dependencies
+        run: npm ci
+      - name: Install Firebase Admin SDK for emulator-only fixture seeding
+        run: npm --prefix functions install --omit=dev
+      - name: Enforce no-use-before-define in application source
+        run: >-
+          npx --yes eslint@9 --no-config-lookup --no-ignore
+          --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}'
+          --rule 'no-use-before-define: [error, { variables: true, functions: false }]'
+          "src/**/*.{js,jsx,mjs,cjs}"
+      - name: Audit upload-path shadowing and undefined identifiers
+        continue-on-error: true
+        run: >-
+          npx --yes eslint@9 --no-config-lookup --no-ignore
+          --parser-options '{"ecmaVersion":"latest","sourceType":"module","ecmaFeatures":{"jsx":true}}'
+          --rule 'no-shadow: error' --rule 'no-undef: error'
+          "src/**/*.{js,jsx,mjs,cjs}"
+      - name: Install Playwright test runner without changing lockfile
+        run: npm install --no-save --package-lock=false @playwright/test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Reproduce upload pathway against unminified bundle and source maps
+        env:
+          VITE_DIAGNOSTIC_UNMINIFIED: "true"
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs tests/browser/upload-production-bundle.spec.mjs --workers=1"
+      - name: Authenticate against isolated Firebase Auth and Firestore emulators; run full suite three times at mobile, tablet and desktop sizes
+        run: npx firebase emulators:exec --config firebase.emulator.test.json --only auth,firestore --project demo-irpa-dgbs "node scripts/seed-authenticated-browser-fixture.cjs && npx playwright test --config=playwright.authenticated-governance.config.mjs --repeat-each=3 --workers=1"
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-cross-portal-browser-failure
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore

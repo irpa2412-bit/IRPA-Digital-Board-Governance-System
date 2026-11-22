@@ -1,0 +1,186 @@
+// V3.0 participant/invitation integration: system records + controlled external invitees.
+import React,{useEffect,useMemo,useRef,useState}from"react";
+import{getMeetingScopedRecords,COLLECTIONS,getAccessibleMeetingRecords}from"../firebase/data";
+
+import{callMeetingService,listMeetingInviteeDirectory,createMeetingAccessInvitation,dispatchMeetingInvitation,revokeMeetingAccessInvitation}from"../firebase/meetingGatewayApi";
+const MANUAL_INVITEE_ROLES=["Technical Expert","Government Representative","Partner / Donor","Invited Guest","External Participant — Non-Voting","Consultant"];
+const AUTHORITATIVE_ROLES=["Board Member","Board Committee Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson"];
+const empty={participantName:"",participantUid:"",participantEmail:"",participantRole:"Invited Guest",participantType:"External Invitee",sourceType:"Manual Invitee",sourceRecordId:"",employeeId:"",boardMemberId:"",memberType:"Technical Advisor",meetingId:"",meetingReference:"",attendanceStatus:"Invited",notes:""};
+const SYSTEM_ROLES=["Board Member","Board Chairperson","Board Secretary","Board Treasurer","Board Vice Chairperson","Executive Director","Director Human Resources","Director Livestock","Director Environment","Director Outreach","Director Community Development","Director Field Operations","HR Manager","Director Finance & Administration","Finance Personnel","Finance Manager","Accountant","Finance Officer","Director Internal Oversight","Internal Oversight Officer","Secretariat","Procurement Officer","Programme/Technical Officer","Management","Operations Manager","IT Specialist","Information Technology Officer","Driver","Field Assistant","Administrative Assistant","Communications Officer","Monitoring & Evaluation Officer","Project Officer","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","Environment Officer","HR Officer","Employee"];
+export default function OperationalGatewaysParticipants(){
+ const[rows,setRows]=useState([]),[meetings,setMeetings]=useState([]),[employees,setEmployees]=useState([]),[boardMembers,setBoardMembers]=useState([]),[members,setMembers]=useState([]),[form,setForm]=useState(empty),[edit,setEdit]=useState(null),[selected,setSelected]=useState(null),[filter,setFilter]=useState("All"),[search,setSearch]=useState(""),[busy,setBusy]=useState(false),[registersLoading,setRegistersLoading]=useState(false),[msg,setMsg]=useState(""),[err,setErr]=useState(""),[sourceMode,setSourceMode]=useState("system"),[resendingInvitationIds,setResendingInvitationIds]=useState([]),resendInFlight=useRef(new Set());
+ function participantEnvironmentConfirmed(){
+  try{
+   const map=JSON.parse(window.sessionStorage.getItem("irpaPortalDataEntryVerifications")||"{}");
+   const record=map&&map.Participants;
+   return Boolean(record&&record.portal==="Participants"&&record.environment===String(window.sessionStorage.getItem("irpaDataEnvironment")||"").toUpperCase()&&window.sessionStorage.getItem("irpaDataEnvironmentTarget")==="Participants");
+  }catch{return false}
+ }
+ async function load(){
+  if(registersLoading)return;
+  setRegistersLoading(true);
+  setErr("");
+  try{
+  const includeParticipantRecords=participantEnvironmentConfirmed();
+  // Resolve category/role-authorized meetings first, then scope dependent registers to those meetings.
+  const meetingsResult=await getAccessibleMeetingRecords();
+  const accessibleMeetings=Array.isArray(meetingsResult)?meetingsResult:[];
+  const accessibleMeetingIds=accessibleMeetings.map(meeting=>meeting.id).filter(Boolean);
+  const requests=[
+   includeParticipantRecords?getMeetingScopedRecords(COLLECTIONS.participants,accessibleMeetingIds):Promise.resolve([]),
+   Promise.resolve(accessibleMeetings),
+   listMeetingInviteeDirectory(),
+  ];
+  const labels=["Participants Register","Meetings Register","Meeting Invitee Directory"];
+  const results=await Promise.allSettled(requests);
+  const failures=[];
+  let inviteeDirectoryUnavailable=false;
+  results.forEach((result,index)=>{
+   if(result.status==="rejected"){
+    if(index===2){
+     // The authoritative directory is helpful but must not block meeting-specific external invitees.
+     // Keep the manual invitation path available; never invent or promote an institutional identity.
+     inviteeDirectoryUnavailable=true;
+     setEmployees([]);setBoardMembers([]);setMembers([]);
+     setSourceMode("manual");
+     setForm(current=>({...current,sourceType:"Manual Invitee",participantType:"External Invitee",participantRole:MANUAL_INVITEE_ROLES.includes(current.participantRole)?current.participantRole:"Invited Guest",employeeId:"",boardMemberId:"",memberId:"",sourceRecordId:"",participantUid:""}));
+     return;
+    }
+    failures.push(labels[index]+": "+(result.reason?.message||"load failed"));return;
+   }
+   const value=Array.isArray(result.value)?result.value:[];
+   if(index===0)setRows(value);
+   else if(index===1)setMeetings(value);
+   else if(index===2){setEmployees(Array.isArray(result.value?.employees)?result.value.employees:[]);setBoardMembers(Array.isArray(result.value?.boardMembers)?result.value.boardMembers:[]);setMembers(Array.isArray(result.value?.members)?result.value.members:[])}
+
+  });
+  if(failures.length)setErr("Some participant registers could not be retrieved: "+failures.join(" | "));
+  else if(inviteeDirectoryUnavailable)setErr("Meeting Invitee Directory is temporarily unavailable. Manual external invitees remain enabled; enter the participant's name and email, then use Register & Send Invitation. Institutional identities are not inferred.");
+  else if(!results[2].value?.boardMembers?.length&&!results[2].value?.members?.length&&!results[2].value?.employees?.length)setErr("The directory service responded, but returned no active Board Members, Members, or Employees. Verify that the authoritative records have an Active/Activated status in at least one of status, employmentStatus, or registrationStatus, then select Retry.");
+  else setErr("");
+  }catch(error){setErr("Unable to retrieve the meeting and attendance registers: "+String(error?.message||"Please retry."));}
+  finally{setRegistersLoading(false);}
+ }
+ useEffect(()=>{
+  load();
+  const refreshAfterEnvironmentConfirmation=()=>{load()};
+  window.addEventListener("irpa:data-environment-changed",refreshAfterEnvironmentConfirmation);
+  return()=>window.removeEventListener("irpa:data-environment-changed",refreshAfterEnvironmentConfirmation);
+ },[]);
+ useEffect(()=>{
+  let live=true;
+  if(!form.meetingId){setEmployees([]);setBoardMembers([]);setMembers([]);return()=>{live=false};}
+  (async()=>{
+   try{
+    // Reuse the already deployed, role-authorized directory callable. Do not depend on
+    // a newly introduced Cloud Function while production Functions deployment is billing-blocked.
+    const directory=await listMeetingInviteeDirectory();
+    if(!live)return;
+    setEmployees(Array.isArray(directory.employees)?directory.employees:[]);
+    setBoardMembers(Array.isArray(directory.boardMembers)?directory.boardMembers:[]);
+    setMembers(Array.isArray(directory.members)?directory.members:[]);
+   }catch(error){
+    if(!live)return;
+    setEmployees([]);setBoardMembers([]);setMembers([]);
+    setErr(error?.message||"The authorised meeting could not load its member and employee invitation candidates.");
+   }
+  })();
+  return()=>{live=false};
+ },[form.meetingId]);
+ function change(e){setForm({...form,[e.target.name]:e.target.value})}
+ function reset(){setForm(empty);setEdit(null);setSourceMode("system")}
+ function selectManualInvitee(){setSourceMode("manual");setForm({...empty,sourceType:"Manual Invitee",participantType:"External Invitee",participantRole:"Invited Guest",employeeId:"",boardMemberId:"",sourceRecordId:"",participantUid:"",memberType:"Technical Advisor"})}
+ function chooseSystem(kind,id){
+  const source=kind==="employee"?employees.find(x=>x.id===id):kind==="member"?members.find(x=>x.id===id):boardMembers.find(x=>x.id===id);
+  if(!source){setForm(empty);return}
+  const email=String(source.email||"").trim().toLowerCase();
+  const counterpart=kind==="employee"?boardMembers.find(x=>String(x.email||"").trim().toLowerCase()===email)||members.find(x=>String(x.email||"").trim().toLowerCase()===email):kind==="member"?employees.find(x=>String(x.email||"").trim().toLowerCase()===email)||boardMembers.find(x=>String(x.email||"").trim().toLowerCase()===email):employees.find(x=>String(x.email||"").trim().toLowerCase()===email)||members.find(x=>String(x.email||"").trim().toLowerCase()===email);
+  const role=kind==="employee"?(source.role||"Employee"):kind==="member"?(source.role||"Member"):(source.boardPosition||source.role||"Board Member");
+  const sourceType=kind==="employee"?"Employee Register":kind==="member"?"Member Register":"Board Member Register";
+  setForm({...empty,participantName:source.name||"",participantEmail:email,participantUid:source.uid||"",participantRole:role,participantType:kind==="employee"?"IRPA Personnel":kind==="member"?"IRPA Member":"IRPA Governance Member",sourceType,sourceRecordId:source.id,employeeId:kind==="employee"?source.id:(counterpart?.employeeNumber?counterpart.id:(kind==="member"&&counterpart&&employees.some(x=>x.id===counterpart.id)?counterpart.id:"")),boardMemberId:kind==="board"?source.id:(counterpart&&boardMembers.some(x=>x.id===counterpart.id)?counterpart.id:""),memberId:kind==="member"?source.id:"",memberType:source.memberType||(kind==="employee"?"Management":kind==="member"?"General Member":"Governance Member")});
+ }
+ async function resendAllFailedInvitations(){
+  if(busy||resendInFlight.current.has("__bulk__"))return;
+  const targets=meetingInvitationRows.filter(isInvitationError);
+  if(!targets.length){setErr("");setMsg("No failed or error-reported invitations require a resend.");return;}
+  resendInFlight.current.add("__bulk__");
+  setBusy(true);setErr("");setMsg("Resending "+targets.length+" failed/error-reported invitation(s) sequentially.");
+  try{for(const invitation of targets){await resendInvitation(invitation,true);}await load();}
+  finally{resendInFlight.current.delete("__bulk__");setBusy(false);}
+ }
+ async function resendInvitation(i,fromBulk=false){
+  if(!i?.id||!i.meetingId){setErr("Cannot resend: the participant is missing its linked meeting record.");return;}
+  if(resendInFlight.current.has(i.id)||(!fromBulk&&resendInFlight.current.has("__bulk__")))return;
+  const participant=rows.find(r=>r.id===i.id);
+  const meeting=meetings.find(m=>m.id===i.meetingId);
+  if(!participant||!meeting){setErr("Cannot resend: the linked participant or authorised meeting record is not available.");return;}
+  resendInFlight.current.add(i.id);
+  setResendingInvitationIds(current=>current.includes(i.id)?current:[...current,i.id]);
+  if(!fromBulk)setBusy(true);
+  setErr("");setMsg("Preparing a fresh meeting-only access pass for "+(participant.participantEmail||"the invitee")+".");
+  let issuedAccess=null;
+  try{
+   const issued=await createMeetingAccessInvitation({meetingId:i.meetingId,participantId:i.id});
+   issuedAccess=issued;
+   if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The Meeting Worker did not return a complete access pass.");
+   const result=await dispatchMeetingInvitation({accessId:issued.accessId,accessToken:issued.accessToken,meetingPassword:issued.meetingPassword});
+   if(result.meetingAccessSent!==true)throw new Error("The IRPA SMTP Worker did not confirm meeting invitation dispatch.");
+   setMsg(result.participantStatusPersisted===false?"SMTP accepted the meeting invitation, but the participant delivery status needs reconciliation. The access pass remains active.":"Meeting invitation accepted by the IRPA SMTP gateway for "+participant.participantEmail+".");
+   await load();
+  }catch(x){
+   if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
+   const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation resend failed.";
+   try{await callMeetingService("/api/meeting-participants/update",{participantId:i.id,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:"resend"}})}catch(persistError){console.error("Unable to persist meeting dispatch failure",persistError?.code||"")}
+   setErr("Meeting invitation resend failed: "+failure);
+   await load();
+  }finally{resendInFlight.current.delete(i.id);setResendingInvitationIds(current=>current.filter(id=>id!==i.id));if(!fromBulk)setBusy(false)}
+ }
+ function startEdit(r){setEdit(r);setSelected(null);setSourceMode(r.sourceType==="Manual Invitee"?"manual":"system");setForm({...empty,...r});window.scrollTo({top:0,behavior:"smooth"})}
+ async function save(e){e.preventDefault();setBusy(true);setErr("");setMsg("");try{
+  const m=meetings.find(x=>x.id===form.meetingId);if(!m)throw new Error("Select a meeting first.");if(!form.participantEmail.trim())throw new Error("An email address is required for the meeting-specific invitation.");const inviteeEmail=form.participantEmail.trim().toLowerCase();const duplicate=rows.find(r=>r.meetingId===m.id&&r.id!==edit?.id&&String(r.participantEmail||r.email||"").trim().toLowerCase()===inviteeEmail&&!["cancelled","removed"].includes(String(r.status||"").toLowerCase()));if(duplicate)throw new Error("This email address is already registered for the selected meeting. Reuse the existing participant record so invitee and quorum counts are not duplicated.");
+  if(sourceMode==="manual"&&(AUTHORITATIVE_ROLES.includes(form.participantRole)||form.boardMemberId||form.employeeId||form.memberId))throw new Error("A provisional manual invitee must use an external participant role. Select the person from the Board Members, Members or Employees Register for an authoritative IRPA identity.");
+  const payload={...form,participantEmail:inviteeEmail,meetingIdentity:m.meetingIdentity||`IRPA-MEET-${String(m.id||"").toUpperCase()}`,meetingReference:m.meetingReference||`IRPA-MTG-${String(m.date||new Date().getFullYear()).slice(0,4)}-${String(m.id||"").slice(0,8).toUpperCase()}`,meetingTitle:m.title,meetingDate:m.date||"",meetingStartTime:m.startTime||"",meetingEndTime:m.endTime||"",meetingPlatform:m.meetingPlatform||"Platform not recorded",platformAccessUrl:m.platformAccessUrl||"",platformMeetingId:m.platformMeetingId||"",platformPasscode:m.platformPasscode||"",meetingVenue:m.venue||"",meetingChairperson:m.chairperson||"",meetingAgenda:m.agenda||"",attendanceStatus:form.attendanceStatus||"Invited",invitationStatus:edit?.invitationStatus||"Not Sent"};
+  if(edit){await callMeetingService("/api/meeting-participants/update",{participantId:edit.id,data:payload});setMsg("Participant record updated.");}
+  else{
+   const created=await callMeetingService("/api/meeting-participants/create",{data:payload});const participantId=created.participantId;
+   let issuedAccess=null,dispatchStage="issue-meeting-access";
+   try{
+    const issued=await createMeetingAccessInvitation({meetingId:payload.meetingId,participantId});
+    issuedAccess=issued;
+    if(!issued.accessToken||!issued.meetingPassword||!issued.accessId)throw new Error("The Meeting Worker did not return a complete access pass.");
+    dispatchStage="smtp-dispatch";
+    const result=await dispatchMeetingInvitation({accessId:issued.accessId,accessToken:issued.accessToken,meetingPassword:issued.meetingPassword});
+    if(result.meetingAccessSent!==true)throw new Error("The IRPA SMTP Worker did not confirm meeting invitation dispatch.");
+    setMsg(result.participantStatusPersisted===false?"Participant registered and SMTP accepted the meeting invitation, but the participant delivery status needs reconciliation. The access pass remains active.":"Participant registered and meeting invitation accepted by the IRPA SMTP gateway. The invitation is recorded on the meeting participant record only.");
+   }catch(x){
+    console.error("IRPA meeting invitation dispatch failed",{stage:dispatchStage,errorCode:String(x?.code||""),errorMessage:String(x?.message||x).slice(0,240),meetingId:payload.meetingId,participantId});
+    if(issuedAccess?.accessId){try{await revokeMeetingAccessInvitation({accessId:issuedAccess.accessId})}catch(revokeError){console.error("Unable to revoke undelivered meeting access pass",revokeError?.code||"")}}
+    const failedAt=new Date().toISOString(),failure=x?.message||"Meeting invitation dispatch failed.";
+    await callMeetingService("/api/meeting-participants/update",{participantId,data:{invitationStatus:"Failed",meetingAccessDispatched:false,meetingAccessDispatchStatus:"Failed",meetingAccessId:issuedAccess?.accessId||null,meetingAccessDispatchFailedAt:failedAt,meetingAccessDispatchError:failure,meetingAccessDispatchStage:dispatchStage}});
+    throw new Error("Participant was registered, but the meeting invitation failed at "+dispatchStage+": "+failure);
+   }
+  }
+  reset();await load()
+ }catch(x){setErr(x.message||"Unable to save participant.")}finally{setBusy(false)}}
+ async function remove(r){if(!window.confirm("Remove this participant record and revoke its meeting access pass?"))return;setBusy(true);try{await callMeetingService("/api/meeting-participants/delete",{participantId:r.id});setMsg("Participant removed and meeting access revoked.");await load()}catch(x){setErr(x.message||"Unable to remove participant.")}finally{setBusy(false)}}
+ const metrics=useMemo(()=>({total:rows.length,present:rows.filter(x=>x.attendanceStatus==="Present").length,invited:rows.filter(x=>x.attendanceStatus==="Invited").length,absent:rows.filter(x=>x.attendanceStatus==="Absent").length}),[rows]);
+ // The meeting participant register is authoritative for meeting-specific dispatch status.
+ // Only access-pass reference metadata is retained; bearer tokens are delivered by SMTP and never stored in participant records.
+ const meetingInvitationRows=useMemo(()=>rows.filter(x=>Boolean(String(x.meetingId||"").trim())&&(x.meetingAccessDispatchStatus||x.invitationStatus)).map(x=>({...x,participantId:x.id,email:x.participantEmail,name:x.participantName,role:x.participantRole,deliveryStatus:x.meetingAccessDeliveryStatus||x.meetingAccessDispatchStatus,status:x.invitationStatus,deliveryError:x.meetingAccessDispatchError})).sort((a,b)=>String(b.meetingAccessDispatchedAt||b.createdAt||"").localeCompare(String(a.meetingAccessDispatchedAt||a.createdAt||""))),[rows]);
+ const isInvitationError=(x)=>{const status=[x?.meetingAccessDispatchStatus,x?.deliveryStatus,x?.status].map(v=>String(v||"").trim().toLowerCase());if(status.some(v=>["cancelled","canceled","cancelled invitation","canceled invitation"].includes(v)))return false;return x?.meetingAccessDispatched===false||Boolean(String(x?.deliveryError||x?.meetingAccessDispatchError||"").trim())||status.some(v=>["failed","error","dispatch error","delivery error","undelivered","invitation dispatch failed","smtp error"].includes(v)||v.includes("error")||v.includes("undelivered"));};
+ const invitationMetrics=useMemo(()=>({
+  total:meetingInvitationRows.length,
+  released:meetingInvitationRows.filter(x=>x.meetingAccessDispatched===true&&!isInvitationError(x)).length,
+  failed:meetingInvitationRows.filter(isInvitationError).length,
+  pending:meetingInvitationRows.filter(x=>!isInvitationError(x)&&x.meetingAccessDispatched!==true&&String(x.status||"").toLowerCase()!=="cancelled").length
+ }),[meetingInvitationRows]);
+ const visible=useMemo(()=>rows.filter(r=>{const q=search.toLowerCase().trim();return(!q||[r.participantName,r.participantEmail,r.participantRole,r.meetingReference].join(" ").toLowerCase().includes(q))&&(filter==="All"||r.attendanceStatus===filter)}),[rows,search,filter]);
+ return <div className="page"><section className="welcome-panel"><div><span className="eyebrow">MEETING PARTICIPATION CONTROL</span><h1>Participants & Attendance</h1><p>Build the authoritative participant register for each meeting, distinguish governance members from invited external participants, and record attendance for the official proceedings.</p></div><button onClick={()=>{reset();window.scrollTo({top:0,behavior:"smooth"})}}>+ Add Participant</button></section>
+ {msg&&<div className="success-message action-feedback">{msg}</div>}{err&&<div className="error-message action-feedback">{err} <button type="button" className="secondary-button" onClick={load} disabled={registersLoading}>{registersLoading?"Retrying register loading…":"Retry loading registers"}</button></div>}
+ <section className="dashboard-grid"><div className="stat-card"><span>Total Participants</span><strong>{metrics.total}</strong><small>Meeting participation register</small></div><div className="stat-card"><span>Present</span><strong>{metrics.present}</strong><small>Attendance confirmed</small></div><div className="stat-card"><span>Invited</span><strong>{metrics.invited}</strong><small>Awaiting attendance</small></div><div className="stat-card"><span>Absent</span><strong>{metrics.absent}</strong><small>Attendance not recorded</small></div></section>
+ <section className="panel"><div className="panel-header"><div><span className="eyebrow">CONTROLLED PARTICIPANT ENTRY</span><h2>{edit?"Edit Participant":"Register Participant"}</h2><p className="panel-description">Provisional manual invitees are meeting-specific external participants. They do not create or imply an authoritative Board Member or Employee appointment; authoritative IRPA identities must be selected from the relevant system register.</p></div></div><form onSubmit={save}><div className="form-grid"><div className="form-field"><label>Meeting</label><select name="meetingId" value={form.meetingId} onChange={change} required><option value="">Select meeting...</option>{meetings.map(m=><option key={m.id} value={m.id}>{m.meetingReference||"Reference pending"} — {m.title} — {m.date||""} — {m.meetingPlatform||"Platform not recorded"}</option>)}</select></div></div><div className="form-actions"><label><input type="radio" name="participantSourceMode" checked={sourceMode==="system"} onChange={()=>{setSourceMode("system");setForm(empty)}}/> Select from IRPA system records</label><label><input type="radio" name="participantSourceMode" checked={sourceMode==="manual"} onChange={selectManualInvitee}/> Enter provisional manual invitee</label></div>{sourceMode==="system"&&<div className="form-grid"><div className="form-field"><label>Board Member Register</label><select value={form.sourceType==="Board Member Register"?form.sourceRecordId:""} onChange={e=>chooseSystem("board",e.target.value)}><option value="">Select a Board Member</option>{boardMembers.map(r=><option key={r.id} value={r.id}>{r.name} — {r.boardPosition||r.role||"Board Member"} — {r.email||"No email"}</option>)}</select></div><div className="form-field"><label>Members Register</label><select value={form.sourceType==="Member Register"?form.sourceRecordId:""} onChange={e=>chooseSystem("member",e.target.value)}><option value="">Select a Member</option>{members.filter(r=>(r.status||"Active")==="Active").map(r=><option key={r.id} value={r.id}>{r.name} — {r.memberType||"Member"} — {r.email||"No email"}</option>)}</select></div><div className="form-field"><label>Employees Register</label><select value={form.sourceType==="Employee Register"?form.sourceRecordId:""} onChange={e=>chooseSystem("employee",e.target.value)}><option value="">Select an Employee</option>{employees.filter(r=>(r.status||r.employmentStatus||"Active")==="Active").map(r=><option key={r.id} value={r.id}>{r.name} — {r.role||"Employee"} — {r.email||"No email"}</option>)}</select></div></div>}<div className="form-grid"><div className="form-field"><label>Participant Name</label><input name="participantName" value={form.participantName} onChange={change} required/></div><div className="form-field"><label>Email Address for Invitation</label><input type="email" name="participantEmail" value={form.participantEmail} onChange={change} required autoComplete="email" placeholder="guest@example.org"/></div><div className="form-field"><label>Participant Type / Role</label><select name="participantRole" value={form.participantRole} onChange={change} disabled={sourceMode==="system"&&Boolean(form.sourceRecordId)}>{sourceMode==="manual"?MANUAL_INVITEE_ROLES.map(role=><option key={role}>{role}</option>):<><option>Board Member</option><option>Board Committee Member</option><option>Management</option><option>IRPA Staff</option><option>Technical Expert</option><option>Government Representative</option><option>Partner / Donor</option><option>Invited Guest</option><option>External Participant — Non-Voting</option></>}</select></div><div className="form-field form-field-wide"><label>Selected Meeting Particulars — invitation reference</label><div className="record-details">{(()=>{const m=meetings.find(x=>x.id===form.meetingId);return m?`${m.meetingIdentity||`IRPA-MEET-${String(m.id||"").toUpperCase()}`} · ${m.meetingReference||`IRPA-MTG-${String(m.date||new Date().getFullYear()).slice(0,4)}-${String(m.id||"").slice(0,8).toUpperCase()}`} · ${m.title} · ${m.date||"Date not set"} ${m.startTime||""}${m.endTime?`–${m.endTime}`:""} · ${m.meetingPlatform||"Platform not recorded"} · ${m.platformAccessUrl||m.venue||"No access details recorded"}${m.platformMeetingId?` · Meeting ID: ${m.platformMeetingId}`:""}`:"Select a registered meeting to load its official reference, schedule and platform details into the invitation."})()}</div></div><div className="form-field"><label>Attendance</label><select name="attendanceStatus" value={form.attendanceStatus} onChange={change}><option>Invited</option><option>Present</option><option>Absent</option><option>Excused</option></select></div><div className="form-field"><label>Participant UID</label><input name="participantUid" value={form.participantUid} onChange={change} placeholder="Captured for registered IRPA users" readOnly={sourceMode==="system"}/></div><div className="form-field"><label>Invitation Protocol</label><input value="Existing IRPA Invitation Register → Firebase Authentication → configured IRPA SMTP" readOnly/></div><div className="form-field form-field-wide"><label>Participation Notes</label><textarea name="notes" value={form.notes} onChange={change} rows="4"/></div></div><div className="form-actions"><button disabled={busy}>{busy?(edit?"Saving...":"Registering & Sending..."):(edit?"Save Participant":"Register & Send Invitation")}</button>{edit&&<button type="button" className="secondary-button" onClick={reset}>Cancel</button>}</div></form></section>
+ <section className="panel meeting-invitation-register"><div className="panel-header"><div><span className="eyebrow">MEETING INVITATION DISPATCH REGISTER</span><h2>Meeting Links & Token Release</h2><p className="panel-description">Each row is linked to the meeting participant and invitation record. Dispatch totals are calculated from invitation records; only access-pass references and release status are shown here. The bearer token is never displayed or stored in this register.</p></div><div className="member-actions"><button type="button" className="secondary-button" onClick={load} disabled={busy||registersLoading}>Refresh Register</button><button type="button" onClick={resendAllFailedInvitations} disabled={busy||invitationMetrics.failed===0}>{busy?"Resending…":"Resend All Failed/Error Invitations ("+invitationMetrics.failed+")"}</button></div></div><div className="dashboard-grid"><div className="stat-card"><span>Meeting Invitations</span><strong>{invitationMetrics.total}</strong><small>Invitation records linked to meetings</small></div><div className="stat-card"><span>Links & Tokens Released</span><strong>{invitationMetrics.released}</strong><small>Mail server confirmed dispatch</small></div><div className="stat-card"><span>Dispatch Failed</span><strong>{invitationMetrics.failed}</strong><small>Not counted as released</small></div><div className="stat-card"><span>Awaiting Confirmation</span><strong>{invitationMetrics.pending}</strong><small>Not yet confirmed as released</small></div></div><div className="table-wrapper"><table><thead><tr><th>Meeting / Invitation</th><th>Invitee</th><th>Email Dispatch</th><th>Meeting Link</th><th>Gate Token</th><th>Access Pass Reference</th><th>Expires</th><th>Released At</th></tr></thead><tbody>{meetingInvitationRows.length===0?<tr><td colSpan="8">No meeting invitation records have been created yet. Register a participant and use “Register & Send Invitation” to issue the meeting link and token.</td></tr>:meetingInvitationRows.map(i=>{const released=i.meetingAccessDispatched===true;const failed=isInvitationError(i);const meeting=meetings.find(m=>String(m.id)===String(i.meetingId));return <tr key={i.id}><td><strong>{i.meetingReference||meeting?.meetingReference||i.meetingTitle||i.meetingId||"—"}</strong><div className="table-subtext">{i.meetingTitle||meeting?.title||""}</div><div className="table-subtext">Invitation: {i.id}</div></td><td><strong>{i.name||i.participantName||"—"}</strong><div className="table-subtext">{i.email||i.participantEmail||"—"}</div></td><td><span className="status-badge">{i.deliveryStatus||i.status||"Pending"}</span></td><td><span className="status-badge">{released?(i.meetingInvitationLinkStatus||"Released"):(failed?"Not released":"Pending confirmation")}</span></td><td><span className="status-badge">{released?(i.meetingTokenStatus||"Released"):(failed?(i.meetingTokenStatus||"Not released"):"Not confirmed")}</span></td><td>{i.meetingAccessTokenReference||i.meetingAccessId||"Not issued"}<div className="table-subtext">Token value protected</div></td><td>{i.meetingAccessExpiresAt?new Date(i.meetingAccessExpiresAt).toLocaleString():"—"}</td><td>{i.meetingAccessDispatchedAt?new Date(i.meetingAccessDispatchedAt).toLocaleString():i.sentAt?new Date(i.sentAt).toLocaleString():"—"}{failed&&<div className="member-actions" style={{marginTop:8}}><button type="button" onClick={()=>resendInvitation(i)} disabled={resendingInvitationIds.includes(i.id)||(busy&&resendInFlight.current.has("__bulk__"))}>{resendingInvitationIds.includes(i.id)?"Resending…":"Resend Invitation"}</button></div>}</td></tr>})}</tbody></table></div></section>
+  <section className="panel"><div className="panel-header"><div><span className="eyebrow">ATTENDANCE REGISTER</span><h2>Meeting Participants</h2><p className="panel-description">{visible.length} of {rows.length} participant record(s)</p></div></div><div className="form-grid"><div className="form-field form-field-wide"><label>Search</label><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search participant, role or meeting..."/></div><div className="form-field"><label>Attendance</label><select value={filter} onChange={e=>setFilter(e.target.value)}><option>All</option><option>Invited</option><option>Present</option><option>Absent</option><option>Excused</option></select></div></div><div className="table-wrapper"><table><thead><tr><th>Participant</th><th>Type / Role</th><th>Meeting</th><th>Attendance</th><th>Voting Access</th><th>Actions</th></tr></thead><tbody>{visible.length===0?<tr><td colSpan="6">No participant records found.</td></tr>:visible.map(r=>{const nonVoting=String(r.participantRole||"").toLowerCase().includes("non-voting")||String(r.participantRole||"").toLowerCase().includes("guest");return <tr key={r.id}><td><strong>{r.participantName||"—"}</strong><div className="table-subtext">{r.participantEmail||""}</div></td><td>{r.participantRole||"—"}</td><td><strong>{r.meetingReference||r.meetingId||"—"}</strong><div className="table-subtext">{r.meetingIdentity||""}</div></td><td><span className="status-badge">{r.attendanceStatus||"—"}</span></td><td>{nonVoting?<span className="status-badge">Non-Voting</span>:<span className="status-badge">Role-controlled</span>}</td><td><div className="member-actions"><button onClick={()=>setSelected(r)}>Open</button><button onClick={()=>startEdit(r)}>Edit</button><button className="danger-button" onClick={()=>remove(r)}>Remove</button></div></td></tr>})}</tbody></table></div></section>
+ {selected&&<section className="panel"><div className="panel-header"><div><span className="eyebrow">PARTICIPANT RECORD</span><h2>{selected.participantName}</h2></div><button className="secondary-button" onClick={()=>setSelected(null)}>Close</button></div><div className="detail-grid">{[["Role",selected.participantRole],["Meeting",selected.meetingReference||selected.meetingId],["Attendance",selected.attendanceStatus],["Email",selected.participantEmail],["Participant UID",selected.participantUid],["Voting Access",String(selected.participantRole||"").toLowerCase().includes("non-voting")?"Non-Voting":"Controlled by governance role"]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b||"—"}</strong></div>)}</div><div className="record-details">{selected.notes||"No participation notes recorded."}</div></section>}
+ </div>
+}

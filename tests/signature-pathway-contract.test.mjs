@@ -1,0 +1,260 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const read = path => readFile(new URL(path, import.meta.url), "utf8");
+
+test("controlled upload allocates one Firestore ID before gateway upload and writes it into Drive description", async () => {
+  const [upload, storage, worker, data] = await Promise.all([
+    read("../src/components/ControlledDocumentUpload.jsx"),
+    read("../src/firebase/signatureStorage.js"),
+    read("../drive-gateway/src/index.js"),
+    read("../src/firebase/data.js")
+  ]);
+  const allocate = upload.indexOf("const documentUid = doc(collection(db, COLLECTIONS.documents)).id;");
+  const routedUpload = upload.indexOf("uploadControlledDocumentRouted({", allocate);
+  assert.ok(allocate >= 0 && routedUpload > allocate, "Firestore ID must be allocated before gateway upload");
+  assert.match(upload.slice(routedUpload, routedUpload + 500), /documentId:\s*documentUid/);
+  assert.match(upload, /pendingDocument\.documentId/);
+  assert.match(data, /createRecord\(collectionName,data,recordId=null\)/);
+  assert.match(data, /recordId\?doc\(db,collectionName,String\(recordId\)\):null/);
+  assert.match(storage, /gatewayPost\(\"\/api\/upload-controlled-document\"/);
+  const uploadRoute = worker.slice(worker.indexOf("async function controlledDocumentUploadPolicyCheck"), worker.indexOf("const categoryFile=await uploadToFolder"));
+  assert.match(uploadRoute, /const documentId = cleanId\(data\.documentId \|\| ""\)/);
+  assert.match(uploadRoute, /description:JSON\.stringify\(\{/);
+  assert.match(uploadRoute, /documentId,\s*documentUid:documentId/);
+});
+
+test("reconcile route authorizes administrators, diagnoses each registered file and remains read-only", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const route = worker.slice(worker.indexOf("async function reconcileSignatureDocumentIds"), worker.indexOf("async function uploadControlledDocument"));
+  assert.match(worker, /api\/signature-pathway\/reconcile/);
+  assert.match(route, /adminProfiles/);
+  assert.match(route, /registeredIds\.includes\(fileId\)/);
+  assert.match(route, /description\.documentId/);
+  assert.match(route, /diagnoseControlledDocument/);
+  assert.match(route, /fields=id,name,mimeType,size,description,trashed,parents,createdTime/);
+  assert.match(route, /alt=media/);
+  assert.match(route, /results\.push\(line\)/);
+  assert.match(route, /body\?\.repairMismatches === true/);
+  assert.match(route, /This diagnostic endpoint is read-only/);
+  assert.match(route, /writesPerformed:false,driveMutationsPerformed:false/);
+  assert.doesNotMatch(route, /method:"PATCH"/);
+});
+
+test("signature palette exposes readable errors in an accessible visible status area", async () => {
+  const platform = await read("../src/pages/SignaturePlatform.jsx");
+  const storage = await read("../src/firebase/signatureStorage.js");
+  assert.match(platform, /className="auth-message" role="alert" aria-live="assertive"/);
+  assert.match(platform, /\{message\s*&&\s*<div className="auth-message"/);
+  assert.match(platform, /setMessage/);
+  assert.match(storage, /STEP gateway controlled download failed/);
+  assert.match(storage, /documentId/);
+});
+
+
+test("actual-data gate Worker route enforces admin role, exact attestation, writes same setting fields, and audits", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const client = await read("../src/firebase/systemControl.js");
+  const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("async function reconcileSignatureDocumentIds"));
+  assert.match(worker, /\/api\/system\/actual-data-access/);
+  assert.match(client, /\/api\/system\/actual-data-access/);
+  assert.match(route, /authenticateFirebaseRequest\(request, env\)/);
+  assert.match(route, /adminProfiles\//);
+  assert.match(route, /profile\?\.fields\?\.active\?\.booleanValue === true/);
+  assert.match(worker, /actualDataAccessPolicy\.mjs/);
+  assert.match(route, /evaluateActualDataAccessPolicy/);
+  assert.match(route, /status:\{stringValue:enabled\?'OPEN':'CLOSED'\}/);
+  assert.match(route, /finalTestsAttested:\{booleanValue:enabled\}/);
+  assert.match(route, /ACTUAL_DATA_ACCESS_OPENED/);
+  assert.match(route, /Commit actual-data setting and audit atomically/);
+  assert.match(route, /step,error:/);
+});
+
+test("actual-data gate status is readable by every authenticated user while writes remain administrator-only", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("function signatureDraftFirestoreValue"));
+  const statusRead = route.indexOf("if (request.method === 'GET')");
+  const administratorCheck = route.indexOf("if (!adminAllowed)");
+  const bodyRead = route.indexOf("const body = await request.json()");
+  assert.ok(statusRead >= 0, "authenticated GET must return the global gate state");
+  assert.ok(administratorCheck > statusRead, "administrator authorization must apply after the read-only GET branch");
+  assert.ok(bodyRead > administratorCheck, "only an administrator may reach POST request parsing and mutation");
+  assert.match(route, /enabled:fields\.enabled\?\.booleanValue===true/);
+  assert.match(route, /status:fields\.status\?\.stringValue \|\| 'CLOSED'/);
+  assert.match(route, /Only an active IRPA Administrator may change actual-data access/);
+});
+
+test("actual-data gate rejects non-administrators and wrong attestation before changing the setting", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const route = worker.slice(worker.indexOf("async function actualDataAccessRoute"), worker.indexOf("async function reconcileSignatureDocumentIds"));
+  const authorization = route.indexOf("if (!adminAllowed)");
+  const policy = route.indexOf("evaluateActualDataAccessPolicy");
+  const write = route.indexOf("step = 'Commit actual-data setting and audit atomically'");
+  assert.ok(authorization >= 0 && policy > authorization && write > policy);
+  assert.match(route, /},403,corsHeaders\(request\)/);
+  assert.match(route, /policy\.status/);
+});
+
+test("actual-data gate policy allows an administrator with the exact attestation", async () => {
+  const { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } = await import("../drive-gateway/src/actualDataAccessPolicy.mjs");
+  assert.deepEqual(evaluateActualDataAccessPolicy({adminAllowed:true,enabled:true,confirmation:ACTUAL_DATA_ATTESTATION}), {allowed:true,status:200,enabled:true,finalTestsAttested:true});
+});
+
+test("actual-data gate policy refuses a non-administrator", async () => {
+  const { evaluateActualDataAccessPolicy, ACTUAL_DATA_ATTESTATION } = await import("../drive-gateway/src/actualDataAccessPolicy.mjs");
+  const result = evaluateActualDataAccessPolicy({adminAllowed:false,enabled:true,confirmation:ACTUAL_DATA_ATTESTATION});
+  assert.equal(result.allowed,false);
+  assert.equal(result.status,403);
+});
+
+test("actual-data gate policy refuses a wrong attestation", async () => {
+  const { evaluateActualDataAccessPolicy } = await import("../drive-gateway/src/actualDataAccessPolicy.mjs");
+  const result = evaluateActualDataAccessPolicy({adminAllowed:true,enabled:true,confirmation:"I CONFIRM"});
+  assert.equal(result.allowed,false);
+  assert.equal(result.status,412);
+});
+
+
+test("registered identity reconciliation allows an authenticated active administrator", async () => {
+  const { authorizeIdentityReconciliation } = await import("../drive-gateway/src/registeredIdentityReconciliation.mjs");
+  assert.deepEqual(authorizeIdentityReconciliation({ authenticated: true, adminAllowed: true }), { allowed: true, status: 200 });
+});
+
+test("registered identity reconciliation refuses a non-administrator", async () => {
+  const { authorizeIdentityReconciliation } = await import("../drive-gateway/src/registeredIdentityReconciliation.mjs");
+  const result = authorizeIdentityReconciliation({ authenticated: true, adminAllowed: false });
+  assert.equal(result.allowed, false);
+  assert.equal(result.status, 403);
+});
+
+test("registered identity reconciliation matches exact normalized emails and never overwrites existing UIDs", async () => {
+  const { classifyRegisteredIdentityRecord } = await import("../drive-gateway/src/registeredIdentityReconciliation.mjs");
+  const users = [{ uid: "uid-a", email: "member@example.org" }, { uid: "uid-b", email: "other@example.org" }];
+  assert.deepEqual(classifyRegisteredIdentityRecord({ email: " Member@Example.org ", authUsers: users }), {
+    status: "assigned", uid: "uid-a", reason: "Assigned the unique existing Firebase Authentication UID for the exact normalized email."
+  });
+  const conflict = classifyRegisteredIdentityRecord({ email: "different@example.org", existingUid: "uid-a", authUsers: users });
+  assert.equal(conflict.status, "conflicting");
+  assert.equal(conflict.uid, undefined);
+  assert.match(conflict.reason, /UID email does not exactly match/);
+});
+
+test("registered identity reconciliation renders a result line per record and a summary", async () => {
+  const [worker, policy, members, settings, client] = await Promise.all([
+    read("../drive-gateway/src/index.js"),
+    read("../drive-gateway/src/registeredIdentityReconciliation.mjs"),
+    read("../src/pages/Members.jsx"),
+    read("../src/pages/Settings.jsx"),
+    read("../src/firebase/registeredIdentityReconciliation.js")
+  ]);
+  assert.match(worker, /api\/members\/reconcile-registered-identity-uids/);
+  assert.match(worker, /results\.push\(line\)/);
+  assert.match(worker, /summarizeIdentityReconciliation\(results\)/);
+  assert.match(policy, /existingUid/);
+  assert.match(members, /uidResults\.map/);
+  assert.match(members, /uidResults\.length>0/);
+  assert.match(settings, /result\.results\|\|\[\]/);
+  assert.match(client, /Step .* failed:/);
+});
+
+
+test("signing authority updates use the Worker and retain register-based authorization", async () => {
+  const [worker, client] = await Promise.all([
+    read("../drive-gateway/src/index.js"),
+    read("../src/firebase/signerIdentity.js")
+  ]);
+  assert.match(worker, /api\/signature\/authority/);
+  const route = worker.slice(worker.indexOf("async function updateSignerAuthorityRoute"), worker.indexOf("async function reconcileRegisteredIdentityUidsRoute"));
+  assert.match(route, /Firebase authentication/);
+  assert.match(route, /activeRecords\.flatMap\(valuesFor\)\.includes\(requestedRole\)/);
+  assert.match(route, /authoritySourceCollection/);
+  assert.match(route, /UPDATE_SIGNER_AUTHORITY/);
+  assert.match(route, /step, error:/);
+  assert.match(client, /\/api\/signature\/authority/);
+  assert.doesNotMatch(client, /httpsCallable\(getFunctions\(undefined,"us-central1"\),"updateSignerAuthority"\)/);
+  assert.doesNotMatch(client, /if\(code!=="functions\/not-found"/);
+});
+
+
+test("Communication Media uploads accept only the provisioned archive folder and validate its metadata", async () => {
+  const worker = await read("../drive-gateway/src/index.js");
+  const start = worker.indexOf("async function upload(request, env)");
+  const end = worker.indexOf("async function uploadControlledDocument", start);
+  const route = worker.slice(start, end);
+  assert.match(route, /purpose === "Controlled Documents" \|\| purpose === "Communication Media"/);
+  assert.match(route, /folderDescription\.irpaCommunicationMediaArchive !== true/);
+  assert.match(route, /folderDescription\.purpose !== "IRPA Communication and Media Archive"/);
+});
+
+
+test("document lifecycle opens its existing signature envelope instead of preparing a duplicate envelope", async () => {
+  const [platform, lifecycle] = await Promise.all([
+    read("../src/pages/SignaturePlatform.jsx"),
+    read("../src/pages/DocumentLifecycleModule.jsx")
+  ]);
+  assert.match(lifecycle, /<SignaturePlatform initialDocument=\{\{\.\.\.selected,id:selected\.documentId\}\}\/>/);
+  assert.match(platform, /if\(initialDocument\.signatureEnvelopeId\)\{setSigningCircle\("Signing Circle"\);setTab\("Envelopes"\)/);
+  assert.match(platform, /envelopes\.find\(item=>String\(item\.id\|\|""\)===envelopeId\|\|String\(item\.gatewayEnvelopeId\|\|""\)===envelopeId\)/);
+  assert.match(platform, /setSelected\(envelope\);setTab\("Sign Document"\)/);
+  assert.match(platform, /a duplicate envelope was not created/);
+});
+
+
+test("Signature Pathway diagnostics batch one document per Worker request with bounded concurrency and retry", async () => {
+  const [ui, worker, diagnostics, readiness, batch] = await Promise.all([
+    read("../src/components/SignaturePathwaySelfTest.jsx"),
+    read("../drive-gateway/src/index.js"),
+    read("../drive-gateway/src/controlledDocumentDiagnostics.mjs"),
+    read("../drive-gateway/src/releaseReadinessRoutes.mjs"),
+    read("../src/utils/controlledDocumentDiagnosticBatch.mjs")
+  ]);
+  assert.match(ui, /selfTestReconcileDocument\(oneDocument\[0\], options\)/);
+  assert.match(ui, /redirect: "error"/);
+  assert.match(batch, /requestDocument\(\[item\], \{ dryRun: true, autoDiscover: false \}\)/);
+  assert.match(batch, /Math\.max\(1, Math\.min\(3, Number\(concurrency\)/);
+  assert.match(batch, /Math\.min\(limit, rows\.length\)/);
+  assert.match(batch, /maxRetries = 3/);
+  assert.match(batch, /attempt <= attemptsLimit/);
+  assert.match(ui, /maxRetries: 3/);
+  assert.match(ui, /role="progressbar"/);
+  const route = worker.slice(worker.indexOf("async function reconcileSignatureDocumentIds"), worker.indexOf("async function controlledDocumentUploadPolicyCheck"));
+  assert.match(route, /body\.documents\.length !== 1/);
+  assert.match(route, /Exactly one controlled document must be checked per Worker request/);
+  assert.match(route, /fields=id,name,mimeType,size,description,trashed,parents,createdTime/);
+  assert.match(route, /alt=media/);
+  assert.match(route, /diagnostic\.driveDescription/);
+  assert.doesNotMatch(route, /const metadata=await diagnosticFetch/);
+  assert.match(diagnostics, /diagnostic\.driveDescription = metadata\.description/);
+  assert.match(readiness, /documents: \[\{ documentId: "wiAfPSIxHLTd6MdeM04q"/);
+});test("mixed self-test rows produce correct readable, unreadable and non-file totals", async () => {
+  const ui = await read("../src/components/SignaturePathwaySelfTest.jsx");
+  function extractFunction(name) {
+    const start = ui.indexOf("export function " + name);
+    assert.ok(start >= 0, name + " must be exported for the diagnostic contract");
+    const open = ui.indexOf(") {", start) + 2;
+    let depth = 0;
+    for (let index = open; index < ui.length; index += 1) {
+      if (ui[index] === "{") depth += 1;
+      if (ui[index] === "}") {
+        depth -= 1;
+        if (depth === 0) return ui.slice(start, index + 1).replace(/^export /, "");
+      }
+    }
+    throw new Error("Unterminated function: " + name);
+  }
+  const classify = new Function(extractFunction("classifySelfTestRecord") + "; return classifySelfTestRecord;")();
+  const summarize = new Function(extractFunction("summarizeSelfTestResults") + "; return summarizeSelfTestResults;")();
+  assert.equal(classify({ documentId: "communicationWebsiteEdits-abc" }), "NON_FILE_RECORD");
+  assert.equal(classify({ documentId: "controlled-document-1" }), "CONTROLLED_DOCUMENT");
+  const rows = [
+    { classification: classify({ documentId: "communicationWebsiteEdits-abc" }), checks: [] },
+    { classification: classify({ documentId: "controlled-document-readable" }), checks: [{ status: "PASS" }, { status: "PASS" }] },
+    { classification: classify({ documentId: "controlled-document-no-drive-id" }), checks: [{ status: "FAIL" }, { status: "FAIL" }] }
+  ];
+  assert.deepEqual(summarize(rows), {
+    documentsReadable: 1,
+    documentsUnreadable: 1,
+    nonFileRecords: 1
+  });
+});

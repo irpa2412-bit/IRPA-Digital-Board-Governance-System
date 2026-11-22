@@ -1,0 +1,106 @@
+name: Email domain deliverability diagnostics
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/email-deliverability-dns.yml
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: email-deliverability-dns
+  cancel-in-progress: false
+jobs:
+  read-only-dns-and-smtps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect DNS, blocklists and SMTPS certificate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import datetime, ipaddress, json, re, socket, ssl, subprocess
+          from pathlib import Path
+
+          rows = []
+          def dig(name, typ):
+              try:
+                  p = subprocess.run(["dig", "+time=4", "+tries=1", "+short", name, typ],
+                                     text=True, capture_output=True, timeout=8)
+                  return [x.strip().strip('"') for x in p.stdout.splitlines() if x.strip()]
+              except Exception as e:
+                  return []
+          def add(label, values, problem=""):
+              rows.append((label, "YES" if values else "NO", "; ".join(values) if values else "(no record/response)", problem if values else (problem or "No record returned")))
+          add("irpa.or.tz MX", dig("irpa.or.tz", "MX"), "Confirm mail exchanger is intended")
+          add("irpa.or.tz A", dig("irpa.or.tz", "A"), "Confirm website address")
+          add("mail.irpa.or.tz A", dig("mail.irpa.or.tz", "A"), "Sending host must resolve")
+          spf = [x for x in dig("irpa.or.tz", "TXT") if x.lower().startswith("v=spf1")]
+          add("irpa.or.tz SPF TXT", spf, "Missing SPF; publish one SPF record authorizing the actual outbound IP")
+          selectors = ["default", "selector1", "selector2", "mail", "k1", "dkim"]
+          dkim_found = []
+          for sel in selectors:
+              for host in (f"{sel}._domainkey.irpa.or.tz", f"{sel}._domainkey.mail.irpa.or.tz"):
+                  vals = dig(host, "TXT")
+                  if vals:
+                      dkim_found.append(host + " = " + " ".join(vals))
+          add("DKIM selectors", dkim_found, "No common selector found; ask host to confirm active selector and publish its public key")
+          dmarc = dig("_dmarc.irpa.or.tz", "TXT")
+          add("irpa.or.tz DMARC", dmarc, "Missing DMARC; publish a monitoring policy beginning with p=none")
+          mail_ips = dig("mail.irpa.or.tz", "A")
+          add("mail.irpa.or.tz A record", mail_ips, "Mail host must resolve to outbound SMTP host")
+          ptrs, block_rows = [], []
+          for ip in mail_ips:
+              try:
+                  rev = ipaddress.ip_address(ip).reverse_pointer
+                  ptr = dig(rev, "PTR")
+                  ptrs.extend([ip + " -> " + p for p in ptr])
+                  octets = ip.split(".")
+                  if len(octets) == 4:
+                      revip = ".".join(reversed(octets))
+                      zones = {
+                        "Spamhaus ZEN": revip + ".zen.spamhaus.org",
+                        "Barracuda": revip + ".b.barracudacentral.org",
+                        "SORBS": revip + ".dnsbl.sorbs.net",
+                        "SpamCop": revip + ".bl.spamcop.net",
+                      }
+                      for name, q in zones.items():
+                          ans = dig(q, "A")
+                          # NXDOMAIN/no A is treated as not listed; DNS errors cannot be distinguished by dig +short.
+                          listed = bool(ans)
+                          block_rows.append((name + " (" + ip + ")", "YES" if listed else "NO",
+                                             "; ".join(ans) if ans else "Not listed / no answer",
+                                             "Listed; request delisting" if listed else "No listing answer observed"))
+              except ValueError:
+                  pass
+          add("Mail server reverse DNS (PTR)", ptrs, "Set PTR at the outbound IP provider to a mail hostname that resolves back")
+          rows.extend(block_rows)
+          try:
+              ctx = ssl.create_default_context()
+              with socket.create_connection(("mail.irpa.or.tz", 465), timeout=10) as raw:
+                  with ctx.wrap_socket(raw, server_hostname="mail.irpa.or.tz") as s:
+                      cert = s.getpeercert()
+                      subject = cert.get("subject", ())
+                      names = [v for group in subject for k,v in group if k == "commonName"]
+                      sans = [v for k,v in cert.get("subjectAltName", ()) if k == "DNS"]
+                      exp = cert.get("notAfter", "")
+                      greeting = s.recv(2048).decode("utf-8", "replace").strip()
+                      add("SMTPS :465 certificate", [f"CN={','.join(names)} SAN={','.join(sans)} expires={exp}"], "Certificate must match mail.irpa.or.tz and be unexpired")
+                      add("SMTPS :465 greeting", [greeting], "Confirm SMTP service greeting")
+          except Exception as e:
+              add("SMTPS :465 connection", [], str(e))
+          print("| Check | Found | Value | Problem |")
+          print("|---|---|---|---|")
+          for r in rows:
+              print("| " + " | ".join(str(x).replace("|","/").replace("\n"," ") for x in r) + " |")
+          summary = ["## Email deliverability diagnostics", "", "| Check | Found | Value | Problem |", "|---|---|---|---|"]
+          summary += ["| " + " | ".join(str(x).replace("|","/").replace("\n"," ") for x in r) + " |" for r in rows]
+          Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]).write_text("\n".join(summary) + "\n")
+          Path("email-deliverability-dns-report.md").write_text("\n".join(summary) + "\n")
+          PY
+      - name: Upload diagnostic report
+        uses: actions/upload-artifact@v4
+        with:
+          name: email-deliverability-dns-report
+          path: email-deliverability-dns-report.md
+          if-no-files-found: error

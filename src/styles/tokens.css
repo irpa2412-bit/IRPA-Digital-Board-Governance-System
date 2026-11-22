@@ -1,0 +1,1138 @@
+/* IRPA-DBGS authoritative design tokens — surface-aware readability layer.
+   Every text/control color is resolved from the surface on which it renders.
+   Contrast requirements: normal text >= 4.5:1; large text >= 3:1; UI borders/focus >= 3:1.
+*/
+:root,
+.surface-dark{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.surface-light,
+.surface-white{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.surface-blue{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+
+/* Existing semantic surfaces inherit the authoritative token set. */
+body,
+.app-shell,
+.auth-screen,
+.loading-screen,
+.sidebar,
+.topbar,
+.auth-card,
+.welcome-panel,
+.module-panel,
+.panel,
+.identity-card,
+.stat-card,
+.detail-grid>div,
+.record-details,
+.mobile-dashboard-search,
+.mobile-dashboard-section,
+.induction-progress-track,
+.authority-card{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+
+.module-interlink-bar,
+.surface-light-card,
+.dashboard-content-area,
+.dashboard-quote4-main .panel,
+.quote4-activity-table>button{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+
+.dashboard-quote4-stats>button,
+.quote4-quick-grid>button,
+.nav-item.active,
+.logout-button,
+.global-home-button,
+.mobile-global-nav button.active{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+
+/* Shared typography/control primitives consume only the active surface tokens. */
+body{background:var(--surface);color:var(--text)}
+.app-shell{color:var(--text)}
+.app-shell h1,.app-shell h2,.app-shell h3,.app-shell h4,.app-shell h5,.app-shell h6,
+.app-shell p,.app-shell span,.app-shell strong,.app-shell small,.app-shell em,
+.app-shell td,.app-shell th,.app-shell legend,.app-shell label{color:var(--text)}
+.app-shell .muted,.app-shell .panel-description,.app-shell .module-panel>p,
+.app-shell .page-header p,.app-shell .module-header p,.app-shell .welcome-panel p{color:var(--text-muted)}
+.app-shell label,.auth-card label,.form-field label,.signature-authority-field>label{
+  color:var(--text);
+  font-size:15px;
+  font-weight:600;
+  line-height:1.45;
+}
+.form-field,
+.form-grid,
+.form-actions{min-width:0}
+.form-grid{grid-template-columns:minmax(0,1fr);gap:0 16px}
+.form-field{gap:7px}
+.form-field input,.form-field select,.form-field textarea,
+.auth-card input,.table-search{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  color:var(--text);
+  background:var(--surface-raised);
+  border:1px solid var(--border);
+  border-radius:9px;
+  outline:none;
+  font-size:16px;
+}
+.form-field input,.form-field select,.auth-card input,.table-search{min-height:46px;padding:11px 12px}
+.form-field textarea{min-height:120px;padding:11px 12px;resize:vertical}
+.form-field input::placeholder,.form-field textarea::placeholder,.auth-card input::placeholder,.table-search::placeholder{
+  color:var(--placeholder);
+}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus,
+.auth-card input:focus,.table-search:focus{
+  border-color:var(--border-strong);
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
+.form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.form-actions>*{min-width:0}
+.form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
+.form-field input[type="checkbox"],.form-field input[type="radio"]{width:auto;min-height:0}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+table th{color:var(--text-muted)}
+table td{color:var(--text)}
+.status-badge{color:var(--success)}
+.error-message,.field-help{color:var(--error)}
+.success-message{color:var(--success)}
+@media(min-width:768px){
+  .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form-grid .form-field-wide,.form-grid .full-field{grid-column:1/-1}
+}
+@media(max-width:767px){
+  .form-grid{grid-template-columns:1fr}
+  .form-grid .form-field-wide,.form-grid .full-field{grid-column:1}
+}
+
+.password-entry-control{display:flex;align-items:stretch;gap:8px;min-width:0}
+.password-entry-input{flex:1 1 auto;min-width:0}
+.password-visibility-toggle{flex:0 0 44px;width:44px;min-width:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-raised);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.password-visibility-toggle:hover{background:var(--surface);color:var(--text)}
+.password-caps-warning{display:block;margin-top:5px;color:var(--error);font-weight:600}
+.login-category-badges{margin-top:4px;color:var(--text)}
+.login-category-heading{display:block;font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--text-muted)}
+.login-category-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;align-items:flex-start}
+.login-category-item{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px}
+.login-category-pill{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid currentColor;line-height:1.2;color:var(--text)}
+.login-category-empty{font-size:12px;color:var(--text-muted)}
+.login-category-identifiers{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;padding-top:6px;border-top:1px solid var(--border)}
+.login-category-identifiers small{display:block;font-size:12px;letter-spacing:.06em;color:var(--text-muted)}
+.login-category-identifiers strong{font-size:12px;color:var(--text)}
+.login-category-note{display:block;font-size:12px;line-height:1.35;color:var(--text-muted);margin-top:6px}
+.authority-capacity-gate{
+  background:rgba(2,10,7,.96);
+}
+.authority-capacity-gate .authority-capacity-card{
+  background:var(--surface);
+  color:var(--text);
+  border-color:var(--border-strong);
+}
+@media(max-width:767px){
+  .password-entry-control{gap:7px}
+  .password-visibility-toggle{flex-basis:44px;width:44px;min-width:44px}
+}
+
+/* Surface assignments for former readability-patch components. */
+.content-area:not(.dashboard-content-area) .page .stat-card,
+.content-area:not(.dashboard-content-area) .page .workflow-stage,
+.content-area.dashboard-content-area .page .dashboard-gauge,
+.content-area.dashboard-content-area .page .dashboard-function-button,
+.content-area.dashboard-content-area .page .dashboard-feed,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+.content-area .page .stat-card,
+.content-area .page .workflow-stage,
+.content-area .page .unified-control-tabs .unified-control-tab{
+  color:var(--text);
+}
+.content-area .page .stat-card span,
+.content-area .page .workflow-stage span,
+.content-area .page .stat-card small,
+.content-area .page .workflow-stage small{
+  color:var(--text-muted);
+}
+.content-area .page .stat-card strong,
+.content-area .page .workflow-stage strong{
+  color:var(--text);
+}
+.content-area .page .unified-control-tabs .unified-control-tab,
+.content-area .page .unified-control-tabs .unified-control-tab *{
+  color:var(--text);
+}
+.module-interlink-bar .module-interlink-list>button,
+.module-interlink-bar .workflow-portal-parent,
+.module-interlink-bar .workflow-portal-children button{
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--border-strong);
+  font-size:13px;
+  line-height:1.35;
+  font-weight:700;
+}
+
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page,
+.members-personnel-page .panel,
+.members-personnel-page .registration-feedback,
+.members-personnel-page .detail-grid>div,
+.finance-engine-card,
+.finance-formula-card,
+.finance-technology-operations .finance-engine-tabs button,
+.main-area>.mobile-global-nav,
+.mobile-stat-card,
+.mobile-priority-list>button,
+.mobile-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.dashboard-quote4-main .panel,
+.quote4-activity-table>button,
+.dashboard-quote4-main,
+.desktop-date-card,
+.desktop-quote4-hero,
+.mobile-quote1-hero,
+.mobile-dashboard-hero{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.dashboard-quote4-stats>button,
+.quote4-quick-grid>button,
+.mobile-blue-nav-button,
+.mobile-global-nav button.active{
+  --surface:#0b5fa8;
+  --surface-raised:#1672bf;
+  --text:#ffffff;
+  --text-muted:#e5f1fa;
+  --border:#8fb9d3;
+  --border-strong:#cde5f5;
+  --focus:#ffffff;
+  --placeholder:#cde5f5;
+  --error:#ffd7d2;
+  --success:#d8f5e5;
+}
+.dashboard-content-area .dashboard-hero,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page,
+.finance-engine-card,
+.finance-formula-card,
+.mobile-stat-card,
+.mobile-priority-list>button,
+.mobile-quick-grid>button,
+.mobile-quote1-stats>button,
+.mobile-quote1-grid>button,
+.main-area>.mobile-global-nav{
+  color:var(--text);
+}
+.dashboard-content-area .dashboard-hero h1,
+.dashboard-content-area .dashboard-hero p,
+.dashboard-content-area .dashboard-gauge,
+.dashboard-content-area .dashboard-function-button,
+.dashboard-content-area .dashboard-feed,
+.members-personnel-page .page-header h1,
+.members-personnel-page .page-header p,
+.finance-engine-card>span,
+.finance-engine-card>strong,
+.finance-engine-card>small,
+.finance-formula-card h3,
+.finance-engine-card h3,
+.finance-formula-card code,
+.finance-formula-card ul,
+.mobile-stat-card *,
+.mobile-priority-list>button *,
+.mobile-quick-grid>button *,
+.mobile-quote1-stats>button *,
+.mobile-quote1-grid>button *{
+  color:var(--text);
+}
+.dashboard-content-area .dashboard-hero p,
+.finance-engine-card>span,
+.finance-engine-card>small,
+.finance-formula-card ul,
+.members-personnel-page .page-header p{
+  color:var(--text-muted);
+}
+.desktop-quote4-hero *,
+.mobile-quote1-hero *,
+.mobile-dashboard-hero *,
+.desktop-date-card *{
+  color:var(--text);
+}
+.desktop-quote4-hero .eyebrow,
+.mobile-quote1-hero .mobile-quote1-user span,
+.desktop-date-card span{
+  color:var(--focus);
+}
+
+/* Authenticated light portal surfaces: Research, Dataset Registry, Finance and Operations. */
+.content-area .page,
+.research-portal-page,
+.finance-portal,
+.finance-accounting-engine,
+.finance-donor-control-cockpit,
+.finance-technology-operations,
+.research-info-card,
+.research-selected-dataset{
+  --surface:#ffffff;
+  --surface-raised:#f4f8f5;
+  --text:#17372b;
+  --text-muted:#526c61;
+  --border:#718a80;
+  --border-strong:#3f6556;
+  --focus:#075f3d;
+  --placeholder:#65776f;
+  --error:#8f2f2a;
+  --success:#0b6b3a;
+}
+.auth-screen,
+.authority-capacity-gate,
+.password-entry-popup{
+  --surface:#07140f;
+  --surface-raised:#0e251b;
+  --text:#f4f8f6;
+  --text-muted:#b9cdc4;
+  --border:#6f8e81;
+  --border-strong:#a5bdb3;
+  --focus:#f3c84b;
+  --placeholder:#829d93;
+  --error:#ffb4ab;
+  --success:#8ad5ae;
+}
+.research-info-card{padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.research-selected-dataset{margin-top:16px;box-shadow:none}
+.research-portal-page .form-grid>label,
+.research-portal-page .panel>h2,
+.research-portal-page .panel-header h2,
+.research-portal-page .welcome-panel h1{color:var(--text)}
+.research-portal-page .panel-description,
+.research-portal-page .welcome-panel p,
+.research-portal-page .table-subtext{color:var(--text-muted)}
+.research-portal-page .form-grid input,
+.research-portal-page .form-grid select,
+.research-portal-page .form-grid textarea{color:var(--text);background:var(--surface-raised);border-color:var(--border)}
+.research-portal-page .form-grid input::placeholder,
+.research-portal-page .form-grid textarea::placeholder{color:var(--placeholder)}
+.finance-engine-tabs{border-color:var(--border);background:var(--surface-raised)}
+.finance-engine-tabs button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
+.finance-engine-tabs button.active{
+  --surface:#0b5fa8;--surface-raised:#1672bf;--text:#fff;--text-muted:#e5f1fa;
+  --border:#8fb9d3;--border-strong:#cde5f5;--focus:#fff;--placeholder:#cde5f5;
+  --error:#ffd7d2;--success:#d8f5e5;
+  background:var(--surface);color:var(--text);border-color:var(--border-strong)
+}
+.finance-engine-card,.finance-formula-card{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-engine-card>span,.finance-engine-card>small,.finance-engine-card th{color:var(--text-muted)}
+.finance-engine-card>strong,.finance-formula-card h3,.finance-engine-card h3,.finance-engine-card table,.finance-engine-card td{color:var(--text)}
+.finance-formula-card code{background:var(--surface-raised);color:var(--text)}
+.finance-formula-card ul{color:var(--text-muted)}
+.finance-engine-card input,.finance-engine-card select{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-engine-card .form-field label{color:var(--text)}
+.finance-engine-card .secondary-button{background:var(--surface-raised);color:var(--text);border-color:var(--border)}
+.finance-technology-operations .finance-engine-tabs button{background:var(--surface);color:var(--text);border-color:var(--border)}
+.finance-operation-result{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+.authority-capacity-card{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.authority-capacity-kicker,.authority-capacity-feedback strong{color:var(--focus)}
+.authority-capacity-card p,.authority-capacity-note,.authority-capacity-option small{color:var(--text-muted)}
+.authority-capacity-status{border-color:var(--border);background:var(--surface-raised)}
+.authority-capacity-status strong{color:var(--text)}
+.authority-capacity-status small{color:var(--text-muted)}
+.authority-capacity-option{border-color:var(--border);background:var(--surface-raised);color:var(--text)}
+.authority-capacity-option:hover:not(:disabled){border-color:var(--border-strong)}
+.authority-capacity-option.selected{border-color:var(--focus);background:var(--surface);box-shadow:0 0 0 2px var(--focus)}
+.authority-capacity-feedback{border-color:var(--focus);background:var(--surface-raised)}
+.authority-capacity-feedback.error{border-color:var(--error);background:var(--surface-raised)}
+.authority-capacity-feedback.error strong{color:var(--error)}
+.authority-capacity-feedback span{color:var(--text)}
+.authority-capacity-signout{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+.authority-capacity-note{color:var(--text-muted)}
+.password-entry-popup{background:var(--surface);color:var(--text)}
+.auth-security-instructions{border-color:var(--border);background:var(--surface-raised);color:var(--text-muted)}
+.auth-security-instructions strong{color:var(--focus)}
+.auth-message{background:var(--surface-raised);border-color:var(--border);color:var(--text)}
+
+/* Portal form readability correction — preserves workflow/data behavior. */
+.content-area:not(.dashboard-content-area) .page .form-field{
+  color:var(--text);
+  font-size:15px;
+  line-height:1.45;
+  font-weight:750;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input,
+.content-area:not(.dashboard-content-area) .page .form-field select,
+.content-area:not(.dashboard-content-area) .page .form-field textarea{
+  color:var(--text);
+  background:var(--surface-raised);
+  border-color:var(--border-strong);
+  font-size:16px;
+  line-height:1.5;
+  font-weight:600;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input::placeholder,
+.content-area:not(.dashboard-content-area) .page .form-field textarea::placeholder{
+  color:var(--placeholder);
+  opacity:1;
+}
+.content-area:not(.dashboard-content-area) .page .form-field input:focus,
+.content-area:not(.dashboard-content-area) .page .form-field select:focus,
+.content-area:not(.dashboard-content-area) .page .form-field textarea:focus{
+  border-color:var(--focus);
+  box-shadow:0 0 0 2px var(--focus);
+}
+.content-area:not(.dashboard-content-area) .page .welcome-panel h1,
+.content-area:not(.dashboard-content-area) .page .panel-header h2{
+  color:var(--text);
+  font-weight:800;
+}
+
+/* ========================================================================
+   IRPA-DBGS GLOBAL READABILITY CONTRACT — FINAL CASCADE LAYER
+   2026-10-08
+   Presentation-only. This layer is loaded last by src/main.jsx and is
+   deliberately stronger than portal-specific readability overrides.
+   It does not alter display, grid, positioning, routing, data or workflow.
+   ======================================================================== */
+#root .app-shell .content-area .page :where(
+  h1,h2,h3,h4,h5,h6,p,li,dt,dd,blockquote,figcaption,caption,label,legend
+){
+  color:var(--text);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  text-rendering:optimizeLegibility;
+}
+#root .app-shell .content-area .page :where(p,li,dt,dd,blockquote,figcaption){
+  line-height:1.55;
+}
+#root .app-shell .content-area .page :where(h1,h2,h3,h4,h5,h6){
+  line-height:1.2;
+}
+#root .app-shell .content-area .page :where(button,input,select,textarea){
+  font-family:inherit;
+}
+#root .app-shell .content-area .page :where(input,select,textarea){
+  color:var(--text);
+  background:var(--surface-raised);
+  border-color:var(--border);
+  font-size:16px;
+  line-height:1.5;
+}
+#root .app-shell .content-area .page :where(input,textarea)::placeholder{
+  color:var(--placeholder);
+  opacity:1;
+}
+#root .app-shell .content-area .page :where(button){
+  color:var(--text);
+}
+#root .app-shell .content-area .page :where(button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible){
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
+#root .app-shell .content-area .page :where(table){
+  color:var(--text);
+}
+#root .app-shell .content-area .page :where(th){
+  color:var(--text-muted);
+  font-weight:800;
+}
+#root .app-shell .content-area .page :where(td){
+  color:var(--text);
+}
+#root .app-shell .content-area .page :where(.muted,.panel-description,.table-subtext){
+  color:var(--text-muted);
+}
+#root .app-shell .content-area .page :where(a){
+  color:var(--focus);
+}
+#root .app-shell .content-area .page :where(.error-message,.field-help){
+  color:var(--error);
+}
+#root .app-shell .content-area .page :where(.success-message){
+  color:var(--success);
+}
+#root .app-shell .content-area .page :where(input,select,textarea):focus{
+  border-color:var(--border-strong);
+  outline:2px solid var(--focus);
+  outline-offset:1px;
+}
+@media (max-width:760px){
+  #root .app-shell .content-area .page :where(h1){font-size:clamp(22px,6vw,28px);}
+  #root .app-shell .content-area .page :where(h2){font-size:clamp(18px,5vw,23px);}
+  #root .app-shell .content-area .page :where(h3){font-size:clamp(16px,4.5vw,20px);}
+  #root .app-shell .content-area .page :where(button,input,select,textarea){min-height:44px;}
+  #root .app-shell .content-area .page :where(input,select,textarea){font-size:16px;}
+}
+@media (min-width:761px){
+  #root .app-shell .content-area .page :where(h1){font-size:clamp(24px,2vw,32px);}
+  #root .app-shell .content-area .page :where(h2){font-size:clamp(19px,1.5vw,24px);}
+  #root .app-shell .content-area .page :where(h3){font-size:clamp(16px,1.2vw,20px);}
+}
+
+
+/* =========================================================================
+   IRPA-DBGS CANONICAL UI CONTRACT — MEMBERS & PERSONNEL REFERENCE
+   2026-10-09
+   Presentation-only harmonisation. The Members & Personnel portal shown in
+   the approved reference is the visual baseline for every authenticated
+   desktop and mobile portal page.
+   No routing, Firebase authorization, roles, permissions, data structures,
+   gates, workflows or portal-specific meanings are changed by this layer.
+   ========================================================================= */
+
+#root .app-shell{
+  background:#ffffff;
+}
+#root .app-shell .main-area{
+  background:#ffffff;
+}
+#root .app-shell .topbar{
+  background:#10233f;
+  border-bottom-color:#294566;
+  box-shadow:0 5px 20px rgba(16,35,63,.16);
+}
+#root .app-shell .topbar h2{
+  color:#ffffff;
+}
+#root .app-shell .topbar p{
+  color:#d5dfeb;
+}
+#root .app-shell .topbar-kicker{
+  color:#9fc5e8;
+}
+
+#root .app-shell .content-area{
+  background:#ffffff;
+  color:#18364f;
+}
+#root .app-shell .content-area .page{
+  color:#18364f;
+}
+#root .app-shell .content-area .page .welcome-panel,
+#root .app-shell .content-area .page .module-panel,
+#root .app-shell .content-area .page .panel{
+  background:#ffffff;
+  color:#18364f;
+  border-color:#d3dce6;
+  box-shadow:0 5px 18px rgba(22,52,79,.07);
+}
+#root .app-shell .content-area .page .page-header h1,
+#root .app-shell .content-area .page .welcome-panel h1,
+#root .app-shell .content-area .page .module-header h1,
+#root .app-shell .content-area .page .panel-header h2,
+#root .app-shell .content-area .page .panel h2,
+#root .app-shell .content-area .page .module-panel h2{
+  color:#17344d;
+}
+#root .app-shell .content-area .page .page-header p,
+#root .app-shell .content-area .page .welcome-panel p,
+#root .app-shell .content-area .page .panel-description,
+#root .app-shell .content-area .page .panel-header span,
+#root .app-shell .content-area .page .module-panel>p{
+  color:#5b6f80;
+}
+
+#root .app-shell .content-area .page .form-field label,
+#root .app-shell .content-area .page .signature-authority-field label,
+#root .app-shell .content-area .page label,
+#root .app-shell .content-area .page legend{
+  color:#1b3a53;
+  font-weight:750;
+}
+#root .app-shell .content-area .page .form-field input,
+#root .app-shell .content-area .page .form-field select,
+#root .app-shell .content-area .page .form-field textarea,
+#root .app-shell .content-area .page input,
+#root .app-shell .content-area .page select,
+#root .app-shell .content-area .page textarea{
+  color:#18364f;
+  background:#ffffff;
+  border-color:#aebdca;
+  border-radius:10px;
+}
+#root .app-shell .content-area .page input::placeholder,
+#root .app-shell .content-area .page textarea::placeholder{
+  color:#687b8b;
+}
+#root .app-shell .content-area .page input:focus,
+#root .app-shell .content-area .page select:focus,
+#root .app-shell .content-area .page textarea:focus{
+  border-color:#2f86cf;
+  box-shadow:0 0 0 2px rgba(47,134,207,.18);
+}
+#root .app-shell .content-area .page .form-actions button,
+#root .app-shell .content-area .page .page-header button,
+#root .app-shell .content-area .page button:not(.secondary-button):not(.danger-button):not(.text-button){
+  background:#0b5fa8;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .content-area .page .secondary-button{
+  background:#f2f6f9;
+  border-color:#aebdca;
+  color:#24435c;
+}
+#root .app-shell .content-area .page .danger-button{
+  background:#a33b34;
+  border-color:#c45a50;
+  color:#ffffff;
+}
+
+#root .app-shell .content-area .page .table-wrapper{
+  border:1px solid #d5dfe7;
+  background:#ffffff;
+}
+#root .app-shell .content-area .page table{
+  color:#18364f;
+  background:#ffffff;
+}
+#root .app-shell .content-area .page th{
+  color:#50677a;
+  background:#f4f7fa;
+  border-bottom-color:#cbd6df;
+}
+#root .app-shell .content-area .page td{
+  color:#29455b;
+  border-bottom-color:#dce4ea;
+}
+#root .app-shell .content-area .page .table-search{
+  color:#18364f;
+  background:#ffffff;
+  border-color:#aebdca;
+}
+#root .app-shell .content-area .page .status-badge{
+  background:#e8f1f8;
+  color:#15527f;
+  border:1px solid #a8c5dc;
+}
+#root .app-shell .content-area .page .detail-grid>div{
+  background:#f7f9fb;
+  border-color:#d2dce5;
+}
+#root .app-shell .content-area .page .detail-grid span{
+  color:#607487;
+}
+#root .app-shell .content-area .page .detail-grid strong{
+  color:#203e55;
+}
+#root .app-shell .content-area .page .record-details{
+  background:#f5f8fa;
+  border-color:#d2dce5;
+  color:#29465c;
+}
+#root .app-shell .content-area .page .success-message{
+  background:#edf8f2;
+  border-color:#9acdb2;
+  color:#17613d;
+}
+#root .app-shell .content-area .page .error-message{
+  background:#fff1f0;
+  border-color:#e0aaa5;
+  color:#8b2d28;
+}
+#root .app-shell .content-area .page .field-help{
+  color:#7b4a45;
+}
+
+#root .app-shell .content-area .page .identity-card,
+#root .app-shell .content-area .page .stat-card{
+  background:#f4f7fa;
+  border-color:#d1dce5;
+  color:#18364f;
+}
+#root .app-shell .content-area .page .identity-card span,
+#root .app-shell .content-area .page .stat-card span,
+#root .app-shell .content-area .page .stat-card small{
+  color:#607487;
+}
+#root .app-shell .content-area .page .identity-card strong,
+#root .app-shell .content-area .page .stat-card strong{
+  color:#18364f;
+}
+#root .app-shell .content-area .page .stat-card:after{
+  background:#d6a52c;
+}
+
+/* Preserve the established dark-blue navigation surface used by the reference. */
+#root .app-shell .content-area .desktop-webapp-navigation-roller{
+  background:#062b4c;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .content-area .mobile-portal-content-roller{
+  background:#062b4c;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .content-area .page-back-next-navigation{
+  background:#f7fafc;
+  border-color:#c9d8e5;
+}
+#root .app-shell .content-area .page-back-next-status strong,
+#root .app-shell .content-area .page-back-next-status small{
+  color:#18364f;
+}
+
+/* Mobile keeps the same canonical visual language while preserving the
+   existing responsive geometry and fixed navigation mechanics. */
+@media (max-width:760px){
+  #root .app-shell .content-area{
+    background:#ffffff;
+  }
+  #root .app-shell .content-area .page .panel,
+  #root .app-shell .content-area .page .module-panel,
+  #root .app-shell .content-area .page .welcome-panel{
+    border-radius:13px;
+    box-shadow:0 4px 14px rgba(22,52,79,.06);
+  }
+  #root .app-shell .content-area .page .form-actions{
+    background:#ffffff;
+  }
+}
+
+/* Canonical UI contract marker for automated policy checks. */
+:root{
+  --irpa-canonical-ui-reference:members-personnel;
+  --irpa-canonical-ui-contract:2026-10-09;
+
+/* Canonical blue navigation states across desktop and mobile. */
+#root .app-shell .sidebar .nav-item{
+  background:#0b5fa8;
+  border-color:#2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .sidebar .nav-item:hover:not(.active){
+  background:#1476bf;
+  border-color:#70b4ed;
+  color:#ffffff;
+}
+#root .app-shell .sidebar .nav-item.active{
+  background:#0b6fba;
+  border-color:#70baff;
+  color:#ffffff;
+  box-shadow:inset 3px 0 #ffffff;
+}
+#root .app-shell .mobile-global-nav button{
+  background:#0b5fa8;
+  border:1px solid #2f86cf;
+  color:#ffffff;
+}
+#root .app-shell .mobile-global-nav button.active{
+  background:#0b6fba;
+  border-color:#70baff;
+  color:#ffffff;
+  box-shadow:inset 0 2px #ffffff;
+}
+
+}
+
+/* ========================================================================
+   IRPA-DBGS UNIFORM BLUE NAVIGATION / TAB FIT CONTRACT — 2026-10-09
+   Presentation-only. Applies the established blue navigation language to
+   portal/register/tab selectors without changing routing, authorization,
+   roles, permissions, data structures, gates, workflows or semantics.
+
+   Inactive controls use a light blue surface with readable dark-blue text.
+   Active controls use the established clear blue surface with white text.
+   Labels remain single-line and size to their own content; containers may
+   scroll horizontally where the existing responsive mechanics require it.
+   ======================================================================== */
+
+#root .app-shell .content-area .module-interlink-list,
+#root .app-shell .content-area .finance-engine-tabs,
+#root .app-shell .content-area .unified-control-tabs{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+
+#root .app-shell .content-area .module-interlink-list{
+  overflow-x:auto;
+  padding:2px 2px 4px;
+  scrollbar-width:thin;
+}
+
+#root .app-shell .content-area .module-interlink-list>button,
+#root .app-shell .content-area .finance-engine-tabs>button,
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab{
+  flex:0 0 auto;
+  width:max-content;
+  min-width:max-content;
+  max-width:none;
+  min-height:40px;
+  height:40px;
+  padding:8px 14px;
+  border:1px solid #9ec5e5;
+  border-radius:9px;
+  background:#eaf4fc;
+  color:#123f66;
+  font-size:13px;
+  line-height:1.15;
+  font-weight:750;
+  letter-spacing:0;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  box-sizing:border-box;
+  box-shadow:0 1px 2px rgba(25,76,116,.08);
+  transform:none;
+}
+
+#root .app-shell .content-area .module-interlink-list>button:hover,
+#root .app-shell .content-area .finance-engine-tabs>button:hover,
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab:hover{
+  background:#dceefb;
+  border-color:#6fa9d8;
+  color:#0e3d65;
+  filter:none;
+  transform:none;
+}
+
+#root .app-shell .content-area .module-interlink-list>button.active,
+#root .app-shell .content-area .finance-engine-tabs>button.active,
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab.active,
+#root .app-shell .content-area .finance-engine-tabs>button[aria-selected="true"],
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab[aria-selected="true"]{
+  background:#0b5fa8;
+  border-color:#2f86cf;
+  color:#ffffff;
+  box-shadow:0 2px 5px rgba(11,95,168,.18);
+}
+
+#root .app-shell .content-area .module-interlink-list>button.active *,
+#root .app-shell .content-area .finance-engine-tabs>button.active *,
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab.active *,
+#root .app-shell .content-area .finance-engine-tabs>button[aria-selected="true"] *,
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab[aria-selected="true"] *{
+  color:#ffffff;
+}
+
+#root .app-shell .content-area .module-interlink-list>button:disabled,
+#root .app-shell .content-area .finance-engine-tabs>button:disabled,
+#root .app-shell .content-area .unified-control-tabs>.unified-control-tab:disabled{
+  min-width:max-content;
+  opacity:.55;
+  cursor:not-allowed;
+  transform:none;
+}
+
+#root .app-shell .content-area .desktop-webapp-navigation-roller{
+  overflow-x:auto;
+}
+
+#root .app-shell .content-area .desktop-webapp-navigation-roller button,
+#root .app-shell .content-area .mobile-portal-content-roller button{
+  flex:0 0 auto;
+  width:max-content;
+  min-width:max-content;
+  max-width:none;
+  white-space:nowrap;
+}
+
+@media (max-width:760px){
+  #root .app-shell .content-area .module-interlink-list,
+  #root .app-shell .content-area .finance-engine-tabs,
+  #root .app-shell .content-area .unified-control-tabs{
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    overflow-y:hidden;
+    justify-content:flex-start;
+    scrollbar-width:thin;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  #root .app-shell .content-area .module-interlink-list>button,
+  #root .app-shell .content-area .finance-engine-tabs>button,
+  #root .app-shell .content-area .unified-control-tabs>.unified-control-tab{
+    min-height:42px;
+    height:42px;
+    padding:8px 13px;
+    font-size:12px;
+  }
+}
+
+
+/* Meeting media layout: preserve a single-column flow on narrow mobile screens. */
+#root .app-shell .content-area .irpa-live-media-columns{
+  grid-template-columns:minmax(0,2fr) minmax(0,1fr);
+  min-width:0;
+}
+#root .app-shell .content-area .irpa-live-media-columns>*{min-width:0;}
+@media (max-width:760px){
+  #root .app-shell .content-area .irpa-live-media-columns{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+
+/* IRPA-DBGS SYSTEM-WIDE READABILITY POLICY
+   Applies across every portal, register, modal, card, table, workflow and device.
+   Keep all content and functionality; explicitly prevent faded/transparent text. */
+#root,
+#root .app-shell,
+#root .app-shell .content-area,
+#root .app-shell .content-area .page,
+#root .app-shell .content-area .page *,
+#root .app-shell .main-area,
+#root .app-shell .main-area *{
+  text-shadow:none;
+}
+#root .app-shell .content-area .page :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  opacity:1!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area .page :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  color:var(--text,#edf5f1);
+}
+#root .app-shell .content-area .page :is(input,select,textarea,option){
+  opacity:1!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area .page :is(input,select,textarea){
+  color:#173b2d!important;
+  background:#fff!important;
+  border:1px solid #6f9282!important;
+}
+#root .app-shell .content-area .page :is(input,select,textarea)::placeholder{
+  color:#526b60!important;
+  opacity:1!important;
+  -webkit-text-fill-color:#526b60!important;
+}
+#root .app-shell .content-area .page select option{
+  color:#173b2d!important;
+  background:#fff!important;
+}
+#root .app-shell .content-area .page button,
+#root .app-shell .content-area .page button :is(span,small,strong){
+  opacity:1!important;
+  -webkit-text-fill-color:currentColor;
+}
+#root .app-shell .content-area .page button:disabled{
+  opacity:1!important;
+  color:#fff!important;
+  background:#526b60!important;
+  border-color:#526b60!important;
+}
+#root .app-shell .content-area .page :is(.panel,.card,.modal,.dialog,.form-field,.field,.section-card,.stat-card,.table-wrap) :is(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,label,legend,small,li,dt,dd,th,td,summary,a,output,.muted,.eyebrow,.field-help,.panel-description){
+  opacity:1!important;
+  text-shadow:none!important;
+}
+@media(max-width:760px){
+  #root .app-shell .content-area .page :is(h1,h2,h3,h4,h5,h6,p,span,strong,label,legend,small,li,th,td,button,input,select,textarea){
+    line-height:1.5;
+  }
+  #root .app-shell .content-area .page :is(input,select,textarea,button){
+    font-size:max(16px,1em);
+  }
+}
+
+
+/* ==========================================================================
+   IRPA-DBGS FORM READABILITY HOTFIX — 2026-10-09
+   The app stylesheet is imported before this token stylesheet. Keep this
+   final-cascade form repair here so portal-specific styles cannot wash out
+   field labels, entered values, placeholders, or helper text.
+   Presentation only: preserve every word, field, option, workflow and role.
+   ========================================================================== */
+#root .app-shell .content-area .page .form-field > label,
+#root .app-shell .content-area .page .form-field > .field-label,
+#root .app-shell .content-area .page .signature-authority-field > label,
+#root .app-shell .content-area .page label:has(+ input),
+#root .app-shell .content-area .page label:has(+ select),
+#root .app-shell .content-area .page label:has(+ textarea) {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  opacity: 1;
+  font-weight: 700;
+}
+
+#root .app-shell .content-area .page .form-field input,
+#root .app-shell .content-area .page .form-field select,
+#root .app-shell .content-area .page .form-field textarea,
+#root .app-shell .content-area .page .form-field input[type="file"],
+#root .app-shell .content-area .page .signature-authority-field input,
+#root .app-shell .content-area .page .signature-authority-field select,
+#root .app-shell .content-area .page .signature-authority-field textarea {
+  color: #18364f;
+  -webkit-text-fill-color: #18364f;
+  background-color: #ffffff;
+  border-color: #7b91a5;
+  opacity: 1;
+  font-weight: 600;
+}
+
+#root .app-shell .content-area .page .form-field input::placeholder,
+#root .app-shell .content-area .page .form-field textarea::placeholder,
+#root .app-shell .content-area .page .signature-authority-field input::placeholder,
+#root .app-shell .content-area .page .signature-authority-field textarea::placeholder {
+  color: #526579;
+  -webkit-text-fill-color: #526579;
+  opacity: 1;
+  font-weight: 500;
+}
+
+#root .app-shell .content-area .page .form-field select option,
+#root .app-shell .content-area .page .signature-authority-field select option {
+  color: #18364f;
+  background-color: #ffffff;
+  -webkit-text-fill-color: #18364f;
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page .form-field :where(.field-help,.muted,.hint,.help-text),
+#root .app-shell .content-area .page .signature-authority-field :where(.field-help,.muted,.hint,.help-text) {
+  color: #40566b;
+  -webkit-text-fill-color: #40566b;
+  opacity: 1;
+}
+
+#root .app-shell .content-area .page .form-field :where(input,select,textarea):focus-visible,
+#root .app-shell .content-area .page .signature-authority-field :where(input,select,textarea):focus-visible {
+  outline: 3px solid #1769aa;
+  outline-offset: 2px;
+  border-color: #1769aa;
+}
+
+@media (max-width: 760px) {
+  #root .app-shell .content-area .page .form-field > label,
+  #root .app-shell .content-area .page .signature-authority-field > label {
+    font-size: 16px;
+    line-height: 1.45;
+  }
+  #root .app-shell .content-area .page .form-field input,
+  #root .app-shell .content-area .page .form-field select,
+  #root .app-shell .content-area .page .form-field textarea {
+    min-height: 48px;
+    font-size: 16px;
+  }
+}
+
+
+/* Signature Portal: responsive palette/PDF workspace repair (2026-10-11).
+   This stylesheet is imported by src/main.jsx after app.css, so these rules are live. */
+.signature-workflow-grid{min-width:0;width:100%;max-width:100%;}
+.signature-workflow-grid>*{min-width:0;max-width:100%;box-sizing:border-box;}
+.signature-field-palette{overflow-x:hidden!important;overscroll-behavior:contain;scrollbar-gutter:stable;}
+.signature-field-palette button{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.4!important;font-size:14px!important;}
+.signature-field-palette img{max-width:100%;height:auto;max-height:72px;object-fit:contain;}
+@media (max-width: 1100px){
+ .signature-workflow-grid{grid-template-columns:minmax(0,1fr)!important;gap:12px!important;}
+ .signature-field-palette{max-height:78vh!important;overflow:auto!important;}
+ .signature-field-palette[aria-expanded="false"]{max-height:52px!important;overflow:hidden!important;}
+ .signature-workflow-grid canvas,.signature-workflow-grid iframe,.signature-workflow-grid object{max-width:100%;}
+}
+@media (max-width: 600px){
+ .signature-workflow-grid{margin-top:12px!important;min-height:0!important;}
+ .signature-field-palette{padding:12px!important;border-radius:10px!important;}
+ .signature-field-palette button{padding:10px!important;min-height:48px!important;font-size:14px!important;}
+ .signature-field-palette img{max-height:64px!important;}
+ .signature-workflow-grid .panel{min-width:0;max-width:100%;}
+}
