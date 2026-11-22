@@ -15,7 +15,6 @@ test("diagnostic marks archive permission unavailable without attempting a write
 
 test("finalisation dry-run accepts the three supported owner identity fields and still denies outsiders",async()=>{
  const {ctx}=await fixture();
- const env=await ctx.meta.get("envelopes","ENV-DRYRUN-001");
  await ctx.meta.update("envelopes","ENV-DRYRUN-001",{createdBy:undefined,createdByUid:"owner-1"});
  const ownerReport=await diagnoseFinalisation(ctx,{uid:"owner-1"},"ENV-DRYRUN-001");
  assert.equal(ownerReport.readOnly,true);
