@@ -15,7 +15,7 @@ const document = (collection, id, data, updateTime = "2026-10-10T00:00:00.000Z")
   updateTime,
   fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, field(v)]))
 });
-const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "organizer-1", email: "organizer@example.org" }, onCommit = () => {} } = {}) => {
+const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "organizer-1", email: "organizer@example.org" }, onCommit = () => {}, members = [], employees = [], departments = [] } = {}) => {
   const calls = [];
   const ctx = {
     authenticateFirebaseRequest: async () => user,
@@ -29,6 +29,11 @@ const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "
   globalThis.fetch = async (url, init = {}) => {
     const target = new URL(url);
     calls.push({ url: target, init });
+    if (target.pathname.endsWith("/documents:runQuery")) {
+      const collection = JSON.parse(init.body || "{}").structuredQuery?.from?.[0]?.collectionId;
+      const records = collection === "members" ? members : collection === "employees" ? employees : collection === "institutionalDepartments" ? departments : [];
+      return new Response(JSON.stringify(records.map((row, index) => ({ document: document(collection, row.id || row.uid || row.employeeNumber || row.memberNumber || "seed-" + index, row) }))), { status: 200 });
+    }
     if (target.pathname.endsWith("/documents:commit")) {
       onCommit(JSON.parse(init.body));
       return new Response(JSON.stringify({ commitTime: new Date().toISOString() }), { status: 200 });
@@ -145,4 +150,31 @@ test("revoking the last active meeting access pass removes meeting read access a
   assert.ok(committed.writes.some(write=>write.update?.fields?.status?.stringValue==="Revoked"));
   assert.ok(committed.writes.some(write=>write.update?.fields?.invitedEmails?.arrayValue?.values?.length===0&&write.update?.fields?.participantEmails?.arrayValue?.values?.length===0));
   assert.ok(committed.writes.some(write=>write.update?.fields?.meetingAccessRevoked?.booleanValue===true&&write.update?.fields?.meetingAccessDispatched?.booleanValue===false));
+});
+
+test("registered Director of Internal Oversight can issue Meeting Portal access through the shared resolver", async () => {
+  const { ctx } = ctxFor({
+    user: { user_id: "oversight-user", email: "oversight@example.org" },
+    members: [{ id: "member-oversight", uid: "oversight-user", email: "oversight@example.org", status: "Active", role: "Director of Internal Oversight" }],
+    meeting: { id: "meeting-1", data: { initiatorUid: "different-user", title: "Operations Meeting", invitedParticipantIds: [], invitedEmails: [] } },
+    participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-access/issue", { meetingId: "meeting-1", participantId: "participant-1" });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).ok, true);
+});
+
+test("Meeting Portal denial identifies attempted duty, active register authority and allowed roles", async () => {
+  const { ctx } = ctxFor({
+    user: { user_id: "ordinary-member", email: "member@example.org" },
+    members: [{ id: "member-1", uid: "ordinary-member", email: "member@example.org", status: "Active", role: "Member" }],
+    meeting: { id: "meeting-1", data: { initiatorUid: "different-user", title: "Operations Meeting", invitedParticipantIds: [], invitedEmails: [] } },
+    participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-access/issue", { meetingId: "meeting-1", participantId: "participant-1" });
+  assert.equal(response.status, 403);
+  const body = await response.json();
+  assert.match(body.error, /Denied duty: issue meeting access/);
+  assert.match(body.error, /Active register authority: Member \[Members\]/);
+  assert.match(body.error, /Roles allowed:.*Director of Internal Oversight.*Executive Director.*Head of Department/);
 });
