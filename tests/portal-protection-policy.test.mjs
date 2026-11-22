@@ -22,7 +22,7 @@ const valid = {
     behaviourDifferences: []
   }
 };
-const windowState = { status: "open", openedAt: "2026-11-19T18:00:00Z", scope: [file] };
+const windowState = { status: "open", openedAt: "2026-11-19T18:00:00Z", expiresAt: "2026-11-22T18:00:00Z", durationHours: 72, scope: [file] };
 const run = (changedFiles, record = valid, win = windowState, activity = "2026-11-19T19:59:00Z") =>
   evaluatePolicy({ changedFiles, registry, record, windowState: win, latestActivityAt: activity, now });
 
@@ -32,7 +32,7 @@ test("active amendment file declarations extend the original change record", () 
   const amended = { ...valid, declaration: { ...valid.declaration, files: [] }, activeAmendment: { files: [file] } };
   assert.equal(run([file], amended).ok, true);
 });
-test("24-hour inactivity closes the window", () => assert.equal(run([file], valid, windowState, "2026-11-18T19:59:00Z").ok, false));
+test("72-hour inactivity closes the window", () => assert.equal(run([file], valid, windowState, "2026-11-18T19:59:00Z").ok, false));
 test("out-of-scope protected change fails", () => assert.equal(run([file], valid, { ...windowState, scope: ["src/pages/Invitations.jsx"] }).ok, false));
 test("multi-portal shared dependency changes fail even with a complete shared record", () => {
   const result = run(["src/App.jsx"], { ...valid, declaration: { ...valid.declaration, affectedPortals: Object.keys(registry.portals), files: ["src/App.jsx"] }, validation: { ...valid.validation, portalSmoke: Object.fromEntries(Object.keys(registry.portals).map(p => [p, "PASS"])) } }, { ...windowState, scope: ["src/App.jsx"] });
@@ -43,11 +43,11 @@ test("multi-portal shared dependency changes fail even with a complete shared re
 test("unrelated change passes without a repair window", () => assert.equal(run(["README.md"], null, null).ok, true));
 
 test("a new commit cannot silently reopen a window after a 24-hour gap", () => {
-  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState, activityTimestamps: ["2026-11-19T18:30:00Z", "2026-11-20T19:00:00Z"], now: Date.parse("2026-11-20T19:01:00Z") });
+  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState, activityTimestamps: ["2026-11-19T18:30:00Z", "2026-11-22T19:00:00Z"], now: Date.parse("2026-11-22T19:01:00Z") });
   assert.equal(result.ok, false);
 });
 test("a fresh declaration reopens after an earlier closure", () => {
-  const reopened = { ...windowState, openedAt: "2026-11-20T18:00:00Z" };
+  const reopened = { ...windowState, openedAt: "2026-11-20T18:00:00Z", expiresAt: "2026-11-23T18:00:00Z" };
   const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState: reopened, activityTimestamps: ["2026-11-19T19:00:00Z", "2026-11-20T18:30:00Z"], now: Date.parse("2026-11-20T18:31:00Z") });
   assert.equal(result.ok, true);
 });
@@ -102,4 +102,24 @@ test("portal smoke PASS requires portal-specific real-run evidence", () => {
   const result = run([file], missingPortalLink);
   assert.equal(result.ok, false);
   assert.match(result.reason, /portal-specific real-run smoke links/);
+});
+
+test("72-hour expiry is mandatory and an expired window fails", () => {
+  const expired = { ...windowState, expiresAt: "2026-11-22T17:59:59Z" };
+  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState: expired, latestActivityAt: "2026-11-22T17:00:00Z", now: Date.parse("2026-11-22T18:00:00Z") });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /72-hour/);
+});
+
+test("warning is emitted below 12 hours remaining without bypassing other checks", () => {
+  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState, latestActivityAt: "2026-11-22T06:00:00Z", now: Date.parse("2026-11-22T07:00:00Z") });
+  assert.equal(result.ok, true);
+  assert.match(result.warning, /less than 12 hours/);
+});
+
+test("break-glass expires after 24 hours even though repair windows last 72 hours", () => {
+  const emergency = { ...windowState, emergency: true, emergencyExpiresAt: "2026-11-20T18:00:00Z" };
+  const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState: emergency, latestActivityAt: "2026-11-20T17:00:00Z", now: Date.parse("2026-11-20T18:00:01Z") });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /24-hour break-glass/);
 });
