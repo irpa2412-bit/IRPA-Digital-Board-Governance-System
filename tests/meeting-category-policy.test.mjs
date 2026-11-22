@@ -6,7 +6,8 @@ import {
   canRegisterMeeting,
   canEditMeeting,
   canVoteInMeeting,
-  meetingCapabilities
+  meetingCapabilities,
+  resolveMeetingAuthorityForIdentity
 } from "../src/firebase/meetingPolicy.js";
 
 const governance = {
@@ -97,4 +98,21 @@ test("meeting reads use the server-authorized Cloudflare gateway", () => {
   assert.doesNotMatch(source, /getDocs|collection\(db/);
   assert.match(meetingDataSource, /collectionName===COLLECTIONS\.meetings\)return getAccessibleMeetingRecords\(\)/);
   assert.match(meetingDataSource, /collectionName===COLLECTIONS\.meetings\)\{const result=await callMeetingGateway\("\/api\/meeting-register\/get"/);
+});
+
+test("full register authority grants all Meeting Portal screen duties without changing category quorum policy",()=>{
+  const identity={uid:"oversight-1",active:true,fullMeetingAccess:true};
+  assert.equal(canRegisterMeeting(identity),true);
+  assert.equal(canAccessMeetingCategory(governance,identity),true);
+  assert.equal(canEditMeeting({...governance,registerStatus:"Registered"},identity),true);
+  assert.equal(canVoteInMeeting(governance,identity),true);
+  assert.equal(meetingCapabilities(governance).quorumRequired,true);
+});
+
+test("screen grant is derived by the same resolver and does not infer from department text",()=>{
+  const grant=resolveMeetingAuthorityForIdentity({uid:"ed"},{employees:[{uid:"ed",status:"Active",role:"Executive Director"}]});
+  assert.equal(grant.fullMeetingAccess,true);
+  assert.equal(canEditMeeting({...governance,registerStatus:"Registered"},{uid:"ed",active:grant.active,fullMeetingAccess:grant.fullMeetingAccess}),true);
+  const noGrant=resolveMeetingAuthorityForIdentity({uid:"staff"},{employees:[{uid:"staff",status:"Active",department:"Executive Director Office"}]});
+  assert.equal(noGrant.fullMeetingAccess,false);
 });
