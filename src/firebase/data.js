@@ -3,9 +3,10 @@ import { auth, db, applicantAuth, applicantDb, applicantApp } from "./config";
 import { getGoogleDriveGatewayUrl } from "./gatewayUrl";
 import { sendEmployeeRegistrationEmail } from "./employeeRegistrationEmail";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { canAccessMeetingCategory, MEETING_CATEGORIES } from "./meetingPolicy.js";
+import { canAccessMeetingCategory, MEETING_CATEGORIES, resolveMeetingAuthority } from "./meetingPolicy.js";
 import { listLifecycleDocuments } from "./documentLifecycle.js";
 import { reconcileRegisteredIdentityUidsViaGateway } from "./registeredIdentityReconciliation";
+import { callMeetingService as callMeetingGateway } from "./meetingGatewayApi";
 
 const uniqueInductionValues=(values)=>[...new Set(values.flatMap(v=>Array.isArray(v)?v:String(v||"").split(",")).map(v=>String(v||"").trim()).filter(Boolean))];
 
@@ -64,8 +65,8 @@ export async function updateEmployee(id,data){if(!id)throw new Error("An employe
 export async function createEmployeeProfile(data){const uid=data.uid||auth.currentUser?.uid;if(!uid)throw new Error("A Firebase Authentication UID is required.");const existing=await getRecord(COLLECTIONS.employees,uid);if(existing)return existing;const email=data.email?.trim().toLowerCase();if(email){const q=await getDocs(query(collection(db,COLLECTIONS.employees),where("email","==",email)));if(!q.empty)return q.docs[0]&&{id:q.docs[0].id,...q.docs[0].data()};}const employeeNumber=data.employeeNumber||await generateEmployeeNumber();await setDoc(doc(db,COLLECTIONS.employees,uid),{...data,uid,email,employeeNumber,status:data.status||"Active",createdAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:false});await writeAudit("CREATE_EMPLOYEE_PROFILE",COLLECTIONS.employees,uid,{employeeNumber,role:data.role||"",department:data.department||""});return getRecord(COLLECTIONS.employees,uid);}
 export async function provisionCurrentMemberFromInvitation(invitationId){const uid=auth.currentUser?.uid;const email=auth.currentUser?.email?.trim().toLowerCase();if(!uid||!email||!invitationId)return null;const invitation=await getRecord(COLLECTIONS.invitations,invitationId);if(!invitation)throw new Error("The member invitation could not be found.");if(invitation.email?.trim().toLowerCase()!==email)throw new Error("This invitation is not assigned to the authenticated email address.");if(invitation.status==="Cancelled")throw new Error("This member invitation has been cancelled.");const role=invitation.role||"Board Member";const memberType=invitation.memberType||"Governance Member";const member=await createMemberProfile(uid,{invitationId,email,name:invitation.name||"",role,memberType,status:"Active"});const employeeRoles=["Executive Director","Director Human Resources","HR Manager","Director Finance & Administration","Finance Personnel","Finance Manager","Accountant","Finance Officer","Director Internal Oversight","Internal Oversight Officer","Secretariat","Procurement Officer","Programme/Technical Officer","Management","Operations Manager","Rangeland Officer","Livestock Officer","Outreach Officer","Community Development Officer","Environment Officer","HR Officer","IT Specialist","Information Technology Officer","Employee"];if(employeeRoles.includes(role))await createEmployeeProfile({uid,email,name:invitation.name||"",role,department:invitation.department||"",employmentType:invitation.employmentType||"Employee",status:"Active",invitationId});return member;}
 /* Trial mode may READ real institutional registers as reference data. Isolation applies to writes: newly created operational records are tagged TRIAL and actual records cannot be modified or deleted through the shared record helpers. */
-export async function getRecord(collectionName,id){const s=await getDoc(doc(db,collectionName,id));if(!s.exists())return null;return{id:s.id,...(s.data()||{})};}
-export async function getRecords(collectionName){const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
+export async function getRecord(collectionName,id){if(collectionName===COLLECTIONS.meetings){const result=await callMeetingGateway("/api/meeting-register/get",{meetingId:id});return result.meeting||null;}const s=await getDoc(doc(db,collectionName,id));if(!s.exists())return null;return{id:s.id,...(s.data()||{})};}
+export async function getRecords(collectionName){if(collectionName===COLLECTIONS.meetings)return getAccessibleMeetingRecords();const s=await getDocs(query(collection(db,collectionName),orderBy("createdAt","desc")));return s.docs.map(x=>({id:x.id,...x.data()}));}
 
 // Read participant/invitation records only within meetings the caller is authorized to access.
 // Firestore rules remain authoritative for every returned document; this helper does not broaden access.
@@ -83,53 +84,8 @@ export async function getMeetingScopedRecords(collectionName,meetingIds=[]){
 }
 export async function getFinanceTrialRecords(collectionName){const ref=collection(db,collectionName);const queries=[query(ref,where("recordOrigin","==","TRIAL")),query(ref,where("trialData","==",true)),query(ref,where("isTrial","==",true))];const results=await Promise.all(queries.map(q=>getDocs(q)));const byId=new Map();for(const snap of results){for(const item of snap.docs){const data=item.data()||{};if(String(data.recordOrigin||"").toUpperCase()==="TRIAL"||data.trialData===true||data.isTrial===true)byId.set(item.id,{id:item.id,...data});}}return[...byId.values()].sort((a,b)=>{const at=a.createdAt?.toMillis?a.createdAt.toMillis():Date.parse(a.createdAt||"")||0;const bt=b.createdAt?.toMillis?b.createdAt.toMillis():Date.parse(b.createdAt||"")||0;return bt-at;});}
 export async function getAccessibleMeetingRecords(){
-  const user=auth.currentUser;
-  if(!user?.uid)throw new Error("Sign in to view the meeting register.");
-  const email=String(user.email||"").trim().toLowerCase();
-  const [member,employee,token,adminProfile]=await Promise.all([
-    getCurrentMemberProfile().catch(()=>null),
-    getCurrentEmployeeProfile().catch(()=>null),
-    user.getIdTokenResult().catch(()=>null),
-    getRecord(COLLECTIONS.adminProfiles,user.uid).catch(()=>null)
-  ]);
-  const activeStatus=record=>["active","activated"].includes(String(record?.status||record?.employmentStatus||record?.registrationStatus||"").trim().toLowerCase());
-  const activeMember=!!member&&activeStatus(member);
-  const activeEmployee=!!employee&&activeStatus(employee);
-  const isAdmin=email==="irpa2412@gmail.com"||token?.claims?.admin===true||adminProfile?.active===true;
-  const profiles=[member||{},employee||{}];
-  const roles=[...new Set(profiles.flatMap(p=>[
-    p.role,p.title,p.position,p.departmentalRole,p.boardPosition,
-    ...(Array.isArray(p.roles)?p.roles:[]),
-    ...(Array.isArray(p.assignedRoles)?p.assignedRoles:[]),
-    ...(Array.isArray(p.selectedRoles)?p.selectedRoles:[]),
-    ...(Array.isArray(p.roleAssignments)?p.roleAssignments:[]),
-    ...(Array.isArray(token?.claims?.irpaRoles)?token.claims.irpaRoles:[])
-  ]).map(v=>String(v||"").trim()).filter(Boolean))];
-  const identity={...(member||employee||{}),uid:user.uid,email,active:activeMember||activeEmployee,isAdmin,activeMember,activeEmployee,roles};
-  // Never issue an unscoped collection read: Firestore rules cannot safely prove access
-  // to every meeting in a collection. Use category-authorized and explicit-invitation
-  // queries, then apply the same policy filter to the merged records.
-  const ref=collection(db,COLLECTIONS.meetings);
-  const jobs=[];
-  for(const policy of Object.values(MEETING_CATEGORIES)){
-    if(!canAccessMeetingCategory({meetingCategory:policy.id,meetingPolicyId:policy.id},identity))continue;
-    jobs.push(query(ref,where("meetingCategory","==",policy.id)));
-    jobs.push(query(ref,where("meetingPolicyId","==",policy.id)));
-    for(const type of policy.meetingTypes)jobs.push(query(ref,where("meetingType","==",type)));
-  }
-  const uid=user.uid;
-  jobs.push(query(ref,where("initiatorUid","==",uid)));
-  for(const field of ["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"])jobs.push(query(ref,where(field,"array-contains",uid)));
-  if(email)for(const field of ["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"])jobs.push(query(ref,where(field,"array-contains",email)));
-  const results=await Promise.all(jobs.map(q=>getDocs(q).catch(()=>null)));
-  const records=new Map();
-  results.forEach(s=>s?.docs?.forEach(d=>records.set(d.id,{id:d.id,...d.data()})));
-  return [...records.values()].filter(m=>canAccessMeetingCategory(m,identity,{
-    isInitiator:String(m.initiatorUid||"")===uid,
-    isInvited:["participantUids","attendeeUids","memberUids","invitedUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))||
-      (email&&["participantEmails","attendeeEmails","invitedEmails","subscriberEmails"].some(k=>Array.isArray(m[k])&&m[k].map(v=>String(v||"").toLowerCase()).includes(email))),
-    isRegisteredParticipant:["participantUids","attendeeUids","memberUids","subscriberUids"].some(k=>Array.isArray(m[k])&&m[k].includes(uid))
-  })).sort((a,b)=>meetingCreatedAt(b)-meetingCreatedAt(a));
+  const result=await callMeetingGateway("/api/meeting-register/list",{});
+  return Array.isArray(result.meetings)?result.meetings:[];
 }
 function meetingCreatedAt(record={}){const value=record.createdAt;return typeof value?.toMillis==="function"?value.toMillis():typeof value==="number"?value:Date.parse(value||"")||0;}
 
@@ -241,6 +197,22 @@ function mergeInstitutionalRecords(records=[]){
 
 export async function getCurrentMemberProfile(){const uid=auth.currentUser?.uid;const email=String(auth.currentUser?.email||"").trim().toLowerCase();if(!uid)return null;const records=[];const direct=await getRecord(COLLECTIONS.members,uid).catch(()=>null);if(direct)records.push(direct);const queries=[];if(email)queries.push(query(collection(db,COLLECTIONS.members),where("email","==",email)));if(email)queries.push(query(collection(db,COLLECTIONS.members),where("firebaseAuthEmail","==",email)));queries.push(query(collection(db,COLLECTIONS.members),where("uid","==",uid)));const snaps=await Promise.all(queries.map(q=>getDocs(q).catch(()=>null)));snaps.forEach(s=>s?.docs?.forEach(x=>records.push({id:x.id,...x.data()})));return mergeInstitutionalRecords(records);}
 export async function getCurrentEmployeeProfile(options={}){const uid=auth.currentUser?.uid;const email=String(auth.currentUser?.email||"").trim().toLowerCase();if(!uid)return null;const records=[];const collect=(snap)=>{if(snap?.docs?.length)snap.docs.forEach(x=>records.push({id:x.id,...x.data()}));};const direct=await getRecord(COLLECTIONS.employees,uid).catch(()=>null);if(direct)records.push(direct);const identityQueries=[];if(email)identityQueries.push(query(collection(db,COLLECTIONS.employees),where("email","==",email)));if(email)identityQueries.push(query(collection(db,COLLECTIONS.employees),where("firebaseAuthEmail","==",email)));identityQueries.push(query(collection(db,COLLECTIONS.employees),where("uid","==",uid)));const identitySnaps=await Promise.all(identityQueries.map(q=>getDocs(q).catch(()=>null)));identitySnaps.forEach(collect);const administratorUid=String(options?.administratorUid||"").trim();if(!records.length&&administratorUid){for(const field of ["administratorUid","adminUid","linkedAdministratorUid"]){const snap=await getDocs(query(collection(db,COLLECTIONS.employees),where(field,"==",administratorUid))).catch(()=>null);collect(snap);if(records.length)break;}}if(!records.length&&options?.fallbackName){const name=String(options.fallbackName||"").trim();if(name){const snap=await getDocs(query(collection(db,COLLECTIONS.employees),where("name","==",name))).catch(()=>null);if(snap?.docs?.length===1)records.push({id:snap.docs[0].id,...snap.docs[0].data()});else if(!snap||snap.empty){const all=await getDocs(collection(db,COLLECTIONS.employees)).catch(()=>null);const normalizedName=name.toLowerCase().replace(/\\s+/g," ").trim();const matches=all?.docs?.map(x=>({id:x.id,...x.data()})).filter(x=>String(x.name||"").toLowerCase().replace(/\\s+/g," ").trim()===normalizedName)||[];if(matches.length===1)records.push(matches[0]);}}}return mergeInstitutionalRecords(records);}
+export async function getCurrentMeetingAuthority(){
+  const user=auth.currentUser;
+  if(!user?.uid)return {active:false,fullMeetingAccess:false,roles:[],registers:[]};
+  const [memberSnap,employeeSnap,departmentSnap]=await Promise.all([
+    getDocs(collection(db,COLLECTIONS.members)),
+    getDocs(collection(db,COLLECTIONS.employees)),
+    getDocs(collection(db,"institutionalDepartments")).catch(()=>({docs:[]}))
+  ]);
+  const members=memberSnap.docs.map(item=>({id:item.id,...item.data()}));
+  const employees=employeeSnap.docs.map(item=>({id:item.id,...item.data()}));
+  const departments=departmentSnap.docs.map(item=>({id:item.id,...item.data()}));
+  const memberNumbers=members.filter(record=>[record.uid,record.authUid,record.userUid,record.email,record.firebaseAuthEmail].some(value=>String(value||"").trim().toLowerCase()===String(user.uid||"").toLowerCase()||String(value||"").trim().toLowerCase()===String(user.email||"").toLowerCase())).map(record=>record.memberNumber||record.registrationNumber).filter(Boolean);
+  const employeeNumbers=employees.filter(record=>[record.uid,record.authUid,record.userUid,record.email,record.firebaseAuthEmail].some(value=>String(value||"").trim().toLowerCase()===String(user.uid||"").toLowerCase()||String(value||"").trim().toLowerCase()===String(user.email||"").toLowerCase())).map(record=>record.employeeNumber).filter(Boolean);
+  return resolveMeetingAuthority({uid:user.uid,email:user.email,memberNumbers,employeeNumbers},{members,employees,departments});
+}
+
 export async function getCurrentAuditorProfile(){
  const uid=auth.currentUser?.uid;
  const email=String(auth.currentUser?.email||"").trim().toLowerCase();

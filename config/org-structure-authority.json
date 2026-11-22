@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "status": "OWNER-APPROVED FOR ROLE-DUTY IMPLEMENTATION AND PROFILE OPERATIONALISATION — runtime permissions remain separately governed",
+  "status": "OWNER-APPROVED ROLE-DUTY POLICY AND OCCUPANCY BASELINE UPDATED — runtime permissions remain separately governed",
   "sourceOfTruth": "This configuration records IRPA's constitutional governance, confirmed interim personnel baseline and authority design. It does not itself appoint a person, create a delegation, amend a bank mandate or grant runtime permissions. Current appointment, employment, volunteer assignment, bank mandate and server-side authorization records remain authoritative.",
   "principles": {
     "allPositions": "Position occupancy is recorded only where confirmed by the owner; confirmed interim volunteers are labelled as volunteers; all other positions remain VACANT or UNCONFIRMED until an approved appointment is recorded.",
@@ -973,7 +973,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -1000,8 +1000,11 @@
         "Cannot approve own expenses or own work.",
         "Finance approver cannot sign the same item they approved."
       ],
-      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
-      "appointmentStatus": "VACANT"
+      "accessStatus": "DENY_UNTIL_IDENTITY_ASSIGNMENT_SCOPE_AND_SERVER_AUTHORIZATION_VERIFIED",
+      "appointmentStatus": "OCCUPIED — ENGAGEMENT CATEGORY NOT VERIFIED",
+      "engagementStatus": "OWNER-CONFIRMED OCCUPIED; EMPLOYEE/VOLUNTEER CLASSIFICATION NOT VERIFIED",
+      "operationalAccessModel": "FULL_OPERATIONAL_ACCESS_FOR_VERIFIED_ASSIGNED_DUTIES",
+      "operationalAccessPrerequisite": "Verified identity + current appointment/volunteer assignment + approved duty scope + server-enforced authorization"
     },
     {
       "id": "director-livestock",
@@ -1749,7 +1752,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -1776,9 +1779,11 @@
         "Cannot approve own expenses or own work.",
         "Finance approver cannot sign the same item they approved."
       ],
-      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "accessStatus": "DENY_UNTIL_IDENTITY_ASSIGNMENT_SCOPE_AND_SERVER_AUTHORIZATION_VERIFIED",
       "appointmentStatus": "VOLUNTEER_ACTIVE",
-      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY; OFFICIAL DUTIES UNDER EXECUTIVE DIRECTOR SUPERVISION",
+      "operationalAccessModel": "FULL_OPERATIONAL_ACCESS_FOR_VERIFIED_ASSIGNED_DUTIES",
+      "operationalAccessPrerequisite": "Verified identity + current appointment/volunteer assignment + approved duty scope + server-enforced authorization"
     },
     {
       "id": "programme-technical-officer",
@@ -1923,7 +1928,7 @@
         "Maintain complete, accurate and attributable records for assigned work.",
         "Follow approved policies, safeguarding, confidentiality and audit requirements."
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -1950,9 +1955,11 @@
         "Cannot approve own expenses or own work.",
         "Finance approver cannot sign the same item they approved."
       ],
-      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "accessStatus": "DENY_UNTIL_IDENTITY_ASSIGNMENT_SCOPE_AND_SERVER_AUTHORIZATION_VERIFIED",
       "appointmentStatus": "VOLUNTEER_ACTIVE",
-      "engagementStatus": "VOLUNTEER — PRELIMINARY COLLEGE TRAINING; SUPERVISED SUPPORT ONLY"
+      "engagementStatus": "VOLUNTEER — PRELIMINARY COLLEGE TRAINING; OFFICIAL DUTIES UNDER EXECUTIVE DIRECTOR SUPERVISION; TASK COMPETENCE AND SYSTEM DUTY SCOPE MUST BE RECORDED",
+      "operationalAccessModel": "FULL_OPERATIONAL_ACCESS_FOR_VERIFIED_ASSIGNED_DUTIES",
+      "operationalAccessPrerequisite": "Verified identity + current appointment/volunteer assignment + approved duty scope + server-enforced authorization"
     },
     {
       "id": "information-technology-officer",
@@ -3110,7 +3117,7 @@
         "Support implementation planning and reporting",
         "Escalate commitments and approvals to the authorised management authority"
       ],
-      "positionsRequired": "1 — VACANT",
+      "positionsRequired": "1 — OCCUPIED",
       "qualifications": "DRAFT: relevant recognised qualification and demonstrated experience in the assigned discipline; final criteria require HR and legal review.",
       "workflows": {
         "mayInitiate": [],
@@ -3135,10 +3142,12 @@
         "Cannot approve own expenses or own work.",
         "Finance approver cannot sign the same item they approved."
       ],
-      "accessStatus": "DENY_UNTIL_RULES_AND_OWNER_APPROVAL",
+      "accessStatus": "DENY_UNTIL_IDENTITY_ASSIGNMENT_SCOPE_AND_SERVER_AUTHORIZATION_VERIFIED",
       "appointmentStatus": "VOLUNTEER_ACTIVE",
       "knownVolunteerDesignation": "Programme Officer",
-      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY"
+      "engagementStatus": "VOLUNTEER — LIMITED AVAILABILITY; OFFICIAL DUTIES UNDER EXECUTIVE DIRECTOR SUPERVISION",
+      "operationalAccessModel": "FULL_OPERATIONAL_ACCESS_FOR_VERIFIED_ASSIGNED_DUTIES",
+      "operationalAccessPrerequisite": "Verified identity + current appointment/volunteer assignment + approved duty scope + server-enforced authorization"
     }
   ],
   "compatibilityAliasCandidates": [
@@ -3686,5 +3695,32 @@
       "This approval does not grant system permissions, Firebase claims, administrator access, financial/procurement approval, signature authority or bank-signatory status.",
       "Current appointment, engagement, volunteer assignment and individual register records remain authoritative."
     ]
+  },
+  "operationalAccessPolicy": {
+    "status": "OWNER-APPROVED_POLICY_DESIGN — NOT A RUNTIME GRANT",
+    "principle": "Every person with a current, verified appointment or formal volunteer assignment receives all operational modules, records and workflows reasonably required to execute the duties expressly assigned to them. Volunteer status alone is not a reason to withhold operational access.",
+    "supervision": "Volunteer official duties are performed under Executive Director supervision and within the approved job description, written assignment and any documented delegation. The Executive Director may define, adjust and withdraw operational duty scope through the controlled governance process.",
+    "grantPrerequisites": [
+      "Verified institutional identity bound to the user's authenticated UID",
+      "Current appointment or formal volunteer assignment recorded in the authoritative personnel register",
+      "Approved job description and explicit duty/module/record scope",
+      "Written Executive Director assignment or delegation where required",
+      "Server-side authorization enforcing the same scope on every read and write path",
+      "Separation-of-duties and audit controls tested for the assigned workflow"
+    ],
+    "accessMeaning": "FULL_OPERATIONAL_ACCESS means complete access to the operational capabilities needed for assigned duties, not unrestricted system-owner, security, finance, procurement, signature, audit, research-clearance or production-release authority.",
+    "reservedCapabilities": [
+      "Primary administrator and account/security administration",
+      "Firebase/Cloudflare secrets, infrastructure and production deployment",
+      "Firestore rules publication and actual-data gate control",
+      "Financial approval, payment execution and bank signatory powers",
+      "Procurement approval, tender evaluation and contract execution",
+      "Signature authority and legally binding release",
+      "Independent audit approval or alteration of audit evidence",
+      "Restricted research data absent named clearance and approved purpose",
+      "Board-reserved governance decisions and approvals"
+    ],
+    "default": "DENY until identity, assignment, duty scope and server-enforced authorization are verified. This policy object does not itself grant permissions or change Firebase claims/rules.",
+    "noStatusInference": "Owner-confirmed occupancy does not establish engagement category, identity binding, appointment instrument, availability or delegated authority unless those are separately recorded."
   }
 }
