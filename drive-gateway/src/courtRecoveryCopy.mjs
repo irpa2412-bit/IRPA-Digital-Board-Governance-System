@@ -17,8 +17,9 @@ export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId) {
     throw new HttpError(409,"Only an archive-pending finalisation can provide an unarchived copy.");
   const pending=envelope.completion?.archivePending;
   const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
+  const runtimeDataEnvironment=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
   const dataEnvironment=String(envelope.dataEnvironment||"").trim().toUpperCase();
-  if(!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment)||!pending?.environment||String(pending.environment).toUpperCase()!==dataEnvironment||(runtimeEnvironment==="staging"&&dataEnvironment==="ACTUAL"))
+  if(!runtimeDataEnvironment||runtimeDataEnvironment!==dataEnvironment||!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment)||!pending?.environment||String(pending.environment).toUpperCase()!==dataEnvironment)
     throw new HttpError(409,"The preserved copy environment does not match the envelope data environment.");
   if(!pending?.storageId||!pending?.finalHash)
     throw new HttpError(409,"No preserved ARCHIVE_PENDING PDF is available.");
