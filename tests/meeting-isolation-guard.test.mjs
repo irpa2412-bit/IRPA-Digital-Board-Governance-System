@@ -193,7 +193,7 @@ test("workflow delegates its source-isolation gate to the extracted guard script
 });
 
 test("only stale runs for the same pull request are cancelled", () => {
-  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}"));
+  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('ref-{0}-sha-{1}', github.ref, github.sha) }}"));
   assert.ok(workflow.includes("cancel-in-progress: false"));
   assert.doesNotMatch(workflow, /^\\s*push:/m);
 });
