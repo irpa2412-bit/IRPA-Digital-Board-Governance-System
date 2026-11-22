@@ -123,6 +123,7 @@
         "src/firebase/meetingGatewayApi.js",
         "src/firebase/meetingPolicy.js",
         "src/firebase/meetingAttendanceSigning.js",
+        "src/firebase/signaturePlatform.js",
         "src/firebase/meetingRecords.js",
         "drive-gateway/src/meetingPortal.mjs",
         "drive-gateway/src/meetingServices.mjs",
