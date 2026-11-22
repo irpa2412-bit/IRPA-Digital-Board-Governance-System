@@ -22,17 +22,33 @@ jobs:
           probe() {
             local label="$1"
             local path="$2"
+            local method="${3:-GET}"
             local body_file status
             body_file="$(mktemp)"
-            status="$(curl --silent --show-error --max-time 20 --output "$body_file" --write-out '%{http_code}' "$BASE$path" || true)"
-            printf '%s status=%s body=' "$label" "${status:-000}"
-            head -c 100 "$body_file" | tr '\n' ' '
+            if [[ "$method" == "POST" ]]; then
+              status="$(curl --silent --show-error --max-time 20 --output "$body_file" --write-out '%{http_code}' -X POST -H "Content-Type: application/json" -d '{}' "$BASE$path" || true)"
+            else
+              status="$(curl --silent --show-error --max-time 20 --output "$body_file" --write-out '%{http_code}' "$BASE$path" || true)"
+            fi
+            printf '%s method=%s status=%s body=' "$label" "$method" "${status:-000}"
+            head -c 160 "$body_file" | tr '\n' ' '
             printf '\n'
+            if [[ "$label" == "nonsense" ]]; then
+              [[ "$status" == "404" ]] || { echo "FAIL: nonsense route must return 404." >&2; exit 1; }
+            else
+              [[ "$status" == "401" || "$status" == "403" ]] || { echo "FAIL: protected route must return 401 or 403." >&2; exit 1; }
+              node - "$body_file" <<'NODE'
+          const fs=require("node:fs");
+          const body=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          if(body?.ok!==false || typeof body?.error!=="string" || !/auth|sign.?in|login|credential|session/i.test(body.error)) {
+            throw new Error("Protected route did not return the expected JSON sign-in/authentication message.");
+          }
+          NODE
+            fi
             rm -f "$body_file"
           }
-          probe "evidence-envelope-id" "/api/recovery/envelopes/ENV-0000000000000000/evidence"
-          probe "evidence-document-reference-id" "/api/recovery/envelopes/IRPA-ENV-2026-00000000/evidence"
-          probe "recovery-queue" "/api/recovery/envelopes"
+          probe "evidence-envelope-id" "/api/recovery/envelopes/IRPA-ENV-2026-11501354/evidence"
+          probe "dry-run-finalisation" "/api/envelopes/IRPA-ENV-2026-11501354/diagnose-finalisation" POST
           probe "nonsense" "/__signature_recovery_route_probe_not_a_real_route__"
 
 # Re-probe trigger: authenticated-route boundary verification only.
