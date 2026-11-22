@@ -1,8 +1,8 @@
 PR #845 is merged and deployed; the three live deletion-path refusal checks remain unverified.
 
-## FIRST TASK NEXT SESSION — retention lock and controlled disposal
+## Queued work after the current rebuild sequence — retention lock and controlled disposal
 
-Create a small, separate implementation PR based on [the Records Retention and Disposal Policy](policies/records-retention-and-disposal.md). This is the first task; keep it separate from #845 and #855. Do not weaken checks or publish Firestore rules.
+Create a small, separate implementation PR based on [the Records Retention and Disposal Policy](policies/records-retention-and-disposal.md) after the currently approved sequence (documentation reconciliation, #845 read-only proof, and #863 access split) is complete. Keep it separate from #845 and #855. Do not weaken checks or publish Firestore rules.
 
 1. **Retention calculation and inheritance:** for every REAL meeting, set `retainUntil = proceedings date + 10 calendar years`. For a single-day meeting, use its meeting date; for a multi-day meeting, use the final day of proceedings. Do not use the signing, approval, upload or filing date. Every minute, resolution, vote, attendance record, action and recording of that meeting inherits exactly the same `retainUntil`.
 2. **Worker enforcement:** enforce the retention deadline server-side. No actor, role, administrator, request, approval or client route may dispose of a REAL proceedings record before `retainUntil`. An active legal hold blocks disposal even after the retention period expires.
@@ -95,11 +95,9 @@ For each path, record the portal, exact screen/control or route/rule location, a
 - Current Firebase Hosting build stamp: commit 57368a8c2ceb418178aa28e5707b02605851dc83; built 2026-11-22T04:23:07Z.
 - Current Firestore rules version: NOT RETRIEVED; rules were unchanged and not published in this wind-up.
 
-## First three tasks next session
-1. Add or use a safe, authenticated, read-only production probe for REAL meeting delete refusal, missing-environment-as-REAL classification, and REAL meeting-record purge refusal. Do not issue a destructive delete or PURGE request against a real record.
-2. Complete Meeting roles and grants, then member upload/signing, with separate scope, tests and approvals. Keep the three live deletion checks clearly marked unverified until safe evidence exists.
-3. Create the fresh owner-only RENEW workflow PR: validate repository owner comment author ID and github.actor, pass comment body through an environment variable with strict validation, renew exactly one portal by 72 hours, and test wrong-named/stale evidence. Keep all parked work separate.
+## Next tasks after this handover
+1. Complete the documentation reconciliation PRs #867 and #868 only after their required checks and exact protection approval are satisfied.
+2. Run the fresh read-only #845 production proof through GitHub Actions. Prepare, but do not run, the canary until the owner writes exactly RUN CANARY.
+3. Split #863 into one-portal PRs, diagnose and repair the failing gates at their causes, and prepare rollback evidence. Stop at APPROVE 863 ... and DEPLOY RULES.
 
-
-## 22 November 2026 — status reconciliation
-This file was reconciled against GitHub PR metadata and commit workflow runs. #857, #858, #859 and #585 are merged (SHAs listed above), not pending. #843 is also merged. #863 remains open with four failing gates; its Staging Gateway E2E/Deploy job is skipped. Previously recorded #845 Worker/frontend/Firebase identifiers are historical release evidence only; fresh live proof is still required. Live REAL/TRIAL deletion-path probes remain NOT VERIFIED. Firestore rules version remains NOT RETRIEVED; no rules were published.
+Do not treat skipped staging WordPress/cPanel jobs as failures for this rebuild. Do not publish Firestore rules.
