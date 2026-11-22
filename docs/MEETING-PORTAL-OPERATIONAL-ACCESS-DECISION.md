@@ -40,14 +40,14 @@ Do not claim Meeting Portal category confidentiality is live. A safe correction 
 - Direct-read, list/query, participant, invitation, category, released-record and data-gate regression tests.
 - Staging acceptance and independent review.
 
-The current implementation branch changes both `firestore.rules` and `firestore.staging.rules` so meeting document reads require the category/participant helper. Category-based role reads now require an active member or employee record. The generic client meeting-list and meeting-document adapters are routed through the Cloudflare Gateway, which applies server-side category, initiator, participant and invitation filtering. These are source changes only; rules have not been published and the gateway has not been deployed.
+The current implementation branch changes both `firestore.rules` and `firestore.staging.rules` so meeting document reads require the category/participant helper. Category-based role reads now require an active member or employee record. The generic client meeting-list and meeting-document adapters are routed through the Cloudflare Gateway, which applies server-side category, initiator, participant and invitation filtering. Invitation access is added to the meeting read allow-list only after successful email dispatch; reissue/revocation/removal clears the relevant participant read access and revokes active passes. These are source changes only; rules have not been published and the gateway has not been deployed.
 
 ## 5. Release sequence and current gate
 
 1. Correct the confirmed occupancy baseline and record the duty-based access decision. **Implemented in this branch.**
 2. Bind each active person to verified identity, current appointment/volunteer assignment, approved job description and ED duty scope. **Pending authoritative records and controlled assignment.**
 3. Implement server-side role/module/record authorization and revocation across all applicable routes. **Meeting read-list and get routes implemented in this branch; broader role/module grants and revocation remain pending.**
-4. Close the Meeting Portal Firestore read-boundary gap with compatible rules and query changes. **Source changes implemented in this branch; emulator/security validation, staging acceptance, independent review and rules publication remain pending.**
+4. Close the Meeting Portal Firestore read-boundary gap with compatible rules and query changes. **Source changes implemented in this branch, including invitation dispatch/revocation; emulator/security validation, staging acceptance, independent review and rules publication remain pending.**
 5. Run automated regression/security checks and staging acceptance. **CI triggered; staging acceptance not yet run.**
 6. Obtain independent review and merge only after all required checks pass. **Pending.**
 7. Publish Firestore rules only after separate exact `DEPLOY RULES` approval; deploy production only after explicit production-release approval and verified staging. **Not performed.**
