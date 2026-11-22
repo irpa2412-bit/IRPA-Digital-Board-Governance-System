@@ -34,7 +34,25 @@ test("recovery queue is owner-scoped and paginated",async()=>{
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.at(-1).type,"signer.signed");
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).at(-1).type,"recovery.queue.viewed");
   assert.equal((await getRecoveryQueue(f.ctx,f.other)).total,0);
-  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-REC-1"),{status:404});
+  await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.other,"ENV-REC-1"),{status:403});
+});
+test("owner queue includes all non-completed envelopes across owner field aliases",async()=>{
+ const f=await fixture();const base=await f.ctx.meta.get("envelopes","ENV-REC-1");
+ await f.ctx.meta.create("envelopes","ENV-CREATED-BY-UID",{...base,id:"ENV-CREATED-BY-UID",createdBy:undefined,createdByUid:"owner-1",status:"Sent"});
+ await f.ctx.meta.create("envelopes","ENV-OWNER-UID",{...base,id:"ENV-OWNER-UID",createdBy:undefined,ownerUid:"owner-1",status:"Signing"});
+ await f.ctx.meta.create("envelopes","ENV-COMPLETED",{...base,id:"ENV-COMPLETED",status:"Completed"});
+ const queue=await getRecoveryQueue(f.ctx,f.user,{limit:50,offset:0});
+ assert.equal(queue.total,3);
+ assert.ok(queue.items.some(item=>item.envelopeId==="ENV-CREATED-BY-UID"));
+ assert.ok(queue.items.some(item=>item.envelopeId==="ENV-OWNER-UID"));
+ assert.equal(queue.items.some(item=>item.envelopeId==="ENV-COMPLETED"),false);
+ assert.equal((await assessRecoveryEvidence(f.ctx,f.user,"ENV-OWNER-UID")).envelopeId,"ENV-OWNER-UID");
+ await assert.rejects(()=>assessRecoveryEvidence(f.ctx,f.user,"ENV-COMPLETED"),{status:409});
+});
+test("administrator queue includes non-completed envelopes across owners",async()=>{
+ const f=await fixture();const base=await f.ctx.meta.get("envelopes","ENV-REC-1");
+ await f.ctx.meta.create("envelopes","ENV-OTHER-OWNER",{...base,id:"ENV-OTHER-OWNER",createdBy:"owner-2",status:"Sent"});
+ assert.equal((await getRecoveryQueue(f.ctx,{uid:"admin-1",isAdmin:true})).total,2);
 });
 test("field-level stamp is verified only when signer event and chained field hash agree",async()=>{
   const f=await fixture();

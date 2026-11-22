@@ -20,8 +20,11 @@ test("evidence router accepts envelope IDs, document IDs and document references
 
 test("screen-generated evidence URL uses the queue envelopeId and matches the router", async () => {
   const panel = await readFile(new URL("../../src/pages/SignatureRecoveryOwnerPanel.jsx", import.meta.url), "utf8");
-  assert.match(panel, /recoveryRequest\("\/api\/recovery\/envelopes\/"\+encodeURIComponent\(item\.envelopeId\)\+"\/evidence"\)/);
-  assert.match(panel, /recoveryRequest\("\/api\/recovery\/envelopes\?limit=50&offset=/);
+  const queue = await readFile(new URL("../../src/pages/SignatureRecoveryOwnerEnvelopes.jsx", import.meta.url), "utf8");
+  assert.match(panel, /encodeURIComponent\(envelopeId\)/);
+  assert.match(panel, /diagnose-finalisation/);
+  assert.match(panel, /\/preview\.pdf/);
+  assert.match(queue, /\/api\/recovery\/envelopes\?limit=50&offset=/);
   const item = { envelopeId: "ENV-0000000000000000", documentId: "IRPA-ENV-2026-00000000", title: "synthetic test" };
   const path = "/api/recovery/envelopes/" + encodeURIComponent(item.envelopeId) + "/evidence";
   assert.equal(matchRecoveryEvidenceRoute("GET", path)?.[1], item.envelopeId);

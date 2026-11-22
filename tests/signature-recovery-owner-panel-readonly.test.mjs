@@ -2,27 +2,38 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 const source=fs.readFileSync(new URL("../src/pages/SignatureRecoveryOwnerPanel.jsx",import.meta.url),"utf8");
-test("owner recovery panel keeps assessment reads and limits POST to the diagnostic endpoint",()=>{
- assert.match(source,/fetch\(gateway\+path,\{method,headers/);
- assert.match(source,/method==="POST"\?\{body:"\\{\\}"\}:\{\}/);
+const queue=fs.readFileSync(new URL("../src/pages/SignatureRecoveryOwnerEnvelopes.jsx",import.meta.url),"utf8");
+test("each selected owner envelope exposes authenticated evidence, dry-run diagnosis and safe preview",()=>{
+ assert.match(source,/\/api\/recovery\/envelopes\//);
+ assert.match(source,/\/evidence/);
  assert.match(source,/diagnose-finalisation/);
- assert.match(source,/DIAGNOSTIC_RESPONSE_INVALID/);
- assert.match(source,/normalizeFinalisationDiagnostic/);
+ assert.match(source,/\/preview\.pdf/);
+ assert.match(source,/normalizeFinalisationDiagnostic\(raw\)/);
+ assert.match(source,/normalized\.readOnly!==true/);
+});
+test("only the finalisation dry-run uses POST; evidence and preview remain GET",()=>{
+ assert.match(source,/recoveryRequest\([^;]*diagnose-finalisation[^;]*method:"POST"/s);
+ assert.match(source,/recoveryRequest\([^;]*evidence/);
+ assert.match(source,/recoveryRequest\([^;]*preview\.pdf/);
  assert.doesNotMatch(source,/method\s*:\s*["'](?:PUT|PATCH|DELETE)["']/i);
 });
-test("owner recovery panel keeps queue, evidence and preview reads",()=>{
- for(const value of ["/api/recovery/envelopes?limit=50&offset=","/evidence","/preview.pdf","Copy report","Download plain-text report"])assert.ok(source.includes(value));
+test("preview is gated by failed status, verified audit chain and verified source hash",()=>{
+ assert.match(source,/canPreview=.*CompletionFailed/);
+ assert.match(source,/auditChain\?\.status==="VERIFIED"/);
+ assert.match(source,/sourceHashStatus==="VERIFIED"/);
+ assert.match(source,/RECOVERY PREVIEW — NOT COMPLETED/);
 });
-test("owner recovery panel does not expose retry, reassignment or completion mutations",()=>{
+test("owner queue is paginated and lists all non-completed owner envelopes",()=>{
+ assert.match(queue,/api\/recovery\/envelopes\?limit=50&offset=/);
+ assert.match(queue,/Load more/);
+ assert.match(queue,/item\.envelopeId/);
+ assert.match(queue,/Every non-completed envelope you own/);
+});
+test("recovery UI does not expose automatic retry, reassignment, repair or completion mutations",()=>{
  for(const forbidden of ["updateDoc(","deleteDoc(","addDoc(","writeBatch(","runTransaction(","signDocument(","reassignSigner(","retryFinalisation(","finalizeEnvelope(","completeEnvelope("])assert.equal(source.includes(forbidden),false,forbidden);
  assert.doesNotMatch(source,/\/stamps\/reassign|\/retry(?:\/|["'])|\/complete(?:\/|["'])|\/repair(?:\/|["'])|\/send-link/i);
 });
-test("diagnostic UI states the operation is a no-write sandbox and supports copying",()=>{
- assert.match(source,/Diagnose finalisation/);
- assert.match(source,/Copy report/);
- assert.match(source,/No envelope, signer, field, signature, hash, certificate, archive, Drive file or email record is changed by diagnosis/);
-});
-test("diagnostic response handling fails closed for malformed payloads without unguarded property access",()=>{
- assert.match(source,/normalizeFinalisationDiagnostic\(raw\)/);
- assert.match(source,/catch\(err\)/);
+test("diagnostic UI explicitly confirms dry-run does not write or modify original evidence",()=>{
+ assert.match(source,/No envelope, signer, field, signature, hash, certificate, archive, Drive or email writes were performed/);
+ assert.match(source,/No retry, reassignment, repair, finalisation/);
 });
