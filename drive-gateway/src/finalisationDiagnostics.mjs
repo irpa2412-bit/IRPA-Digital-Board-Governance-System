@@ -25,7 +25,9 @@ async function buildEvidence(envelope,bytes,ctx){
 export async function diagnoseFinalisation(ctx,user,envelopeId){
  const envelope=await ctx.meta.get("envelopes",envelopeId);
  if(!envelope)throw new HttpError(404,"Envelope not found.");
- if(!user?.uid||![envelope.createdBy,envelope.createdByUid,envelope.ownerUid].includes(user.uid))if(user?.isAdmin!==true&&user?.isOwner!==true)throw new HttpError(403,"Not authorized.");
+ if(!user?.uid)throw new HttpError(401,"Authentication required.");
+ const isEnvelopeOwner=[envelope.createdBy,envelope.createdByUid,envelope.ownerUid].includes(user.uid);
+ if(!isEnvelopeOwner&&user?.isAdmin!==true&&user?.isOwner!==true)throw new HttpError(403,"Not authorized.");
  if(!["CompletionFailed","Completing","Completed"].includes(envelope.status))throw new HttpError(409,"Only a completed or failed-completion envelope can be diagnosed.");
  const fields=fieldsFor(envelope),report={schema:"IRPA-FINALISATION-DIAGNOSTIC-1",envelopeId:String(envelope.id),status:envelope.status,readOnly:true,generatedAt:ctx.now().toISOString(),timezone:"East Africa Time (UTC+3)",steps:[],fieldChecks:[],summary:{passed:0,failed:0,firstFailedStage:null}};
  report.fieldChecks=fields.map(field=>({...field,status:["Signature","Initials","Date","Name","Title","Text","Number","Comment","Remarks","Checkbox"].includes(field.type)&&[0,90,180,270].includes(field.rotation)&&Object.values(field.position).every(Number.isFinite)?"PASS":"FAILED",errorCode:null,message:null}));
