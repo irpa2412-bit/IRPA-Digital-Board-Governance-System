@@ -85,7 +85,7 @@ test("C-I02 production finalize fails closed when signer key custody is unavaila
     config:{ttlDays:14},
     crypto:{keyProvider:createSignerKeyProvider(new Map())},
   },f.envelope.id);
-  assert.deepEqual(result,{ok:false,completed:false,error:"COMPLETION_FAILED"});
+  assert.equal(result.ok,false);assert.equal(result.completed,false);assert.equal(result.error,"COMPLETION_FAILED");assert.equal(result.failure.code,"COMPLETION_FAILED");assert.equal(result.failure.stage,"SEAL_CRYPTOGRAPHIC_EVIDENCE");assert.equal(result.failure.retryable,true);
   const state = await f.meta.get("envelopes",f.envelope.id);
   assert.equal(state.status,"CompletionFailed");
   assert.equal(state.completion,null);
@@ -104,7 +104,7 @@ test("C-I03 production completion fails closed when the cryptographic key provid
     now:()=>new Date("2026-10-07T19:00:00.000Z"),
     config:{ttlDays:14}
   },f.envelope.id);
-  assert.deepEqual(result,{ok:false,completed:false,error:"COMPLETION_FAILED"});
+  assert.equal(result.ok,false);assert.equal(result.completed,false);assert.equal(result.error,"COMPLETION_FAILED");assert.equal(result.failure.code,"COMPLETION_FAILED");assert.equal(result.failure.stage,"SEAL_CRYPTOGRAPHIC_EVIDENCE");assert.equal(result.failure.retryable,true);
   const state=await f.meta.get("envelopes",f.envelope.id);
   assert.equal(state.status,"CompletionFailed");
   assert.equal(state.completion,null);
