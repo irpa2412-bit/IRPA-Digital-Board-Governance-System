@@ -18,7 +18,7 @@ function signedEvent(envelope,signerId){
 }
 export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
   if(!user?.uid)throw new HttpError(401,"Authentication required.");
-  const safeLimit=Math.max(1,Math.min(50,Number.isInteger(Number(limit))?Number(limit):25));
+  const safeLimit=Math.max(1,Math.min(50,limit==null?25:(Number.isInteger(Number(limit))?Number(limit):25)));
   const safeOffset=Math.max(0,Math.min(10000,Number.isInteger(Number(offset))?Number(offset):0));
   const rows=await ctx.meta.list("envelopes");
   const eligible=(rows||[]).filter(row=>row.status==="CompletionFailed"&&isOwner(row,user))
@@ -94,5 +94,5 @@ export async function buildRecoveryPreview(ctx,user,id){
     page.drawText("RECOVERY PREVIEW — NOT COMPLETED",{x:Math.max(18,width*0.12),y:height*0.48,size:Math.max(18,Math.min(30,width/18)),font,color:rgb(0.78,0.12,0.12),opacity:0.42,rotate:{type:"degrees",angle:32}});
     page.drawText("NON-AUTHORITATIVE COPY",{x:24,y:18,size:9,font,color:rgb(0.65,0.08,0.08),opacity:0.8});
   }
-  return {bytes:await pdf.save(),assessment};
+  return {bytes:await pdf.save({useObjectStreams:false}),assessment};
 }
