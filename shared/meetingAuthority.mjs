@@ -9,7 +9,7 @@ const active = (record, now = Date.now()) => {
   if (expiry && Number.isFinite(Date.parse(expiry)) && Date.parse(expiry) <= now) return false;
   const start = record.effectiveFrom || record.validFrom || record.startDate;
   if (start && Number.isFinite(Date.parse(start)) && Date.parse(start) > now) return false;
-  return statuses.length === 0 || statuses.some(status => ["active","activated","approved","current","valid"].includes(status));
+  return record.active === true || statuses.some(status => ["active","activated","approved","current","valid"].includes(status));
 };
 const values = value => Array.isArray(value) ? value : value == null ? [] : [value];
 const recordRoles = (record, now=Date.now()) => {
@@ -23,7 +23,7 @@ const recordRoles = (record, now=Date.now()) => {
   ];
   return candidates.flatMap(value => {
     if(typeof value==="string")return value.split(",");
-    if(value&&typeof value==="object"&&active(value,now))return [value.role,value.title,value.authority,value.category];
+    if(value&&typeof value==="object"){const hasOwnStatus=["active","status","employmentStatus","registrationStatus","authorityStatus","revoked","revokedAt","expiresAt","expiryDate","validUntil","endDate","effectiveFrom","validFrom","startDate"].some(key=>value[key]!==undefined);if((hasOwnStatus?active(value,now):active(record,now)))return [value.role,value.title,value.authority,value.category];}
     return [];
   }).map(clean).filter(Boolean);
 };
