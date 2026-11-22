@@ -421,7 +421,18 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
-  if(!out.winner){const nextInvitations=await inviteNextPosition(ctx,e0.id);return{ok:true,status:"InProgress",completed:false,nextInvitations};}
+  if(!out.winner){
+    if(s0.identityType==="email-link"&&typeof ctx.persistSignerProgress==="function"){
+      try{
+        const progressEnvelope=await ctx.meta.get("envelopes",e0.id);
+        if(progressEnvelope)await ctx.persistSignerProgress({envelope:progressEnvelope});
+      }catch(error){
+        ctx.logger?.error?.("EMAIL_SIGNER_PROGRESS_MIRROR_FAILED",{envelopeId:e0.id,signerId:s0.id,errorType:String(error?.name||"Error").slice(0,60)});
+      }
+    }
+    const nextInvitations=await inviteNextPosition(ctx,e0.id);
+    return{ok:true,status:"InProgress",completed:false,nextInvitations};
+  }
   const done=await finalizeEnvelope(ctx,e0.id);
   return done.completed?{ok:true,status:"Completed",completed:true,distribution:done.distribution||null}:{ok:true,status:"CompletionFailed",completed:false};
 }
@@ -538,7 +549,7 @@ export async function revokeInvitation(ctx,user,id,signerId){
 }
 
 
-export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}const last=e.events?.at(-1)||null;const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>{
+export async function getEnvelopeStatus(ctx,user,id){let e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed"&&e.externalReference&&e.mirrorStatus==="Pending"&&typeof ctx.persistCompletedSignatureEnvelope==="function"){await persistMirrorWithStatus(ctx,e,e.completion);e=await ctx.meta.get("envelopes",id)||e}else if(e.status!=="Completed"&&e.externalReference&&e.signers?.some(signer=>signer.status==="Signed")&&typeof ctx.persistSignerProgress==="function"){try{await ctx.persistSignerProgress({envelope:e})}catch(error){ctx.logger?.error?.("EMAIL_SIGNER_PROGRESS_MIRROR_RECONCILE_FAILED",{envelopeId:e.id,errorType:String(error?.name||"Error").slice(0,60)})}}const last=e.events?.at(-1)||null;const lastEvent=last?{type:last.type||"event",at:last.at||null,signerId:last.signerId||null,deliveryStatus:last.deliveryStatus||null}:null;return{ok:true,envelopeId:id,documentId:e.documentId,status:e.status,mirrorStatus:e.mirrorStatus||null,mirrorError:e.mirrorError||null,mirrorAttempts:Number(e.mirrorAttempts||0),signers:e.signers.map(s=>{
   const signerEvents=(e.events||[]).filter(event=>event.signerId===s.id);
   const stages=signerEvents.filter(event=>event.type==="email_link.stage");
   const latestFailure=[...stages].reverse().find(event=>event.outcome==="failure");
