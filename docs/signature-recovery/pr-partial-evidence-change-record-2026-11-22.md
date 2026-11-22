@@ -63,5 +63,7 @@ Revert this change through a protected PR to baseline `908b314ab0de566d057b4093f
 - Latest Worker source commit: `87a5129ba1ce06ededa82f205c113f19f50df469`.
 - Latest seeded Worker tests commit: `1c58b7ed2ed100846f9e9f482b6039ee28ae8114`.
 - Latest owner panel/report commit: `81780a360134b58eb425cabfa53b7f344cd56d3d`.
-- Latest read-only UI test commit: `9698a9c630e0d72db1482d136e91c6638db21829`.
+- Latest read-only UI test commit: `6331fce4eb2607ccb21b726ebf2cc6a1fac94f1f`.
 - Required PR checks are running against the final PR head; no check is marked PASS in this record until the job conclusion is retrieved.
+
+The final UI test commit above includes a corrected literal matcher for the explicit route-missing message. This Change Record update is the final documentation-only PR-head commit; any validation conclusions will be reported from the resulting head's check runs, not copied from earlier attempts.
