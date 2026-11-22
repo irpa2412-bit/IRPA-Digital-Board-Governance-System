@@ -144,3 +144,55 @@ test("complete recovery lifecycle signs the replacement slot and finalizes only 
   assert.equal(envelope.signers.find(signer=>signer.id==="S2").status,"Signed");
   assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-2").signerId,"S2");
 });
+
+test("partial assessment accepts the source hash field written by the upload path",async()=>{
+  const f=await fixture();
+  const doc=await f.ctx.meta.get("documents","DOC-REC-1");
+  await f.ctx.meta.update("documents","DOC-REC-1",{sha256:null,hash:doc.sha256});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.sourceHashStatus,"VERIFIED");
+  assert.equal(result.auditChain.status,"VERIFIED");
+  assert.equal(result.finalisationStage,"ARCHIVE");
+});
+
+test("missing audit events and missing source hash return independent partial evidence",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{events:[],documentHash:null,originalHash:null});
+  await f.ctx.meta.update("documents","DOC-REC-1",{sha256:null,hash:null});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.auditChain.status,"NO_EVENTS");
+  assert.equal(result.sourceHashStatus,"NO_STORED_HASH");
+  assert.equal(result.stampSlots.every(row=>row.status==="MISSING"),true);
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,0);
+});
+
+test("missing source bytes do not hide audit and stamp evidence",async()=>{
+  const f=await fixture();
+  const doc=await f.ctx.meta.get("documents","DOC-REC-1");
+  await f.ctx.storage.delete(doc.primaryStorageId);
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.auditChain.status,"VERIFIED");
+  assert.equal(result.sourceHashStatus,"SOURCE_FILE_MISSING");
+  assert.equal(result.stampSlots[0].status,"PASS");
+  await assert.rejects(()=>buildRecoveryPreview(f.ctx,f.user,"ENV-REC-1"),{status:409});
+});
+
+test("a missing stamp value is reported without failing the complete assessment",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{signers:envelope.signers.map(s=>({...s,fieldValues:{"SIG-2":s.fieldValues["SIG-2"]}}))});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.stampSlots.find(row=>row.fieldId==="SIG-1").status,"UNVERIFIABLE");
+  assert.equal(result.stampSlots.find(row=>row.fieldId==="SIG-2").status,"PASS");
+});
+
+test("a failed audit chain is reported as partial evidence, not a global not-found error",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const events=envelope.events.map((event,index)=>index===0?{...event,type:"tampered.event"}:event);
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{events});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.auditChain.status,"FAILED");
+  assert.equal(result.stampSlots.every(row=>row.status==="UNVERIFIABLE"),true);
+});
