@@ -73,7 +73,7 @@
       "Every Head of Department"
     ],
     "grantDuration": "Permanent until owner revokes; inactive/revoked authority denied on next request.",
-    "identitySource": "Active registered authority in Members and Employees; same authoritative source as governance tool and Authorized User Access Categories card. No free-text role inference.",
+    "identitySource": "ACTIVE registered authority in Members and Employees; same authoritative source as governance tool and Authorized User Access Categories card. No free-text role inference.",
     "duties": [
       "view",
       "create",
