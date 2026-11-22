@@ -46,3 +46,18 @@ Safety boundary: no Firestore rules or indexes have been published by this work.
 **Functions integrity:** [workflow run #44987305636](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44987305636), job `137100588224`. `node --check functions/index.js`, `functions/bootstrap.js`, and `functions/authorizationFunctions.js` all completed successfully. `node scripts/verify-functions-entrypoint-integrity.js` also completed successfully and reported the trial-only reset safety markers and retained legacy meeting callables. The subsequent `node scripts/portal-protection-check.mjs` failed with the same `ownerApproved: false` exact-owner-approval message and exit code 1. Thus the Functions job failure was the shared protection gate, not a Functions syntax/entrypoint defect.
 
 **Cause and correction:** the runner did not find the required exact owner-account guard-maintenance approval at the time of those initial attempts. The existing owner-approved guard-core text was subsequently posted verbatim by the owner on [PR #857](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/857#issuecomment-7074491811). Failed jobs were rerun without changing source code or gate logic. Subsequent results are recorded only by GitHub Actions; this report does not manually record a PASS.
+
+## 2026-11-22 GitHub-runner live read-only verification
+
+**Evidence:** [Live read-only workflow run #44989838696](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44989838696), successful read-only job rerun at 2026-11-22T05:34:47Z. The manual canary job remained skipped; no meeting or meeting-record canary was created.
+
+- **Gateway Worker active version:** `aa5e131b-752e-4b30-b2f9-d28907d3eee7`; read-only `/health` commit: `57368a8c2ceb418178aa28e5707b02605851dc83`.
+- **Gateway rollback version:** `dd4637ea-0804-4b85-a455-1e691f1f0d72`; the read-only Cloudflare API check confirmed this version remains available.
+- **Frontend Worker active version after the automatic deployment attempt:** `43bb3b38-33b7-43b1-b6be-9ef8e7c64a2f`; frontend health returned HTTP 200. Immediately before that deployment attempt, the observed active version was `adc62abe-3e3a-4165-9cc3-5c96ad117ee2`.
+- **Firebase Hosting build stamp:** `57368a8c2ceb418178aa28e5707b02605851dc83`, built `2026-11-22T04:23:34Z`. This meets the required 57368a8 minimum.
+- **Cloudflare frontend Worker root HTML stamp:** `c4c5abc05e0b8f11b61ad5e993b36fed274f7f7b`, observed by [frontend deployment verification run #44989838650](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44989838650). GitHub compare confirms it is a descendant of `57368a8`. The automatic frontend deployment run failed its stricter exact-current-commit check because it expected `cb3d233fca13ac1601759bc1a58212d3924d80bd` but live HTML still reported `c4c5abc`. Do not treat that deployment verification as a pass.
+- **Firestore Rules active release:** `projects/irpa-digital-board-governance/rulesets/00ebeb44-e151-415c-9616-b94c215c2589`, retrieved using the existing Firebase service-account credential path and a read-only Firebase Rules API GET.
+- **Canary prerequisites:** existing approved Firebase administrator credential path available; specified Gateway rollback version available. The canary remains manual-only and has not been run.
+- **Live deletion checks:** REAL meeting delete refusal, missing-environment-as-REAL, and REAL meeting-record purge refusal remain **NOT TESTED** until the owner authorises and dispatches the canary.
+- **Previous Firebase Hosting rollback build:** `40c7cfa33a53871a48c8568a5ff3f876f2df5ac5`. No Firestore Rules or indexes were changed or published.
+
