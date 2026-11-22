@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const workflow = fs.readFileSync(path.join(__dirname, "../.github/workflows/meeting-real-record-protection-canary.yml"), "utf8");
 const guard = fs.readFileSync(path.join(__dirname, "../scripts/canary-comment-authorized.cjs"), "utf8");
+const canary = fs.readFileSync(path.join(__dirname, "../scripts/live-meeting-real-canary.cjs"), "utf8");
 const { isAuthorizedComment, isAuthorizedManualInput } = require("../scripts/canary-comment-authorized.cjs");
 
 function ownerComment() { return { action: "created", issue: { number: 876 }, comment: { body: "RUN CANARY", user: { id: 319164319, login: "irpa2412-bit" } } }; }
@@ -34,4 +35,17 @@ test("automatic read-only triggers remain separate from issue_comment", () => {
   assert.match(readOnly, /github\.event_name == 'schedule'/);
   assert.match(readOnly, /github\.event_name == 'workflow_run'/);
   assert.doesNotMatch(readOnly, /issue_comment/);
+});
+
+test("canary fixture stores no administrator UID or email and does not capture a user-attributed record", () => {
+  assert.doesNotMatch(canary, /initiatorUid:\\s*admin\\.uid|meetingHostUid:\\s*admin\\.uid|createdByUid:\\s*admin\\.uid|capturedByUid|capturedByEmail/);
+  assert.doesNotMatch(canary, /\\/api\\/meeting-records\\/capture/);
+  assert.match(canary, /system-canary-record-/);
+});
+test("canary reuses an existing labelled meeting and linked record", () => {
+  assert.match(canary, /where\\("systemTestLabel", "==", LABEL\\)/);
+  assert.match(canary, /results\\.reusedExistingMeeting = true/);
+  assert.match(canary, /results\\.reusedExistingRecord = true/);
+  assert.match(canary, /results\\.finalMeetingExists === true/);
+  assert.match(canary, /results\\.finalRecordExists === true/);
 });
