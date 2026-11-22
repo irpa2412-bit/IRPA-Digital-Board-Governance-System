@@ -18,10 +18,10 @@ for (const name of files) {
       continue;
     }
     const condition = block.split('\n').find(line => line.trimStart().startsWith('if:')) || '';
-    if (!condition.includes("github.event_name == 'workflow_dispatch'") || !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'DEPLOY'")) {
-      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and exact DEPLOY confirmation.');
+    if (!condition.includes("github.event_name == 'workflow_dispatch'") || !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'")) {
+      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
     }
   }
 }
 if (failures.length) { console.error('FIRESTORE_DEPLOY_TRIGGER_GUARD_FAILED'); console.error(failures.join('\n')); process.exit(1); }
-console.log('PASS: every production Firestore deployment command is manually dispatched and requires exact DEPLOY confirmation; emulator and explicitly isolated staging commands are excluded.');
+console.log('PASS: every production Firestore deployment command is manually dispatched and requires exact DEPLOY RULES confirmation; emulator and explicitly isolated staging commands are excluded.');
