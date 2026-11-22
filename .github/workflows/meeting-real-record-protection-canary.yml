@@ -102,7 +102,7 @@ jobs:
     name: One-record REAL meeting protection canary
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.CANARY == 'RUN CANARY') ||
-      (github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.number == 876 && github.event.issue.pull_request == null && github.event.comment.user.id == 319164319 && github.event.comment.user.login == 'irpa2412-bit')
+      (github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.number == 876)
     concurrency:
       group: irpa-live-meeting-real-protection-canary
       cancel-in-progress: false
