@@ -9,7 +9,7 @@ test("each selected owner envelope exposes authenticated evidence, dry-run diagn
  assert.match(source,/diagnose-finalisation/);
  assert.match(source,/\/preview\.pdf/);
  assert.match(source,/normalizeFinalisationDiagnostic\(raw\)/);
- assert.match(source,/normalized\\.readOnly!==true/);
+ assert.match(source,/normalized\.readOnly!==true/);
 });
 test("only the finalisation dry-run uses POST; evidence and preview remain GET",()=>{
  assert.match(source,/recoveryRequest\([^;]*diagnose-finalisation[^;]*method:"POST"/s);
