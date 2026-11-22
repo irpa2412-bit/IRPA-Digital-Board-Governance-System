@@ -7,7 +7,7 @@
   "warningHours": 12,
   "openedAt": "2026-11-22T18:06:00.000Z",
   "expiresAt": "2026-11-25T18:06:00.000Z",
-  "lastActivityAt": "2026-11-22T18:06:00.000Z",
+  "lastActivityAt": "2026-11-22T18:13:01Z",
   "emergency": false,
   "emergencyLimitHours": 24,
   "reason": "Owner-authorised 72-hour Signature Portal repair for finalisation-stage recording and a write-isolated dry-run diagnosis, followed by a separately shipped owner/admin retry control. Preserve the affected envelope's 12 verified signatures, source hash and signing audit chain.",
@@ -70,6 +70,11 @@
       "at": "2026-11-22T18:06:00.000Z",
       "action": "owner-approved-72-hour-window",
       "description": "Owner explicitly approved the 72-hour Signature Portal repair window for IRPA-ENV-2026-11501354. Scope: recovery module/screen and stage-recording wrappers only around existing finalisation steps; first PR stage recording and no-write dry run, second PR retry control. No signature, signer, audit-chain, source-hash, PDF-build, hash, certificate, archive or distribution logic changes. If diagnosis identifies a defect inside existing finalisation logic, stop and request owner approval for the exact line and proposed change."
+    },
+    {
+      "at": "2026-11-22T18:13:01Z",
+      "action": "owner-approved-scope-amendment",
+      "description": "Owner rejects moving Completed after distribution; approves envelope-level distribution status and failed-recipient-only resend as a separate PR. Completed remains independent of email delivery. Work sequence: stage recording + no-write dry run, distribution status, retry."
     }
   ],
   "emergencyExpiresAt": null,
