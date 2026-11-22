@@ -83,7 +83,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Run complete test:all suite
-        run: npm run test:all
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-baseline 'npm run test:all'
 
   signature-portal-smoke:
     name: signature-portal-smoke
