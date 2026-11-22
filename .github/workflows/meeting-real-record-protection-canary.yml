@@ -112,10 +112,11 @@ jobs:
     environment: production
     timeout-minutes: 20
     steps:
-      - name: Checkout trusted workflow revision from main
+      - name: Checkout trusted workflow revision from main with full history for build ancestry verification
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
