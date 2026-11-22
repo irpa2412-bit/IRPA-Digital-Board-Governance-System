@@ -18,6 +18,7 @@ import { authenticateSmtpPlain } from "./smtpAuth.mjs";
 import { resolveSmtpConfiguration } from "./smtpConfig.mjs";
 
 import { route as esignRoute } from "./router.mjs";
+import { isEsignPath } from "./esignPathPolicy.mjs";
 import { maskEmailForConfirmation, formatEmailLinkExpiryEAT } from "./emailSigning/index.mjs";
 import { buildEsignContext, EsignRecordDurableObject } from "./esignContext.mjs";
 import { verifyCanonicalSignatureEnvelope as verifyCanonicalSignatureEnvelopeRecord } from "./canonicalSignatureVerification.mjs";
@@ -541,14 +542,7 @@ export default {
           const ctx = buildEsignContext({env,verifyUser:async()=>({uid:claims.user_id,isAdmin:true}),sendInvitation:async()=>{throw new Error("Cleanup context does not send invitations.");},logger:console,driveHelpers:{getDriveAccessToken,driveFetch}});
           return json(await runCleanup(ctx),200,corsHeaders(request));
         }
-        const isEsignPath =
-          pathname === "/api/documents/next-reference" ||
-          /^\/api\/documents(?:\/.*)?$/.test(pathname) ||
-          /^\/api\/envelopes(?:\/[A-Za-z0-9_-]{3,64}(?:\/(?:status|resync|retry|retry-completion|void|distribution\/retry)|\/invitations\/S\d+\/(?:resend|revoke))?)?$/.test(pathname) ||
-          /^\/api\/sign\/.*$/.test(pathname) ||
-          /^\/api\/document-lifecycle\/.*$/.test(pathname) ||
-          /^\/api\/auth\/.*$/.test(pathname);
-        if (isEsignPath) {
+        if (isEsignPath(pathname)) {
           const persistCompletedSignatureEnvelope = async ({envelope,completion}) => {
             const token = await getFirestoreAdminAccessToken(env);
             const encode = value => {
