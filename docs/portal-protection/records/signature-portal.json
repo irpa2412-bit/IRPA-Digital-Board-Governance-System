@@ -122,12 +122,12 @@
   ],
   "repairWindow": {
     "portal": "Signature Portal",
-    "prNumber": null,
+    "prNumber": 896,
     "durationHours": 72,
-    "status": "awaiting owner approval",
-    "openedAt": null,
-    "expiresAt": null,
-    "approvalComment": null
+    "status": "open",
+    "openedAt": "2026-11-22T16:00:57.118Z",
+    "expiresAt": "2026-11-25T16:00:57.118Z",
+    "approvalComment": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/896#issuecomment-7081732872"
   },
   "prHeadCommit": null,
   "prHeadRuns": []
