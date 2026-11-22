@@ -12,13 +12,21 @@ const active = (record, now = Date.now()) => {
   return statuses.length === 0 || statuses.some(status => ["active","activated","approved","current","valid"].includes(status));
 };
 const values = value => Array.isArray(value) ? value : value == null ? [] : [value];
-const recordRoles = record => [
-  ...values(record.roles),record.role,...values(record.assignedRoles),...values(record.selectedRoles),
-  ...values(record.roleAssignments),...values(record.authorities),...values(record.accessAuthorities),
-  ...values(record.accessCategories),...values(record.authorityCategories),record.accessCategory,
-  record.authorizedRole,record.boardPosition,record.jobTitle,record.position,record.title,record.designation,...values(record.authorizedUserAccessCategories),...values(record.authorizedAccessCategories),...(record.isHeadOfDepartment===true||record.isDepartmentHead===true||record.headOfDepartment===true?["Head of Department"]:[])
-].flatMap(value => typeof value === "string" ? value.split(",") : value && typeof value === "object" ? [value.role,value.title,value.authority,value.category] : [])
- .map(clean).filter(Boolean);
+const recordRoles = (record, now=Date.now()) => {
+  const candidates=[
+    ...values(record.roles),record.role,...values(record.assignedRoles),...values(record.selectedRoles),
+    ...values(record.roleAssignments),...values(record.authorities),...values(record.accessAuthorities),
+    ...values(record.accessCategories),...values(record.authorityCategories),record.accessCategory,
+    record.authorizedRole,record.boardPosition,record.jobTitle,record.position,record.title,record.designation,
+    ...values(record.authorizedUserAccessCategories),...values(record.authorizedAccessCategories),
+    ...(record.isHeadOfDepartment===true||record.isDepartmentHead===true||record.headOfDepartment===true?["Head of Department"]:[])
+  ];
+  return candidates.flatMap(value => {
+    if(typeof value==="string")return value.split(",");
+    if(value&&typeof value==="object"&&active(value,now))return [value.role,value.title,value.authority,value.category];
+    return [];
+  }).map(clean).filter(Boolean);
+};
 const identifiers = record => ({
   uids:[record.uid,record.authUid,record.userUid,record.firebaseUid,record.firebaseAuthUid,record.linkedUid,record.administratorUid,record.adminUid,record.linkedAdministratorUid,...(!/^IRPA-(?:MEM|EMP)-/i.test(clean(record.id))?[record.id]:[])].map(clean).filter(Boolean),
   emails:[record.email,record.emailAddress,record.contactEmail,record.firebaseAuthEmail,record.officialEmail].map(value=>clean(value).toLowerCase()).filter(Boolean),
@@ -53,7 +61,7 @@ export function resolveMeetingAuthority(identity={}, registers={}, now=Date.now(
     }
   }
   const roles=[];
-  for(const {record,source} of sources)for(const role of recordRoles(record))roles.push({role,source,recordId:clean(record.id||record.uid||record.memberNumber||record.employeeNumber)||null,active:true,department:clean(record.department)||null});
+  for(const {record,source} of sources)for(const role of recordRoles(record,now))roles.push({role,source,recordId:clean(record.id||record.uid||record.memberNumber||record.employeeNumber)||null,active:true,department:clean(record.department)||null});
   for(const department of departments){
     if(!active(department,now))continue;
     const headIds=identifiers({
@@ -69,7 +77,7 @@ export function resolveMeetingAuthority(identity={}, registers={}, now=Date.now(
     if(!active(category,now))continue;
     const ids=identifiers(category);
     if(!Object.entries(ids).some(([key,values])=>values.some(value=>keys[key].has(value))))continue;
-    for(const role of recordRoles(category))roles.push({role,source:"Authorized User Access Categories",recordId:clean(category.id)||null,active:true,department:clean(category.department)||null});
+    for(const role of recordRoles(category,now))roles.push({role,source:"Authorized User Access Categories",recordId:clean(category.id)||null,active:true,department:clean(category.department)||null});
   }
   const activeRoles=[...new Map(roles.map(item=>[normalize(item.role)+"|"+item.source+"|"+item.recordId, item])).values()];
   const grant=activeRoles.some(item=>grantRole(item.role));
