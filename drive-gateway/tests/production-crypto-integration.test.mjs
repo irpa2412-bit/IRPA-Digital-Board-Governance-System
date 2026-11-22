@@ -39,6 +39,7 @@ async function fixture() {
   };
   const envelope = {
     id:"ENV-CI-001",
+    dataEnvironment:"ACTUAL",
     documentId:"DOC-CI-001",
     documentHash:originalHash,
     title:"Production Crypto Integration",
@@ -58,7 +59,7 @@ async function fixture() {
 test("C-I01 production finalize seals the exact final PDF before Completed", async () => {
   const f = await fixture();
   const keyProvider = createSignerKeyProvider(new Map([[f.envelope.signers[0].uid,{keyId:"IRPA-KEY-PROD-001",...f.keyPair}]]));
-  const result = await finalizeEnvelope({...{meta:f.meta,storage:f.storage,now:()=>new Date("2026-10-07T19:00:00.000Z"),config:{ttlDays:14}},crypto:{keyProvider}},f.envelope.id);
+  const result = await finalizeEnvelope({...{meta:f.meta,storage:f.storage,env:{DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"production"},now:()=>new Date("2026-10-07T19:00:00.000Z"),config:{ttlDays:14}},crypto:{keyProvider}},f.envelope.id);
   assert.equal(result.completed,true);
   const state = await f.meta.get("envelopes",f.envelope.id);
   assert.equal(state.status,"Completed");
@@ -81,6 +82,7 @@ test("C-I02 production finalize fails closed when signer key custody is unavaila
   const result = await finalizeEnvelope({
     meta:f.meta,
     storage:f.storage,
+    env:{DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"production"},
     now:()=>new Date("2026-10-07T19:00:00.000Z"),
     config:{ttlDays:14},
     crypto:{keyProvider:createSignerKeyProvider(new Map())},
@@ -88,8 +90,9 @@ test("C-I02 production finalize fails closed when signer key custody is unavaila
   assert.equal(result.ok,false);assert.equal(result.completed,false);assert.equal(result.error,"COMPLETION_FAILED");assert.equal(result.failure.code,"COMPLETION_FAILED");assert.equal(result.failure.stage,"SEAL_CRYPTOGRAPHIC_EVIDENCE");assert.equal(result.failure.retryable,true);
   const state = await f.meta.get("envelopes",f.envelope.id);
   assert.equal(state.status,"CompletionFailed");
-  assert.equal(state.completion,null);
-  assert.equal(f.storage.objs.size,before);
+  assert.ok(state.completion?.archivePending?.storageId);
+  assert.equal(state.completion.archivePending.environment,"ACTUAL");
+  assert.equal(f.storage.objs.size,before+1);
   assert.equal((await f.meta.list("cryptographicEvidence")).length,0);
 });
 
@@ -107,7 +110,8 @@ test("C-I03 production completion fails closed when the cryptographic key provid
   assert.equal(result.ok,false);assert.equal(result.completed,false);assert.equal(result.error,"COMPLETION_FAILED");assert.equal(result.failure.code,"COMPLETION_FAILED");assert.equal(result.failure.stage,"SEAL_CRYPTOGRAPHIC_EVIDENCE");assert.equal(result.failure.retryable,true);
   const state=await f.meta.get("envelopes",f.envelope.id);
   assert.equal(state.status,"CompletionFailed");
-  assert.equal(state.completion,null);
-  assert.equal(f.storage.objs.size,before);
+  assert.ok(state.completion?.archivePending?.storageId);
+  assert.equal(state.completion.archivePending.environment,"ACTUAL");
+  assert.equal(f.storage.objs.size,before+1);
   assert.equal((await f.meta.list("cryptographicEvidence")).length,0);
 });

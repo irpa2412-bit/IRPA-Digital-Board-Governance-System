@@ -609,6 +609,17 @@ export default {
             env,
             persistCompletedSignatureEnvelope,
             persistSignerProgress,
+            resolveEnvelopeDataEnvironment: async (externalReference,ownerUid) => {
+              if(!externalReference||!ownerUid)throw Object.assign(new Error("The source signing draft identity is incomplete."),{status:409});
+              const adminToken=await getFirestoreAdminAccessToken(env);
+              const snapshot=await getFirestoreDocument(env,`signatureEnvelopes/${externalReference}`,adminToken);
+              const draft=firestoreDocumentToPlain(snapshot)||null;
+              if(!draft||String(draft.ownerUid||"")!==String(ownerUid))throw Object.assign(new Error("The source signing draft could not be verified for this owner."),{status:403});
+              const origin=String(draft.recordOrigin||"").trim().toUpperCase();
+              if(origin==="TRIAL")return "TRIAL";
+              if(origin==="PRODUCTION")return "ACTUAL";
+              throw Object.assign(new Error("The source signing draft has no valid recorded data environment."),{status:409});
+            },
             verifyUser: async req => {
               const claims = await authenticateFirebaseRequest(req, env);
               const adminToken = await getFirestoreAdminAccessToken(env);

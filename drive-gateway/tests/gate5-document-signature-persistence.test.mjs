@@ -405,10 +405,11 @@ test("G5-08 — partial completion rollback", async () => {
 
   const state = await s.meta.get("envelopes", envelopeId);
   assert.equal(state.status, "CompletionFailed");
-  assert.equal(state.completion, null);
+  assert.ok(state.completion?.archivePending?.storageId);
+  assert.equal(state.completion.archivePending.environment,"TEST");
 
   const objects = [...s.storage.objs.values()];
-  assert.equal(objects.length, 2);
+  assert.equal(objects.length, 3);
   assert.ok(objects.every((o) => o.metadata?.documentId === "DOC-G5"));
   assert.ok(objects.every((o) => !String(o.metadata?.state || "").includes("Final Completed Document")));
   assert.equal(
