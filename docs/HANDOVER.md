@@ -59,3 +59,7 @@ The live member-register read and live deletion-path probes were not available i
 1. Add or use a safe, authenticated, read-only production probe for REAL meeting delete refusal, missing-environment-as-REAL classification, and REAL meeting-record purge refusal. Do not issue a destructive delete or PURGE request against a real record.
 2. Complete Meeting roles and grants, then member upload/signing, with separate scope, tests and approvals. Keep the three live deletion checks clearly marked unverified until safe evidence exists.
 3. Create the fresh owner-only RENEW workflow PR: validate repository owner comment author ID and github.actor, pass comment body through an environment variable with strict validation, renew exactly one portal by 72 hours, and test wrong-named/stale evidence. Keep all parked work separate.
+
+## Open decisions
+
+- **Oversight role-title confirmation:** the policy records "Director of Internal Oversight", while repository materials show "Director of International Oversight"; the owner must confirm the correct title before the disposal workflow is built.
