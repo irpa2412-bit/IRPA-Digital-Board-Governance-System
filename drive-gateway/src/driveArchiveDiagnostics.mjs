@@ -19,7 +19,7 @@ async function listNamedFolders(token,name,parentId){
  }while(pageToken);
  return{status:200,ok:true,reason:null,files};
 }
-export async function probeDriveArchiveDestinations({env,helpers,paths=[]}={}){
+export async function probeDriveArchiveDestinations({env,helpers,paths=[],rootFolderName="IRPA Governance System"}={}){
  const destinations=(paths||[]).map(item=>typeof item==="string"?{name:item,path:item}:{...item});
  let token;
  try{token=await helpers.getDriveAccessToken(env);}
@@ -27,11 +27,15 @@ export async function probeDriveArchiveDestinations({env,helpers,paths=[]}={}){
  let oauthScopes=null,quota={usedBytes:null,freeBytes:null,limitBytes:null};
  try{const info=await fetch("https://oauth2.googleapis.com/tokeninfo?access_token="+encodeURIComponent(token));if(info.ok){const data=await info.json();oauthScopes=String(data.scope||"").split(/\\s+/).filter(Boolean);}}catch{}
  try{const about=await driveGet(token,"/drive/v3/about?fields=storageQuota(limit,usage,usageInDrive,usageInDriveTrash)");if(about.ok){const q=about.data.storageQuota||{},limit=q.limit==null?null:Number(q.limit),used=q.usage==null?null:Number(q.usage);quota={usedBytes:used,freeBytes:limit==null||used==null?null:Math.max(0,limit-used),limitBytes:limit};}}catch{}
+ const rootLookup=await listNamedFolders(token,String(rootFolderName||"IRPA Governance System"),null);
+ const rootFolder=rootLookup.ok&&rootLookup.files.length===1?rootLookup.files[0]:null;
+ const rootFailure=!rootLookup.ok?{httpStatus:rootLookup.status,reasonCode:rootLookup.reason||"DRIVE_ROOT_LOOKUP_FAILED"}:!rootLookup.files.length?{httpStatus:rootLookup.status,reasonCode:"DRIVE_ROOT_NOT_FOUND"}:rootLookup.files.length>1?{httpStatus:rootLookup.status,reasonCode:"MULTIPLE_ROOT_FOLDERS"}:null;
  const results=[];
  for(const item of destinations){
   const segments=String(item.path||"").split("/").filter(Boolean);segments.pop();
-  let parentId=null,last=null,failed=null,ambiguous=false,matched=0;
+  let parentId=rootFolder?.id||null,last=null,failed=rootFailure,ambiguous=Boolean(rootFailure?.reasonCode==="MULTIPLE_ROOT_FOLDERS"),matched=rootLookup.files?.length||0;
   for(const segment of segments){
+   if(failed)break;
    const listing=await listNamedFolders(token,segment,parentId);
    if(!listing.ok){failed={httpStatus:listing.status,reasonCode:listing.reason||"DRIVE_FOLDER_LOOKUP_FAILED"};break;}
    matched=listing.files.length;
