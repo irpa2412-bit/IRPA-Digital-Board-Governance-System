@@ -187,6 +187,7 @@ async function post(path, body, idToken) {
         }, { merge: true });
       } catch {
         fatalError = fatalError || "Could not confirm the canary meeting remains protected.";
+        liveCheckFailed = true;
       }
     }
     if (db && recordRef) {
@@ -208,6 +209,7 @@ async function post(path, body, idToken) {
         }, { merge: true });
       } catch {
         fatalError = fatalError || "Could not confirm the canary meeting record remains protected.";
+        liveCheckFailed = true;
       }
     }
   }
@@ -217,6 +219,7 @@ async function post(path, body, idToken) {
     results.realMeetingPurge === true &&
     results.trialEnvironmentMutationBlocked === true &&
     !fatalError;
+  if (!passed && !fatalError && !liveCheckFailed) liveCheckFailed = true;
   output("live_check_failed", liveCheckFailed ? "true" : "false");
   output("meeting_id", meetingId);
   output("record_id", recordId);
@@ -231,9 +234,5 @@ async function post(path, body, idToken) {
     "Final state: system-test canary retained; meeting and record marked protected/legal-hold.",
     "No cleanup or deletion was attempted after the tests."
   ]);
-  if (!passed) {
-    if (!fatalError && !liveCheckFailed) liveCheckFailed = true;
-    if (liveCheckFailed) output("live_check_failed", "true");
-    process.exitCode = 1;
-  }
+  if (!passed) process.exitCode = 1;
 })();
