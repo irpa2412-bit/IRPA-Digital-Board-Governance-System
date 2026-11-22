@@ -100,13 +100,19 @@ test("server-side meeting register returns only category-authorized, initiator a
     fsDocument("meetings","staff",{meetingCategory:"STAFF",meetingPolicyId:"STAFF",meetingType:"Staff Meeting",initiatorUid:"other-user"}),
     fsDocument("meetings","own",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"staff-user"}),
     fsDocument("meetings","invited",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user",invitedEmails:["staff@example.test"]}),
-    fsDocument("meetings","private",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user"})
+    fsDocument("meetings","private",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user"}),
+    fsDocument("meetings","participant-only",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user"}),
+    fsDocument("meetings","revoked-participant",{meetingCategory:"GOVERNANCE",meetingPolicyId:"GOVERNANCE",meetingType:"Board Meeting",initiatorUid:"other-user"})
+  ];
+  const participants = [
+    fsDocument("participants","active-participant",{meetingId:"participant-only",participantEmail:"staff@example.test",meetingAccessDispatched:true,meetingAccessRevoked:false,status:"Active"}),
+    fsDocument("participants","revoked-participant",{meetingId:"revoked-participant",participantEmail:"staff@example.test",meetingAccessDispatched:true,meetingAccessRevoked:true,status:"Active"})
   ];
   globalThis.fetch = async (url, init = {}) => {
     const parsed = new URL(url);
     if (parsed.pathname.endsWith(":runQuery")) {
       const collection = JSON.parse(init.body).structuredQuery.from[0].collectionId;
-      const rows = collection === "meetings" ? meetings : [];
+      const rows = collection === "meetings" ? meetings : collection === "participants" ? participants : [];
       return new Response(JSON.stringify(rows), { status:200, headers:{"content-type":"application/json"} });
     }
     if (parsed.pathname.endsWith("/members/staff-user")) {
@@ -123,7 +129,7 @@ test("server-side meeting register returns only category-authorized, initiator a
     assert.equal(response.status,200);
     const body = await response.json();
     assert.equal(body.ok,true);
-    assert.deepEqual(body.meetings.map(row=>row.id).sort(),["invited","own","staff"]);
+    assert.deepEqual(body.meetings.map(row=>row.id).sort(),["invited","own","participant-only","staff"]);
     assert.equal(body.accessMode,"SERVER_AUTHORIZED_CATEGORY_AND_PARTICIPANT_SCOPE");
   } finally {
     globalThis.fetch = previousFetch;
