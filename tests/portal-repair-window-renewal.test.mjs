@@ -32,14 +32,15 @@ test("shared dependencies and cross-portal PRs cannot be renewed", () => {
 });
 
 
+
 test("renewal workflow is owner-only, PR-scoped, 72 hours and records the exact quotation", () => {
   const workflow = fs.readFileSync(new URL("../.github/workflows/portal-repair-window-renewal.yml", import.meta.url), "utf8");
-  assert.match(workflow, /author_association == 'OWNER'/);
-  assert.match(workflow, /comment\\.user\\.login !== repoInfo\\.data\\.owner\\.login/);
-  assert.match(workflow, /72 \\* 60 \\* 60 \\* 1000/);
-  assert.match(workflow, /quotedApproval: quote/);
-  assert.match(workflow, /record\\.renewals/);
-  assert.match(workflow, /docs\\/approvals\\.md/);
-  assert.match(workflow, /multi-portal PRs cannot be renewed/);
-  assert.match(workflow, /Renewal commands must be posted on a pull request/);
+  assert.ok(workflow.includes("author_association == 'OWNER'"));
+  assert.ok(workflow.includes("comment.user.login !== repoInfo.data.owner.login"));
+  assert.ok(workflow.includes("72 * 60 * 60 * 1000"));
+  assert.ok(workflow.includes("quotedApproval: quote"));
+  assert.ok(workflow.includes("record.renewals"));
+  assert.ok(workflow.includes("docs/approvals.md"));
+  assert.ok(workflow.includes("multi-portal PRs cannot be renewed"));
+  assert.ok(workflow.includes("Renewal commands must be posted on a pull request"));
 });
