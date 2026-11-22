@@ -1,5 +1,20 @@
 PR #845 is merged and deployed; the three live deletion-path refusal checks remain unverified.
 
+## FIRST TASK NEXT SESSION — retention lock and controlled disposal
+
+Create a small, separate implementation PR based on [the Records Retention and Disposal Policy](policies/records-retention-and-disposal.md). This is the first task; keep it separate from #845 and #855. Do not weaken checks or publish Firestore rules.
+
+1. **Retention calculation and inheritance:** for every REAL meeting, set `retainUntil = proceedings date + 10 calendar years`. For a single-day meeting, use its meeting date; for a multi-day meeting, use the final day of proceedings. Do not use the signing, approval, upload or filing date. Every minute, resolution, vote, attendance record, action and recording of that meeting inherits exactly the same `retainUntil`.
+2. **Worker enforcement:** enforce the retention deadline server-side. No actor, role, administrator, request, approval or client route may dispose of a REAL proceedings record before `retainUntil`. An active legal hold blocks disposal even after the retention period expires.
+3. **Signature Portal disposal workflow:** build on the existing signature portal and authorisation matrix, in this exact order: disposal request with identified records, reason and legal-hold flag; authorisation document reviewed and duly signed by the Director of Internal Oversight; subsequent authorisation by the Executive Director; then execution by an administrator. The administrator executes only and cannot decide relevance or authorise disposal.
+4. **No direct deletion:** remove/omit every deletion button and direct deletion path for REAL proceedings records. Preserve administrator deletion for explicitly TRIAL meetings subject to existing safeguards; missing, invalid or ambiguous environment remains REAL.
+5. **Permanent audit:** every disposal produces a permanent audit entry containing the document's SHA-256 hash, identifiers, proceedings date, `retainUntil`, reason, legal-hold state, request and authorisation evidence, approvers, executor and timestamp.
+6. **Role-register check before implementation assumptions:** inspect the authoritative member register for the exact roles Director of Internal Oversight and Executive Director; report presence and occupancy of each. Do not substitute Director of International Oversight for Director of Internal Oversight. If either role is missing, report it without inventing a holder.
+7. **Acceptance evidence:** tests must cover multi-day final-day calculation, identical inherited retention dates, Worker refusal for all actors/routes before the deadline, legal holds, approval sequence and separation of duties, absence of direct REAL deletion, preserved TRIAL safeguards, and permanent SHA-256 disposal audit. Report only actual GitHub check evidence; do not manually mark PASS.
+
+The live member-register read and live deletion-path probes were not available in the 22 November wind-up. Keep those items explicitly NOT VERIFIED until safe, authoritative evidence is obtained.
+
+
 # IRPA-DBGS handover — 22 November 2026
 
 ## Live and verified
