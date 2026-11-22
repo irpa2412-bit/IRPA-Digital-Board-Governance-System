@@ -43,4 +43,8 @@ test("renewal workflow is owner-only, PR-scoped, 72 hours and records the exact 
   assert.ok(workflow.includes("docs/approvals.md"));
   assert.ok(workflow.includes("multi-portal PRs cannot be renewed"));
   assert.ok(workflow.includes("Renewal commands must be posted on a pull request"));
+  const template = fs.readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
+  assert.ok(template.includes("Adapter-only boundary"));
+  assert.ok(template.includes("Feature flag (default OFF)"));
+  assert.ok(template.includes("Kill switch"));
 });
