@@ -101,8 +101,6 @@ export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,
     const row=rows.get(fieldId);
     if(!row||row.signerId!==target.id||row.status==="VERIFIED_EXISTING")throw new HttpError(409,"A selected field is not an eligible failed stamp slot for this signer.");
   }
-  const retainedVerified=assessment.stampSlots.some(row=>row.signerId===target.id&&row.status==="VERIFIED_EXISTING"&&!requested.includes(row.fieldId));
-  if(!retainedVerified)throw new HttpError(409,"This signer has no independently verified stamp to retain. Reassignment is blocked pending the separate full-signer recovery path.");
   const replacementEmail=validateEmail(email).trim().toLowerCase();
   if(replacementEmail===String(target.email||"").trim().toLowerCase())throw new HttpError(400,"Use a different email identity for the replacement signer.");
   const replacementName=validateName(name);
@@ -121,7 +119,7 @@ export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,
   const replacement={id:newSignerId,email:replacementEmail,emailHash:await sha256Hex(replacementEmail),profileUid:null,name:replacementName,title:"",declaredParticulars:{name:replacementName,title:"",occupation:"",capacity:""},roleAssignments:replacementRoles,order:target.order,uid:null,status:"Pending",identityType:"email-link",tokenHash:await sha256Hex(randomHex(32)),tokenExpiresAt:expiresAt,emailLinkExpiresAt:expiresAt,emailLinkStatus:"issued",emailLinkSessionStatus:"revoked",emailLinkSessionHash:null,emailLinkTokenHistory:[],emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{},invitation:"Pending"};
   const retainedField=assessment.stampSlots.find(row=>row.signerId===target.id&&row.status==="VERIFIED_EXISTING"&&!requested.includes(row.fieldId));
   const retainedValue=retainedField?target.fieldValues?.[retainedField.fieldId]:null;
-  const nextSigners=(current.signers||[]).map(item=>item.id===target.id?{...item,certificateSignatureValue:retainedValue||item.signatureValue,certificateSignatureType:typeof retainedValue==="string"&&retainedValue.startsWith("data:image/png;base64,")?"drawn":item.signatureType}:item);
+  const nextSigners=(current.signers||[]).map(item=>item.id===target.id?{...item,certificateSignatureValue:retainedValue||"Stamp not verified — reassigned",certificateSignatureType:typeof retainedValue==="string"&&retainedValue.startsWith("data:image/png;base64,")?"drawn":"typed"}:item);
   const mappedFields=(current.fields||[]).map(field=>{
     if(!requested.includes(field.fieldId))return field;
     return {...field,signerId:newSignerId,signerUid:null,roleAssignmentIndex:roleIndexes.indexOf(Number(field.roleAssignmentIndex||0))};
