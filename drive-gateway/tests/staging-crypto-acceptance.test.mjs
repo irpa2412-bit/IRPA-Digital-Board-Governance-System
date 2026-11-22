@@ -67,6 +67,7 @@ async function fixture() {
   const tokenHash = await sha256Hex(signingSecret);
   const envelope = {
     id: "ENV-STAGING-CRYPTO-001",
+    dataEnvironment: "TRIAL",
     documentId: "DOC-STAGING-CRYPTO-001",
     documentHash: originalHash,
     title: "Staging Cryptographic Acceptance",
@@ -127,6 +128,7 @@ test("C-G13R non-extractable Cloudflare-style public custody produces independen
   const result = await finalizeEnvelope({
     meta: f.meta,
     storage: f.storage,
+    env: { IRPA_ENVIRONMENT: "staging", DRIVE_MOCK: "false" },
     now: () => new Date("2026-10-07T20:00:00.000Z"),
     config: { ttlDays: 14 },
     crypto: { keyProvider: provider },
