@@ -1,7 +1,7 @@
 const clean = value => String(value ?? "").trim();
 const lower = value => clean(value).toLowerCase();
 const ACTIVE = new Set(["active", "activated", "approved", "current"]);
-const DENIED = new Set(["inactive", "revoked", "expired", "terminated", "disabled", "suspended", "removed", "cancelled", "canceled", "deactivated", "lapsed", "withdrawn", "pending"]);
+const DENIED = new Set(["inactive", "revoked", "expired", "terminated", "disabled", "suspended", "removed", "cancelled", "canceled", "deactivated", "lapsed", "withdrawn"]);
 const ROLE_FIELDS = ["role", "title", "position", "jobTitle", "designation", "departmentalRole", "authorityRole", "boardPosition", "departmentRole", "post"];
 const ARRAY_ROLE_FIELDS = ["roles", "assignedRoles", "selectedRoles", "roleAssignments", "authorities"];
 const STATUS_FIELDS = ["status", "employmentStatus", "membershipStatus", "authorityStatus", "accessStatus", "registrationStatus", "revocationStatus"];
@@ -21,7 +21,7 @@ export const MEETING_PERMANENT_AUTHORITY_ROLES = Object.freeze([
 
 const normalizeWords = value => lower(value)
   .replace(/&/g, " and ")
-  .replace(/[._,;:/\\()[\]{}-]+/g, " ")
+  .replace(/[._,;:/\\()[\]{}–—-]+/g, " ")
   .replace(/\bof\b/g, " ")
   .replace(/\bthe\b/g, " ")
   .replace(/\s+/g, " ")
@@ -56,6 +56,18 @@ function hasHodAuthority(record = {}) {
     const role = normalizeWords(value);
     return role === "hod" || role.includes("head of department") || role.includes("department head");
   });
+}
+function isDepartmentHeadAssignment(actor, record = {}) {
+  const nested = record.departmentHead && typeof record.departmentHead === "object" ? record.departmentHead
+    : record.headOfDepartment && typeof record.headOfDepartment === "object" ? record.headOfDepartment
+      : record.hod && typeof record.hod === "object" ? record.hod : {};
+  const reference = {
+    uid: record.headUid || record.departmentHeadUid || record.hodUid || record.headOfDepartmentUid || record.departmentHeadUserId || nested.uid || nested.userId,
+    email: record.headEmail || record.departmentHeadEmail || record.hodEmail || record.headOfDepartmentEmail || nested.email,
+    memberNumber: record.headMemberNumber || record.departmentHeadMemberNumber || record.hodMemberNumber || nested.memberNumber,
+    employeeNumber: record.headEmployeeNumber || record.departmentHeadEmployeeNumber || record.hodEmployeeNumber || nested.employeeNumber
+  };
+  return Boolean(matchRecord(actor, reference, "register"));
 }
 
 const normalizeKey = (value, type) => {
@@ -220,7 +232,7 @@ export function resolveMeetingAuthority({
     let grantedRole = null;
     if (isInternalOversight(record)) grantedRole = "Director of Internal Oversight";
     else if (isExecutiveDirector(record)) grantedRole = "Executive Director";
-    else if (hasHodAuthority(record)) grantedRole = "Head of Department";
+    else if (hasHodAuthority(record) || ((match.source === "departments" || match.source === "departmentHeads") && isDepartmentHeadAssignment(actor, record))) grantedRole = "Head of Department";
     if (grantedRole) grants.push({
       role: grantedRole,
       sourceCollection: match.source,
