@@ -8,6 +8,7 @@ on:
       - "scripts/portal-repair-window-renewal.mjs"
       - "tests/portal-protection-policy.test.mjs"
       - "tests/portal-repair-window-renewal.test.mjs"
+      - "tests/meeting-portal-protection.test.mjs"
       - "docs/portal-protection/**"
       - "docs/approvals.md"
       - ".github/pull_request_template.md"
@@ -44,7 +45,7 @@ jobs:
       - name: Syntax-check portal guard and renewal logic
         run: node --check scripts/portal-protection-check.mjs && node --check scripts/portal-repair-window-renewal.mjs
       - name: Test per-portal policy and owner renewal commands
-        run: node --test tests/portal-protection-policy.test.mjs tests/portal-repair-window-renewal.test.mjs
+        run: node --test tests/portal-protection-policy.test.mjs tests/portal-repair-window-renewal.test.mjs tests/meeting-portal-protection.test.mjs
       - name: Validate every registered portal has isolated window and Change Record files
         run: |
           node --input-type=module <<'NODE'
