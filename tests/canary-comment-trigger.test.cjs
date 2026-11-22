@@ -20,10 +20,13 @@ test("workflow listens only to newly created issue comments", () => {
   assert.match(workflow, /issue_comment:\s*\n\s*types:\s*\[created\]/);
   assert.doesNotMatch(workflow, /issue_comment:[\s\S]{0,80}edited/);
 });
-test("workflow pins the dedicated issue and both owner identity fields", () => {
+test("workflow limits the job to the dedicated issue; the payload guard enforces owner identity", () => {
   assert.match(workflow, /github\.event\.issue\.number == 876/);
-  assert.match(workflow, /github\.event\.comment\.user\.id == 319164319/);
-  assert.match(workflow, /github\.event\.comment\.user\.login == 'irpa2412-bit'/);
+  assert.doesNotMatch(workflow, /github\.event\.issue\.pull_request == null/);
+  assert.match(guard, /event\.comment\.user\.id === OWNER_ID/);
+  assert.match(guard, /event\.comment\.user\.login === OWNER_LOGIN/);
+  assert.match(guard, /event\.comment\.body === EXACT_BODY/);
+  assert.match(guard, /!event\.issue\.pull_request/);
 });
 test("comment body is checked in a file-based guard, never interpolated into a shell command", () => {
   assert.match(guard, /event\.comment\.body === EXACT_BODY/);
