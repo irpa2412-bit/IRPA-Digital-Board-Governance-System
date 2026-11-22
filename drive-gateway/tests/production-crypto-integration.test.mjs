@@ -39,7 +39,7 @@ async function fixture() {
   };
   const envelope = {
     id:"ENV-CI-001",
-    dataEnvironment:"production",
+    dataEnvironment:"ACTUAL",
     documentId:"DOC-CI-001",
     documentHash:originalHash,
     title:"Production Crypto Integration",
