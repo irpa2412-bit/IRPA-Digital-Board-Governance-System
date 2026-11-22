@@ -19,6 +19,11 @@ on:
         type: boolean
         required: true
         default: false
+      confirm_staging_firestore_rules_deployment:
+        description: "Type DEPLOY RULES to publish isolated staging Firestore rules"
+        type: string
+        required: true
+        default: "no"
 concurrency:
   group: irpa-staging-website-integration-${{ github.ref }}
   cancel-in-progress: false
@@ -2454,7 +2459,7 @@ jobs:
           console.log("STAGING_FIREBASE_IDENTITY_VALID=true");
           NODE
       - name: Deploy approved Firestore rules to isolated staging only
-        if: github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/fix/communication-media-archive-drive-oauth' && inputs.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'
         env:
           PROJECT: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.LIVEKIT_STAGING_FIREBASE_SERVICE_ACCOUNT }}

@@ -47,7 +47,7 @@ on:
           - "yes"
         default: "no"
       confirm_production_firestore_rules_deployment:
-        description: "Type DEPLOY to publish production Firestore rules and indexes. No push can publish them."
+        description: "Type DEPLOY RULES to publish production Firestore rules and indexes. No push can publish them."
         required: true
         type: string
         default: "no"
@@ -380,7 +380,7 @@ jobs:
           fi
 
       - name: Deploy Firestore Rules and Indexes (retry transient Google 5xx)
-        if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_firestore_rules_deployment == 'DEPLOY' && steps.firestore_changes.outputs.changed == 'true'
+        if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES' && steps.firestore_changes.outputs.changed == 'true'
         shell: bash
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IRPA_DIGITAL_BOARD_GOVERNANCE }}
