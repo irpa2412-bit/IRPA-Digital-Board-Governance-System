@@ -26,7 +26,7 @@ async function fixture({tamperFieldHash=false}={}){
     signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],signedAt:"2026-11-22T10:00:00.000Z",signatureValue,fieldValues:{"SIG-1":fieldValue,"SIG-2":fieldValue},name:"Test Signer",email:"signer@example.test",signatureType:"drawn"}],
     events,completionFailure:{stage:"WRITE_ARCHIVE_COPIES",errorType:"Error",failedAt:"2026-11-22T10:00:01.000Z"}
   });
-  return {ctx:{meta,storage,now:()=>new Date("2026-11-22T12:00:00.000Z"),config:{appUrl:"https://irpa.example.test",emailLinkTtlDays:7,ttlDays:14},sendInvitation:async message=>{sent.push(message);}},sent:[],user:{uid:"owner-1"},other:{uid:"intruder"},events};
+  return {ctx:{meta,storage,now:()=>new Date("2026-11-22T12:00:00.000Z"),config:{appUrl:"https://irpa.example.test",emailLinkTtlDays:7,ttlDays:14},sendInvitation:async message=>{sent.push(message);}},sent,user:{uid:"owner-1"},other:{uid:"intruder"},events};
 }
 test("recovery queue is owner-scoped and paginated",async()=>{
   const f=await fixture();
