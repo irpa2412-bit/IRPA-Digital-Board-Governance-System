@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy, parseActivityTimestamps, portalPolicyPaths, resolvePortalPolicyPaths } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/portal-register.json", import.meta.url), "utf8"));
 
@@ -63,7 +63,7 @@ test("single-portal changes resolve to isolated per-portal records", () => {
     recordPath: "docs/portal-protection/records/meeting-portal.json"
   });
 });
-test("shared or multi-portal changes retain the shared protection record", () => {
+test("shared or multi-portal changes are rejected rather than selecting a shared record", () => {
   assert.equal(portalPolicyPaths(["Meeting Portal", "Signature Portal"]), null);
   assert.equal(portalPolicyPaths([]), null);
 });
@@ -122,4 +122,29 @@ test("break-glass expires after 24 hours even though repair windows last 72 hour
   const result = evaluatePolicy({ changedFiles: [file], registry, record: valid, windowState: emergency, latestActivityAt: "2026-11-20T17:00:00Z", now: Date.parse("2026-11-20T18:00:01Z") });
   assert.equal(result.ok, false);
   assert.match(result.reason, /24-hour break-glass/);
+});
+
+test("a portal's per-portal record paths are unique and cannot approve another portal", () => {
+  const names = Object.keys(registry.portals);
+  const paths = names.map(name => portalPolicyPaths([name]));
+  assert.equal(new Set(paths.map(value => value.windowPath)).size, names.length);
+  assert.equal(new Set(paths.map(value => value.recordPath)).size, names.length);
+  const meeting = portalPolicyPaths(["Meeting Portal"]);
+  const signature = portalPolicyPaths(["Signature Portal"]);
+  assert.notEqual(meeting.windowPath, signature.windowPath);
+  assert.notEqual(meeting.recordPath, signature.recordPath);
+});
+
+test("new portals receive a seven-day warning period and then require full protection files", () => {
+  const entry = { guardMode: "warning", registeredAt: "2026-11-22T00:00:00Z" };
+  const until = newPortalWarningUntil(entry);
+  assert.equal(until, Date.parse("2026-11-29T00:00:00Z"));
+  assert.equal(newPortalWarningUntil({ guardMode: "protected", registeredAt: entry.registeredAt }), null);
+});
+
+test("real evidence URLs must identify an exact repository, run and job", () => {
+  assert.deepEqual(parseGitHubJobEvidence("Baseline smoke PASS https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"), {
+    repository: "irpa2412-bit/IRPA-Digital-Board-Governance-System", runId: 44952176019, jobId: 136992981056
+  });
+  assert.equal(parseGitHubJobEvidence("https://example.com/not-a-run"), null);
 });
