@@ -27,7 +27,7 @@ function installFetch({duplicates=false,missing=false}={}){
 test("per-destination archive probe reports masked IDs, scopes, quota and never writes",async()=>{
  const mock=installFetch();
  try{
-  const result=await probeDriveArchiveDestinations({env:{},helpers:{async getDriveAccessToken(){return"short-lived-token";}},rootFolderName:"Root",paths:[{name:"Board archive",destinationType:"archive",path:"Root/Archive/Document/file.pdf"}]});
+  const result=await probeDriveArchiveDestinations({env:{},helpers:{async getDriveAccessToken(){return"short-lived-token";}},rootFolderName:"Root",paths:[{name:"Board archive",destinationType:"archive",path:"Archive/Document/file.pdf"}]});
   assert.equal(result.tokenRefreshResult,"SUCCESS");
   assert.deepEqual(result.oauthScopes,["https://www.googleapis.com/auth/drive.file"]);
   assert.equal(result.quota.usedBytes,50);assert.equal(result.quota.freeBytes,50);
@@ -43,7 +43,7 @@ test("per-destination archive probe reports masked IDs, scopes, quota and never 
 test("duplicate folder names are denied rather than choosing an ambiguous archive",async()=>{
  const mock=installFetch({duplicates:true});
  try{
-  const result=await probeDriveArchiveDestinations({env:{},helpers:{async getDriveAccessToken(){return"token";}},rootFolderName:"Root",paths:[{name:"Owner copy",path:"Root/Archive/Document/file.pdf"}]});
+  const result=await probeDriveArchiveDestinations({env:{},helpers:{async getDriveAccessToken(){return"token";}},rootFolderName:"Root",paths:[{name:"Owner copy",path:"Archive/Document/file.pdf"}]});
   assert.equal(result.destinations[0].probe,"DENIED");
   assert.equal(result.destinations[0].reasonCode,"MULTIPLE_FOLDER_MATCHES");
   assert.equal(result.destinations[0].matchedByName,2);
@@ -54,7 +54,7 @@ test("duplicate folder names are denied rather than choosing an ambiguous archiv
 test("missing archive folders are reported without creating them",async()=>{
  const mock=installFetch({missing:true});
  try{
-  const result=await probeDriveArchiveDestinations({env:{},helpers:{async getDriveAccessToken(){return"token";}},rootFolderName:"Root",paths:[{name:"Signer copy",path:"Root/Archive/Document/file.pdf"}]});
+  const result=await probeDriveArchiveDestinations({env:{},helpers:{async getDriveAccessToken(){return"token";}},rootFolderName:"Root",paths:[{name:"Signer copy",path:"Archive/Document/file.pdf"}]});
   assert.equal(result.destinations[0].probe,"DENIED");
   assert.equal(result.destinations[0].reasonCode,"FOLDER_NOT_FOUND");
   assert.equal(result.destinations[0].matchedByName,0);
