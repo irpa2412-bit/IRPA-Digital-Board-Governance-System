@@ -74,9 +74,26 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   if (!record.declaration?.reason || !record.declaration?.expectedEffect || !Array.isArray(record.declaration?.prohibitedChanges) || !record.declaration.prohibitedChanges.length) return fail("Change Record must state reason, expected effect and prohibited changes.");
   if (!record.baseline?.commit || !record.baseline?.rollbackCommit) return fail("Baseline and rollback commits are mandatory.");
   if (record.validation?.baselineSmoke !== "PASS" || record.validation?.fullRegression !== "PASS") return fail("Baseline smoke and full regression must both be recorded as PASS.");
+  const evidence = record.validation?.evidence;
+  const runLink = /https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+\/job\/\d+/;
+  const hasRunEvidence = label => Array.isArray(evidence) && evidence.some(item =>
+    String(item).toLowerCase().includes(label.toLowerCase()) &&
+    String(item).includes(record.baseline.commit) &&
+    runLink.test(String(item))
+  );
+  if (!hasRunEvidence("baseline smoke") || !hasRunEvidence("full regression")) {
+    return fail("Baseline smoke and full regression require real-run links tied to this portal baseline commit.");
+  }
   const smoke = record.validation?.portalSmoke ?? {};
   const missingSmoke = [...affected].filter((portal) => smoke[portal] !== "PASS");
   if (missingSmoke.length) return fail("Missing passing smoke evidence for: " + missingSmoke.join(", "));
+  const missingPortalRunEvidence = [...affected].filter(portal => !Array.isArray(evidence) || !evidence.some(item =>
+    String(item).includes(portal) &&
+    /portal smoke/i.test(String(item)) &&
+    String(item).includes(record.baseline.commit) &&
+    runLink.test(String(item))
+  ));
+  if (missingPortalRunEvidence.length) return fail("Missing portal-specific real-run smoke links for: " + missingPortalRunEvidence.join(", "));
   if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).");
   return { ok: true, affected: [...affected].sort(), protectedFiles, reason: "Protected changes are declared and within the active repair window." };
 }
