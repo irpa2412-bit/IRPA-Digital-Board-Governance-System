@@ -1,0 +1,160 @@
+name: Signature Portal Baseline Evidence
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/signature-portal-baseline-evidence.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signature-portal-baseline-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BASELINE_SHA: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+
+jobs:
+  baseline-smoke:
+    name: baseline-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASELINE_SHA }}
+          fetch-depth: 1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build baseline application
+        run: npm run build
+      - name: Start built application preview
+        run: |
+          (npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/irpa-preview.log 2>&1 &)
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/irpa-preview.log
+          exit 1
+      - name: Install Chromium for browser smoke
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Run built-app startup and production browser smoke
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+          const urls = [
+            "http://127.0.0.1:4173/",
+            "https://irpa-digital-board-governance.web.app/",
+            "https://irpa-digital-board-governance-frontend.irpa-governance.workers.dev/"
+          ];
+          const widths = [360, 390, 768, 1024, 1366, 1920];
+          const browser = await chromium.launch({ headless: true });
+          let failed = false;
+          try {
+            for (const url of urls) {
+              const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+              const errors = [];
+              page.on("pageerror", error => errors.push(error.message));
+              try {
+                const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+                if (!response || response.status() !== 200) throw new Error("Expected HTTP 200; received " + (response?.status() ?? "no response"));
+                await page.waitForFunction(() => {
+                  const root = document.querySelector("#root");
+                  return Boolean(root && root.children.length > 0);
+                }, { timeout: 30000 });
+                const startup = await page.evaluate(() => ({
+                  title: document.title,
+                  rootChildren: document.querySelector("#root")?.children.length ?? 0,
+                  textLength: document.querySelector("#root")?.innerText?.trim().length ?? 0,
+                  viewportMeta: document.querySelector('meta[name="viewport"]')?.content ?? null
+                }));
+                if (!startup.title.toLowerCase().includes("irpa") || !startup.textLength) throw new Error("Application startup content check failed: " + JSON.stringify(startup));
+                if (!startup.viewportMeta?.includes("width=device-width")) throw new Error("Missing responsive viewport metadata.");
+                for (const width of widths) {
+                  await page.setViewportSize({ width, height: 900 });
+                  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+                  if (overflow) throw new Error("Horizontal overflow at viewport width " + width);
+                }
+                if (errors.length) throw new Error("Uncaught browser errors: " + errors.join(" | "));
+                console.log(JSON.stringify({ url, status: response.status(), ...startup, viewportWidths: widths, pageErrors: errors }));
+              } catch (error) {
+                failed = true;
+                console.error(JSON.stringify({ url, error: error.message, pageErrors: errors }));
+              } finally {
+                await page.close();
+              }
+            }
+          } finally {
+            await browser.close();
+          }
+          if (failed) process.exit(1);
+          console.log("PASS: built baseline startup plus Firebase Hosting and Cloudflare production browser smoke.");
+          NODE
+
+  full-regression:
+    name: full-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASELINE_SHA }}
+          fetch-depth: 1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set up Java for Firebase emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run complete test:all suite
+        run: npx firebase emulators:exec --only firestore --project demo-irpa-dgbs "npm run test:all"
+
+  signature-portal-smoke:
+    name: signature-portal-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASELINE_SHA }}
+          fetch-depth: 1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run Signature Portal smoke from seven-portal protection registry
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { spawnSync } from "node:child_process";
+          const registry = JSON.parse(fs.readFileSync("docs/portal-protection/portal-register.json", "utf8"));
+          const entry = registry.portals["Signature Portal"];
+          if (!entry?.tests?.length) throw new Error("Signature Portal has no registered smoke tests.");
+          const result = spawnSync(process.execPath, ["--test", ...entry.tests], { encoding: "utf8" });
+          process.stdout.write(result.stdout || "");
+          process.stderr.write(result.stderr || "");
+          if (result.status !== 0) process.exit(result.status ?? 1);
+          console.log(JSON.stringify({ portal: "Signature Portal", tests: entry.tests, result: "PASS" }));
+          NODE
