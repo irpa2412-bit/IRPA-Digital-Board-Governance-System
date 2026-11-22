@@ -218,7 +218,7 @@ test("workflow delegates its source-isolation gate to the extracted guard script
 });
 
 test("only stale runs for the same pull request are cancelled", () => {
-  assert.match(workflow, /group: meeting-portal-browser-\\$\\{\\{\\s*github\\.event\\.pull_request\\.number\\s*&&\\s*format\\('pr-\\{0\\}',\\s*github\\.event\\.pull_request\\.number\\)\\s*\\|\\|\\s*format\\('ref-\\{0\\}-sha-\\{1\\}',\\s*github\\.ref,\\s*github\\.sha\\)\\s*\\}\\}/);
+  assert.ok(workflow.includes("group: meeting-portal-browser-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('ref-{0}-sha-{1}', github.ref, github.sha) }}"));
   assert.match(workflow, /cancel-in-progress: true/);
   const groupFor = ({ eventName, pullRequestNumber, ref, sha }) =>
     `meeting-portal-browser-${pullRequestNumber ? `pr-${pullRequestNumber}` : `ref-${ref}-sha-${sha}`}`;
