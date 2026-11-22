@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "portal": "Meeting Portal",
+  "status": "open",
+  "openedAt": "2026-11-21T20:23:03Z",
+  "lastActivityAt": "2026-11-21T20:23:03Z",
+  "inactivityCloseHours": 72,
+  "emergency": false,
+  "reason": "Owner-approved Tier 1 REAL/TRIAL meeting deletion protection, approved 21 November 2026. REAL and unclassified meetings must never be deleted; only an explicitly created TRIAL meeting may be deleted by an administrator under existing safeguards. Approval is conditional on every required check on the final PR head being green and the protected portal repair policy failure being investigated and fixed without bypass or manually recorded PASS.",
+  "scope": [
+    "drive-gateway/src/meetingServices.mjs",
+    "drive-gateway/src/meetingEnvironment.mjs",
+    "drive-gateway/tests/meeting-environment.test.mjs",
+    "docs/implementation-status.md",
+    "docs/portal-protection/records/meeting-portal.json",
+    "docs/portal-protection/windows/meeting-portal.json",
+    "scripts/portal-protection-check.mjs",
+    "tests/portal-protection-policy.test.mjs",
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "tests/meeting-isolation-guard.test.mjs",
+    "drive-gateway/src/meetingDeletion.mjs",
+    "src/pages/Meetings.jsx"
+  ],
+  "activityLog": [
+    {
+      "at": "2026-11-21T20:23:03Z",
+      "action": "opened",
+      "description": "Owner approval: \"APPROVE 845 REAL meetings must never be deleted by anyone; only a meeting explicitly created as TRIAL may be deleted, by an administrator, with safeguards. This is my decision of 21 November 2026.\" PR #845; conditional on all required final-head checks green and policy guard failure repaired without bypass or hand-recorded PASS."
+    }
+  ],
+  "baseline": {
+    "commit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c",
+    "rollbackCommit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c"
+  },
+  "durationHours": 72,
+  "warningHours": 12,
+  "expiresAt": "2026-11-24T20:23:03.000Z"
+}
