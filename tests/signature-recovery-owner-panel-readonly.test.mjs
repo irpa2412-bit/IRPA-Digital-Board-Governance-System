@@ -37,3 +37,20 @@ test("diagnostic UI explicitly confirms dry-run does not write or modify origina
  assert.match(source,/No envelope, signer, field, signature, hash, certificate, archive, Drive or email writes were performed/);
  assert.match(source,/No retry, reassignment, repair, finalisation/);
 });
+
+import {formatRecoveryRouteError} from "../src/utils/recoveryRouteError.mjs";
+test("recovery errors identify the exact button and route with stable short codes",()=>{
+ const route="/api/recovery/envelopes/ENV-0000000000000000/evidence";
+ assert.equal(formatRecoveryRouteError({status:404,body:{ok:false,error:"Not found."},button:"Check this document",route}),
+  "Recovery service route missing: "+route+" (ROUTE_MISSING) — Button: Check this document — Route: "+route);
+ assert.match(formatRecoveryRouteError({status:401,body:{error:"Authentication required."},button:"Diagnose finalisation",route}),/^Not signed in \(NOT_SIGNED_IN\) — Button: Diagnose finalisation — Route:/);
+ assert.match(formatRecoveryRouteError({status:403,body:{error:"Forbidden."},button:"Download completed copy",route}),/^Not your envelope \(NOT_YOUR_ENVELOPE\) — Button: Download completed copy — Route:/);
+ assert.match(formatRecoveryRouteError({status:503,body:{error:"Unavailable."},button:"Generate watermarked preview",route}),/^Service unavailable \(SERVICE_UNAVAILABLE\) — Button: Generate watermarked preview — Route:/);
+});
+test("each recovery action passes its own button label into the route error formatter",()=>{
+ assert.match(source,/button:"Check this document"/);
+ assert.match(source,/button:"Diagnose finalisation \(read-only\)"/);
+ assert.match(source,/button:"Download completed copy"/);
+ assert.match(source,/button:"Generate watermarked preview"/);
+ assert.match(queue,/formatRecoveryRouteError/);
+});
