@@ -1,5 +1,6 @@
 name: Protected Portal Baseline Evidence
 # PR A evidence run: baseline 908b314; PR-head tests use github.sha
+# Rerun after final owner report and Gateway authorization assertions.
 
 on:
   workflow_dispatch:
