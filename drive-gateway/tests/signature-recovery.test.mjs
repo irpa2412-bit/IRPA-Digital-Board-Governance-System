@@ -15,8 +15,8 @@ async function fixture({tamperFieldHash=false}={}){
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
   await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:sourceHash});
-  const signatureValue="data:image/png;base64,aGVsbG8=";
-  const fieldValue="data:image/png;base64,aGVsbG8=";
+  const signatureValue="Test Signer";
+  const fieldValue="Test Signer";
   let events=[];
   events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
@@ -48,7 +48,7 @@ test("recovery preview is a valid PDF and contains only verified stamps with non
   const doc=await PDFDocument.load(result.bytes);
   assert.equal(doc.getPageCount(),2);
   assert.equal(result.assessment.summary.verified,1);
-  assert.ok(new TextDecoder().decode(result.bytes).includes("RECOVERY PREVIEW"));
+  assert.ok(new TextDecoder().decode(result.bytes).includes("RECOVERY PREVIEW — NOT COMPLETED"));
 });
 test("tampered audit chain blocks recovery assessment and preview",async()=>{
   const f=await fixture();
