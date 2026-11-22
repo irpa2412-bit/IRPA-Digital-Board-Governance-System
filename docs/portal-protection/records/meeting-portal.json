@@ -53,5 +53,121 @@
       "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
     ]
   },
-  "renewals": []
+  "renewals": [],
+  "activeAmendment": {
+    "status": "implementation-in-progress",
+    "changeId": "MP-2026-11-22-OWNER-FULL-ACCESS",
+    "relatedPullRequest": 863,
+    "branch": "fix/meeting-operational-access-implementation-20261122",
+    "ownerInstruction": "owner instruction",
+    "repairWindow": {
+      "openedAt": "2026-11-22T16:34:38Z",
+      "expiresAt": "2026-11-25T16:34:38Z",
+      "durationHours": 72
+    },
+    "baselineCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
+    "rollbackCommit": "908b314ab0de566d057b4093f4addb11ca434ff3",
+    "grantedRoles": [
+      "Internal Oversight Director",
+      "Executive Director",
+      "Every Head of Department"
+    ],
+    "grantDuration": "Permanent until owner revokes; inactive/revoked authority denied on next request.",
+    "identitySource": "ACTIVE registered authority in Members and Employees; same authoritative source as governance tool and Authorized User Access Categories card. No free-text role inference.",
+    "duties": [
+      "view",
+      "create",
+      "schedule",
+      "edit",
+      "cancel",
+      "invite",
+      "admit entry requests",
+      "record attendance",
+      "agenda",
+      "working documents",
+      "minutes",
+      "resolutions",
+      "voting control and voting",
+      "decisions",
+      "actions",
+      "close meeting",
+      "export records",
+      "sign minutes"
+    ],
+    "preserveExistingPolicy": "PR #863 duty-based access remains in force for everyone else; deny by default.",
+    "validation": {
+      "implementation": "SOURCE_CHANGES_PUSHED; PROTECTED_CI_VALIDATION_PENDING",
+      "tests": "SEE_SEEDED_TESTS; LATEST_HEAD_RUNS_PENDING",
+      "requiredChecks": "PENDING_ON_LATEST_HEAD",
+      "sevenPortalSmoke": "PENDING",
+      "emailSigningContract": "PENDING",
+      "fullRegression": "PENDING",
+      "productionDeployment": "NOT_DEPLOYED_FOR_PR_863",
+      "liveRegisterInspection": "NOT_RETRIEVED; no connected read-only Firestore register query available",
+      "firestoreRules": "UNCHANGED; no separate rules PR justified without emulator evidence",
+      "window": "72-hour repair window; access remains permanent until owner revokes"
+    },
+    "prohibitedChanges": [
+      "secrets",
+      "environment variables",
+      "SMTP settings",
+      "signing rules",
+      "PDF logic",
+      "hash logic",
+      "certificate logic",
+      "archive logic",
+      "branch protection"
+    ],
+    "implementation": {
+      "sharedResolver": "shared/meetingAuthority.mjs",
+      "worker": "drive-gateway/src/meetingServices.mjs and drive-gateway/src/meetingPortal.mjs",
+      "clientPolicy": "src/firebase/meetingPolicy.js",
+      "clientRegisterRead": "src/firebase/data.js",
+      "screens": [
+        "src/pages/Meetings.jsx",
+        "src/pages/MeetingRoom.jsx"
+      ],
+      "seededTests": [
+        "tests/meeting-authority-resolver.test.mjs",
+        "tests/meeting-category-policy.test.mjs",
+        "drive-gateway/tests/meeting-services-router.test.mjs"
+      ],
+      "identityKeys": [
+        "UID",
+        "email",
+        "IRPA-MEM member number",
+        "IRPA-EMP employee number",
+        "register document ID",
+        "department-head register references",
+        "registered authority/access-category fields"
+      ],
+      "revocation": "top-level and nested authority status, active flag, revoked marker, effective date and expiry are re-evaluated on each Worker request and client authority refresh",
+      "firestoreRulesChanged": false
+    },
+    "lastUpdatedAt": "2026-11-22T17:10:00Z",
+    "files": [
+      "config/org-structure-authority.json",
+      "docs/MEETING-PORTAL-AUTHORITY-RESOLVER-AMENDMENT-2026-11-22.md",
+      "docs/MEETING-PORTAL-OPERATIONAL-ACCESS-DECISION.md",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json",
+      "drive-gateway/src/meetingPortal.mjs",
+      "drive-gateway/src/meetingServices.mjs",
+      "drive-gateway/tests/meeting-portal-router.test.mjs",
+      "drive-gateway/tests/meeting-services-router.test.mjs",
+      "drive-gateway/tests/meeting-translation-cloudflare.test.mjs",
+      "package.json",
+      "shared/meetingAuthority.mjs",
+      "src/firebase/data.js",
+      "src/firebase/meetingPolicy.js",
+      "src/pages/MeetingRoom.jsx",
+      "src/pages/Meetings.jsx",
+      "tests/meeting-authority-resolver.test.mjs",
+      "tests/meeting-category-policy.test.mjs",
+      "tests/operational-access-policy.test.mjs",
+      "tests/org-structure-authority.test.mjs",
+      "scripts/meeting-portal-fixture-isolation-guard.sh"
+    ]
+  },
+  "ownerInstruction": "Owner instruction — 22 November 2026: grant permanent full Meeting Portal access (view, create, schedule, edit, cancel, invite, admit entry requests, record attendance, agenda, working documents, minutes, resolutions, voting control and voting, decisions, actions, close meeting, export records, sign minutes) to the Internal Oversight Director, Executive Director and every head of department. Resolve each person only from their ACTIVE registered authority in the Members and Employees registers, the same source used by the governance tool and Authorized User Access Categories card. Access remains permanent until owner revocation; inactive or revoked authority is denied on the next request. The one-hour period referred to the repair-window time frame, not access expiry. Everyone else retains PR #863's duty-based policy; default deny."
 }
