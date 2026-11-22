@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";
 import { memoryMeta,memoryStorage } from "../src/adapters.mjs";
 import { canonicalJson,sha256Hex } from "../src/util.mjs";
-import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview } from "../src/signatureRecovery.mjs";
+import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots } from "../src/signatureRecovery.mjs";
 
 async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
@@ -22,11 +22,11 @@ async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false}={}){
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
-    title:"Recovery test",fileName:"source.pdf",fields:[{fieldId:"SIG-1",type:"Signature",page:1,x:0.1,y:0.1,width:0.3,height:0.1,signerId:"S1",roleAssignmentIndex:0},{fieldId:"SIG-2",type:"Signature",page:1,x:0.5,y:0.1,width:0.3,height:0.1,signerId:"S1",roleAssignmentIndex:0}],
+    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:[{fieldId:"SIG-1",type:"Signature",page:1,x:0.1,y:0.1,width:0.3,height:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0},{fieldId:"SIG-2",type:"Signature",page:1,x:0.5,y:0.1,width:0.3,height:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0}],
     signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],signedAt:"2026-11-22T10:00:00.000Z",signatureValue,fieldValues:{"SIG-1":fieldValue,"SIG-2":fieldValue},name:"Test Signer",email:"signer@example.test",signatureType:"drawn"}],
     events,completionFailure:{stage:"WRITE_ARCHIVE_COPIES",errorType:"Error",failedAt:"2026-11-22T10:00:01.000Z"}
   });
-  return {ctx:{meta,storage,now:()=>new Date("2026-11-22T12:00:00.000Z"),config:{appUrl:"https://irpa.example.test",emailLinkTtlDays:7,ttlDays:14},sendInvitation:async message=>{sent.push(message);}},sent,user:{uid:"owner-1"},other:{uid:"intruder"},events};
+  return {ctx:{meta,storage,env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test"},now:()=>new Date("2026-11-22T12:00:00.000Z"),config:{appUrl:"https://irpa.example.test",emailLinkTtlDays:7,ttlDays:14},sendInvitation:async message=>{sent.push(message);}},sent,user:{uid:"owner-1"},other:{uid:"intruder"},events};
 }
 test("recovery queue is owner-scoped and paginated",async()=>{
   const f=await fixture();
@@ -99,4 +99,30 @@ test("reassignment supports a signed signer with no verified stamps without rend
   assert.equal(originalSigner.signatureValue,"Original signature specimen");
   assert.equal(originalSigner.certificateSignatureValue,"Stamp not verified — reassigned");
   assert.ok(envelope.fields.filter(field=>field.signerId==="S2").length===2);
+});
+
+test("complete recovery lifecycle signs the replacement slot and finalizes only after the new signer signs",async()=>{
+  const f=await fixture({tamperFieldHash:true});
+  const reassigned=await reassignRecoveryStampSlots(f.ctx,f.user,"ENV-REC-1",{
+    signerId:"S1",fieldIds:["SIG-2"],email:"replacement@example.test",name:"Replacement Signer",reason:"Original stamp evidence for this slot could not be verified."
+  });
+  assert.equal(reassigned.deliveryStatus,"Sent");
+  const invitationUrl=new URL(f.sent[0].link);
+  const token=invitationUrl.searchParams.get("emailSignToken");
+  assert.ok(token);
+  const {openEmailSigning,sign}=await import("../src/signing.mjs");
+  const opened=await openEmailSigning(f.ctx,token,"192.0.2.44");
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const completed=await sign(f.ctx,{
+    token:opened.sessionToken,signature:{type:"field-applications"},
+    fieldApplications:[{fieldId:"SIG-2",page:1,x:0.5,y:0.1,width:0.3,height:0.1,coordinateSpace:"visible-page-fraction-v1",confirmed:true,value:png}],
+    signatureConfirmed:true,consent:true,declarations:{name:"Replacement Signer"}
+  });
+  assert.equal(completed.completed,true);
+  assert.equal(completed.status,"Completed");
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  assert.equal(envelope.status,"Completed");
+  assert.ok(envelope.completion?.finalHash);
+  assert.equal(envelope.signers.find(signer=>signer.id==="S2").status,"Signed");
+  assert.equal(envelope.fields.find(field=>field.fieldId==="SIG-2").signerId,"S2");
 });
