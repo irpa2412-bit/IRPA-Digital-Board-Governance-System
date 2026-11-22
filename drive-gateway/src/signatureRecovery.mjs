@@ -71,9 +71,9 @@ export async function assessRecoveryEvidence(ctx,user,id){
     const value=signer.fieldValues?.[field.fieldId];
     if(typeof value!=="string"||!value){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"UNVERIFIABLE",reason:"The stored signature field value is unavailable."});continue;}
     const expected=await sha256Hex(value);
-    const roleEvidence=(envelope.events||[]).filter(item=>item.type==="signer.role_assignment.completed"&&item.signerId===signer.id)
-      .flatMap(item=>Array.isArray(item.signatureFieldHashes)?item.signatureFieldHashes:[])
-      .find(item=>item.fieldId===field.fieldId&&item.type===field.type&&Number(item.roleAssignmentIndex||0)===Number(field.roleAssignmentIndex||0));
+    const roleEvidenceEvent=(envelope.events||[]).filter(item=>item.type==="signer.role_assignment.completed"&&item.signerId===signer.id&&Number(item.roleAssignmentIndex||0)===Number(field.roleAssignmentIndex||0))
+      .find(item=>(item.signatureFieldHashes||[]).some(value=>value.fieldId===field.fieldId&&value.type===field.type));
+    const roleEvidence=(roleEvidenceEvent?.signatureFieldHashes||[]).find(value=>value.fieldId===field.fieldId&&value.type===field.type);
     const signatureHashMatches=event.signatureHash===await sha256Hex(signer.signatureValue||"")&&event.at===signer.signedAt;
     if(!signatureHashMatches){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"INVALID",reason:"The signed-event signature hash does not match the retained signer evidence."});continue;}
     if(!roleEvidence||roleEvidence.hash!==expected){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"UNVERIFIABLE",reason:"The audit chain does not contain a matching field-level signature hash."});continue;}
