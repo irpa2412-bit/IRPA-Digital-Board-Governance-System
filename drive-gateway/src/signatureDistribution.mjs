@@ -2,8 +2,8 @@ import {sha256Hex, validateEmail} from "./util.mjs";
 
 const clean = value => String(value ?? "").trim();
 const safeError = (error, email) => String(error?.message || "Email delivery failed.")
-  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, "[recipient]")
-  .replace(email || "\\u0000", "[recipient]")
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[recipient]")
+  .replace(email || "\u0000", "[recipient]")
   .slice(0, 240);
 const maskAddress=email=>{const [local,domain]=String(email||"").split("@");if(!local||!domain)return "";return local.slice(0,1)+"***@"+domain;};
 const replyCategory=error=>["ACCEPTED","RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:"UNKNOWN";

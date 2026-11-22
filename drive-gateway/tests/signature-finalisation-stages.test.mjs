@@ -41,5 +41,5 @@ test("email failure preserves Completed and persists PartiallyFailed distributio
  assert.equal(summary.sent,1);assert.equal(summary.failed,1);
  const failed=summary.deliveries.find(row=>row.status==="Failed");
  assert.equal(failed.accepted,false);assert.equal(failed.stageCode,"SUBMIT");assert.equal(failed.replyCategory,"RECIPIENT_REJECTED");
- assert.match(failed.recipientAddress,/\\*\\*\\*@example.org/);
+ assert.match(failed.recipientAddress,/\*\*\*@example.org/);
 });

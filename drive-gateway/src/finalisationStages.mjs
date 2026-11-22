@@ -1,8 +1,8 @@
 const STAGES=new Set(["PDF_BUILD","HASH","ARCHIVE","CERTIFICATE","DISTRIBUTION"]);
 const safeMessage=value=>String(value??"Finalisation step failed.")
-  .replace(/Bearer\\s+\\S+/gi,"Bearer [REDACTED]")
-  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi,"[REDACTED EMAIL]")
-  .replace(/https?:\\/\\/\\S+/gi,"[URL REDACTED]")
+  .replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]")
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]")
+  .replace(/https?:\/\/\S+/gi,"[URL REDACTED]")
   .slice(0,180);
 const safeCode=value=>String(value??"STAGE_FAILED").replace(/[^A-Z0-9_-]/gi,"").slice(0,48)||"STAGE_FAILED";
 async function persistStage(ctx,envelopeId,stageCode,entry){
