@@ -66,13 +66,6 @@ jobs:
             await browser.close();
           }
           NODE
-      - name: Checkout PR head for owner-panel policy test
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: owner-panel
-      - name: Enforce the owner recovery panel read-only boundary
-        run: node --test owner-panel/tests/signature-recovery-owner-panel-readonly.test.mjs
  
   full-regression:
     name: full-regression
@@ -123,3 +116,10 @@ jobs:
           if (result.status !== 0) process.exit(result.status ?? 1);
           console.log(JSON.stringify({ baseline: "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe", portal: "Signature Portal", tests: portal.tests, result: "PASS" }));
           NODE
+      - name: Checkout PR head for owner-panel policy test
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: owner-panel
+      - name: Enforce the owner recovery panel read-only boundary
+        run: node --test owner-panel/tests/signature-recovery-owner-panel-readonly.test.mjs
