@@ -406,7 +406,7 @@ test("G5-08 — partial completion rollback", async () => {
   const state = await s.meta.get("envelopes", envelopeId);
   assert.equal(state.status, "CompletionFailed");
   assert.ok(state.completion?.archivePending?.storageId);
-  assert.equal(state.completion.archivePending.environment,"test");
+  assert.equal(state.completion.archivePending.environment,"TEST");
 
   const objects = [...s.storage.objs.values()];
   assert.equal(objects.length, 3);
