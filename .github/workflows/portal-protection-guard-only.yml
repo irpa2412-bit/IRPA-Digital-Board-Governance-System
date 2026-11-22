@@ -2,7 +2,7 @@ name: Portal protection guard-only checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: ["**"]
     paths:
       - "scripts/portal-protection-check.mjs"
       - "scripts/portal-repair-window-renewal.mjs"
@@ -13,6 +13,11 @@ on:
       - ".github/pull_request_template.md"
       - ".github/workflows/portal-repair-window-renewal.yml"
       - ".github/workflows/portal-protection-guard-only.yml"
+      - ".github/workflows/security-baseline.yml"
+      - ".github/workflows/readability-release-gate.yml"
+      - ".github/workflows/functions-entrypoint-integrity-test.yml"
+      - "package.json"
+      - "docs/implementation-status.md"
 
 permissions:
   contents: read
