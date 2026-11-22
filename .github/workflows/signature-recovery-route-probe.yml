@@ -1,0 +1,35 @@
+name: Signature Recovery Public Route Probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/signature-recovery-route-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe public Worker routes without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://irpa-google-drive-gateway.workers.dev"
+          probe() {
+            local label="$1"
+            local path="$2"
+            local body_file status
+            body_file="$(mktemp)"
+            status="$(curl --silent --show-error --max-time 20 --output "$body_file" --write-out '%{http_code}' "$BASE$path" || true)"
+            printf '%s status=%s body=' "$label" "${status:-000}"
+            head -c 100 "$body_file" | tr '\n' ' '
+            printf '\n'
+            rm -f "$body_file"
+          }
+          probe "health" "/health"
+          probe "recovery-evidence" "/api/recovery/envelopes/test-id/evidence"
+          probe "nonsense" "/__signature_recovery_route_probe_not_a_real_route__"
