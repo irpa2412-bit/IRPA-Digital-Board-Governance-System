@@ -182,6 +182,11 @@
       "guardMode": "protected",
       "lockTests": [
         "tests/meeting-portal-protection.test.mjs"
+      ],
+      "pendingPaths": [
+        "drive-gateway/src/meetingDeletion.mjs",
+        "drive-gateway/src/meetingEnvironment.mjs",
+        "drive-gateway/tests/meeting-environment.test.mjs"
       ]
     }
   },
