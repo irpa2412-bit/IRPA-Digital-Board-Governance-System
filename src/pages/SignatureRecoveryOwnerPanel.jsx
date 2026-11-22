@@ -34,7 +34,7 @@ function diagnosticText(diagnostic){
  return lines.join("\n");
 }
 export default function SignatureRecoveryOwnerPanel({envelopeId,item}){
- const[evidence,setEvidence]=useState(null),[diagnostic,setDiagnostic]=useState(null),[loading,setLoading]=useState(false),[diagnosticLoading,setDiagnosticLoading]=useState(false),[previewLoading,setPreviewLoading]=useState(false),[error,setError]=useState(""),[previewReason,setPreviewReason]=useState(""),[notice,setNotice]=useState(""),[previewUrl,setPreviewUrl]=useState("");
+ const[evidence,setEvidence]=useState(null),[diagnostic,setDiagnostic]=useState(null),[loading,setLoading]=useState(false),[diagnosticLoading,setDiagnosticLoading]=useState(false),[previewLoading,setPreviewLoading]=useState(false),[copyLoading,setCopyLoading]=useState(false),[copyHash,setCopyHash]=useState(""),[copyMatch,setCopyMatch]=useState(""),[copyLabel,setCopyLabel]=useState(""),[copyError,setCopyError]=useState(""),[error,setError]=useState(""),[previewReason,setPreviewReason]=useState(""),[notice,setNotice]=useState(""),[previewUrl,setPreviewUrl]=useState("");
  useEffect(()=>{let active=true;setLoading(true);setEvidence(null);setDiagnostic(null);setError("");setPreviewReason("");setNotice("");if(previewUrl){URL.revokeObjectURL(previewUrl);setPreviewUrl("");}
   recoveryRequest("/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/evidence").then(value=>{if(active)setEvidence(value)}).catch(err=>{if(active)setError(err?.message||"Evidence could not be retrieved.")}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
@@ -45,6 +45,33 @@ export default function SignatureRecoveryOwnerPanel({envelopeId,item}){
   try{const raw=await recoveryRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/diagnose-finalisation",{method:"POST"});const normalized=normalizeFinalisationDiagnostic(raw);if(!normalized||normalized.readOnly!==true)throw new Error("The diagnostic response was invalid or did not confirm read-only mode. (DIAGNOSTIC_RESPONSE_INVALID)");setDiagnostic(normalized);setNotice("Finalisation dry-run completed. No records or files were written.");}
   catch(err){setError(err?.message||"Finalisation diagnostic could not be retrieved.");}
   finally{setDiagnosticLoading(false);}
+ }
+ async function downloadUnarchivedCopy(){
+  setCopyLoading(true);setCopyError("");setCopyHash("");setCopyMatch("");setCopyLabel("");
+  try{
+   if(!auth.currentUser)throw new Error("Sign in with your authorised IRPA account. (AUTH_REQUIRED)");
+   const gateway=String(getGoogleDriveGatewayUrl()||"").replace(/\/$/,"");
+   if(!gateway)throw new Error("The recovery service is not configured. (RECOVERY_SERVICE_URL_MISSING)");
+   const token=await getIdToken(auth.currentUser);
+   const response=await fetch(gateway+"/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/completed-copy.pdf",{method:"GET",headers:{Authorization:"Bearer "+token,Accept:"application/pdf"},cache:"no-store"});
+   if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body?.error||("Unarchived copy unavailable (HTTP "+response.status+"). ("+(body?.code||"COPY_DOWNLOAD_FAILED")+")"));}
+   const type=String(response.headers.get("content-type")||"").toLowerCase();
+   if(!type.includes("application/pdf"))throw new Error("The recovery service returned an invalid file type. (COPY_RESPONSE_NOT_PDF)");
+   const bytes=await response.arrayBuffer();
+   if(!bytes.byteLength)throw new Error("The recovery service returned an empty PDF. (COPY_RESPONSE_EMPTY)");
+   const digest=await crypto.subtle.digest("SHA-256",bytes);
+   const actualHash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,"0")).join("");
+   const headerHash=String(response.headers.get("x-irpa-document-sha256")||"").toLowerCase();
+   if(!/^[a-f0-9]{64}$/.test(headerHash))throw new Error("The response did not include a valid SHA-256 value. (COPY_HASH_MISSING)");
+   const match=actualHash===headerHash?"MATCH":"DIFFERENT";
+   setCopyHash(actualHash);setCopyMatch(match);
+   const generated=response.headers.get("x-irpa-generated-at-eat")||"time not supplied";
+   setCopyLabel("Unarchived copy generated "+generated+" EAT; the envelope is not yet Completed");
+   if(match!=="MATCH")throw new Error("The downloaded bytes do not match the response SHA-256. (COPY_HASH_DIFFERENT)");
+   const blob=new Blob([bytes],{type:"application/pdf"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+   a.href=url;a.download="unarchived-completed-copy.pdf";a.click();URL.revokeObjectURL(url);
+  }catch(err){setCopyError(err?.message||"Unarchived copy could not be downloaded. (COPY_DOWNLOAD_FAILED)");}
+  finally{setCopyLoading(false);}
  }
  async function loadPreview(){
   setPreviewLoading(true);setPreviewReason("");
@@ -62,8 +89,8 @@ export default function SignatureRecoveryOwnerPanel({envelopeId,item}){
   {loading&&<p role="status">Checking evidence… / Inakagua ushahidi…</p>}{error&&<p role="alert">{error}</p>}
   {evidence&&<><p><strong>Audit chain:</strong> {evidence.auditChain?.status||"NOT_RETRIEVED"} ({evidence.auditChain?.code||"NOT_RETRIEVED"})</p><p><strong>Source hash:</strong> {evidence.sourceHashStatus||"NOT_RETRIEVED"} ({evidence.sourceHashCode||"NOT_RETRIEVED"}) — {evidence.sourceHashReason||"Not recorded"}</p><p><strong>Finalisation stage:</strong> {evidence.finalisationStage||"NOT_RECORDED"} ({evidence.finalisationStageCode||"NOT_RECORDED"})</p>
    <h4>Signature stamps / Mihuri ya saini</h4>{(evidence.stampSlots||[]).length===0?<p>No signature or initials fields were returned. (STAMP_FIELDS_NONE)</p>:<div style={{display:"grid",gap:8}}>{evidence.stampSlots.map(row=><div key={row.fieldId} style={{border:"1px solid var(--border-color,#cbd5e1)",borderRadius:8,padding:10}}><strong>{row.resultStatus||row.status||"UNVERIFIABLE"}</strong> — Page {row.page||"unknown"}, field {row.fieldId||"unknown"}<div style={{fontSize:13}}>{row.reason} ({row.code})</div></div>)}</div>}
-   <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>{canDiagnose?<button type="button" onClick={diagnose} disabled={diagnosticLoading}>{diagnosticLoading?"Diagnosing…":"Diagnose finalisation (read-only)"}</button>:<span className="muted">Dry-run diagnosis is not supported for this envelope status.</span>}<button type="button" onClick={()=>copy(report,"Assessment report")}>Copy assessment</button><button type="button" onClick={()=>download(report,"signature-recovery-assessment.txt")}>Download assessment</button><button type="button" onClick={loadPreview} disabled={!canPreview||previewLoading}>{previewLoading?"Preparing preview…":"Generate watermarked preview"}</button></div>
-   {!canPreview&&<p className="muted">Preview is withheld unless the envelope is CompletionFailed and both the signing audit chain and original source hash are verified.</p>}
+   <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>{canDiagnose?<button type="button" onClick={diagnose} disabled={diagnosticLoading}>{diagnosticLoading?"Diagnosing…":"Diagnose finalisation (read-only)"}</button>:<span className="muted">Dry-run diagnosis is not supported for this envelope status.</span>}<button type="button" onClick={()=>copy(report,"Assessment report")}>Copy assessment</button><button type="button" onClick={()=>download(report,"signature-recovery-assessment.txt")}>Download evidence report</button><button type="button" onClick={downloadUnarchivedCopy} disabled={copyLoading}>{copyLoading?"Preparing copy…":"Download completed copy"}</button><button type="button" onClick={loadPreview} disabled={!canPreview||previewLoading}>{previewLoading?"Preparing preview…":"Generate watermarked preview"}</button></div>
+   {copyError&&<p role="alert">{copyError}</p>}{copyLabel&&<p role="status">{copyLabel}</p>}{copyHash&&<p><strong>SHA-256:</strong> <code>{copyHash}</code> · <strong>{copyMatch}</strong> <button type="button" onClick={()=>copy(copyHash,"SHA-256 hash")}>Copy hash</button></p>}{!canPreview&&<p className="muted">Preview is withheld unless the envelope is CompletionFailed and both the signing audit chain and original source hash are verified.</p>}
    {diagnostic&&<div style={{marginTop:14,border:"1px solid var(--border-color,#cbd5e1)",borderRadius:8,padding:12}}><h4>Finalisation dry-run results</h4><p>{diagnostic.summary?.passed??0} PASS · {diagnostic.summary?.failed??0} FAILED · First failure: {diagnostic.summary?.firstFailedStage||"None"}</p>{diagnostic.steps.map((step,index)=><div key={step.stageCode||index} style={{padding:"8px 0",borderBottom:"1px solid var(--border-color,#cbd5e1)"}}><strong>{step.stageCode||"UNKNOWN"} — {step.status||"UNVERIFIABLE"}</strong><div style={{fontSize:12}}>{step.errorCode||"NO_ERROR"} · {step.message||"No error reported"}</div>{(step.fields||[]).map(field=><small key={field.fieldId}>Page {field.page} · {field.fieldId} · rotation {field.rotation} · x {field.position?.x}, y {field.position?.y}</small>)}</div>)}<button type="button" onClick={()=>copy(dryRun,"Diagnostic report")}>Copy diagnostic report</button><button type="button" onClick={()=>download(dryRun,"signature-finalisation-dry-run.txt")}>Download diagnostic report</button></div>}
    {previewReason&&<p role="status">Preview not available: {previewReason}</p>}{previewUrl&&<><p>Preview is a non-authoritative copy marked “RECOVERY PREVIEW — NOT COMPLETED”. It is not a court-ready completed document.</p><a href={previewUrl} target="_blank" rel="noreferrer">Open / save watermarked preview PDF</a></>}
   </>}
