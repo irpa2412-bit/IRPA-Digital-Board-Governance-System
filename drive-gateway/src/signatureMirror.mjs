@@ -28,6 +28,15 @@ export async function persistSignerProgressMirror({envelope, getDocument, update
       action: s.action || prior?.action || prior?.role || ""
     };
   });
+  const changed = signers.some(signer => {
+    const prior = priorSigners.find(item =>
+      (signer.signerId && item.signerId === signer.signerId) ||
+      (signer.uid && item.uid === signer.uid) ||
+      (signer.email && String(item.email || "").toLowerCase() === String(signer.email).toLowerCase())
+    );
+    return !prior || prior.status !== signer.status || (prior.signedAt || null) !== (signer.signedAt || null);
+  });
+  if (!changed) return false;
   const timestamp = now();
   await updateDocument(path, {
     signers,
@@ -36,6 +45,7 @@ export async function persistSignerProgressMirror({envelope, getDocument, update
     gatewayStatusUpdatedAt: timestamp,
     updatedAt: timestamp
   });
+  return true;
 }
 
 export async function persistCompletedSignatureEnvelope({envelope, completion, getDocument, updateDocument, now = () => new Date().toISOString()}) {
