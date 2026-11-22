@@ -11,7 +11,17 @@ const valid = {
   status: "complete",
   declaration: { affectedPortals: [portal, "Meeting Portal"], reason: "Repair", files: [file], expectedEffect: "Fix scoped defect", prohibitedChanges: ["No signing rule changes"] },
   baseline: { commit: "433727282012c75cdaebca21dcdadcb28dba59fb", rollbackCommit: "433727282012c75cdaebca21dcdadcb28dba59fb" },
-  validation: { baselineSmoke: "PASS", fullRegression: "PASS", portalSmoke: { [portal]: "PASS", "Meeting Portal": "PASS" }, behaviourDifferences: [] }
+  validation: {
+    baselineSmoke: "PASS",
+    fullRegression: "PASS",
+    portalSmoke: { [portal]: "PASS", "Meeting Portal": "PASS" },
+    evidence: [
+      "Baseline smoke PASS for 433727282012c75cdaebca21dcdadcb28dba59fb https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/11",
+      "Full regression PASS for 433727282012c75cdaebca21dcdadcb28dba59fb https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/12",
+      "Signature Portal portal smoke PASS for 433727282012c75cdaebca21dcdadcb28dba59fb https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/13"
+    ],
+    behaviourDifferences: []
+  }
 };
 const windowState = { status: "open", openedAt: "2026-11-19T18:00:00Z", scope: [file] };
 const run = (changedFiles, record = valid, win = windowState, activity = "2026-11-19T19:59:00Z") =>
@@ -73,4 +83,24 @@ test("a multi-portal change cannot select or fall back to any shared record", ()
   const selected = resolvePortalPolicyPaths(["Meeting Portal", "Signature Portal"], () => true);
   assert.equal(selected.ok, false);
   assert.match(selected.reason, /one-portal PRs/);
+});
+
+test("PASS labels without real-run links for the exact baseline cannot pass", () => {
+  const noEvidence = { ...valid, validation: { ...valid.validation, evidence: [] } };
+  const result = run([file], noEvidence);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /real-run links/);
+});
+
+test("portal smoke PASS requires portal-specific real-run evidence", () => {
+  const missingPortalLink = {
+    ...valid,
+    validation: {
+      ...valid.validation,
+      evidence: valid.validation.evidence.filter(item => !item.includes("Signature Portal"))
+    }
+  };
+  const result = run([file], missingPortalLink);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /portal-specific real-run smoke links/);
 });
