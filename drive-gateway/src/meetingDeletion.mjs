@@ -90,6 +90,9 @@ export function validateMeetingDeletion({
   if (!isTrialMeeting(meeting)) {
     return { ok: false, status: 409, code: "REAL_MEETING_PROTECTED", message: "Only meetings explicitly created as TRIAL can be deleted. Missing or invalid environment is treated as REAL." };
   }
+  if (childRecords.some(({ collection }) => collection === "meetingRecords")) {
+    return { ok: false, status: 409, code: "MEETING_RECORD_DISPOSITION_REQUIRED", message: "Linked authoritative meeting records must first pass their own legal-hold, retention and pending-review disposition workflow. No meeting or child records were deleted." };
+  }
   if (!clean(meeting?.updateTime)) {
     return { ok: false, status: 409, code: "MEETING_VERSION_UNAVAILABLE", message: "The meeting version could not be verified; deletion was blocked." };
   }
@@ -119,4 +122,24 @@ export function validateMeetingDeletion({
     childCount: childRecords.length,
     collectionCounts
   };
+}
+
+
+export function validateMeetingRecordPurge({ meeting, record, now = new Date() }) {
+  if (!isTrialMeeting(meeting)) {
+    return { ok: false, status: 409, code: "REAL_MEETING_PROTECTED", message: "Meeting records linked to REAL or unclassified meetings cannot be purged. Only explicitly TRIAL meetings qualify." };
+  }
+  if (record?.legalHold === true) {
+    return { ok: false, status: 409, code: "LEGAL_HOLD_ACTIVE", message: "A legal hold prevents deletion." };
+  }
+  if (new Date(record?.retainUntil || 8640000000000000) > now) {
+    return { ok: false, status: 409, code: "RETENTION_NOT_EXPIRED", message: "The retention period has not expired." };
+  }
+  if (record?.deletionStatus !== "PENDING_REVIEW") {
+    return { ok: false, status: 409, code: "DISPOSITION_REVIEW_REQUIRED", message: "A deletion request and review are required before purge." };
+  }
+  if (!record?.updateTime) {
+    return { ok: false, status: 409, code: "RECORD_VERSION_UNAVAILABLE", message: "The record version could not be verified; purge was blocked safely." };
+  }
+  return { ok: true };
 }
