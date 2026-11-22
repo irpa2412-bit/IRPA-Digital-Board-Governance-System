@@ -11,6 +11,7 @@ permissions:
   actions: read
   contents: read
   issues: read
+  pull-requests: read
 
 concurrency:
   group: irpa-readability-gate-pr-${{ github.event.pull_request.number || github.ref }}
