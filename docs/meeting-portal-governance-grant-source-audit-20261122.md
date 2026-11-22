@@ -41,3 +41,31 @@ No permission schema, collection, field name, duty mapping, or default was inven
 ## Change classification
 
 Documentation/audit only. No application code, Worker routes, Firestore rules, deployment workflow, or production configuration changed.
+
+
+## Historical PR/window search — 22 November 2026 follow-up
+
+### Candidate resolution
+
+- **PR #863 — “Record duty-based operational access and correct confirmed role occupancy”** is the matching Meeting Portal implementation candidate found in the historical thread. Issue #860 comment 7074837267 identifies its branch as `fix/meeting-operational-access-implementation-20261122`. The branch diff from the retrieved `main` baseline includes `config/org-structure-authority.json`, `docs/MEETING-PORTAL-OPERATIONAL-ACCESS-DECISION.md`, `docs/portal-protection/records/meeting-portal.json`, `docs/portal-protection/windows/meeting-portal.json`, `drive-gateway/src/meetingPortal.mjs`, `drive-gateway/src/meetingServices.mjs`, two Worker router tests, both Firestore rules files, `src/firebase/data.js`, policy tests and authority tests.
+- PR #863's own description explicitly says **no Firebase claims, individual user permissions, personnel identity bindings or live role assignments were changed**, no Firestore rules were published, and no staging acceptance or production deployment occurred. The branch's `docs/MEETING-PORTAL-OPERATIONAL-ACCESS-DECISION.md` says access remains default-deny until identity, current appointment/assignment, approved duty scope and server-side enforcement are verified; it explicitly records **Live: No**. It is not evidence of a one-hour live permission grant.
+- Issue #860 comment 7074969161 records the server-side list/get route work and confirms that no live permission activation occurred; it also says the required Firestore approval label and separate exact `DEPLOY RULES` input remain outstanding. The later issue comment 7075034100 again says PR #863 is unmerged and **Live: No**.
+- **PR #895** is the Signature Portal recovery-screen PR for envelope `IRPA-ENV-2026-11501354`; its comments concern a Signature Portal 72-hour repair window and recovery telemetry. It is unrelated to Meeting Portal access.
+- **PR #901** is this documentation-only grant-source audit. It has no access grant or repair-window approval.
+- Searches for PR titles/bodies containing Meeting Portal + Internal Oversight Director, Executive Director, head of department/HOD, extended permission, one-hour/60 minutes, or full Meeting Portal access did not surface a separate matching one-hour grant PR. The branch `fix/meeting-operational-access-implementation-20261122` is the #863 branch, not a separate later grant.
+
+### Repair-window records
+
+- The root `docs/portal-protection/repair-window.json` records a Meeting Portal operational-readiness window opened `2026-11-20T11:08:48Z`, duration 48 hours, closing `2026-11-22T11:08:48Z` (14:08:48 EAT). Its scope is a broad operational-readiness/test list, not a one-hour access grant. It had expired by the current follow-up at `2026-11-22T16:27:58Z` (19:27:58 EAT).
+- The separate `docs/portal-protection/windows/meeting-portal.json` window opened `2026-11-21T20:23:03Z`, duration 72 hours, expires `2026-11-24T20:23:03Z`; its reason and Change Record are for REAL/TRIAL meeting deletion protection, not officer access.
+- PR #863's per-portal Change Record is about category/participant/invitation read boundaries and expressly prohibits granting live individual permissions without separate approvals. No one-hour start/end interval or active grant record is present in the inspected branch decision, per-portal window, or per-portal Change Record.
+
+### Exact access and time-frame conclusion
+
+The #863 policy text authorises duty-complete operational access for formally assigned volunteers under Executive Director supervision, while reserving system-owner/security, production deployment, finance, procurement, signature, audit, restricted-research and Board-reserved powers. It does **not** specify a grant to the Executive Director, Director of Internal Oversight, or every head of department; it does not enumerate an all-duties Meeting Portal grant; and it supplies no one-hour start/end timestamps. The branch explicitly leaves individual live permissions default-deny. Therefore the requested one-hour grant is **NOT FOUND / NOT RETRIEVED**, not safely re-applicable as an exact change.
+
+No data grant document or fields with effective/expiry timestamps were identified in the repository evidence. The inspected resolver builds authorities from identity/role fields and does not read an explicit time-bounded duty grant.
+
+### Execution decision
+
+Do not create a replacement 24-hour window or reapply #863 as though it were the requested one-hour grant: that would substitute a different access policy and could activate access beyond the user's specified roles, duties and time bounds. No runtime or rules change is safe until the actual one-hour PR/record is identified. No deployment is justified by the evidence above.
