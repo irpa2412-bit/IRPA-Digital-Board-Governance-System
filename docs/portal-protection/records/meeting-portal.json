@@ -8,7 +8,9 @@
     ],
     "reason": "Implement the owner-approved fail-closed REAL/TRIAL meeting deletion boundary. A meeting is REAL by default; only an administrator explicitly creating it with the exact TRIAL marker can mark it TRIAL. Environment is immutable after creation. Only administrators may delete explicitly TRIAL meetings, with all existing safeguards retained. REAL, missing, invalid, lowercase and whitespace-padded values are non-deletable.",
     "files": [
-      "drive-gateway/src/meetingServices.mjs"
+      "drive-gateway/src/meetingServices.mjs",
+      "drive-gateway/src/meetingDeletion.mjs",
+      "src/pages/Meetings.jsx"
     ],
     "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
     "prohibitedChanges": [
