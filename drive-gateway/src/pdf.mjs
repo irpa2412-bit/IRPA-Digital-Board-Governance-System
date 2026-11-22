@@ -248,12 +248,14 @@ export async function buildSignedPdf(originalBytes, info) {
     certificatePage.drawText(safeText(regular, `Owner declared: ${signer.declarationDiscrepancy?.ownerDeclared?.name || signer.name || ""} | Occupation: ${signer.declarationDiscrepancy?.ownerDeclared?.occupation || "n/a"} | Capacity: ${signer.declarationDiscrepancy?.ownerDeclared?.capacity || "n/a"}`, 90), { x: 56, y: top - 73, size: 7, font: regular });
     certificatePage.drawText(safeText(regular, `Signer declared: ${signer.signerDeclarations?.name || signer.name || ""} | Occupation: ${signer.signerDeclarations?.occupation || "n/a"} | Capacity: ${signer.signerDeclarations?.capacity || "n/a"}`, 90), { x: 56, y: top - 84, size: 7, font: regular });
     certificatePage.drawText(safeText(bold, signer.declarationDiscrepancy?.detected ? `DISCREPANCY NOTED: ${(signer.declarationDiscrepancy.fields || []).join(", ")}` : "Declaration comparison: no discrepancy recorded", 90), { x: 56, y: top - 94, size: 6.5, font: bold, color: signer.declarationDiscrepancy?.detected ? rgb(0.65, 0.2, 0.1) : rgb(0.12, 0.12, 0.12) });
-    if (signer.signatureType === "drawn" && typeof signer.signatureValue === "string" && signer.signatureValue.startsWith("data:image/png;base64,")) {
-      const png = await document.embedPng(decodePngDataUrl(signer.signatureValue));
+    const certificateSignatureValue=signer.certificateSignatureValue??signer.signatureValue;
+    const certificateSignatureType=signer.certificateSignatureType??signer.signatureType;
+    if (certificateSignatureType === "drawn" && typeof certificateSignatureValue === "string" && certificateSignatureValue.startsWith("data:image/png;base64,")) {
+      const png = await document.embedPng(decodePngDataUrl(certificateSignatureValue));
       const fit = fitSignatureImage(png.width, png.height, { x: 340, y: top - 60, width: 170, height: 50 });
       certificatePage.drawImage(png, { x: fit.x, y: fit.y, width: fit.width, height: fit.height });
     } else {
-      certificatePage.drawText(safeText(italic, signer.signatureValue, 28), { x: 340, y: top - 40, size: 18, font: italic });
+      certificatePage.drawText(safeText(italic, certificateSignatureValue, 28), { x: 340, y: top - 40, size: 18, font: italic });
     }
     y -= 104;
   }
