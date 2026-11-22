@@ -45,3 +45,20 @@ test("policy prerequisites require identity, assignment, scope and server enforc
     assert.ok(policy.grantPrerequisites.some(item => item.includes(phrase)), phrase);
   }
 });
+
+const meetingRecord = JSON.parse(readFileSync(new URL("../docs/portal-protection/records/meeting-portal.json", import.meta.url), "utf8"));
+
+test("owner instruction grants permanent full Meeting Portal duties to the three specified role groups", () => {
+  const amendment = meetingRecord.activeAmendment;
+  assert.equal(amendment.ownerInstruction, "owner instruction");
+  assert.deepEqual(amendment.grantedRoles, [
+    "Internal Oversight Director",
+    "Executive Director",
+    "Every Head of Department"
+  ]);
+  assert.match(amendment.grantDuration, /Permanent until owner revokes/);
+  assert.match(amendment.identitySource, /ACTIVE registered authority in Members and Employees/);
+  assert.ok(amendment.duties.includes("sign minutes"));
+  assert.match(meetingRecord.ownerInstruction, /one-hour period referred to the repair-window time frame, not access expiry/);
+  assert.match(amendment.preserveExistingPolicy, /deny by default/);
+});
