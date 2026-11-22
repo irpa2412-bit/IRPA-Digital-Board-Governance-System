@@ -34,7 +34,7 @@ test("owner recovery panel cannot directly change envelope completion state", ()
 
 test("owner recovery panel distinguishes a missing evidence route from authentication and ownership failures",()=>{
   assert.match(source,/EVIDENCE_ROUTE_MISSING/);
-  assert.match(source,/The recovery service is unavailable \\(route missing\\)/);
+  assert.match(source,/The recovery service is unavailable \(route missing\)/);
   assert.match(source,/AUTH_REQUIRED/);
   assert.match(source,/OWNER_FORBIDDEN/);
 });
