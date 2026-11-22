@@ -53,6 +53,17 @@ async function loadOwnedFailedEnvelope(ctx,user,id){
   if(!await validChain(envelope.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
   return envelope;
 }
+function maskRecoveryAddress(value){
+ const [local,domain]=String(value||"").trim().toLowerCase().split("@");
+ if(!local||!domain)return "NOT_RECORDED";
+ const parts=domain.split(".");
+ return local.slice(0,1)+"***@"+parts[0].slice(0,1)+"***"+(parts.length>1?"."+parts.slice(1).join("."):"");
+}
+function formatRecoveryTimeEAT(value){
+ const ms=Date.parse(String(value||""));
+ if(!Number.isFinite(ms))return "NOT_RECORDED";
+ return new Date(ms+3*60*60*1000).toISOString().slice(0,19).replace("T"," ")+" EAT";
+}
 export async function assessRecoveryEvidence(ctx,user,id){
   const envelope=await loadOwnedIncompleteEnvelope(ctx,user,id);
   const events=Array.isArray(envelope.events)?envelope.events:[];
@@ -91,10 +102,12 @@ export async function assessRecoveryEvidence(ctx,user,id){
     rows.push({fieldId:field.fieldId,page,signerId:signer.id,status:"VERIFIED_EXISTING",resultStatus:"PASS",code:"STAMP_VERIFIED",reason:"Field value, signer action, and chained field-level hash agree."});
   }
   const rawStage=String(envelope.completionFailure?.stage||"").toUpperCase();
-  const stageMap=[["PDF","PDF_BUILD"],["HASH","HASH"],["ARCHIVE","ARCHIVE"],["CERTIFICATE","CERTIFICATE"],["DISTRIBUT","DISTRIBUTION"]];
+  const stageMap=[["READ","READ_ORIGINAL"],["PDF","PDF_BUILD"],["HASH","HASH"],["ARCHIVE","ARCHIVE"],["RECIPIENT","RECIPIENT_COPIES"],["CERTIFICATE","CERTIFICATE"],["PERSIST","PERSIST_COMPLETION_RECORD"],["SYNC","SYNC_FIREBASE_MIRROR"],["DISTRIBUT","DISTRIBUTION"]];
   const finalisationStage=stageMap.find(([needle])=>rawStage.includes(needle))?.[1]||"NOT_RECORDED";
   if(auditChainStatus==="VERIFIED"){try{await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="PASS").length});}catch{}}
-  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
+  const retryAttempt=await ctx.meta.get("finalisationRetryAttempts",id);
+  const signers=(envelope.signers||[]).map(signer=>({name:String(signer.name||"Signer").slice(0,120),maskedAddress:maskRecoveryAddress(signer.email),signedAtEAT:formatRecoveryTimeEAT(signer.signedAt),status:String(signer.status||"Unknown")}));
+  return {ok:true,envelopeId:id,title:envelope.title||"",documentId:envelope.documentId||null,status:envelope.status,signers,retry:retryAttempt?{status:retryAttempt.status||"UNKNOWN",startedAt:retryAttempt.startedAt||null,finishedAt:retryAttempt.finishedAt||null,stageCode:retryAttempt.stageCode||null,undoUntil:retryAttempt.undoUntil||null,undoneAt:retryAttempt.undoneAt||null}:null,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,stageCode:envelope.completionFailure?.stageCode||envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
 }
 export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,email,name,reason}={}){
   const envelope=await loadOwnedFailedEnvelope(ctx,user,id);

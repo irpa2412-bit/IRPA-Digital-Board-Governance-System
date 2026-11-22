@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {recordFinalisationStage} from "../src/finalisationStages.mjs";
+import {createFinalisationAttemptRecord,recordFinalisationStage} from "../src/finalisationStages.mjs";
 import {distributeCompletedSignatureDocument} from "../src/signatureDistribution.mjs";
 import {sha256Hex} from "../src/util.mjs";
 
@@ -10,7 +10,7 @@ const makeMeta=initial=>{let row={...initial,_v:1};return{
  snapshot(){return row;}
 };};
 
-for(const stageCode of ["PDF_BUILD","HASH","ARCHIVE","CERTIFICATE","DISTRIBUTION"]){
+for(const stageCode of ["READ_ORIGINAL","PDF_BUILD","HASH","ARCHIVE","RECIPIENT_COPIES","CERTIFICATE","PERSIST_COMPLETION_RECORD","SYNC_FIREBASE_MIRROR","DISTRIBUTION"]){
  test("records "+stageCode+" failure with a sanitised stage record",async()=>{
   const meta=makeMeta({id:"ENV-TEST",status:"CompletionFailed"});
   const ctx={meta,now:()=>new Date("2026-11-22T18:00:00Z"),logger:{error(){}}};
@@ -42,4 +42,17 @@ test("email failure preserves Completed and persists PartiallyFailed distributio
  const failed=summary.deliveries.find(row=>row.status==="Failed");
  assert.equal(failed.accepted,false);assert.equal(failed.stageCode,"SUBMIT");assert.equal(failed.replyCategory,"RECIPIENT_REJECTED");
  assert.match(failed.recipientAddress,/\*\*\*@example.org/);
+});
+
+test("each finalisation stage is attributed to the current attempt and prior attempts remain in history",async()=>{
+ const previous={attemptId:"OLD-ATTEMPT",startedAt:"2026-11-21T10:00:00Z",stages:{HASH:{status:"FAILED"}}};
+ const record=createFinalisationAttemptRecord(previous,"NEW-ATTEMPT","2026-11-22T18:00:00Z");
+ assert.equal(record.attemptId,"NEW-ATTEMPT");
+ assert.equal(record.stages.HASH,undefined);
+ assert.equal(record.history[0].attemptId,"OLD-ATTEMPT");
+ const meta=makeMeta({id:"ENV-TEST",status:"Finalizing",finalisationRecord:record});
+ const ctx={meta,now:()=>new Date("2026-11-22T18:00:01Z")};
+ await recordFinalisationStage(ctx,"ENV-TEST","READ_ORIGINAL",async()=>"source");
+ assert.equal(meta.snapshot().finalisationRecord.stages.READ_ORIGINAL.status,"PASS");
+ assert.equal(meta.snapshot().finalisationRecord.stages.READ_ORIGINAL.attemptId,"NEW-ATTEMPT");
 });

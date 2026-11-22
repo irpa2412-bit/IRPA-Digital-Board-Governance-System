@@ -11,8 +11,11 @@ test("each selected owner envelope exposes authenticated evidence, dry-run diagn
  assert.match(source,/normalizeFinalisationDiagnostic\(raw\)/);
  assert.match(source,/normalized\.readOnly!==true/);
 });
-test("only the finalisation dry-run uses POST; evidence and preview remain GET",()=>{
+test("evidence and preview remain GET while diagnosis and controlled retry actions use POST",()=>{
  assert.match(source,/recoveryRequest\([^;]*diagnose-finalisation[^;]*method:"POST"/s);
+ assert.match(source,/retry-finalisation/);
+ assert.match(source,/confirmOneRetry:true/);
+ assert.match(source,/undo-finalisation-retry/);
  assert.match(source,/recoveryRequest\([^;]*evidence/);
  assert.match(source,/recoveryRequest\([^;]*preview\.pdf/);
  assert.doesNotMatch(source,/method\s*:\s*["'](?:PUT|PATCH|DELETE)["']/i);
@@ -29,11 +32,20 @@ test("owner queue is paginated and lists all non-completed owner envelopes",()=>
  assert.match(queue,/item\.envelopeId/);
  assert.match(queue,/Every non-completed envelope you own/);
 });
-test("recovery UI does not expose automatic retry, reassignment, repair or completion mutations",()=>{
- for(const forbidden of ["updateDoc(","deleteDoc(","addDoc(","writeBatch(","runTransaction(","signDocument(","reassignSigner(","retryFinalisation(","finalizeEnvelope(","completeEnvelope("])assert.equal(source.includes(forbidden),false,forbidden);
- assert.doesNotMatch(source,/\/stamps\/reassign|\/retry(?:\/|["'])|\/complete(?:\/|["'])|\/repair(?:\/|["'])|\/send-link/i);
+test("recovery UI exposes only a manually confirmed single retry and failed-retry undo",()=>{
+ assert.match(source,/I approve exactly one normal finalisation attempt/);
+ assert.match(source,/retryApproved/);
+ assert.match(source,/diagnostic\?\.readOnly===true/);
+ assert.match(source,/Retry finalisation/);
+ assert.match(source,/Undo failed retry/);
+ assert.match(source,/Download evidence report/);
+ assert.match(source,/maskedAddress/);
+ assert.match(source,/signedAtEAT/);
+ assert.match(source,/signatures verified; completed PDF not yet generated/);
+ for(const forbidden of ["updateDoc(","deleteDoc(","addDoc(","writeBatch(","runTransaction(","signDocument(","reassignSigner(","finalizeEnvelope(","completeEnvelope("])assert.equal(source.includes(forbidden),false,forbidden);
+ assert.doesNotMatch(source,/\/stamps\/reassign|\/complete(?:\/|["'])|\/repair(?:\/|["'])|\/send-link/i);
 });
 test("diagnostic UI explicitly confirms dry-run does not write or modify original evidence",()=>{
  assert.match(source,/No envelope, signer, field, signature, hash, certificate, archive, Drive or email writes were performed/);
- assert.match(source,/No retry, reassignment, repair, finalisation/);
+ assert.match(source,/This diagnostic does not retry, reassign, repair or finalise the envelope/);
 });

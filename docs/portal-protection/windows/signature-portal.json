@@ -7,10 +7,10 @@
   "warningHours": 12,
   "openedAt": "2026-11-22T18:06:00.000Z",
   "expiresAt": "2026-11-25T18:06:00.000Z",
-  "lastActivityAt": "2026-11-22T18:13:01Z",
+  "lastActivityAt": "2026-11-22T21:49:37Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised 72-hour Signature Portal repair for finalisation-stage recording and a write-isolated dry-run diagnosis, followed by a separately shipped owner/admin retry control. Preserve the affected envelope's 12 verified signatures, source hash and signing audit chain.",
+  "reason": "Owner-authorised 72-hour Signature Portal repair for per-attempt finalisation stage recording, a masked evidence report, and backup-first one-shot owner/admin retry with failed-retry undo. No production envelope may be touched until the owner supplies the Diagnose finalisation report and separately approves the single retry.",
   "scope": [
     "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
@@ -32,7 +32,14 @@
     "drive-gateway/src/signing.mjs",
     "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
     "tests/signature-recovery-owner-panel-finalisation.test.mjs",
-    "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md"
+    "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+    "drive-gateway/src/finalisationStages.mjs",
+    "drive-gateway/src/router.mjs",
+    "drive-gateway/src/esignPathPolicy.mjs",
+    "drive-gateway/tests/signature-finalisation-stages.test.mjs",
+    "drive-gateway/tests/signature-finalisation-retry.test.mjs",
+    "drive-gateway/tests/signature-recovery-route-dispatch.test.mjs",
+    "docs/signature-recovery/controlled-retry-change-record-2026-11-23.md"
   ],
   "activityLog": [
     {
@@ -75,6 +82,11 @@
       "at": "2026-11-22T18:13:01Z",
       "action": "owner-approved-scope-amendment",
       "description": "Owner rejects moving Completed after distribution; approves envelope-level distribution status and failed-recipient-only resend as a separate PR. Completed remains independent of email delivery. Work sequence: stage recording + no-write dry run, distribution status, retry."
+    },
+    {
+      "at": "2026-11-22T21:49:37Z",
+      "action": "owner-approved-one-PR-scope-amendment",
+      "description": "Owner requests one Signature Portal PR for per-attempt stage recording, a masked downloadable evidence report, and backup-first one-shot owner/admin retry with three-per-hour rate limit and seven-day undo for failed retries. The retry must not be executed until the owner supplies the Diagnose finalisation report and separately approves it. No envelope, environment, protection rule, secret or permission changes."
     }
   ],
   "emergencyExpiresAt": null,
@@ -85,6 +97,7 @@
     "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
     "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
     "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
-    "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
+    "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals.",
+    "Do not execute any production retry for IRPA-ENV-2026-11501354 until the owner supplies the Diagnose finalisation report and separately approves the one retry."
   ]
 }
