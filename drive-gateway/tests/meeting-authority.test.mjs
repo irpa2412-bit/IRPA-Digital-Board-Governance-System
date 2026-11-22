@@ -82,6 +82,6 @@ test("missing register records deny with an explicit reason", async () => {
 test("denial message identifies duty, register evidence and permitted roles", () => {
   const message = denialMessage("approve agenda", [{ role: "Member", source: "Members" }]);
   assert.match(message, /Duty attempted: approve agenda/);
-  assert.match(message, /Member \\[Members\\]/);
+  assert.match(message, /Member \[Members\]/);
   assert.match(message, /Director of Internal Oversight.*Executive Director.*Head of Department/);
 });

@@ -14,7 +14,7 @@ export function normalizeMeetingRole(value) {
     return MEETING_AUTHORITY_ROLES.OVERSIGHT;
   }
   if (role === "executive director") return MEETING_AUTHORITY_ROLES.EXECUTIVE;
-  if (/head of department|\\bhod\\b/.test(role)) return MEETING_AUTHORITY_ROLES.DEPARTMENT_HEAD;
+  if (/head of department|hod/.test(role)) return MEETING_AUTHORITY_ROLES.DEPARTMENT_HEAD;
   return clean(value).replace(/\\s+/g, " ");
 }
 
