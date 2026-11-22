@@ -13,7 +13,9 @@
       "src/pages/Meetings.jsx",
       "drive-gateway/src/meetingEnvironment.mjs",
       "drive-gateway/tests/meeting-environment.test.mjs",
-      "docs/portal-protection/records/meeting-portal.json"
+      "docs/portal-protection/records/meeting-portal.json",
+      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/windows/meeting-portal.json"
     ],
     "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
     "prohibitedChanges": [
@@ -149,6 +151,19 @@
       "environment variables",
       "SMTP settings",
       "branch protection"
-    ]
+    ],
+    "repairWindow": {
+      "openedAt": "2026-11-22T18:10:00Z",
+      "expiresAt": "2026-11-25T18:10:00Z",
+      "durationHours": 72
+    },
+    "files": [
+      "tests/meeting-category-policy.test.mjs",
+      "docs/portal-protection/records/meeting-portal.json",
+      "docs/portal-protection/windows/meeting-portal.json"
+    ],
+    "expectedEffect": "Prevent active Meeting Portal attendance screens from invoking Firebase callables that are not deployed; preserve Worker-backed attendance and entry-request routes.",
+    "changeRecord": "The active MeetingRoom uses Worker routes for attendance read/write and daily dispatch. The active Meeting Access Control component uses Worker list/resolve routes. The callable-backed src/components/MeetingAccessControl.jsx is legacy and not imported by the active screen. Firebase attendance callable exports are not used by active screens.",
+    "validation": "Static regression guard added; required CI and live deployment verification pending."
   }
 }
