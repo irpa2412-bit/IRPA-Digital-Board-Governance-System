@@ -36,5 +36,6 @@ for (const name of files) {
       failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
     }
   }
+}
 if (failures.length) { console.error('FIRESTORE_DEPLOY_TRIGGER_GUARD_FAILED'); console.error(failures.join('\n')); process.exit(1); }
 console.log('PASS: every production and staging Firestore publisher is manually dispatched and requires exact DEPLOY RULES confirmation; emulator-only commands are excluded.');
