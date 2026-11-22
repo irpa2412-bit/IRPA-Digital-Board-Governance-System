@@ -37,6 +37,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, no
   if (!protectedFiles.length) return { ok: true, affected: [], protectedFiles: [], reason: "No protected portal or shared dependency changed." };
 
   const fail = (reason) => ({ ok: false, affected: [...affected].sort(), protectedFiles, reason });
+  if (affected.size > 1) return fail("Protected changes must be split into one-portal PRs; multi-portal changes are blocked.");
   if (!record || record.status !== "complete") return fail("A completed Change Record is required.");
   if (!windowState || windowState.status !== "open") return fail("No repair window is open; closed windows require a new declaration.");
   const openedAt = Date.parse(windowState.openedAt);
@@ -79,20 +80,24 @@ function main() {
     changedFiles = execFileSync("git", ["diff", "--name-only", "HEAD^...HEAD"], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   }
   const registry = readJson("docs/portal-protection/portal-register.json");
-  const sharedWindow = readJson("docs/portal-protection/repair-window.json");
-  const sharedRecordPath = "docs/portal-protection/change-record.json";
-  const sharedRecord = fs.existsSync(sharedRecordPath) ? readJson(sharedRecordPath) : null;
-  const discovery = evaluatePolicy({ changedFiles, registry, windowState: sharedWindow, record: sharedRecord });
-  let windowState = sharedWindow;
-  let record = sharedRecord;
-  // Prefer an isolated per-portal declaration when a PR changes exactly one
-  // registered portal. Shared/multi-portal changes continue to require the
-  // shared Change Record and repair window.
-  const portalPaths = portalPolicyPaths(discovery.affected);
-  if (portalPaths && fs.existsSync(portalPaths.windowPath) && fs.existsSync(portalPaths.recordPath)) {
-    windowState = readJson(portalPaths.windowPath);
-    record = readJson(portalPaths.recordPath);
+  const discovery = evaluatePolicy({ changedFiles, registry, windowState: null, record: null });
+  if (!discovery.protectedFiles.length) {
+    console.log(JSON.stringify(discovery, null, 2));
+    return;
   }
+  const portalPaths = portalPolicyPaths(discovery.affected);
+  if (!portalPaths) {
+    console.log(JSON.stringify({ ...discovery, ok: false, reason: "Protected changes must be split into one-portal PRs; multi-portal changes are blocked." }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+  if (!fs.existsSync(portalPaths.windowPath) || !fs.existsSync(portalPaths.recordPath)) {
+    console.log(JSON.stringify({ ...discovery, ok: false, reason: "A dedicated, portal-specific repair window and Change Record are required; shared records cannot substitute." }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+  const windowState = readJson(portalPaths.windowPath);
+  const record = readJson(portalPaths.recordPath);
   const initial = evaluatePolicy({ changedFiles, registry, windowState, record });
   if (!initial.protectedFiles.length) {
     console.log(JSON.stringify(initial, null, 2));
