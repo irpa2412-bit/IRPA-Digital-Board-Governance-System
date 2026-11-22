@@ -27,5 +27,3 @@ Verbatim owner approval:
 Scope is limited to this one workflow's owner-comment canary trigger and its text-level trigger tests. This is not approval for portal source, Worker routes, Firestore rules, other deploy workflows, or canary execution before the workflow change is merged and independently verified. Merge only when every required check is green.
 
 Dedicated request issue: [#876 — Canary run request](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/issues/876), locked. Workflow must enforce comment action `created`, issue number `876`, owner login `irpa2412-bit`, owner numeric ID `319164319`, and exact body `RUN CANARY`; edited comments must not trigger.
-
-- 2026-11-22T15:05:20.559Z — Signature Portal — APPROVE 895 Add the owner-facing read-only recovery assessment screen for IRPA-ENV-2026-11501354; preserve existing signatures and do not mutate the envelope. — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081030720 — expires 2026-11-25T15:05:20.559Z
