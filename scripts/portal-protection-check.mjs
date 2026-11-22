@@ -36,14 +36,16 @@ async function verifyRealRunEvidence(record, affected) {
     for (const item of candidates) {
       const ref = parseGitHubJobEvidence(item);
       if (!ref || ref.repository.toLowerCase() !== repository.toLowerCase()) continue;
-      const [runResponse, jobResponse] = await Promise.all([
-        fetch(`${api}/repos/${repository}/actions/runs/${ref.runId}`, { headers }),
-        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers })
+      const [jobResponse, logsResponse] = await Promise.all([
+        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}`, { headers }),
+        fetch(`${api}/repos/${repository}/actions/jobs/${ref.jobId}/logs`, { headers })
       ]);
-      if (!runResponse.ok || !jobResponse.ok) continue;
-      const [run, job] = await Promise.all([runResponse.json(), jobResponse.json()]);
-      if (run.head_sha === record.baseline.commit && run.status === "completed" && run.conclusion === "success" &&
-          job.run_id === ref.runId && job.status === "completed" && job.conclusion === "success") {
+      if (!jobResponse.ok || !logsResponse.ok) continue;
+      const job = await jobResponse.json();
+      const logs = await logsResponse.text();
+      const checkedOutBaseline = logs.includes(`git checkout --progress --force ${record.baseline.commit}`) ||
+        logs.includes(`HEAD is now at ${record.baseline.commit.slice(0, 8)}`);
+      if (job.run_id === ref.runId && job.status === "completed" && job.conclusion === "success" && checkedOutBaseline) {
         verified = true;
         break;
       }
