@@ -1,5 +1,9 @@
 name: Firebase Functions Entrypoint Integrity Test
 
+permissions:
+  actions: read
+  contents: read
+
 on:
   push:
     branches: [main]
