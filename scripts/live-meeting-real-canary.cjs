@@ -219,10 +219,36 @@ async function post(path, body, idToken) {
     }
   }
 
+  if (db && meetingRef) {
+    try {
+      const finalMeeting = await meetingRef.get();
+      results.finalMeetingExists = finalMeeting.exists;
+      results.finalEnvironmentUnchanged = finalMeeting.exists && finalMeeting.get("environment") === undefined;
+      if (!results.finalMeetingExists || !results.finalEnvironmentUnchanged) liveCheckFailed = true;
+    } catch {
+      results.finalMeetingExists = false;
+      results.finalEnvironmentUnchanged = false;
+      liveCheckFailed = true;
+    }
+  }
+  if (db && recordRef) {
+    try {
+      const finalRecord = await recordRef.get();
+      results.finalRecordExists = finalRecord.exists;
+      if (!finalRecord.exists) liveCheckFailed = true;
+    } catch {
+      results.finalRecordExists = false;
+      liveCheckFailed = true;
+    }
+  }
+
   const passed = results.missingEnvironment === true &&
     results.realMeetingDelete === true &&
     results.realMeetingPurge === true &&
     results.trialEnvironmentMutationBlocked === true &&
+    results.finalMeetingExists === true &&
+    results.finalEnvironmentUnchanged === true &&
+    results.finalRecordExists === true &&
     !fatalError;
   if (!passed && !fatalError && !liveCheckFailed) liveCheckFailed = true;
   output("live_check_failed", liveCheckFailed ? "true" : "false");
