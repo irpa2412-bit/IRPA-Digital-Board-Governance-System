@@ -36,7 +36,7 @@ test("active amendment file declarations extend the original change record", () 
 test("72-hour inactivity closes the window", () => assert.equal(run([file], valid, windowState, "2026-11-18T19:59:00Z").ok, false));
 test("out-of-scope protected change fails", () => assert.equal(run([file], valid, { ...windowState, scope: ["src/pages/Invitations.jsx"] }).ok, false));
 const sharedPath = "src/pages/SignaturePlatform.jsx";
-const sharedOwners = ["Signature Portal", "Meeting Portal"];
+const sharedOwners = ["Meeting Portal", "Signature Portal"];
 const sharedOwnerPolicies = () => Object.fromEntries(sharedOwners.map((owner, index) => {
   const baselineCommit = "433727282012c75cdaebca21dcdadcb28dba59fb";
   const record = {
