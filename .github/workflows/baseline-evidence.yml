@@ -1,4 +1,5 @@
 name: Protected Portal Baseline Evidence
+# PR A evidence run: baseline 908b314; PR-head tests use github.sha
 
 on:
   workflow_dispatch:
