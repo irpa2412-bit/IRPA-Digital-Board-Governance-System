@@ -10,7 +10,7 @@ async function addEvent(events,event){
   return [...events,{...body,hash:await sha256Hex(canonicalJson(body))}];
 }
 async function fixture({tamperFieldHash=false}={}){
-  const meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
+  const sent=[],meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
   pdf.addPage([612,792]);
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
@@ -18,7 +18,7 @@ async function fixture({tamperFieldHash=false}={}){
   const signatureValue="Test Signer";
   const fieldValue="Test Signer";
   let events=[];
-  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(fieldValue)},{fieldId:"SIG-2",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
+  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1","SIG-2"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(fieldValue)},{fieldId:"SIG-2",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
