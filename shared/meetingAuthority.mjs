@@ -16,7 +16,7 @@ const recordRoles = record => [
   ...values(record.roles),record.role,...values(record.assignedRoles),...values(record.selectedRoles),
   ...values(record.roleAssignments),...values(record.authorities),...values(record.accessAuthorities),
   ...values(record.accessCategories),...values(record.authorityCategories),record.accessCategory,
-  record.authorizedRole,record.boardPosition,...(record.isHeadOfDepartment===true||record.isDepartmentHead===true||record.headOfDepartment===true?["Head of Department"]:[])
+  record.authorizedRole,record.boardPosition,record.jobTitle,record.position,record.title,record.designation,...values(record.authorizedUserAccessCategories),...values(record.authorizedAccessCategories),...(record.isHeadOfDepartment===true||record.isDepartmentHead===true||record.headOfDepartment===true?["Head of Department"]:[])
 ].flatMap(value => typeof value === "string" ? value.split(",") : value && typeof value === "object" ? [value.role,value.title,value.authority,value.category] : [])
  .map(clean).filter(Boolean);
 const identifiers = record => ({
