@@ -54,7 +54,7 @@ function hasHodAuthority(record = {}) {
   if (flags.some(key => record?.[key] === true)) return true;
   return roleValues(record).some(value => {
     const role = normalizeWords(value);
-    return role === "hod" || role.includes("head of department") || role.includes("department head");
+    return role === "hod" || role.includes("head department") || role.includes("department head");
   });
 }
 function isDepartmentHeadAssignment(actor, record = {}) {
