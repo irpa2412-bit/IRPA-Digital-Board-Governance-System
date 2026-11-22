@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "portal": "Signature Portal",
-  "status": "closed",
+  "status": "open",
   "durationHours": 72,
   "inactivityCloseHours": 72,
   "warningHours": 12,
-  "openedAt": null,
-  "expiresAt": null,
-  "lastActivityAt": null,
+  "openedAt": "2026-11-22T15:05:20.559Z",
+  "expiresAt": "2026-11-25T15:05:20.559Z",
+  "lastActivityAt": "2026-11-22T15:05:20.559Z",
   "emergency": false,
   "emergencyLimitHours": 24,
   "reason": "No active repair authorization. An owner-approved APPROVE or RENEW comment opens one 72-hour window for this portal only.",
@@ -22,5 +22,18 @@
     "src/firebase/signature/",
     "src/utils/signature/"
   ],
-  "activityLog": []
+  "activityLog": [
+    {
+      "at": "2026-11-22T15:05:20.559Z",
+      "expiresAt": "2026-11-25T15:05:20.559Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 895 Add the owner-facing read-only recovery assessment screen for IRPA-ENV-2026-11501354; preserve existing signatures and do not mutate the envelope.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/895#issuecomment-7081030720",
+      "command": "approve",
+      "reason": "Add the owner-facing read-only recovery assessment screen for IRPA-ENV-2026-11501354; preserve existing signatures and do not mutate the envelope.",
+      "prNumber": 895,
+      "action": "owner-approved 72-hour renewal"
+    }
+  ],
+  "emergencyExpiresAt": null
 }
