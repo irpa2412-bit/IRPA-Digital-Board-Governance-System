@@ -44,7 +44,10 @@
       "Meeting Portal baseline smoke evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110084",
       "Full regression executed from exact pre-change base SHA 5fa8d46deeeb96c3172a1798411c18f57991855d: PR #849 run 44948792716, job 136982110196. npm run test:all FAILED: tests/workflow-production-deploy-policy.test.mjs — production Firebase CLI rules and Worker deployments require explicit owner dispatch approval (8 passed, 1 failed).",
       "Full regression failure evidence: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44948792716/job/136982110196",
-      "Baseline smoke and full regression were rerun after PR #846 was merged, both on the exact PR #845 base SHA 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c. Run 44952176019: baseline-protection-smoke job 136992981056 reported all seven registered portals PASS; baseline-full-regression job 136992981099 checked out the same SHA, ran npm run test:all inside the Firestore emulator, and exited successfully (code 0)."
+      "Baseline smoke and full regression were rerun after PR #846 was merged, both on the exact PR #845 base SHA 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c. Run 44952176019: baseline-protection-smoke job 136992981056 reported all seven registered portals PASS; baseline-full-regression job 136992981099 checked out the same SHA, ran npm run test:all inside the Firestore emulator, and exited successfully (code 0).",
+      "Baseline smoke PASS for Meeting Portal on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056",
+      "Full regression PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981099; npm run test:all completed in the Firestore emulator with exit code 0.",
+      "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
     ]
   }
 }
