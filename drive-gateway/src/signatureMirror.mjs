@@ -1,5 +1,43 @@
 const clean = value => String(value ?? "").trim();
 
+export async function persistSignerProgressMirror({envelope, getDocument, updateDocument, now = () => new Date().toISOString()}) {
+  if (!envelope?.externalReference) return;
+  if (typeof getDocument !== "function" || typeof updateDocument !== "function") throw new Error("Firestore signature mirror dependencies are not configured.");
+  const envelopeId = clean(envelope.externalReference);
+  const path = "signatureEnvelopes/" + envelopeId;
+  const existing = await getDocument(path);
+  if (!existing) throw new Error("The portal signature envelope was not found for signer progress.");
+  const priorSigners = Array.isArray(existing.signers) ? existing.signers : [];
+  const signers = (envelope.signers || []).map(s => {
+    const prior = priorSigners.find(p =>
+      (s.id && p.signerId === s.id) ||
+      (s.uid && p.uid === s.uid) ||
+      (s.email && String(p.email || "").toLowerCase() === String(s.email).toLowerCase())
+    );
+    return {
+      ...(prior || {}),
+      uid: s.uid || null,
+      profileUid: s.profileUid || s.uid || null,
+      signerId: s.id || null,
+      identityType: s.identityType || "account",
+      name: s.name || "",
+      email: s.email || "",
+      status: s.status || "Pending",
+      signedAt: s.signedAt || null,
+      role: s.role || prior?.role || prior?.action || "",
+      action: s.action || prior?.action || prior?.role || ""
+    };
+  });
+  const timestamp = now();
+  await updateDocument(path, {
+    signers,
+    gatewayStatus: envelope.status || "InProgress",
+    gatewaySigningStatus: envelope.status || "InProgress",
+    gatewayStatusUpdatedAt: timestamp,
+    updatedAt: timestamp
+  });
+}
+
 export async function persistCompletedSignatureEnvelope({envelope, completion, getDocument, updateDocument, now = () => new Date().toISOString()}) {
   if (!envelope?.externalReference) return;
   if (typeof getDocument !== "function" || typeof updateDocument !== "function") throw new Error("Firestore signature mirror dependencies are not configured.");
