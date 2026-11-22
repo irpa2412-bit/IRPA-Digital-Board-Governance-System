@@ -121,6 +121,8 @@ test("issue creates an access pass and updates invitee tally in one atomic Fires
   assert.equal(committed.writes[0].update.fields.tokenHash.stringValue.length, 64);
   assert.equal(committed.writes[0].update.fields.passwordHash.stringValue.length, 64);
   assert.equal(committed.writes[1].update.fields.invitedParticipantCount.integerValue, "1");
+  assert.equal(committed.writes[1].update.fields.invitedEmails.arrayValue.values.length, 0);
+  assert.equal(committed.writes[1].update.fields.participantEmails.arrayValue.values.length, 0);
   assert.equal(committed.writes[2].update.fields.meetingAccessRevoked.booleanValue, true);
   assert.equal(committed.writes[2].update.fields.meetingAccessDispatched.booleanValue, false);
   assert.equal(calls.filter(call => call.url.pathname.endsWith("/documents:commit")).length, 1);
