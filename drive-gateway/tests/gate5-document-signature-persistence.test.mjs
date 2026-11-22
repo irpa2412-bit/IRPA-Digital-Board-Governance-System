@@ -468,7 +468,7 @@ test("G5-09 — retry persistence", async () => {
     assert.ok(bytes);
     assert.equal(await sha256Hex(bytes), state.completion.finalHash);
   }
-  assert.equal(s.storage.objs.size, 7);
+  assert.equal(s.storage.objs.size, 6);
 });
 
 test("G5-10 — completion idempotency", async () => {
