@@ -125,4 +125,5 @@ export function meetingCapabilities(meeting={}){
 export function governanceLineage(meeting={},recordType="MEETING"){
   return {origin:"MEETING",meetingId:meeting.id||null,meetingType:meeting.meetingType||null,meetingCategory:meeting.meetingCategory||null,meetingPolicyId:meeting.meetingPolicyId||null,recordType,authorityClass:meeting.meetingCategory==="GOVERNANCE"?"BOARD_GOVERNANCE":"OPERATIONAL",confidentialityClass:meeting.confidentialityClass||"INTERNAL"};
 }
-\nexport function resolveMeetingAuthorityForIdentity(identity={},registers={}){return resolveMeetingAuthority(identity,registers);}\n
+
+export function resolveMeetingAuthorityForIdentity(identity={},registers={}){return resolveMeetingAuthority(identity,registers);}
