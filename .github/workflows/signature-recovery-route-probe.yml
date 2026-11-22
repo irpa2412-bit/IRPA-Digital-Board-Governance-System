@@ -7,11 +7,6 @@ on:
       - main
     paths:
       - .github/workflows/signature-recovery-route-probe.yml
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/signature-recovery-route-probe.yml
   workflow_run:
     workflows:
       - Deploy IRPA Gateway to Cloudflare Production (No Secret Sync)
