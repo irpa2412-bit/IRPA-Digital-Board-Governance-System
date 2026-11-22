@@ -78,3 +78,15 @@ test("structured job title and position fields resolve authority without free-te
   assert.equal(resolveMeetingAuthority({uid:"ed"},{employees:[{uid:"ed",status:"Active",jobTitle:"Executive Director"}]}).fullMeetingAccess,true);
   assert.equal(resolveMeetingAuthority({uid:"staff"},{employees:[{uid:"staff",status:"Active",department:"Executive Director's Office"}]}).fullMeetingAccess,false);
 });
+
+test("accepts canonical and historical Internal Oversight Director titles",()=>{
+  for(const role of ["Director of Internal Oversight","Internal Oversight Director","Director of International Oversight","Director Internal Oversight"]){
+    const result=resolveMeetingAuthority({uid:"oversight-"+role},{members:[{...active,uid:"oversight-"+role,role}],employees:[]});
+    assert.equal(result.fullMeetingAccess,true,role);
+  }
+});
+
+test("normalizes repeated whitespace in register role titles",()=>{
+  const result=resolveMeetingAuthority({uid:"spacing"},{members:[{...active,uid:"spacing",role:"Director   of   Internal Oversight"}],employees:[]});
+  assert.equal(result.fullMeetingAccess,true);
+});
