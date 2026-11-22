@@ -62,10 +62,10 @@ async function findOwnerMaintenanceApproval() {
   const pullNumber = event.pull_request?.number;
   if (!pullNumber) return null;
   const api = process.env.GITHUB_API_URL || "https://api.github.com";
-  const headers = { authorization: \`Bearer \${token}\`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
+  const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
   const [repoResponse, commentsResponse] = await Promise.all([
-    fetch(\`\${api}/repos/\${repository}\`, { headers }),
-    fetch(\`\${api}/repos/\${repository}/issues/\${pullNumber}/comments?per_page=100\`, { headers })
+    fetch(`${api}/repos/${repository}`, { headers }),
+    fetch(`${api}/repos/${repository}/issues/${pullNumber}/comments?per_page=100`, { headers })
   ]);
   if (!repoResponse.ok || !commentsResponse.ok) return null;
   const ownerLogin = (await repoResponse.json()).owner?.login;
@@ -281,7 +281,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
   if (missingPortalRunEvidence.length) return fail("Missing portal-specific real-run smoke links for: " + missingPortalRunEvidence.join(", "), affected);
   if (!Array.isArray(record.validation?.behaviourDifferences)) return fail("Baseline comparison must list behaviour differences (use an empty array when none).", affected);
   const remainingMs = expiresAt - now;
-  const warning = remainingMs < WARNING_12 ? \`Repair window expires in less than 12 hours (expires at \${windowState.expiresAt}); obtain owner renewal before expiry.\` : null;
+  const warning = remainingMs < WARNING_12 ? `Repair window expires in less than 12 hours (expires at ${windowState.expiresAt}); obtain owner renewal before expiry.` : null;
   return { ok: true, affected, protectedFiles, warning, reason: "Protected changes are declared and within the active 72-hour repair window." };
 }
 
