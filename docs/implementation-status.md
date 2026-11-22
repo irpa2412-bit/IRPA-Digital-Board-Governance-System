@@ -24,3 +24,16 @@ Safety boundary: no Firestore rules or indexes have been published by this work.
 - Cross-portal wiring is adapter-only, behind feature flags default OFF and a kill switch; working portal internals and their lock tests remain unchanged.
 - The guard now verifies evidence URLs against GitHub Actions API: the referenced job must be completed/successful and its workflow run head SHA must equal the portal baseline commit. Link-shaped strings alone cannot pass.
 - Guard-only path-filtered workflow added for policy scripts/tests/docs and the PR template. No runtime deployment or Firestore rules publication is part of this change.
+
+
+## 2026-11-22 wind-up — deployment rollback references
+
+**Read-only evidence captured:** 04:42 UTC.
+
+- PR #845 final head: `ada73c51f3bade9fd58c7986f9f0193ee5a19287`; merge commit: `57368a8c2ceb418178aa28e5707b02605851dc83`.
+- Latest recorded successful production Gateway Worker release: Version ID `1e25f147-e89d-44ba-8f17-80e7e7a75563`, deployed from commit `57368a8c2ceb418178aa28e5707b02605851dc83`. Previous Gateway Worker rollback version: `dd4637ea-0804-4b85-a455-1e691f1f0d72` (run `44897446502`, prior commit `352d8b36718a3b88173934c607e6c7834f72a71b`).
+- Latest recorded successful Cloudflare frontend Worker release: Version ID `2a55c255-cb66-4e1e-aa78-9c219a1ab06d`. Previous frontend Worker rollback version: `b2430948-c116-4ba9-b08c-d8e2a6c9bba1`.
+- Latest recorded Firebase Hosting build stamp: commit `57368a8c2ceb418178aa28e5707b02605851dc83`, built `2026-11-22T04:23:07Z`. Previous Firebase Hosting rollback build: commit `40c7cfa33a53871a48c8568a5ff3f876f2df5ac5`, built `2026-11-22T04:06:59Z`.
+- **Fresh live re-read limitation:** read-only requests to the production Gateway Worker `/health`, frontend Worker `/health`, and Firebase Hosting origin could not resolve DNS in the execution environment at 04:42 UTC. The identifiers above are the latest recorded successful release versions, not newly verified live-at-04:42 values. Re-read live state before any rollback or release decision.
+- Live REAL meeting delete refusal: NOT TESTED. Missing-environment-as-REAL: NOT TESTED. Live REAL meeting-record purge refusal: NOT TESTED. The endpoints are potentially destructive and no authenticated read-only probe was available; no destructive request was sent to a real record.
+- Firestore rules and indexes were not changed or published.
