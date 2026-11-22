@@ -25,10 +25,11 @@ test("active amendment file declarations extend the original change record", () 
 });
 test("24-hour inactivity closes the window", () => assert.equal(run([file], valid, windowState, "2026-11-18T19:59:00Z").ok, false));
 test("out-of-scope protected change fails", () => assert.equal(run([file], valid, { ...windowState, scope: ["src/pages/Invitations.jsx"] }).ok, false));
-test("shared dependency fans out to every dependent portal", () => {
+test("multi-portal shared dependency changes fail even with a complete shared record", () => {
   const result = run(["src/App.jsx"], { ...valid, declaration: { ...valid.declaration, affectedPortals: Object.keys(registry.portals), files: ["src/App.jsx"] }, validation: { ...valid.validation, portalSmoke: Object.fromEntries(Object.keys(registry.portals).map(p => [p, "PASS"])) } }, { ...windowState, scope: ["src/App.jsx"] });
   assert.equal(result.affected.length, 7);
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /one-portal PRs/);
 });
 test("unrelated change passes without a repair window", () => assert.equal(run(["README.md"], null, null).ok, true));
 
