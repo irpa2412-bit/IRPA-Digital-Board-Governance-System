@@ -39,6 +39,7 @@ async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
   await ctx.meta.create("recoveryAccessEvents",eventId,{envelopeId:id,type,actor:user.uid,at,...details});
 }
 async function loadOwnedIncompleteEnvelope(ctx,user,id){
+  if(!user?.uid)throw new HttpError(401,"Authentication required.");
   const envelope=await ctx.meta.get("envelopes",id);
   if(!envelope)throw new HttpError(404,"Recovery record not found.");
   if(!isOwner(envelope,user))throw new HttpError(403,"This envelope belongs to another owner.");
