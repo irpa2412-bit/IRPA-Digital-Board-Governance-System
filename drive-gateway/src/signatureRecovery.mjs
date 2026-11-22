@@ -54,15 +54,15 @@ export async function assessRecoveryEvidence(ctx,user,id){
   const events=Array.isArray(envelope.events)?envelope.events:[];
   const auditChainStatus=events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
   const document=await ctx.meta.get("documents",envelope.documentId);
-  const expectedHash=String(document?.sha256||document?.hash||envelope.documentHash||envelope.originalHash||"").trim().toLowerCase();
+  const expectedHashes=[...new Set([document?.sha256,document?.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase()))];
   let sourceHash=null,sourceHashStatus="NO_STORED_HASH",sourceHashCode="SOURCE_HASH_MISSING",sourceHashReason="No stored source hash is available.";
   if(document?.primaryStorageId){
     try{
       const original=await ctx.storage.get(document.primaryStorageId);
       if(original){
         sourceHash=await sha256Hex(original);
-        if(!expectedHash){sourceHashStatus="NO_STORED_HASH";sourceHashCode="SOURCE_HASH_MISSING";sourceHashReason="The source file exists, but no stored reference hash is available.";}
-        else if(sourceHash===expectedHash){sourceHashStatus="VERIFIED";sourceHashCode="SOURCE_HASH_VERIFIED";sourceHashReason="The original source file matches its stored hash.";}
+        if(!expectedHashes.length){sourceHashStatus="NO_STORED_HASH";sourceHashCode="SOURCE_HASH_MISSING";sourceHashReason="The source file exists, but no stored reference hash is available.";}
+        else if(expectedHashes.every(expected=>sourceHash===expected)){sourceHashStatus="VERIFIED";sourceHashCode="SOURCE_HASH_VERIFIED";sourceHashReason="The original source file matches every stored reference hash.";}
         else{sourceHashStatus="MISMATCH";sourceHashCode="SOURCE_HASH_MISMATCH";sourceHashReason="The original source file does not match its stored hash.";}
       }else{sourceHashStatus="SOURCE_FILE_MISSING";sourceHashCode="SOURCE_FILE_MISSING";sourceHashReason="The original source file is not available in storage.";}
     }catch{sourceHashStatus="SOURCE_READ_FAILED";sourceHashCode="SOURCE_READ_FAILED";sourceHashReason="The original source file could not be read from storage.";}
