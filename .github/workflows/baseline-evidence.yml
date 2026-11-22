@@ -22,7 +22,7 @@ jobs:
       - name: Checkout immutable production baseline
         uses: actions/checkout@v4
         with:
-          ref: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+          ref: 908b314ab0de566d057b4093f4addb11ca434ff3
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,7 +61,7 @@ jobs:
               return Boolean(root && root.children.length > 0 && root.innerText.trim().length > 0);
             }, { timeout: 30000 });
             if (errors.length) throw new Error("Browser startup errors: " + errors.join(" | "));
-            console.log(JSON.stringify({ baseline: "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe", url, http: navigation.status(), rootRendered: true, pageErrors: errors }));
+            console.log(JSON.stringify({ baseline: "908b314ab0de566d057b4093f4addb11ca434ff3", url, http: navigation.status(), rootRendered: true, pageErrors: errors }));
           } finally {
             await browser.close();
           }
@@ -75,7 +75,7 @@ jobs:
       - name: Checkout immutable production baseline
         uses: actions/checkout@v4
         with:
-          ref: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+          ref: 908b314ab0de566d057b4093f4addb11ca434ff3
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -93,7 +93,7 @@ jobs:
       - name: Checkout immutable production baseline
         uses: actions/checkout@v4
         with:
-          ref: 25ddcc6d8f89b6a4103c37a254fbd2af0c26febe
+          ref: 908b314ab0de566d057b4093f4addb11ca434ff3
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -114,7 +114,7 @@ jobs:
           process.stdout.write(result.stdout || "");
           process.stderr.write(result.stderr || "");
           if (result.status !== 0) process.exit(result.status ?? 1);
-          console.log(JSON.stringify({ baseline: "25ddcc6d8f89b6a4103c37a254fbd2af0c26febe", portal: "Signature Portal", tests: portal.tests, result: "PASS" }));
+          console.log(JSON.stringify({ baseline: "908b314ab0de566d057b4093f4addb11ca434ff3", portal: "Signature Portal", tests: portal.tests, result: "PASS" }));
           NODE
       - name: Checkout PR head for owner-panel policy test
         uses: actions/checkout@v4
