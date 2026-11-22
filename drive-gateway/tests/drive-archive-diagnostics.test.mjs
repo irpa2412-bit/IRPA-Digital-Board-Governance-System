@@ -11,11 +11,11 @@ function installFetch({duplicates=false,missing=false}={}){
   if(url.pathname==="/drive/v3/about")return response({storageQuota:{usage:"50",limit:"100"}});
   if(url.pathname==="/drive/v3/files"&&method==="GET"){
    const name=(url.searchParams.get("q")||"").match(/name='([^']+)'/)?.[1]||"";
-   if(missing&&name==="Root")return response({files:[]});
+   if(missing&&name==="Archive")return response({files:[]});
    const id={Root:"root-folder-123456",Archive:"archive-folder-234567",Document:"document-folder-345678"}[name];
    if(!id)return response({files:[]});
    const rows=[{id,name,owners:[{emailAddress:"drive-owner@example.org"}],createdTime:"2026-11-23T00:00:00Z",capabilities:{canAddChildren:true}}];
-   if(duplicates&&name==="Root")rows.push({...rows[0],id:"duplicate-root-654321"});
+   if(duplicates&&name==="Archive")rows.push({...rows[0],id:"duplicate-root-654321"});
    return response({files:rows});
   }
   if(url.pathname==="/drive/v3/files/document-folder-345678")return response({id:"document-folder-345678",capabilities:{canAddChildren:true}});
