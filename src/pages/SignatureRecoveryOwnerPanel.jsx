@@ -33,7 +33,7 @@ function diagnosticText(diagnostic){
  lines.push("No envelope, signer, field, signature, hash, certificate, archive, Drive or email writes were performed.");
  return lines.join("\n");
 }
-export default function SignatureRecoveryOwnerPanel({envelopeId,item}){
+function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
  const[evidence,setEvidence]=useState(null),[diagnostic,setDiagnostic]=useState(null),[loading,setLoading]=useState(false),[diagnosticLoading,setDiagnosticLoading]=useState(false),[previewLoading,setPreviewLoading]=useState(false),[copyLoading,setCopyLoading]=useState(false),[copyHash,setCopyHash]=useState(""),[copyMatch,setCopyMatch]=useState(""),[copyLabel,setCopyLabel]=useState(""),[copyError,setCopyError]=useState(""),[error,setError]=useState(""),[previewReason,setPreviewReason]=useState(""),[notice,setNotice]=useState(""),[previewUrl,setPreviewUrl]=useState("");
  useEffect(()=>{let active=true;setLoading(true);setEvidence(null);setDiagnostic(null);setError("");setPreviewReason("");setNotice("");if(previewUrl){URL.revokeObjectURL(previewUrl);setPreviewUrl("");}
   recoveryRequest("/api/recovery/envelopes/"+encodeURIComponent(envelopeId)+"/evidence").then(value=>{if(active)setEvidence(value)}).catch(err=>{if(active)setError(err?.message||"Evidence could not be retrieved.")}).finally(()=>{if(active)setLoading(false)});
@@ -97,4 +97,14 @@ export default function SignatureRecoveryOwnerPanel({envelopeId,item}){
   {notice&&<p role="status">{notice}</p>}
   <p style={{fontSize:12,marginTop:10}}>Assessment and dry-run are read-only. No retry, reassignment, repair, finalisation, or change to the original document, signers, signatures, signing events, hashes, certificates or archive records is performed. / Tathmini haisaini tena, haibadilishi msaini, hairekebishi wala kubadilisha hati ya awali au ushahidi wake.</p>
  </section>;
+}
+
+class SignatureRecoveryPanelErrorBoundary extends React.Component {
+ constructor(props){super(props);this.state={failed:false};}
+ static getDerivedStateFromError(){return{failed:true};}
+ componentDidCatch(){/* keep recovery UI failures local and non-sensitive */}
+ render(){return this.state.failed?<section role="alert" className="panel">The recovery panel could not be displayed. Refresh the page and retry. (RECOVERY_PANEL_RENDER_FAILED)</section>:this.props.children;}
+}
+export default function SignatureRecoveryOwnerPanel(props){
+ return <SignatureRecoveryPanelErrorBoundary><SignatureRecoveryOwnerPanelInner {...props}/></SignatureRecoveryPanelErrorBoundary>;
 }
