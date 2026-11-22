@@ -16,7 +16,7 @@ const recordRoles = (record, now=Date.now()) => {
   const candidates=[
     ...values(record.roles),record.role,...values(record.assignedRoles),...values(record.selectedRoles),
     ...values(record.roleAssignments),...values(record.authorities),...values(record.accessAuthorities),
-    ...values(record.accessCategories),...values(record.authorityCategories),record.accessCategory,
+    ...values(record.accessCategories),...values(record.authorityCategories),...values(record.categories),record.accessCategory,
     record.authorizedRole,record.boardPosition,record.jobTitle,record.position,record.title,record.designation,
     ...values(record.authorizedUserAccessCategories),...values(record.authorizedAccessCategories),
     ...(record.isHeadOfDepartment===true||record.isDepartmentHead===true||record.headOfDepartment===true?["Head of Department"]:[])

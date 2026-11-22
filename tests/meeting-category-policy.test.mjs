@@ -106,7 +106,7 @@ test("full register authority grants all Meeting Portal screen duties without ch
   assert.equal(canAccessMeetingCategory(governance,identity),true);
   assert.equal(canEditMeeting({...governance,registerStatus:"Registered"},identity),true);
   assert.equal(canVoteInMeeting(governance,identity),true);
-  assert.equal(meetingCapabilities(governance).quorumRequired,true);
+  assert.equal(meetingCapabilities({...governance,meetingType:"Board Meeting"}).quorumRequired,true);
 });
 
 test("screen grant is derived by the same resolver and does not infer from department text",()=>{
