@@ -15,6 +15,11 @@ Create a small, separate implementation PR based on [the Records Retention and D
 The live member-register read and live deletion-path probes were not available in the 22 November wind-up. Keep those items explicitly NOT VERIFIED until safe, authoritative evidence is obtained.
 
 
+## Open decisions
+
+- **Role-title confirmation (OPEN DECISION):** the retention policy records the role as "Director of Internal Oversight", while repository records show "Director of International Oversight"; the owner must confirm the correct title before the disposal workflow is built.
+
+
 # IRPA-DBGS handover — 22 November 2026
 
 ## Live and verified
@@ -38,6 +43,19 @@ The live member-register read and live deletion-path probes were not available i
 - Authorisation portal.
 - Communication and Media feature work.
 - Finance and Procurement review.
+
+### Finance and Procurement retention-policy review task
+
+Review the draft section [Finance and Procurement records](policies/records-retention-and-disposal.md#8-finance-and-procurement-records-draft-to-be-confirmed) with the owner and the person responsible for finance/procurement compliance. The proposed rules are explicitly DRAFT and must not be treated as confirmed or implemented. Determine the applicable retention period only after checking donor agreements and Tanzanian legal requirements; report the evidence and leave the duration as an open owner decision.
+
+As part of that review, inventory **every delete/disposal path** in both portals and report which paths would break the proposed draft policy. Inspect and list separately:
+1. every user-interface deletion control or workflow;
+2. every Worker route, including direct/API and alternate route paths; and
+3. every applicable Firestore rule or rules-based deletion permission.
+
+For each path, record the portal, exact screen/control or route/rule location, actor/permission, record classifications affected (REAL, TRIAL, missing/invalid/ambiguous), whether it can delete or bypass approval/audit, and the evidence supporting the finding. Identify explicitly which paths would permit deletion of a real financial/procurement record, bypass the Director of Internal Oversight review/signature or Executive Director authorisation, delete a non-explicit-TRIAL test record, or omit the permanent SHA-256 audit. Mark unverified paths NOT VERIFIED rather than assuming they are safe.
+
+**Scope boundary:** this is an inventory and policy-review task only. Do not change portal behaviour, Worker code, Firestore rules, permissions, or deployment configuration as part of this review. Any later enforcement work requires a separate, explicitly scoped change and the required approvals/checks.
 - Grant analysis features.
 - The three live deletion-path refusal checks described above.
 
@@ -59,7 +77,3 @@ The live member-register read and live deletion-path probes were not available i
 1. Add or use a safe, authenticated, read-only production probe for REAL meeting delete refusal, missing-environment-as-REAL classification, and REAL meeting-record purge refusal. Do not issue a destructive delete or PURGE request against a real record.
 2. Complete Meeting roles and grants, then member upload/signing, with separate scope, tests and approvals. Keep the three live deletion checks clearly marked unverified until safe evidence exists.
 3. Create the fresh owner-only RENEW workflow PR: validate repository owner comment author ID and github.actor, pass comment body through an environment variable with strict validation, renew exactly one portal by 72 hours, and test wrong-named/stale evidence. Keep all parked work separate.
-
-## Open decisions
-
-- **Oversight role-title confirmation:** the policy records "Director of Internal Oversight", while repository materials show "Director of International Oversight"; the owner must confirm the correct title before the disposal workflow is built.

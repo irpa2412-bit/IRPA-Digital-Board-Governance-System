@@ -67,3 +67,21 @@ The audit entry is retained permanently and is not deleted with the disposed doc
 ## 7. Implementation boundary
 
 This document records policy; it does not itself implement runtime enforcement. The next implementation change is a separate, small, docs-referenced PR as specified first in `docs/HANDOVER.md`. No policy change is to be added to PR #845. No Firestore rules are to be published as part of this work.
+
+## 8. Finance and Procurement records (DRAFT, to be confirmed)
+
+**Status:** Proposed default only. This section is not a final owner-approved retention schedule and does not implement or change portal behaviour.
+
+The owner's recorded words are:
+
+> The deletion policy may apply to procurement and financial portals as well.
+
+For the owner's confirmation, the following is proposed as the default:
+
+1. **No deletion of real records:** no real financial or procurement record may be deleted by anyone. This proposed scope includes payments, invoices, requisitions, quotations, tenders, evaluations, awards, purchase orders, receipts, budgets, ledgers, payroll and payment requests. The prohibition is intended to apply to all actors, including administrators, unless and until the owner confirms a formal disposal policy.
+2. **Retention period — OPEN QUESTION:** the owner has not yet decided the retention period for financial and procurement records. The meeting/proceedings rule elsewhere in this policy is ten (10) years from the proceedings day; that rule must not be assumed to apply automatically to finance or procurement records. The responsible person must check applicable donor agreements and Tanzanian legal requirements, document the findings and recommend a period for the owner's decision. No finance/procurement retention duration is established by this draft.
+3. **Authorised disposal of an irrelevant document:** proposed disposal of an irrelevant finance or procurement document must follow the same authority chain: the authorisation document is first reviewed and duly signed by the Director of Internal Oversight, then the Executive Director authorises disposal. An administrator may execute only after those steps and applicable safeguards; the administrator does not decide relevance or authorise disposal.
+4. **Trial/test exception:** trial or test financial and procurement records may be deleted by an administrator, subject to safeguards equivalent to those for trial meetings, only when the record carries an explicit authoritative TRIAL flag. Missing, invalid or ambiguous environment/classification values must not be treated as TRIAL and default to real-record protection.
+5. **Permanent disposal audit:** every disposal leaves a permanent audit entry containing the disposed document's SHA-256 hash and the applicable request, review, authorisation, executor, reason and timestamp evidence. The audit entry must not be deleted with the disposed record.
+
+**Confirmation required:** the owner must confirm or amend this proposed default, particularly the scope, retention period, trial safeguards and disposal process. Until confirmed, treat this section as a policy proposal for review, not an implemented rule or an approved finance/procurement retention schedule.
