@@ -1,5 +1,5 @@
 import { isTrialMeeting, meetingEnvironment } from "./meetingEnvironment.mjs";
-import { resolveMeetingAuthority } from "../../shared/meetingAuthority.mjs";
+import { resolveMeetingAuthority } from "../../src/firebase/meetingPolicy.js";
 import { MEETING_CHILD_COLLECTIONS, buildMeetingDeletionPreview, validateMeetingDeletion, validateMeetingRecordPurge } from "./meetingDeletion.mjs";
 const clean = v => String(v ?? "").trim();
 const lower = v => clean(v).toLowerCase();
