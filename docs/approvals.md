@@ -7,3 +7,12 @@ This ledger stores exact owner approval quotations and the resulting scoped acti
 - 2026-11-22T05:02:09Z — PR #858 — "APPROVE 858, docs only" — owner approval for the Finance and Procurement retention draft, documentation only. Owner comment: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/858#issuecomment-7074519877.
 
 - 2026-11-22 — Standing approval A (owner quotation): "Docs, verification and protection records only; approved to merge when required checks are green." Scope limited to documentation under docs/*, protection records/window files, and read-only verification workflows. Explicitly excludes portal source, Worker routes, Firestore rules and deploy workflows. Merge only when all required checks are green. Recorded in PR #870 owner comment.
+
+
+## CI diagnostic — PR #869 (2026-11-22)
+
+- Failing checks: IRPA Security Baseline Gate (run 45004536843, job 137153069183); IRPA-DBGS Readability Release Gate (run 45004536980, job 137153069821); Firebase Functions Entrypoint Integrity Test (run 45004536889, job 137153069515).
+- Exact diagnostic lines from all three jobs: `protectedFiles: ["docs/approvals.md"]`; `reason: "Protected changes must be split into one-portal PRs; multi-portal changes are blocked."`
+- Cause: PR #869 combined the protected approval ledger (`docs/approvals.md`) with general handover documentation (`docs/HANDOVER.md`). The protection classifier correctly treated the approval ledger as a protected change affecting multiple portal owners; the PR was not a valid guard-only change.
+- Repair: split the approval-ledger record into its own single-file PR #872; handover/inventory changes must remain in a separate docs-only PR. No guard condition was weakened.
+- Follow-up on PR #872: initial checks ran before the owner approval comment was posted and reported `ownerApproved: false`. The exact prior Guard-core approval is present in the owner account comment #7076820276, alongside the current standing approval A. A fresh run is required to evaluate the approval comment after it exists.
