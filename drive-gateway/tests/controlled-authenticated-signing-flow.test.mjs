@@ -49,6 +49,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
   }
   const envelope = {
     id: envelopeId,
+    dataEnvironment: "TEST",
     documentId: "DOC-TEST123",
     documentHash,
     title: "Controlled Signing Test",
@@ -76,7 +77,7 @@ async function makeFixture({ signerUid, signerEmail, secondSigner = true } = {})
     token: envelopeId + "." + signerId + "." + secret,
     envelope,
     ctx: {
-      env: {},
+      env: { IRPA_ENVIRONMENT: "test", DRIVE_MOCK: "true" },
       now: () => new Date(NOW),
       config: { appUrl: "https://example.test", ttlDays: 14 },
       logger: { error() {} },
@@ -326,7 +327,7 @@ test("Gateway completed-PDF verification requires the invited UID even for a val
 
 test("Production-mode Gateway signing does not require Member/Employee authority verification", async () => {
   const fixture=await makeFixture({signerUid:"member-uid",signerEmail:"member@example.org"});
-  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};
+  fixture.ctx.env={DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"staging"};\n  fixture.envelope.dataEnvironment="TRIAL";
   const result=await sign(fixture.ctx,{
     declarations:{name:"Institutional Signer",occupation:"Board Member"},
     token:fixture.token,
