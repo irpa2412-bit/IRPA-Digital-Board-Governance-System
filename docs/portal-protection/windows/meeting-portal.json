@@ -19,7 +19,8 @@
     "scripts/meeting-portal-fixture-isolation-guard.sh",
     "tests/meeting-isolation-guard.test.mjs",
     "drive-gateway/src/meetingDeletion.mjs",
-    "src/pages/Meetings.jsx"
+    "src/pages/Meetings.jsx",
+    "drive-gateway/src/meetingPortal.mjs"
   ],
   "activityLog": [
     {
