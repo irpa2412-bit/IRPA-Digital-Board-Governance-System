@@ -63,3 +63,18 @@ test("department text alone never creates a head-of-department grant",()=>{
   const result=resolveMeetingAuthority({uid:"u"},{members:[],employees:[{...active,uid:"u",department:"Livestock"}]});
   assert.equal(result.fullMeetingAccess,false);
 });
+
+test("resolves register documents whose document IDs are IRPA member or employee numbers",()=>{
+  assert.equal(resolveMeetingAuthority({memberNumber:"IRPA-MEM-00991"},{members:[{id:"IRPA-MEM-00991",status:"Active",role:"Executive Director"}]}).fullMeetingAccess,true);
+  assert.equal(resolveMeetingAuthority({employeeNumber:"IRPA-EMP-00991"},{employees:[{id:"IRPA-EMP-00991",status:"Active",title:"Internal Oversight Director"}]}).fullMeetingAccess,true);
+});
+
+test("revoked or expired nested role assignments do not grant authority",()=>{
+  const result=resolveMeetingAuthority({uid:"u"},{members:[{uid:"u",status:"Active",roleAssignments:[{role:"Executive Director",status:"Revoked"},{role:"Head of Department",status:"Expired"}]}]});
+  assert.equal(result.fullMeetingAccess,false);
+});
+
+test("structured job title and position fields resolve authority without free-text department inference",()=>{
+  assert.equal(resolveMeetingAuthority({uid:"ed"},{employees:[{uid:"ed",status:"Active",jobTitle:"Executive Director"}]}).fullMeetingAccess,true);
+  assert.equal(resolveMeetingAuthority({uid:"staff"},{employees:[{uid:"staff",status:"Active",department:"Executive Director's Office"}]}).fullMeetingAccess,false);
+});
