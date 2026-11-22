@@ -191,12 +191,12 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
         const result=await getRecoveryQueue(ctx,user,{limit,offset});
         return json(result,200,corsHeaders(request));
       }
-      const evidence=pathname.match(/^\\/api\\/recovery\\/envelopes\\/([A-Za-z0-9_-]{1,128})\\/evidence$/);
+      const evidence=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/evidence$/);
       if(evidence) {
         const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]));
         return json(result,200,corsHeaders(request));
       }
-      const preview=pathname.match(/^\\/api\\/recovery\\/envelopes\\/([A-Za-z0-9_-]{1,128})\\/preview\\.pdf$/);
+      const preview=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/preview\.pdf$/);
       if(preview) {
         const result=await buildRecoveryPreview(ctx,user,decodeURIComponent(preview[1]));
         return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf","cache-control":"no-store","content-disposition":"inline; filename=\\\"recovery-preview.pdf\\\""}});
