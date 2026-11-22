@@ -30,3 +30,21 @@ Those three job-level evidence links and run IDs have not been retrieved and ver
 ## Deployment
 
 No merge or production deployment is authorised by this snapshot. Do not deploy an unmerged head. No production login or envelope mutation was attempted.
+
+## Additional baseline runs retrieved
+
+The main-branch run list for the exact baseline commit also confirms these successful supporting checks (all created 2026-11-22 around 12:47 UTC):
+
+| Check | Run |
+|---|---:|
+| email-signing-contract | 45024123162 |
+| Authentication and Identity Parity Tests | 45024123404 |
+| Firebase Functions Entrypoint Integrity Test | 45024123437 |
+| IRPA Security Baseline Gate | 45024123414 |
+| IRPA-DBGS Readability Release Gate | 45024123170 |
+| IRPA Release Build | 45024123168 |
+| Firebase-free governance migration checks | 45024123423 |
+| Cloudflare Gateway deployment (no secret sync) | 45024123456 |
+| Firebase Hosting deploy/live verification | 45024123411 |
+
+These successful runs strengthen the baseline evidence, but none is explicitly identified or independently verified as the required baseline smoke, full regression, or Signature Portal smoke job. They are therefore recorded as supporting evidence only and do not satisfy the guard's three distinct evidence labels.
