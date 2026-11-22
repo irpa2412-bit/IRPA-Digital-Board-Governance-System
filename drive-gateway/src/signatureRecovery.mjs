@@ -64,7 +64,7 @@ export async function assessRecoveryEvidence(ctx,user,id){
   const rows=[];
   for(const field of envelope.fields||[]){
     if(!["Signature","Initials"].includes(field.type))continue;
-    const signer=(envelope.signers||[]).find(s=>s.id===field.signerId||(s.uid&&s.uid===field.signerUid));
+    const signer=(envelope.signers||[]).find(s=>field.signerId?s.id===field.signerId:Boolean(s.uid&&s.uid===field.signerUid));
     if(!signer){rows.push({fieldId:field.fieldId,signerId:field.signerId||null,status:"MISSING",reason:"Assigned signer record is unavailable."});continue;}
     const event=signedEvent(envelope,signer.id);
     if(signer.status!=="Signed"||!signer.signedAt||!event){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"MISSING",reason:"No completed signer action is recorded for this stamp slot."});continue;}
@@ -73,8 +73,8 @@ export async function assessRecoveryEvidence(ctx,user,id){
     const expected=await sha256Hex(value);
     const roleEvidence=(envelope.events||[]).filter(item=>item.type==="signer.role_assignment.completed"&&item.signerId===signer.id)
       .flatMap(item=>Array.isArray(item.signatureFieldHashes)?item.signatureFieldHashes:[])
-      .find(item=>item.fieldId===field.fieldId);
-    const signatureHashMatches=event.signatureHash===await sha256Hex(signer.signatureValue||"");
+      .find(item=>item.fieldId===field.fieldId&&item.type===field.type&&Number(item.roleAssignmentIndex||0)===Number(field.roleAssignmentIndex||0));
+    const signatureHashMatches=event.signatureHash===await sha256Hex(signer.signatureValue||"")&&event.at===signer.signedAt;
     if(!signatureHashMatches){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"INVALID",reason:"The signed-event signature hash does not match the retained signer evidence."});continue;}
     if(!roleEvidence||roleEvidence.hash!==expected){rows.push({fieldId:field.fieldId,signerId:signer.id,status:"UNVERIFIABLE",reason:"The audit chain does not contain a matching field-level signature hash."});continue;}
     rows.push({fieldId:field.fieldId,signerId:signer.id,status:"VERIFIED_EXISTING",reason:"Field value, signer action, and chained field-level hash agree."});
@@ -119,6 +119,9 @@ export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,
   if((current.signers||[]).some(item=>item.id===newSignerId))throw new HttpError(409,"A replacement signer identifier already exists.");
   const now=ctx.now(),ttlDays=Math.max(1,Math.min(30,Number(ctx.config.emailLinkTtlDays)||7)),expiresAt=new Date(now.getTime()+ttlDays*86400000).toISOString();
   const replacement={id:newSignerId,email:replacementEmail,emailHash:await sha256Hex(replacementEmail),profileUid:null,name:replacementName,title:"",declaredParticulars:{name:replacementName,title:"",occupation:"",capacity:""},roleAssignments:replacementRoles,order:target.order,uid:null,status:"Pending",identityType:"email-link",tokenHash:await sha256Hex(randomHex(32)),tokenExpiresAt:expiresAt,emailLinkExpiresAt:expiresAt,emailLinkStatus:"issued",emailLinkSessionStatus:"revoked",emailLinkSessionHash:null,emailLinkTokenHistory:[],emailLinkAttemptCount:0,emailLinkOpenCount:0,emailLinkIpAttempts:{},invitation:"Pending"};
+  const retainedField=assessment.stampSlots.find(row=>row.signerId===target.id&&row.status==="VERIFIED_EXISTING"&&!requested.includes(row.fieldId));
+  const retainedValue=retainedField?target.fieldValues?.[retainedField.fieldId]:null;
+  const nextSigners=(current.signers||[]).map(item=>item.id===target.id?{...item,certificateSignatureValue:retainedValue||item.signatureValue,certificateSignatureType:typeof retainedValue==="string"&&retainedValue.startsWith("data:image/png;base64,")?"drawn":item.signatureType}:item);
   const mappedFields=(current.fields||[]).map(field=>{
     if(!requested.includes(field.fieldId))return field;
     return {...field,signerId:newSignerId,signerUid:null,roleAssignmentIndex:roleIndexes.indexOf(Number(field.roleAssignmentIndex||0))};
@@ -126,7 +129,7 @@ export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,
   const at=now.toISOString();
   const eventBody={type:"recovery.stamp.reassigned",actor:user.uid,at,previousSignerId:target.id,replacementSignerId:newSignerId,fieldIds:requested,reason:cleanReason,replacementEmailHash:replacement.emailHash,prevHash:current.events.length?current.events.at(-1).hash:"GENESIS"};
   const event={...eventBody,hash:await sha256Hex(canonicalJson(eventBody))};
-  await ctx.meta.update("envelopes",id,{signers:[...(current.signers||[]),replacement],fields:mappedFields,events:[...(current.events||[]),event],updatedAt:at},{ifVersion:current._v});
+  await ctx.meta.update("envelopes",id,{signers:[...nextSigners,replacement],fields:mappedFields,events:[...(current.events||[]),event],updatedAt:at},{ifVersion:current._v});
   const delivery=await resendInvitation(ctx,user,id,newSignerId,{invitationKind:"recovery-reassignment"});
   return {ok:true,envelopeId:id,previousSignerId:target.id,replacementSignerId:newSignerId,reassignedFieldIds:requested,deliveryStatus:delivery.deliveryStatus,expiresAt:delivery.expiresAt};
 }
@@ -138,9 +141,11 @@ export async function buildRecoveryPreview(ctx,user,id){
   const verifiedIds=new Set(assessment.stampSlots.filter(x=>x.status==="VERIFIED_EXISTING").map(x=>x.fieldId));
   const safeFields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
   const safeSignerIds=new Set(safeFields.map(field=>field.signerId));
-  const safeSigners=(envelope.signers||[]).filter(signer=>safeSignerIds.has(signer.id)).map(signer=>({
-    ...signer,fieldValues:Object.fromEntries(Object.entries(signer.fieldValues||{}).filter(([fieldId])=>verifiedIds.has(fieldId)))
-  }));
+  const safeSigners=(envelope.signers||[]).filter(signer=>safeSignerIds.has(signer.id)).map(signer=>{
+    const verifiedField=safeFields.find(field=>field.signerId===signer.id);
+    const verifiedValue=verifiedField?signer.fieldValues?.[verifiedField.fieldId]:null;
+    return {...signer,certificateSignatureValue:verifiedValue||signer.signatureValue,certificateSignatureType:typeof verifiedValue==="string"&&verifiedValue.startsWith("data:image/png;base64,")?"drawn":signer.signatureType,fieldValues:Object.fromEntries(Object.entries(signer.fieldValues||{}).filter(([fieldId])=>verifiedIds.has(fieldId)))};
+  });
   const {buildSignedPdf}=await import("./pdf.mjs");
   const preview=await buildSignedPdf(original,{
     envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"Recovery preview",
