@@ -12,7 +12,6 @@
   "emergencyLimitHours": 24,
   "reason": "PR A has its own 72-hour Signature Portal repair window. Window remains closed until an owner APPROVE comment references PR A.",
   "scope": [
-    "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
     "src/pages/SignatureRecoveryOwnerPanel.jsx",
     "drive-gateway/src/signatureRecovery.mjs",
@@ -20,7 +19,8 @@
     "tests/signature-recovery-owner-panel-readonly.test.mjs",
     ".github/workflows/baseline-evidence.yml",
     "docs/portal-protection/records/signature-portal.json",
-    "docs/portal-protection/windows/signature-portal.json"
+    "docs/portal-protection/windows/signature-portal.json",
+    "src/pages/SignatureRecoveryOwnerEnvelopes.jsx"
   ],
   "activityLog": [],
   "emergencyExpiresAt": null
