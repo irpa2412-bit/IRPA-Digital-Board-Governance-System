@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 const registry = JSON.parse(fs.readFileSync(new URL("../docs/portal-protection/portal-register.json", import.meta.url), "utf8"));
 
@@ -217,4 +217,60 @@ test("real evidence URLs must identify an exact repository, run and job", () => 
     repository: "irpa2412-bit/IRPA-Digital-Board-Governance-System", runId: 44952176019, jobId: 136992981056
   });
   assert.equal(parseGitHubJobEvidence("https://example.com/not-a-run"), null);
+});
+
+const ownerApproval = {
+  authorLogin: "irpa2412-bit",
+  ownerLogin: "irpa2412-bit",
+  body: MAINTENANCE_APPROVAL_QUOTE
+};
+const sevenPortalProtectionFiles = Object.keys(registry.portals).map(name => {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `docs/portal-protection/windows/${slug}.json`;
+});
+
+test("shared register entries carry the explicit shared class", () => {
+  assert.ok(registry.shared.length > 0);
+  assert.ok(registry.shared.every(entry => entry.class === "shared"));
+  assert.ok(registry.shared.some(entry =>
+    entry.path === "src/pages/SignaturePlatform.jsx" &&
+    entry.portals.includes("Signature Portal") &&
+    entry.portals.includes("Meeting Portal")
+  ));
+});
+
+test("seven-portal protection-only maintenance passes classification with quoted owner approval", () => {
+  const result = classifyProtectionOnlyChange(sevenPortalProtectionFiles, ownerApproval);
+  assert.equal(result.eligible, true);
+  assert.equal(result.ownerApproved, true);
+  assert.equal(result.ok, true);
+});
+
+test("the same seven-portal protection-only maintenance fails without owner approval", () => {
+  const result = classifyProtectionOnlyChange(sevenPortalProtectionFiles, null);
+  assert.equal(result.eligible, true);
+  assert.equal(result.ownerApproved, false);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /repository owner account/);
+});
+
+test("two portals' source files fail even when the owner approval is present", () => {
+  const changed = ["src/pages/Invitations.jsx", "src/pages/GrantIntelligencePortal.jsx"];
+  const classification = classifyProtectionOnlyChange(changed, ownerApproval);
+  assert.equal(classification.eligible, false);
+  const result = evaluatePolicy({ changedFiles: changed, registry, record: valid, windowState });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /multi-portal changes are blocked/);
+});
+
+test("a protection file for one portal mixed with another portal's source fails even with approval", () => {
+  const changed = [
+    "docs/portal-protection/windows/invitation-portal.json",
+    "src/pages/GrantIntelligencePortal.jsx"
+  ];
+  const classification = classifyProtectionOnlyChange(changed, ownerApproval);
+  assert.equal(classification.eligible, false);
+  const result = evaluatePolicy({ changedFiles: changed, registry, record: valid, windowState });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /multi-portal changes are blocked/);
 });
