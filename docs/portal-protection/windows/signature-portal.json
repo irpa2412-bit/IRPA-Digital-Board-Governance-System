@@ -5,9 +5,9 @@
   "durationHours": 72,
   "inactivityCloseHours": 72,
   "warningHours": 12,
-  "openedAt": "2026-11-22T15:35:28.470Z",
-  "expiresAt": "2026-11-25T15:35:28.470Z",
-  "lastActivityAt": "2026-11-22T15:35:28.470Z",
+  "openedAt": "2026-11-22T16:03:14.989Z",
+  "expiresAt": "2026-11-25T16:03:14.989Z",
+  "lastActivityAt": "2026-11-22T16:03:14.989Z",
   "emergency": false,
   "emergencyLimitHours": 24,
   "reason": "No active repair authorization. An owner-approved APPROVE or RENEW comment opens one 72-hour window for this portal only.",
@@ -50,6 +50,17 @@
       "command": "approve",
       "reason": "Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
       "prNumber": 895,
+      "action": "owner-approved 72-hour renewal"
+    },
+    {
+      "at": "2026-11-22T16:03:14.989Z",
+      "expiresAt": "2026-11-25T16:03:14.989Z",
+      "actor": "irpa2412-bit",
+      "quotedApproval": "APPROVE 898 Generalise owner self-service read-only assessment to every non-Completed envelope in the Signature Portal; enforce owner/admin authorization in the Gateway, preserve all signature and envelope evidence, and do not add retry, reassignment, repair or completion actions.",
+      "commentUrl": "https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/898#issuecomment-7081752806",
+      "command": "approve",
+      "reason": "Generalise owner self-service read-only assessment to every non-Completed envelope in the Signature Portal; enforce owner/admin authorization in the Gateway, preserve all signature and envelope evidence, and do not add retry, reassignment, repair or completion actions.",
+      "prNumber": 898,
       "action": "owner-approved 72-hour renewal"
     }
   ],
