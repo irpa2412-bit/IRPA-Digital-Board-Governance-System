@@ -33,18 +33,12 @@ export async function getRecoveryQueue(ctx,user,{limit=25,offset=0}={}){
   }))};
 }
 async function appendRecoveryAccessEvent(ctx,user,id,type,details={}){
-  for(let attempt=0;attempt<5;attempt++){
-    const current=await ctx.meta.get("envelopes",id);
-    if(!current||!isOwner(current,user)||current.status!=="CompletionFailed")throw new HttpError(409,"Recovery record changed; refresh before continuing.");
-    if(!await validChain(current.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
-    const at=ctx.now().toISOString();
-    const body={type,actor:user.uid,at,...details,prevHash:current.events.length?current.events.at(-1).hash:"GENESIS"};
-    const event={...body,hash:await sha256Hex(canonicalJson(body))};
-    try{
-      await ctx.meta.update("envelopes",id,{events:[...(current.events||[]),event],updatedAt:at},{ifVersion:current._v});
-      return;
-    }catch(error){if(!(error instanceof VersionConflict)||attempt===4)throw error;}
-  }
+  const current=await ctx.meta.get("envelopes",id);
+  if(!current||!isOwner(current,user)||current.status!=="CompletionFailed")throw new HttpError(409,"Recovery record changed; refresh before continuing.");
+  if(!await validChain(current.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
+  const at=ctx.now().toISOString();
+  const eventId="recovery-"+id+"-"+Date.parse(at)+"-"+randomHex(8);
+  await ctx.meta.create("recoveryAccessEvents",eventId,{envelopeId:id,type,actor:user.uid,at,...details});
 }
 async function loadOwnedFailedEnvelope(ctx,user,id){
   const envelope=await ctx.meta.get("envelopes",id);
