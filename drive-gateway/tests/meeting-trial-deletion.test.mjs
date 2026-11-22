@@ -5,7 +5,8 @@ import {
   MEETING_CHILD_COLLECTIONS,
   buildMeetingDeletionPreview,
   sanitizeMeetingExport,
-  validateMeetingDeletion
+  validateMeetingDeletion,
+  validateMeetingRecordPurge
 } from "../src/meetingDeletion.mjs";
 import { isTrialMeeting, meetingEnvironment } from "../src/meetingEnvironment.mjs";
 
@@ -157,4 +158,37 @@ test("gateway preview and delete routes enforce admin, preview, validation and o
   assert.match(source, /action:"TRIAL_MEETING_DELETED"/);
   assert.match(source, /commitWrites\(ctx,env,token,writes\)/);
   assert.match(source, /deletedChildCount:validation\.childCount/);
+});
+
+test("meeting deletion cannot bypass authoritative meeting-record disposition", async () => {
+  const preview = await buildMeetingDeletionPreview("trial-1", meeting, childRecords);
+  const result = validateMeetingDeletion({
+    meeting,
+    reason: "Test cleanup",
+    confirmationTitle: meeting.title,
+    previewDigest: preview.previewDigest,
+    currentDigest: preview.previewDigest,
+    childRecords: [{ collection: "meetingRecords", record: { id: "minutes-1", updateTime: meeting.updateTime } }]
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "MEETING_RECORD_DISPOSITION_REQUIRED");
+});
+
+test("final purge preserves trial-only, legal-hold, retention, pending-review and version checks", () => {
+  const expired = { legalHold: false, retainUntil: "2020-01-01T00:00:00.000Z", deletionStatus: "PENDING_REVIEW", updateTime: "2026-11-21T20:00:00.000Z" };
+  const now = new Date("2026-11-22T00:00:00.000Z");
+  assert.equal(validateMeetingRecordPurge({ meeting, record: expired, now }).ok, true);
+  assert.equal(validateMeetingRecordPurge({ meeting: { ...meeting, environment: "REAL" }, record: expired, now }).code, "REAL_MEETING_PROTECTED");
+  assert.equal(validateMeetingRecordPurge({ meeting: { ...meeting, environment: undefined }, record: expired, now }).code, "REAL_MEETING_PROTECTED");
+  assert.equal(validateMeetingRecordPurge({ meeting, record: { ...expired, legalHold: true }, now }).code, "LEGAL_HOLD_ACTIVE");
+  assert.equal(validateMeetingRecordPurge({ meeting, record: { ...expired, retainUntil: "2027-01-01T00:00:00.000Z" }, now }).code, "RETENTION_NOT_EXPIRED");
+  assert.equal(validateMeetingRecordPurge({ meeting, record: { ...expired, deletionStatus: "ACTIVE" }, now }).code, "DISPOSITION_REVIEW_REQUIRED");
+  assert.equal(validateMeetingRecordPurge({ meeting, record: { ...expired, updateTime: undefined }, now }).code, "RECORD_VERSION_UNAVAILABLE");
+});
+
+test("gateway final purge route uses the full trial and record-disposition validator", () => {
+  const source = readFileSync(new URL("../src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.ok(source.includes('validateMeetingRecordPurge({meeting:c.meeting,record})'));
+  assert.ok(source.includes('if(op==="PURGE")'));
+  assert.ok(source.includes('currentDocument:{updateTime:record.updateTime}'));
 });
