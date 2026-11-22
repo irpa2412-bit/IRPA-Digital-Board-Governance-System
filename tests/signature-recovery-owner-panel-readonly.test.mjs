@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/pages/SignatureRecoveryOwnerPanel.jsx", import.meta.url), "utf8");
-const ownerView = fs.readFileSync(new URL("../src/pages/SignaturePlatform.jsx", import.meta.url), "utf8");
+const ownerView = fs.readFileSync(new URL("../src/pages/SignatureRecoveryOwnerEnvelopes.jsx", import.meta.url), "utf8");
 
 test("owner recovery panel performs only authenticated GET requests", () => {
   assert.match(source, /fetch\(gateway\+path,\{method:"GET"/);
@@ -35,7 +35,7 @@ test("owner recovery panel renders bilingual report sections and no completion a
 
 test("owner Envelopes view exposes Check this document only for non-completed owned envelopes", () => {
   assert.match(ownerView, /My Created Envelopes/);
-  assert.match(ownerView, /e\.ownerUid===auth\.currentUser\?\.uid/);
-  assert.match(ownerView, /e\.status!==\"Completed\"/);
+  assert.match(ownerView, /envelope\.ownerUid===uid/);
+  assert.match(ownerView, /status!==\"Completed\"/);
   assert.match(ownerView, /Check this document/);
 });
