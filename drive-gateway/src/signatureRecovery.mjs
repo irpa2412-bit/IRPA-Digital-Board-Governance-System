@@ -1,6 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { canonicalJson, sha256Hex, HttpError } from "./util.mjs";
-import { VersionConflict } from "./adapters.mjs";
 import { resendInvitation } from "./signing.mjs";
 import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 
