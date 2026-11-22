@@ -67,3 +67,10 @@ Revert this change through a protected PR to baseline `908b314ab0de566d057b4093f
 - Required PR checks are running against the final PR head; no check is marked PASS in this record until the job conclusion is retrieved.
 
 The final UI test commit above includes a corrected literal matcher for the explicit route-missing message. This Change Record update is the final documentation-only PR-head commit; any validation conclusions will be reported from the resulting head's check runs, not copied from earlier attempts.
+
+## Final audit-chain visibility refinement
+
+- Worker access telemetry remains isolated in `recoveryAccessEvents`; its separate append no longer rejects an owner queue read solely because the signing audit chain is invalid.
+- The assessor now returns `auditChain: FAILED` and per-stamp `UNVERIFIABLE` while preserving the signed envelope and audit events. Preview remains fail-closed for invalid audit chains.
+- Worker source commit: `ec065bd37d32d96d0821d5b492ac7db8e7f4dc90`.
+- Seeded Worker test commit: `3937ffe65325c262fa4817e9d085d797cbea9d4b`.
