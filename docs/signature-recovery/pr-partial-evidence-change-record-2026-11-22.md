@@ -57,3 +57,11 @@ Revert this change through a protected PR to baseline `908b314ab0de566d057b4093f
 `5496b61665aab73972275d33dd2d71f67c43f835` — Worker partial evidence tests.
 
 `348e04e8555b10a9390980567e0aa18f5d5ce17e` — UI read-only and report tests.
+## Final source revision for this PR
+
+- PR: [#900](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/900) (draft pending required checks).
+- Latest Worker source commit: `87a5129ba1ce06ededa82f205c113f19f50df469`.
+- Latest seeded Worker tests commit: `1c58b7ed2ed100846f9e9f482b6039ee28ae8114`.
+- Latest owner panel/report commit: `81780a360134b58eb425cabfa53b7f344cd56d3d`.
+- Latest read-only UI test commit: `9698a9c630e0d72db1482d136e91c6638db21829`.
+- Required PR checks are running against the final PR head; no check is marked PASS in this record until the job conclusion is retrieved.
