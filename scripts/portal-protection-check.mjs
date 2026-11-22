@@ -169,15 +169,15 @@ async function main() {
     console.log(JSON.stringify(discovery, null, 2));
     return;
   }
+  const registeredPortal = discovery.affected.length === 1 ? registry.portals[discovery.affected[0]] : null;
+  const warningUntil = newPortalWarningUntil(registeredPortal);
+  if (Number.isFinite(warningUntil) && Date.now() < warningUntil) {
+    console.warn(`::warning::New portal ${discovery.affected[0]} is in its seven-day protection warning period until ${new Date(warningUntil).toISOString()}; create its dedicated window, Change Record and lock tests.`);
+    console.log(JSON.stringify({ ...discovery, ok: true, warning: "New portal seven-day warning period; no protection exemption after expiry." }, null, 2));
+    return;
+  }
   const portalSelection = resolvePortalPolicyPaths(discovery.affected);
   if (!portalSelection.ok) {
-    const portal = discovery.affected.length === 1 ? registry.portals[discovery.affected[0]] : null;
-    const warningUntil = newPortalWarningUntil(portal);
-    if (Number.isFinite(warningUntil) && Date.now() < warningUntil) {
-      console.warn(`::warning::New portal ${discovery.affected[0]} is in its seven-day protection warning period until ${new Date(warningUntil).toISOString()}; create its dedicated window, Change Record and lock tests.`);
-      console.log(JSON.stringify({ ...discovery, ok: true, warning: "New portal seven-day warning period; no protection exemption after expiry." }, null, 2));
-      return;
-    }
     console.log(JSON.stringify({ ...discovery, ok: false, reason: portalSelection.reason }, null, 2));
     process.exitCode = 1;
     return;
