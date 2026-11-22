@@ -27,3 +27,5 @@ Verbatim owner approval:
 Scope is limited to this one workflow's owner-comment canary trigger and its text-level trigger tests. This is not approval for portal source, Worker routes, Firestore rules, other deploy workflows, or canary execution before the workflow change is merged and independently verified. Merge only when every required check is green.
 
 Dedicated request issue: [#876 — Canary run request](https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/issues/876), locked. Workflow must enforce comment action `created`, issue number `876`, owner login `irpa2412-bit`, owner numeric ID `319164319`, and exact body `RUN CANARY`; edited comments must not trigger.
+
+- 2026-11-22T16:03:14.989Z — Signature Portal — APPROVE 898 Generalise owner self-service read-only assessment to every non-Completed envelope in the Signature Portal; enforce owner/admin authorization in the Gateway, preserve all signature and envelope evidence, and do not add retry, reassignment, repair or completion actions. — https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/pull/898#issuecomment-7081752806 — expires 2026-11-25T16:03:14.989Z
