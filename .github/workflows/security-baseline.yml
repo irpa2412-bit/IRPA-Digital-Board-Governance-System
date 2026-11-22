@@ -3,6 +3,7 @@ name: IRPA Security Baseline Gate
 permissions:
   actions: read
   contents: read
+  issues: read
 
 on:
   push:
