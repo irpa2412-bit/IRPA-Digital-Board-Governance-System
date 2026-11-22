@@ -38,14 +38,14 @@ test("automatic read-only triggers remain separate from issue_comment", () => {
 });
 
 test("canary fixture stores no administrator UID or email and does not capture a user-attributed record", () => {
-  assert.doesNotMatch(canary, /initiatorUid:\\s*admin\\.uid|meetingHostUid:\\s*admin\\.uid|createdByUid:\\s*admin\\.uid|capturedByUid|capturedByEmail/);
-  assert.doesNotMatch(canary, /\\/api\\/meeting-records\\/capture/);
+  assert.doesNotMatch(canary, /initiatorUid:\s*admin\.uid|meetingHostUid:\s*admin\.uid|createdByUid:\s*admin\.uid|capturedByUid|capturedByEmail/);
+  assert.doesNotMatch(canary, /\/api\/meeting-records\/capture/);
   assert.match(canary, /system-canary-record-/);
 });
 test("canary reuses an existing labelled meeting and linked record", () => {
-  assert.match(canary, /where\\("systemTestLabel", "==", LABEL\\)/);
-  assert.match(canary, /results\\.reusedExistingMeeting = true/);
-  assert.match(canary, /results\\.reusedExistingRecord = true/);
-  assert.match(canary, /results\\.finalMeetingExists === true/);
-  assert.match(canary, /results\\.finalRecordExists === true/);
+  assert.match(canary, /where\("systemTestLabel", "==", LABEL\)/);
+  assert.match(canary, /results\.reusedExistingMeeting = true/);
+  assert.match(canary, /results\.reusedExistingRecord = true/);
+  assert.match(canary, /results\.finalMeetingExists === true/);
+  assert.match(canary, /results\.finalRecordExists === true/);
 });
