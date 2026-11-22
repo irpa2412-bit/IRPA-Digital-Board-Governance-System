@@ -55,14 +55,16 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   const accessToken = "test-meeting-access-token-0123456789";
   const meetingPassword = "ABCD1234WXYZ";
   const digest = async value => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(b => b.toString(16).padStart(2, "0")).join("");
+  let committed;
   const { ctx, calls } = ctxFor({
-    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled", platformAccessUrl: "https://meet.example.org/board", platformMeetingId: "ROOM-123", platformPasscode: "ROOM-PASS", agenda: "Approve minutes" } },
+    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled", platformAccessUrl: "https://meet.example.org/board", platformMeetingId: "ROOM-123", platformPasscode: "ROOM-PASS", agenda: "Approve minutes", invitedEmails:[], participantEmails:[] } },
     participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } },
     pass: { id: "access-1", data: {
       meetingId: "meeting-1", participantId: "participant-1", participantEmail: "participant@example.org",
       tokenHash: await digest(accessToken), passwordHash: await digest(meetingPassword), status: "Active",
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
-    } }
+    } },
+    onCommit: value => { committed = value; }
   });
   const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-invitations/dispatch", {
     accessId: "access-1", accessToken, meetingPassword
@@ -78,8 +80,9 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   assert.match(ctx.sentEmail.html, /Join online meeting/);
   assert.match(ctx.sentEmail.text, /Agenda: Approve minutes/);
   assert.match(ctx.sentEmail.text, /meetingToken=/);
-  assert.ok(calls.some(call => call.url.pathname.includes("/documents/participants/participant-1")));
-  assert.ok(calls.some(call => call.url.pathname.endsWith("/documents/audit")));
+  assert.ok(committed.writes.some(write => write.update?.fields?.meetingAccessDispatched?.booleanValue === true && write.update?.fields?.meetingAccessRevoked?.booleanValue === false));
+  assert.ok(committed.writes.some(write => write.update?.fields?.participantEmails?.arrayValue?.values?.some(value => value.stringValue === "participant@example.org")));
+  assert.ok(calls.some(call => call.url.pathname.endsWith("/documents:audit")));
 });
 
 
@@ -119,4 +122,23 @@ test("issue creates an access pass and updates invitee tally in one atomic Fires
   assert.equal(committed.writes[0].update.fields.passwordHash.stringValue.length, 64);
   assert.equal(committed.writes[1].update.fields.invitedParticipantCount.integerValue, "1");
   assert.equal(calls.filter(call => call.url.pathname.endsWith("/documents:commit")).length, 1);
+});
+
+
+test("revoking the last active meeting access pass removes meeting read access atomically", async () => {
+  let committed;
+  const { ctx } = ctxFor({
+    meeting: { id:"meeting-1", data:{initiatorUid:"organizer-1",invitedEmails:["participant@example.org"],participantEmails:["participant@example.org"]} },
+    participant: { id:"participant-1", data:{meetingId:"meeting-1",participantEmail:"participant@example.org",meetingAccessDispatched:true,meetingAccessRevoked:false} },
+    pass: { id:"access-1", data:{meetingId:"meeting-1",participantId:"participant-1",participantEmail:"participant@example.org",status:"Active",createdByUid:"organizer-1",expiresAt:new Date(Date.now()+3600000).toISOString()} },
+    onCommit: value => { committed = value; }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-access/revoke", {accessId:"access-1"});
+  assert.equal(response.status,200);
+  const body=await response.json();
+  assert.equal(body.status,"Revoked");
+  assert.equal(body.participantAccessRemoved,true);
+  assert.ok(committed.writes.some(write=>write.update?.fields?.status?.stringValue==="Revoked"));
+  assert.ok(committed.writes.some(write=>write.update?.fields?.invitedEmails?.arrayValue?.values?.length===0&&write.update?.fields?.participantEmails?.arrayValue?.values?.length===0));
+  assert.ok(committed.writes.some(write=>write.update?.fields?.meetingAccessRevoked?.booleanValue===true&&write.update?.fields?.meetingAccessDispatched?.booleanValue===false));
 });
