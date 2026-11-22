@@ -1,3 +1,4 @@
+import { resolveMeetingAuthority } from "../../shared/meetingAuthority.mjs";
 const sha256 = async value => {
   const bytes = new TextEncoder().encode(String(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -81,6 +82,17 @@ async function getDoc(ctx, env, token, collection, id) {
   try { return await firestoreRequest(ctx, env, token, `${collection}/${encodeURIComponent(id)}`); }
   catch (error) { if (error.status === 404) return null; throw error; }
 }
+async function listCollection(ctx, env, token, collection) {
+  const rows = await firestoreRequest(ctx, env, token, ":runQuery", {
+    method: "POST",
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collection }] } })
+  });
+  return (Array.isArray(rows) ? rows : []).filter(row => row.document).map(row => docToPlain(row.document));
+}
+function denyDuty(ctx, request, authority, duty, allowed) {
+  const registered = (authority?.roles || []).map(item => clean(item.role) + " [" + clean(item.source) + "]").join(", ") || "none";
+  return errorResponse(ctx, request, "Denied duty: " + duty + ". Active register authority: " + registered + ". Roles allowed: " + allowed + ".", 403);
+}
 async function commitWrites(ctx, env, token, writes) {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents:commit`, {
     method: "POST",
@@ -131,6 +143,22 @@ export function createMeetingPortalRouter(ctx) {
       return null;
     });
     if (!adminToken) return errorResponse(ctx, request, "Meeting services are temporarily unavailable because the server identity is not configured.", 503);
+    let authority = { active: false, fullMeetingAccess: false, roles: [] };
+    if (action !== "authorize") {
+      try {
+        const [members, employees, departments] = await Promise.all([
+          listCollection(ctx, env, adminToken, "members"),
+          listCollection(ctx, env, adminToken, "employees"),
+          listCollection(ctx, env, adminToken, "institutionalDepartments")
+        ]);
+        authority = resolveMeetingAuthority({
+          uid, email, memberNumber: claims.memberNumber, employeeNumber: claims.employeeNumber
+        }, { members, employees, departments });
+      } catch (error) {
+        console.error("MEETING_AUTHORITY_REGISTER_LOOKUP_FAILED", { uid, code: String(error?.status || error?.code || "UNKNOWN") });
+        return errorResponse(ctx, request, "Meeting authority registers could not be verified. No access was granted.", 503);
+      }
+    }
 
     const ids = { meetingId: clean(data.meetingId), participantId: clean(data.participantId), uid };
     try {
@@ -157,7 +185,7 @@ export function createMeetingPortalRouter(ctx) {
         ]);
         const initiator = clean(meeting.initiatorUid) === uid;
         logStage("AUTHORIZATION_EVALUATED", "SUCCESS", ids, { isAdmin: admin, chair, secretary, initiator });
-        if (!admin && !chair && !secretary && !initiator) return errorResponse(ctx, request, "Only the authorised meeting initiator, administrator, chairperson or secretary may issue meeting access.", 403);
+        if (!admin && !authority.fullMeetingAccess && !chair && !secretary && !initiator) return denyDuty(ctx, request, authority, "issue meeting access", "meeting initiator, administrator, chairperson, secretary, Director of Internal Oversight, Executive Director, Head of Department");
         const priorPasses = await listByField(ctx, env, adminToken, "meetingAccessTokens", "participantId", ids.participantId);
         const activePriorPasses = priorPasses.filter(pass => pass.status === "Active");
         const priorEntryRequests = await listByField(ctx, env, adminToken, "meetingEntryRequests", "participantId", ids.participantId);
@@ -246,7 +274,7 @@ export function createMeetingPortalRouter(ctx) {
           Promise.resolve(lower(meeting.chairpersonEmail) === email || clean(meeting.chairpersonUid) === uid),
           Promise.resolve(lower(meeting.secretaryEmail) === email || clean(meeting.secretaryUid) === uid)
         ]);
-        if (!admin && !chair && !secretary && clean(meeting.initiatorUid) !== uid && clean(meeting.createdByUid) !== uid) return errorResponse(ctx, request, "Only an authorised meeting organiser may dispatch meeting access.", 403);
+        if (!admin && !authority.fullMeetingAccess && !chair && !secretary && clean(meeting.initiatorUid) !== uid && clean(meeting.createdByUid) !== uid) return denyDuty(ctx, request, authority, "dispatch meeting access", "meeting initiator, administrator, chairperson, secretary, Director of Internal Oversight, Executive Director, Head of Department");
         if (!isActiveMeeting(meeting.status)) return errorResponse(ctx, request, "This meeting is closed and cannot issue invitations.", 409);
         const recipient = lower(participant.participantEmail || participant.email);
         if (!recipient || (pass.participantEmail && lower(pass.participantEmail) !== recipient)) return errorResponse(ctx, request, "The participant email does not match the issued access pass.", 409);
@@ -349,7 +377,7 @@ export function createMeetingPortalRouter(ctx) {
           Promise.resolve(lower(meeting.chairpersonEmail) === email),
           Promise.resolve(lower(meeting.secretaryEmail) === email)
         ]);
-        if (!admin && clean(pass.createdByUid) !== uid && !chair && !secretary) return errorResponse(ctx, request, "Only the issuer or an authorised meeting administrator may revoke this pass.", 403);
+        if (!admin && !authority.fullMeetingAccess && clean(pass.createdByUid) !== uid && !chair && !secretary) return denyDuty(ctx, request, authority, "revoke meeting access", "pass issuer, administrator, chairperson, secretary, Director of Internal Oversight, Executive Director, Head of Department");
         const now = new Date();
         const otherActivePass = priorPasses.some(row => row.id !== accessId && row.status === "Active" && row.expiresAt && new Date(row.expiresAt).getTime() > now.getTime());
         const writes = [];
