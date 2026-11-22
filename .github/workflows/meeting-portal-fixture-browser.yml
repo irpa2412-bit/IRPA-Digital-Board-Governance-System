@@ -37,14 +37,15 @@ on:
       - "tests/meeting-configurable-quorum.test.mjs"
       - "tests/meeting-category-policy.test.mjs"
       - "tests/meeting-isolation-guard.test.mjs"
+      - "tests/meeting-browser-concurrency.test.mjs"
       - "tests/fixtures/**"
       - "vite.meeting-fixture.config.js"
       - "scripts/meeting-portal-fixture-isolation-guard.sh"
       - ".github/workflows/meeting-portal-fixture-browser.yml"
   workflow_dispatch: {}
 concurrency:
-  group: meeting-portal-browser-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: meeting-portal-browser-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('ref-{0}-sha-{1}', github.ref, github.sha) }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -133,6 +134,8 @@ jobs:
         run: npm ci
       - name: Test source-isolation guard policy
         run: node --test tests/meeting-isolation-guard.test.mjs
+      - name: Test safe browser workflow concurrency
+        run: node --test tests/meeting-browser-concurrency.test.mjs
       - name: Test meeting policy and invitation removal
         run: node --test tests/invitation-removal-policy.test.mjs tests/meeting-category-policy.test.mjs tests/meeting-quorum-reconciliation.test.mjs
       - name: Install isolated browser runner
