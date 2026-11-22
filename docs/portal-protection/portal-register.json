@@ -196,7 +196,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/main.jsx",
@@ -208,7 +209,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/auth.js",
@@ -220,7 +222,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/components/",
@@ -232,7 +235,8 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/styles/",
@@ -244,49 +248,56 @@
         "Members and Employees Portal",
         "Communication and Media Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/pages/SignaturePlatform.jsx",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/signaturePlatform.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/signatureStorage.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/signatureWorkflowPolicy.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/components/ControlledDocumentUpload.jsx",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     },
     {
       "path": "src/firebase/meetingAttendanceSigning.js",
       "portals": [
         "Signature Portal",
         "Meeting Portal"
-      ]
+      ],
+      "class": "shared"
     }
   ],
   "exclusions": [
