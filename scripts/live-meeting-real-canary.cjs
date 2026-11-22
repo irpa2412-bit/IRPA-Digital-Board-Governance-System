@@ -162,7 +162,7 @@ async function post(path, body, idToken) {
     results.trialEnvironmentMutationBlocked =
       resultingEnvironment !== "TRIAL" &&
       ((environmentAttempt.status === 200 && Array.isArray(changedFields) && !changedFields.includes("environment")) ||
-       (environmentAttempt.status === 409 && /environment/i.test(String(environmentAttempt.body.error || "")));
+       (environmentAttempt.status === 409 && /environment/i.test(String(environmentAttempt.body.error || ""))));
     console.log("TRIAL_ENVIRONMENT_MUTATION_BLOCKED=" + (results.trialEnvironmentMutationBlocked ? "PASS" : "FAIL") +
       "; HTTP=" + environmentAttempt.status + "; persistedEnvironment=" + (resultingEnvironment || "ABSENT"));
     if (!results.trialEnvironmentMutationBlocked) liveCheckFailed = true;
