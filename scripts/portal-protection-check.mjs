@@ -112,6 +112,7 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
     }
     const owners = [...new Set([...sharedMatches.values()].flat())].sort();
     const sharedFiles = [...sharedMatches.keys()].sort();
+    if (!ownerPolicies) return { ok: true, affected: owners, protectedFiles: sharedFiles, sharedFiles, needsOwnerPolicies: true, reason: "Shared-file classification requires independent owner policies." };
     const ownerResults = [];
     for (const portal of owners) {
       const policy = ownerPolicies?.[portal] ?? (owners.length === 1 ? { windowState, record, activityTimestamps, latestActivityAt } : null);
@@ -224,6 +225,53 @@ async function main() {
   const discovery = evaluatePolicy({ changedFiles, registry, windowState: null, record: null });
   if (!discovery.protectedFiles.length) {
     console.log(JSON.stringify(discovery, null, 2));
+    return;
+  }
+  if (discovery.sharedFiles?.length) {
+    const ownerPolicies = {};
+    for (const portal of discovery.affected) {
+      const paths = portalPolicyPaths([portal]);
+      if (!paths || !fs.existsSync(paths.windowPath) || !fs.existsSync(paths.recordPath)) {
+        console.log(JSON.stringify({ ...discovery, ok: false, reason: "Shared-file change is missing the dedicated window or Change Record for owner: " + portal }, null, 2));
+        process.exitCode = 1;
+        return;
+      }
+      ownerPolicies[portal] = {
+        windowState: readJson(paths.windowPath),
+        record: readJson(paths.recordPath)
+      };
+    }
+    const history = execFileSync("git", ["log", "--format=%cI", "--", ...discovery.sharedFiles], { encoding: "utf8" }).trim();
+    const activityTimestamps = parseActivityTimestamps(history);
+    for (const policy of Object.values(ownerPolicies)) policy.activityTimestamps = activityTimestamps;
+    const result = evaluatePolicy({ changedFiles, registry, ownerPolicies });
+    if (!result.ok) {
+      console.log(JSON.stringify(result, null, 2));
+      process.exitCode = 1;
+      return;
+    }
+    for (const portal of result.affected) {
+      const evidenceCheck = await verifyRealRunEvidence(ownerPolicies[portal].record, [portal]);
+      if (!evidenceCheck.ok) {
+        console.log(JSON.stringify({ ...result, ok: false, reason: "Shared-file owner " + portal + " baseline evidence failed: " + evidenceCheck.reason }, null, 2));
+        process.exitCode = 1;
+        return;
+      }
+    }
+    const lockTests = [...new Set(result.affected.flatMap(portal => registry.portals[portal].lockTests ?? registry.portals[portal].tests ?? []))];
+    if (!lockTests.length) {
+      console.log(JSON.stringify({ ...result, ok: false, reason: "Shared-file change has no registered owner lock tests." }, null, 2));
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      execFileSync("node", ["--test", ...lockTests], { stdio: "inherit" });
+    } catch (error) {
+      console.log(JSON.stringify({ ...result, ok: false, reason: "One or more owning portal lock tests failed: " + (error.message || error) }, null, 2));
+      process.exitCode = 1;
+      return;
+    }
+    console.log(JSON.stringify({ ...result, lockTestsExecuted: lockTests }, null, 2));
     return;
   }
   const registeredPortal = discovery.affected.length === 1 ? registry.portals[discovery.affected[0]] : null;
