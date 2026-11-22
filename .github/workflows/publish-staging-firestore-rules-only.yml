@@ -3,12 +3,13 @@ name: Publish Isolated Staging Firestore Rules Only
 run-name: Publish staging Firestore rules only (${{ github.ref_name }})
 
 on:
-  push:
-    branches:
-      - fix/signature-trail-20261024
-    paths:
-      - "firestore.staging.rules"
-      - ".github/workflows/publish-staging-firestore-rules-only.yml"
+  workflow_dispatch:
+    inputs:
+      confirm_staging_firestore_rules_deployment:
+        description: "Type DEPLOY RULES to publish isolated staging Firestore rules"
+        required: true
+        type: string
+        default: "no"
 
 permissions:
   contents: read
@@ -19,7 +20,7 @@ concurrency:
 
 jobs:
   publish-staging-rules:
-    if: ${{ github.ref == 'refs/heads/fix/signature-trail-20261024' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/fix/signature-trail-20261024' && inputs.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
