@@ -196,3 +196,11 @@ test("a failed audit chain is reported as partial evidence, not a global not-fou
   assert.equal(result.auditChain.status,"FAILED");
   assert.equal(result.stampSlots.every(row=>row.status==="UNVERIFIABLE"),true);
 });
+test("a mismatch against any stored source hash is reported without suppressing other evidence",async()=>{
+  const f=await fixture();
+  await f.ctx.meta.update("documents","DOC-REC-1",{hash:"0".repeat(64)});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.sourceHashStatus,"MISMATCH");
+  assert.equal(result.auditChain.status,"VERIFIED");
+  assert.equal(result.stampSlots[0].status,"VERIFIED_EXISTING");
+});
