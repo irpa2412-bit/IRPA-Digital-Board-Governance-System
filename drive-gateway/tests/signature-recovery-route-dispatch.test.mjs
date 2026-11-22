@@ -39,6 +39,8 @@ test("recovery evidence route is GET-only and invalid paths are not dispatched",
 
 test("recovery dispatch repair changes only its six approved files from the immutable baseline", async () => {
   const { execFileSync } = await import("node:child_process");
+  const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).trim() === "true";
+  if (shallow) execFileSync("git", ["fetch", "--no-tags", "--unshallow", "origin", "main"]);
   const changed = execFileSync("git", [
     "diff", "--name-only",
     "605cc913b442bc4e28716937a549aee1d6766cb8",
