@@ -1,5 +1,5 @@
 const clean = value => String(value ?? "").trim();
-const normalize = value => clean(value).toLowerCase().replace(/[._-]+/g," ").replace(/\\s+/g," ");
+const normalize = value => clean(value).toLowerCase().replace(/[._-]+/g," ").replace(/\s+/g," ");
 const inactive = new Set(["inactive","disabled","suspended","expired","revoked","removed","cancelled","canceled"]);
 const active = (record, now = Date.now()) => {
   if (!record || record.active === false || record.revoked === true || record.revokedAt) return false;
@@ -36,7 +36,7 @@ const identifiers = record => ({
 const headRole = role => {const value=normalize(role);return ["head of department","department head","head of the department"].includes(value)||/^head of .+ department$/.test(value)||/^department head of .+$/.test(value);};
 const grantRole = role => {
   const roleName=normalize(role);
-  return roleName==="internal oversight director" || roleName==="director internal oversight" ||
+  return ["internal oversight director","director internal oversight","director of internal oversight","director of international oversight"].includes(roleName) ||
     roleName==="executive director" || headRole(roleName);
 };
 export function resolveMeetingAuthority(identity={}, registers={}, now=Date.now()) {
