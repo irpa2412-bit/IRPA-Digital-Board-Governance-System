@@ -3,14 +3,18 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-22T18:10:00Z",
+  "lastActivityAt": "2026-11-23T19:55:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner instruction, 22 November 2026: repair Meeting Portal attendance callable integration. Active attendance screens must use authenticated Worker routes; undeployed Firebase callable actions must not be reachable from active screens. The repair window is 72 hours for implementation and validation only; no envelope, signer, guest, duplicate-signer, signature, Firestore rules, secrets, environment variables, SMTP settings or branch protection changes.",
+  "reason": "Owner-authorised 23 November 2026 scope extension: enable every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal, and allow active members and employees to participate in Staff and General meeting categories. Preserve Board voting, quorum, resolutions, formal approvals, signature workflows and restricted meeting access. Includes minimum Firestore production/staging meetingRegistrar rule changes; production rules publication remains behind the separate owner approval gate.",
   "scope": [
     "tests/meeting-category-policy.test.mjs",
     "docs/portal-protection/records/meeting-portal.json",
-    "docs/portal-protection/windows/meeting-portal.json"
+    "docs/portal-protection/windows/meeting-portal.json",
+    "src/firebase/meetingPolicy.js",
+    "firestore.rules",
+    "firestore.staging.rules",
+    "tests/meeting-category-firestore-rules.test.cjs"
   ],
   "activityLog": [
     {
@@ -22,6 +26,11 @@
       "at": "2026-11-22T18:10:00Z",
       "action": "owner instruction — attendance callable guard window opened",
       "description": "Add regression guard that active Meeting Portal attendance and entry-request screens use Worker routes and never invoke undeployed Firebase callables. No signer, guest or duplicate-signer behavior is modified."
+    },
+    {
+      "at": "2026-11-23T19:55:00Z",
+      "action": "owner-authorised scope extension — organisation-wide meeting initiation",
+      "description": "Owner authorised every active registered member and employee to initiate meetings; active members and staff participate in Staff and General meeting categories. Board voting, quorum and formal approval powers remain restricted. PR #941."
     }
   ],
   "baseline": {
