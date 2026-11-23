@@ -317,17 +317,17 @@ test("owner revoke invalidates a guest link; resend rotates token and marks the 
 });
 
 
-test("an expired session is closed without consuming the still-valid invitation",async()=>{
+test("a device session remains usable after long inactivity until the signer submits",async()=>{
   const f=await fixture();
   const first=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
-  f.now(new Date(NOW.getTime()+31*60*1000));
-  await assert.rejects(()=>openEmailSigning(f.ctx,first.sessionToken,"198.51.100.27"),error=>error.status===410);
-  const afterExpiry=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(afterExpiry.signers[0].emailLinkSessionStatus,"expired");
-  assert.equal(afterExpiry.signers[0].emailLinkStatus,"issued");
-  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
-  assert.ok(second.sessionToken);
-  assert.notEqual(second.sessionToken,first.sessionToken);
+  assert.equal(first.sessionExpiresAt,null,"email-link device sessions have no elapsed-time expiry");
+  f.now(new Date(NOW.getTime()+365*24*60*60*1000));
+  const resumed=await openEmailSigning(f.ctx,first.sessionToken,"198.51.100.27");
+  assert.equal(resumed.sessionToken,first.sessionToken,"reopening on the same or another device resumes the existing session");
+  assert.equal((await getSigningPdf(f.ctx,first.sessionToken,null)).fileName,"email-link.pdf");
+  const stillActive=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(stillActive.signers[0].emailLinkSessionStatus,"active");
+  assert.equal(stillActive.signers[0].emailLinkStatus,"issued");
 });
 
 test("owner Send new link replaces a legacy burned invitation and invalidates its old session",async()=>{
