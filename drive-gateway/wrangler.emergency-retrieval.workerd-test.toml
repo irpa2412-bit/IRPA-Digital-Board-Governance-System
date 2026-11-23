@@ -1,4 +1,4 @@
 name = "irpa-emergency-retrieval-workerd-test"
 main = "tests/workers/emergency-retrieval-worker.mjs"
-compatibility_date = "2026-09-29"
+compatibility_date = "2026-09-24"
 workers_dev = true
