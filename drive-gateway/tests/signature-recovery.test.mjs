@@ -517,3 +517,23 @@ test("source read failure refuses emergency PDF with SOURCE_READ sub-code",async
   assert.equal(result.bytes,undefined);
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
 });
+
+test("emergency evidence report is a read-only PDF with a verifiable report hash",async()=>{
+  const f=await fixture({stampCount:12});
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const path="/api/recovery/envelopes/ENV-REC-1/emergency-evidence-report.pdf";
+  const response=await router(new Request("https://worker.test"+path),{},path);
+  assert.equal(response.status,200);
+  assert.match(response.headers.get("content-type"),/application\/pdf/);
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  assert.equal(response.headers.get("x-irpa-report-sha256"),await sha256Hex(bytes));
+  assert.ok((await PDFDocument.load(bytes)).getPageCount()>=1);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+  assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
+});
