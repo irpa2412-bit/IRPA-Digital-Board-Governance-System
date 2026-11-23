@@ -16,7 +16,8 @@ test("original invitation remains valid beyond the former 7-day expiry and has n
  const {issued,envelope,signer}=await fixture();
  signer.emailLinkExpiresAt="2026-11-30T13:00:00.000Z";
  signer.tokenExpiresAt=signer.emailLinkExpiresAt;
- await assert.rejects(()=>inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future}),error=>error.status===410&&error.message=== "This document is already signed.");
+ const result=await inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future});
+ assert.equal(result.ok,true);
  assert.equal(result.expiry,null);
  assert.equal(issued.record.expiresAt,undefined);
 });
@@ -30,7 +31,9 @@ test("legacy expired marker does not invalidate the current original invitation"
 
 test("completed envelope clears the original invitation link",async()=>{
  const {issued,envelope,signer}=await fixture({status:"opened",envelopeStatus:"Completed",signerStatus:"Signed"});
- await assert.rejects(()=>inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future}),error=>error.status===410&&error.message==="This document is already signed.");
+ const result=await inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future});
+ assert.equal(result.ok,true);
+ assert.equal(result.tokenKind,"invitation");
 });
 
 test("temporary session expires independently while original invitation remains reusable",async()=>{
