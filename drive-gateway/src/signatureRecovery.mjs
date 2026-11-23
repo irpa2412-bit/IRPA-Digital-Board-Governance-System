@@ -296,10 +296,10 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     const document=await ctx.meta.get("documents",envelope.documentId);
     if(!document?.primaryStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
     let source;
-    try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail("SOURCE_READ",error);}
+    try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail(classifyEmergencyRetrievalError(error,"SOURCE_READ"),error);}
     if(!(source instanceof Uint8Array)||!source.length)return fail("SOURCE_READ",new Error("SOURCE_FILE_MISSING"));
     let sourceHash;
-    try{sourceHash=await sha256Hex(source);}catch(error){return fail("HASH",error);}
+    try{sourceHash=await sha256Hex(source);}catch(error){return fail(classifyEmergencyRetrievalError(error,"HASH"),error);}
     const references=[document.sha256,document.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase());
     if(!references.length||references.some(value=>value!==sourceHash))return fail("HASH",new Error("SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING"));
     stage("SOURCE_READ","PASS");
@@ -330,13 +330,16 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     let pageText;
     try{pageText=await (ctx.recoveryTextExtractor||extractLastPdfPageText)(new Uint8Array(output));}
     catch(error){
+      const step=classifyEmergencyRetrievalError(error,"TEXT_EXTRACT");
+      if(step!=="TEXT_EXTRACT")return fail(step,error);
       const errorType=emergencyErrorClass(error);
       certificateWarning={step:"TEXT_EXTRACT",errorClass:errorType,messages:emergencyStepMessages.TEXT_EXTRACT};
       stage("TEXT_EXTRACT","FAILED",errorType);
       stage("CERT_VERIFY","NOT_APPLICABLE",errorType);
     }
     if(pageText!==undefined){
-      const certificate=verifyCertificatePageText(pageText,events,signers);
+      let certificate;
+      try{certificate=verifyCertificatePageText(pageText,events,signers);}catch(error){const step=classifyEmergencyRetrievalError(error,"CERT_VERIFY");if(step!=="CERT_VERIFY")return fail(step,error);certificate={ok:false};}
       if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL)){
         certificateWarning={step:"CERT_VERIFY",errorClass:"CertificateVerificationError",messages:emergencyStepMessages.CERT_VERIFY};
         stage("TEXT_EXTRACT","PASS");
@@ -350,7 +353,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     stage("SOURCE_HASH","PASS");
     stage("STAMP_HASHES","PASS");
     let outputHash;
-    try{outputHash=await sha256Hex(output);}catch(error){return fail("HASH",error);}
+    try{outputHash=await sha256Hex(output);}catch(error){return fail(classifyEmergencyRetrievalError(error,"HASH"),error);}
     stage("OUTPUT_SHA256","PASS");
     const label=certificateWarning
       ?"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed."
