@@ -375,3 +375,73 @@ test("restricted research studies remain unreadable until separately cleared for
   const owner = env.authenticatedContext("owner-primary", { admin: true }).firestore();
   await assertFails(owner.doc("researchStudies/restricted-test-record").get());
 });
+
+
+test("Executive Director and Director Internal Oversight receive cross-department read access only", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("members/executive-reader").set({ uid: "executive-reader", status: "Active", role: "Executive Director" });
+    await db.doc("employees/oversight-reader").set({ uid: "oversight-reader", employmentStatus: "Active", title: "Director Internal Oversight" });
+    await db.doc("reports/cross-department-report").set({ title: "Cross-department report", recordOrigin: "PRODUCTION" });
+    await db.doc("procurementVendorScores/cross-department-score").set({ vendorId: "vendor-1", year: 2026, totalScore: 8, maximumScore: 10, recordOrigin: "PRODUCTION" });
+    await db.doc("audit/cross-department-audit").set({ action: "TEST_READ", recordOrigin: "PRODUCTION" });
+    await db.doc("financeTransactions/cross-department-finance").set({ recordOrigin: "PRODUCTION", status: "Posted", amount: 100, currency: "TZS" });
+    await db.doc("researchStudies/oversight-restricted-study").set({ classification: "RESTRICTED", sharingStatus: "NOT_CLEARED", clearedForSharing: false, recordOrigin: "PRODUCTION" });
+  });
+  const executive = env.authenticatedContext("executive-reader").firestore();
+  const oversight = env.authenticatedContext("oversight-reader").firestore();
+  for (const db of [executive, oversight]) {
+    await assertSucceeds(db.doc("reports/cross-department-report").get());
+    await assertSucceeds(db.doc("procurementVendorScores/cross-department-score").get());
+    await assertSucceeds(db.doc("audit/cross-department-audit").get());
+    await assertSucceeds(db.doc("financeTransactions/cross-department-finance").get());
+    await assertFails(db.doc("researchStudies/oversight-restricted-study").get());
+    await assertFails(db.doc("procurementVendorScores/cross-department-score").update({ totalScore: 9 }));
+  }
+});
+
+test("inactive Director Internal Oversight identity does not receive cross-department access", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("employees/inactive-oversight").set({ uid: "inactive-oversight", employmentStatus: "Inactive", title: "Director Internal Oversight" });
+    await db.doc("reports/inactive-oversight-report").set({ title: "Protected report", recordOrigin: "PRODUCTION" });
+  });
+  const inactive = env.authenticatedContext("inactive-oversight").firestore();
+  await assertFails(inactive.doc("reports/inactive-oversight-report").get());
+});
+
+test("institutional oversight comments, queries and remarks are append-only and role-scoped", async () => {
+  const { addDoc, collection, serverTimestamp } = require("firebase/firestore");
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("employees/oversight-writer").set({ uid: "oversight-writer", status: "Active", role: "Director Internal Oversight" });
+  });
+  const oversight = env.authenticatedContext("oversight-writer").firestore();
+  const created = await addDoc(collection(oversight, "institutionalOversightNotes"), {
+    recordType: "Institutional Oversight Note", portalName: "Finance Portfolio",
+    departmentName: "Finance & Administration", recordReference: "FIN-2026-001",
+    type: "QUERY", message: "Please clarify the supporting document.",
+    authorUid: "oversight-writer", authorName: "Oversight Director",
+    authorRole: "Director Internal Oversight", createdAt: serverTimestamp(), recordOrigin: "PRODUCTION"
+  });
+  await assertSucceeds(oversight.doc("institutionalOversightNotes/" + created.id).get());
+  await assertFails(oversight.doc("institutionalOversightNotes/" + created.id).update({ message: "Changed" }));
+  await assertFails(oversight.doc("institutionalOversightNotes/" + created.id).delete());
+  const ordinary = env.authenticatedContext("ordinary-reader").firestore();
+  await assertFails(ordinary.doc("institutionalOversightNotes/" + created.id).get());
+});
+
+test("administrator can inspect production Finance records without changing Finance write rules", async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("financeTransactions/admin-production-read").set({ recordOrigin: "PRODUCTION", status: "Posted", amount: 250, currency: "TZS" });
+  });
+  const administrator = env.authenticatedContext("owner-primary", { admin: true }).firestore();
+  await assertSucceeds(administrator.doc("financeTransactions/admin-production-read").get());
+});
+
+test("cross-department portal navigation and oversight notes remain separate from administrative and signing controls", () => {
+  assert.ok(appSource.includes('institutionalReadOnlyAccess=["Executive Director","Director Internal Oversight"].includes(selectedAuthority)'));
+  assert.ok(appSource.includes("if(sessionAdministrator||institutionalReadOnlyAccess)return true"));
+  assert.ok(appSource.includes("modules=sessionAdministrator?[...ALL_MODULES,...registeredPortalModules]:institutionalReadOnlyAccess?"));
+  assert.ok(appSource.includes("InstitutionalOversightNotes activePortal={active}"));
+  assert.ok(appSource.includes('"Signature Platform","Authorization & Approvals","Voting"'));
+});
