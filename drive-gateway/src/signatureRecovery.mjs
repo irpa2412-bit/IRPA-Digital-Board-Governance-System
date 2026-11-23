@@ -310,11 +310,11 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     let assessment;
     try{assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});}catch(error){return fail(classifyEmergencyRetrievalError(error,"STAMP_LOAD"),error);}
     if(assessment.stampSlots.length!==12||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_LOAD",new Error("STAMP_EVIDENCE_NOT_12_FULLY_VERIFIED_STAMPS"));
-    stage("STAMP_LOAD","PASS");
+    stage("STAMP_EVIDENCE","PASS");
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
     const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
     const signers=(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id));
-    if(!signers.length)return fail("STAMP_RENDER",new Error("NO_VERIFIED_SIGNERS"));
+    if(!signers.length)return fail("PDF_BUILD",new Error("NO_VERIFIED_SIGNERS"));
     const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
     const completedAt=completionEvent?.at||"NOT RECORDED";
     const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,signers,fields,events};
