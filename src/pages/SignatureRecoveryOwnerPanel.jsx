@@ -21,6 +21,39 @@ async function recoveryRequest(path,{pdf=false,method="GET",button="Recovery act
 }
 function reportText(item,evidence){
  const lines=["IRPA SIGNATURE RECOVERY ASSESSMENT","Document: "+(item?.title||evidence?.title||"Untitled document"),"Reference: "+(item?.documentId||"Not recorded"),"Envelope ID: "+(item?.envelopeId||evidence?.envelopeId||"Not recorded"),"Envelope status: "+(item?.status||evidence?.status||"Unknown"),"Finalisation stage: "+(evidence?.finalisationStage||"NOT_RECORDED")+" ("+(evidence?.finalisationStageCode||"FINALISATION_STAGE_NOT_RECORDED")+")","Audit chain: "+(evidence?.auditChain?.status||"NOT_RETRIEVED")+" ("+(evidence?.auditChain?.code||"AUDIT_CHAIN_NOT_RETRIEVED")+")","Source hash: "+(evidence?.sourceHashStatus||"NOT_RETRIEVED")+" ("+(evidence?.sourceHashCode||"SOURCE_HASH_NOT_RETRIEVED")+") — "+(evidence?.sourceHashReason||"Not recorded"),"Signature stamps:"];
+ const env=evidence?.environmentDiagnostics;
+ lines.push("Environment diagnostics: "+(env?"RETRIEVED":"NOT_RETRIEVED"));
+ if(env){
+  lines.push("  Envelope environment: "+(env.envelope||"MISSING"));
+  lines.push("  Preserved-copy environment: "+(env.preservedCopy||"MISSING"));
+  lines.push("  Gateway expected environment: "+(env.gatewayExpected||"MISSING"));
+  lines.push("  All environments match: "+(env.allMatch===true?"YES":env.allMatch===false?"NO":"NOT_CONFIRMED"));
+ }
+ const archive=evidence?.archivePending;
+ lines.push("Preserved archive record: "+(archive?"PRESENT":"NOT_PRESENT"));
+ if(archive){
+  lines.push("  Metadata present: "+(archive.metadataPresent===true?"YES":"NO"));
+  lines.push("  Storage reference present: "+(archive.storageReferencePresent===true?"YES":"NO"));
+  lines.push("  Recorded hash present: "+(archive.recordedHashPresent===true?"YES":"NO"));
+  lines.push("  Preserved PDF integrity: "+(archive.artifactIntegrityStatus||(archive.artifactBytesVerified===true?"MATCH":"NOT_RETRIEVED")));
+  lines.push("  Archive environment: "+(archive.environment||"MISSING"));
+  if(archive.fileName)lines.push("  File name: "+archive.fileName);
+  if(archive.createdAt)lines.push("  Archive record created: "+archive.createdAt);
+ }
+ const integrity=evidence?.stageRecordIntegrity;
+ lines.push("Finalisation stage-record integrity: "+(integrity?.status||"NOT_RETRIEVED"));
+ if(integrity){
+  lines.push("  Stage entry count: "+(Number.isInteger(integrity.entryCount)?integrity.entryCount:"NOT_RECORDED"));
+  lines.push("  Stage pointer interpretation: "+(integrity.firstFailedStageMeaning||"NOT_RECORDED"));
+ }
+ const record=evidence?.finalisationRecord;
+ lines.push("Stored finalisation record: "+(record?"PRESENT":"NOT_PRESENT"));
+ if(record){
+  lines.push("  Latest stage: "+(record.latestStage||"NOT_RECORDED"));
+  lines.push("  First failed stage: "+(record.firstFailedStage||"NOT_RECORDED"));
+  lines.push("  Updated at: "+(record.updatedAt||"NOT_RECORDED"));
+  for(const stage of Array.isArray(record.stages)?record.stages:[])lines.push("  Stage "+(stage.stageCode||"UNKNOWN")+": "+(stage.status||"INVALID")+" · "+(stage.errorCode||"NO_ERROR")+" · "+(stage.errorMessage||""));
+ }
  for(const row of evidence?.stampSlots||[])lines.push("- Page "+(row.page||"unknown")+", field "+(row.fieldId||"unknown")+": "+(row.resultStatus||row.status||"UNVERIFIABLE")+" ("+(row.code||"NOT_CODED")+") — "+(row.reason||"No reason recorded."));
  if(!(evidence?.stampSlots||[]).length)lines.push("- No signature or initials fields were returned.");
  lines.push("This report is an assessment only. The original PDF, signatures, signer identities, signing events, hashes, certificates and archive records were not changed.");
