@@ -1,3 +1,5 @@
+import { PDFDocument } from "pdf-lib";
+
 export function normalizeCertificateWhitespace(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
@@ -31,10 +33,22 @@ export function verifyCertificateInput(info, verifiedEvents, verifiedSigners = [
   return { ok: failures.length === 0, failures: [...new Set(failures)] };
 }
 
-export async function extractPdfText(pdfBytes) {
-  // Certificate evidence may span multiple continuation pages; verify the full PDF text.
+export async function extractPdfText(pdfBytes, startPage = 0) {
+  // Certificate evidence may span multiple continuation pages; isolate those pages
+  // so source-document text cannot be mistaken for certificate evidence.
+  const input = pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes);
+  const sourcePdf = await PDFDocument.load(input);
+  const pageCount = sourcePdf.getPageCount();
+  if (!Number.isInteger(startPage) || startPage < 0 || startPage >= pageCount) {
+    throw new RangeError("CERTIFICATE_PAGE_RANGE_INVALID");
+  }
+  const certificatePdf = await PDFDocument.create();
+  const pageIndices = Array.from({ length: pageCount - startPage }, (_, index) => startPage + index);
+  const pages = await certificatePdf.copyPages(sourcePdf, pageIndices);
+  for (const page of pages) certificatePdf.addPage(page);
+  const certificateBytes = new Uint8Array(await certificatePdf.save({ useObjectStreams: false }));
   const { extractText } = await import("unpdf");
-  const { text } = await extractText(pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes));
+  const { text } = await extractText(certificateBytes);
   if (Array.isArray(text)) return text.join("\n");
   return String(text || "").replace(/\f/g, "\n");
 }
