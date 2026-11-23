@@ -84,7 +84,7 @@ async function createMeetingAsIdentity({ uid, email, member = null, employee = n
     const url = new URL(String(input));
     const documentPath = url.pathname.split("/documents/")[1] || "";
     if (init.method === "POST") {
-      if (documentPath.startsWith("meetings?")) meetingWrites += 1;
+      if (documentPath === "meetings") meetingWrites += 1;
       return new Response(JSON.stringify({ name: url.pathname + "/test-record", fields: {} }), { status: 200 });
     }
     const collection = documentPath.split("/")[0];
