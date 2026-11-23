@@ -263,6 +263,8 @@ export function classifyEmergencyRetrievalFailure(stageCode,error){
   if(/timeout|timed out|deadline|cpu time/.test(message)||name==="TimeoutError")return "TIMEOUT";
   if(/memory|allocation|out of bounds|arraybuffer|too large|size limit|maximum.*size/.test(message)||name==="OutOfMemoryError")return "SIZE_LIMIT";
   if(stageCode==="SOURCE_READ")return "SOURCE_READ";
+  if(stageCode==="SIZE_LIMIT")return "SIZE_LIMIT";
+  if(stageCode==="TIMEOUT")return "TIMEOUT";
   if(stageCode==="HASH"||stageCode==="SOURCE_HASH"||stageCode==="AUDIT_CHAIN")return "HASH";
   if(stageCode==="STAMP_LOAD"||stageCode==="STAMP_EVIDENCE")return "STAMP_LOAD";
   if(stageCode==="STAMP_RENDER")return "STAMP_RENDER";

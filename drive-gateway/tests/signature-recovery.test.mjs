@@ -519,7 +519,7 @@ test("emergency retrieval failure stages map to the only permitted sanitised sub
     ["HASH",new Error("digest failed"),"HASH"],
     ["CERT_VERIFY",new Error("certificate mismatch"),"CERT_VERIFY"],
     ["TEXT_EXTRACT",new TypeError("unpdf import failed"),"TEXT_EXTRACT"],
-    ["SIZE_LIMIT",new RangeError("memory allocation too large"),"SIZE_LIMIT"],
+    ["SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"),"SIZE_LIMIT"],
     ["REQUEST",new Error("script exceeded CPU time limit"),"TIMEOUT"],
     ["unmapped",new Error("unclassified"),"UNKNOWN"]
   ];
