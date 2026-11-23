@@ -429,7 +429,6 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   }
   if(!declared.name)throw new HttpError(400,"Enter your name before signing.");
   const signerNameMatch=s0.identityType==="email-link"?assessForwardedSignerName(s0.name||s0.declaredParticulars?.name,declared.name):null;
-  if(s0.identityType==="email-link"&&!signerNameMatch?.matched)throw new HttpError(400,"The name entered does not sufficiently match the signer assigned to this document. Check the spelling and try again, or contact the document owner for assistance.");
   const ownerDeclared=s0.declaredParticulars||{};
   const discrepancyFields=["name","occupation","capacity"].filter(key=>String(ownerDeclared[key]||"").trim()!==""&&String(ownerDeclared[key]||"").trim().toLowerCase()!==String(declared[key]||"").trim().toLowerCase());
   await original(ctx,e0);
@@ -453,7 +452,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     for(const assignment of roleAssignmentEvidence){
       events=await chainEvents(events,{type:"signer.role_assignment.completed",signerId:s.id,at,roleAssignmentIndex:assignment.roleAssignmentIndex,role:assignment.role,capacity:assignment.capacity,fieldIds:assignment.fieldIds,signatureFieldHashes:assignment.signatureFieldHashes});
     }
-    if(s.identityType==="email-link")events=await chainEvents(events,{type:"signer.name_match_assessed",signerId:s.id,at,method:signerNameMatch.method,version:signerNameMatch.version,matched:true,assignedName:String(s.name||s.declaredParticulars?.name||""),presentedName:declared.name,accessIp:ip||null,userAgent:s.userAgent||null});
+    if(s.identityType==="email-link")events=await chainEvents(events,{type:"signer.name_match_assessed",signerId:s.id,at,method:signerNameMatch.method,version:signerNameMatch.version,matched:signerNameMatch.matched,matchStatus:signerNameMatch.matched?"MATCHED":"VARIANCE_RECORDED",assignedName:String(s.name||s.declaredParticulars?.name||""),presentedName:declared.name,accessIp:ip||null,userAgent:s.userAgent||null});
     events=await chainEvents(events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],roleAssignmentEvidence,signerDeclarations:declared,signerNameMatch:s.signerNameMatch||null,declarationDiscrepancy:s.declarationDiscrepancy});
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
