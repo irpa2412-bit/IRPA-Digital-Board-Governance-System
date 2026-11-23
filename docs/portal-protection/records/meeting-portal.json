@@ -19,7 +19,8 @@
       "src/firebase/meetingPolicy.js",
       "firestore.rules",
       "firestore.staging.rules",
-      "tests/meeting-category-firestore-rules.test.cjs"
+      "tests/meeting-category-firestore-rules.test.cjs",
+      "drive-gateway/tests/meeting-services-router.test.mjs"
     ],
     "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings.",
     "prohibitedChanges": [
@@ -30,7 +31,7 @@
   },
   "repairWindow": {
     "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-23T19:55:00Z",
+    "lastActivityAt": "2026-11-23T19:57:00Z",
     "emergency": false
   },
   "baseline": {
@@ -185,10 +186,12 @@
       "firestore.rules",
       "firestore.staging.rules",
       "tests/meeting-category-policy.test.mjs",
-      "tests/meeting-category-firestore-rules.test.cjs"
+      "tests/meeting-category-firestore-rules.test.cjs",
+      "drive-gateway/src/meetingServices.mjs",
+      "drive-gateway/tests/meeting-services-router.test.mjs"
     ],
     "ownerInstruction": "23 November 2026: every active registered member may initiate meetings; staff and members must have access to the shared Meeting Portal; meetings operate at multiple organisational levels.",
     "governanceBoundary": "Meeting initiation and participation do not grant Board voting, quorum, resolutions, formal approval, or unrestricted access to restricted Board records.",
-    "validation": "CI pending; Firestore rules approval label required after owner review."
+    "validation": "Worker route functional tests added for active staff, active members and inactive identities; CI pending; Firestore rules approval label applied by repository owner."
   }
 }
