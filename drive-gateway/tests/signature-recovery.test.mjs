@@ -495,6 +495,26 @@ test("emergency retrieval returns stage log and SHA-256 without changing envelop
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
 });
 
+test("emergency certificate paginates long audit chains and verifies every continuation page",async()=>{
+  const f=await fixture({stampCount:12});
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  for(let index=0;index<110;index++){
+    envelope.events=await addEvent(envelope.events,{
+      type:"audit.evidence.retained",
+      at:new Date(Date.parse("2026-11-23T00:00:00.000Z")+index*60000).toISOString(),
+      sequence:index
+    });
+  }
+  await f.ctx.meta.update("envelopes","ENV-REC-1",envelope);
+  const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,true,JSON.stringify(result.stages));
+  assert.equal(result.certificateVerified,true);
+  assert.ok(result.stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="PASS"));
+  const pdf=await PDFDocument.load(result.bytes);
+  assert.ok(pdf.getPageCount()>=4,"certificate evidence should continue across multiple pages");
+  assert.equal(result.outputHash,await sha256Hex(result.bytes));
+});
+
 test("certificate text extraction failure is labelled and served only after all other checks pass",async()=>{
   const f=await fixture({stampCount:12});
   const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
