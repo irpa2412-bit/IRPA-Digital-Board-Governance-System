@@ -275,7 +275,8 @@ export function createDocumentLifecycleRouter(deps) {
       if(document.ownerProfileHiddenAt)return deps.json({ok:false,error:"This PDF has already been removed from the owner's profile."},409,deps.corsHeaders(request));
       const isPdf=clean(document.contentType).toLowerCase()==="application/pdf"||clean(document.fileName||document.title).toLowerCase().endsWith(".pdf");
       if(!isPdf)return deps.json({ok:false,error:"Profile removal is available only for PDF documents."},415,deps.corsHeaders(request));
-      const archiveCandidates=[document.finalArchiveFileId,document.signedArchiveFileId,document.fileId].map(cleanId).filter((id,index,all)=>id&&all.indexOf(id)===index);
+      const completedStage=["SIGNED","POST_SIGNATURE","FINAL_ARCHIVE"].includes(clean(document.status).toUpperCase());
+      const archiveCandidates=(completedStage?[document.finalArchiveFileId,document.signedArchiveFileId]:[document.fileId]).map(cleanId).filter((id,index,all)=>id&&all.indexOf(id)===index);
       if(!archiveCandidates.length)return deps.json({ok:false,error:"No registered archive copy is available; profile removal is blocked."},409,deps.corsHeaders(request));
       const accessToken=await deps.getDriveAccessToken(env);
       let verifiedArchive=null;
