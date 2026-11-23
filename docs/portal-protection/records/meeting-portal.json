@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised organisation-wide Meeting Portal access repair: every active registered IRPA member and employee may initiate a meeting; active members and staff may participate in Staff and General meetings; Board voting, quorum, resolutions and formal approval authority remain separately restricted. The authenticated Cloudflare Worker is the meeting-creation path, so direct Firestore write rules remain unchanged.",
+    "reason": "Owner-authorised organisation-wide Meeting Portal access repair: every active registered IRPA member and employee may initiate meetings from the existing Meeting Centre; Staff and General meeting participation remains category-scoped; Board voting, quorum, resolutions and formal approval authority remain separately restricted. Meeting creation continues through the authenticated Cloudflare Worker; direct Firestore rules and shared policy files remain unchanged.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -15,9 +15,7 @@
       "drive-gateway/tests/meeting-environment.test.mjs",
       "docs/portal-protection/records/meeting-portal.json",
       "tests/meeting-category-policy.test.mjs",
-      "docs/portal-protection/windows/meeting-portal.json",
-      "src/firebase/meetingPolicy.js",
-      "drive-gateway/tests/meeting-services-router.test.mjs"
+      "docs/portal-protection/windows/meeting-portal.json"
     ],
     "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings.",
     "prohibitedChanges": [
@@ -29,7 +27,7 @@
   },
   "repairWindow": {
     "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-23T19:58:00Z",
+    "lastActivityAt": "2026-11-23T20:04:00Z",
     "emergency": false
   },
   "baseline": {
@@ -180,13 +178,12 @@
     "relatedPullRequest": 941,
     "status": "SUBMITTED_FOR_VALIDATION",
     "scope": [
-      "src/firebase/meetingPolicy.js",
       "tests/meeting-category-policy.test.mjs",
       "drive-gateway/src/meetingServices.mjs",
-      "drive-gateway/tests/meeting-services-router.test.mjs"
+      "src/pages/Meetings.jsx"
     ],
     "ownerInstruction": "23 November 2026: every active registered member may initiate meetings; staff and members must have access to the shared Meeting Portal; meetings operate at multiple organisational levels.",
     "governanceBoundary": "Meeting initiation and participation do not grant Board voting, quorum, resolutions, formal approval, or unrestricted access to restricted Board records.",
-    "validation": "Worker functional tests added for active staff, active members and inactive identities; direct Firestore write rules unchanged; CI pending."
+    "validation": "Worker functional tests and Meeting Centre initiation tests added to the existing Meeting Portal policy test file; direct Firestore rules and shared policy file unchanged; CI pending."
   }
 }
