@@ -37,6 +37,8 @@ jobs:
         run: node --test drive-gateway/tests/email-signing-links.integration.test.mjs
       - name: Install frontend dependencies
         run: npm ci
+      - name: Run Signature Recovery owner panel read-only regression
+        run: node --test tests/signature-recovery-owner-panel-readonly.test.mjs
       - name: Run Signature Pathway Self-Test session-safety regression
         run: npm run test:signature-self-test
       - name: Run seven-portal protection smoke tests
