@@ -242,6 +242,26 @@ test("GET preview and PDF are read-only; explicit Open document to sign creates 
   assert.equal(resumedEnvelope.events.filter(event=>event.type==="email_link.session_created").length,2);
 });
 
+test("upgrading an existing live session preserves it when another browser opens the invitation",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const signer={...envelope.signers[0]};
+  const legacySecret="d".repeat(64);
+  signer.emailLinkSessionHash=await sha256Hex(legacySecret);
+  signer.emailLinkSessionStatus="active";
+  signer.emailLinkSessionCreatedAt=NOW.toISOString();
+  signer.emailLinkSessionExpiresAt=new Date(NOW.getTime()+30*60*1000).toISOString();
+  delete signer.emailLinkSessions;
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[signer]});
+  const legacySessionToken=`${f.created.envelopeId}.${signer.id}.${legacySecret}`;
+  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.10");
+  assert.equal(second.ok,true);
+  const upgraded=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(upgraded.signers[0].emailLinkSessions.length,2);
+  assert.equal((await getSigningPdf(f.ctx,legacySessionToken,null)).fileName,"email-link.pdf");
+  assert.equal((await getSigningPdf(f.ctx,second.sessionToken,null)).fileName,"email-link.pdf");
+});
+
 test("completed email-link signing consumes the invitation and session exactly once",async()=>{
   const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
