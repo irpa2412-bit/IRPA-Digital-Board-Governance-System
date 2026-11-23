@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Miniflare } from "miniflare";
+import { unstable_dev } from "wrangler";
 import { PDFDocument } from "pdf-lib";
 import { canonicalJson, sha256Hex } from "../src/util.mjs";
 
@@ -30,11 +30,10 @@ async function seededWorkerFixture(){
 }
 test("12-stamp recovery runs in workerd with stamps on source pages 1 and 3 and returns byte-matching SHA-256",async()=>{
   const fixture=await seededWorkerFixture();
-  const scriptPath=new URL("./workers/emergency-retrieval-worker.mjs",import.meta.url).pathname;
-  const miniflare=new Miniflare({scriptPath,modules:true,compatibilityDate:"2026-09-29",compatibilityFlags:["nodejs_compat"],log:{level:"error"}});
+  const worker=await unstable_dev("tests/workers/emergency-retrieval-worker.mjs",{config:"wrangler.emergency-retrieval.workerd-test.toml",local:true,logLevel:"error",experimental:{disableExperimentalWarning:true}});
   try{
     const sourceBase64=Buffer.from(fixture.source).toString("base64");
-    const response=await miniflare.dispatchFetch("https://worker.test/recovery",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...fixture,sourceBase64})});
+    const response=await worker.fetch("https://worker.test/recovery",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...fixture,sourceBase64})});
     assert.equal(response.status,200);
     const result=await response.json();
     assert.equal(result.ok,true,JSON.stringify({code:result.code,step:result.step,errorClass:result.errorClass,stages:result.stages}));
@@ -53,5 +52,5 @@ test("12-stamp recovery runs in workerd with stamps on source pages 1 and 3 and 
     }else{
       assert.ok(result.stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="PASS"));
     }
-  }finally{await miniflare.dispose();}
+  }finally{await worker.stop();}
 });
