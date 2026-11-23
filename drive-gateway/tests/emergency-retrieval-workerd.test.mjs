@@ -33,9 +33,8 @@ test("12-stamp recovery runs in workerd with stamps on source pages 1 and 3 and 
   const scriptPath=new URL("./workers/emergency-retrieval-worker.mjs",import.meta.url).pathname;
   const miniflare=new Miniflare({scriptPath,modules:true,compatibilityDate:"2026-09-29",compatibilityFlags:["nodejs_compat"],log:{level:"error"}});
   try{
-    const worker=await miniflare.getWorker();
     const sourceBase64=Buffer.from(fixture.source).toString("base64");
-    const response=await worker.fetch(new Request("https://worker.test/recovery",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...fixture,sourceBase64})}));
+    const response=await miniflare.dispatchFetch("https://worker.test/recovery",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...fixture,sourceBase64})});
     assert.equal(response.status,200);
     const result=await response.json();
     assert.equal(result.ok,true,JSON.stringify({code:result.code,step:result.step,errorClass:result.errorClass,stages:result.stages}));
