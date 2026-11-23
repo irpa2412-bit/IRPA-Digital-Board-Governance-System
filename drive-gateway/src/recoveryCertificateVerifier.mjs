@@ -1,5 +1,3 @@
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-
 export function normalizeCertificateWhitespace(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
@@ -34,17 +32,12 @@ export function verifyCertificateInput(info, verifiedEvents, verifiedSigners = [
 }
 
 export async function extractLastPdfPageText(pdfBytes) {
-  const task = getDocument({ data: pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes), useSystemFonts: true, isEvalSupported: false });
-  let pdf;
-  try {
-    pdf = await task.promise;
-    const page = await pdf.getPage(pdf.numPages);
-    const content = await page.getTextContent();
-    return content.items.map(item => typeof item.str === "string" ? item.str : "").join(" ");
-  } finally {
-    if (pdf) await pdf.destroy();
-    else await task.destroy();
-  }
+  // Load the serverless PDF.js build only when the emergency route reaches certificate verification.
+  const { extractText } = await import("unpdf");
+  const { text } = await extractText(pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes));
+  if (Array.isArray(text)) return text.at(-1) || "";
+  const pages = String(text || "").split("\f");
+  return pages.at(-1) || pages[0] || "";
 }
 
 export function verifyCertificatePageText(pageText, verifiedEvents, verifiedSigners = []) {

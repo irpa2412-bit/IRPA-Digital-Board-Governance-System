@@ -279,7 +279,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     const events=Array.isArray(envelope.events)?envelope.events:[];
     stage("AUDIT_CHAIN","pass");
     const assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});
-    if(assessment.stampSlots.length===0||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_EVIDENCE","STAMP_EVIDENCE_NOT_FULLY_VERIFIED");
+    if(assessment.stampSlots.length!==12||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_EVIDENCE","STAMP_EVIDENCE_NOT_12_FULLY_VERIFIED_STAMPS");
     stage("STAMP_EVIDENCE","pass");
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
     const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
@@ -301,7 +301,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL))return fail("CERT_PAGE_VERIFY","CERTIFICATE_PAGE_VERIFICATION_FAILED:"+certificate.failures.join(","));
     stage("CERT_PAGE_VERIFY","pass");
     stage("STAMPS_IN_OUTPUT","not-checked","NOT CHECKED: the gateway has no independent PDF image/pixel comparison that can prove each rendered stamp matches its verified source field value.");
-    stage("DETACHED_EVIDENCE","not-checked","NOT CHECKED: no existing detached-evidence export/read contract is defined for this envelope; no evidence was created.");
+    stage("DETACHED_EVIDENCE","not-checked","NOT EXPORTED: no existing contract");
     const outputHash=await sha256Hex(output);
     stage("OUTPUT_SHA256","pass");
     return {ok:true,bytes:output,outputHash,stages,label:EMERGENCY_COPY_LABEL};
