@@ -20,7 +20,8 @@ async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,stampCo
   const fieldIds=stampCount===12?Array.from({length:12},(_,index)=>"SIG-"+(index+1)) : ["SIG-1","SIG-2"];
   const fieldValues=Object.fromEntries(fieldIds.map(fieldId=>[fieldId,fieldValue]));
   let events=[];
-  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds,signatureFieldHashes:fieldIds.map(fieldId=>({fieldId,type:"Signature",hash:await sha256Hex(tamperAllFieldHashes||fieldId==="SIG-1"&&tamperAllFieldHashes||fieldId==="SIG-2"&&tamperFieldHash?"different":fieldValue)}))});
+  const signatureFieldHashes=await Promise.all(fieldIds.map(async fieldId=>({fieldId,type:"Signature",hash:await sha256Hex(tamperAllFieldHashes||(fieldId==="SIG-2"&&tamperFieldHash)?"different":fieldValue)})));
+  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds,signatureFieldHashes});
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",dataEnvironment:"TEST",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
