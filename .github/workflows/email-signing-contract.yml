@@ -35,6 +35,8 @@ jobs:
         run: node --test tests/email-signing-review-navigation.test.mjs
       - name: Run email signing integration regressions
         run: node --test drive-gateway/tests/email-signing-links.integration.test.mjs
+      - name: Run forwarded email signer name matching regressions
+        run: node --test drive-gateway/tests/forwarded-email-signer-name-match.test.mjs
       - name: Install frontend dependencies
         run: npm ci
       - name: Run Signature Pathway Self-Test session-safety regression
