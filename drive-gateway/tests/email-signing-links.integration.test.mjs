@@ -123,7 +123,7 @@ test("invalid token failures are rate-limited by token and IP with one neutral r
   const f=await fixture();
   const repeated="ENV-UNKNOWN.S1."+"a".repeat(64);
   let message="";
-  for(let index=0;index<8;index++){
+  for(let index=0;index<40;index++){
     await assert.rejects(()=>openEmailSigning(f.ctx,repeated,"198.51.100.21"),error=>{message=error.message;return error.message===genericEmailSigningFailure();});
   }
   await assert.rejects(()=>openEmailSigning(f.ctx,repeated,"198.51.100.21"),error=>error.message===genericEmailSigningFailure());
@@ -225,17 +225,48 @@ test("GET preview and PDF are read-only; explicit Open document to sign creates 
   assert.equal(stored.signers[0].emailLinkSessionHash,await sha256Hex(opened.sessionToken.split(".")[2]));
   const sessionPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
   assert.equal(sessionPdf.fileName,"email-link.pdf");
+  // A second recipient browser opening the same forwarded invitation must not
+  // revoke the first browser's still-valid session.
+  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.9");
+  assert.equal(second.ok,true);
+  assert.notEqual(second.sessionToken,opened.sessionToken);
+  const bothSessions=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(bothSessions.signers[0].emailLinkSessions.length,2);
+  assert.equal((await getSigningPdf(f.ctx,opened.sessionToken,null)).fileName,"email-link.pdf");
+  assert.equal((await getSigningPdf(f.ctx,second.sessionToken,null)).fileName,"email-link.pdf");
   const resumed=await openEmailSigning(f.ctx,opened.sessionToken,"198.51.100.8");
   assert.equal(resumed.sessionToken,opened.sessionToken);
   const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(resumedEnvelope.signers[0].emailLinkStatus,"issued");
   assert.equal(resumedEnvelope.signers[0].emailLinkSessionStatus,"active");
-  assert.equal(resumedEnvelope.events.filter(event=>event.type==="email_link.session_created").length,1);
+  assert.equal(resumedEnvelope.events.filter(event=>event.type==="email_link.session_created").length,2);
 });
 
-test("completed email-link signing consumes the invitation and session exactly once",async()=>{
+test("upgrading an existing live session preserves it when another browser opens the invitation",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  const signer={...envelope.signers[0]};
+  const legacySecret="d".repeat(64);
+  signer.emailLinkSessionHash=await sha256Hex(legacySecret);
+  signer.emailLinkSessionStatus="active";
+  signer.emailLinkSessionCreatedAt=NOW.toISOString();
+  signer.emailLinkSessionExpiresAt=new Date(NOW.getTime()+30*60*1000).toISOString();
+  delete signer.emailLinkSessions;
+  await f.ctx.meta.update("envelopes",f.created.envelopeId,{signers:[signer]});
+  const legacySessionToken=`${f.created.envelopeId}.${signer.id}.${legacySecret}`;
+  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.10");
+  assert.equal(second.ok,true);
+  const upgraded=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(upgraded.signers[0].emailLinkSessions.length,2);
+  assert.equal((await getSigningPdf(f.ctx,legacySessionToken,null)).fileName,"email-link.pdf");
+  assert.equal((await getSigningPdf(f.ctx,second.sessionToken,null)).fileName,"email-link.pdf");
+});
+
+test("successful signing consumes the shared invitation and every device session exactly once",async()=>{
   const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  const secondDevice=await openEmailSigning(f.ctx,f.token,"198.51.100.9");
+  assert.notEqual(opened.sessionToken,secondDevice.sessionToken);
   const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary",occupation:"Secretary"},consent:true,user:null});
   assert.ok(["InProgress","Completed","CompletionFailed"].includes(result.status));
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
@@ -243,8 +274,11 @@ test("completed email-link signing consumes the invitation and session exactly o
   assert.equal(stored.signers[0].emailLinkStatus,"used");
   assert.equal(stored.signers[0].emailLinkSessionStatus,"used");
   assert.ok(stored.signers[0].emailLinkSessionHash,"the consumed session hash remains only to authorize read-only retrieval of the completed PDF");
+  assert.equal(stored.signers[0].emailLinkSessions.length,2);
+  assert.ok(stored.signers[0].emailLinkSessions.every(session=>session.status==="used"),"all device sessions are consumed together");
   await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"));
   await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary"},consent:true,user:null}));
+  await assert.rejects(()=>sign(f.ctx,{token:secondDevice.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary"},consent:true,user:null}));
   if(result.completed===true){const finalPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);assert.match(finalPdf.fileName,/signed-/);}
 });
 
@@ -288,17 +322,17 @@ test("owner revoke invalidates a guest link; resend rotates token and marks the 
 });
 
 
-test("an expired session is closed without consuming the still-valid invitation",async()=>{
+test("a device session remains usable after long inactivity until the signer submits",async()=>{
   const f=await fixture();
   const first=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
-  f.now(new Date(NOW.getTime()+31*60*1000));
-  await assert.rejects(()=>openEmailSigning(f.ctx,first.sessionToken,"198.51.100.27"),error=>error.status===410);
-  const afterExpiry=await f.ctx.meta.get("envelopes",f.created.envelopeId);
-  assert.equal(afterExpiry.signers[0].emailLinkSessionStatus,"expired");
-  assert.equal(afterExpiry.signers[0].emailLinkStatus,"issued");
-  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.27");
-  assert.ok(second.sessionToken);
-  assert.notEqual(second.sessionToken,first.sessionToken);
+  assert.equal(first.sessionExpiresAt,null,"email-link device sessions have no elapsed-time expiry");
+  f.now(new Date(NOW.getTime()+365*24*60*60*1000));
+  const resumed=await openEmailSigning(f.ctx,first.sessionToken,"198.51.100.27");
+  assert.equal(resumed.sessionToken,first.sessionToken,"reopening on the same or another device resumes the existing session");
+  assert.equal((await getSigningPdf(f.ctx,first.sessionToken,null)).fileName,"email-link.pdf");
+  const stillActive=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(stillActive.signers[0].emailLinkSessionStatus,"active");
+  assert.equal(stillActive.signers[0].emailLinkStatus,"issued");
 });
 
 test("owner Send new link replaces a legacy burned invitation and invalidates its old session",async()=>{

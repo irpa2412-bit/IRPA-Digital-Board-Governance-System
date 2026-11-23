@@ -36,18 +36,20 @@ test("completed envelope restricts the original invitation to read-only access",
  assert.equal(result.tokenKind,"invitation");
 });
 
-test("temporary session expires independently while original invitation remains reusable",async()=>{
+test("device session remains valid after elapsed legacy expiry until signer submits",async()=>{
  const sessionSecret="b".repeat(64);
  const {issued,envelope,signer}=await fixture({sessionStatus:"active",sessionHash:await sha256Hex(sessionSecret),sessionExpiry:"2026-11-23T13:30:00.000Z"});
  const sessionToken=`${envelope.id}.${signer.id}.${sessionSecret}`;
- await assert.rejects(()=>inspectEmailSigningLink({token:sessionToken,envelope,signer,now:future}),error=>error.status===410);
+ const session=await inspectEmailSigningLink({token:sessionToken,envelope,signer,now:future});
+ assert.equal(session.ok,true);
+ assert.equal(session.tokenKind,"session");
  const original=await inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future});
  assert.equal(original.ok,true);
 });
 
-test("fresh signing session receives its own 30-minute lifetime, not the invitation lifetime",()=>{
- const session=createFreshSigningSession({envelopeId:"ENV-LIFETIME-1",signerId:"S1",now,linkExpiresAt:"2026-11-23T13:05:00.000Z"});
- assert.equal(session.expiresAt,"2026-11-23T13:30:00.000Z");
+test("fresh device session has no elapsed-time expiry",()=>{
+ const session=createFreshSigningSession({envelopeId:"ENV-LIFETIME-1",signerId:"S1",now});
+ assert.equal(session.expiresAt,null);
 });
 
 test("successful resend rotates the invitation hash without adding a date expiry",async()=>{

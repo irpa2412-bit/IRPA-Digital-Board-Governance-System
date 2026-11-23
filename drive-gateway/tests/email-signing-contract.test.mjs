@@ -30,26 +30,25 @@ async function fixture() {
   return { issued, envelope, signer };
 }
 
-test("one reusable invitation survives preview, close, reopen and a second device", async () => {
+test("one forwarded invitation supports independent active sessions on multiple devices", async () => {
   const f = await fixture();
   const before = structuredClone(f.signer);
   const first = await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${f.issued.token}`, ...f, now: NOW });
   assert.equal(first.ok, true);
   assert.deepEqual(f.signer, before, "read-only preview does not mutate signer state");
   const session1 = createFreshSigningSession({ envelopeId: f.envelope.id, signerId: "S1", now: NOW, linkExpiresAt: EXPIRY });
-  f.signer.emailLinkSessionHash = await sha256Hex(session1.secret);
-  f.signer.emailLinkSessionStatus = "active";
-  f.signer.emailLinkSessionExpiresAt = session1.expiresAt;
-  assert.equal((await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${session1.secret}`, ...f, now: NOW })).tokenKind, "session");
   const session2 = createFreshSigningSession({ envelopeId: f.envelope.id, signerId: "S1", now: new Date(NOW.getTime()+1000), linkExpiresAt: EXPIRY });
+  f.signer.emailLinkSessions = [
+    { tokenHash: await sha256Hex(session1.secret), status: "active", createdAt: NOW.toISOString(), expiresAt: session1.expiresAt },
+    { tokenHash: await sha256Hex(session2.secret), status: "active", createdAt: new Date(NOW.getTime()+1000).toISOString(), expiresAt: session2.expiresAt }
+  ];
   f.signer.emailLinkSessionHash = await sha256Hex(session2.secret);
+  f.signer.emailLinkSessionStatus = "active";
   f.signer.emailLinkSessionExpiresAt = session2.expiresAt;
-  await assert.rejects(
-    () => inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${session1.secret}`, ...f, now: NOW }),
-    /unavailable|expired/i
-  );
+  assert.equal((await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${session1.secret}`, ...f, now: NOW })).tokenKind, "session");
+  assert.equal((await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${session2.secret}`, ...f, now: NOW })).tokenKind, "session");
   assert.equal((await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${f.issued.token}`, ...f, now: NOW })).tokenKind, "invitation");
-  assert.notEqual(session1.token, session2.token, "a second device/open receives a fresh isolated session");
+  assert.notEqual(session1.token, session2.token, "each browser receives its own session token");
 });
 
 test("link preview is read-only and the explicit open creates a fresh session", async () => {
