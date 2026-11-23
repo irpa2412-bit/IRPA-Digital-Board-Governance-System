@@ -50,13 +50,13 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   const sessionMatch = Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
 
   const completed = envelope?.status === "Completed";
-  if (completed && signer?.status === "Signed" && matchesKnown) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
   if (!matchesCurrent && !sessionMatch) {
     const replaced = (signer?.emailLinkTokenHistory || []).some(item => item?.status === "replaced" && safeEqual(suppliedHash, String(item.tokenHash || "")));
     if (replaced) throw new HttpError(410, "This link was replaced. Please use the newest email.");
     throw new HttpError(401, "This signing link is unavailable. Contact the document owner for a new invitation.");
   }
   const tokenKind = sessionMatch ? "session" : "invitation";
+  if (completed && tokenKind === "invitation" && signer?.status === "Signed" && matchesCurrent) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
   const status = String(tokenKind === "session" ? signer.emailLinkSessionStatus : signer.emailLinkStatus || "");
   const completedSession = tokenKind === "session" && envelope.status === "Completed" && signer.status === "Signed" && status === "used";
   if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession) {
