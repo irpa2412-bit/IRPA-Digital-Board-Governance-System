@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createMeetingServicesRouter } from "../drive-gateway/src/meetingServices.mjs";
 import {
   canAccessMeetingCategory,
   canRegisterMeeting,
@@ -115,4 +116,96 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
  assert.match(signing,/callMeetingService/);
  assert.match(legacy,/listMeetingEntryRequests/);
  assert.match(legacy,/resolveMeetingEntryRequest/);
+});
+
+
+const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
+test("Meeting Centre exposes initiation to every active member and employee", () => {
+  assert.ok(meetingCentreSource.includes("const canRegisterMeeting = identity => canRegisterMeetingByRole(identity) || identity.activeMember===true || identity.activeEmployee===true"));
+  assert.equal(meetingCentreSource.split("canRegisterMeeting({...actorIdentity,isAdmin:admin})").length - 1, 4);
+});
+
+const meetingGatewayContext = {
+  authenticateFirebaseRequest: async () => ({ user_id: "test-user", email: "test@example.test" }),
+  getFirebaseProjectId: () => "test-project",
+  getFirestoreAdminAccessToken: async () => "test-token",
+  json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
+  corsHeaders: () => ({ "content-type": "application/json" })
+};
+const postMeetingGateway = (router, path, body = {}) => router(new Request("https://worker.test" + path, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body)
+}), { FIREBASE_PROJECT_ID: "test-project" }, path);
+
+async function createMeetingAsInstitutionalIdentity({ uid, email, member = null, employee = null, category = "GENERAL" }) {
+  const originalFetch = globalThis.fetch;
+  let meetingWrites = 0;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input));
+    const documentPath = url.pathname.split("/documents/")[1] || "";
+    if (init.method === "POST") {
+      if (documentPath === "meetings") meetingWrites += 1;
+      return new Response(JSON.stringify({ name: url.pathname + "/test-record", fields: {} }), { status: 200 });
+    }
+    const [collection, id] = documentPath.split("/");
+    const record = collection === "members" ? member : collection === "employees" ? employee : null;
+    if (id !== uid || !record) return new Response("{}", { status: 404 });
+    const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, { stringValue: String(value) }]));
+    return new Response(JSON.stringify({ name: url.pathname, fields }), { status: 200 });
+  };
+  try {
+    const context = {
+      ...meetingGatewayContext,
+      authenticateFirebaseRequest: async () => ({ user_id: uid, email })
+    };
+    const router = createMeetingServicesRouter(context);
+    const response = await postMeetingGateway(router, "/api/meeting-register/create", {
+      data: {
+        title: "Member-initiated meeting",
+        meetingCategory: category,
+        meetingPolicyId: category,
+        meetingType: category === "GOVERNANCE" ? "Board Meeting" : "General Meeting",
+        initiatorUid: uid,
+        initiatorEmail: email,
+        date: "2026-11-24"
+      }
+    });
+    return { response, body: await response.json(), meetingWrites };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test("active staff can initiate a Governance-level meeting through the authenticated Worker", async () => {
+  const result = await createMeetingAsInstitutionalIdentity({
+    uid: "staff-initiator", email: "staff@example.test",
+    employee: { uid: "staff-initiator", email: "staff@example.test", status: "Active", role: "Staff" },
+    category: "GOVERNANCE"
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.meetingWrites, 1);
+});
+
+test("active members can initiate meetings without a management title", async () => {
+  const result = await createMeetingAsInstitutionalIdentity({
+    uid: "member-initiator", email: "member@example.test",
+    member: { uid: "member-initiator", email: "member@example.test", status: "Active", role: "Member" },
+    category: "ADMINISTRATIVE"
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.meetingWrites, 1);
+});
+
+test("inactive institutional identities cannot initiate meetings through the Worker", async () => {
+  const result = await createMeetingAsInstitutionalIdentity({
+    uid: "inactive-user", email: "inactive@example.test",
+    employee: { uid: "inactive-user", email: "inactive@example.test", status: "Suspended", role: "Staff" },
+    category: "GENERAL"
+  });
+  assert.equal(result.response.status, 403);
+  assert.equal(result.body.ok, false);
+  assert.equal(result.meetingWrites, 0);
 });

@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Implement the owner-approved fail-closed REAL/TRIAL meeting deletion boundary. A meeting is REAL by default; only an administrator explicitly creating it with the exact TRIAL marker can mark it TRIAL. Environment is immutable after creation. Only administrators may delete explicitly TRIAL meetings, with all existing safeguards retained. REAL, missing, invalid, lowercase and whitespace-padded values are non-deletable.",
+    "reason": "Owner-authorised organisation-wide Meeting Portal access repair: every active registered IRPA member and employee may initiate meetings from the existing Meeting Centre; Staff and General meeting participation remains category-scoped; Board voting, quorum, resolutions and formal approval authority remain separately restricted. Meeting creation continues through the authenticated Cloudflare Worker; direct Firestore rules and shared policy files remain unchanged.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -17,16 +17,17 @@
       "tests/meeting-category-policy.test.mjs",
       "docs/portal-protection/windows/meeting-portal.json"
     ],
-    "expectedEffect": "Prevent deletion or final purge of any REAL or unclassified meeting. Permit only administrator deletion of an explicitly TRIAL meeting after existing safeguards. No other portal behavior changes.",
+    "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings.",
     "prohibitedChanges": [
       "Never delete REAL or unclassified meetings.",
       "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
-      "Do not change signing, sign-in, invitations, email-link rules, SMTP, secrets, Firestore rules or production deployment."
+      "Do not change Board voting, quorum, resolution approval, minutes approval, signature workflows, or unrelated portal permissions.",
+      "Do not change Firestore rules or staging Firestore rules; the authenticated Worker path is sufficient."
     ]
   },
   "repairWindow": {
     "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-21T20:23:03Z",
+    "lastActivityAt": "2026-11-23T20:04:00Z",
     "emergency": false
   },
   "baseline": {
@@ -55,7 +56,13 @@
       "Meeting Portal portal smoke PASS on exact baseline 7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/44952176019/job/136992981056"
     ]
   },
-  "renewals": [],
+  "renewals": [
+    {
+      "at": "2026-11-23T19:55:00Z",
+      "action": "scope extended for owner-authorised organisation-wide meeting initiation repair",
+      "pullRequest": 941
+    }
+  ],
   "attendanceCallableAudit": {
     "changeId": "MP-2026-11-22-ATTENDANCE-CALLABLE-GUARD",
     "relatedPullRequest": 908,
@@ -165,5 +172,18 @@
     "expectedEffect": "Prevent active Meeting Portal attendance screens from invoking Firebase callables that are not deployed; preserve Worker-backed attendance and entry-request routes.",
     "changeRecord": "The active MeetingRoom uses Worker routes for attendance read/write and daily dispatch. The active Meeting Access Control component uses Worker list/resolve routes. The callable-backed src/components/MeetingAccessControl.jsx is legacy and not imported by the active screen. Firebase attendance callable exports are not used by active screens.",
     "validation": "Static regression guard added; required CI and live deployment verification pending."
+  },
+  "accessInitiationChange": {
+    "changeId": "MP-2026-11-23-ORG-WIDE-INITIATION",
+    "relatedPullRequest": 941,
+    "status": "SUBMITTED_FOR_VALIDATION",
+    "scope": [
+      "tests/meeting-category-policy.test.mjs",
+      "drive-gateway/src/meetingServices.mjs",
+      "src/pages/Meetings.jsx"
+    ],
+    "ownerInstruction": "23 November 2026: every active registered member may initiate meetings; staff and members must have access to the shared Meeting Portal; meetings operate at multiple organisational levels.",
+    "governanceBoundary": "Meeting initiation and participation do not grant Board voting, quorum, resolutions, formal approval, or unrestricted access to restricted Board records.",
+    "validation": "Worker functional tests and Meeting Centre initiation tests added to the existing Meeting Portal policy test file; direct Firestore rules and shared policy file unchanged; CI pending."
   }
 }

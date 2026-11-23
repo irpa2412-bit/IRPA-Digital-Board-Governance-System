@@ -464,13 +464,12 @@ if(!uid)return fail(ctx,request,"A valid IRPA sign-in is required.",401);
 const [adminProfile,member,employee]=await Promise.all([getDoc(ctx,env,token,"adminProfiles",uid),getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid)]);
 const isAdmin=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;
 const active=r=>r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));
-const roleList=r=>[r?.role,r?.title,r?.position,r?.departmentalRole,r?.department,r?.boardPosition,...(Array.isArray(r?.roles)?r.roles:[]),...(Array.isArray(r?.assignedRoles)?r.assignedRoles:[]),...(Array.isArray(r?.selectedRoles)?r.selectedRoles:[]),...(Array.isArray(r?.roleAssignments)?r.roleAssignments:[])].flatMap(v=>clean(v).split(",")).map(v=>v.trim().toLowerCase()).filter(Boolean);
-const roles=[...roleList(member),...roleList(employee)];
-if(!isAdmin&&!(active(member)||active(employee)))return fail(ctx,request,"An active institutional identity is required to register a meeting.",403);
+if(!isAdmin&&!(active(member)||active(employee)))return fail(ctx,request,"An active registered IRPA member or employee identity is required to initiate a meeting.",403);
 const category=clean(incoming.meetingCategory||incoming.meetingPolicyId||"OTHER").toUpperCase();
 if(!["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].includes(category))return fail(ctx,request,"Choose a valid meeting category.",400);
-const rolePolicy={GOVERNANCE:new Set(["board secretary","secretary to the board","meeting secretary","executive director","director internal oversight"]),ADMINISTRATIVE:new Set(["executive director","director finance & administration","director human resources","hr director","operations manager","departmental director","departmental manager","director outreach","director community development","director livestock","director environment","director field department"]),STAFF:new Set(["executive director","director human resources","hr director","operations manager","departmental director","departmental manager"]),GENERAL:new Set(["executive director","departmental director","departmental manager","operations manager","meeting secretary"]),OTHER:new Set(["executive director","departmental director","departmental manager","operations manager","meeting secretary"])};
-if(!isAdmin&&!roles.some(r=>rolePolicy[category].has(r)))return fail(ctx,request,"Your institutional role is not authorised to register this meeting category.",403);
+// Meeting initiation is open to every active registered member and employee.
+// Category-specific access, participant admission, Board voting, quorum and
+// formal approval remain enforced by their separate policies and routes.
 if(clean(incoming.initiatorUid)!==uid)return fail(ctx,request,"The meeting initiator must match the authenticated account.",403);
 const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,environment:isAdmin&&meetingEnvironment(incoming.environment)==="TRIAL"?"TRIAL":"REAL",meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdByUid:uid,createdAt:now,updatedAt:now};
 await writeDoc(ctx,env,token,"meetings",id,record,false);
