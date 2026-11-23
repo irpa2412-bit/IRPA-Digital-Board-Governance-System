@@ -364,6 +364,79 @@ export async function buildEmergencyRetrieval(ctx,user,id){
   }
 }
 
+function maskedRecoveryAddress(value){
+  const [local="",domain=""]=String(value||"").split("@");
+  if(!domain)return "NOT RECORDED";
+  return (local.slice(0,1)||"*")+"***@"+domain;
+}
+function recoveryTimeEAT(value){
+  const date=new Date(value||"");
+  if(!Number.isFinite(date.getTime()))return "NOT RECORDED";
+  return new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Dar_es_Salaam",dateStyle:"medium",timeStyle:"medium",hour12:false}).format(date)+" EAT";
+}
+async function buildEmergencyEvidenceReportPdf(ctx,user,id){
+  const envelope=await ctx.meta.get("envelopes",id);
+  if(!envelope)throw new HttpError(404,"Recovery record not found.");
+  if(!emergencyOwner(envelope,user))throw new HttpError(403,"This envelope belongs to another owner.");
+  const [assessment,emergency]=await Promise.all([
+    assessRecoveryEvidence(ctx,user,id,{recordAccess:false}),
+    buildEmergencyRetrieval(ctx,user,id)
+  ]);
+  const pdf=await PDFDocument.create();
+  const regular=await pdf.embedFont(StandardFonts.Helvetica);
+  const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  let page=pdf.addPage([612,792]),y=752;
+  const line=(value,isBold=false,size=9)=>{
+    const text=String(value??"").replace(/[^\x20-\x7E]/g,"?");
+    const font=isBold?bold:regular;
+    const max=Math.max(24,Math.floor(510/(size*0.52)));
+    for(let offset=0;offset<text.length;offset+=max){
+      if(y<42){page=pdf.addPage([612,792]);y=752;}
+      page.drawText(text.slice(offset,offset+max),{x:48,y,size,font});
+      y-=size+4;
+    }
+  };
+  const firstLine=emergency.ok?emergency.label:"EMERGENCY RETRIEVAL FAILED: "+(emergency.code||"EMERGENCY_RETRIEVAL_FAILED:UNKNOWN");
+  line(firstLine,true,10);
+  y-=8;
+  line("IRPA EMERGENCY RETRIEVAL EVIDENCE REPORT",true,14);
+  line("Document title: "+(envelope.title||"Untitled document"));
+  line("Document reference: "+(envelope.documentId||"NOT RECORDED"));
+  line("Envelope reference: "+id);
+  line("Envelope status: "+String(envelope.status||"UNKNOWN")+" (this report does not complete the envelope)");
+  line("Audit chain: "+(assessment.auditChain?.status==="VERIFIED"?"PASS":"FAILED")+" - "+(assessment.auditChain?.status||"NOT RETRIEVED"));
+  line("Source hash: "+(assessment.sourceHashStatus==="VERIFIED"?"PASS":"FAILED")+" - "+(assessment.sourceHash||"NOT AVAILABLE"));
+  line("PDF copy SHA-256: "+(emergency.outputHash||"NOT APPLICABLE"));
+  line("Certificate page: "+(emergency.checks?.certificatePage||"NOT APPLICABLE"));
+  line("Environment recorded on envelope: "+String(envelope.dataEnvironment||"NOT RECORDED").toUpperCase());
+  line("Environment recorded on preserved copy: "+String(envelope.completion?.archivePending?.environment||"NOT RECORDED").toUpperCase());
+  line("Worker environment: "+String(ctx.env?.IRPA_ENVIRONMENT||"NOT RECORDED").toUpperCase());
+  y-=6;line("SIGNATURE STAMPS",true,11);
+  for(const row of assessment.stampSlots||[]){
+    const status=row.status==="VERIFIED_EXISTING"?"PASS":row.status==="UNVERIFIABLE"?"NOT APPLICABLE":"FAILED";
+    line(status+" - Page "+(row.page||"UNKNOWN")+" - Field "+(row.fieldId||"UNKNOWN")+" - "+(row.code||"NO_CODE"));
+  }
+  y-=6;line("SIGNERS AND SIGNING TIMES",true,11);
+  for(const signer of envelope.signers||[]){
+    line((signer.name||"Name not recorded")+" - "+maskedRecoveryAddress(signer.email)+" - "+recoveryTimeEAT(signer.signedAt));
+  }
+  y-=6;line("VERIFICATION CHECKS",true,11);
+  line("Source hash: "+(emergency.checks?.sourceHash|| (assessment.sourceHashStatus==="VERIFIED"?"PASS":"FAILED")));
+  line("Audit chain: "+(emergency.checks?.auditChain|| (assessment.auditChain?.status==="VERIFIED"?"PASS":"FAILED")));
+  line("12 field-level stamp hashes: "+(emergency.checks?.stampHashes||"FAILED"));
+  line("Certificate page: "+(emergency.checks?.certificatePage||"NOT APPLICABLE"));
+  line("Output PDF SHA-256: "+(emergency.checks?.pdfHash||"NOT APPLICABLE"));
+  if(emergency.certificateWarning){
+    line("Certificate verification detail: "+emergency.certificateWarning.step+" ("+emergency.certificateWarning.errorClass+")");
+    line("The certificate page was not verified. No certificate claim is made.");
+  }else if(!emergency.ok){
+    line("Failure step: "+(emergency.step||"UNKNOWN")+" ("+(emergency.errorClass||"Error")+")");
+  }
+  line("No envelope, signer, field, signature, audit-chain, hash, certificate, archive or storage record was written or changed.");
+  const bytes=new Uint8Array(await pdf.save({useObjectStreams:false}));
+  return {bytes,hash:await sha256Hex(bytes)};
+}
+
 export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFirestoreDocument,buildContext,json,corsHeaders}={}) {
   return async function signatureRecoveryRouter(request,env,pathname) {
     if(!pathname.startsWith("/api/recovery/envelopes"))return null;
@@ -384,6 +457,11 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
         if(!result.ok)return json({ok:false,code:result.code||"EMERGENCY_RETRIEVAL_FAILED:UNKNOWN",step:result.step||"UNKNOWN",errorClass:result.errorClass||"Error",messageEn:result.messages?.[0]||emergencyStepMessages.UNKNOWN[0],messageSw:result.messages?.[1]||emergencyStepMessages.UNKNOWN[1],stages:result.stages},result.status||500,corsHeaders(request));
         return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="UNARCHIVED-COPY-CERTIFICATE-NOT-VERIFIED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages),"x-irpa-copy-warning":result.certificateWarning?result.label:"","x-irpa-copy-checks":JSON.stringify(result.checks),"x-irpa-environments":JSON.stringify({envelope:result.envelopeEnvironment,preservedCopy:result.preservedEnvironment,worker:result.workerEnvironment})}});
+      }
+      const evidencePdf=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/emergency-evidence-report\.pdf$/);
+      if(evidencePdf){
+        const report=await buildEmergencyEvidenceReportPdf(ctx,user,decodeURIComponent(evidencePdf[1]));
+        return new Response(report.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf","content-disposition":'attachment; filename="emergency-retrieval-evidence-report.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-report-sha256":report.hash}});
       }
       if(pathname==="/api/recovery/envelopes") {
         const url=new URL(request.url);
