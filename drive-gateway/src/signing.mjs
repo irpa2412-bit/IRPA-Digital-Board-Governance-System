@@ -45,6 +45,38 @@ function invitationFailureDiagnostics(error){
   const failureClass=smtpResponseCode!==null?(smtpResponseCode>=500?"permanent-provider-rejection":smtpResponseCode>=400?"temporary-provider-rejection":"provider-response"):error?.deliveryOutcome==="unknown"?"delivery-outcome-unknown":errorCode||/password.*not configured/i.test(message)?"smtp-configuration-or-transport":"smtp-transport-error";
   return{errorType:String(error?.name||"Error").slice(0,60),errorCode,smtpResponseCode,failureClass,deliveryOutcome:error?.deliveryOutcome==="unknown"?"unknown":"not-confirmed",retryable:error?.retryable===false?false:(smtpResponseCode!==null?smtpResponseCode>=400&&smtpResponseCode<500:true)};
 }
+// Permissive transaction-level name matching for forwarded email-link invitations.
+// This compares the name declared by the link holder with the name assigned in the envelope;
+// it does not claim legal identity verification or read an external mail-provider profile.
+const SIGNER_NAME_TITLES=new Set(["prof","professor","dr","doctor","mr","mrs","ms","miss","sir","madam"]);
+function signerNameTokens(value){
+  return String(value||"").normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase()
+    .replace(/[^a-z0-9]+/g," ").trim().split(/\\s+/).filter(Boolean)
+    .filter(token=>!SIGNER_NAME_TITLES.has(token.replace(/\\.$/,"")));
+}
+function signerNameTokenMatches(left,right){
+  if(left===right)return true;
+  if(Math.min(left.length,right.length)>=3&&(left.startsWith(right)||right.startsWith(left)))return true;
+  if(Math.min(left.length,right.length)<5||Math.abs(left.length-right.length)>1)return false;
+  let previous=Array.from({length:right.length+1},(_,i)=>i);
+  for(let i=1;i<=left.length;i++){
+    const current=[i];
+    for(let j=1;j<=right.length;j++)current[j]=Math.min(current[j-1]+1,previous[j]+1,previous[j-1]+(left[i-1]===right[j-1]?0:1));
+    previous=current;
+  }
+  return previous[right.length]<=1;
+}
+export function assessForwardedSignerName(assignedName,presentedName){
+  const assigned=signerNameTokens(assignedName),presented=signerNameTokens(presentedName);
+  if(assigned.length<2||presented.length<2)return{matched:false,method:"insufficient-name-parts",version:"permissive-name-v1"};
+  const first=assigned[0],last=assigned[assigned.length-1];
+  const firstMatched=presented.some(token=>signerNameTokenMatches(token,first));
+  const lastMatched=presented.some(token=>signerNameTokenMatches(token,last));
+  const matchedTokens=presented.filter(token=>assigned.some(candidate=>signerNameTokenMatches(token,candidate)));
+  const matched=firstMatched&&lastMatched&&matchedTokens.length>=2;
+  return{matched,method:matched?"first-last-anchor-with-optional-middle-variants":"name-anchor-mismatch",matchedTokenCount:matchedTokens.length,assignedTokenCount:assigned.length,presentedTokenCount:presented.length,version:"permissive-name-v1"};
+}
+
 function tokenParts(t){const p=String(t||"").split(".");if(p.length!==3||!ID_RE.test(p[0])||!/^S\d+$/.test(p[1])||!/^[0-9a-f]{64}$/.test(p[2]))throw new HttpError(401,"Invalid signing link.");return p}
 async function load(ctx,t){
   const[eid,sid,secret]=tokenParts(t),e=await ctx.meta.get("envelopes",eid),signer=e?.signers.find(item=>item.id===sid);
@@ -396,6 +428,8 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     for(const fieldId of assignment.fieldIds){const field=(e0.fields||[]).find(item=>item.fieldId===fieldId);if(field&&["Signature","Initials"].includes(field.type))assignment.signatureFieldHashes.push({fieldId,type:field.type,hash:await sha256Hex(checkedFieldValues[fieldId])});}
   }
   if(!declared.name)throw new HttpError(400,"Enter your name before signing.");
+  const signerNameMatch=s0.identityType==="email-link"?assessForwardedSignerName(s0.name||s0.declaredParticulars?.name,declared.name):null;
+  if(s0.identityType==="email-link"&&!signerNameMatch?.matched)throw new HttpError(400,"The name entered does not sufficiently match the signer assigned to this document. Check the spelling and try again, or contact the document owner for assistance.");
   const ownerDeclared=s0.declaredParticulars||{};
   const discrepancyFields=["name","occupation","capacity"].filter(key=>String(ownerDeclared[key]||"").trim()!==""&&String(ownerDeclared[key]||"").trim().toLowerCase()!==String(declared[key]||"").trim().toLowerCase());
   await original(ctx,e0);
@@ -411,6 +445,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     }
     if(s.identityType==="email-link"&&cur.emailSigningModule==="v2")Object.assign(s,markEmailSignerSigned(s,at));else s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=signedFieldValues;if(s.identityType==="email-link"){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"used",usedAt:at}].slice(-20);s.emailLinkStatus="used";s.emailLinkSessionStatus="used";s.emailLinkSessionConsumedAt=at;}
     s.signerDeclarations=declared;s.roleAssignmentEvidence=roleAssignmentEvidence;
+    if(s.identityType==="email-link")s.signerNameMatch={...signerNameMatch,assignedName:String(s.name||s.declaredParticulars?.name||""),presentedName:declared.name,assessedAt:at};
     s.declarationDiscrepancy={detected:discrepancyFields.length>0,fields:discrepancyFields,ownerDeclared:{...ownerDeclared},signerDeclared:{...declared},detectedAt:at};
     s.authorityVerification=null;s.ip=ip||null;s.userAgent=cleanText(userAgent||"",200)||null;
     const last=cur.signers.every(x=>x.status==="Signed");
@@ -418,7 +453,8 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
     for(const assignment of roleAssignmentEvidence){
       events=await chainEvents(events,{type:"signer.role_assignment.completed",signerId:s.id,at,roleAssignmentIndex:assignment.roleAssignmentIndex,role:assignment.role,capacity:assignment.capacity,fieldIds:assignment.fieldIds,signatureFieldHashes:assignment.signatureFieldHashes});
     }
-    events=await chainEvents(events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],roleAssignmentEvidence,signerDeclarations:declared,declarationDiscrepancy:s.declarationDiscrepancy});
+    if(s.identityType==="email-link")events=await chainEvents(events,{type:"signer.name_match_assessed",signerId:s.id,at,method:signerNameMatch.method,version:signerNameMatch.version,matched:true,assignedName:String(s.name||s.declaredParticulars?.name||""),presentedName:declared.name,accessIp:ip||null,userAgent:s.userAgent||null});
+    events=await chainEvents(events,{type:"signer.signed",signerId:s.id,at,ip:ip||null,signatureType:sig.type,signatureHash:await sha256Hex(sig.value),identityType:s.identityType,roleAssignments:s.roleAssignments||[],roleAssignmentEvidence,signerDeclarations:declared,signerNameMatch:s.signerNameMatch||null,declarationDiscrepancy:s.declarationDiscrepancy});
     return{patch:{signers:cur.signers,status:last?"Completing":"InProgress",events},result:{idempotent:false,winner:last,status:last?"Completing":"InProgress"}};
   });
   if(out.idempotent)return{ok:true,idempotent:true,status:out.status,completed:out.status==="Completed"};
