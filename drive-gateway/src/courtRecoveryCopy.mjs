@@ -25,10 +25,10 @@ export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId) {
   const dataEnvironment=String(envelope.dataEnvironment||"").trim().toUpperCase();
   if(!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment))
     throw recoveryError("PRESERVED_COPY_ENV_MISMATCH","The envelope data environment is not valid.");
-  if(!pending?.environment||String(pending.environment).trim().toUpperCase()!==dataEnvironment)
-    throw recoveryError("PRESERVED_COPY_ENV_MISMATCH","The preserved copy environment differs from the envelope data environment.");
-  if(!pending?.storageId)
+  if(!pending||!pending.storageId)
     throw recoveryError("PRESERVED_COPY_MISSING","No preserved PDF is recorded.");
+  if(!pending.environment||String(pending.environment).trim().toUpperCase()!==dataEnvironment)
+    throw recoveryError("PRESERVED_COPY_ENV_MISMATCH","The preserved copy environment differs from the envelope data environment.");
   const preservedHash=String(pending.finalHash||"").trim().toLowerCase();
   const envelopeHash=String(envelope.completion?.finalHash||"").trim().toLowerCase();
   if(!/^[a-f0-9]{64}$/.test(preservedHash)||! /^[a-f0-9]{64}$/.test(envelopeHash))
