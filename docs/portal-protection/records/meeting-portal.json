@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised organisation-wide Meeting Portal access repair: every active registered IRPA member and employee may initiate a meeting; active members and staff may participate in Staff and General meetings; Board voting, quorum, resolutions and formal approval authority remain separately restricted. Minimum required Firestore meeting-creation rules changes are included.",
+    "reason": "Owner-authorised organisation-wide Meeting Portal access repair: every active registered IRPA member and employee may initiate a meeting; active members and staff may participate in Staff and General meetings; Board voting, quorum, resolutions and formal approval authority remain separately restricted. The authenticated Cloudflare Worker is the meeting-creation path, so direct Firestore write rules remain unchanged.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -17,21 +17,19 @@
       "tests/meeting-category-policy.test.mjs",
       "docs/portal-protection/windows/meeting-portal.json",
       "src/firebase/meetingPolicy.js",
-      "firestore.rules",
-      "firestore.staging.rules",
-      "tests/meeting-category-firestore-rules.test.cjs",
       "drive-gateway/tests/meeting-services-router.test.mjs"
     ],
     "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings.",
     "prohibitedChanges": [
       "Never delete REAL or unclassified meetings.",
       "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
-      "Do not change Board voting, quorum, resolution approval, minutes approval, signature workflows, or unrelated portal permissions."
+      "Do not change Board voting, quorum, resolution approval, minutes approval, signature workflows, or unrelated portal permissions.",
+      "Do not change Firestore rules or staging Firestore rules; the authenticated Worker path is sufficient."
     ]
   },
   "repairWindow": {
     "openedAt": "2026-11-21T20:23:03Z",
-    "lastActivityAt": "2026-11-23T19:57:00Z",
+    "lastActivityAt": "2026-11-23T19:58:00Z",
     "emergency": false
   },
   "baseline": {
@@ -183,15 +181,12 @@
     "status": "SUBMITTED_FOR_VALIDATION",
     "scope": [
       "src/firebase/meetingPolicy.js",
-      "firestore.rules",
-      "firestore.staging.rules",
       "tests/meeting-category-policy.test.mjs",
-      "tests/meeting-category-firestore-rules.test.cjs",
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/tests/meeting-services-router.test.mjs"
     ],
     "ownerInstruction": "23 November 2026: every active registered member may initiate meetings; staff and members must have access to the shared Meeting Portal; meetings operate at multiple organisational levels.",
     "governanceBoundary": "Meeting initiation and participation do not grant Board voting, quorum, resolutions, formal approval, or unrestricted access to restricted Board records.",
-    "validation": "Worker route functional tests added for active staff, active members and inactive identities; CI pending; Firestore rules approval label applied by repository owner."
+    "validation": "Worker functional tests added for active staff, active members and inactive identities; direct Firestore write rules unchanged; CI pending."
   }
 }
