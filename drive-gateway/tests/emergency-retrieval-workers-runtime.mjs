@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
-test("emergency retrieval reaches CERT_PAGE_VERIFY inside a local Workers runtime", async () => {
+test("emergency retrieval exposes the current verification stages inside a local Workers runtime", async () => {
   const port = 8791;
   const child = spawn(process.execPath, [
     "node_modules/wrangler/bin/wrangler.js", "dev", "--local",
@@ -29,9 +29,9 @@ test("emergency retrieval reaches CERT_PAGE_VERIFY inside a local Workers runtim
     assert.equal(response.status, 200, detail + "\n" + logs);
     assert.equal(response.headers.get("content-type"), "application/pdf");
     const stages = JSON.parse(response.headers.get("x-irpa-stage-log"));
-    assert.ok(stages.some(stage => stage.stageCode === "CERT_PAGE_VERIFY" && stage.status === "pass"), JSON.stringify(stages));
-    assert.ok(stages.some(stage => stage.stageCode === "STAMP_EVIDENCE" && stage.status === "pass"), JSON.stringify(stages));
-    assert.ok(stages.some(stage => stage.stageCode === "DETACHED_EVIDENCE" && stage.status === "not-checked" && stage.error === "NOT EXPORTED: no existing contract"), JSON.stringify(stages));
+    assert.ok(stages.some(stage => stage.stageCode === "CERT_VERIFY" && stage.status === "PASS"), JSON.stringify(stages));
+    assert.ok(stages.some(stage => stage.stageCode === "STAMP_RENDER" && stage.status === "PASS"), JSON.stringify(stages));
+    assert.ok(stages.some(stage => stage.stageCode === "DETACHED_EVIDENCE" && stage.status === "NOT_APPLICABLE"), JSON.stringify(stages));
     assert.match(response.headers.get("x-irpa-output-sha256"), /^[a-f0-9]{64}$/);
     const bytes = new Uint8Array(await response.arrayBuffer());
     assert.ok(bytes.length > 1000);
