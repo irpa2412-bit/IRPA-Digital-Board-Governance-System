@@ -225,12 +225,21 @@ test("GET preview and PDF are read-only; explicit Open document to sign creates 
   assert.equal(stored.signers[0].emailLinkSessionHash,await sha256Hex(opened.sessionToken.split(".")[2]));
   const sessionPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);
   assert.equal(sessionPdf.fileName,"email-link.pdf");
+  // A second recipient browser opening the same forwarded invitation must not
+  // revoke the first browser's still-valid session.
+  const second=await openEmailSigning(f.ctx,f.token,"198.51.100.9");
+  assert.equal(second.ok,true);
+  assert.notEqual(second.sessionToken,opened.sessionToken);
+  const bothSessions=await f.ctx.meta.get("envelopes",f.created.envelopeId);
+  assert.equal(bothSessions.signers[0].emailLinkSessions.length,2);
+  assert.equal((await getSigningPdf(f.ctx,opened.sessionToken,null)).fileName,"email-link.pdf");
+  assert.equal((await getSigningPdf(f.ctx,second.sessionToken,null)).fileName,"email-link.pdf");
   const resumed=await openEmailSigning(f.ctx,opened.sessionToken,"198.51.100.8");
   assert.equal(resumed.sessionToken,opened.sessionToken);
   const resumedEnvelope=await f.ctx.meta.get("envelopes",f.created.envelopeId);
   assert.equal(resumedEnvelope.signers[0].emailLinkStatus,"issued");
   assert.equal(resumedEnvelope.signers[0].emailLinkSessionStatus,"active");
-  assert.equal(resumedEnvelope.events.filter(event=>event.type==="email_link.session_created").length,1);
+  assert.equal(resumedEnvelope.events.filter(event=>event.type==="email_link.session_created").length,2);
 });
 
 test("completed email-link signing consumes the invitation and session exactly once",async()=>{
