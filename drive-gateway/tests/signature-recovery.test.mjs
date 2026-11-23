@@ -431,6 +431,32 @@ test("completed-copy route falls back to the same read-only emergency builder wh
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
 });
 
+test("completed-copy route falls back to emergency build for missing and hash-mismatched preserved files",async()=>{
+  for(const failure of ["missing","hash-mismatch"]){
+    const f=await fixture({stampCount:12});
+    const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+    const source=await f.ctx.meta.get("documents","DOC-REC-1");
+    const preservedId=failure==="missing"?"not-present":source.primaryStorageId;
+    envelope.completion={archivePending:{storageId:preservedId,finalHash:"a".repeat(64),environment:"TEST"}};
+    await f.ctx.meta.update("envelopes","ENV-REC-1",envelope);
+    const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+    const router=createSignatureRecoveryRouter({
+      authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+      getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+      json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+      corsHeaders:()=>({})
+    });
+    const path="/api/recovery/envelopes/ENV-REC-1/completed-copy.pdf";
+    const response=await router(new Request("https://gateway.test"+path),{},path);
+    assert.equal(response.status,200,failure);
+    assert.equal(response.headers.get("x-irpa-copy-source"),"emergency-build",failure);
+    const bytes=new Uint8Array(await response.arrayBuffer());
+    assert.equal(response.headers.get("x-irpa-output-sha256"),await sha256Hex(bytes),failure);
+    assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before,failure);
+    assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0,failure);
+  }
+});
+
 test("emergency retrieval rejects a non-owner explicitly",async()=>{
   const f=await fixture();
   const router=createSignatureRecoveryRouter({
