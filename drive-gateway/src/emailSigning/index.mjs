@@ -49,7 +49,8 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   const matchesCurrent = Boolean(currentHash) && safeEqual(suppliedHash, currentHash);
   const sessionMatch = Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
 
-  const completedReadOnly = signer?.status === "Signed" && envelope?.status === "Completed" && matchesKnown;
+  const completed = envelope?.status === "Completed";
+  if (completed && signer?.status === "Signed" && matchesKnown) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
   if (!matchesCurrent && !sessionMatch) {
     const replaced = (signer?.emailLinkTokenHistory || []).some(item => item?.status === "replaced" && safeEqual(suppliedHash, String(item.tokenHash || "")));
     if (replaced) throw new HttpError(410, "This link was replaced. Please use the newest email.");
@@ -58,14 +59,14 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   const tokenKind = sessionMatch ? "session" : "invitation";
   const status = String(tokenKind === "session" ? signer.emailLinkSessionStatus : signer.emailLinkStatus || "");
   const completedSession = tokenKind === "session" && envelope.status === "Completed" && signer.status === "Signed" && status === "used";
-  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession && !completedReadOnly) {
+  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession) {
     throw new HttpError(410, "This signing envelope is no longer active.");
   }
   const permitted = tokenKind === "session"
     ? status === "active" || completedSession
-    : ["issued", "opened", "expired"].includes(status) || completedReadOnly;
+    : ["issued", "opened", "expired"].includes(status);
   if (!permitted) {
-    if (signer?.status === "Signed" && tokenKind === "invitation" && !completedReadOnly) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
+    if (signer?.status === "Signed" && tokenKind === "invitation") throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
     throw new HttpError(410, "This signing link has expired or is no longer active.");
   }
   const expiry = tokenKind === "session" ? signer.emailLinkSessionExpiresAt : null;
