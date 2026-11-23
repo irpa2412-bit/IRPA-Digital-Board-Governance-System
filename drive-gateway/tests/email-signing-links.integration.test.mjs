@@ -630,6 +630,39 @@ test("parallel signing supports more than ten signers and makes every signer eli
   }
 });
 
+test("the twelfth parallel signer to sign completes the envelope and triggers one final distribution pass",async()=>{
+  const f=await fixture(),sent=[];
+  f.ctx.sendInvitation=async message=>sent.push(message);
+  const positions=Array.from({length:12},(_,index)=>index+1);
+  const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
+    documentId:f.envelope.documentId,externalReference:"IRPA-D-PARALLEL-COMPLETE-"+Math.random().toString(16).slice(2,10),
+    archives:["board-governance"],signingMode:"Parallel",
+    signers:positions.map(index=>({identityType:"email-link",email:"parallel-"+index+"@example.test",name:"Parallel "+index,order:index,role:"Signer"})),
+    fields:positions.map(index=>({fieldId:"D-COMPLETE-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:5+(index%4)*22,y:10+Math.floor((index-1)/4)*20,width:18,height:8,required:true}))
+  });
+  const png="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  let finalResult=null;
+  for(const index of [...positions].reverse()){
+    const token=new URL(sent[index-1].link).searchParams.get("emailSignToken");
+    const opened=await openEmailSigning(f.ctx,token,"198.51.100.92");
+    assert.equal(opened.canSign,true);
+    const result=await sign(f.ctx,{
+      token:opened.sessionToken,
+      signature:{type:"drawn",value:png},
+      fieldApplications:[{fieldId:"D-COMPLETE-SIGN-"+index,confirmed:true,page:1,x:0.05,y:0.1,width:0.18,height:0.08,coordinateSpace:"visible-page-fraction-v1",value:png}],
+      fieldValues:{},signatureConfirmed:true,consent:true,declarations:{name:"Parallel "+index}
+    });
+    if(index===1)finalResult=result;
+    else assert.equal(result.completed,false);
+  }
+  assert.equal(finalResult.status,"Completed");
+  assert.equal(finalResult.completed,true);
+  const completed=await f.ctx.meta.get("envelopes",created.envelopeId);
+  assert.equal(completed.status,"Completed");
+  assert.ok(completed.completion?.finalHash);
+  assert.ok(completed.signers.every(signer=>signer.status==="Signed"));
+});
+
 test("c) the owner's IRPA address at position 1 is emailed and Gmail X is automatically emailed at position 2",async()=>{
   const f=await fixture(),sent=[];
   f.ctx.sendInvitation=async message=>sent.push(message);
