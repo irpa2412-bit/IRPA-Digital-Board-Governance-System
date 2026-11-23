@@ -202,7 +202,6 @@ export default function EmailSigningReadOnlyPage({token}){
   try{if(parts.length===3)window.sessionStorage.removeItem("irpaEmailSigningSession:"+parts[0]+"."+parts[1]);for(const key of Object.keys(window.sessionStorage)){if(/emailSigningSession|emailSignToken|gatewaySigningToken|signature.*(token|application|field)|signing.*token/i.test(key))window.sessionStorage.removeItem(key);}}catch{}
   try{const url=new URL(window.location.href);url.searchParams.delete("emailSignToken");url.searchParams.delete("signingToken");url.searchParams.set("signingComplete","1");window.history.replaceState({}, "", url.pathname+url.search);}catch{}
   setSigningToken("");setFieldApplications([]);setFieldValues({});setSignatureMarks({});setDeclarations({name:"",occupation:"",capacity:""});setSignaturePadField(null);setSelectedFieldId("");setSavedProfile(null);setTypedSignature("");setConsent(false);setRecord(null);setPdfDocument(current=>{if(current){const pending=current.destroy?.();pending?.catch?.(()=>{});}return null;});setPageCount(0);setPageRendered(false);
-  if(auth.currentUser?.uid){window.location.replace("/");return;}
   setLeftSession(true);
  }
  async function revoke(){
@@ -219,7 +218,7 @@ export default function EmailSigningReadOnlyPage({token}){
   finally{setRevoking(false);}
  }
 
- if(leftSession)return <main style={{minHeight:"100vh",background:"#f3f4f6",color:"#111827",padding:"20px 12px",boxSizing:"border-box"}}><section style={{maxWidth:620,margin:"8vh auto",background:"#fff",border:"1px solid #d1d5db",borderRadius:12,padding:24,textAlign:"center"}}><h1>IRPA — Signing session closed</h1><p role="status">This signing session has ended. The signing form, temporary signature marks and invitation token have been cleared from this page.</p><p>{copySent?"The completed signed copy has been sent to the document owner and signing participants.":"Your signing action was recorded. The document owner will receive the final signed copy after all required signing actions are complete."}</p><a href="https://irpa.or.tz" rel="noreferrer" style={{...buttonStyle,display:"inline-block",textDecoration:"none",marginTop:12}}>Close</a></section></main>;
+ if(leftSession)return <main style={{minHeight:"100vh",background:"#f3f4f6",color:"#111827",padding:"20px 12px",boxSizing:"border-box"}}><section style={{maxWidth:620,margin:"8vh auto",background:"#fff",border:"1px solid #d1d5db",borderRadius:12,padding:24,textAlign:"center"}}><h1>IRPA — Signing session closed</h1><p role="status">This signing session has ended. The signing form, temporary signature marks and invitation token have been cleared from this page.</p><p>{copySent?"The completed signed copy has been sent to the document owner and signing participants.":"Your signing action was recorded. The document owner will receive the final signed copy after all required signing actions are complete."}</p><button type="button" onClick={()=>{try{window.close();}catch{}}} style={{...buttonStyle,marginTop:12}}>Close this tab</button></section></main>;
  return <main style={{minHeight:"100vh",background:"#f3f4f6",color:"#111827",padding:"20px 12px",boxSizing:"border-box"}}>
   <section style={{maxWidth:1100,margin:"0 auto",background:"#fff",border:"1px solid #d1d5db",borderRadius:12,padding:16}}>
    <h1 style={{fontSize:20,margin:"0 0 10px"}}>IRPA — Secure document signing</h1>
