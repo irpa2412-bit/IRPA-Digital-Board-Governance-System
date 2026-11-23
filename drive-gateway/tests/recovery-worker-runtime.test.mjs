@@ -23,7 +23,9 @@ test("workerd builds 12 verified stamps across source pages 1 and 3 and reports 
   assert.equal(body.headerHash,body.outputHash);
   assert.ok(body.outputByteLength>0);
   assert.match(body.outputHash,/^[a-f0-9]{64}$/);
-  assert.ok(body.stages.some(stage=>stage.stageCode==="TEXT_EXTRACT"&&["PASS","FAILED"].includes(stage.status)));
+  const textStep=body.stages.find(stage=>stage.stageCode==="TEXT_EXTRACT");
+  assert.ok(textStep&&["PASS","FAILED"].includes(textStep.status));
+  if(textStep.status==="FAILED")assert.ok(textStep.errorClass);
   if(!body.certificateVerified){assert.equal(body.label,"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.");assert.match(body.fileName,/UNARCHIVED-COPY-CERTIFICATE-NOT-VERIFIED/);}
   else assert.match(body.fileName,/EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED/);
 });

@@ -311,7 +311,8 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     if(!envelope)throw Object.assign(new Error("Recovery record not found."),{status:404});
     if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
     if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
-    const document=await ctx.meta.get("documents",envelope.documentId);
+    let document;
+    try{document=await ctx.meta.get("documents",envelope.documentId);}catch(error){return fail("SOURCE_READ",error);}
     if(!document?.primaryStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
     let source;
     try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail("SOURCE_READ",error);}
@@ -322,7 +323,9 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     const references=[document.sha256,document.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase());
     if(!references.length||references.some(value=>value!==sourceHash))return fail("HASH",new Error("SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING"));
     stage("SOURCE_HASH","PASS");
-    if(!await validChain(envelope.events))return fail("AUDIT_CHAIN",new Error("AUDIT_CHAIN_FAILED"));
+    let chainValid;
+    try{chainValid=await validChain(envelope.events);}catch(error){return fail("AUDIT_CHAIN",error);}
+    if(!chainValid)return fail("AUDIT_CHAIN",new Error("AUDIT_CHAIN_FAILED"));
     const events=Array.isArray(envelope.events)?envelope.events:[];
     stage("AUDIT_CHAIN","PASS");
     let assessment;
@@ -336,7 +339,8 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
     const completedAt=completionEvent?.at||"NOT RECORDED";
     const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,signers,fields,events};
-    const inputCheck=verifyCertificateInput(info,events,signers);
+    let inputCheck;
+    try{inputCheck=verifyCertificateInput(info,events,signers);}catch(error){return fail("CERT_VERIFY",error);}
     if(!inputCheck.ok)return fail("CERT_VERIFY",new Error("VERIFIED_BUILDER_INPUT_MISMATCH"));
     let built;
     try{built=await buildSignedPdf(source,info);}catch(error){return fail("PDF_BUILD",error);}
