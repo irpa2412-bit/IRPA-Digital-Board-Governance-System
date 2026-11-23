@@ -343,23 +343,21 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     if(!(built instanceof Uint8Array)||built.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("PDF_BUILD","PASS");
     stage("STAMP_RENDER","PASS");
-    stage("SIZE_LIMIT","PASS");
     let output;
     try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
     if(!(output instanceof Uint8Array)||output.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
-    let certificateVerified=true;
-    try{
-      const pageText=await extractText(new Uint8Array(output));
-      stage("TEXT_EXTRACT","PASS");
-      const certificate=verifyCertificatePageText(pageText,events,signers);
-      if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL)){
-        certificateVerified=false;
-        stage("CERT_VERIFY","FAILED",new Error("CERTIFICATE_PAGE_VERIFICATION_FAILED"),"CERT_VERIFY");
-      }else stage("CERT_VERIFY","PASS");
-    }catch(error){
-      certificateVerified=false;
-      stage("TEXT_EXTRACT","FAILED",error,"TEXT_EXTRACT");
-      stage("CERT_VERIFY","NOT_APPLICABLE");
+    stage("SIZE_LIMIT","PASS");
+    let certificateVerified=true,pageText=null;
+    try{pageText=await extractText(new Uint8Array(output));stage("TEXT_EXTRACT","PASS");}
+    catch(error){certificateVerified=false;stage("TEXT_EXTRACT","FAILED",error,"TEXT_EXTRACT");stage("CERT_VERIFY","NOT_APPLICABLE");}
+    if(pageText!==null){
+      try{
+        const certificate=verifyCertificatePageText(pageText,events,signers);
+        if(!certificate.ok||typeof pageText!=="string"||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL)){
+          certificateVerified=false;
+          stage("CERT_VERIFY","FAILED",new Error("CERTIFICATE_PAGE_VERIFICATION_FAILED"),"CERT_VERIFY");
+        }else stage("CERT_VERIFY","PASS");
+      }catch(error){certificateVerified=false;stage("CERT_VERIFY","FAILED",error,"CERT_VERIFY");}
     }
     stage("STAMPS_IN_OUTPUT","NOT_APPLICABLE");
     stage("DETACHED_EVIDENCE","NOT_APPLICABLE");
