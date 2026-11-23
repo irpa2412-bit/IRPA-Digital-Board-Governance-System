@@ -360,7 +360,9 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPd
     if(!(output instanceof Uint8Array)||output.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("SIZE_LIMIT","PASS");
     let certificateVerified=true,pageText=null;
-    try{pageText=await extractText(new Uint8Array(output));stage("TEXT_EXTRACT","PASS");}
+    let certificateStartPage=0;
+    try{certificateStartPage=(await PDFDocument.load(built)).getPageCount();}catch(error){return fail("PDF_BUILD",error);}
+    try{pageText=await extractText(new Uint8Array(output),certificateStartPage);stage("TEXT_EXTRACT","PASS");}
     catch(error){certificateVerified=false;stage("TEXT_EXTRACT","FAILED",error,"TEXT_EXTRACT");stage("CERT_VERIFY","NOT_APPLICABLE");}
     if(pageText!==null){
       try{
