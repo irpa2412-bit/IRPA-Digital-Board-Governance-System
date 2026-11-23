@@ -58,7 +58,7 @@ test("restricted upload is denied server-side without restricted permission",asy
 });
 
 test("PDF owner profile removal hides only the owner listing and preserves the verified archive file",async()=>{
-  const doc={documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",sha256:"a".repeat(64),classification:"Internal",ownerUid:"emp-1",status:"SIGNED"};
+  const doc={documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",sha256:"a".repeat(64),classification:"Internal",ownerUid:"emp-1",status:"WORKING"};
   const state={docs:{"LIFE-test":{plain:doc}},writes:[],deletedFiles:[]};
   const router=createDocumentLifecycleRouter(makeDeps(state));
   const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
@@ -70,8 +70,8 @@ test("PDF owner profile removal hides only the owner listing and preserves the v
   assert.equal(state.docs["LIFE-test"].plain.ownerProfileHiddenByUid,"emp-1");
   assert.equal(state.deletedFiles.length,0);
   assert.equal(state.writes.length,2);
-  assert.equal(plain(state.writes[1].fields).action,"DOCUMENT_LIFECYCLE_OWNER_PROFILE_HIDDEN");
-  assert.equal(plain(state.writes[1].fields).details.systemRecordPreserved,true);
+  assert.equal(state.writes[1].fields.action.stringValue,"DOCUMENT_LIFECYCLE_OWNER_PROFILE_HIDDEN");
+  assert.equal(state.writes[1].fields.details.mapValue.fields.systemRecordPreserved.booleanValue,true);
 });
 test("PDF owner profile removal is denied to a non-owner",async()=>{
   const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",ownerUid:"another-user"}}},writes:[],deletedFiles:[]};
@@ -89,6 +89,15 @@ test("PDF owner profile removal is blocked when the archive copy cannot be verif
   const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
   assert.equal(response.status,409);
   assert.match((await response.json()).error,/archive PDF could be verified/);
+  assert.equal(state.writes.length,0);
+  assert.equal(state.deletedFiles.length,0);
+});
+test("completed PDF profile removal requires a signed or final archive copy",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",ownerUid:"emp-1",status:"SIGNED"}}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
+  assert.equal(response.status,409);
+  assert.match((await response.json()).error,/archive copy is available/);
   assert.equal(state.writes.length,0);
   assert.equal(state.deletedFiles.length,0);
 });
