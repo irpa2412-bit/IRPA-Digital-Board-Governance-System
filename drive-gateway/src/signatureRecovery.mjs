@@ -329,8 +329,8 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     try {
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
-        if(!result.ok)return json({ok:false,stages:result.stages,error:result.stages.at(-1)?.error||"EMERGENCY_RETRIEVAL_FAILED"},result.status||500,corsHeaders(request));
-        return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages)}});
+        if(!result.ok)return json({ok:false,code:result.stages.at(-1)?.error||"EMERGENCY_RETRIEVAL_FAILED",stages:result.stages,error:"Emergency retrieval could not be verified."},result.status||500,corsHeaders(request));
+        return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-source":"emergency-build","x-irpa-copy-label":"Unarchived copy; the envelope is not yet Completed","x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages)}});
       }
       if(pathname==="/api/recovery/envelopes") {
         const url=new URL(request.url);
@@ -346,21 +346,33 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
       }
       const completedCopy=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/completed-copy\.pdf$/);
       if(completedCopy) {
-        const copy=await buildUnarchivedCompletedCopy(ctx,user,decodeURIComponent(completedCopy[1]));
-        const eat=new Date(copy.generatedAt).toLocaleString("en-GB",{timeZone:"Africa/Dar_es_Salaam",hour12:false});
-        return new Response(copy.bytes,{status:200,headers:{
-          ...corsHeaders(request),
-          "content-type":"application/pdf",
-          "content-disposition":'attachment; filename="unarchived-completed-copy.pdf"',
-          "cache-control":"no-store, private",
-          "pragma":"no-cache",
-          "x-content-type-options":"nosniff",
-          "x-irpa-copy-status":"UNARCHIVED_NOT_COMPLETED",
-          "x-irpa-generated-at-eat":eat,
-          "x-irpa-document-sha256":copy.hash,
-          "x-irpa-recorded-hash-comparison":copy.comparison,
-          "x-irpa-copy-disclaimer":"Unarchived copy generated "+eat+" EAT; SHA-256 "+copy.hash+"; the envelope is not yet Completed"
-        }});
+        const id=decodeURIComponent(completedCopy[1]);
+        try {
+          const copy=await buildUnarchivedCompletedCopy(ctx,user,id);
+          const eat=new Date(copy.generatedAt).toLocaleString("en-GB",{timeZone:"Africa/Dar_es_Salaam",hour12:false});
+          return new Response(copy.bytes,{status:200,headers:{
+            ...corsHeaders(request),"content-type":"application/pdf",
+            "content-disposition":'attachment; filename="unarchived-completed-copy.pdf"',
+            "cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff",
+            "x-irpa-copy-status":"UNARCHIVED_NOT_COMPLETED","x-irpa-copy-source":"preserved-copy",
+            "x-irpa-generated-at-eat":eat,"x-irpa-document-sha256":copy.hash,
+            "x-irpa-recorded-hash-comparison":copy.comparison,
+            "x-irpa-copy-disclaimer":"Unarchived copy; the envelope is not yet Completed"
+          }});
+        } catch(error) {
+          if(!["PRESERVED_COPY_MISSING","PRESERVED_COPY_ENV_MISMATCH","PRESERVED_COPY_UNREADABLE","HASH_MISMATCH"].includes(error?.code))throw error;
+          const emergency=await buildEmergencyRetrieval(ctx,user,id);
+          if(!emergency.ok)return json({ok:false,code:error.code,stages:emergency.stages,error:"Preserved copy unavailable; emergency retrieval could not be verified."},emergency.status||409,corsHeaders(request));
+          return new Response(emergency.bytes,{status:200,headers:{
+            ...corsHeaders(request),"content-type":"application/pdf",
+            "content-disposition":'attachment; filename="EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf"',
+            "cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff",
+            "x-irpa-copy-status":"UNARCHIVED_NOT_COMPLETED","x-irpa-copy-source":"emergency-build",
+            "x-irpa-copy-label":"Unarchived copy; the envelope is not yet Completed",
+            "x-irpa-output-sha256":emergency.outputHash,"x-irpa-fallback-code":error.code,
+            "x-irpa-stage-log":JSON.stringify(emergency.stages)
+          }});
+        }
       }
       const preview=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/preview\.pdf$/);
       if(preview) {
