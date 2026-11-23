@@ -56,7 +56,7 @@ test("each recovery action passes its own button label into the route error form
 });
 
 test("assessment report includes environment, preserved archive integrity and finalisation stage diagnostics",()=>{
- assert.match(source,/const env=evidence\\?\\.environmentDiagnostics/);
+ assert.match(source,/const env=evidence\?\.environmentDiagnostics/);
  assert.match(source,/Environment diagnostics:/);
  assert.match(source,/Envelope environment:/);
  assert.match(source,/Preserved-copy environment:/);
@@ -67,7 +67,7 @@ test("assessment report includes environment, preserved archive integrity and fi
  assert.match(source,/Finalisation stage-record integrity:/);
  assert.match(source,/stageRecordIntegrity/);
  assert.match(source,/Stored finalisation record:/);
- assert.match(source,/record\\.stages/);
+ assert.match(source,/record\.stages/);
  assert.match(source,/errorCode/);
  assert.match(source,/errorMessage/);
 });
