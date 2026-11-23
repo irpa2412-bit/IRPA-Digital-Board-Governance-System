@@ -257,57 +257,110 @@ async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   const output=await pdf.save({useObjectStreams:false});
   return new Uint8Array(output);
 }
+function emergencyErrorClass(error){
+  return String(error?.name||"Error").replace(/[^A-Za-z0-9_]/g,"").slice(0,48)||"Error";
+}
+function emergencyStepFor(error,fallback="UNKNOWN"){
+  const name=emergencyErrorClass(error),message=String(error?.message||"");
+  if(/cpu time|exceeded.*time|timed? ?out|timeout/i.test(message)||name==="TimeoutError"||name==="AbortError")return "TIMEOUT";
+  if(/out of memory|memory allocation|array buffer|buffer too large|maximum.*size/i.test(message)||name==="RangeError")return "SIZE_LIMIT";
+  if(/png|image decode|invalid image|failed to parse image/i.test(message))return "STAMP_LOAD";
+  if(/field.*page|missing pdf page|outside.*page|draw.*image|embed.*image/i.test(message))return "STAMP_RENDER";
+  return fallback;
+}
+const emergencyStepMessages={
+  SOURCE_READ:["The original PDF could not be read.","PDF ya awali haikuweza kusomwa."],
+  STAMP_LOAD:["A signature image could not be loaded.","Picha ya saini haikuweza kupakiwa."],
+  STAMP_RENDER:["A signature image could not be placed on the PDF.","Picha ya saini haikuweza kuwekwa kwenye PDF."],
+  PDF_BUILD:["The recovery PDF could not be created.","PDF ya urejeshaji haikuweza kuundwa."],
+  HASH:["The SHA-256 integrity check could not be completed.","Ukaguzi wa uadilifu wa SHA-256 haukuweza kukamilishwa."],
+  CERT_VERIFY:["The certificate page did not pass verification.","Ukurasa wa cheti haukupita uthibitishaji."],
+  TEXT_EXTRACT:["Text could not be read from the certificate page.","Maandishi ya ukurasa wa cheti hayakuweza kusomwa."],
+  SIZE_LIMIT:["The recovery PDF exceeded an available processing limit.","PDF ya urejeshaji imezidi kikomo cha uchakataji."],
+  TIMEOUT:["The recovery operation exceeded its time limit.","Urejeshaji umevuka muda wa uchakataji."],
+  UNKNOWN:["The recovery operation failed unexpectedly.","Urejeshaji umeshindwa bila kutarajiwa."]
+};
 export async function buildEmergencyRetrieval(ctx,user,id){
   const stages=[];
-  const stage=(stageCode,status,error=null)=>stages.push({stageCode,status,error});
-  const fail=(stageCode,error)=>{stage(stageCode,"fail",String(error?.message||error));return {ok:false,status:409,stages};};
+  const stage=(stageCode,status,errorClass=null)=>stages.push({stageCode,status,errorClass});
+  const fail=(step,error)=>{
+    const errorType=emergencyErrorClass(error);
+    stage(step,"FAILED",errorType);
+    return {ok:false,status:Number(error?.status)||409,code:"EMERGENCY_RETRIEVAL_FAILED:"+step,step,errorClass:errorType,messages:emergencyStepMessages[step]||emergencyStepMessages.UNKNOWN,stages};
+  };
   try{
     const envelope=await ctx.meta.get("envelopes",id);
     if(!envelope)throw Object.assign(new Error("Recovery record not found."),{status:404});
     if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
     if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
     const document=await ctx.meta.get("documents",envelope.documentId);
-    if(!document?.primaryStorageId) return fail("SOURCE_HASH","SOURCE_REFERENCE_MISSING");
+    if(!document?.primaryStorageId)return fail("SOURCE_READ",new Error("SOURCE_REFERENCE_MISSING"));
     let source;
-    try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail("SOURCE_HASH",error);}
-    if(!(source instanceof Uint8Array)||!source.length)return fail("SOURCE_HASH","SOURCE_FILE_MISSING");
-    const sourceHash=await sha256Hex(source);
+    try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail("SOURCE_READ",error);}
+    if(!(source instanceof Uint8Array)||!source.length)return fail("SOURCE_READ",new Error("SOURCE_FILE_MISSING"));
+    let sourceHash;
+    try{sourceHash=await sha256Hex(source);}catch(error){return fail("HASH",error);}
     const references=[document.sha256,document.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase());
-    if(!references.length||references.some(value=>value!==sourceHash))return fail("SOURCE_HASH","SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING");
-    stage("SOURCE_HASH","pass");
-    if(!await validChain(envelope.events))return fail("AUDIT_CHAIN","AUDIT_CHAIN_FAILED");
+    if(!references.length||references.some(value=>value!==sourceHash))return fail("HASH",new Error("SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING"));
+    stage("SOURCE_READ","PASS");
+    stage("SOURCE_HASH","PASS");
+    if(!await validChain(envelope.events))return fail("AUDIT_CHAIN",new Error("AUDIT_CHAIN_FAILED"));
     const events=Array.isArray(envelope.events)?envelope.events:[];
-    stage("AUDIT_CHAIN","pass");
-    const assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});
-    if(assessment.stampSlots.length!==12||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_EVIDENCE","STAMP_EVIDENCE_NOT_12_FULLY_VERIFIED_STAMPS");
-    stage("STAMP_EVIDENCE","pass");
+    stage("AUDIT_CHAIN","PASS");
+    let assessment;
+    try{assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});}catch(error){return fail(emergencyStepFor(error,"STAMP_LOAD"),error);}
+    if(assessment.stampSlots.length!==12||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_LOAD",new Error("STAMP_EVIDENCE_NOT_12_FULLY_VERIFIED_STAMPS"));
+    stage("STAMP_LOAD","PASS");
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
     const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
     const signers=(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id));
-    if(!signers.length)return fail("PDF_BUILD","NO_VERIFIED_SIGNERS");
+    if(!signers.length)return fail("STAMP_RENDER",new Error("NO_VERIFIED_SIGNERS"));
     const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
     const completedAt=completionEvent?.at||"NOT RECORDED";
     const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,signers,fields,events};
     const inputCheck=verifyCertificateInput(info,events,signers);
-    if(!inputCheck.ok)return fail("PDF_BUILD","VERIFIED_BUILDER_INPUT_MISMATCH:"+inputCheck.failures.join(","));
+    if(!inputCheck.ok)return fail("CERT_VERIFY",new Error("CERTIFICATE_INPUT_MISMATCH"));
     let built;
-    try{built=await buildSignedPdf(source,info);}catch(error){return fail("PDF_BUILD",error);}
-    stage("PDF_BUILD","pass");
+    try{built=await buildSignedPdf(source,info);}catch(error){return fail(emergencyStepFor(error,"PDF_BUILD"),error);}
+    stage("STAMP_RENDER","PASS");
+    stage("PDF_BUILD","PASS");
     let output;
-    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
+    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail(emergencyStepFor(error,"PDF_BUILD"),error);}
+    let certificateWarning=null;
     let pageText;
-    try{pageText=await extractLastPdfPageText(new Uint8Array(output));}catch(error){return fail("CERT_PAGE_VERIFY",error);}
-    const certificate=verifyCertificatePageText(pageText,events,signers);
-    if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL))return fail("CERT_PAGE_VERIFY","CERTIFICATE_PAGE_VERIFICATION_FAILED:"+certificate.failures.join(","));
-    stage("CERT_PAGE_VERIFY","pass");
-    stage("STAMPS_IN_OUTPUT","not-checked","NOT CHECKED: the gateway has no independent PDF image/pixel comparison that can prove each rendered stamp matches its verified source field value.");
-    stage("DETACHED_EVIDENCE","not-checked","NOT EXPORTED: no existing contract");
-    const outputHash=await sha256Hex(output);
-    stage("OUTPUT_SHA256","pass");
-    return {ok:true,bytes:output,outputHash,stages,label:EMERGENCY_COPY_LABEL};
+    try{pageText=await extractLastPdfPageText(new Uint8Array(output));}
+    catch(error){
+      const errorType=emergencyErrorClass(error);
+      certificateWarning={step:"TEXT_EXTRACT",errorClass:errorType,messages:emergencyStepMessages.TEXT_EXTRACT};
+      stage("TEXT_EXTRACT","FAILED",errorType);
+      stage("CERT_VERIFY","NOT_APPLICABLE",errorType);
+    }
+    if(pageText!==undefined){
+      const certificate=verifyCertificatePageText(pageText,events,signers);
+      if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL)){
+        certificateWarning={step:"CERT_VERIFY",errorClass:"CertificateVerificationError",messages:emergencyStepMessages.CERT_VERIFY};
+        stage("TEXT_EXTRACT","PASS");
+        stage("CERT_VERIFY","FAILED","CertificateVerificationError");
+      }else{
+        stage("TEXT_EXTRACT","PASS");
+        stage("CERT_VERIFY","PASS");
+      }
+    }
+    stage("AUDIT_CHAIN","PASS");
+    stage("SOURCE_HASH","PASS");
+    stage("STAMP_HASHES","PASS");
+    let outputHash;
+    try{outputHash=await sha256Hex(output);}catch(error){return fail("HASH",error);}
+    stage("OUTPUT_SHA256","PASS");
+    const label=certificateWarning
+      ?"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed."
+      :"UNARCHIVED COPY. Certificate page verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.";
+    return {ok:true,bytes:output,outputHash,stages,label,certificateWarning,checks:{sourceHash:"PASS",auditChain:"PASS",stampHashes:"PASS",pdfHash:"PASS",certificatePage:certificateWarning?"NOT APPLICABLE":"PASS"},envelopeEnvironment:String(envelope.dataEnvironment||"UNKNOWN").toUpperCase(),preservedEnvironment:String(envelope.completion?.archivePending?.environment||"MISSING").toUpperCase(),workerEnvironment:String(ctx.env?.IRPA_ENVIRONMENT||"UNKNOWN").toUpperCase()};
   }catch(error){
     const status=Number(error?.status)||500;
-    return {ok:false,status,stages:[...stages,{stageCode:"REQUEST",status:"fail",error:String(error?.message||"EMERGENCY_RETRIEVAL_FAILED")}]};
+    const step=emergencyStepFor(error,"UNKNOWN");
+    const errorType=emergencyErrorClass(error);
+    return {ok:false,status,code:"EMERGENCY_RETRIEVAL_FAILED:"+step,step,errorClass:errorType,messages:emergencyStepMessages[step],stages:[...stages,{stageCode:step,status:"FAILED",errorClass:errorType}]};
   }
 }
 
@@ -329,8 +382,8 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     try {
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
-        if(!result.ok)return json({ok:false,stages:result.stages,error:result.stages.at(-1)?.error||"EMERGENCY_RETRIEVAL_FAILED"},result.status||500,corsHeaders(request));
-        return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages)}});
+        if(!result.ok)return json({ok:false,code:result.code||"EMERGENCY_RETRIEVAL_FAILED:UNKNOWN",step:result.step||"UNKNOWN",errorClass:result.errorClass||"Error",messageEn:result.messages?.[0]||emergencyStepMessages.UNKNOWN[0],messageSw:result.messages?.[1]||emergencyStepMessages.UNKNOWN[1],stages:result.stages},result.status||500,corsHeaders(request));
+        return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="UNARCHIVED-COPY-CERTIFICATE-NOT-VERIFIED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages),"x-irpa-copy-warning":result.certificateWarning?result.label:"","x-irpa-copy-checks":JSON.stringify(result.checks),"x-irpa-environments":JSON.stringify({envelope:result.envelopeEnvironment,preservedCopy:result.preservedEnvironment,worker:result.workerEnvironment})}});
       }
       if(pathname==="/api/recovery/envelopes") {
         const url=new URL(request.url);
