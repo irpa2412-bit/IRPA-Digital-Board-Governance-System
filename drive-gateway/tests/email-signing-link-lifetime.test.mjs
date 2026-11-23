@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {issueEmailSigningLink,inspectEmailSigningLink,createFreshSigningSession,commitEmailSigningResend} from "../src/emailSigning/index.mjs";
 import {buildEmailSigningInvitationMessage} from "../src/invitationEmail.mjs";
+import {sha256Hex} from "../src/util.mjs";
 
 const now=new Date("2026-11-23T13:00:00.000Z");
 const future=new Date("2028-11-23T13:00:00.000Z");
@@ -37,8 +38,9 @@ test("completed signer can reopen original invitation in read-only state",async(
 });
 
 test("temporary session expires independently while original invitation remains reusable",async()=>{
- const {issued,envelope,signer}=await fixture({sessionStatus:"active",sessionHash:"b".repeat(64),sessionExpiry:"2026-11-23T13:30:00.000Z"});
- const sessionToken=`${envelope.id}.${signer.id}.${"b".repeat(64)}`;
+ const sessionSecret="b".repeat(64);
+ const {issued,envelope,signer}=await fixture({sessionStatus:"active",sessionHash:await sha256Hex(sessionSecret),sessionExpiry:"2026-11-23T13:30:00.000Z"});
+ const sessionToken=`${envelope.id}.${signer.id}.${sessionSecret}`;
  await assert.rejects(()=>inspectEmailSigningLink({token:sessionToken,envelope,signer,now:future}),error=>error.status===410);
  const original=await inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future});
  assert.equal(original.ok,true);
