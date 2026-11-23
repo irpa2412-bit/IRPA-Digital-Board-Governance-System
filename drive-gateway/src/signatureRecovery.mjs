@@ -4,6 +4,8 @@ import { resendInvitation } from "./signing.mjs";
 import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
 import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
+import { buildSignedPdf } from "./pdf.mjs";
+import { verifyCertificateInput, verifyCertificatePageText, extractLastPdfPageText } from "./recoveryCertificateVerifier.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function validChain(events){
@@ -54,7 +56,7 @@ async function loadOwnedFailedEnvelope(ctx,user,id){
   if(!await validChain(envelope.events))throw new HttpError(409,"The signing audit chain failed verification; recovery is blocked.");
   return envelope;
 }
-export async function assessRecoveryEvidence(ctx,user,id){
+export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={}){
   const envelope=await loadOwnedIncompleteEnvelope(ctx,user,id);
   const events=Array.isArray(envelope.events)?envelope.events:[];
   const auditChainStatus=events.length===0?"NO_EVENTS":(await validChain(events)?"VERIFIED":"FAILED");
@@ -141,7 +143,7 @@ export async function assessRecoveryEvidence(ctx,user,id){
   }else if(pendingRecord?.storageId)artifactIntegrityStatus="RECORDED_HASH_INVALID";
   else if(pendingRecord)artifactIntegrityStatus="STORAGE_REFERENCE_MISSING";
   const archivePending={metadataPresent:Boolean(pendingRecord),storageReferencePresent:Boolean(pendingRecord?.storageId),recordedHashPresent:/^[a-f0-9]{64}$/.test(pendingHash),recordedHash:/^[a-f0-9]{64}$/.test(pendingHash)?pendingHash:null,fileName:pendingFileName,createdAt:typeof pendingRecord?.createdAt==="string"?pendingRecord.createdAt:null,environment:pendingRecord?.environment?String(pendingRecord.environment).toUpperCase():null,artifactBytesVerified:artifactIntegrityStatus==="MATCH",artifactIntegrityStatus};
-  if(auditChainStatus==="VERIFIED"){try{await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="PASS").length});}catch{}}
+  if(recordAccess&&auditChainStatus==="VERIFIED"){try{await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="PASS").length});}catch{}}
   return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},finalisationRecord:{latestStage,firstFailedStage,updatedAt:typeof storedFinalisationRecord.updatedAt==="string"?storedFinalisationRecord.updatedAt:null,stages:finalisationStages},stageRecordIntegrity,environmentDiagnostics,archivePending,stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
 }
 export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,email,name,reason}={}){
@@ -223,10 +225,99 @@ export async function buildRecoveryPreview(ctx,user,id){
 }
 
 
+
+const EMERGENCY_COPY_LABEL="EMERGENCY-RETRIEVAL-COPY, NOT ARCHIVED";
+const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency retrieval copy, not archived.";
+const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid);
+async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
+  const pdf=await PDFDocument.load(bytes);
+  const page=pdf.addPage([612,792]);
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  let y=752;
+  const write=(value,size=7.5,useBold=false)=>{
+    const selected=useBold?bold:font;
+    const text=String(value??"");
+    const max=Math.max(30,Math.floor(500/(size*0.55)));
+    for(let offset=0;offset<text.length;offset+=max){
+      if(y<28)throw new Error("EMERGENCY_CERTIFICATE_PAGE_OVERFLOW");
+      page.drawText(text.slice(offset,offset+max),{x:48,y,size,font:selected});
+      y-=size+3;
+    }
+  };
+  write(EMERGENCY_COPY_LABEL,12,true); y-=8;
+  write(EMERGENCY_COPY_DISCLAIMER,9,true);
+  write("Completion timestamp: "+completedAt,8);
+  write("Verified signer names:",8,true);
+  for(const signer of signers)write(signer.name,7.5);
+  write("Verified audit-chain timestamps:",8,true);
+  for(const event of events)if(typeof event.at==="string"&&event.at.trim())write(event.at,6.5);
+  write("Verified audit-chain event hashes:",8,true);
+  for(const event of events)if(typeof event.hash==="string")write(event.hash,5.5);
+  const output=await pdf.save({useObjectStreams:false});
+  return new Uint8Array(output);
+}
+export async function buildEmergencyRetrieval(ctx,user,id){
+  const stages=[];
+  const stage=(stageCode,status,error=null)=>stages.push({stageCode,status,error});
+  const fail=(stageCode,error)=>{stage(stageCode,"fail",String(error?.message||error));return {ok:false,stages};};
+  try{
+    const envelope=await ctx.meta.get("envelopes",id);
+    if(!envelope)throw Object.assign(new Error("Recovery record not found."),{status:404});
+    if(!emergencyOwner(envelope,user))throw Object.assign(new Error("This envelope belongs to another owner."),{status:403});
+    if(envelope.status!=="CompletionFailed")throw Object.assign(new Error("Only failed-completion envelopes are eligible for emergency retrieval."),{status:409});
+    const document=await ctx.meta.get("documents",envelope.documentId);
+    if(!document?.primaryStorageId) return fail("SOURCE_HASH","SOURCE_REFERENCE_MISSING");
+    let source;
+    try{source=await ctx.storage.get(document.primaryStorageId);}catch(error){return fail("SOURCE_HASH",error);}
+    if(!(source instanceof Uint8Array)||!source.length)return fail("SOURCE_HASH","SOURCE_FILE_MISSING");
+    const sourceHash=await sha256Hex(source);
+    const references=[document.sha256,document.hash,envelope.documentHash,envelope.originalHash].filter(value=>typeof value==="string"&&value.trim()).map(value=>value.trim().toLowerCase());
+    if(!references.length||references.some(value=>value!==sourceHash))return fail("SOURCE_HASH","SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING");
+    stage("SOURCE_HASH","pass");
+    if(!await validChain(envelope.events))return fail("AUDIT_CHAIN","AUDIT_CHAIN_FAILED");
+    const events=Array.isArray(envelope.events)?envelope.events:[];
+    stage("AUDIT_CHAIN","pass");
+    const assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});
+    if(assessment.stampSlots.length===0||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_EVIDENCE","STAMP_EVIDENCE_NOT_FULLY_VERIFIED");
+    stage("STAMP_EVIDENCE","pass");
+    const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
+    const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
+    const signerIds=new Set(fields.map(field=>field.signerId).filter(Boolean));
+    const signers=(envelope.signers||[]).filter(signer=>signerIds.has(signer.id));
+    if(!signers.length)return fail("PDF_BUILD","NO_VERIFIED_SIGNERS");
+    const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
+    const completedAt=completionEvent?.at||"NOT RECORDED";
+    const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,signers,fields,events};
+    const inputCheck=verifyCertificateInput(info,events,signers);
+    if(!inputCheck.ok)return fail("PDF_BUILD","VERIFIED_BUILDER_INPUT_MISMATCH:"+inputCheck.failures.join(","));
+    let built;
+    try{built=await buildSignedPdf(source,info);}catch(error){return fail("PDF_BUILD",error);}
+    stage("PDF_BUILD","pass");
+    let output;
+    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
+    let pageText;
+    try{pageText=await extractLastPdfPageText(output);}catch(error){return fail("CERT_PAGE_VERIFY",error);}
+    const certificate=verifyCertificatePageText(pageText,events,signers);
+    if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL))return fail("CERT_PAGE_VERIFY","CERTIFICATE_PAGE_VERIFICATION_FAILED:"+certificate.failures.join(","));
+    stage("CERT_PAGE_VERIFY","pass");
+    stage("STAMPS_IN_OUTPUT","not-checked","NOT CHECKED: the gateway has no independent PDF image/pixel comparison that can prove each rendered stamp matches its verified source field value.");
+    stage("DETACHED_EVIDENCE","not-checked","NOT CHECKED: no existing detached-evidence export/read contract is defined for this envelope; no evidence was created.");
+    const outputHash=await sha256Hex(output);
+    stage("OUTPUT_SHA256","pass");
+    return {ok:true,bytes:output,outputHash,stages,label:EMERGENCY_COPY_LABEL};
+  }catch(error){
+    const status=Number(error?.status)||500;
+    return {ok:false,status,stages:[...stages,{stageCode:"REQUEST",status:"fail",error:String(error?.message||"EMERGENCY_RETRIEVAL_FAILED")}]};
+  }
+}
+
 export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFirestoreDocument,buildContext,json,corsHeaders}={}) {
   return async function signatureRecoveryRouter(request,env,pathname) {
     if(!pathname.startsWith("/api/recovery/envelopes"))return null;
-    if(request.method!=="GET")return json({ok:false,error:"Recovery evidence endpoints are read-only GET operations."},405,corsHeaders(request));
+    const emergencyPath=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/emergency-retrieval$/);
+    if(emergencyPath&&request.method!=="POST")return json({ok:false,error:"Emergency retrieval requires POST."},405,corsHeaders(request));
+    if(!emergencyPath&&request.method!=="GET")return json({ok:false,error:"Recovery evidence endpoints are read-only GET operations."},405,corsHeaders(request));
     let claims;
     try { claims=await authenticateFirebaseRequest(request,env); }
     catch { return json({ok:false,error:"A valid IRPA sign-in is required."},401,corsHeaders(request)); }
@@ -237,6 +328,11 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     const user={uid,isAdmin};
     const ctx=buildContext(env,claims,user);
     try {
+      if(emergencyPath){
+        const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
+        if(!result.ok)return json({ok:false,stages:result.stages,error:result.stages.at(-1)?.error||"EMERGENCY_RETRIEVAL_FAILED"},result.status||500,corsHeaders(request));
+        return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages)}});
+      }
       if(pathname==="/api/recovery/envelopes") {
         const url=new URL(request.url);
         const limit=url.searchParams.get("limit");
