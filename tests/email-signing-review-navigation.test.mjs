@@ -31,8 +31,8 @@ test("email-link Submit remains visible in review and gated by required fields, 
 });
 
 test("leaving an email signing session never redirects to the IRPA public website or app root", () => {
-  assert.doesNotMatch(page, /window\\.location\\.(?:replace|assign|href)\\s*\\(?["']\\/?["']/);
-  assert.doesNotMatch(page, /href=["']https:\\/\\/irpa\\.or\\.tz/);
+  assert.doesNotMatch(page, /window\\.location\\.(?:replace|assign)/);
+  assert.doesNotMatch(page, /https:\\/\\/irpa\\.or\\.tz/);
   assert.match(page, /setLeftSession\\(true\\);/);
   assert.match(page, /Close this tab/);
   assert.match(page, /window\\.close\\(\\)/);
