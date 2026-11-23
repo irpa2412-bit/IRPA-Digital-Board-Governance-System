@@ -40,12 +40,6 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   }
   const suppliedHash = await sha256Hex(parts[2].toLowerCase());
   const currentHash = String(signer?.tokenHash || "");
-  const knownHashes = [
-    currentHash,
-    ...(Array.isArray(signer?.emailLinkTokenHistory) ? signer.emailLinkTokenHistory.map(item => item?.tokenHash) : []),
-    ...(Array.isArray(signer?.tokenHistory) ? signer.tokenHistory.map(item => item?.tokenHash) : [])
-  ].filter(Boolean).map(String);
-  const matchesKnown = knownHashes.some(hash => safeEqual(suppliedHash, hash));
   const matchesCurrent = Boolean(currentHash) && safeEqual(suppliedHash, currentHash);
   const sessionMatch = Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
 
