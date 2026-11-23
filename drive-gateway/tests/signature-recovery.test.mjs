@@ -490,7 +490,7 @@ test("emergency retrieval returns stage log and SHA-256 without changing envelop
   const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
   assert.ok(stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="PASS"));
   assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="NOT_APPLICABLE"));
-  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="not-checked"));
+  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="NOT_APPLICABLE"));
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,before.events.length);
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
 });
@@ -530,7 +530,7 @@ test("corrupt stamp evidence fails closed and returns no PDF",async()=>{
   const f=await fixture({tamperFieldHash:true});
   const result=await (await import("../src/signatureRecovery.mjs")).buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.ok,false);
-  assert.ok(result.stages.some(stage=>stage.stageCode==="STAMP_EVIDENCE"&&stage.status==="fail"));
+  assert.ok(result.stages.some(stage=>stage.stageCode==="STAMP_LOAD"&&stage.status==="FAILED"));
   assert.equal(result.bytes,undefined);
 });
 
