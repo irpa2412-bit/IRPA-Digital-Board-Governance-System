@@ -123,7 +123,7 @@ test("invalid token failures are rate-limited by token and IP with one neutral r
   const f=await fixture();
   const repeated="ENV-UNKNOWN.S1."+"a".repeat(64);
   let message="";
-  for(let index=0;index<8;index++){
+  for(let index=0;index<40;index++){
     await assert.rejects(()=>openEmailSigning(f.ctx,repeated,"198.51.100.21"),error=>{message=error.message;return error.message===genericEmailSigningFailure();});
   }
   await assert.rejects(()=>openEmailSigning(f.ctx,repeated,"198.51.100.21"),error=>error.message===genericEmailSigningFailure());
