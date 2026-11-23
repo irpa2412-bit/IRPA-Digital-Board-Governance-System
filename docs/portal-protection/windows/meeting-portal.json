@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-23T19:55:00Z",
+  "lastActivityAt": "2026-11-23T19:57:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-authorised 23 November 2026 scope extension: enable every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal, and allow active members and employees to participate in Staff and General meeting categories. Preserve Board voting, quorum, resolutions, formal approvals, signature workflows and restricted meeting access. Includes minimum Firestore production/staging meetingRegistrar rule changes; production rules publication remains behind the separate owner approval gate.",
@@ -14,7 +14,9 @@
     "src/firebase/meetingPolicy.js",
     "firestore.rules",
     "firestore.staging.rules",
-    "tests/meeting-category-firestore-rules.test.cjs"
+    "tests/meeting-category-firestore-rules.test.cjs",
+    "drive-gateway/src/meetingServices.mjs",
+    "drive-gateway/tests/meeting-services-router.test.mjs"
   ],
   "activityLog": [
     {
@@ -31,6 +33,11 @@
       "at": "2026-11-23T19:55:00Z",
       "action": "owner-authorised scope extension — organisation-wide meeting initiation",
       "description": "Owner authorised every active registered member and employee to initiate meetings; active members and staff participate in Staff and General meeting categories. Board voting, quorum and formal approval powers remain restricted. PR #941."
+    },
+    {
+      "at": "2026-11-23T19:57:00Z",
+      "action": "Worker route policy and tests added",
+      "description": "Removed the category-role restriction from meeting initiation while retaining active-register validation; added Worker functional tests for active staff, active members and inactive identities. PR #941."
     }
   ],
   "baseline": {
