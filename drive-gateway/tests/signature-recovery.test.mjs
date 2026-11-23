@@ -328,3 +328,51 @@ test("completed-copy recovery route fails closed for non-owners and hash mismatc
   assert.equal(reads,1);
   assert.equal(writes,0);
 });
+
+
+test("evidence assessment exposes persisted finalisation stages and archive-pending metadata without mutating the envelope",async()=>{
+  const f=await fixture();
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const finalisationRecord={
+    latestStage:"ARCHIVE",
+    firstFailedStage:"ARCHIVE",
+    updatedAt:"2026-11-22T10:00:02.000Z",
+    stages:{
+      PDF_BUILD:{status:"PASS",stageCode:"PDF_BUILD",errorCode:null,errorMessage:null,recordedAt:"2026-11-22T10:00:00.500Z"},
+      HASH:{status:"PASS",stageCode:"HASH",errorCode:null,errorMessage:null,recordedAt:"2026-11-22T10:00:01.000Z"},
+      ARCHIVE:{status:"FAILED",stageCode:"ARCHIVE",errorCode:"STORAGE_WRITE",errorMessage:"Archive write failed for owner@example.test; token Bearer secret-value https://private.example/path",recordedAt:"2026-11-22T10:00:02.000Z"}
+    }
+  };
+  const completion={archivePending:{storageId:"private-storage-reference",path:"private/archive/pending.pdf",finalHash:"a".repeat(64),fileName:"family-session-signed.pdf",createdAt:"2026-11-22T10:00:03.000Z",environment:"TEST"}};
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{finalisationRecord,completion});
+  const envelopeBeforeAssessment=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.finalisationStage,"ARCHIVE");
+  assert.equal(result.finalisationStageCode,"WRITE_ARCHIVE_COPIES");
+  assert.equal(result.finalisationRecord.latestStage,"ARCHIVE");
+  assert.equal(result.finalisationRecord.firstFailedStage,"ARCHIVE");
+  assert.equal(result.finalisationRecord.stages.length,3);
+  assert.equal(result.finalisationRecord.stages[2].errorCode,"STORAGE_WRITE");
+  assert.doesNotMatch(result.finalisationRecord.stages[2].errorMessage,/owner@example\.test|secret-value|private\.example/);
+  assert.equal(result.stageRecordIntegrity.status,"CONSISTENT");
+  assert.equal(result.stageRecordIntegrity.firstFailedStageMeaning,"FIRST_FAILED_ENTRY_IN_STORED_MAP_NOT_PROVEN_CHRONOLOGY");
+  assert.equal(result.archivePending.metadataPresent,true);
+  assert.equal(result.archivePending.storageReferencePresent,true);
+  assert.equal(result.archivePending.recordedHashPresent,true);
+  assert.equal(result.archivePending.recordedHash,"a".repeat(64));
+  assert.equal(result.archivePending.fileName,"family-session-signed.pdf");
+  assert.equal(result.archivePending.artifactBytesVerified,false);
+  assert.equal(JSON.stringify(result).includes("private-storage-reference"),false);
+  assert.equal(JSON.stringify(result).includes("private/archive/pending.pdf"),false);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),envelopeBeforeAssessment);
+});
+
+test("evidence assessment reports absent persisted finalisation and archive-pending metadata distinctly",async()=>{
+  const f=await fixture();
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.finalisationStage,"ARCHIVE");
+  assert.equal(result.stageRecordIntegrity.status,"NOT_PRESENT");
+  assert.equal(result.finalisationRecord.stages.length,0);
+  assert.equal(result.archivePending.metadataPresent,false);
+  assert.equal(result.archivePending.artifactBytesVerified,false);
+});
