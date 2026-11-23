@@ -40,9 +40,11 @@ export async function extractPdfText(pdfBytes) {
 }
 
 export async function extractLastPdfPageText(pdfBytes) {
-  const text = await extractPdfText(pdfBytes);
-  const pages = text.split("\n");
-  return pages.at(-1) || text;
+  const { extractText } = await import("unpdf");
+  const { text } = await extractText(pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes));
+  if (Array.isArray(text)) return text.at(-1) || "";
+  const pages = String(text || "").split("\f");
+  return pages.at(-1) || pages[0] || "";
 }
 
 export function verifyCertificatePageText(pageText, verifiedEvents, verifiedSigners = []) {
