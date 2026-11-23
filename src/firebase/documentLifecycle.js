@@ -24,3 +24,5 @@ export async function downloadLifecycleDocument(documentId,fileId){const result=
 export async function transitionLifecycleDocument(documentId,targetStage,extra={}){return post("/api/document-lifecycle/transition",{documentId,targetStage,...extra});}
 export async function completeLifecycleSignature(documentId,envelopeId){return post("/api/document-lifecycle/signature-complete",{documentId,envelopeId});}
 export async function shareLifecycleDocument(documentId,targetUid){return post("/api/document-lifecycle/share",{documentId,targetUid});}
+
+export async function hideLifecyclePdfFromProfile(documentId){return post("/api/document-lifecycle/profile-hide",{documentId});}
