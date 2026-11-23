@@ -3,6 +3,7 @@ import { canonicalJson, sha256Hex, HttpError } from "./util.mjs";
 import { resendInvitation } from "./signing.mjs";
 import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
+import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function validChain(events){
@@ -200,6 +201,24 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
       if(evidence) {
         const result=await assessRecoveryEvidence(ctx,user,decodeURIComponent(evidence[1]));
         return json(result,200,corsHeaders(request));
+      }
+      const completedCopy=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/completed-copy\.pdf$/);
+      if(completedCopy) {
+        const copy=await buildUnarchivedCompletedCopy(ctx,user,decodeURIComponent(completedCopy[1]));
+        const eat=new Date(copy.generatedAt).toLocaleString("en-GB",{timeZone:"Africa/Dar_es_Salaam",hour12:false});
+        return new Response(copy.bytes,{status:200,headers:{
+          ...corsHeaders(request),
+          "content-type":"application/pdf",
+          "content-disposition":'attachment; filename="unarchived-completed-copy.pdf"',
+          "cache-control":"no-store, private",
+          "pragma":"no-cache",
+          "x-content-type-options":"nosniff",
+          "x-irpa-copy-status":"UNARCHIVED_NOT_COMPLETED",
+          "x-irpa-generated-at-eat":eat,
+          "x-irpa-document-sha256":copy.hash,
+          "x-irpa-recorded-hash-comparison":copy.comparison,
+          "x-irpa-copy-disclaimer":"Unarchived copy generated "+eat+" EAT; SHA-256 "+copy.hash+"; the envelope is not yet Completed"
+        }});
       }
       const preview=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{1,128})\/preview\.pdf$/);
       if(preview) {
