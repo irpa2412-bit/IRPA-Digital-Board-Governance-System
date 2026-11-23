@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";
 import { memoryMeta,memoryStorage } from "../src/adapters.mjs";
 import { canonicalJson,sha256Hex } from "../src/util.mjs";
-import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots,createSignatureRecoveryRouter } from "../src/signatureRecovery.mjs";
+import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots,createSignatureRecoveryRouter,buildEmergencyRetrieval,classifyEmergencyRetrievalError } from "../src/signatureRecovery.mjs";
 
 async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
@@ -434,9 +434,9 @@ test("emergency retrieval returns stage log and SHA-256 without changing envelop
   assert.equal(response.status,200,responseBody);
   assert.match(response.headers.get("x-irpa-output-sha256"),/^[a-f0-9]{64}$/);
   const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
-  assert.ok(stages.some(stage=>stage.stageCode==="CERT_PAGE_VERIFY"&&stage.status==="pass"));
-  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="not-checked"));
-  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="not-checked"));
+  assert.ok(stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="PASS"));
+  assert.ok(stages.some(stage=>stage.stageCode==="STAMP_HASHES"&&stage.status==="PASS"));
+  assert.ok(stages.some(stage=>stage.stageCode==="AUDIT_CHAIN"&&stage.status==="PASS"));
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,before.events.length);
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
 });
@@ -458,4 +458,62 @@ test("repeat emergency retrieval has the same verification result",async()=>{
   assert.equal(second.ok,true);
   assert.deepEqual(first.stages,second.stages);
   assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_PAGE_VERIFY").status,"pass");
+});
+
+test("emergency retrieval maps every public failure step to a sanitised step code",()=>{
+  assert.equal(classifyEmergencyRetrievalError(new Error("source unavailable"),"SOURCE_READ"),"SOURCE_READ");
+  assert.equal(classifyEmergencyRetrievalError(new Error("Invalid PNG image data"),"PDF_BUILD"),"STAMP_LOAD");
+  assert.equal(classifyEmergencyRetrievalError(new Error("A signing field references a missing PDF page."),"PDF_BUILD"),"STAMP_RENDER");
+  assert.equal(classifyEmergencyRetrievalError(new Error("builder failed"),"PDF_BUILD"),"PDF_BUILD");
+  assert.equal(classifyEmergencyRetrievalError(new Error("digest failed"),"HASH"),"HASH");
+  assert.equal(classifyEmergencyRetrievalError(new Error("certificate mismatch"),"CERT_VERIFY"),"CERT_VERIFY");
+  assert.equal(classifyEmergencyRetrievalError(new Error("text extraction failed"),"TEXT_EXTRACT"),"TEXT_EXTRACT");
+  assert.equal(classifyEmergencyRetrievalError(new Error("memory allocation failed"),"PDF_BUILD"),"SIZE_LIMIT");
+  assert.equal(classifyEmergencyRetrievalError(new Error("Worker CPU time limit exceeded"),"PDF_BUILD"),"TIMEOUT");
+  assert.equal(classifyEmergencyRetrievalError(new Error("unexpected failure"),"UNKNOWN"),"UNKNOWN");
+});
+
+test("only certificate text extraction failure may be disclosed as not verified while integrity checks pass",async()=>{
+  const f=await fixture({stampCount:12});
+  f.ctx.recoveryTextExtractor=async()=>{throw new TypeError("Worker PDF text extraction unavailable");};
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,true);
+  assert.equal(result.certificateWarning.step,"TEXT_EXTRACT");
+  assert.equal(result.certificateWarning.errorClass,"TypeError");
+  assert.equal(result.checks.sourceHash,"PASS");
+  assert.equal(result.checks.auditChain,"PASS");
+  assert.equal(result.checks.stampHashes,"PASS");
+  assert.equal(result.checks.pdfHash,"PASS");
+  assert.equal(result.checks.certificatePage,"NOT APPLICABLE");
+  assert.equal(result.label,"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.");
+  assert.equal(await sha256Hex(result.bytes),result.outputHash);
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).status,"CompletionFailed");
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+  assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
+});
+
+test("certificate text mismatch is visible as FAILED and does not hide other verification results",async()=>{
+  const f=await fixture({stampCount:12});
+  f.ctx.recoveryTextExtractor=async()=>"unrelated page text";
+  const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,true);
+  assert.equal(result.checks.certificatePage,"NOT APPLICABLE");
+  assert.ok(result.stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="FAILED"));
+  assert.equal(result.checks.auditChain,"PASS");
+  assert.equal(result.checks.sourceHash,"PASS");
+  assert.equal(result.checks.stampHashes,"PASS");
+  assert.equal(result.checks.pdfHash,"PASS");
+});
+
+test("source read failure refuses emergency PDF with SOURCE_READ sub-code",async()=>{
+  const f=await fixture({stampCount:12});
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  f.ctx.storage.get=async()=>{throw new Error("storage unavailable");};
+  const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,false);
+  assert.equal(result.code,"EMERGENCY_RETRIEVAL_FAILED:SOURCE_READ");
+  assert.equal(result.errorClass,"Error");
+  assert.equal(result.bytes,undefined);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
 });
