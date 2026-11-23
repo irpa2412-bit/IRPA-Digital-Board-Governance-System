@@ -304,7 +304,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     if(!references.length||references.some(value=>value!==sourceHash))return fail("HASH",new Error("SOURCE_HASH_MISMATCH_OR_REFERENCE_MISSING"));
     stage("SOURCE_READ","PASS");
     stage("SOURCE_HASH","PASS");
-    if(!await validChain(envelope.events))return fail("AUDIT_CHAIN",new Error("AUDIT_CHAIN_FAILED"));
+    if(!await validChain(envelope.events)){stage("AUDIT_CHAIN","FAILED","IntegrityError");return fail("UNKNOWN",new Error("AUDIT_CHAIN_FAILED"));}
     const events=Array.isArray(envelope.events)?envelope.events:[];
     stage("AUDIT_CHAIN","PASS");
     let assessment;
@@ -455,7 +455,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     try {
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
-        if(!result.ok)return json({ok:false,code:result.code||"EMERGENCY_RETRIEVAL_FAILED:UNKNOWN",step:result.step||"UNKNOWN",errorClass:result.errorClass||"Error",messageEn:result.messages?.[0]||emergencyStepMessages.UNKNOWN[0],messageSw:result.messages?.[1]||emergencyStepMessages.UNKNOWN[1],stages:result.stages},result.status||500,corsHeaders(request));
+        if(!result.ok){const denied=result.status===403;return json({ok:false,code:denied?"NOT_YOUR_ENVELOPE":result.code||"EMERGENCY_RETRIEVAL_FAILED:UNKNOWN",step:result.step||"UNKNOWN",errorClass:result.errorClass||"Error",messageEn:denied?"This envelope belongs to another owner.":result.messages?.[0]||emergencyStepMessages.UNKNOWN[0],messageSw:denied?"Hati hii ni ya mmiliki mwingine.":result.messages?.[1]||emergencyStepMessages.UNKNOWN[1],stages:result.stages},result.status||500,corsHeaders(request));}
         return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="UNARCHIVED-COPY-CERTIFICATE-NOT-VERIFIED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-label":result.label,"x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages),"x-irpa-copy-warning":result.certificateWarning?result.label:"","x-irpa-copy-checks":JSON.stringify(result.checks),"x-irpa-environments":JSON.stringify({envelope:result.envelopeEnvironment,preservedCopy:result.preservedEnvironment,worker:result.workerEnvironment})}});
       }
       const evidencePdf=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/emergency-evidence-report\.pdf$/);
