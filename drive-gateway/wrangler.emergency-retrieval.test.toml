@@ -1,0 +1,4 @@
+name = "irpa-emergency-retrieval-runtime-test"
+main = "tests/fixtures/emergency-retrieval-runtime-worker.mjs"
+compatibility_date = "2026-09-29"
+workers_dev = true
