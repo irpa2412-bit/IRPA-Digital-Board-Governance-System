@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { SELF_TEST_RUN_LIMIT, SELF_TEST_DOCUMENT_TIMEOUT_MS, SELF_TEST_TOTAL_TIMEOUT_MS, safeGatewayText, validateSelfTestGatewayResponse, takeSelfTestBatch } from "../utils/signatureSelfTestSafety.mjs";
 import { getIdToken } from "firebase/auth";
 import { getGoogleDriveGatewayUrl } from "../firebase/gatewayUrl";
 import { collection as firestoreCollection, doc, getDoc as firestoreGetDoc, getDocs as firestoreGetDocs } from "firebase/firestore";
 import { runSignatureFirestore } from "../firebase/signatureFirestoreDiagnostics.js";
 import { auth, db } from "../firebase/config";
-import { runControlledDocumentDiagnosticBatch } from "../utils/controlledDocumentDiagnosticBatch";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { renderPdfPageToCanvas, describePdfPageError } from "../utils/pdfPageRendering.mjs";
@@ -14,7 +14,8 @@ const collection=(...args)=>runSignatureFirestore({operation:"collection",collec
 const getDoc=ref=>runSignatureFirestore({operation:"getDoc",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDoc(ref));
 const getDocs=ref=>runSignatureFirestore({operation:"getDocs",target:ref,screen:"Signature Pathway Self-Test",userType:"logged-in administrator"},()=>firestoreGetDocs(ref));
 
-async function selfTestGatewayPost(path, payload) {
+
+async function selfTestGatewayPost(path, payload, { signal, kind = "generic" } = {}) {
   const gateway = getGoogleDriveGatewayUrl();
   if (!gateway) throw new Error("Google Drive gateway is not configured.");
   if (!auth.currentUser) throw new Error("Authentication is required.");
@@ -23,30 +24,25 @@ async function selfTestGatewayPost(path, payload) {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(payload),
-    redirect: "error"
+    redirect: "error",
+    signal
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) {
-    const error = new Error(data.error || "Gateway request failed (HTTP " + response.status + ").");
-    error.httpStatus = response.status;
-    throw error;
-  }
-  return data;
+  const data = await response.json().catch(() => null);
+  return validateSelfTestGatewayResponse(data, { kind, httpStatus: response.status });
 }
 
 async function selfTestReconcileDocument(document, options = {}) {
   return selfTestGatewayPost("/api/signature-pathway/reconcile", {
-    ...options,
     documents: [{
       documentId: String(document.documentId || document.id || ""),
       fileId: String(document.fileId || document.driveFileId || document.archiveFileId || document.governanceArchiveFileId || document.sourceFileId || "")
     }]
-  });
+  }, { ...options, kind: "reconcile" });
 }
 
-async function selfTestDownloadControlledDocument(fileId, documentId) {
+async function selfTestDownloadControlledDocument(fileId, documentId, options = {}) {
   if (!fileId || !documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
-  const result = await selfTestGatewayPost("/api/download", { fileId, documentId });
+  const result = await selfTestGatewayPost("/api/download", { fileId, documentId }, { ...options, kind: "download" });
   if (!result.base64) throw new Error("Google Drive returned no controlled document content.");
   const binary = atob(result.base64);
   const bytes = new Uint8Array(binary.length);
@@ -106,7 +102,7 @@ function diagnosticRow(item, result) {
     "PDF page check: " + (result.pdfPageCheck?.status || "NOT RUN"),
     "PDF page count: " + (result.pdfPageCheck?.pageCount ?? "(not parsed)"),
     ...(result.pdfPageCheck?.pages || []).map(page => "Page " + page.pageNumber + ": " + page.textCharacters + " text characters; non-blank pixel ratio " + (page.nonBlankPixelRatio ?? "unavailable") + "; render " + (page.rendered ? "PASS" : "FAIL") + (page.error ? "; error " + page.error.name + ": " + page.error.message : "")),
-    "Last-page check: " + (result.pdfPageCheck?.lastPageFlag || "NOT RUN"),
+    "Page check note: " + (result.pdfPageCheck?.pageCheckNote || result.pdfPageCheck?.lastPageFlag || "NOT RUN"),
     "Drive description.documentId: " + (result.previousDescriptionDocumentId || "(not checked)"),
     "Reason: " + (result.reason || "(no reason returned)")
   ].filter(Boolean).join("\n");
@@ -120,14 +116,17 @@ function diagnosticRow(item, result) {
     }, {
       name: "PDF page check",
       status: result.pdfPageCheck?.status === "PASS" ? "PASS" : "FAIL",
-      reason: result.pdfPageCheck ? "Page count: " + result.pdfPageCheck.pageCount + "\n" + (result.pdfPageCheck.pages || []).map(page => "Page " + page.pageNumber + ": " + page.textCharacters + " text characters; non-blank pixel ratio " + (page.nonBlankPixelRatio ?? "unavailable") + "; " + (page.rendered ? "render PASS" : "render FAIL") + (page.error ? " — " + page.error.name + ": " + page.error.message : "")).join("\n") + "\nLast page: " + result.pdfPageCheck.lastPageFlag : "PDF page check did not complete."
+      reason: result.pdfPageCheck ? "Page count: " + result.pdfPageCheck.pageCount + "\n" + (result.pdfPageCheck.pages || []).map(page => "Page " + page.pageNumber + ": " + page.textCharacters + " text characters; non-blank pixel ratio " + (page.nonBlankPixelRatio ?? "unavailable") + "; " + (page.rendered ? "render PASS" : "render FAIL") + (page.error ? " — " + page.error.name + ": " + page.error.message : "")).join("\n") + "\nPage check note: " + (result.pdfPageCheck.pageCheckNote || result.pdfPageCheck.lastPageFlag || "not available") : "PDF page check did not complete."
     }],
     diagnostic: result
   };
 }
 
-export default function SignaturePathwaySelfTest() {
+function SignaturePathwaySelfTestPanel() {
+  const cancelController = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [documentQueue, setDocumentQueue] = useState([]);
+  const [nextOffset, setNextOffset] = useState(0);
   const [message, setMessage] = useState("Ready. Run the test to inspect registered controlled documents.");
   const [results, setResults] = useState([]);
   const [progress, setProgress] = useState({ completed: 0, total: 0, active: 0 });
@@ -152,12 +151,14 @@ export default function SignaturePathwaySelfTest() {
     const token = await getIdToken(auth.currentUser);
     const response = await fetch(gateway + "/api/signature-pathway/emergency-storage", {
       method: "POST",
-      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "error"
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.ok !== true) throw new Error(data.error || "Emergency-storage discovery request failed (HTTP " + response.status + ").");
-    return data;
+    const data = await response.json().catch(() => null);
+    const validated = validateSelfTestGatewayResponse(data, { httpStatus: response.status });
+    if (validated.ok !== true) throw new Error(safeGatewayText(validated.error, "Emergency-storage discovery request failed."));
+    return validated;
   }
 
   async function findEmergencyStorage() {
@@ -254,76 +255,110 @@ export default function SignaturePathwaySelfTest() {
         cache: "no-store",
         redirect: "error"
       });
-      const data = await response.json().catch(() => ({}));
+      const data = validateSelfTestGatewayResponse(await response.json().catch(() => null), { httpStatus: response.status });
       setDriveHealth({
-        statusClass: String(data.statusClass || (response.ok ? "ok" : "error")),
-        classification: String(data.classification || "unknown")
+        statusClass: safeGatewayText(data.statusClass || "ok", "error"),
+        classification: safeGatewayText(data.classification || "unknown", "unknown")
       });
     } catch {
       setDriveHealth({ statusClass: "error", classification: "gateway_redirect_blocked_or_network_or_authentication" });
     }
   }
 
-  async function reconcile() {
+  async function reconcile({ startNew = false } = {}) {
+    if (busy) return;
+    const controller = new AbortController();
+    cancelController.current = controller;
     setBusy(true);
-    setResults([]);
-    setProgress({ completed: 0, total: 0, active: 0 });
-    setMessage("Read-only diagnostic: discovering document metadata in the browser, then checking one document per authenticated Worker request. Maximum concurrency 3; transient failures retry up to 3 times (4 total attempts). No changes will be made.");
+    setMessage("Read-only diagnostic: one document at a time; maximum 20 documents in this run.");
+    const startedAt = Date.now();
+    const totalTimeout = setTimeout(() => controller.abort(), SELF_TEST_TOTAL_TIMEOUT_MS);
     try {
-      await requireAdministrator();
-      const snapshot = await getDocs(collection(db, "documents"));
-      const rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
+      let rows = documentQueue;
+      if (startNew || !rows.length) {
+        await requireAdministrator();
+        const snapshot = await getDocs(collection(db, "documents"));
+        rows = snapshot.docs.map(item => ({ documentId: item.id, ...item.data() }));
+        setDocumentQueue(rows);
+        setResults(rows.filter(item => classifySelfTestRecord(item) === "NON_FILE_RECORD").map(item => diagnosticRow(item, null)));
+        setNextOffset(0);
+      }
       const documentRows = rows.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD");
-      setProgress({ completed: 0, total: documentRows.length, active: 0 });
-      const diagnostics = await runControlledDocumentDiagnosticBatch(
-        documentRows,
-        async (oneDocument, options) => {
-          const response = await selfTestReconcileDocument(oneDocument[0], options);
-          const item = oneDocument[0];
-          const result = response.results[0];
-          let pdfPageCheck;
-          try {
+      const offset = startNew ? 0 : nextOffset;
+      const batch = takeSelfTestBatch(documentRows, offset, SELF_TEST_RUN_LIMIT);
+      setProgress({ completed: 0, total: batch.length, active: 0 });
+      const diagnostics = [];
+      for (let index = 0; index < batch.length; index += 1) {
+        if (controller.signal.aborted) throw new Error("Diagnostic cancelled.");
+        if (Date.now() - startedAt >= SELF_TEST_TOTAL_TIMEOUT_MS) throw new Error("Diagnostic stopped at the 60-second run limit. Select Run next 20 to continue.");
+        const item = batch[index];
+        setProgress({ completed: index, total: batch.length, active: 1 });
+        const documentController = new AbortController();
+        const abortOnCancel = () => documentController.abort();
+        controller.signal.addEventListener("abort", abortOnCancel, { once: true });
+        const timeout = setTimeout(() => documentController.abort(), SELF_TEST_DOCUMENT_TIMEOUT_MS);
+        let diagnostic;
+        let pdf = null;
+        let pdfLoadingTask = null;
+        let bytes = null;
+        try {
+          const work = (async () => {
+            const response = await selfTestReconcileDocument(item, { signal: documentController.signal });
+            const result = response.results[0];
+            let pdfPageCheck = { status: "FAIL", pageCount: 0, pages: [], pageCheckNote: "PDF check not completed." };
             const fileId = result.fileId || driveFileId(item);
             if (!fileId || !item.documentId) throw new Error("Controlled document file ID or canonical Firestore document ID is missing.");
-            const bytes = await selfTestDownloadControlledDocument(fileId, item.documentId);
-            const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-            const pages = [];
+            bytes = await selfTestDownloadControlledDocument(fileId, item.documentId, { signal: documentController.signal });
+            pdfLoadingTask = pdfjsLib.getDocument({ data: bytes });
+            pdf = await pdfLoadingTask.promise;
+            const canvas = document.createElement("canvas");
             try {
-              for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-                const canvas = document.createElement("canvas");
-                try {
-                  const metrics = await renderPdfPageToCanvas(pdf, pageNumber, canvas, { maxWidth: 640, maxPixels: 2500000 });
-                  pages.push({ pageNumber, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null });
-                } catch (error) {
-                  console.error("Signature Pathway Self-Test PDF page check failed", { documentId: item.documentId, pageNumber, error });
-                  let textCharacters = 0;
-                  try { const page = await pdf.getPage(pageNumber); const content = await page.getTextContent(); textCharacters = (content.items || []).reduce((sum, entry) => sum + String(entry.str || "").length, 0); } catch {}
-                  pages.push({ pageNumber, textCharacters, nonBlankPixelRatio: 0, rendered: false, error: describePdfPageError(error) });
-                } finally { canvas.width = 1; canvas.height = 1; }
-              }
-            } finally { await pdf.destroy(); }
-            const last = pages[pages.length - 1];
-            const lastPageFlag = !last ? "FAIL: no pages parsed" : last.textCharacters === 0 ? "FLAG: last page has zero extractable text" : !last.rendered ? "FLAG: last page failed to render" : "PASS";
-            pdfPageCheck = { status: last && last.textCharacters > 0 && pages.length === pdf.numPages && pages.every(page => page.rendered) ? "PASS" : "FAIL", pageCount: pages.length, pages, lastPageFlag };
-          } catch (error) {
-            console.error("Signature Pathway Self-Test controlled PDF check failed", { documentId: item.documentId, error });
-            pdfPageCheck = { status: "FAIL", pageCount: 0, pages: [], lastPageFlag: "FAIL: " + (error?.name || "Error") + ": " + (error?.message || String(error)), error: describePdfPageError(error) };
-          }
-          return { ...response, results: [{ ...result, pdfPageCheck }] };
-        },
-        { concurrency: 3, maxRetries: 3, onProgress: setProgress }
-      );
-      const documentResults = new Map(documentRows.map((item, index) => [item.documentId, diagnostics[index]]));
-      const output = rows.map(item => diagnosticRow(item, documentResults.get(item.documentId)));
-      setResults(output);
-      const totals = summarizeSelfTestResults(output);
-      const review = output.filter(row => row.classification !== "NON_FILE_RECORD" && row.checks[0]?.status === "NEEDS REVIEW" && !row.checks.some(check => check.status === "FAIL")).length;
-      setMessage("Read-only diagnostics completed. " + documentRows.length + " document(s) checked using exactly one document per Worker request (maximum concurrency 3; up to 3 retries (4 total attempts) per document); " + totals.documentsReadable + " readable, " + totals.documentsUnreadable + " unreadable, " + totals.nonFileRecords + " non-file record(s)" + (review ? "; " + review + " need review" : "") + ". No metadata or document was changed.");
+              const page = await pdf.getPage(1);
+              const metrics = await renderPdfPageToCanvas(pdf, 1, canvas, { maxWidth: 420, maxPixels: 1000000, zoom: 0.65, signal: documentController.signal });
+              pdfPageCheck = { status: metrics.textCharacters > 0 && metrics.nonBlankPixelRatio > 0 ? "PASS" : "FAIL", pageCount: pdf.numPages, pages: [{ pageNumber: 1, textCharacters: metrics.textCharacters, nonBlankPixelRatio: metrics.nonBlankPixelRatio, rendered: true, error: null }], pageCheckNote: "First-page-only check; remaining pages were not rendered." };
+            } finally { canvas.width = 1; canvas.height = 1; }
+            return { ...result, pdfPageCheck };
+          })();
+          const result = await Promise.race([work, new Promise((_, reject) => {
+            documentController.signal.addEventListener("abort", () => reject(new Error("Document diagnostic timed out or was cancelled.")), { once: true });
+          })]);
+          diagnostic = diagnosticRow(item, result);
+        } catch (error) {
+          diagnostic = diagnosticRow(item, { status: "unreadable", reason: safeGatewayText(error?.message, "Diagnostic failed."), pdfPageCheck: { status: "FAIL", pageCount: 0, pages: [], pageCheckNote: safeGatewayText(error?.message, "Diagnostic failed.") } });
+        } finally {
+          clearTimeout(timeout);
+          controller.signal.removeEventListener("abort", abortOnCancel);
+          try {
+            if (pdf) await pdf.destroy();
+            else if (pdfLoadingTask) await pdfLoadingTask.destroy();
+          } catch {}
+          if (bytes) bytes.fill(0);
+          bytes = null;
+          pdf = null;
+          documentController.abort();
+        }
+        diagnostics.push(diagnostic);
+        setResults(previous => [...previous, diagnostic]);
+        setNextOffset(offset + index + 1);
+        setProgress({ completed: index + 1, total: batch.length, active: 0 });
+      }
+      const next = offset + batch.length;
+      setNextOffset(next);
+      setMessage(next < documentRows.length
+        ? "Checked " + next + " of " + documentRows.length + " documents. Select Run next 20 to continue."
+        : "Read-only diagnostics complete. " + documentRows.length + " document(s) checked; no metadata or document was changed.");
     } catch (error) {
-      setMessage("Read-only diagnostic failed: " + (error?.message || "Unknown gateway error. No success is assumed."));
+      setMessage("Read-only diagnostic stopped: " + safeGatewayText(error?.message, "Unknown diagnostic error."));
     } finally {
+      clearTimeout(totalTimeout);
+      cancelController.current = null;
       setBusy(false);
     }
+  }
+
+  function cancelReconcile() {
+    cancelController.current?.abort();
+    setMessage("Cancellation requested. The active document will be released before the run stops.");
   }
 
   return <section className="panel">
@@ -371,15 +406,29 @@ export default function SignaturePathwaySelfTest() {
       <div className="panel" style={{padding:10}}><strong>{summarizeSelfTestResults(results).documentsUnreadable}</strong><div className="muted" style={{fontSize:12}}>Documents unreadable</div></div>
       <div className="panel" style={{padding:10}}><strong>{summarizeSelfTestResults(results).nonFileRecords}</strong><div className="muted" style={{fontSize:12}}>Non-file records</div></div>
     </div>
-    {progress.total > 0 && <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:13,marginBottom:5}}><strong>Document checks</strong><span>{progress.completed} / {progress.total} · {progress.active} active (max 3)</span></div><div role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.completed} style={{height:10,borderRadius:99,overflow:"hidden",background:"var(--border)"}}><div style={{height:"100%",width:(progress.total ? progress.completed / progress.total * 100 : 0)+"%",background:"var(--accent,#2563eb)",transition:"width .2s"}} /></div></div>}
+    {progress.total > 0 && <div style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:13,marginBottom:5}}><strong>Document checks</strong><span>{progress.completed} / {progress.total} · {progress.active} active (sequential)</span></div><div role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.completed} style={{height:10,borderRadius:99,overflow:"hidden",background:"var(--border)"}}><div style={{height:"100%",width:(progress.total ? progress.completed / progress.total * 100 : 0)+"%",background:"var(--accent,#2563eb)",transition:"width .2s"}} /></div></div>}
     <div className="auth-message" role="status" aria-live="polite" style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginBottom:12}}>{message}</div>
-    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={() => reconcile()} disabled={busy}>{busy ? "Working…" : "Run Self-Test & Drive Diagnostics"}</button><button type="button" className="secondary-button" onClick={() => { const report = results.map(row => [row.title || row.documentId, "Firestore ID: " + row.documentId, ...row.checks.map(check => check.status + ": " + check.name + "\n" + check.reason)].join("\n")).join("\n\n"); navigator.clipboard.writeText(report).then(() => setMessage("Full diagnostic report copied to clipboard.")).catch(error => setMessage("Copy failed: " + (error?.message || "Clipboard access unavailable."))); }} disabled={!results.length}>Copy report</button></div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}><button type="button" onClick={() => reconcile({ startNew: true })} disabled={busy}>{busy ? "Working…" : "Run Self-Test"}</button><button type="button" className="secondary-button" onClick={() => reconcile()} disabled={busy || !documentQueue.length || nextOffset >= documentQueue.filter(item => classifySelfTestRecord(item) !== "NON_FILE_RECORD").length}>Run next 20</button><button type="button" className="secondary-button" onClick={cancelReconcile} disabled={!busy}>Cancel</button><button type="button" className="secondary-button" onClick={() => { const report = results.map(row => [row.title || row.documentId, "Firestore ID: " + row.documentId, ...row.checks.map(check => check.status + ": " + check.name + "\n" + check.reason)].join("\n")).join("\n\n"); navigator.clipboard.writeText(report).then(() => setMessage("Full diagnostic report copied to clipboard.")).catch(error => setMessage("Copy failed: " + (error?.message || "Clipboard access unavailable."))); }} disabled={!results.length}>Copy report</button></div>
     {results.map((row,index)=><article key={row.documentId + "-" + index} className="panel" style={{marginBottom:10,padding:12}}>
       <strong style={{display:"block",overflowWrap:"anywhere"}}>{row.title || row.documentId}</strong><small style={{display:"block",overflowWrap:"anywhere"}}>Firestore ID: {row.documentId}</small>
       {row.classification === "NON_FILE_RECORD" ? <div style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8,color:"var(--muted)"}}><strong>NOT A DOCUMENT</strong><div style={{fontSize:13,marginTop:3}}>Edit record (no file)</div></div> : row.checks.map((check,i)=><div key={check.name + i} style={{borderTop:"1px solid var(--border)",paddingTop:8,marginTop:8}}>
         <strong>{check.status}: {check.name}</strong><div style={{fontSize:13,whiteSpace:"pre-wrap",overflowWrap:"anywhere",marginTop:3}}>{check.reason}</div>
       </div>)}
     </article>)}
-    {!results.length && <p className="muted">No results yet. Tap Run Self-Test & Drive Diagnostics to inspect each registered document and its exact failure reason.</p>}
+    {!results.length && <p className="muted">No results yet. Run the self-test to inspect up to 20 documents per run.</p>}
   </section>;
+}
+
+
+class SignaturePathwaySelfTestBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    if (this.state.failed) return <section className="panel" role="alert"><h2>Signature self-test unavailable</h2><p>The diagnostic panel encountered an error. The rest of the Signature Portal remains available. Reload the panel before running another diagnostic.</p><button type="button" onClick={() => this.setState({ failed: false })}>Retry self-test panel</button></section>;
+    return this.props.children;
+  }
+}
+
+export default function SignaturePathwaySelfTest() {
+  return <SignaturePathwaySelfTestBoundary><SignaturePathwaySelfTestPanel /></SignaturePathwaySelfTestBoundary>;
 }

@@ -14,6 +14,14 @@ import "./styles/mobile-app-enhancement.css";
 import "./styles/page-back-next-navigation.css";
 import "./styles/grant-intelligence-layout.css";
 
+// Diagnostic output is intentionally ephemeral and must never survive a workspace restart.
+for (const storageName of ["sessionStorage", "localStorage"]) {
+  try {
+    const storage = window[storageName];
+    for (const key of ["irpaSignatureSelfTestResults", "signaturePathwaySelfTestResults", "irpaSelfTestResults"]) storage.removeItem(key);
+  } catch { /* Storage may be unavailable in restricted browser contexts. */ }
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     const hadController = Boolean(navigator.serviceWorker.controller);
