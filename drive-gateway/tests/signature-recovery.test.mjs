@@ -272,7 +272,7 @@ test("recovery evidence router refuses non-GET methods before authentication or 
 test("completed-copy recovery route is authenticated and serves only the exact preserved hash-matched PDF",async()=>{
   const bytes=new TextEncoder().encode("%PDF-1.7\\nexisting archive-pending PDF\\n%%EOF");
   const hash=await sha256Hex(bytes);
-  const envelope={id:"ENV-REC-COPY",createdBy:"owner-copy",status:"CompletionFailed",dataEnvironment:"TEST",completion:{archivePending:{storageId:"pending-copy",finalHash:hash,fileName:"preserved.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
+  const envelope={id:"ENV-REC-COPY",createdBy:"owner-copy",status:"CompletionFailed",dataEnvironment:"TEST",completion:{finalHash:hash,archivePending:{storageId:"pending-copy",finalHash:hash,fileName:"preserved.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
   let reads=0,writes=0,authCalls=0;
   const ctx={
     env:{IRPA_ENVIRONMENT:"test"},
@@ -317,7 +317,7 @@ test("completed-copy recovery route rejects unauthenticated callers before build
 test("completed-copy recovery route fails closed for non-owners and hash mismatches without writes",async()=>{
   const bytes=new TextEncoder().encode("%PDF-1.7\\npreserved bytes\\n%%EOF");
   const hash=await sha256Hex(bytes);
-  const envelope={id:"ENV-REC-COPY",createdBy:"actual-owner",status:"CompletionFailed",dataEnvironment:"TEST",completion:{archivePending:{storageId:"pending-copy",finalHash:hash,createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
+  const envelope={id:"ENV-REC-COPY",createdBy:"actual-owner",status:"CompletionFailed",dataEnvironment:"TEST",completion:{finalHash:hash,archivePending:{storageId:"pending-copy",finalHash:hash,createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
   let reads=0,writes=0,caller="intruder",corrupt=false;
   const ctx={env:{IRPA_ENVIRONMENT:"test"},meta:{async get(){return structuredClone(envelope);},async update(){writes++;throw Error("writes forbidden");},async create(){writes++;throw Error("writes forbidden");}},storage:{async get(){reads++;return corrupt?new TextEncoder().encode("wrong"):new Uint8Array(bytes);},async put(){writes++;throw Error("writes forbidden");},async delete(){writes++;throw Error("writes forbidden");}},now:()=>new Date("2026-11-23T06:01:00.000Z")};
   const router=createSignatureRecoveryRouter({authenticateFirebaseRequest:async()=>({user_id:caller,token:"test-token"}),getFirestoreDocument:async()=>null,buildContext:()=>ctx,json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),corsHeaders:()=>({})});
@@ -405,6 +405,31 @@ test("evidence assessment classifies legacy production environment without accep
   assert.equal(result.archivePending.artifactIntegrityStatus,"MISSING");
 });
 
+
+test("completed-copy route falls back to the same read-only emergency builder when preserved environment differs",async()=>{
+  const f=await fixture({stampCount:12});
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  envelope.completion={archivePending:{storageId:"pending-from-other-env",finalHash:"a".repeat(64),environment:"ACTUAL"}};
+  await f.ctx.meta.update("envelopes","ENV-REC-1",envelope);
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const path="/api/recovery/envelopes/ENV-REC-1/completed-copy.pdf";
+  const response=await router(new Request("https://gateway.test"+path),{},path);
+  assert.equal(response.status,200);
+  assert.equal(response.headers.get("x-irpa-copy-source"),"emergency-build");
+  assert.equal(response.headers.get("x-irpa-copy-label"),"Unarchived copy; the envelope is not yet Completed");
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  const hash=await sha256Hex(bytes);
+  assert.equal(response.headers.get("x-irpa-output-sha256"),hash);
+  assert.ok(bytes.length>0);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+  assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
+});
 
 test("emergency retrieval rejects a non-owner explicitly",async()=>{
   const f=await fixture();
