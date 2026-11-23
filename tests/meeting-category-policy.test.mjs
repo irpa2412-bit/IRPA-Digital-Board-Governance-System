@@ -121,8 +121,8 @@ test("active Meeting Portal attendance screens never call undeployed Firebase at
 
 const meetingCentreSource = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
 test("Meeting Centre exposes initiation to every active member and employee", () => {
-  assert.match(meetingCentreSource, /admin\|\|actorIdentity\.activeMember===true\|\|actorIdentity\.activeEmployee===true/);
-  assert.doesNotMatch(meetingCentreSource, /canRegisterMeeting/);
+  assert.match(meetingCentreSource, /const canRegisterMeeting = identity => canRegisterMeetingByRole\\(identity\\) \\|\\| identity\\.activeMember===true \\|\\| identity\\.activeEmployee===true/);
+  assert.equal((meetingCentreSource.match(/canRegisterMeeting\\(\\{\\.\\.\\.actorIdentity,isAdmin:admin\\}\\)/g) || []).length, 4);
 });
 
 const meetingGatewayContext = {
