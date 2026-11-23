@@ -15,6 +15,6 @@ export function isEsignPath(pathname) {
     /^\/api\/document-lifecycle\/.*$/.test(path) ||
     /^\/api\/auth\/.*$/.test(path) ||
     path === "/api/recovery/envelopes" ||
-    /^\/api\/recovery\/envelopes\/[A-Za-z0-9_-]{3,64}\/(?:evidence|preview\.pdf|completed-copy\.pdf)$/.test(path) ||
+    /^\/api\/recovery\/envelopes\/[A-Za-z0-9_-]{3,64}\/(?:evidence|preview\.pdf|completed-copy\.pdf|emergency-retrieval)$/.test(path) ||
     /^\/api\/recovery\/envelopes\/[A-Za-z0-9_-]{3,64}\/stamps\/reassign$/.test(path);
 }
