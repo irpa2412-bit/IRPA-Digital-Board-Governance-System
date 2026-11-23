@@ -80,7 +80,7 @@ async function listVisibleDocuments(deps, env, claims, identity) {
     const documentId=String(raw.name||"").split("/").pop();
     const data=deps.firestoreDocumentToPlain(raw)||{};
     return {...data,id:documentId,documentId:data.documentId||documentId};
-  }).filter(doc=>canRead(identity,doc).allowed);
+  }).filter(doc=>canRead(identity,doc).allowed && !(clean(doc.ownerUid)===clean(identity.uid)&&doc.ownerProfileHiddenAt));
 }
 
 function archiveFolderPath(category,classification,stage,documentId) {
@@ -264,6 +264,35 @@ export function createDocumentLifecycleRouter(deps) {
         throw error;
       }
       return deps.json({ok:true,documentId,reference,archivePath:archive.archivePath,fileId:uploaded.id,fileName,sha256:hash,status:"WORKING"},201,deps.corsHeaders(request));
+    }
+
+    if(pathname==="/api/document-lifecycle/profile-hide"&&method==="POST"){
+      const data=await request.json();const documentId=cleanId(data.documentId);
+      if(!documentId)return deps.json({ok:false,error:"Document ID is required."},400,deps.corsHeaders(request));
+      const document=await getPlainDocument(deps,env,claims,documentId);
+      if(!document)return deps.json({ok:false,error:"Document registry record was not found."},404,deps.corsHeaders(request));
+      if(clean(document.ownerUid)!==clean(identity.uid))return deps.json({ok:false,error:"Only the authenticated document owner may remove this PDF from their profile."},403,deps.corsHeaders(request));
+      if(document.ownerProfileHiddenAt)return deps.json({ok:false,error:"This PDF has already been removed from the owner's profile."},409,deps.corsHeaders(request));
+      const isPdf=clean(document.contentType).toLowerCase()==="application/pdf"||clean(document.fileName||document.title).toLowerCase().endsWith(".pdf");
+      if(!isPdf)return deps.json({ok:false,error:"Profile removal is available only for PDF documents."},415,deps.corsHeaders(request));
+      const completedStage=["SIGNED","POST_SIGNATURE","FINAL_ARCHIVE"].includes(clean(document.status).toUpperCase());
+      const archiveCandidates=(completedStage?[document.finalArchiveFileId,document.signedArchiveFileId]:[document.fileId]).map(cleanId).filter((id,index,all)=>id&&all.indexOf(id)===index);
+      if(!archiveCandidates.length)return deps.json({ok:false,error:"No registered archive copy is available; profile removal is blocked."},409,deps.corsHeaders(request));
+      const accessToken=await deps.getDriveAccessToken(env);
+      let verifiedArchive=null;
+      for(const fileId of archiveCandidates){
+        try{
+          const metadata=await deps.driveFetch(env,accessToken,"/drive/v3/files/"+encodeURIComponent(fileId)+"?fields=id,name,mimeType,description,trashed");
+          const description=JSON.parse(metadata.description||"{}");
+          const matches=clean(metadata.id)===fileId&&metadata.trashed!==true&&description.irpaGovernance===true&&clean(description.documentId)===documentId;
+          const pdf=clean(metadata.mimeType).toLowerCase()==="application/pdf"||clean(metadata.name).toLowerCase().endsWith(".pdf");
+          if(matches&&pdf){verifiedArchive={fileId,name:metadata.name||document.fileName||"",mimeType:metadata.mimeType||"application/pdf"};break;}
+        }catch(_error){/* Fail closed unless another registered archive copy verifies. */}
+      }
+      if(!verifiedArchive)return deps.json({ok:false,error:"No matching, retrievable institutional archive PDF could be verified. The profile copy was not removed."},409,deps.corsHeaders(request));
+      const hiddenAt=nowIso();
+      await commitDocumentAndAudit(deps,env,claims,documentId,{ownerProfileHiddenAt:hiddenAt,ownerProfileHiddenByUid:identity.uid,ownerProfileArchiveFileId:verifiedArchive.fileId,updatedAt:hiddenAt},"OWNER_PROFILE_HIDDEN",{sha256:document.sha256||null,archiveFileId:verifiedArchive.fileId,archiveFileName:verifiedArchive.name,documentStatus:document.status||"WORKING",systemRecordPreserved:true,driveFileDeleted:false});
+      return deps.json({ok:true,documentId,profileRemoved:true,systemRecordPreserved:true,archiveFileId:verifiedArchive.fileId,driveFileDeleted:false},200,deps.corsHeaders(request));
     }
 
     if(pathname==="/api/document-lifecycle/download"&&method==="POST"){
