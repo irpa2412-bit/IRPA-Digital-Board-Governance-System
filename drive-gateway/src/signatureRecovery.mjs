@@ -297,15 +297,16 @@ function safeRecoveryErrorClass(error){
 }
 export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLastPdfPageText}={}){
   const stages=[];
-  const stage=(stageCode,status,error=null,failureCode=null)=>{
+  const stage=(stageCode,status,error=null,failureCode=null,substep=null)=>{
     const entry={stageCode,status};
     if(error)entry.errorClass=safeRecoveryErrorClass(error);
     if(failureCode)entry.failureCode=failureCode;
+    if(substep)entry.substep=substep;
     stages.push(entry);
   };
-  const fail=(stageCode,error,forcedCode=null)=>{
+  const fail=(stageCode,error,forcedCode=null,substep=null)=>{
     const failureCode=forcedCode||classifyEmergencyRetrievalFailure(stageCode,error);
-    stage(stageCode,"FAILED",error,failureCode);
+    stage(stageCode,"FAILED",error,failureCode,substep);
     return {ok:false,status:409,stages,failureCode,errorClass:safeRecoveryErrorClass(error)};
   };
   try{
@@ -337,7 +338,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
     const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
     const signers=(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id));
-    if(!signers.length)return fail("PDF_BUILD",new Error("NO_VERIFIED_SIGNERS"));
+    if(!signers.length)return fail("PDF_BUILD",new Error("NO_VERIFIED_SIGNERS"),null,"SIGNED_DOCUMENT_PREPARATION");
     const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
     const completedAt=completionEvent?.at||"NOT RECORDED";
     const info={envelopeId:envelope.id,documentId:envelope.documentId,title:envelope.title||"",originalHash:sourceHash,chainHead:events.at(-1)?.hash||"GENESIS",completedAt,signers,fields,events};
@@ -345,12 +346,12 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     try{inputCheck=verifyCertificateInput(info,events,signers);}catch(error){return fail("CERT_VERIFY",error);}
     if(!inputCheck.ok)return fail("CERT_VERIFY",new Error("VERIFIED_BUILDER_INPUT_MISMATCH"));
     let built;
-    try{built=await buildSignedPdf(source,info);}catch(error){return fail("PDF_BUILD",error);}
+    try{built=await buildSignedPdf(source,info);}catch(error){return fail("PDF_BUILD",error,null,"SIGNED_DOCUMENT_COMPOSITION");}
     if(!(built instanceof Uint8Array)||built.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("PDF_BUILD","PASS");
     stage("STAMP_RENDER","PASS");
     let output;
-    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
+    try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error,null,"CERTIFICATE_PAGE_APPEND");}
     if(!(output instanceof Uint8Array)||output.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("SIZE_LIMIT","PASS");
     let certificateVerified=true,pageText=null;
