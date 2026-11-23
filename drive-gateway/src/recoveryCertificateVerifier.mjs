@@ -31,13 +31,18 @@ export function verifyCertificateInput(info, verifiedEvents, verifiedSigners = [
   return { ok: failures.length === 0, failures: [...new Set(failures)] };
 }
 
-export async function extractLastPdfPageText(pdfBytes) {
-  // Load the serverless PDF.js build only when the emergency route reaches certificate verification.
+export async function extractPdfText(pdfBytes) {
+  // Certificate evidence may span multiple continuation pages; verify the full PDF text.
   const { extractText } = await import("unpdf");
   const { text } = await extractText(pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes));
-  if (Array.isArray(text)) return text.at(-1) || "";
-  const pages = String(text || "").split("\f");
-  return pages.at(-1) || pages[0] || "";
+  if (Array.isArray(text)) return text.join("\n");
+  return String(text || "").replace(/\f/g, "\n");
+}
+
+export async function extractLastPdfPageText(pdfBytes) {
+  const text = await extractPdfText(pdfBytes);
+  const pages = text.split("\n");
+  return pages.at(-1) || text;
 }
 
 export function verifyCertificatePageText(pageText, verifiedEvents, verifiedSigners = []) {
