@@ -29,7 +29,7 @@ test("legacy expired marker does not invalidate the current original invitation"
  assert.equal(result.ok,true);
 });
 
-test("completed envelope clears the original invitation link",async()=>{
+test("completed envelope restricts the original invitation to read-only access",async()=>{
  const {issued,envelope,signer}=await fixture({status:"opened",envelopeStatus:"Completed",signerStatus:"Signed"});
  const result=await inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future});
  assert.equal(result.ok,true);
