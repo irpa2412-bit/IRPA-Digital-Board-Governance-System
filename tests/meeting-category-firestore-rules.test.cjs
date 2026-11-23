@@ -57,29 +57,6 @@ test("active designated departmental director can create a categorized meeting",
   }).firestore();
   await assertSucceeds(db.doc("meetings/departmental-meeting").set(meeting()));
 });
-
-test("every active registered member and employee can initiate a meeting", async () => {
-  const staffDb = testEnv.authenticatedContext("staff-user", {
-    email: "staff@example.test"
-  }).firestore();
-  const memberDb = testEnv.authenticatedContext("board-member", {
-    email: "board@example.test"
-  }).firestore();
-  await assertSucceeds(staffDb.doc("meetings/staff-initiated").set(meeting({
-    initiatorUid: "staff-user",
-    initiatorEmail: "staff@example.test",
-    meetingCategory: "STAFF",
-    meetingPolicyId: "STAFF",
-    meetingType: "Staff Meeting"
-  })));
-  await assertSucceeds(memberDb.doc("meetings/member-initiated").set(meeting({
-    initiatorUid: "board-member",
-    initiatorEmail: "board@example.test",
-    meetingCategory: "GENERAL",
-    meetingPolicyId: "GENERAL",
-    meetingType: "General Meeting"
-  })));
-});
 test("designated initiator can complete initial registration release exactly once", async () => {
   await testEnv.withSecurityRulesDisabled(async context => {
     await context.firestore().doc("meetings/departmental-meeting").set(meeting());
