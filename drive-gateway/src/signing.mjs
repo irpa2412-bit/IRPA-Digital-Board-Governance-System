@@ -332,27 +332,27 @@ export async function openEmailSigning(ctx,token,ip=""){
     const loaded=await load(ctx,token);
     if(loaded.signer.identityType!=="email-link")throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env,loaded.signer);
-    if(loaded.tokenKind==="session"){const preview=await openSigning(ctx,token,null);return {...preview,sessionToken:token,sessionExpiresAt:loaded.session?.expiresAt||loaded.signer.emailLinkSessionExpiresAt};}
+    if(loaded.tokenKind==="session"){const preview=await openSigning(ctx,token,null);return {...preview,sessionToken:token,sessionExpiresAt:null};}
     stage="SESSION_CREATE";
-    const freshSession=loaded.env.emailSigningModule==="v2"
-      ?createFreshSigningSession({envelopeId:loaded.env.id,signerId:loaded.signer.id,now,linkExpiresAt:null})
-      :null;
-    const sessionSecret=freshSession?.secret||randomHex(32),sessionToken=freshSession?.token||loaded.env.id+"."+loaded.signer.id+"."+sessionSecret;
-    const sessionHash=await sha256Hex(sessionSecret);
-    const sessionExpiresAt=freshSession?.expiresAt||new Date(now.getTime()+30*60*1000).toISOString();
+    // All email-link envelopes use reusable invitation-scoped access. A new
+    // browser gets its own token, but no device token expires by elapsed time.
+    const freshSession=createFreshSigningSession({envelopeId:loaded.env.id,signerId:loaded.signer.id});
+    const sessionToken=freshSession.token;
+    const sessionHash=await sha256Hex(freshSession.secret);
+    const sessionExpiresAt=null;
     await mutate(ctx,loaded.env.id,async current=>{
       const signer=current.signers.find(item=>item.id===loaded.signer.id);
       if(!signer||signer.identityType!=="email-link"||!["issued","opened","expired"].includes(signer.emailLinkStatus)||!safeEqual(String(signer.tokenHash||""),await sha256Hex(parts[2])))throw new HttpError(409,"The invitation changed before the signing session could be opened.");
       const existingSessions=Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[];
       const legacyHash=String(signer.emailLinkSessionHash||"");
       const legacyExpiry=String(signer.emailLinkSessionExpiresAt||"");
-      const legacySession=legacyHash&&signer.emailLinkSessionStatus==="active"&&Date.parse(legacyExpiry)>now.getTime()&&!existingSessions.some(session=>safeEqual(String(session?.tokenHash||""),legacyHash))
-        ?[{tokenHash:legacyHash,status:"active",createdAt:signer.emailLinkSessionCreatedAt||now.toISOString(),expiresAt:legacyExpiry,ipHash:null}]
+      const legacySession=legacyHash&&signer.emailLinkSessionStatus==="active"&&!existingSessions.some(session=>safeEqual(String(session?.tokenHash||""),legacyHash))
+        ?[{tokenHash:legacyHash,status:"active",createdAt:signer.emailLinkSessionCreatedAt||now.toISOString(),expiresAt:null,ipHash:null}]
         :[];
       const retainedSessions=[...existingSessions,...legacySession]
-        .filter(session=>session?.status==="active"&&Date.parse(String(session.expiresAt||""))>now.getTime());
-      // Do not replace another browser's still-valid session, including a legacy
-      // single-session record created before this multi-session repair was deployed.
+        .filter(session=>session?.status==="active"&&(!session.expiresAt||!Number.isFinite(Date.parse(String(session.expiresAt)))||Date.parse(String(session.expiresAt))>now.getTime()));
+      // Never replace another browser's active session. All sessions remain
+      // usable until the signer submits or the invitation is revoked/replaced.
       signer.emailLinkSessions=[...retainedSessions,{tokenHash:sessionHash,status:"active",createdAt:now.toISOString(),expiresAt:sessionExpiresAt,ipHash}];
       signer.emailLinkSessionHash=sessionHash;
       signer.emailLinkSessionStatus="active";
