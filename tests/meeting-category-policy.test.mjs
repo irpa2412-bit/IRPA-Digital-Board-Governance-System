@@ -30,10 +30,12 @@ test("governance category allows authorised board roles and administrators", () 
   assert.equal(canAccessMeetingCategory(governance, { uid: "admin-1", isAdmin: true }), true);
 });
 
-test("general meetings allow active institutional members and employees", () => {
-  const general = { meetingCategory: "GENERAL", meetingPolicyId: "GENERAL" };
-  assert.equal(canAccessMeetingCategory(general, { active: true, activeMember: true }), true);
-  assert.equal(canAccessMeetingCategory(general, { active: true, activeEmployee: true }), true);
+test("staff and general meetings are accessible to all active registered members and employees", () => {
+  for (const category of ["GENERAL", "STAFF"]) {
+    const meeting = { meetingCategory: category, meetingPolicyId: category };
+    assert.equal(canAccessMeetingCategory(meeting, { active: true, activeMember: true }), true);
+    assert.equal(canAccessMeetingCategory(meeting, { active: true, activeEmployee: true }), true);
+  }
 });
 
 test("explicitly invited participants can access their meeting regardless of institutional role", () => {
@@ -42,10 +44,11 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("meeting registration requires an active designated institutional role", () => {
-  assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
-  assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
-  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
+test("every active registered member and employee may initiate a meeting", () => {
+  assert.equal(canRegisterMeeting({ active: true, activeMember: true, role: "Member" }), true);
+  assert.equal(canRegisterMeeting({ active: true, activeEmployee: true, role: "Staff" }), true);
+  assert.equal(canRegisterMeeting({ active: true, role: "Unregistered visitor" }), false);
+  assert.equal(canRegisterMeeting({ active: false, activeMember: true, role: "Member" }), false);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
 });
 
