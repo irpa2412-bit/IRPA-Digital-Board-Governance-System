@@ -630,10 +630,10 @@ test("parallel signing supports more than ten signers and makes every signer eli
   }
 });
 
-test("the twelfth parallel signer to sign completes the envelope and triggers one final distribution pass",async()=>{
+test("the sixteenth parallel signer to sign completes the envelope and triggers one final distribution pass",async()=>{
   const f=await fixture(),sent=[];
   f.ctx.sendInvitation=async message=>sent.push(message);
-  const positions=Array.from({length:12},(_,index)=>index+1);
+  const positions=Array.from({length:16},(_,index)=>index+1);
   const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
     documentId:f.envelope.documentId,externalReference:"IRPA-D-PARALLEL-COMPLETE-"+Math.random().toString(16).slice(2,10),
     archives:["board-governance"],signingMode:"Parallel",
