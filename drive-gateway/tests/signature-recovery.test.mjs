@@ -376,3 +376,28 @@ test("evidence assessment reports absent persisted finalisation and archive-pend
   assert.equal(result.archivePending.metadataPresent,false);
   assert.equal(result.archivePending.artifactBytesVerified,false);
 });
+
+
+test("evidence assessment reports sanitised environment agreement and verifies preserved archive bytes without envelope mutation",async()=>{
+  const f=await fixture();
+  const preserved=new TextEncoder().encode("%PDF-1.7\\npreserved signed artifact\\n%%EOF");
+  const stored=await f.ctx.storage.put({path:"private/pending.pdf",bytes:preserved,contentType:"application/pdf",metadata:{}});
+  const hash=await sha256Hex(preserved);
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{completion:{archivePending:{storageId:stored.id,finalHash:hash,environment:"TEST",fileName:"preserved.pdf"}}});
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.deepEqual(result.environmentDiagnostics,{envelope:"TEST",preservedCopy:"TEST",gatewayExpected:"TEST",allMatch:true});
+  assert.equal(result.archivePending.artifactBytesVerified,true);
+  assert.equal(result.archivePending.artifactIntegrityStatus,"MATCH");
+  assert.equal(JSON.stringify(result).includes(stored.id),false);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+});
+
+test("evidence assessment classifies legacy production environment without accepting it as canonical",async()=>{
+  const f=await fixture();
+  const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  await f.ctx.meta.update("envelopes","ENV-REC-1",{dataEnvironment:"PRODUCTION",completion:{archivePending:{storageId:"missing-pending",finalHash:"a".repeat(64),environment:"PRODUCTION"}}});
+  const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
+  assert.deepEqual(result.environmentDiagnostics,{envelope:"LEGACY_PRODUCTION",preservedCopy:"LEGACY_PRODUCTION",gatewayExpected:"TEST",allMatch:false});
+  assert.equal(result.archivePending.artifactIntegrityStatus,"MISSING");
+});
