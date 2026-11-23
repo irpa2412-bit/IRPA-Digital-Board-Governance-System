@@ -83,7 +83,7 @@ async function load(ctx,t){
   if(!e||!signer)throw new HttpError(401,"Invalid signing link.");
   if(e.emailSigningModule==="v2"&&signer.identityType==="email-link"){
     const inspected=await inspectEmailSigningLink({token:t,envelope:e,signer,now:ctx.now()});
-    return{env:e,signer,tokenKind:inspected.tokenKind};
+    return{env:e,signer,tokenKind:inspected.tokenKind,session:inspected.sessionRecord||null};
   }
   const suppliedHash=await sha256Hex(secret),invitationMatch=safeEqual(suppliedHash,String(signer.tokenHash||"")),sessionMatch=Boolean(signer.emailLinkSessionHash)&&safeEqual(suppliedHash,String(signer.emailLinkSessionHash));
   if(!invitationMatch&&!sessionMatch){
@@ -102,7 +102,7 @@ function active(ctx,e,s=null){if(["Voided","Declined","Cancelled","Canceled"].in
 const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
-  if(signer?.identityType==="email-link") return signer.emailLinkSessionStatus==="active"||signer.emailLinkSessionStatus==="used"||signer.emailLinkStatus==="opened";
+  if(signer?.identityType==="email-link") return signer.emailLinkSessionStatus==="active"||signer.emailLinkSessionStatus==="used"||signer.emailLinkStatus==="opened"||(Array.isArray(signer.emailLinkSessions)&&signer.emailLinkSessions.some(session=>["active","used"].includes(session?.status)));
   if(!signer?.uid) return false;
   return Boolean(user?.uid)&&user.uid===signer.uid;
 }
@@ -320,12 +320,14 @@ export async function openEmailSigning(ctx,token,ip=""){
   try{
     parts=tokenParts(token);
     const tokenHash=await sha256Hex(parts[2]);
-    await consumeEmailLinkRateLimit(ctx,"token:"+tokenHash,8,now);
+    // Forwarded invitations are intentionally reusable across recipient devices.
+    // Keep abuse protection, but do not exhaust the shared bearer link after a few retries.
+    await consumeEmailLinkRateLimit(ctx,"token:"+tokenHash,40,now);
     await consumeEmailLinkRateLimit(ctx,"ip:"+ipHash,20,now);
     const loaded=await load(ctx,token);
     if(loaded.signer.identityType!=="email-link")throw new HttpError(401,genericEmailSigningFailure());
     active(ctx,loaded.env,loaded.signer);
-    if(loaded.tokenKind==="session"){const preview=await openSigning(ctx,token,null);return {...preview,sessionToken:token,sessionExpiresAt:loaded.signer.emailLinkSessionExpiresAt};}
+    if(loaded.tokenKind==="session"){const preview=await openSigning(ctx,token,null);return {...preview,sessionToken:token,sessionExpiresAt:loaded.session?.expiresAt||loaded.signer.emailLinkSessionExpiresAt};}
     stage="SESSION_CREATE";
     const freshSession=loaded.env.emailSigningModule==="v2"
       ?createFreshSigningSession({envelopeId:loaded.env.id,signerId:loaded.signer.id,now,linkExpiresAt:null})
@@ -336,17 +338,22 @@ export async function openEmailSigning(ctx,token,ip=""){
     await mutate(ctx,loaded.env.id,async current=>{
       const signer=current.signers.find(item=>item.id===loaded.signer.id);
       if(!signer||signer.identityType!=="email-link"||!["issued","opened","expired"].includes(signer.emailLinkStatus)||!safeEqual(String(signer.tokenHash||""),await sha256Hex(parts[2])))throw new HttpError(409,"The invitation changed before the signing session could be opened.");
+      const retainedSessions=(Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[])
+        .filter(session=>session?.status==="active"&&Date.parse(String(session.expiresAt||""))>now.getTime());
+      // Do not replace another browser's still-valid session. Each browser receives
+      // an independent bearer session, all scoped to this same signer assignment.
+      signer.emailLinkSessions=[...retainedSessions,{tokenHash:sessionHash,status:"active",createdAt:now.toISOString(),expiresAt:sessionExpiresAt,ipHash}];
       signer.emailLinkSessionHash=sessionHash;
       signer.emailLinkSessionStatus="active";
       signer.emailLinkSessionCreatedAt=now.toISOString();
       signer.emailLinkSessionExpiresAt=sessionExpiresAt;
-      return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.session_created",signerId:signer.id,at:now.toISOString(),ipHash,sessionTokenHash:sessionHash,invitationTokenConsumed:false})}};
+      return {patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.session_created",signerId:signer.id,at:now.toISOString(),ipHash,sessionTokenHash:sessionHash,activeSessionCount:signer.emailLinkSessions.length,invitationTokenConsumed:false})}};
     });
     await recordEmailLinkStage(ctx,loaded.env.id,loaded.signer.id,"SESSION_CREATE","success");
     const preview=await openSigning(ctx,sessionToken,null);
     return {...preview,sessionToken,sessionExpiresAt};
   }catch(error){
-    if(error?.status===410&&error?.message!=="This link was replaced. Please use the newest email."&&parts?.length===3){try{const snapshot=await ctx.meta.get("envelopes",parts[0]),suppliedHash=await sha256Hex(parts[2]);if(snapshot){const sessionExpired=Boolean(snapshot.signers.find(item=>item.id===parts[1])?.emailLinkSessionHash)&&safeEqual(suppliedHash,String(snapshot.signers.find(item=>item.id===parts[1])?.emailLinkSessionHash||""));await mutate(ctx,parts[0],async current=>{const signer=current.signers.find(item=>item.id===parts[1]);if(!signer)return{patch:null};const at=now.toISOString();if(sessionExpired){signer.emailLinkSessionStatus="expired";signer.emailLinkSessionHash=null;return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.session_expired",signerId:signer.id,at})}};}if(signer.emailLinkStatus!=="issued")return{patch:null};signer.emailLinkStatus="expired";signer.emailLinkSessionStatus="expired";signer.emailLinkSessionHash=null;signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"expired",expiredAt:at}].slice(-20);return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.expired",signerId:signer.id,at})}};});}}catch(auditError){ctx.logger?.error?.("EMAIL_LINK_EXPIRY_AUDIT_FAILED",{stage,errorType:String(auditError?.name||"Error")});}}
+    if(error?.status===410&&parts?.length===3){try{const suppliedHash=await sha256Hex(parts[2]);await mutate(ctx,parts[0],async current=>{const signer=current.signers.find(item=>item.id===parts[1]);if(!signer)return{patch:null};const sessions=Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[];const matching=sessions.find(session=>session?.tokenHash&&safeEqual(suppliedHash,String(session.tokenHash)));const legacyMatch=Boolean(signer.emailLinkSessionHash)&&safeEqual(suppliedHash,String(signer.emailLinkSessionHash));if(!matching&&!legacyMatch)return{patch:null};const at=now.toISOString();if(matching)signer.emailLinkSessions=sessions.map(session=>session===matching?{...session,status:"expired",expiredAt:at}:session);if(legacyMatch){signer.emailLinkSessionStatus="expired";signer.emailLinkSessionHash=null;}return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.session_expired",signerId:signer.id,at,sessionTokenHash:suppliedHash})}};});}catch(auditError){ctx.logger?.error?.("EMAIL_LINK_EXPIRY_AUDIT_FAILED",{stage,errorType:String(auditError?.name||"Error")});}}
     if(parts?.length===3)await recordEmailLinkStage(ctx,parts[0],parts[1],stage,"failure");
     const replaced=error?.status===410&&error?.message==="This link was replaced. Please use the newest email.";const alreadySigned=error?.status===410&&error?.message===EMAIL_SIGNING_ALREADY_SIGNED;const failure=new HttpError(error?.status===410?410:401,replaced||alreadySigned?error.message:error?.status===410?"This invitation has expired. Ask the document owner to send a new link.":stage==="SESSION_CREATE"?"The signing session could not be opened. Please retry or ask the owner to send a new link.":genericEmailSigningFailure());
     failure.code=stage;
@@ -411,7 +418,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   if(consent!==true)throw new HttpError(400,"Consent to sign electronically is required.");
   if(signatureConfirmed!==true&&Array.isArray(fieldApplications)&&fieldApplications.length>0)throw new HttpError(400,"A signature field cannot be applied without an explicit Confirm action.");
   const sig=signature?.type==="field-applications"&&Array.isArray(fieldApplications)&&fieldApplications.length?await validateSignatureInput({type:"drawn",value:fieldApplications[0]?.value}):await validateSignatureInput(signature),loaded=await load(ctx,token),e0=loaded.env,s0=loaded.signer;
-  if(s0.identityType==="email-link"){const legacyOpenedSession=s0.emailLinkStatus==="opened"&&!s0.emailLinkSessionHash;if(loaded.tokenKind!=="session"||!(s0.emailLinkSessionStatus==="active"||legacyOpenedSession))throw new HttpError(401,"Open the document to sign before submitting. (SESSION_REQUIRED)");}
+  if(s0.identityType==="email-link"){const legacyOpenedSession=s0.emailLinkStatus==="opened"&&!s0.emailLinkSessionHash;const activeSession=loaded.session?.status==="active"||(!loaded.session&&s0.emailLinkSessionStatus==="active")||legacyOpenedSession;if(loaded.tokenKind!=="session"||!activeSession)throw new HttpError(401,"Open the document to sign before submitting. (SESSION_REQUIRED)");}
   else assertSignerAuthentication(s0,user);
   if(!await verifyChain(e0.events))throw new HttpError(409,"Signing audit chain failed verification.");
   if(s0.status==="Signed")return{ok:true,idempotent:true,status:e0.status,completed:e0.status==="Completed"};
@@ -442,7 +449,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
       const assignedToSigner=field.signerId===s.id||(!field.signerId&&s.uid&&field.signerUid===s.uid);
       if(assignedToSigner&&field.type==="Date")signedFieldValues[field.fieldId]=at;
     }
-    if(s.identityType==="email-link"&&cur.emailSigningModule==="v2")Object.assign(s,markEmailSignerSigned(s,at));else s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=signedFieldValues;if(s.identityType==="email-link"){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"used",usedAt:at}].slice(-20);s.emailLinkStatus="used";s.emailLinkSessionStatus="used";s.emailLinkSessionConsumedAt=at;}
+    if(s.identityType==="email-link"&&cur.emailSigningModule==="v2")Object.assign(s,markEmailSignerSigned(s,at));else s.status="Signed";s.signedAt=at;s.signatureType=sig.type;s.signatureValue=sig.value;s.fieldValues=signedFieldValues;if(s.identityType==="email-link"){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"used",usedAt:at}].slice(-20);s.emailLinkStatus="used";s.emailLinkSessionStatus="used";s.emailLinkSessionConsumedAt=at;s.emailLinkSessions=(Array.isArray(s.emailLinkSessions)?s.emailLinkSessions:[]).map(session=>({...session,status:"used",consumedAt:at}));}
     s.signerDeclarations=declared;s.roleAssignmentEvidence=roleAssignmentEvidence;
     if(s.identityType==="email-link")s.signerNameMatch={...signerNameMatch,assignedName:String(s.name||s.declaredParticulars?.name||""),presentedName:declared.name,assessedAt:at};
     s.declarationDiscrepancy={detected:discrepancyFields.length>0,fields:discrepancyFields,ownerDeclared:{...ownerDeclared},signerDeclared:{...declared},detectedAt:at};
@@ -472,7 +479,7 @@ export async function sign(ctx,{token,signature,fieldValues,fieldApplications=[]
   const done=await finalizeEnvelope(ctx,e0.id);
   return done.completed?{ok:true,status:"Completed",completed:true,distribution:done.distribution||null}:{ok:true,status:"CompletionFailed",completed:false};
 }
-export async function declineSigning(ctx,{token,reason,ip,user}){const{env,signer}=await load(ctx,token);active(ctx,env,signer);assertSignerAuthentication(signer,user);await mutate(ctx,env.id,async cur=>{const s=cur.signers.find(x=>x.id===signer.id);if(s.status!=="Pending")throw new HttpError(409,"This envelope can no longer be declined.");const at=ctx.now().toISOString();const emailLink=s.identityType==="email-link";s.status="Declined";if(emailLink){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"revoked_by_signer",revokedAt:at}].slice(-10);s.emailLinkStatus="revoked";s.emailLinkSessionStatus="revoked";s.emailLinkSessionHash=null;}return{patch:{signers:cur.signers,status:"Declined",events:await chainEvents(cur.events,{type:emailLink?"email_link.revoked_by_signer":"signer.declined",signerId:s.id,at,ip:ip||null,reason:cleanText(reason||"",300),identityType:s.identityType||"firebase-uid"})}}});return{ok:true,status:"Declined",revoked:signer.identityType==="email-link"}}
+export async function declineSigning(ctx,{token,reason,ip,user}){const{env,signer}=await load(ctx,token);active(ctx,env,signer);assertSignerAuthentication(signer,user);await mutate(ctx,env.id,async cur=>{const s=cur.signers.find(x=>x.id===signer.id);if(s.status!=="Pending")throw new HttpError(409,"This envelope can no longer be declined.");const at=ctx.now().toISOString();const emailLink=s.identityType==="email-link";s.status="Declined";if(emailLink){s.emailLinkTokenHistory=[...(s.emailLinkTokenHistory||[]),{tokenHash:s.tokenHash,status:"revoked_by_signer",revokedAt:at}].slice(-10);s.emailLinkStatus="revoked";s.emailLinkSessionStatus="revoked";s.emailLinkSessionHash=null;s.emailLinkSessions=(Array.isArray(s.emailLinkSessions)?s.emailLinkSessions:[]).map(session=>({...session,status:"revoked",revokedAt:at}));}return{patch:{signers:cur.signers,status:"Declined",events:await chainEvents(cur.events,{type:emailLink?"email_link.revoked_by_signer":"signer.declined",signerId:s.id,at,ip:ip||null,reason:cleanText(reason||"",300),identityType:s.identityType||"firebase-uid"})}}});return{ok:true,status:"Declined",revoked:signer.identityType==="email-link"}}
 export async function resolveEnvelopeFinalisationEnvironment(ctx,envelope){
  const workerEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
  const workerDefault=workerEnvironment==="staging"?"TRIAL":workerEnvironment==="production"?"ACTUAL":workerEnvironment==="trial"?"TRIAL":workerEnvironment==="actual"?"ACTUAL":workerEnvironment==="test"?"TEST":null;
@@ -491,7 +498,7 @@ export async function finalizeEnvelope(ctx,id){const e=await ctx.meta.get("envel
 const owner=(e,u)=>e.createdBy===u.uid||u.isAdmin===true;
 export async function retryCompletion(ctx,user,id){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");return finalizeEnvelope(ctx,id)}
 export async function retryCompletedDocumentDistribution(ctx,user,id){const envelope=await ctx.meta.get("envelopes",id);if(!envelope||!owner(envelope,user))throw new HttpError(403,"Not authorized.");await resolveEnvelopeFinalisationEnvironment(ctx,envelope);return retryFailedSignatureDistributions(ctx,user,id)}
-export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");for(const signer of c.signers||[])if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="used"){signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);signer.emailLinkStatus="revoked";signer.emailLinkSessionStatus="revoked";signer.emailLinkSessionHash=null;}return{patch:{status:"Voided",signers:c.signers,events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
+export async function voidEnvelope(ctx,user,id,reason){const e=await ctx.meta.get("envelopes",id);if(!e||!owner(e,user))throw new HttpError(403,"Not authorized.");if(e.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");await mutate(ctx,id,async c=>{if(c.status==="Completed")throw new HttpError(409,"A completed envelope cannot be voided.");for(const signer of c.signers||[])if(signer.identityType==="email-link"&&signer.emailLinkStatus!=="used"){signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);signer.emailLinkStatus="revoked";signer.emailLinkSessionStatus="revoked";signer.emailLinkSessionHash=null;signer.emailLinkSessions=(Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[]).map(session=>({...session,status:"revoked",revokedAt:ctx.now().toISOString()}));}return{patch:{status:"Voided",signers:c.signers,events:await chainEvents(c.events,{type:"envelope.voided",at:ctx.now().toISOString(),actor:user.uid,reason:cleanText(reason||"",300)})}}});return{ok:true,status:"Voided"}}
 
 export async function resendInvitation(ctx,user,id,signerId,options={}){
   const envelope=await ctx.meta.get("envelopes",id);
