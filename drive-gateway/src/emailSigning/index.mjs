@@ -8,7 +8,7 @@ export const EMAIL_SIGNING_RESEND_STATUSES = Object.freeze([
 const CLOSED_ENVELOPES = new Set(["Completed", "Voided", "Declined", "Cancelled", "Canceled"]);
 const normalizeEmail = value => String(value || "").trim().toLowerCase();
 
-export async function issueEmailSigningLink({ envelopeId, signerId, email, now = new Date(), expiresAt, secret = randomHex(32) }) {
+export async function issueEmailSigningLink({ envelopeId, signerId, email, now = new Date(), secret = randomHex(32) }) {
   const normalized = normalizeEmail(email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new HttpError(400, "A valid signer email is required.");
   if (!/^[0-9a-f]{64}$/i.test(String(secret))) throw new HttpError(400, "Email signing links require a 256-bit secret.");
@@ -75,7 +75,7 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   }
   return { ok: true, tokenKind, suppliedHash, expiry: Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null };
 }
-export function createFreshSigningSession({ envelopeId, signerId, now = new Date(), linkExpiresAt, durationMinutes = 30 }) {
+export function createFreshSigningSession({ envelopeId, signerId, now = new Date(), durationMinutes = 30 }) {
   const secret = randomHex(32);
   const nowMs = new Date(now).getTime();
   const sessionExpiry = nowMs + durationMinutes * 60000;
