@@ -228,7 +228,7 @@ export async function buildRecoveryPreview(ctx,user,id){
 
 const EMERGENCY_COPY_LABEL="EMERGENCY-RETRIEVAL-COPY, NOT ARCHIVED";
 const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency retrieval copy, not archived.";
-const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid);
+const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   const pdf=await PDFDocument.load(bytes);
   const page=pdf.addPage([612,792]);
@@ -346,7 +346,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
       }
       const completedCopy=pathname.match(/^\/api\/recovery\/envelopes\/([A-Za-z0-9_-]{3,64})\/completed-copy\.pdf$/);
       if(completedCopy) {
-        const copy=await buildUnarchivedCompletedCopy(ctx,user,decodeURIComponent(completedCopy[1]));
+        const copy=await buildUnarchivedCompletedCopy(ctx,user,decodeURIComponent(completedCopy[1]),buildEmergencyRetrieval);
         const eat=new Date(copy.generatedAt).toLocaleString("en-GB",{timeZone:"Africa/Dar_es_Salaam",hour12:false});
         return new Response(copy.bytes,{status:200,headers:{
           ...corsHeaders(request),
@@ -359,6 +359,9 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
           "x-irpa-generated-at-eat":eat,
           "x-irpa-document-sha256":copy.hash,
           "x-irpa-recorded-hash-comparison":copy.comparison,
+          "x-irpa-copy-source":copy.source,
+          "x-irpa-fallback-code":copy.fallbackCode||"",
+          "x-irpa-copy-label":"Unarchived copy; the envelope is not yet Completed",
           "x-irpa-copy-disclaimer":"Unarchived copy generated "+eat+" EAT; SHA-256 "+copy.hash+"; the envelope is not yet Completed"
         }});
       }
