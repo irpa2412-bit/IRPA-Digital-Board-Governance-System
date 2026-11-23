@@ -50,9 +50,9 @@ function invitationFailureDiagnostics(error){
 // it does not claim legal identity verification or read an external mail-provider profile.
 const SIGNER_NAME_TITLES=new Set(["prof","professor","dr","doctor","mr","mrs","ms","miss","sir","madam"]);
 function signerNameTokens(value){
-  return String(value||"").normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase()
-    .replace(/[^a-z0-9]+/g," ").trim().split(/\\s+/).filter(Boolean)
-    .filter(token=>!SIGNER_NAME_TITLES.has(token.replace(/\\.$/,"")));
+  return String(value||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
+    .replace(/[^a-z0-9]+/g," ").trim().split(/\s+/).filter(Boolean)
+    .filter(token=>!SIGNER_NAME_TITLES.has(token.replace(/\.$/,"")));
 }
 function signerNameTokenMatches(left,right){
   if(left===right)return true;
