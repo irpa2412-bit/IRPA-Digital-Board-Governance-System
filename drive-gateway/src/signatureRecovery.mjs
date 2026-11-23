@@ -108,10 +108,13 @@ export async function assessRecoveryEvidence(ctx,user,id){
   const hasFinalisationRecord=Object.keys(storedFinalisationRecord).length>0;
   const latestStage=storedFinalisationRecord.latestStage==null?null:String(storedFinalisationRecord.latestStage);
   const firstFailedStage=storedFinalisationRecord.firstFailedStage==null?null:String(storedFinalisationRecord.firstFailedStage);
-  const stageRecordIntegrityValid=finalisationStages.length>0&&finalisationStages.every(entry=>entry.stageCodeValid&&entry.status!=="INVALID"&&entry.recordedAt!==null)&&
-    (latestStage===null||allowedFinalisationStages.has(latestStage))&&
-    (firstFailedStage===null||(allowedFinalisationStages.has(firstFailedStage)&&storedStageMap[firstFailedStage]?.status==="FAILED"));
-  const stageRecordIntegrity={status:!hasFinalisationRecord?"NOT_PRESENT":stageRecordIntegrityValid?"CONSISTENT":"INCONSISTENT",entryCount:finalisationStages.length};
+  const hasFailedStage=finalisationStages.some(entry=>entry.status==="FAILED");
+  const latestStageValid=latestStage!==null&&allowedFinalisationStages.has(latestStage)&&Object.prototype.hasOwnProperty.call(storedStageMap,latestStage);
+  const failedStagePointerValid=hasFailedStage
+    ?firstFailedStage!==null&&allowedFinalisationStages.has(firstFailedStage)&&storedStageMap[firstFailedStage]?.status==="FAILED"
+    :firstFailedStage===null;
+  const stageRecordIntegrityValid=finalisationStages.length>0&&finalisationStages.every(entry=>entry.stageCodeValid&&entry.status!=="INVALID"&&entry.recordedAt!==null)&&latestStageValid&&failedStagePointerValid;
+  const stageRecordIntegrity={status:!hasFinalisationRecord?"NOT_PRESENT":stageRecordIntegrityValid?"CONSISTENT":"INCONSISTENT",entryCount:finalisationStages.length,firstFailedStageMeaning:"FIRST_FAILED_ENTRY_IN_STORED_MAP_NOT_PROVEN_CHRONOLOGY"};
   const pendingRecord=envelope.completion?.archivePending&&typeof envelope.completion.archivePending==="object"?envelope.completion.archivePending:null;
   const pendingHash=String(pendingRecord?.finalHash||"").trim().toLowerCase();
   const pendingFileName=String(pendingRecord?.fileName||"").split(/[\\\/]/).pop().slice(0,120)||null;
