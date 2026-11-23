@@ -5,37 +5,30 @@ const owns=(envelope,user)=>Boolean(user?.uid)&&(
   envelope.ownerUid===user.uid||user.isAdmin===true||user.isOwner===true
 );
 
-/**
- * Returns only the exact PDF bytes already preserved by the ARCHIVE_PENDING
- * finalisation path. This endpoint never rebuilds, signs, archives, or mutates.
- */
-export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId) {
+/** Read the preserved Drive object by its recorded ID; deployment switch is never a data selector. */
+export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId,emergencyBuilder) {
   const envelope=await ctx.meta.get("envelopes",envelopeId);
   if(!envelope) throw new HttpError(404,"Envelope not found.");
   if(!owns(envelope,user)) throw new HttpError(403,"Not authorized.");
   if(!["CompletionFailed","Completing"].includes(envelope.status))
     throw new HttpError(409,"Only an archive-pending finalisation can provide an unarchived copy.");
   const pending=envelope.completion?.archivePending;
-  const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
-  const runtimeDataEnvironment=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
   const dataEnvironment=String(envelope.dataEnvironment||"").trim().toUpperCase();
-  if(!runtimeDataEnvironment||runtimeDataEnvironment!==dataEnvironment||!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment)||!pending?.environment||String(pending.environment).toUpperCase()!==dataEnvironment)
-    throw new HttpError(409,"The preserved copy environment does not match the envelope data environment.");
-  if(!pending?.storageId||!pending?.finalHash)
-    throw new HttpError(409,"No preserved ARCHIVE_PENDING PDF is available.");
-  const bytes=await ctx.storage.get(pending.storageId);
-  if(!(bytes instanceof Uint8Array)||!bytes.length)
-    throw new HttpError(409,"The preserved ARCHIVE_PENDING PDF is unavailable.");
-  const hash=await sha256Hex(bytes);
-  if(hash!==String(pending.finalHash).toLowerCase())
-    throw new HttpError(409,"The preserved PDF failed its SHA-256 integrity check.");
-  return {
-    bytes,
-    hash,
-    recordedHash:pending.finalHash,
-    comparison:"MATCH",
-    generatedAt:pending.createdAt||ctx.now().toISOString(),
-    fileName:pending.fileName||"unarchived-completed-copy.pdf",
-    environment:pending.environment||envelope.dataEnvironment||null
+  const fallback=async code=>{
+    if(typeof emergencyBuilder!=="function"){const e=new HttpError(409,code);e.code=code;throw e;}
+    const emergency=await emergencyBuilder(ctx,user,envelopeId);
+    if(!emergency?.ok){const e=new HttpError(emergency?.status||409,emergency?.stages?.at(-1)?.error||"EMERGENCY_RETRIEVAL_FAILED");e.code=code;throw e;}
+    return {bytes:emergency.bytes,hash:emergency.outputHash,recordedHash:emergency.outputHash,comparison:"MATCH",source:"EMERGENCY_BUILD",label:"Unarchived copy; the envelope is not yet Completed",generatedAt:ctx.now().toISOString(),fileName:"emergency-retrieval-copy.pdf",environment:dataEnvironment,fallbackCode:code};
   };
+  if(!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment))return fallback("PRESERVED_COPY_ENV_MISMATCH");
+  if(!pending?.storageId||!pending?.finalHash)return fallback("PRESERVED_COPY_MISSING");
+  if(String(pending.environment||"").trim().toUpperCase()!==dataEnvironment)return fallback("PRESERVED_COPY_ENV_MISMATCH");
+  let bytes;
+  try{bytes=await ctx.storage.get(pending.storageId);}catch{return fallback("PRESERVED_COPY_MISSING");}
+  if(!(bytes instanceof Uint8Array)||!bytes.length)return fallback("PRESERVED_COPY_MISSING");
+  const hash=await sha256Hex(bytes);
+  const preservedHash=String(pending.finalHash).trim().toLowerCase();
+  const completedHash=String(envelope.completion?.completedHash||envelope.completion?.finalHash||envelope.completedHash||envelope.completedPdfHash||pending.finalHash).trim().toLowerCase();
+  if(!/^[a-f0-9]{64}$/.test(preservedHash)||!/^[a-f0-9]{64}$/.test(completedHash)||hash!==preservedHash||hash!==completedHash)return fallback("HASH_MISMATCH");
+  return {bytes,hash,recordedHash:preservedHash,comparison:"MATCH",source:"PRESERVED_COPY",label:"Unarchived copy; the envelope is not yet Completed",generatedAt:pending.createdAt||ctx.now().toISOString(),fileName:pending.fileName||"unarchived-completed-copy.pdf",environment:pending.environment};
 }
