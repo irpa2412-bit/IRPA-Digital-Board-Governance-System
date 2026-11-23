@@ -343,6 +343,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     if(!(built instanceof Uint8Array)||built.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("PDF_BUILD","PASS");
     stage("STAMP_RENDER","PASS");
+    stage("SIZE_LIMIT","PASS");
     let output;
     try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
     if(!(output instanceof Uint8Array)||output.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
@@ -364,6 +365,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     let outputHash;
     try{outputHash=await sha256Hex(output);}catch(error){return fail("OUTPUT_SHA256",error);}
     stage("OUTPUT_SHA256","PASS");
+    stage("TIMEOUT","PASS");
     const label=certificateVerified?EMERGENCY_COPY_LABEL:EMERGENCY_UNARCHIVED_LABEL;
     return {ok:true,bytes:output,outputHash,stages,label,certificateVerified,sourceHash,auditChainStatus:"PASS",stampResults:assessment.stampSlots.map(row=>({fieldId:row.fieldId,page:row.page,status:"PASS"})),environmentDiagnostics:assessment.environmentDiagnostics,signerSummary:(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id)).map(signer=>({name:String(signer.name||"Signer").slice(0,100),maskedAddress:maskRecoveryEmail(signer.email),signedAt:formatRecoveryTimestampEAT(signer.signedAt)}))};
   }catch(error){

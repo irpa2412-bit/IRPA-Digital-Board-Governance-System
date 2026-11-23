@@ -4,7 +4,7 @@ import { unstable_dev } from "wrangler";
 
 test("workerd builds 12 verified stamps across source pages 1 and 3 and reports certificate text extraction outcome",async t=>{
   const worker=await unstable_dev("tests/recovery-worker-runtime.worker.mjs",{
-    config:"wrangler.toml",local:true,logLevel:"error",
+    config:"wrangler.recovery-test.toml",local:true,logLevel:"error",
     experimental:{disableExperimentalWarning:true}
   });
   t.after(async()=>{await worker.stop();});
