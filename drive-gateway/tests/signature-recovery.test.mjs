@@ -427,7 +427,8 @@ test("emergency retrieval returns stage log and SHA-256 without changing envelop
     corsHeaders:()=>({})
   });
   const response=await router(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/emergency-retrieval",{method:"POST"}),{}, "/api/recovery/envelopes/ENV-REC-1/emergency-retrieval");
-  assert.equal(response.status,200);
+  const responseBody=response.status===200?"":await response.clone().text();
+  assert.equal(response.status,200,responseBody);
   assert.match(response.headers.get("x-irpa-output-sha256"),/^[a-f0-9]{64}$/);
   const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
   assert.ok(stages.some(stage=>stage.stageCode==="CERT_PAGE_VERIFY"&&stage.status==="pass"));
