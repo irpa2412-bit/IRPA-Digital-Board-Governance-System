@@ -94,8 +94,30 @@ export async function assessRecoveryEvidence(ctx,user,id){
   const rawStage=String(envelope.completionFailure?.stage||"").toUpperCase();
   const stageMap=[["PDF","PDF_BUILD"],["HASH","HASH"],["ARCHIVE","ARCHIVE"],["CERTIFICATE","CERTIFICATE"],["DISTRIBUT","DISTRIBUTION"]];
   const finalisationStage=stageMap.find(([needle])=>rawStage.includes(needle))?.[1]||"NOT_RECORDED";
+  const storedFinalisationRecord=envelope.finalisationRecord&&typeof envelope.finalisationRecord==="object"&&!Array.isArray(envelope.finalisationRecord)?envelope.finalisationRecord:{};
+  const allowedFinalisationStages=new Set(["PDF_BUILD","HASH","ARCHIVE","CERTIFICATE","DISTRIBUTION"]);
+  const storedStageMap=storedFinalisationRecord.stages&&typeof storedFinalisationRecord.stages==="object"&&!Array.isArray(storedFinalisationRecord.stages)?storedFinalisationRecord.stages:{};
+  const finalisationStages=Object.entries(storedStageMap).map(([stageCode,entry])=>{
+    const validStage=allowedFinalisationStages.has(stageCode)&&entry?.stageCode===stageCode;
+    const status=["PASS","FAILED"].includes(entry?.status)?entry.status:"INVALID";
+    const errorCode=entry?.errorCode==null?null:String(entry.errorCode).replace(/[^A-Z0-9_-]/gi,"").slice(0,48)||"STAGE_FAILED";
+    const errorMessage=entry?.errorMessage==null?null:String(entry.errorMessage).replace(/Bearer\\s+\\S+/gi,"Bearer [REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").replace(/https?:\\/\\/\\S+/gi,"[URL REDACTED]").slice(0,180);
+    const recordedAt=typeof entry?.recordedAt==="string"&&Number.isFinite(Date.parse(entry.recordedAt))?entry.recordedAt:null;
+    return {stageCode,stageCodeValid:validStage,status,errorCode,errorMessage,recordedAt};
+  });
+  const hasFinalisationRecord=Object.keys(storedFinalisationRecord).length>0;
+  const latestStage=storedFinalisationRecord.latestStage==null?null:String(storedFinalisationRecord.latestStage);
+  const firstFailedStage=storedFinalisationRecord.firstFailedStage==null?null:String(storedFinalisationRecord.firstFailedStage);
+  const stageRecordIntegrityValid=finalisationStages.length>0&&finalisationStages.every(entry=>entry.stageCodeValid&&entry.status!=="INVALID"&&entry.recordedAt!==null)&&
+    (latestStage===null||allowedFinalisationStages.has(latestStage))&&
+    (firstFailedStage===null||(allowedFinalisationStages.has(firstFailedStage)&&storedStageMap[firstFailedStage]?.status==="FAILED"));
+  const stageRecordIntegrity={status:!hasFinalisationRecord?"NOT_PRESENT":stageRecordIntegrityValid?"CONSISTENT":"INCONSISTENT",entryCount:finalisationStages.length};
+  const pendingRecord=envelope.completion?.archivePending&&typeof envelope.completion.archivePending==="object"?envelope.completion.archivePending:null;
+  const pendingHash=String(pendingRecord?.finalHash||"").trim().toLowerCase();
+  const pendingFileName=String(pendingRecord?.fileName||"").split(/[\\\\/]/).pop().slice(0,120)||null;
+  const archivePending={metadataPresent:Boolean(pendingRecord),storageReferencePresent:Boolean(pendingRecord?.storageId),recordedHashPresent:/^[a-f0-9]{64}$/.test(pendingHash),recordedHash:/^[a-f0-9]{64}$/.test(pendingHash)?pendingHash:null,fileName:pendingFileName,createdAt:typeof pendingRecord?.createdAt==="string"?pendingRecord.createdAt:null,environment:pendingRecord?.environment?String(pendingRecord.environment).toUpperCase():null,artifactBytesVerified:false};
   if(auditChainStatus==="VERIFIED"){try{await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="PASS").length});}catch{}}
-  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
+  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},finalisationRecord:{latestStage,firstFailedStage,updatedAt:typeof storedFinalisationRecord.updatedAt==="string"?storedFinalisationRecord.updatedAt:null,stages:finalisationStages},stageRecordIntegrity,archivePending,stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
 }
 export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,email,name,reason}={}){
   const envelope=await loadOwnedFailedEnvelope(ctx,user,id);
