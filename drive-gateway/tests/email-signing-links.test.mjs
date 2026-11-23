@@ -241,8 +241,8 @@ test("concurrent signer resends are serialized and the delivered token is the pe
   const deliveredToken=new URL(sent[0].link).searchParams.get("emailSignToken");
   assert.equal(record.signers[0].tokenHash,await sha256Hex(deliveredToken.split(".")[2]));
   assert.equal(result.expiresAt,null);
-  assert.equal(record.signers[0].tokenExpiresAt,undefined);
-  assert.equal(record.signers[0].emailLinkExpiresAt,undefined);
+  assert.equal(record.signers[0].tokenExpiresAt,null);
+  assert.equal(record.signers[0].emailLinkExpiresAt,null);
   assert.equal(record.signers[0].emailLinkStatus,"issued");
   assert.equal(record.signers[0].resendAttempt,undefined);
   assert.equal(record.signers[0].emailLinkTokenHistory.at(-1).tokenHash,originalHash);
