@@ -3,17 +3,16 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-23T19:58:00Z",
+  "lastActivityAt": "2026-11-23T20:04:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised 23 November 2026 scope extension: enable every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal, and allow active members and employees to participate in Staff and General meeting categories. Preserve Board voting, quorum, resolutions, formal approvals, signature workflows and restricted meeting access. Meeting creation uses the authenticated Cloudflare Worker; direct Firestore write rules remain unchanged.",
+  "reason": "Owner-authorised 23 November 2026 scope extension: every active registered IRPA member and employee can initiate meetings through the existing Meeting Centre; Staff and General meeting visibility remains category-scoped; Board voting, quorum, resolutions, formal approvals and restricted meeting access remain unchanged. The authenticated Worker remains the meeting-creation path. No shared policy or Firestore rules changes.",
   "scope": [
     "tests/meeting-category-policy.test.mjs",
     "docs/portal-protection/records/meeting-portal.json",
     "docs/portal-protection/windows/meeting-portal.json",
-    "src/firebase/meetingPolicy.js",
     "drive-gateway/src/meetingServices.mjs",
-    "drive-gateway/tests/meeting-services-router.test.mjs"
+    "src/pages/Meetings.jsx"
   ],
   "activityLog": [
     {
@@ -40,6 +39,11 @@
       "at": "2026-11-23T19:58:00Z",
       "action": "Direct Firestore rules scope removed",
       "description": "Code-path inspection confirmed the active Meeting Portal creates meetings through the authenticated Cloudflare Worker with server-side Firestore access. Direct Firestore rules changes are unnecessary and were reverted; the narrower browser-write boundary is preserved. PR #941."
+    },
+    {
+      "at": "2026-11-23T20:04:00Z",
+      "action": "Fit implementation to existing Meeting Portal source-isolation allowlist",
+      "description": "Restored the shared meeting policy and removed the new Worker test file after the isolated fixture guard rejected them. Moved initiation controls to the already-authorised Meeting Centre page and placed functional Worker tests in the existing Meeting Portal policy test file. No guard was weakened. PR #941."
     }
   ],
   "baseline": {
