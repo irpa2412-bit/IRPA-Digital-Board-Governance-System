@@ -599,7 +599,7 @@ export async function revokeInvitation(ctx,user,id,signerId){
     if(!signer||signer.identityType!=="email-link")throw new HttpError(404,"Signer assignment not found.");
     if(signer.emailLinkStatus==="used")throw new HttpError(409,"A used signing link cannot be revoked.");
     signer.emailLinkTokenHistory=[...(signer.emailLinkTokenHistory||[]),{tokenHash:signer.tokenHash,status:"revoked",revokedAt:ctx.now().toISOString()}].slice(-10);
-    signer.emailLinkStatus="revoked";signer.emailLinkSessionStatus="revoked";signer.emailLinkSessionHash=null;signer.invitation="Revoked";
+    signer.emailLinkStatus="revoked";signer.emailLinkSessionStatus="revoked";signer.emailLinkSessionHash=null;signer.emailLinkSessions=(Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[]).map(session=>({...session,status:"revoked",revokedAt:ctx.now().toISOString()}));signer.invitation="Revoked";
     return{patch:{signers:current.signers,events:await chainEvents(current.events,{type:"email_link.revoked",signerId,actor:user.uid,at:ctx.now().toISOString()})}};
   });
   return{ok:true,envelopeId:id,signerId,status:"revoked"};
