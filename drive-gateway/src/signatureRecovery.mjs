@@ -117,10 +117,32 @@ export async function assessRecoveryEvidence(ctx,user,id){
   const stageRecordIntegrity={status:!hasFinalisationRecord?"NOT_PRESENT":stageRecordIntegrityValid?"CONSISTENT":"INCONSISTENT",entryCount:finalisationStages.length,firstFailedStageMeaning:"FIRST_FAILED_ENTRY_IN_STORED_MAP_NOT_PROVEN_CHRONOLOGY"};
   const pendingRecord=envelope.completion?.archivePending&&typeof envelope.completion.archivePending==="object"?envelope.completion.archivePending:null;
   const pendingHash=String(pendingRecord?.finalHash||"").trim().toLowerCase();
-  const pendingFileName=String(pendingRecord?.fileName||"").split(/[\\\/]/).pop().slice(0,120)||null;
-  const archivePending={metadataPresent:Boolean(pendingRecord),storageReferencePresent:Boolean(pendingRecord?.storageId),recordedHashPresent:/^[a-f0-9]{64}$/.test(pendingHash),recordedHash:/^[a-f0-9]{64}$/.test(pendingHash)?pendingHash:null,fileName:pendingFileName,createdAt:typeof pendingRecord?.createdAt==="string"?pendingRecord.createdAt:null,environment:pendingRecord?.environment?String(pendingRecord.environment).toUpperCase():null,artifactBytesVerified:false};
+  const pendingFileName=String(pendingRecord?.fileName||"").split(/[\\\\/]/).pop().slice(0,120)||null;
+  const environmentClass=value=>{
+    const normalized=String(value||"").trim().toUpperCase();
+    if(["ACTUAL","TRIAL","TEST"].includes(normalized))return normalized;
+    if(normalized==="PRODUCTION")return "LEGACY_PRODUCTION";
+    if(!normalized)return "MISSING";
+    return "UNRECOGNIZED";
+  };
+  const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
+  const runtimeDataEnvironment=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
+  const envelopeEnvironment=environmentClass(envelope.dataEnvironment);
+  const pendingEnvironment=environmentClass(pendingRecord?.environment);
+  const expectedEnvironment=environmentClass(runtimeDataEnvironment);
+  const environmentDiagnostics={envelope:envelopeEnvironment,preservedCopy:pendingEnvironment,gatewayExpected:expectedEnvironment,allMatch:Boolean(runtimeDataEnvironment)&&["ACTUAL","TRIAL","TEST"].includes(envelopeEnvironment)&&envelopeEnvironment===pendingEnvironment&&envelopeEnvironment===expectedEnvironment};
+  let artifactIntegrityStatus="NOT_CHECKED";
+  if(pendingRecord?.storageId&&/^[a-f0-9]{64}$/.test(pendingHash)){
+    try{
+      const pendingBytes=await ctx.storage.get(pendingRecord.storageId);
+      if(!(pendingBytes instanceof Uint8Array)||!pendingBytes.length)artifactIntegrityStatus="MISSING";
+      else artifactIntegrityStatus=(await sha256Hex(pendingBytes))===pendingHash?"MATCH":"MISMATCH";
+    }catch{artifactIntegrityStatus="READ_FAILED";}
+  }else if(pendingRecord?.storageId)artifactIntegrityStatus="RECORDED_HASH_INVALID";
+  else if(pendingRecord)artifactIntegrityStatus="STORAGE_REFERENCE_MISSING";
+  const archivePending={metadataPresent:Boolean(pendingRecord),storageReferencePresent:Boolean(pendingRecord?.storageId),recordedHashPresent:/^[a-f0-9]{64}$/.test(pendingHash),recordedHash:/^[a-f0-9]{64}$/.test(pendingHash)?pendingHash:null,fileName:pendingFileName,createdAt:typeof pendingRecord?.createdAt==="string"?pendingRecord.createdAt:null,environment:pendingRecord?.environment?String(pendingRecord.environment).toUpperCase():null,artifactBytesVerified:artifactIntegrityStatus==="MATCH",artifactIntegrityStatus};
   if(auditChainStatus==="VERIFIED"){try{await appendRecoveryAccessEvent(ctx,user,id,"recovery.evidence.assessed",{verifiedStampCount:rows.filter(x=>x.status==="VERIFIED_EXISTING").length,nonVerifiedStampCount:rows.filter(x=>x.status!=="PASS").length});}catch{}}
-  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},finalisationRecord:{latestStage,firstFailedStage,updatedAt:typeof storedFinalisationRecord.updatedAt==="string"?storedFinalisationRecord.updatedAt:null,stages:finalisationStages},stageRecordIntegrity,archivePending,stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
+  return {ok:true,envelopeId:id,title:envelope.title||"",status:envelope.status,auditChain:{status:auditChainStatus,code:auditChainStatus==="VERIFIED"?"AUDIT_CHAIN_VERIFIED":auditChainStatus==="FAILED"?"AUDIT_CHAIN_FAILED":"AUDIT_CHAIN_NO_EVENTS"},auditChainValid:auditChainStatus==="VERIFIED",sourceHash,sourceHashStatus,sourceHashCode,sourceHashReason,finalisationStage,finalisationStageCode:rawStage||"FINALISATION_STAGE_NOT_RECORDED",completionFailure:{stage:envelope.completionFailure?.stage||null,failedAt:envelope.completionFailure?.failedAt||null},finalisationRecord:{latestStage,firstFailedStage,updatedAt:typeof storedFinalisationRecord.updatedAt==="string"?storedFinalisationRecord.updatedAt:null,stages:finalisationStages},stageRecordIntegrity,environmentDiagnostics,archivePending,stampSlots:rows,summary:{verified:rows.filter(x=>x.resultStatus==="PASS"||x.status==="VERIFIED_EXISTING").length,missing:rows.filter(x=>x.status==="MISSING").length,failed:rows.filter(x=>x.status==="INVALID").length,unverifiable:rows.filter(x=>x.status==="UNVERIFIABLE").length}};
 }
 export async function reassignRecoveryStampSlots(ctx,user,id,{signerId,fieldIds,email,name,reason}={}){
   const envelope=await loadOwnedFailedEnvelope(ctx,user,id);
