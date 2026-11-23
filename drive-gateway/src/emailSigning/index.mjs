@@ -50,17 +50,17 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
     throw new HttpError(401, "This signing link is unavailable. Contact the document owner for a new invitation.");
   }
   const tokenKind = sessionMatch ? "session" : "invitation";
-  if (completed && tokenKind === "invitation" && signer?.status === "Signed" && matchesCurrent) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
+  const completedReadOnly = completed && tokenKind === "invitation" && signer?.status === "Signed" && matchesCurrent;
   const status = String(tokenKind === "session" ? signer.emailLinkSessionStatus : signer.emailLinkStatus || "");
   const completedSession = tokenKind === "session" && envelope.status === "Completed" && signer.status === "Signed" && status === "used";
-  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession) {
+  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession && !completedReadOnly) {
     throw new HttpError(410, "This signing envelope is no longer active.");
   }
   const permitted = tokenKind === "session"
     ? status === "active" || completedSession
-    : ["issued", "opened", "expired"].includes(status);
+    : ["issued", "opened", "expired"].includes(status) || completedReadOnly;
   if (!permitted) {
-    if (signer?.status === "Signed" && tokenKind === "invitation") throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
+    if (signer?.status === "Signed" && tokenKind === "invitation" && !completedReadOnly) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
     throw new HttpError(410, "This signing link has expired or is no longer active.");
   }
   const expiry = tokenKind === "session" ? signer.emailLinkSessionExpiresAt : null;
