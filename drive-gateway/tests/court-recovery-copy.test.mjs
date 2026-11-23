@@ -59,6 +59,6 @@ test("missing preserved copy is classified for emergency fallback",async()=>{
 test("download rejects bytes that do not match the preserved final hash",async()=>{
  const f=await fixture();
  f.ctx.storage.get=async()=>new TextEncoder().encode("%PDF-1.7\nwrong bytes\n%%EOF");
- await assert.rejects(()=>buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id),e=>e.status===409);
+ await assert.rejects(()=>buildUnarchivedCompletedCopy(f.ctx,{uid:"court-owner"},f.envelope.id),e=>e.code==="HASH_MISMATCH");
  assert.equal(f.getWrites(),0);
 });
