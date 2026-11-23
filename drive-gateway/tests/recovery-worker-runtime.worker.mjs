@@ -1,7 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import { memoryMeta,memoryStorage } from "../src/adapters.mjs";
 import { canonicalJson,sha256Hex } from "../src/util.mjs";
-import { buildEmergencyRetrieval } from "../src/signatureRecovery.mjs";
+import { assessRecoveryEvidence,createSignatureRecoveryRouter } from "../src/signatureRecovery.mjs";
 
 async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
@@ -35,9 +35,22 @@ export default {
     try{
       const fixture=await seededContext();
       const before=await fixture.ctx.meta.get("envelopes","ENV-WORKER");
-      const result=await buildEmergencyRetrieval(fixture.ctx,fixture.user,"ENV-WORKER");
+      const documentBefore=await fixture.ctx.meta.get("documents","DOC-WORKER");
+      const assessment=await assessRecoveryEvidence(fixture.ctx,fixture.user,"ENV-WORKER",{recordAccess:false});
+      const router=createSignatureRecoveryRouter({
+        authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"worker-test"}),
+        getFirestoreDocument:async()=>null,buildContext:()=>fixture.ctx,
+        json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+        corsHeaders:()=>({})
+      });
+      const path="/api/recovery/envelopes/ENV-WORKER/emergency-retrieval";
+      const response=await router(new Request("https://worker.test"+path,{method:"POST"}),{},path);
+      const bytes=new Uint8Array(await response.arrayBuffer());
+      const outputHash=await sha256Hex(bytes);
       const after=await fixture.ctx.meta.get("envelopes","ENV-WORKER");
-      return Response.json({ok:result.ok,certificateVerified:result.certificateVerified,stages:result.stages,stampResults:result.stampResults||[],sourceHash:result.sourceHash,outputHash:result.outputHash,outputByteLength:result.bytes?.byteLength||0,label:result.label,recordUnchanged:JSON.stringify(before)===JSON.stringify(after)});
+      const documentAfter=await fixture.ctx.meta.get("documents","DOC-WORKER");
+      const stages=JSON.parse(response.headers.get("x-irpa-stage-log")||"[]");
+      return Response.json({status:response.status,ok:response.status===200,certificateVerified:!String(response.headers.get("x-irpa-copy-label")||"").startsWith("UNARCHIVED COPY."),stages,stampResults:assessment.stampSlots.map(row=>({fieldId:row.fieldId,page:row.page,status:row.status})),outputHash,headerHash:response.headers.get("x-irpa-output-sha256"),downloadedHashMatches:outputHash===response.headers.get("x-irpa-output-sha256"),outputByteLength:bytes.byteLength,label:response.headers.get("x-irpa-copy-label"),fileName:response.headers.get("content-disposition"),recordUnchanged:JSON.stringify(before)===JSON.stringify(after),documentUnchanged:JSON.stringify(documentBefore)===JSON.stringify(documentAfter),accessEventCount:(await fixture.ctx.meta.list("recoveryAccessEvents")).length,storagePutCalls:fixture.ctx.storage.putCalls});
     }catch(error){return Response.json({ok:false,errorClass:error?.name||"Error"} ,500);}
   }
 };
