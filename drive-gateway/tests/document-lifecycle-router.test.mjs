@@ -57,6 +57,48 @@ test("restricted upload is denied server-side without restricted permission",asy
   assert.equal(response.status,403);assert.match(await response.text(),/Restricted document upload permission/);
 });
 
+test("PDF owner profile removal hides only the owner listing and preserves the verified archive file",async()=>{
+  const doc={documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",sha256:"a".repeat(64),classification:"Internal",ownerUid:"emp-1",status:"SIGNED"};
+  const state={docs:{"LIFE-test":{plain:doc}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.profileRemoved,true);
+  assert.equal(result.systemRecordPreserved,true);
+  assert.equal(result.driveFileDeleted,false);
+  assert.equal(state.docs["LIFE-test"].plain.ownerProfileHiddenByUid,"emp-1");
+  assert.equal(state.deletedFiles.length,0);
+  assert.equal(state.writes.length,2);
+  assert.equal(plain(state.writes[1].fields).action,"DOCUMENT_LIFECYCLE_OWNER_PROFILE_HIDDEN");
+  assert.equal(plain(state.writes[1].fields).details.systemRecordPreserved,true);
+});
+test("PDF owner profile removal is denied to a non-owner",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",ownerUid:"another-user"}}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
+  assert.equal(response.status,403);
+  assert.equal(state.writes.length,0);
+  assert.equal(state.deletedFiles.length,0);
+});
+test("PDF owner profile removal is blocked when the archive copy cannot be verified",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"test.pdf",contentType:"application/pdf",ownerUid:"emp-1"}}},writes:[],deletedFiles:[]};
+  const deps=makeDeps(state);
+  deps.driveFetch=async()=>({id:"wrong-file",name:"test.pdf",mimeType:"application/pdf",description:JSON.stringify({irpaGovernance:true,documentId:"other-document"})});
+  const router=createDocumentLifecycleRouter(deps);
+  const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
+  assert.equal(response.status,409);
+  assert.match((await response.json()).error,/archive PDF could be verified/);
+  assert.equal(state.writes.length,0);
+  assert.equal(state.deletedFiles.length,0);
+});
+test("PDF owner profile removal rejects non-PDF documents",async()=>{
+  const state={docs:{"LIFE-test":{plain:{documentId:"LIFE-test",fileId:"drive-1",fileName:"notes.txt",contentType:"text/plain",ownerUid:"emp-1"}}},writes:[],deletedFiles:[]};
+  const router=createDocumentLifecycleRouter(makeDeps(state));
+  const response=await router(req("/api/document-lifecycle/profile-hide",{documentId:"LIFE-test"}),env);
+  assert.equal(response.status,415);
+  assert.equal(state.writes.length,0);
+});
 test("download requires documentId even when fileId is supplied",async()=>{
   const state={docs:{},writes:[]};const router=createDocumentLifecycleRouter(makeDeps(state));
   const response=await router(req("/api/document-lifecycle/download",{fileId:"drive-1"}),env);
