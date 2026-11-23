@@ -6,7 +6,7 @@ import{createRecord,COLLECTIONS}from"../firebase/data";
 import SignaturePlatform from "./SignaturePlatform";
 import DocumentReader from "../components/DocumentReader";
 import DocumentTranslationWorkspace from "../components/DocumentTranslationWorkspace";
-import { listLifecycleDocuments,uploadLifecycleDocument,downloadLifecycleDocument,transitionLifecycleDocument,completeLifecycleSignature,shareLifecycleDocument } from "../firebase/documentLifecycle";
+import { listLifecycleDocuments,uploadLifecycleDocument,downloadLifecycleDocument,transitionLifecycleDocument,completeLifecycleSignature,shareLifecycleDocument,hideLifecyclePdfFromProfile } from "../firebase/documentLifecycle";
 
 const collection=(...args)=>runSignatureFirestore({operation:"collection",collectionPath:String(args[1]||"unknown"),screen:"Document Lifecycle / Translation Requests",userType:"logged-in document owner"},()=>firestoreCollection(...args));
 const query=(ref,...constraints)=>runSignatureFirestore({operation:"query",target:ref,screen:"Document Lifecycle / Translation Requests",userType:"logged-in document owner"},()=>firestoreQuery(ref,...constraints));
