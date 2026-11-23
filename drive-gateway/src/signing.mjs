@@ -350,7 +350,7 @@ export async function openEmailSigning(ctx,token,ip=""){
         ?[{tokenHash:legacyHash,status:"active",createdAt:signer.emailLinkSessionCreatedAt||now.toISOString(),expiresAt:null,ipHash:null}]
         :[];
       const retainedSessions=[...existingSessions,...legacySession]
-        .filter(session=>session?.status==="active"&&(!session.expiresAt||!Number.isFinite(Date.parse(String(session.expiresAt)))||Date.parse(String(session.expiresAt))>now.getTime()));
+        .filter(session=>session?.status==="active");
       // Never replace another browser's active session. All sessions remain
       // usable until the signer submits or the invitation is revoked/replaced.
       signer.emailLinkSessions=[...retainedSessions,{tokenHash:sessionHash,status:"active",createdAt:now.toISOString(),expiresAt:sessionExpiresAt,ipHash}];
