@@ -98,7 +98,7 @@ async function load(ctx,t){
   const tokenKind=sessionMatch?"session":"invitation";
   const sessionStatus=sessionRecord?.status||signer.emailLinkSessionStatus;
   if(signer.identityType==="email-link"&&(tokenKind==="session"?!(sessionStatus==="active"||(sessionStatus==="used"&&e.status==="Completed"&&signer.status==="Signed")):!["issued","opened","expired"].includes(signer.emailLinkStatus)&&!(e.status==="Completed"&&signer.status==="Signed")))throw new HttpError(401,genericEmailSigningFailure());
-  const expiry=tokenKind==="session"?(sessionRecord?.expiresAt||signer.emailLinkSessionExpiresAt):(signer.identityType==="email-link"?null:(signer.tokenExpiresAt||e.expiresAt));
+  const expiry=tokenKind==="session"?null:(signer.identityType==="email-link"?null:(signer.tokenExpiresAt||e.expiresAt));
   const expiryMs=Date.parse(String(expiry||""));
   if(Number.isFinite(expiryMs)&&ctx.now().getTime()>expiryMs)throw new HttpError(410,"This signing session has expired. Reopen the original invitation link.");
   return{env:e,signer,tokenKind,session:sessionRecord||null};
