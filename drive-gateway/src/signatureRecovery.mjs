@@ -260,7 +260,7 @@ async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
 function emergencyErrorClass(error){
   return String(error?.name||"Error").replace(/[^A-Za-z0-9_]/g,"").slice(0,48)||"Error";
 }
-function emergencyStepFor(error,fallback="UNKNOWN"){
+export function classifyEmergencyRetrievalError(error,fallback="UNKNOWN"){
   const name=emergencyErrorClass(error),message=String(error?.message||"");
   if(/cpu time|exceeded.*time|timed? ?out|timeout/i.test(message)||name==="TimeoutError"||name==="AbortError")return "TIMEOUT";
   if(/out of memory|memory allocation|array buffer|buffer too large|maximum.*size/i.test(message)||name==="RangeError")return "SIZE_LIMIT";
@@ -308,7 +308,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     const events=Array.isArray(envelope.events)?envelope.events:[];
     stage("AUDIT_CHAIN","PASS");
     let assessment;
-    try{assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});}catch(error){return fail(emergencyStepFor(error,"STAMP_LOAD"),error);}
+    try{assessment=await assessRecoveryEvidence(ctx,user,id,{recordAccess:false});}catch(error){return fail(classifyEmergencyRetrievalError(error,"STAMP_LOAD"),error);}
     if(assessment.stampSlots.length!==12||assessment.stampSlots.some(row=>row.status!=="VERIFIED_EXISTING"))return fail("STAMP_LOAD",new Error("STAMP_EVIDENCE_NOT_12_FULLY_VERIFIED_STAMPS"));
     stage("STAMP_LOAD","PASS");
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
@@ -328,7 +328,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail(emergencyStepFor(error,"PDF_BUILD"),error);}
     let certificateWarning=null;
     let pageText;
-    try{pageText=await extractLastPdfPageText(new Uint8Array(output));}
+    try{pageText=await (ctx.recoveryTextExtractor||extractLastPdfPageText)(new Uint8Array(output));}
     catch(error){
       const errorType=emergencyErrorClass(error);
       certificateWarning={step:"TEXT_EXTRACT",errorClass:errorType,messages:emergencyStepMessages.TEXT_EXTRACT};
