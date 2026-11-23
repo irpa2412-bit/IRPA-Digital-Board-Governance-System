@@ -28,7 +28,7 @@ export async function buildUnarchivedCompletedCopy(ctx,user,envelopeId,emergency
   if(!(bytes instanceof Uint8Array)||!bytes.length)return fallback("PRESERVED_COPY_MISSING");
   const hash=await sha256Hex(bytes);
   const preservedHash=String(pending.finalHash).trim().toLowerCase();
-  const completedHash=String(envelope.completion?.completedHash||envelope.completion?.finalHash||envelope.completedHash||envelope.completedPdfHash||pending.finalHash).trim().toLowerCase();
+  const completedHash=String(envelope.completion?.finalHash).trim().toLowerCase();
   if(!/^[a-f0-9]{64}$/.test(preservedHash)||!/^[a-f0-9]{64}$/.test(completedHash)||hash!==preservedHash||hash!==completedHash)return fallback("HASH_MISMATCH");
   return {bytes,hash,recordedHash:preservedHash,comparison:"MATCH",source:"PRESERVED_COPY",label:"Unarchived copy; the envelope is not yet Completed",generatedAt:pending.createdAt||ctx.now().toISOString(),fileName:pending.fileName||"unarchived-completed-copy.pdf",environment:pending.environment};
 }

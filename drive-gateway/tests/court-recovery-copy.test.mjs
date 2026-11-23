@@ -4,7 +4,7 @@ import { buildUnarchivedCompletedCopy } from "../src/courtRecoveryCopy.mjs";
 import { sha256Hex } from "../src/util.mjs";
 async function fixture({switchEnvironment="production",pendingEnvironment="TRIAL",missing=false,wrongBytes=false}={}){
  const bytes=new TextEncoder().encode("%PDF-1.7\\nexisting-preserved-final-pdf\\n%%EOF"),hash=await sha256Hex(bytes);
- const envelope={id:"IRPA-ENV-2026-11501354",createdBy:"court-owner",status:"CompletionFailed",dataEnvironment:"TRIAL",completion:{completedHash:hash,archivePending:missing?null:{storageId:"pending-pdf",finalHash:hash,fileName:"court-copy.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:pendingEnvironment}}};
+ const envelope={id:"IRPA-ENV-2026-11501354",createdBy:"court-owner",status:"CompletionFailed",dataEnvironment:"TRIAL",completion:{finalHash:hash,archivePending:missing?null:{storageId:"pending-pdf",finalHash:hash,fileName:"court-copy.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:pendingEnvironment}}};
  let writes=0,reads=0,calls=0;
  const ctx={env:{IRPA_ENVIRONMENT:switchEnvironment},meta:{async get(){return envelope;},async update(){writes++;throw Error("write forbidden");},async create(){writes++;throw Error("write forbidden");}},storage:{async get(id){reads++;assert.equal(id,"pending-pdf");return wrongBytes?new TextEncoder().encode("wrong bytes"):new Uint8Array(bytes);},async put(){writes++;throw Error("write forbidden");},async delete(){writes++;throw Error("write forbidden");}},now:()=>new Date("2026-11-23T06:00:00.000Z")};
  const emergency=async()=>{calls++;const output=new TextEncoder().encode("%PDF emergency");return{ok:true,bytes:output,outputHash:await sha256Hex(output)};};
