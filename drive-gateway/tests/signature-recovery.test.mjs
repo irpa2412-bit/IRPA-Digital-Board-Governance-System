@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";
 import { memoryMeta,memoryStorage } from "../src/adapters.mjs";
 import { canonicalJson,sha256Hex } from "../src/util.mjs";
-import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots,createSignatureRecoveryRouter } from "../src/signatureRecovery.mjs";
+import { getRecoveryQueue,assessRecoveryEvidence,buildRecoveryPreview,reassignRecoveryStampSlots,createSignatureRecoveryRouter,buildEmergencyRetrieval,classifyEmergencyRetrievalFailure } from "../src/signatureRecovery.mjs";
 
 async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
@@ -12,6 +12,7 @@ async function addEvent(events,event){
 async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,stampCount=2}={}){
   const sent=[],meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
   pdf.addPage([612,792]);
+  if(stampCount===12){pdf.addPage([612,792]);pdf.addPage([612,792]);}
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
   await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:sourceHash});
@@ -25,7 +26,7 @@ async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,stampCo
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",dataEnvironment:"TEST",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
-    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:fieldIds.map((fieldId,index)=>({fieldId,type:"Signature",page:1,x:stampCount===12?0.05+(index%4)*0.23:(index===0?0.1:0.5),y:stampCount===12?0.08+Math.floor(index/4)*0.22:0.1,width:stampCount===12?0.18:0.3,height:stampCount===12?0.08:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0})),
+    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:fieldIds.map((fieldId,index)=>({fieldId,type:"Signature",page:stampCount===12?(index<6?1:3):1,x:stampCount===12?0.05+(index%4)*0.23:(index===0?0.1:0.5),y:stampCount===12?0.08+Math.floor(index/4)*0.22:0.1,width:stampCount===12?0.18:0.3,height:stampCount===12?0.08:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0})),
     signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],order:1,signedAt:"2026-11-22T10:00:00.000Z",signatureValue,fieldValues,name:"Test Signer",email:"signer@example.test",signatureType:"drawn"}],
     events,completionFailure:{stage:"WRITE_ARCHIVE_COPIES",errorType:"Error",failedAt:"2026-11-22T10:00:01.000Z"}
   });
@@ -487,18 +488,49 @@ test("emergency retrieval returns stage log and SHA-256 without changing envelop
   assert.equal(response.status,200,responseBody);
   assert.match(response.headers.get("x-irpa-output-sha256"),/^[a-f0-9]{64}$/);
   const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
-  assert.ok(stages.some(stage=>stage.stageCode==="CERT_PAGE_VERIFY"&&stage.status==="pass"));
-  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="not-checked"));
-  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="not-checked"));
+  assert.ok(stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="PASS"));
+  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="NOT_APPLICABLE"));
+  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="NOT_APPLICABLE"));
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,before.events.length);
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+});
+
+test("certificate text extraction failure is labelled and served only after all other checks pass",async()=>{
+  const f=await fixture({stampCount:12});
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const result=await buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1",{extractText:async()=>{throw new TypeError("Worker module import failure");}});
+  assert.equal(result.ok,true);
+  assert.equal(result.certificateVerified,false);
+  assert.equal(result.label,"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.");
+  assert.ok(result.stages.some(stage=>stage.stageCode==="TEXT_EXTRACT"&&stage.status==="FAILED"&&stage.failureCode==="TEXT_EXTRACT"&&stage.errorClass==="TypeError"));
+  assert.equal(result.stampResults.length,12);
+  assert.deepEqual(result.stampResults.map(row=>row.page),[1,1,1,1,1,1,3,3,3,3,3,3]);
+  assert.equal(result.outputHash,await sha256Hex(result.bytes));
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+  assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
+});
+
+test("emergency retrieval failure stages map to the only permitted sanitised sub-codes",()=>{
+  const cases=[
+    ["SOURCE_READ",new Error("storage read failed"),"SOURCE_READ"],
+    ["STAMP_LOAD",new Error("stamp evidence missing"),"STAMP_LOAD"],
+    ["STAMP_RENDER",new Error("drawImage failed"),"STAMP_RENDER"],
+    ["PDF_BUILD",new Error("PDF parse failed"),"PDF_BUILD"],
+    ["HASH",new Error("digest failed"),"HASH"],
+    ["CERT_VERIFY",new Error("certificate mismatch"),"CERT_VERIFY"],
+    ["TEXT_EXTRACT",new TypeError("unpdf import failed"),"TEXT_EXTRACT"],
+    ["SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"),"SIZE_LIMIT"],
+    ["REQUEST",new Error("script exceeded CPU time limit"),"TIMEOUT"],
+    ["unmapped",new Error("unclassified"),"UNKNOWN"]
+  ];
+  for(const [stage,error,expected] of cases)assert.equal(classifyEmergencyRetrievalFailure(stage,error),expected,stage);
 });
 
 test("corrupt stamp evidence fails closed and returns no PDF",async()=>{
   const f=await fixture({tamperFieldHash:true});
   const result=await (await import("../src/signatureRecovery.mjs")).buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
   assert.equal(result.ok,false);
-  assert.ok(result.stages.some(stage=>stage.stageCode==="STAMP_EVIDENCE"&&stage.status==="fail"));
+  assert.ok(result.stages.some(stage=>stage.stageCode==="STAMP_LOAD"&&stage.status==="FAILED"));
   assert.equal(result.bytes,undefined);
 });
 
@@ -510,5 +542,5 @@ test("repeat emergency retrieval has the same verification result",async()=>{
   assert.equal(first.ok,true);
   assert.equal(second.ok,true);
   assert.deepEqual(first.stages,second.stages);
-  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_PAGE_VERIFY").status,"pass");
+  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_VERIFY").status,"PASS");
 });

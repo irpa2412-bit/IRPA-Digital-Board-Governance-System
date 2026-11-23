@@ -1,0 +1,4 @@
+name = "irpa-recovery-runtime-test"
+main = "tests/recovery-worker-runtime.worker.mjs"
+compatibility_date = "2026-09-24"
+workers_dev = true

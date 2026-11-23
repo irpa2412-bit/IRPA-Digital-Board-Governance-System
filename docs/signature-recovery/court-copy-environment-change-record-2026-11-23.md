@@ -30,3 +30,14 @@ No changes to signing rules, tokens, link format, sessions, signer identity, fie
 ## Delivery gates
 
 PR checks required: `security-baseline`, `integrity`, and `Readability Checker and Independent Verifier`. Merge only through normal branch protection. Deployment, if approved by required checks and reviewers, must use the existing no-secret-sync workflow, Firebase Hosting and Cloudflare frontend deployment. Verify Worker health version and frontend build stamp against the merge commit and perform fresh unauthenticated JSON sign-in probes. No deployment is authorised by this Change Record alone.
+
+## Additional owner decision — certificate-only read-only retrieval
+
+- **Decision time:** 2026-11-23 10:24:45Z, explicit owner instruction.
+- **Applies to:** ENV-4b06e60941f8eb1d only, within the repair window above.
+- **Conditional exception:** If and only if the source hash, complete audit chain, all 12 chained field-level stamp hashes, stamp rendering, PDF build and final PDF SHA-256 pass, but certificate-page text extraction or certificate-page verification alone cannot pass in this read-only builder, the system may serve the generated copy.
+- **Mandatory label:** UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.
+- The exact label must appear on the recovery screen, in the downloaded PDF filename and as the first line of the downloadable PDF evidence report. The screen and report must show the SHA-256, a Copy hash control, and an explicit PASS, FAILED or NOT APPLICABLE result for every verification check. Signer addresses in the report must be masked and signing times shown in EAT.
+- **Fail-closed boundary:** Any source read/hash, audit-chain, stamp evidence/rendering, PDF build, size-limit, timeout or output-hash failure still refuses the copy. A certificate-only exception never changes the envelope status or creates a completion event.
+- **No-write condition:** This is a read-only delivery exception only. It does not authorise any envelope, signer, field, signature, audit, hash, certificate, archive, Drive or environment-record write, nor any retry or finalisation.
+- **Expiry:** This owner decision lapses immediately when the document is delivered, or at the end of the existing 72-hour repair window, whichever occurs first. It does not create a standing recovery policy.
