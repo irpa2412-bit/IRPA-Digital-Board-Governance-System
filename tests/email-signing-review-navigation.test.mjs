@@ -29,3 +29,11 @@ test("email-link Submit remains visible in review and gated by required fields, 
   assert.match(page, /if\(incomplete\.length\)\{setError\("Complete all required assigned fields before submitting/);
   assert.match(gateway, /const can=\(e,s\)=>s\.status==="Pending"&&e\.signers\.every\(x=>x\.order>=s\.order\|\|x\.status==="Signed"\)/);
 });
+
+test("leaving an email signing session never redirects to the IRPA public website or app root", () => {
+  assert.doesNotMatch(page, /window\.location\.(?:replace|assign)/);
+  assert.doesNotMatch(page, /https:\/\/(?:www\.)?irpa\.or\.tz/);
+  assert.match(page, /setLeftSession\(true\);/);
+  assert.match(page, /Close this tab/);
+  assert.match(page, /window\.close\(\)/);
+});
