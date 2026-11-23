@@ -54,3 +54,24 @@ test("each recovery action passes its own button label into the route error form
  assert.match(source,/button:"Generate watermarked preview"/);
  assert.match(queue,/formatRecoveryRouteError/);
 });
+
+test("assessment report includes environment, preserved archive integrity and finalisation stage diagnostics",()=>{
+ assert.match(source,/const env=evidence\?\.environmentDiagnostics/);
+ assert.match(source,/Environment diagnostics:/);
+ assert.match(source,/Envelope environment:/);
+ assert.match(source,/Preserved-copy environment:/);
+ assert.match(source,/Gateway expected environment:/);
+ assert.match(source,/All environments match:/);
+ assert.match(source,/Preserved PDF integrity:/);
+ assert.match(source,/artifactIntegrityStatus/);
+ assert.match(source,/Finalisation stage-record integrity:/);
+ assert.match(source,/stageRecordIntegrity/);
+ assert.match(source,/Stored finalisation record:/);
+ assert.match(source,/record\.stages/);
+ assert.match(source,/errorCode/);
+ assert.match(source,/errorMessage/);
+ assert.match(source,/Environment diagnostics \/ Mazingira ya data/);
+ assert.match(source,/Preserved PDF integrity \/ Uhakiki wa PDF iliyohifadhiwa/);
+ assert.match(source,/Finalisation stage-record integrity \/ Uthabiti wa rekodi za hatua/);
+ assert.match(source,/evidence\.finalisationRecord\.stages\.map/);
+});

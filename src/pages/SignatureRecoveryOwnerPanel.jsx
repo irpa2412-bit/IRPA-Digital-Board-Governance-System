@@ -21,6 +21,39 @@ async function recoveryRequest(path,{pdf=false,method="GET",button="Recovery act
 }
 function reportText(item,evidence){
  const lines=["IRPA SIGNATURE RECOVERY ASSESSMENT","Document: "+(item?.title||evidence?.title||"Untitled document"),"Reference: "+(item?.documentId||"Not recorded"),"Envelope ID: "+(item?.envelopeId||evidence?.envelopeId||"Not recorded"),"Envelope status: "+(item?.status||evidence?.status||"Unknown"),"Finalisation stage: "+(evidence?.finalisationStage||"NOT_RECORDED")+" ("+(evidence?.finalisationStageCode||"FINALISATION_STAGE_NOT_RECORDED")+")","Audit chain: "+(evidence?.auditChain?.status||"NOT_RETRIEVED")+" ("+(evidence?.auditChain?.code||"AUDIT_CHAIN_NOT_RETRIEVED")+")","Source hash: "+(evidence?.sourceHashStatus||"NOT_RETRIEVED")+" ("+(evidence?.sourceHashCode||"SOURCE_HASH_NOT_RETRIEVED")+") — "+(evidence?.sourceHashReason||"Not recorded"),"Signature stamps:"];
+ const env=evidence?.environmentDiagnostics;
+ lines.push("Environment diagnostics: "+(env?"RETRIEVED":"NOT_RETRIEVED"));
+ if(env){
+  lines.push("  Envelope environment: "+(env.envelope||"MISSING"));
+  lines.push("  Preserved-copy environment: "+(env.preservedCopy||"MISSING"));
+  lines.push("  Gateway expected environment: "+(env.gatewayExpected||"MISSING"));
+  lines.push("  All environments match: "+(env.allMatch===true?"YES":env.allMatch===false?"NO":"NOT_CONFIRMED"));
+ }
+ const archive=evidence?.archivePending;
+ lines.push("Preserved archive record: "+(archive?"PRESENT":"NOT_PRESENT"));
+ if(archive){
+  lines.push("  Metadata present: "+(archive.metadataPresent===true?"YES":"NO"));
+  lines.push("  Storage reference present: "+(archive.storageReferencePresent===true?"YES":"NO"));
+  lines.push("  Recorded hash present: "+(archive.recordedHashPresent===true?"YES":"NO"));
+  lines.push("  Preserved PDF integrity: "+(archive.artifactIntegrityStatus||(archive.artifactBytesVerified===true?"MATCH":"NOT_RETRIEVED")));
+  lines.push("  Archive environment: "+(archive.environment||"MISSING"));
+  if(archive.fileName)lines.push("  File name: "+archive.fileName);
+  if(archive.createdAt)lines.push("  Archive record created: "+archive.createdAt);
+ }
+ const integrity=evidence?.stageRecordIntegrity;
+ lines.push("Finalisation stage-record integrity: "+(integrity?.status||"NOT_RETRIEVED"));
+ if(integrity){
+  lines.push("  Stage entry count: "+(Number.isInteger(integrity.entryCount)?integrity.entryCount:"NOT_RECORDED"));
+  lines.push("  Stage pointer interpretation: "+(integrity.firstFailedStageMeaning||"NOT_RECORDED"));
+ }
+ const record=evidence?.finalisationRecord;
+ lines.push("Stored finalisation record: "+(record?"PRESENT":"NOT_PRESENT"));
+ if(record){
+  lines.push("  Latest stage: "+(record.latestStage||"NOT_RECORDED"));
+  lines.push("  First failed stage: "+(record.firstFailedStage||"NOT_RECORDED"));
+  lines.push("  Updated at: "+(record.updatedAt||"NOT_RECORDED"));
+  for(const stage of Array.isArray(record.stages)?record.stages:[])lines.push("  Stage "+(stage.stageCode||"UNKNOWN")+": "+(stage.status||"INVALID")+" · "+(stage.errorCode||"NO_ERROR")+" · "+(stage.errorMessage||""));
+ }
  for(const row of evidence?.stampSlots||[])lines.push("- Page "+(row.page||"unknown")+", field "+(row.fieldId||"unknown")+": "+(row.resultStatus||row.status||"UNVERIFIABLE")+" ("+(row.code||"NOT_CODED")+") — "+(row.reason||"No reason recorded."));
  if(!(evidence?.stampSlots||[]).length)lines.push("- No signature or initials fields were returned.");
  lines.push("This report is an assessment only. The original PDF, signatures, signer identities, signing events, hashes, certificates and archive records were not changed.");
@@ -90,6 +123,13 @@ function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
   <h3>Evidence assessment / Tathmini ya ushahidi</h3>
   {loading&&<p role="status">Checking evidence… / Inakagua ushahidi…</p>}{error&&<p role="alert">{error}</p>}
   {evidence&&<><p><strong>Audit chain:</strong> {evidence.auditChain?.status||"NOT_RETRIEVED"} ({evidence.auditChain?.code||"NOT_RETRIEVED"})</p><p><strong>Source hash:</strong> {evidence.sourceHashStatus||"NOT_RETRIEVED"} ({evidence.sourceHashCode||"NOT_RETRIEVED"}) — {evidence.sourceHashReason||"Not recorded"}</p><p><strong>Finalisation stage:</strong> {evidence.finalisationStage||"NOT_RECORDED"} ({evidence.finalisationStageCode||"NOT_RECORDED"})</p>
+   <h4>Environment diagnostics / Mazingira ya data</h4>
+   <p><strong>Envelope:</strong> {evidence.environmentDiagnostics?.envelope||"NOT_RETRIEVED"} · <strong>Preserved copy:</strong> {evidence.environmentDiagnostics?.preservedCopy||"NOT_RETRIEVED"} · <strong>Gateway expected:</strong> {evidence.environmentDiagnostics?.gatewayExpected||"NOT_RETRIEVED"} · <strong>All match:</strong> {evidence.environmentDiagnostics?.allMatch===true?"YES":evidence.environmentDiagnostics?.allMatch===false?"NO":"NOT_RETRIEVED"}</p>
+   <h4>Preserved PDF integrity / Uhakiki wa PDF iliyohifadhiwa</h4>
+   <p><strong>Archive metadata:</strong> {evidence.archivePending?.metadataPresent===true?"PRESENT":evidence.archivePending?.metadataPresent===false?"NOT_PRESENT":"NOT_RETRIEVED"} · <strong>Storage reference:</strong> {evidence.archivePending?.storageReferencePresent===true?"PRESENT":evidence.archivePending?.storageReferencePresent===false?"MISSING":"NOT_RETRIEVED"} · <strong>Recorded hash:</strong> {evidence.archivePending?.recordedHashPresent===true?"PRESENT":evidence.archivePending?.recordedHashPresent===false?"MISSING":"NOT_RETRIEVED"} · <strong>Byte integrity:</strong> {evidence.archivePending?.artifactIntegrityStatus||(evidence.archivePending?.artifactBytesVerified===true?"MATCH":"NOT_RETRIEVED")} · <strong>Archive environment:</strong> {evidence.archivePending?.environment||"NOT_RETRIEVED"}</p>
+   <h4>Finalisation stage-record integrity / Uthabiti wa rekodi za hatua</h4>
+   <p><strong>Record:</strong> {evidence.stageRecordIntegrity?.status||"NOT_RETRIEVED"} · <strong>Entries:</strong> {Number.isInteger(evidence.stageRecordIntegrity?.entryCount)?evidence.stageRecordIntegrity.entryCount:"NOT_RETRIEVED"} · <strong>Latest stage:</strong> {evidence.finalisationRecord?.latestStage||"NOT_RECORDED"} · <strong>First failed stage:</strong> {evidence.finalisationRecord?.firstFailedStage||"NOT_RECORDED"}</p>
+   {(evidence.finalisationRecord?.stages||[]).length>0&&<div style={{display:"grid",gap:6}}>{evidence.finalisationRecord.stages.map((stage,index)=><div key={stage.stageCode||index} style={{border:"1px solid var(--border-color,#cbd5e1)",borderRadius:8,padding:8}}><strong>{stage.stageCode||"UNKNOWN"}: {stage.status||"INVALID"}</strong> · {stage.errorCode||"NO_ERROR"}{stage.errorMessage&&<div style={{fontSize:13}}>{stage.errorMessage}</div>}</div>)}</div>}
    <h4>Signature stamps / Mihuri ya saini</h4>{(evidence.stampSlots||[]).length===0?<p>No signature or initials fields were returned. (STAMP_FIELDS_NONE)</p>:<div style={{display:"grid",gap:8}}>{evidence.stampSlots.map(row=><div key={row.fieldId} style={{border:"1px solid var(--border-color,#cbd5e1)",borderRadius:8,padding:10}}><strong>{row.resultStatus||row.status||"UNVERIFIABLE"}</strong> — Page {row.page||"unknown"}, field {row.fieldId||"unknown"}<div style={{fontSize:13}}>{row.reason} ({row.code})</div></div>)}</div>}
    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>{canDiagnose?<button type="button" onClick={diagnose} disabled={diagnosticLoading}>{diagnosticLoading?"Diagnosing…":"Diagnose finalisation (read-only)"}</button>:<span className="muted">Dry-run diagnosis is not supported for this envelope status.</span>}<button type="button" onClick={()=>copy(report,"Assessment report")}>Copy assessment</button><button type="button" onClick={()=>download(report,"signature-recovery-assessment.txt")}>Download evidence report</button><button type="button" onClick={downloadUnarchivedCopy} disabled={copyLoading}>{copyLoading?"Preparing copy…":"Download completed copy"}</button><button type="button" onClick={loadPreview} disabled={!canPreview||previewLoading}>{previewLoading?"Preparing preview…":"Generate watermarked preview"}</button></div>
    {copyError&&<p role="alert">{copyError}</p>}{copyLabel&&<p role="status">{copyLabel}</p>}{copyHash&&<p><strong>SHA-256:</strong> <code>{copyHash}</code> · <strong>{copyMatch}</strong> <button type="button" onClick={()=>copy(copyHash,"SHA-256 hash")}>Copy hash</button></p>}{!canPreview&&<p className="muted">Preview is withheld unless the envelope is CompletionFailed and both the signing audit chain and original source hash are verified.</p>}
