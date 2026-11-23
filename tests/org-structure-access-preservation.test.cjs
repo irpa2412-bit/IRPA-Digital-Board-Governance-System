@@ -443,5 +443,5 @@ test("cross-department portal navigation and oversight notes remain separate fro
   assert.ok(appSource.includes("if(sessionAdministrator||institutionalReadOnlyAccess)return true"));
   assert.ok(appSource.includes("modules=sessionAdministrator?[...ALL_MODULES,...registeredPortalModules]:institutionalReadOnlyAccess?"));
   assert.ok(appSource.includes("InstitutionalOversightNotes activePortal={active}"));
-  assert.ok(appSource.includes('"Signature Platform","Authorization & Approvals","Voting"'));
+  assert.ok(appSource.includes('"Signature Platform","Signing Workspace","Post-Signature Work","Final Archive","Upload Document","Retrieve Archived Documents","Email Signing","Authorization & Approvals","Voting"'));
 });
