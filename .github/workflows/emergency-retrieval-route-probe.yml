@@ -1,0 +1,41 @@
+name: Emergency Retrieval Public Route Probe
+
+on:
+  push:
+    paths:
+      - ".github/workflows/emergency-retrieval-route-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Probe production Worker routes without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://irpa-google-drive-gateway.irpa-governance.workers.dev"
+          probe() {
+            local label="$1"
+            local method="$2"
+            local path="$3"
+            local body_file status
+            body_file="$(mktemp)"
+            status="$(curl --silent --show-error --max-time 20 --request "$method" --output "$body_file" --write-out '%{http_code}' "$BASE$path" || true)"
+            printf '%s method=%s status=%s content_type=' "$label" "$method" "${status:-000}"
+            grep -i '^content-type:' "$body_file" 2>/dev/null | head -1 | tr '\n' ' ' || true
+            printf ' body='
+            head -c 160 "$body_file" | tr '\n' ' '
+            printf '\n'
+            rm -f "$body_file"
+          }
+          probe "health" GET "/health"
+          probe "recovery-queue" GET "/api/recovery/envelopes"
+          probe "recovery-evidence" GET "/api/recovery/envelopes/IRPA-ENV-2026-11501354/evidence"
+          probe "recovery-preview" GET "/api/recovery/envelopes/IRPA-ENV-2026-11501354/preview.pdf"
+          probe "recovery-completed-copy" GET "/api/recovery/envelopes/IRPA-ENV-2026-11501354/completed-copy.pdf"
+          probe "emergency-retrieval" POST "/api/recovery/envelopes/IRPA-ENV-2026-11501354/emergency-retrieval"
+          probe "nonsense" GET "/__emergency_retrieval_probe_not_a_real_route__"
