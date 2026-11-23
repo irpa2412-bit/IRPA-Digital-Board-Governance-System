@@ -69,21 +69,17 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
     if (signer?.status === "Signed" && tokenKind === "invitation" && !completedReadOnly) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
     throw new HttpError(410, "This signing link has expired or is no longer active.");
   }
-  const expiry = tokenKind === "session" ? (sessionRecord?.expiresAt || signer.emailLinkSessionExpiresAt) : null;
-  const expiryMs = Date.parse(String(expiry || ""));
-  if (tokenKind === "session" && (!Number.isFinite(expiryMs) || new Date(now).getTime() > expiryMs)) {
-    throw new HttpError(410, "This signing session has expired. Reopen the original email invitation.");
-  }
-  return { ok: true, tokenKind, suppliedHash, sessionRecord: sessionRecord || null, expiry: Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null };
+  // Email-link access is invitation-scoped, not device-session-scoped.
+  // A device session remains valid until the signer submits, or the owner
+  // revokes/replaces the invitation. Legacy expiry timestamps are ignored.
+  return { ok: true, tokenKind, suppliedHash, sessionRecord: sessionRecord || null, expiry: null };
 }
-export function createFreshSigningSession({ envelopeId, signerId, now = new Date(), durationMinutes = 30 }) {
+export function createFreshSigningSession({ envelopeId, signerId }) {
   const secret = randomHex(32);
-  const nowMs = new Date(now).getTime();
-  const sessionExpiry = nowMs + durationMinutes * 60000;
   return {
     token: `${envelopeId}.${signerId}.${secret}`,
     secret,
-    expiresAt: new Date(sessionExpiry).toISOString()
+    expiresAt: null
   };
 }
 
