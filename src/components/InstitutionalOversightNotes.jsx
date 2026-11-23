@@ -1,0 +1,26 @@
+import React,{useEffect,useMemo,useState}from"react";
+import{addDoc,collection,limit,onSnapshot,orderBy,query,serverTimestamp}from"firebase/firestore";
+import{auth,db}from"../firebase/config";
+const NOTE_TYPES=[["COMMENT","Comment"],["QUERY","Query"],["REMARK","Remark"]];
+const clean=value=>String(value??"").trim();
+function formatDate(value){try{const date=value?.toDate?value.toDate():value instanceof Date?value:new Date(value);return Number.isNaN(date.getTime())?"Time pending":date.toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"});}catch{return"Time pending";}}
+export default function InstitutionalOversightNotes({activePortal="Dashboard",portalDepartment="",profile={},employee={},selectedAuthority=""}){
+ const[notes,setNotes]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[type,setType]=useState("COMMENT"),[reference,setReference]=useState(""),[message,setMessage]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ useEffect(()=>{if(!auth.currentUser){setNotes([]);setLoading(false);return;}const ref=query(collection(db,"institutionalOversightNotes"),orderBy("createdAt","desc"),limit(100));const unsubscribe=onSnapshot(ref,snapshot=>{setNotes(snapshot.docs.map(item=>({id:item.id,...item.data()})));setLoading(false);setError("");},failure=>{setError(failure?.message||"Oversight notes could not be loaded.");setLoading(false);});return()=>unsubscribe();},[]);
+ const visibleNotes=useMemo(()=>activePortal==="Dashboard"?notes:notes.filter(note=>note.portalName===activePortal),[notes,activePortal]);
+ async function submit(event){event.preventDefault();setError("");setNotice("");const text=clean(message),portal=clean(activePortal),user=auth.currentUser;if(!portal||!text){setError("Select a portal and enter a comment, query or remark.");return;}if(!user){setError("Your authenticated session has expired. Sign in again.");return;}setBusy(true);try{const authorName=clean(profile?.displayName||employee?.displayName||profile?.name||employee?.name||user.displayName||user.email||"IRPA user").slice(0,120);await addDoc(collection(db,"institutionalOversightNotes"),{recordType:"Institutional Oversight Note",portalName:portal.slice(0,160),departmentName:clean(portalDepartment||profile?.department||employee?.department).slice(0,120),recordReference:clean(reference).slice(0,180),type,message:text.slice(0,5000),authorUid:user.uid,authorName,authorRole:selectedAuthority,createdAt:serverTimestamp(),recordOrigin:"PRODUCTION"});setMessage("");setReference("");setNotice("Your entry has been recorded in the institutional oversight log.");}catch(failure){setError(failure?.message||"The entry was not saved. No success is being reported.");}finally{setBusy(false);}}
+ return <section className="panel institutional-oversight-notes" aria-labelledby="institutional-oversight-notes-title">
+  <div className="panel-header"><div><span className="eyebrow">CROSS-DEPARTMENT OVERSIGHT</span><h2 id="institutional-oversight-notes-title">Comments, queries and remarks</h2></div><span className="status-badge">Read access · {activePortal}</span></div>
+  <p>Record an observation against the current portal. Entries are immutable and retained in the institutional oversight log; they do not edit the department’s underlying records or approve transactions.</p>
+  {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
+  <form onSubmit={submit} className="form-grid">
+   <label className="form-field"><span>Entry type</span><select value={type} onChange={event=>setType(event.target.value)}>{NOTE_TYPES.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+   <label className="form-field"><span>Record reference (optional)</span><input value={reference} onChange={event=>setReference(event.target.value)} maxLength={180} placeholder="Document, transaction or register reference"/></label>
+   <label className="form-field" style={{gridColumn:"1 / -1"}}><span>Comment, query or remark</span><textarea value={message} onChange={event=>setMessage(event.target.value)} rows={3} maxLength={5000} required placeholder="Enter the observation or query for the department record."/></label>
+   <div style={{gridColumn:"1 / -1"}}><button type="submit" disabled={busy||!clean(message)}>{busy?"Recording…":"Record oversight entry"}</button></div>
+  </form>
+  <div className="institutional-oversight-notes-list" aria-live="polite"><h3>{activePortal==="Dashboard"?"Recent institutional oversight entries":`Recent entries · ${activePortal}`}</h3>{loading&&<p>Loading oversight entries…</p>}{!loading&&!visibleNotes.length&&<p>No oversight entries are recorded for this portal.</p>}
+   {visibleNotes.map(note=><article className="stat-card" key={note.id}><div className="panel-header"><strong>{NOTE_TYPES.find(item=>item[0]===note.type)?.[1]||"Oversight entry"}</strong><span>{formatDate(note.createdAt)}</span></div><p>{note.message}</p><small>{note.portalName}{note.departmentName?` · ${note.departmentName}`:""}{note.recordReference?` · Ref: ${note.recordReference}`:""}</small><small>Recorded by {note.authorName||"IRPA user"} · {note.authorRole||"Institutional role"}</small></article>)}
+  </div>
+ </section>;
+}
