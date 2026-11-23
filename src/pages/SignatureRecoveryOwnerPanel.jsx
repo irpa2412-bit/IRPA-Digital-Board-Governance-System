@@ -57,7 +57,7 @@ function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
    if(!gateway)throw new Error("The recovery service is not configured. (RECOVERY_SERVICE_URL_MISSING)");
    const token=await getIdToken(auth.currentUser);
    const response=await fetch(gateway+path,{method,headers:{Authorization:"Bearer "+token,Accept:"application/pdf",...(method==="POST"?{"Content-Type":"application/json"}:{})},...(method==="POST"?{body:"{}"}:{}),cache:"no-store"});
-   if(!response.ok){const body=await response.json().catch(()=>({}));const code=String(body.code||"RECOVERY_REQUEST_FAILED");throw new Error(String(body.error||"The copy could not be verified.")+" ("+code+")");}
+   if(!response.ok){const body=await response.json().catch(()=>({}));if(Array.isArray(body.stages))setCopyStages(body.stages);const code=String(body.code||"RECOVERY_REQUEST_FAILED");throw new Error(String(body.error||"The copy could not be verified.")+" ("+code+")");}
    const type=String(response.headers.get("content-type")||"").toLowerCase();
    if(!type.includes("application/pdf"))throw new Error("The recovery service returned an invalid file type. (COPY_RESPONSE_NOT_PDF)");
    const bytes=await response.arrayBuffer();

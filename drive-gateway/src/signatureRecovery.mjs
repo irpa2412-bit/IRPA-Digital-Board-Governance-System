@@ -349,6 +349,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     let certificateVerified=true;
     try{
       const pageText=await extractText(new Uint8Array(output));
+      stage("TEXT_EXTRACT","PASS");
       const certificate=verifyCertificatePageText(pageText,events,signers);
       if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL)){
         certificateVerified=false;
@@ -357,6 +358,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     }catch(error){
       certificateVerified=false;
       stage("TEXT_EXTRACT","FAILED",error,"TEXT_EXTRACT");
+      stage("CERT_VERIFY","NOT_APPLICABLE");
     }
     stage("DETACHED_EVIDENCE","NOT_APPLICABLE");
     let outputHash;
