@@ -329,7 +329,7 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
     try {
       if(emergencyPath){
         const result=await buildEmergencyRetrieval(ctx,user,decodeURIComponent(emergencyPath[1]));
-        if(!result.ok)return json({ok:false,code:result.stages.at(-1)?.error||"EMERGENCY_RETRIEVAL_FAILED",stages:result.stages,error:"Emergency retrieval could not be verified."},result.status||500,corsHeaders(request));
+        if(!result.ok){const denied=result.status===403;return json({ok:false,code:denied?"NOT_YOUR_ENVELOPE":"EMERGENCY_RETRIEVAL_FAILED",stages:result.stages,error:denied?"This envelope belongs to another owner.":"Emergency retrieval could not be verified."},result.status||500,corsHeaders(request));}
         return new Response(result.bytes,{status:200,headers:{...corsHeaders(request),"content-type":"application/pdf",'content-disposition':'attachment; filename="EMERGENCY-RETRIEVAL-COPY-NOT-ARCHIVED.pdf"',"cache-control":"no-store, private","pragma":"no-cache","x-content-type-options":"nosniff","x-irpa-copy-source":"emergency-build","x-irpa-copy-label":"Unarchived copy; the envelope is not yet Completed","x-irpa-output-sha256":result.outputHash,"x-irpa-stage-log":JSON.stringify(result.stages)}});
       }
       if(pathname==="/api/recovery/envelopes") {
