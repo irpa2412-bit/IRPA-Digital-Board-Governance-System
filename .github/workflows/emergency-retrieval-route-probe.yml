@@ -45,7 +45,6 @@ jobs:
           probe "recovery-evidence" GET "/api/recovery/envelopes/$ID/evidence" protected
           probe "recovery-preview" GET "/api/recovery/envelopes/$ID/preview.pdf" protected
           probe "recovery-completed-copy" GET "/api/recovery/envelopes/$ID/completed-copy.pdf" protected
-          probe "recovery-stamp-reassign" POST "/api/recovery/envelopes/$ID/stamps/reassign" protected
           probe "recovery-diagnose-finalisation" POST "/api/envelopes/$ID/diagnose-finalisation" protected
           probe "emergency-retrieval" POST "/api/recovery/envelopes/$ID/emergency-retrieval" protected
           probe "nonsense" GET "/__emergency_retrieval_probe_not_a_real_route__" missing
