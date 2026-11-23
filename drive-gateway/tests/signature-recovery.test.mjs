@@ -264,3 +264,67 @@ test("recovery evidence router refuses non-GET methods before authentication or 
   assert.equal(response.status,405);
   assert.equal(authenticationAttempts,0);
 });
+
+
+test("completed-copy recovery route is authenticated and serves only the exact preserved hash-matched PDF",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\nexisting archive-pending PDF\\n%%EOF");
+  const hash=await sha256Hex(bytes);
+  const envelope={id:"ENV-REC-COPY",createdBy:"owner-copy",status:"CompletionFailed",dataEnvironment:"TEST",completion:{archivePending:{storageId:"pending-copy",finalHash:hash,fileName:"preserved.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
+  let reads=0,writes=0,authCalls=0;
+  const ctx={
+    env:{IRPA_ENVIRONMENT:"test"},
+    meta:{async get(collection,id){assert.equal(collection,"envelopes");assert.equal(id,envelope.id);return structuredClone(envelope);},async update(){writes++;throw Error("writes forbidden");},async create(){writes++;throw Error("writes forbidden");}},
+    storage:{async get(id){reads++;assert.equal(id,"pending-copy");return new Uint8Array(bytes);},async put(){writes++;throw Error("writes forbidden");},async delete(){writes++;throw Error("writes forbidden");}},
+    now:()=>new Date("2026-11-23T06:01:00.000Z")
+  };
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>{authCalls++;return {user_id:"owner-copy",token:"test-token"};},
+    getFirestoreDocument:async()=>null,
+    buildContext:()=>ctx,
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({"access-control-allow-origin":"*"})
+  });
+  const response=await router(new Request("https://worker.test/api/recovery/envelopes/ENV-REC-COPY/completed-copy.pdf"),{}, "/api/recovery/envelopes/ENV-REC-COPY/completed-copy.pdf");
+  assert.equal(response.status,200);
+  assert.equal(response.headers.get("content-type"),"application/pdf");
+  assert.equal(response.headers.get("x-irpa-copy-status"),"UNARCHIVED_NOT_COMPLETED");
+  assert.equal(response.headers.get("x-irpa-document-sha256"),hash);
+  assert.match(response.headers.get("x-irpa-copy-disclaimer"),/not yet Completed/);
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()),bytes);
+  assert.equal(authCalls,1);
+  assert.equal(reads,1);
+  assert.equal(writes,0);
+  assert.equal(envelope.status,"CompletionFailed");
+});
+
+test("completed-copy recovery route rejects unauthenticated callers before building context",async()=>{
+  let contextBuilds=0;
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>{throw Error("missing bearer token");},
+    getFirestoreDocument:async()=>null,
+    buildContext:()=>{contextBuilds++;throw Error("must not build context");},
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const response=await router(new Request("https://worker.test/api/recovery/envelopes/ENV-REC-COPY/completed-copy.pdf"),{}, "/api/recovery/envelopes/ENV-REC-COPY/completed-copy.pdf");
+  assert.equal(response.status,401);
+  assert.equal(contextBuilds,0);
+});
+
+test("completed-copy recovery route fails closed for non-owners and hash mismatches without writes",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\npreserved bytes\\n%%EOF");
+  const hash=await sha256Hex(bytes);
+  const envelope={id:"ENV-REC-COPY",createdBy:"actual-owner",status:"CompletionFailed",dataEnvironment:"TEST",completion:{archivePending:{storageId:"pending-copy",finalHash:hash,createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
+  let reads=0,writes=0,caller="intruder",corrupt=false;
+  const ctx={env:{IRPA_ENVIRONMENT:"test"},meta:{async get(){return structuredClone(envelope);},async update(){writes++;throw Error("writes forbidden");},async create(){writes++;throw Error("writes forbidden");}},storage:{async get(){reads++;return corrupt?new TextEncoder().encode("wrong"):new Uint8Array(bytes);},async put(){writes++;throw Error("writes forbidden");},async delete(){writes++;throw Error("writes forbidden");}},now:()=>new Date("2026-11-23T06:01:00.000Z")};
+  const router=createSignatureRecoveryRouter({authenticateFirebaseRequest:async()=>({user_id:caller,token:"test-token"}),getFirestoreDocument:async()=>null,buildContext:()=>ctx,json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),corsHeaders:()=>({})});
+  const url="https://worker.test/api/recovery/envelopes/ENV-REC-COPY/completed-copy.pdf";
+  const denied=await router(new Request(url),{},new URL(url).pathname);
+  assert.equal(denied.status,403);
+  assert.equal(reads,0);
+  caller="actual-owner";corrupt=true;
+  const mismatch=await router(new Request(url),{},new URL(url).pathname);
+  assert.equal(mismatch.status,409);
+  assert.equal(reads,1);
+  assert.equal(writes,0);
+});
