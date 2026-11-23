@@ -607,22 +607,27 @@ test("b) owner is not a signer; the same Gmail mailbox receives one invitation p
   assert.equal(sent[1].position,2);
 });
 
-test("d) parallel signing sends every signer position at envelope creation without email deduplication",async()=>{
+test("parallel signing supports more than ten signers and makes every signer eligible immediately",async()=>{
   const f=await fixture(),sent=[];
   f.ctx.sendInvitation=async message=>sent.push(message);
+  const positions=Array.from({length:12},(_,index)=>index+1);
   const created=await createEnvelope(f.ctx,{uid:"owner-uid",email:"owner@example.org",name:"Document Owner",isAdmin:false},{
     documentId:f.envelope.documentId,externalReference:"IRPA-D-PARALLEL-"+Math.random().toString(16).slice(2,10),
     archives:["board-governance"],signingMode:"Parallel",
-    signers:[1,2,3].map(index=>({identityType:"email-link",email:"parallel-gmail@example.com",name:"Parallel "+index,order:index,role:"Signer"})),
-    fields:[1,2,3].map(index=>({fieldId:"D-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
+    signers:positions.map(index=>({identityType:"email-link",email:"parallel-gmail@example.com",name:"Parallel "+index,order:index,role:"Signer"})),
+    fields:positions.map(index=>({fieldId:"D-SIGN-"+index,type:"Signature",signerId:"S"+index,page:1,x:10,y:10,width:20,height:8,required:true}))
   });
-  assert.equal(sent.length,3,"parallel mode emails all positions during creation");
-  assert.deepEqual(sent.map(item=>item.signerId),["S1","S2","S3"]);
-  assert.deepEqual(sent.map(item=>item.position),[1,2,3]);
-  assert.deepEqual(sent.map(item=>item.to),["parallel-gmail@example.com","parallel-gmail@example.com","parallel-gmail@example.com"]);
+  assert.equal(sent.length,12,"parallel mode emails all twelve signer positions during creation");
+  assert.deepEqual(sent.map(item=>item.signerId),positions.map(index=>"S"+index));
+  assert.deepEqual(sent.map(item=>item.position),positions);
+  assert.ok(sent.every(item=>item.to==="parallel-gmail@example.com"));
   const tokens=sent.map(item=>new URL(item.link).searchParams.get("emailSignToken"));
-  assert.equal(new Set(tokens).size,3,"each position has its own signer-bound token");
-  assert.equal(created.invitations.length,3);
+  assert.equal(new Set(tokens).size,12,"each position has its own signer-bound token");
+  assert.equal(created.invitations.length,12);
+  for(const token of tokens){
+    const opened=await openEmailSigning(f.ctx,token,"198.51.100.91");
+    assert.equal(opened.canSign,true,"parallel signer eligibility must not depend on earlier positions signing");
+  }
 });
 
 test("c) the owner's IRPA address at position 1 is emailed and Gmail X is automatically emailed at position 2",async()=>{
