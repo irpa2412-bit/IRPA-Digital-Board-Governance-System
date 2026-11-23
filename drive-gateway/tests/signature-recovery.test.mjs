@@ -488,8 +488,8 @@ test("emergency retrieval returns stage log and SHA-256 without changing envelop
   assert.equal(response.status,200,responseBody);
   assert.match(response.headers.get("x-irpa-output-sha256"),/^[a-f0-9]{64}$/);
   const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
-  assert.ok(stages.some(stage=>stage.stageCode==="CERT_PAGE_VERIFY"&&stage.status==="pass"));
-  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="not-checked"));
+  assert.ok(stages.some(stage=>stage.stageCode==="CERT_VERIFY"&&stage.status==="PASS"));
+  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="NOT_APPLICABLE"));
   assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="not-checked"));
   assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,before.events.length);
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
@@ -542,5 +542,5 @@ test("repeat emergency retrieval has the same verification result",async()=>{
   assert.equal(first.ok,true);
   assert.equal(second.ok,true);
   assert.deepEqual(first.stages,second.stages);
-  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_PAGE_VERIFY").status,"pass");
+  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_VERIFY").status,"PASS");
 });

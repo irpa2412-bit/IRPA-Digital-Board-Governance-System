@@ -361,6 +361,7 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
       stage("TEXT_EXTRACT","FAILED",error,"TEXT_EXTRACT");
       stage("CERT_VERIFY","NOT_APPLICABLE");
     }
+    stage("STAMPS_IN_OUTPUT","NOT_APPLICABLE");
     stage("DETACHED_EVIDENCE","NOT_APPLICABLE");
     let outputHash;
     try{outputHash=await sha256Hex(output);}catch(error){return fail("OUTPUT_SHA256",error);}
