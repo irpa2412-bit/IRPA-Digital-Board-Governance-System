@@ -40,8 +40,8 @@ test("Gateway email-link signing is independent of Firebase UID authentication",
   assert.match(gateway,/emailLinkSessionStatus==="active"/);
   assert.match(gateway,/SESSION_REQUIRED/);
   assert.match(gateway,/emailSignToken=/);
-  assert.match(invitation,/single-use link/);
-  assert.match(invitation,/signer-specific session/);
+  assert.match(invitation,/no time-based expiry/);
+  assert.match(invitation,/signing session may expire after inactivity/);
 });
 
 test("staging and production Gateway envelopes reject every non-email-link signer identity",()=>{

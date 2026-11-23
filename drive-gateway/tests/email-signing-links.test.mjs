@@ -23,7 +23,7 @@ import {route as esignRoute,makeContext} from "../src/router.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00.000Z");
 
-test.skip("email signing invitation expiry copy is obsolete (replaced by the rebuild)",()=>{});
+test("email signing invitation states that the original link does not expire by time",()=>{const message=buildEmailSigningInvitationMessage({name:"Signer",link:"https://irpa.example.test/?emailSignToken=token",title:"Board Policy",ownerName:"Document Owner"});assert.match(message.text,/no time-based expiry/i);assert.match(message.text,/until the envelope is completed/i);assert.doesNotMatch(message.text,/single-use|link expiry:/i);});
 
 test("email token has at least 32 random bytes and only its SHA-256 hash is persisted", async () => {
   const issued = await createEmailSigningToken({envelopeId:"ENV-TEST01",signerId:"S1",email:"Signer@Example.org",now:NOW});
@@ -240,8 +240,9 @@ test("concurrent signer resends are serialized and the delivered token is the pe
   assert.equal(result.signingLink,sent[0].link,"the returned sharing URL must be the exact link delivered to this signer");
   const deliveredToken=new URL(sent[0].link).searchParams.get("emailSignToken");
   assert.equal(record.signers[0].tokenHash,await sha256Hex(deliveredToken.split(".")[2]));
-  assert.equal(record.signers[0].tokenExpiresAt,result.expiresAt);
-  assert.equal(record.signers[0].emailLinkExpiresAt,result.expiresAt);
+  assert.equal(result.expiresAt,null);
+  assert.equal(record.signers[0].tokenExpiresAt,null);
+  assert.equal(record.signers[0].emailLinkExpiresAt,null);
   assert.equal(record.signers[0].emailLinkStatus,"issued");
   assert.equal(record.signers[0].resendAttempt,undefined);
   assert.equal(record.signers[0].emailLinkTokenHistory.at(-1).tokenHash,originalHash);

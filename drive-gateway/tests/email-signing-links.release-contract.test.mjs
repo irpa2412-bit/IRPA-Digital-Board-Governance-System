@@ -61,7 +61,7 @@ test("token, IP and envelope mutations use hashes and compare-and-set",()=>{
   assert.match(signing,/sha256Hex\("email-signing-rate:"\+key\)/);
   assert.match(signing,/ctx\.meta\.update\("envelopes",id,patch,\{ifVersion:c\._v\}\)/);
   assert.match(signing,/signer\.emailLinkSessionHash=sessionHash/);
-  assert.match(signing,/signer\.emailLinkStatus==="issued"/);
+  assert.match(signing,/\["issued","opened","expired"\]\.includes\(signer\.emailLinkStatus\)/);
   assert.match(signing,/emailLinkStatus="revoked"/);
   assert.doesNotMatch(signing,/logger\.(?:info|debug|error)\([^\n]*token\b/i);
 });

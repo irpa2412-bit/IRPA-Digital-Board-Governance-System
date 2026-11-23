@@ -138,10 +138,13 @@ test("contact correction preserves signer ID and assigned fields and returns an 
   assert.equal(updated.audit.fieldsPreserved, true);
 });
 
-test("configured expiry is enforced and is displayed in EAT", async () => {
+test("original email invitation remains valid beyond the former configured expiry", async () => {
   const f = await fixture();
-  await assert.rejects(() => inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${f.issued.token}`, ...f, now: new Date("2026-11-28T00:00:00.000Z") }), /expired/i);
-  assert.match(formatEmailLinkExpiryEAT(EXPIRY), /EAT$/);
+  f.signer.emailLinkExpiresAt=EXPIRY;
+  f.signer.tokenExpiresAt=EXPIRY;
+  const result=await inspectEmailSigningLink({ token: `${f.envelope.id}.S1.${f.issued.token}`, ...f, now: new Date("2028-11-28T00:00:00.000Z") });
+  assert.equal(result.ok,true);
+  assert.equal(result.expiry,null);
 });
 
 test("legacy single-use token state is rejected by the reusable-link contract", async () => {
@@ -267,9 +270,9 @@ test("owner/admin SMTP self-check remains protected by the existing Worker route
 test("v2 invitation copy and Worker routes describe a reusable, signer-scoped link", () => {
   const worker = fs.readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
   const signing = fs.readFileSync(new URL("../src/signing.mjs", import.meta.url), "utf8");
-  assert.ok(worker.includes("Your link is reusable"));
-  assert.ok(worker.includes("Previewing the link does not consume it"));
-  assert.ok(worker.includes("reopen the same email link"));
+  assert.ok(worker.includes("no time-based expiry"));
+  assert.ok(worker.includes("remains reusable until the envelope is completed"));
+  assert.ok(worker.includes("read-only access to the completed PDF"));
   assert.ok(worker.includes("previewGatewayEmailSigning"));
   assert.ok(worker.includes("openGatewayEmailSigning"));
   assert.ok(signing.includes('emailSigningModule=EMAIL_SIGNING_REBUILD_ENABLED?"v2":"legacy"'));
