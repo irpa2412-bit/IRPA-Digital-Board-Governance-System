@@ -343,10 +343,16 @@ export async function openEmailSigning(ctx,token,ip=""){
     await mutate(ctx,loaded.env.id,async current=>{
       const signer=current.signers.find(item=>item.id===loaded.signer.id);
       if(!signer||signer.identityType!=="email-link"||!["issued","opened","expired"].includes(signer.emailLinkStatus)||!safeEqual(String(signer.tokenHash||""),await sha256Hex(parts[2])))throw new HttpError(409,"The invitation changed before the signing session could be opened.");
-      const retainedSessions=(Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[])
+      const existingSessions=Array.isArray(signer.emailLinkSessions)?signer.emailLinkSessions:[];
+      const legacyHash=String(signer.emailLinkSessionHash||"");
+      const legacyExpiry=String(signer.emailLinkSessionExpiresAt||"");
+      const legacySession=legacyHash&&signer.emailLinkSessionStatus==="active"&&Date.parse(legacyExpiry)>now.getTime()&&!existingSessions.some(session=>safeEqual(String(session?.tokenHash||""),legacyHash))
+        ?[{tokenHash:legacyHash,status:"active",createdAt:signer.emailLinkSessionCreatedAt||now.toISOString(),expiresAt:legacyExpiry,ipHash:null}]
+        :[];
+      const retainedSessions=[...existingSessions,...legacySession]
         .filter(session=>session?.status==="active"&&Date.parse(String(session.expiresAt||""))>now.getTime());
-      // Do not replace another browser's still-valid session. Each browser receives
-      // an independent bearer session, all scoped to this same signer assignment.
+      // Do not replace another browser's still-valid session, including a legacy
+      // single-session record created before this multi-session repair was deployed.
       signer.emailLinkSessions=[...retainedSessions,{tokenHash:sessionHash,status:"active",createdAt:now.toISOString(),expiresAt:sessionExpiresAt,ipHash}];
       signer.emailLinkSessionHash=sessionHash;
       signer.emailLinkSessionStatus="active";
