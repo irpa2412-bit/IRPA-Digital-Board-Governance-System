@@ -15,8 +15,9 @@ async function seededContext(){
   const stored=await storage.put({path:"source/original.pdf",bytes:source,contentType:"application/pdf",metadata:{}});
   await meta.create("documents","DOC-WORKER",{id:"DOC-WORKER",primaryStorageId:stored.id,sha256:sourceHash});
   const fieldIds=Array.from({length:12},(_,i)=>"SIG-"+(i+1));
-  const fieldValues=Object.fromEntries(fieldIds.map((id,i)=>[id,"Verified stamp specimen "+(i+1)]));
-  const signatureValue="Original signer specimen";
+  const stampPng="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+  const fieldValues=Object.fromEntries(fieldIds.map(id=>[id,stampPng]));
+  const signatureValue=stampPng;
   const signatureFieldHashes=await Promise.all(fieldIds.map(async fieldId=>({fieldId,type:"Signature",hash:await sha256Hex(fieldValues[fieldId])})));
   let events=[];
   events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-23T06:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds,signatureFieldHashes});
@@ -24,7 +25,7 @@ async function seededContext(){
   await meta.create("envelopes","ENV-WORKER",{
     id:"ENV-WORKER",dataEnvironment:"TEST",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-WORKER",documentHash:sourceHash,
     title:"Worker recovery fixture",fields:fieldIds.map((fieldId,index)=>({fieldId,type:"Signature",page:index<6?1:3,x:0.05+(index%3)*0.3,y:0.08+Math.floor(index%6/3)*0.3,width:0.22,height:0.12,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0})),
-    signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],order:1,signedAt:"2026-11-23T06:00:00.000Z",signatureValue,fieldValues,name:"Worker Test Signer",email:"worker-signer@example.test",signatureType:"typed"}],
+    signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],order:1,signedAt:"2026-11-23T06:00:00.000Z",signatureValue,fieldValues,name:"Worker Test Signer",email:"worker-signer@example.test",signatureType:"drawn"}],
     events,completionFailure:{stage:"WRITE_ARCHIVE_COPIES",errorType:"Error",failedAt:"2026-11-23T06:00:01.000Z"}
   });
   return {ctx:{meta,storage,env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test"},config:{appUrl:"https://irpa.example.test"}},user:{uid:"owner-1"}};
