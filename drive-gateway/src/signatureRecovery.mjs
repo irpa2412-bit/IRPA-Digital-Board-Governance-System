@@ -5,7 +5,7 @@ import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
 import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
 import { buildSignedPdf, MAX_PDF_BYTES } from "./pdf.mjs";
-import { verifyCertificateInput, verifyCertificatePageText, extractLastPdfPageText } from "./recoveryCertificateVerifier.mjs";
+import { verifyCertificateInput, verifyCertificatePageText, extractPdfText } from "./recoveryCertificateVerifier.mjs";
 
 const isOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function validChain(events){
@@ -231,16 +231,22 @@ const EMERGENCY_COPY_DISCLAIMER="Cryptographic PDF seal: NOT APPLIED. Emergency 
 const emergencyOwner=(envelope,user)=>Boolean(user?.uid)&&(envelope.createdBy===user.uid||envelope.createdByUid===user.uid||envelope.ownerUid===user.uid||user.isAdmin===true);
 async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
   const pdf=await PDFDocument.load(bytes);
-  const page=pdf.addPage([612,792]);
+  let page=pdf.addPage([612,792]);
   const font=await pdf.embedFont(StandardFonts.Helvetica);
   const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
   let y=752;
+  const nextPage=()=>{
+    page=pdf.addPage([612,792]);
+    y=752;
+    page.drawText("EMERGENCY RETRIEVAL EVIDENCE - CONTINUED",{x:48,y,size:9,font:bold});
+    y-=18;
+  };
   const write=(value,size=7.5,useBold=false)=>{
     const selected=useBold?bold:font;
     const text=String(value??"");
     const max=Math.max(30,Math.floor(500/(size*0.55)));
     for(let offset=0;offset<text.length;offset+=max){
-      if(y<28)throw new Error("EMERGENCY_CERTIFICATE_PAGE_OVERFLOW");
+      if(y<28)nextPage();
       page.drawText(text.slice(offset,offset+max),{x:48,y,size,font:selected});
       y-=size+3;
     }
@@ -295,7 +301,7 @@ function safeRecoveryErrorClass(error){
   const value=String(error?.name||"Error");
   return /^[A-Za-z][A-Za-z0-9]{0,47}$/.test(value)?value:"Error";
 }
-export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLastPdfPageText}={}){
+export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractPdfText}={}){
   const stages=[];
   const stage=(stageCode,status,error=null,failureCode=null)=>{
     const entry={stageCode,status};
@@ -354,7 +360,9 @@ export async function buildEmergencyRetrieval(ctx,user,id,{extractText=extractLa
     if(!(output instanceof Uint8Array)||output.byteLength>MAX_PDF_BYTES)return fail("SIZE_LIMIT",new RangeError("RECOVERY_PDF_SIZE_LIMIT"));
     stage("SIZE_LIMIT","PASS");
     let certificateVerified=true,pageText=null;
-    try{pageText=await extractText(new Uint8Array(output));stage("TEXT_EXTRACT","PASS");}
+    let certificateStartPage=0;
+    try{certificateStartPage=(await PDFDocument.load(built)).getPageCount();}catch(error){return fail("PDF_BUILD",error);}
+    try{pageText=await extractText(new Uint8Array(output),certificateStartPage);stage("TEXT_EXTRACT","PASS");}
     catch(error){certificateVerified=false;stage("TEXT_EXTRACT","FAILED",error,"TEXT_EXTRACT");stage("CERT_VERIFY","NOT_APPLICABLE");}
     if(pageText!==null){
       try{

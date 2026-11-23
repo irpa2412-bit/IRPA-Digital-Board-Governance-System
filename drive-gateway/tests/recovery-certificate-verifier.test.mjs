@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifyCertificatePageText, verifyCertificateInput, extractLastPdfPageText } from "../src/recoveryCertificateVerifier.mjs";
+import { verifyCertificatePageText, verifyCertificateInput, extractLastPdfPageText, extractPdfText } from "../src/recoveryCertificateVerifier.mjs";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
 const hash1 = "a".repeat(64);
@@ -32,6 +32,17 @@ test("builder input must exactly carry the verified chain values", () => {
   assert.equal(verifyCertificateInput({ ...info, signers: [{ name: "Altered" }] }, events, signers).ok, false);
 });
 
+
+test("unpdf extracts certificate text from every page", async () => {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  pdf.addPage([612, 792]).drawText("First certificate continuation", { x: 30, y: 700, size: 12, font });
+  pdf.addPage([612, 792]).drawText("Last certificate continuation", { x: 30, y: 700, size: 12, font });
+  const bytes = new Uint8Array(await pdf.save());
+  const text = await extractPdfText(bytes);
+  assert.match(text, /First certificate continuation/);
+  assert.match(text, /Last certificate continuation/);
+});
 
 test("unpdf extracts certificate page text on the Node runtime", async () => {
   const pdf = await PDFDocument.create();
