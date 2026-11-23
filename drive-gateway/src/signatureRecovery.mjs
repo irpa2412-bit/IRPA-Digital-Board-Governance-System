@@ -370,7 +370,8 @@ export function createSignatureRecoveryRouter({authenticateFirebaseRequest,getFi
       return json({ok:false,error:"Not found."},404,corsHeaders(request));
     } catch(error) {
       const status=Number(error?.status)||500;
-      return json({ok:false,error:status>=400&&status<500?String(error.message||"Recovery request denied."):"Recovery assessment is temporarily unavailable."},status,corsHeaders(request));
+      const message=String(error?.message||"EMERGENCY_RETRIEVAL_REQUEST_FAILED");
+      return json({ok:false,error:message,stages:[{stageCode:"REQUEST",status:"fail",error:message}]},status,corsHeaders(request));
     }
   };
 }
