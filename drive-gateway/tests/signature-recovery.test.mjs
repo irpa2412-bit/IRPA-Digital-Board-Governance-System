@@ -9,7 +9,7 @@ async function addEvent(events,event){
   const body={...event,prevHash:events.length?events.at(-1).hash:"GENESIS"};
   return [...events,{...body,hash:await sha256Hex(canonicalJson(body))}];
 }
-async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false}={}){
+async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,stampCount=2}={}){
   const sent=[],meta=memoryMeta(),storage=memoryStorage(),pdf=await PDFDocument.create();
   pdf.addPage([612,792]);
   const source=new Uint8Array(await pdf.save()),sourceHash=await sha256Hex(source);
@@ -17,13 +17,16 @@ async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false}={}){
   await meta.create("documents","DOC-REC-1",{id:"DOC-REC-1",primaryStorageId:stored.id,sha256:sourceHash});
   const signatureValue="Original signature specimen";
   const fieldValue="Verified stamp specimen";
+  const fieldIds=stampCount===12?Array.from({length:12},(_,index)=>"SIG-"+(index+1)) : ["SIG-1","SIG-2"];
+  const fieldValues=Object.fromEntries(fieldIds.map(fieldId=>[fieldId,fieldValue]));
   let events=[];
-  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds:["SIG-1","SIG-2"],signatureFieldHashes:[{fieldId:"SIG-1",type:"Signature",hash:await sha256Hex(tamperAllFieldHashes?"different":fieldValue)},{fieldId:"SIG-2",type:"Signature",hash:await sha256Hex(tamperFieldHash?"different":fieldValue)}]});
+  const signatureFieldHashes=await Promise.all(fieldIds.map(async fieldId=>({fieldId,type:"Signature",hash:await sha256Hex(tamperAllFieldHashes||(fieldId==="SIG-2"&&tamperFieldHash)?"different":fieldValue)})));
+  events=await addEvent(events,{type:"signer.role_assignment.completed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",roleAssignmentIndex:0,role:"Signer",capacity:"",fieldIds,signatureFieldHashes});
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",dataEnvironment:"TEST",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
-    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:[{fieldId:"SIG-1",type:"Signature",page:1,x:0.1,y:0.1,width:0.3,height:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0},{fieldId:"SIG-2",type:"Signature",page:1,x:0.5,y:0.1,width:0.3,height:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0}],
-    signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],order:1,signedAt:"2026-11-22T10:00:00.000Z",signatureValue,fieldValues:{"SIG-1":fieldValue,"SIG-2":fieldValue},name:"Test Signer",email:"signer@example.test",signatureType:"drawn"}],
+    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:fieldIds.map((fieldId,index)=>({fieldId,type:"Signature",page:1,x:stampCount===12?0.05+(index%4)*0.23:(index===0?0.1:0.5),y:stampCount===12?0.08+Math.floor(index/4)*0.22:0.1,width:stampCount===12?0.18:0.3,height:stampCount===12?0.08:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0})),
+    signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],order:1,signedAt:"2026-11-22T10:00:00.000Z",signatureValue,fieldValues,name:"Test Signer",email:"signer@example.test",signatureType:"drawn"}],
     events,completionFailure:{stage:"WRITE_ARCHIVE_COPIES",errorType:"Error",failedAt:"2026-11-22T10:00:01.000Z"}
   });
   return {ctx:{meta,storage,env:{DRIVE_MOCK:"true",IRPA_ENVIRONMENT:"test"},now:()=>new Date("2026-11-22T12:00:00.000Z"),config:{appUrl:"https://irpa.example.test",emailLinkTtlDays:7,ttlDays:14},sendInvitation:async message=>{sent.push(message);}},sent,user:{uid:"owner-1"},other:{uid:"intruder"},events};
@@ -400,4 +403,59 @@ test("evidence assessment classifies legacy production environment without accep
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
   assert.deepEqual(result.environmentDiagnostics,{envelope:"LEGACY_PRODUCTION",preservedCopy:"LEGACY_PRODUCTION",gatewayExpected:"TEST",allMatch:false});
   assert.equal(result.archivePending.artifactIntegrityStatus,"MISSING");
+});
+
+
+test("emergency retrieval rejects a non-owner explicitly",async()=>{
+  const f=await fixture();
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"intruder",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const response=await router(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/emergency-retrieval",{method:"POST"}),{}, "/api/recovery/envelopes/ENV-REC-1/emergency-retrieval");
+  assert.equal(response.status,403);
+  assert.match((await response.json()).error,/another owner/i);
+});
+
+test("emergency retrieval returns stage log and SHA-256 without changing envelope or using a new timestamp",async()=>{
+  const f=await fixture({stampCount:12});
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  f.ctx.now=()=>{throw new Error("CTX_NOW_MUST_NOT_BE_CALLED");};
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const response=await router(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/emergency-retrieval",{method:"POST"}),{}, "/api/recovery/envelopes/ENV-REC-1/emergency-retrieval");
+  const responseBody=response.status===200?"":await response.clone().text();
+  assert.equal(response.status,200,responseBody);
+  assert.match(response.headers.get("x-irpa-output-sha256"),/^[a-f0-9]{64}$/);
+  const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
+  assert.ok(stages.some(stage=>stage.stageCode==="CERT_PAGE_VERIFY"&&stage.status==="pass"));
+  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="not-checked"));
+  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="not-checked"));
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,before.events.length);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+});
+
+test("corrupt stamp evidence fails closed and returns no PDF",async()=>{
+  const f=await fixture({tamperFieldHash:true});
+  const result=await (await import("../src/signatureRecovery.mjs")).buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,false);
+  assert.ok(result.stages.some(stage=>stage.stageCode==="STAMP_EVIDENCE"&&stage.status==="fail"));
+  assert.equal(result.bytes,undefined);
+});
+
+test("repeat emergency retrieval has the same verification result",async()=>{
+  const f=await fixture({stampCount:12});
+  const module=await import("../src/signatureRecovery.mjs");
+  const first=await module.buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  const second=await module.buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(first.ok,true);
+  assert.equal(second.ok,true);
+  assert.deepEqual(first.stages,second.stages);
+  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_PAGE_VERIFY").status,"pass");
 });
