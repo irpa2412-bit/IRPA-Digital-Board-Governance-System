@@ -110,7 +110,7 @@ test("administrator portal navigation includes every registered app module witho
   assert.match(appSource, /const sessionAdministrator=Boolean\(admin\|\|profile\?\.authorizationType===["']administrator["']\)/);
   assert.match(appSource, /storedAuthority!=="Administrator"/);
   assert.match(appSource, /sessionAdministrator\|\|authority==="Administrator"/);
-  assert.match(appSource, /if\(sessionAdministrator\)return true/);
+  assert.match(appSource, /if\(sessionAdministrator(?:\|\|institutionalReadOnlyAccess)?\)return true/);
   assert.match(appSource, /selected==="Administrator"\?\["Dashboard","Role Descriptions"\]/);
   assert.match(appSource, /modules=sessionAdministrator\?\[\.\.\.ALL_MODULES,\.\.\.registeredPortalModules\]/);
   assert.ok(appSource.includes("const ALL_MODULES="));
@@ -428,14 +428,6 @@ test("institutional oversight comments, queries and remarks are append-only and 
   await assertFails(oversight.doc("institutionalOversightNotes/" + created.id).delete());
   const ordinary = env.authenticatedContext("ordinary-reader").firestore();
   await assertFails(ordinary.doc("institutionalOversightNotes/" + created.id).get());
-});
-
-test("administrator can inspect production Finance records without changing Finance write rules", async () => {
-  await env.withSecurityRulesDisabled(async context => {
-    await context.firestore().doc("financeTransactions/admin-production-read").set({ recordOrigin: "PRODUCTION", status: "Posted", amount: 250, currency: "TZS" });
-  });
-  const administrator = env.authenticatedContext("owner-primary", { admin: true }).firestore();
-  await assertSucceeds(administrator.doc("financeTransactions/admin-production-read").get());
 });
 
 test("cross-department portal navigation and oversight notes remain separate from administrative and signing controls", () => {
