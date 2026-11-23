@@ -262,9 +262,11 @@ test("upgrading an existing live session preserves it when another browser opens
   assert.equal((await getSigningPdf(f.ctx,second.sessionToken,null)).fileName,"email-link.pdf");
 });
 
-test("completed email-link signing consumes the invitation and session exactly once",async()=>{
+test("successful signing consumes the shared invitation and every device session exactly once",async()=>{
   const f=await fixture();
   const opened=await openEmailSigning(f.ctx,f.token,"198.51.100.8");
+  const secondDevice=await openEmailSigning(f.ctx,f.token,"198.51.100.9");
+  assert.notEqual(opened.sessionToken,secondDevice.sessionToken);
   const result=await sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary",occupation:"Secretary"},consent:true,user:null});
   assert.ok(["InProgress","Completed","CompletionFailed"].includes(result.status));
   const stored=await f.ctx.meta.get("envelopes",f.created.envelopeId);
@@ -272,8 +274,11 @@ test("completed email-link signing consumes the invitation and session exactly o
   assert.equal(stored.signers[0].emailLinkStatus,"used");
   assert.equal(stored.signers[0].emailLinkSessionStatus,"used");
   assert.ok(stored.signers[0].emailLinkSessionHash,"the consumed session hash remains only to authorize read-only retrieval of the completed PDF");
+  assert.equal(stored.signers[0].emailLinkSessions.length,2);
+  assert.ok(stored.signers[0].emailLinkSessions.every(session=>session.status==="used"),"all device sessions are consumed together");
   await assert.rejects(()=>openEmailSigning(f.ctx,f.token,"198.51.100.8"));
   await assert.rejects(()=>sign(f.ctx,{token:opened.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary"},consent:true,user:null}));
+  await assert.rejects(()=>sign(f.ctx,{token:secondDevice.sessionToken,signature:{type:"typed",value:"Board Secretary"},declarations:{name:"Board Secretary"},consent:true,user:null}));
   if(result.completed===true){const finalPdf=await getSigningPdf(f.ctx,opened.sessionToken,null);assert.match(finalPdf.fileName,/signed-/);}
 });
 
