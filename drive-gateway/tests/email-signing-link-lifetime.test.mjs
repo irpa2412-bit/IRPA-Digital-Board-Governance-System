@@ -30,9 +30,7 @@ test("legacy expired marker does not invalidate the current original invitation"
 
 test("completed envelope clears the original invitation link",async()=>{
  const {issued,envelope,signer}=await fixture({status:"opened",envelopeStatus:"Completed",signerStatus:"Signed"});
- const result=await inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future});
- assert.equal(result.ok,true);
- assert.equal(result.tokenKind,"invitation");
+ await assert.rejects(()=>inspectEmailSigningLink({token:`${envelope.id}.${signer.id}.${issued.token}`,envelope,signer,now:future}),error=>error.status===410&&error.message==="This document is already signed.");
 });
 
 test("temporary session expires independently while original invitation remains reusable",async()=>{
