@@ -15,7 +15,7 @@ const document = (collection, id, data, updateTime = "2026-10-10T00:00:00.000Z")
   updateTime,
   fields: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, field(v)]))
 });
-const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "organizer-1", email: "organizer@example.org" }, onCommit = () => {} } = {}) => {
+const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "organizer-1", email: "organizer@example.org" }, onCommit = () => {}, members = [], employees = [], departments = [] } = {}) => {
   const calls = [];
   const ctx = {
     authenticateFirebaseRequest: async () => user,
@@ -29,6 +29,11 @@ const ctxFor = ({ meeting, participant, pass, admin = false, user = { user_id: "
   globalThis.fetch = async (url, init = {}) => {
     const target = new URL(url);
     calls.push({ url: target, init });
+    if (target.pathname.endsWith("/documents:runQuery")) {
+      const collection = JSON.parse(init.body || "{}").structuredQuery?.from?.[0]?.collectionId;
+      const records = collection === "members" ? members : collection === "employees" ? employees : collection === "institutionalDepartments" ? departments : [];
+      return new Response(JSON.stringify(records.map((row, index) => ({ document: document(collection, row.id || row.uid || row.employeeNumber || row.memberNumber || "seed-" + index, row) }))), { status: 200 });
+    }
     if (target.pathname.endsWith("/documents:commit")) {
       onCommit(JSON.parse(init.body));
       return new Response(JSON.stringify({ commitTime: new Date().toISOString() }), { status: 200 });
@@ -55,14 +60,16 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   const accessToken = "test-meeting-access-token-0123456789";
   const meetingPassword = "ABCD1234WXYZ";
   const digest = async value => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(b => b.toString(16).padStart(2, "0")).join("");
+  let committed;
   const { ctx, calls } = ctxFor({
-    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled", platformAccessUrl: "https://meet.example.org/board", platformMeetingId: "ROOM-123", platformPasscode: "ROOM-PASS", agenda: "Approve minutes" } },
+    meeting: { id: "meeting-1", data: { initiatorUid: "organizer-1", title: "Board Meeting", reference: "IRPA-MTG-001", status: "Scheduled", platformAccessUrl: "https://meet.example.org/board", platformMeetingId: "ROOM-123", platformPasscode: "ROOM-PASS", agenda: "Approve minutes", invitedEmails:[], participantEmails:[] } },
     participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } },
     pass: { id: "access-1", data: {
       meetingId: "meeting-1", participantId: "participant-1", participantEmail: "participant@example.org",
       tokenHash: await digest(accessToken), passwordHash: await digest(meetingPassword), status: "Active",
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
-    } }
+    } },
+    onCommit: value => { committed = value; }
   });
   const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-invitations/dispatch", {
     accessId: "access-1", accessToken, meetingPassword
@@ -78,7 +85,8 @@ test("meeting invitation dispatch uses the injected SMTP worker and writes only 
   assert.match(ctx.sentEmail.html, /Join online meeting/);
   assert.match(ctx.sentEmail.text, /Agenda: Approve minutes/);
   assert.match(ctx.sentEmail.text, /meetingToken=/);
-  assert.ok(calls.some(call => call.url.pathname.includes("/documents/participants/participant-1")));
+  assert.ok(committed.writes.some(write => write.update?.fields?.meetingAccessDispatched?.booleanValue === true && write.update?.fields?.meetingAccessRevoked?.booleanValue === false));
+  assert.ok(committed.writes.some(write => write.update?.fields?.participantEmails?.arrayValue?.values?.some(value => value.stringValue === "participant@example.org")));
   assert.ok(calls.some(call => call.url.pathname.endsWith("/documents/audit")));
 });
 
@@ -112,11 +120,61 @@ test("issue creates an access pass and updates invitee tally in one atomic Fires
   assert.equal(body.ok, true);
   assert.ok(body.accessToken);
   assert.ok(body.meetingPassword);
-  assert.equal(committed.writes.length, 2);
+  assert.equal(committed.writes.length, 3);
   assert.equal(committed.writes[0].currentDocument.exists, false);
   assert.equal(committed.writes[1].currentDocument.updateTime, "2026-10-10T00:00:00.000Z");
   assert.equal(committed.writes[0].update.fields.tokenHash.stringValue.length, 64);
   assert.equal(committed.writes[0].update.fields.passwordHash.stringValue.length, 64);
   assert.equal(committed.writes[1].update.fields.invitedParticipantCount.integerValue, "1");
+  assert.equal(committed.writes[1].update.fields.invitedEmails.arrayValue.values.length, 0);
+  assert.equal(committed.writes[1].update.fields.participantEmails.arrayValue.values.length, 0);
+  assert.equal(committed.writes[2].update.fields.meetingAccessRevoked.booleanValue, true);
+  assert.equal(committed.writes[2].update.fields.meetingAccessDispatched.booleanValue, false);
   assert.equal(calls.filter(call => call.url.pathname.endsWith("/documents:commit")).length, 1);
+});
+
+
+test("revoking the last active meeting access pass removes meeting read access atomically", async () => {
+  let committed;
+  const { ctx } = ctxFor({
+    meeting: { id:"meeting-1", data:{initiatorUid:"organizer-1",invitedEmails:["participant@example.org"],participantEmails:["participant@example.org"]} },
+    participant: { id:"participant-1", data:{meetingId:"meeting-1",participantEmail:"participant@example.org",meetingAccessDispatched:true,meetingAccessRevoked:false} },
+    pass: { id:"access-1", data:{meetingId:"meeting-1",participantId:"participant-1",participantEmail:"participant@example.org",status:"Active",createdByUid:"organizer-1",expiresAt:new Date(Date.now()+3600000).toISOString()} },
+    onCommit: value => { committed = value; }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-access/revoke", {accessId:"access-1"});
+  assert.equal(response.status,200);
+  const body=await response.json();
+  assert.equal(body.status,"Revoked");
+  assert.equal(body.participantAccessRemoved,true);
+  assert.ok(committed.writes.some(write=>write.update?.fields?.status?.stringValue==="Revoked"));
+  assert.ok(committed.writes.some(write=>write.update?.fields?.invitedEmails?.arrayValue?.values?.length===0&&write.update?.fields?.participantEmails?.arrayValue?.values?.length===0));
+  assert.ok(committed.writes.some(write=>write.update?.fields?.meetingAccessRevoked?.booleanValue===true&&write.update?.fields?.meetingAccessDispatched?.booleanValue===false));
+});
+
+test("registered Director of Internal Oversight can issue Meeting Portal access through the shared resolver", async () => {
+  const { ctx } = ctxFor({
+    user: { user_id: "oversight-user", email: "oversight@example.org" },
+    members: [{ id: "member-oversight", uid: "oversight-user", email: "oversight@example.org", status: "Active", role: "Director of Internal Oversight" }],
+    meeting: { id: "meeting-1", data: { initiatorUid: "different-user", title: "Operations Meeting", invitedParticipantIds: [], invitedEmails: [] } },
+    participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-access/issue", { meetingId: "meeting-1", participantId: "participant-1" });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).ok, true);
+});
+
+test("Meeting Portal denial identifies attempted duty, active register authority and allowed roles", async () => {
+  const { ctx } = ctxFor({
+    user: { user_id: "ordinary-member", email: "member@example.org" },
+    members: [{ id: "member-1", uid: "ordinary-member", email: "member@example.org", status: "Active", role: "Member" }],
+    meeting: { id: "meeting-1", data: { initiatorUid: "different-user", title: "Operations Meeting", invitedParticipantIds: [], invitedEmails: [] } },
+    participant: { id: "participant-1", data: { meetingId: "meeting-1", participantName: "Test Participant", participantEmail: "participant@example.org" } }
+  });
+  const response = await post(createMeetingPortalRouter(ctx), "/api/meeting-access/issue", { meetingId: "meeting-1", participantId: "participant-1" });
+  assert.equal(response.status, 403);
+  const body = await response.json();
+  assert.match(body.error, /Denied duty: issue meeting access/);
+  assert.match(body.error, /Active register authority: Member \[Members\]/);
+  assert.match(body.error, /Roles allowed:.*Director of Internal Oversight.*Executive Director.*Head of Department/);
 });
