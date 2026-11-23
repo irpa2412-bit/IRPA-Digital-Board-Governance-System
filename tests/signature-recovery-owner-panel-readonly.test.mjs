@@ -70,4 +70,8 @@ test("assessment report includes environment, preserved archive integrity and fi
  assert.match(source,/record\.stages/);
  assert.match(source,/errorCode/);
  assert.match(source,/errorMessage/);
+ assert.match(source,/Environment diagnostics \/ Mazingira ya data/);
+ assert.match(source,/Preserved PDF integrity \/ Uhakiki wa PDF iliyohifadhiwa/);
+ assert.match(source,/Finalisation stage-record integrity \/ Uthabiti wa rekodi za hatua/);
+ assert.match(source,/evidence\.finalisationRecord\.stages\.map/);
 });
