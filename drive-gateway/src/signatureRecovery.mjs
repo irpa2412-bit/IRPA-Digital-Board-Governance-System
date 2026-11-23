@@ -260,7 +260,7 @@ async function appendEmergencyCertificatePage(bytes,events,signers,completedAt){
 export async function buildEmergencyRetrieval(ctx,user,id){
   const stages=[];
   const stage=(stageCode,status,error=null)=>stages.push({stageCode,status,error});
-  const fail=(stageCode,error)=>{stage(stageCode,"fail",String(error?.message||error));return {ok:false,stages};};
+  const fail=(stageCode,error)=>{stage(stageCode,"fail",String(error?.message||error));return {ok:false,status:409,stages};};
   try{
     const envelope=await ctx.meta.get("envelopes",id);
     if(!envelope)throw Object.assign(new Error("Recovery record not found."),{status:404});
@@ -283,8 +283,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     stage("STAMP_EVIDENCE","pass");
     const verifiedIds=new Set(assessment.stampSlots.map(row=>row.fieldId));
     const fields=(envelope.fields||[]).filter(field=>verifiedIds.has(field.fieldId));
-    const signerIds=new Set(fields.map(field=>field.signerId).filter(Boolean));
-    const signers=(envelope.signers||[]).filter(signer=>signerIds.has(signer.id));
+    const signers=(envelope.signers||[]).filter(signer=>events.some(event=>event.type==="signer.signed"&&event.signerId===signer.id));
     if(!signers.length)return fail("PDF_BUILD","NO_VERIFIED_SIGNERS");
     const completionEvent=[...events].reverse().find(event=>/^(envelope|document|signing)[._-]?(completed|complete)$/i.test(String(event.type||""))&&typeof event.at==="string");
     const completedAt=completionEvent?.at||"NOT RECORDED";

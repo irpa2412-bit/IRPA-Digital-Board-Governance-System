@@ -401,3 +401,57 @@ test("evidence assessment classifies legacy production environment without accep
   assert.deepEqual(result.environmentDiagnostics,{envelope:"LEGACY_PRODUCTION",preservedCopy:"LEGACY_PRODUCTION",gatewayExpected:"TEST",allMatch:false});
   assert.equal(result.archivePending.artifactIntegrityStatus,"MISSING");
 });
+
+
+test("emergency retrieval rejects a non-owner explicitly",async()=>{
+  const f=await fixture();
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"intruder",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const response=await router(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/emergency-retrieval",{method:"POST"}),{}, "/api/recovery/envelopes/ENV-REC-1/emergency-retrieval");
+  assert.equal(response.status,403);
+  assert.match((await response.json()).error,/another owner/i);
+});
+
+test("emergency retrieval returns stage log and SHA-256 without changing envelope or using a new timestamp",async()=>{
+  const f=await fixture();
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  f.ctx.now=()=>{throw new Error("CTX_NOW_MUST_NOT_BE_CALLED");};
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const response=await router(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/emergency-retrieval",{method:"POST"}),{}, "/api/recovery/envelopes/ENV-REC-1/emergency-retrieval");
+  assert.equal(response.status,200);
+  assert.match(response.headers.get("x-irpa-output-sha256"),/^[a-f0-9]{64}$/);
+  const stages=JSON.parse(response.headers.get("x-irpa-stage-log"));
+  assert.ok(stages.some(stage=>stage.stageCode==="CERT_PAGE_VERIFY"&&stage.status==="pass"));
+  assert.ok(stages.some(stage=>stage.stageCode==="STAMPS_IN_OUTPUT"&&stage.status==="not-checked"));
+  assert.ok(stages.some(stage=>stage.stageCode==="DETACHED_EVIDENCE"&&stage.status==="not-checked"));
+  assert.equal((await f.ctx.meta.get("envelopes","ENV-REC-1")).events.length,before.events.length);
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+});
+
+test("corrupt stamp evidence fails closed and returns no PDF",async()=>{
+  const f=await fixture({tamperFieldHash:true});
+  const result=await (await import("../src/signatureRecovery.mjs")).buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(result.ok,false);
+  assert.ok(result.stages.some(stage=>stage.stageCode==="STAMP_EVIDENCE"&&stage.status==="fail"));
+  assert.equal(result.bytes,undefined);
+});
+
+test("repeat emergency retrieval has the same verification result",async()=>{
+  const f=await fixture();
+  const module=await import("../src/signatureRecovery.mjs");
+  const first=await module.buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  const second=await module.buildEmergencyRetrieval(f.ctx,f.user,"ENV-REC-1");
+  assert.equal(first.ok,true);
+  assert.equal(second.ok,true);
+  assert.deepEqual(first.stages,second.stages);
+  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_PAGE_VERIFY").status,"pass");
+});
