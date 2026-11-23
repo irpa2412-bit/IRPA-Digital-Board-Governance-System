@@ -25,15 +25,21 @@ function identityRoles(identity={}){
 export function canRegisterMeeting(identity={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   if(identity.active!==true)return false;
-  const roles=identityRoles(identity);
-  return MEETING_REGISTRATION_ROLES.some(role=>roles.has(NORMALIZE_ROLE(role)));
+  // Meeting initiation is an organisation-wide participation right for every
+  // active registered member and employee, not a privilege limited to managers.
+  return identity.activeMember===true||identity.activeEmployee===true;
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
   if(options.isInvited===true||options.isRegisteredParticipant===true||options.isInitiator===true)return true;
   if(identity.active!==true)return false;
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  if(policy.id==="GENERAL"&&(identity.activeMember===true||identity.activeEmployee===true))return true;
+  const activeMember=identity.activeMember===true;
+  const activeEmployee=identity.activeEmployee===true;
+  // Staff and members can participate in institution-wide staff/general forums.
+  if((policy.id==="GENERAL"||policy.id==="STAFF")&&(activeMember||activeEmployee))return true;
+  // Management meetings are visible to active staff; members may join by invitation.
+  if(policy.id==="ADMINISTRATIVE"&&activeEmployee)return true;
   const roles=identityRoles(identity);
   return policy.accessRoles.some(role=>roles.has(NORMALIZE_ROLE(role)));
 }
