@@ -25,7 +25,7 @@ async function fixture({tamperFieldHash=false,tamperAllFieldHashes=false,stampCo
   events=await addEvent(events,{type:"signer.signed",signerId:"S1",at:"2026-11-22T10:00:00.000Z",signatureHash:await sha256Hex(signatureValue)});
   await meta.create("envelopes","ENV-REC-1",{
     id:"ENV-REC-1",dataEnvironment:"TEST",createdBy:"owner-1",status:"CompletionFailed",emailSigningModule:"v2",documentId:"DOC-REC-1",documentHash:sourceHash,
-    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:fieldIds.map((fieldId,index)=>({fieldId,type:"Signature",page:1,x:0.05+(index%4)*0.23,y:0.08+Math.floor(index/4)*0.22,width:0.18,height:0.08,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0})),
+    title:"Recovery test",fileName:"source.pdf",classification:"Restricted",archiveTargets:[],fields:fieldIds.map((fieldId,index)=>({fieldId,type:"Signature",page:1,x:stampCount===12?0.05+(index%4)*0.23:(index===0?0.1:0.5),y:stampCount===12?0.08+Math.floor(index/4)*0.22:0.1,width:stampCount===12?0.18:0.3,height:stampCount===12?0.08:0.1,coordinateSpace:"visible-page-fraction-v1",signerId:"S1",roleAssignmentIndex:0})),
     signers:[{id:"S1",status:"Signed",identityType:"email-link",emailHash:await sha256Hex("signer@example.test"),roleAssignments:[{role:"Signer",capacity:"",occupation:""}],order:1,signedAt:"2026-11-22T10:00:00.000Z",signatureValue,fieldValues,name:"Test Signer",email:"signer@example.test",signatureType:"drawn"}],
     events,completionFailure:{stage:"WRITE_ARCHIVE_COPIES",errorType:"Error",failedAt:"2026-11-22T10:00:01.000Z"}
   });
