@@ -52,7 +52,7 @@ function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
   setCopyLoading(true);setCopyError("");setCopyHash("");setCopyMatch("");setCopyLabel("");setCopySource("");
   try{
    if(!auth.currentUser)throw new Error("Sign in with your authorised IRPA account. (AUTH_REQUIRED)");
-   const gateway=String(getGoogleDriveGatewayUrl()||"").replace(/\\/$/,"");if(!gateway)throw new Error("Recovery service unavailable. (RECOVERY_SERVICE_URL_MISSING)");
+   let gateway=String(getGoogleDriveGatewayUrl()||"");while(gateway.endsWith("/"))gateway=gateway.slice(0,-1);if(!gateway)throw new Error("Recovery service unavailable. (RECOVERY_SERVICE_URL_MISSING)");
    const token=await getIdToken(auth.currentUser);
    const response=await fetch(gateway+path,{method,headers:{Authorization:"Bearer "+token,Accept:"application/pdf",...(method==="POST"?{"Content-Type":"application/json"}:{})},...(method==="POST"?{body:"{}"}:{}),cache:"no-store"});
    if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(formatRecoveryRouteError({status:response.status,body,button,route:path}));}
