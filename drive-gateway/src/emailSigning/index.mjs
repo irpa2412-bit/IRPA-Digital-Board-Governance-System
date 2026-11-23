@@ -21,7 +21,7 @@ export async function issueEmailSigningLink({ envelopeId, signerId, email, now =
       envelopeId: String(envelopeId),
       signerId: String(signerId),
       createdAt,
-      expiresAt: new Date(expiresAt).toISOString(),
+      // Invitation tokens remain valid until signer/envelope state revokes them.
       status: "issued",
       attemptCount: 0,
       openCount: 0,
@@ -49,7 +49,7 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   const matchesCurrent = Boolean(currentHash) && safeEqual(suppliedHash, currentHash);
   const sessionMatch = Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
 
-  if (signer?.status === "Signed" && matchesKnown) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
+  const completedReadOnly = signer?.status === "Signed" && envelope?.status === "Completed" && matchesKnown;
   if (!matchesCurrent && !sessionMatch) {
     const replaced = (signer?.emailLinkTokenHistory || []).some(item => item?.status === "replaced" && safeEqual(suppliedHash, String(item.tokenHash || "")));
     if (replaced) throw new HttpError(410, "This link was replaced. Please use the newest email.");
@@ -58,30 +58,27 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   const tokenKind = sessionMatch ? "session" : "invitation";
   const status = String(tokenKind === "session" ? signer.emailLinkSessionStatus : signer.emailLinkStatus || "");
   const completedSession = tokenKind === "session" && envelope.status === "Completed" && signer.status === "Signed" && status === "used";
-  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession) {
+  if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession && !completedReadOnly) {
     throw new HttpError(410, "This signing envelope is no longer active.");
   }
   const permitted = tokenKind === "session"
     ? status === "active" || completedSession
-    : ["issued", "opened"].includes(status);
+    : ["issued", "opened", "expired"].includes(status) || completedReadOnly;
   if (!permitted) {
-    if (signer?.status === "Signed" && tokenKind === "invitation") throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
+    if (signer?.status === "Signed" && tokenKind === "invitation" && !completedReadOnly) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
     throw new HttpError(410, "This signing link has expired or is no longer active.");
   }
-  const expiry = tokenKind === "session"
-    ? signer.emailLinkSessionExpiresAt
-    : signer.emailLinkExpiresAt || signer.tokenExpiresAt || envelope.expiresAt;
+  const expiry = tokenKind === "session" ? signer.emailLinkSessionExpiresAt : null;
   const expiryMs = Date.parse(String(expiry || ""));
-  if (!completedSession && (!Number.isFinite(expiryMs) || new Date(now).getTime() > expiryMs)) {
-    throw new HttpError(410, "This signing link has expired. Contact the document owner for a new invitation.");
+  if (tokenKind === "session" && (!Number.isFinite(expiryMs) || new Date(now).getTime() > expiryMs)) {
+    throw new HttpError(410, "This signing session has expired. Reopen the original email invitation.");
   }
   return { ok: true, tokenKind, suppliedHash, expiry: Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null };
 }
 export function createFreshSigningSession({ envelopeId, signerId, now = new Date(), linkExpiresAt, durationMinutes = 30 }) {
   const secret = randomHex(32);
   const nowMs = new Date(now).getTime();
-  const linkExpiry = Date.parse(String(linkExpiresAt || ""));
-  const sessionExpiry = Math.min(Number.isFinite(linkExpiry) ? linkExpiry : nowMs + durationMinutes * 60000, nowMs + durationMinutes * 60000);
+  const sessionExpiry = nowMs + durationMinutes * 60000;
   return {
     token: `${envelopeId}.${signerId}.${secret}`,
     secret,
@@ -111,7 +108,7 @@ export function rollbackEmailSigningResend(signer, attemptId) {
   return { ...signer, resendAttempts: attempts.filter(item => item?.id !== String(attemptId)) };
 }
 
-export async function commitEmailSigningResend(signer, { attemptId, tokenHash, expiresAt, now = new Date(), emailHash = null }) {
+export async function commitEmailSigningResend(signer, { attemptId, tokenHash, now = new Date(), emailHash = null }) {
   if (!signer || signer.status === "Signed" || !(Array.isArray(signer.resendAttempts) && signer.resendAttempts.some(item => item?.id === String(attemptId)))) {
     throw new HttpError(409, "The invitation was sent but its signer reservation changed; refresh delivery status before another resend.");
   }
@@ -128,8 +125,8 @@ export async function commitEmailSigningResend(signer, { attemptId, tokenHash, e
     emailLinkSessionStatus: "revoked",
     emailLinkSessionHash: null,
     emailLinkSessionExpiresAt: null,
-    emailLinkExpiresAt: new Date(expiresAt).toISOString(),
-    tokenExpiresAt: new Date(expiresAt).toISOString(),
+    emailLinkExpiresAt: null,
+    tokenExpiresAt: null,
     emailLinkAttemptCount: 0,
     emailLinkOpenCount: 0,
     emailLinkIpAttempts: {},
