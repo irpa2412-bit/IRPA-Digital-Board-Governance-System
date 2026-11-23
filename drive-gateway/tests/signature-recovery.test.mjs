@@ -468,8 +468,8 @@ test("emergency retrieval rejects a non-owner explicitly",async()=>{
   const response=await router(new Request("https://gateway.test/api/recovery/envelopes/ENV-REC-1/emergency-retrieval",{method:"POST"}),{}, "/api/recovery/envelopes/ENV-REC-1/emergency-retrieval");
   assert.equal(response.status,403);
   const body=await response.json();
-  assert.equal(body.error,"Emergency retrieval could not be verified.");
-  assert.match(body.code,/another owner/i);
+  assert.equal(body.error,"This envelope belongs to another owner.");
+  assert.equal(body.code,"NOT_YOUR_ENVELOPE");
 });
 
 test("emergency retrieval returns stage log and SHA-256 without changing envelope or using a new timestamp",async()=>{
