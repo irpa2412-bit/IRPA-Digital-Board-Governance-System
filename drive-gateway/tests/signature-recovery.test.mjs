@@ -457,7 +457,7 @@ test("repeat emergency retrieval has the same verification result",async()=>{
   assert.equal(first.ok,true);
   assert.equal(second.ok,true);
   assert.deepEqual(first.stages,second.stages);
-  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_PAGE_VERIFY").status,"pass");
+  assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_VERIFY").status,"PASS");
 });
 
 test("emergency retrieval maps every public failure step to a sanitised step code",()=>{
