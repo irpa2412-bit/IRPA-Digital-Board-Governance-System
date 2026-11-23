@@ -272,7 +272,7 @@ test("recovery evidence router refuses non-GET methods before authentication or 
 test("completed-copy recovery route is authenticated and serves only the exact preserved hash-matched PDF",async()=>{
   const bytes=new TextEncoder().encode("%PDF-1.7\\nexisting archive-pending PDF\\n%%EOF");
   const hash=await sha256Hex(bytes);
-  const envelope={id:"ENV-REC-COPY",createdBy:"owner-copy",status:"CompletionFailed",dataEnvironment:"TEST",completion:{archivePending:{storageId:"pending-copy",finalHash:hash,fileName:"preserved.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
+  const envelope={id:"ENV-REC-COPY",createdBy:"owner-copy",status:"CompletionFailed",dataEnvironment:"TEST",completion:{finalHash:hash,archivePending:{storageId:"pending-copy",finalHash:hash,fileName:"preserved.pdf",createdAt:"2026-11-23T06:00:00.000Z",environment:"TEST"}}};
   let reads=0,writes=0,authCalls=0;
   const ctx={
     env:{IRPA_ENVIRONMENT:"test"},
