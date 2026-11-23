@@ -537,3 +537,42 @@ test("emergency evidence report is a read-only PDF with a verifiable report hash
   assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
   assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
 });
+
+test("emergency route serves a labelled copy only for the certificate-text-extraction exception",async()=>{
+  const f=await fixture({stampCount:12});
+  f.ctx.recoveryTextExtractor=async()=>{throw new TypeError("Worker text extractor unavailable");};
+  const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const path="/api/recovery/envelopes/ENV-REC-1/emergency-retrieval";
+  const response=await router(new Request("https://worker.test"+path,{method:"POST"}),{},path);
+  assert.equal(response.status,200);
+  assert.match(response.headers.get("content-disposition"),/UNARCHIVED-COPY-CERTIFICATE-NOT-VERIFIED\.pdf/);
+  assert.equal(response.headers.get("x-irpa-copy-warning"),"UNARCHIVED COPY. Certificate page not verified. Audit chain, source hash and 12 stamps verified. The envelope is NOT Completed.");
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  assert.equal(response.headers.get("x-irpa-output-sha256"),await sha256Hex(bytes));
+  assert.equal(JSON.parse(response.headers.get("x-irpa-copy-checks")).certificatePage,"NOT APPLICABLE");
+  assert.deepEqual(await f.ctx.meta.get("envelopes","ENV-REC-1"),before);
+  assert.equal((await f.ctx.meta.list("recoveryAccessEvents")).length,0);
+});
+
+test("any source, stamp, or audit integrity failure still refuses the labelled certificate exception",async()=>{
+  const f=await fixture({stampCount:12,tamperFieldHash:true});
+  f.ctx.recoveryTextExtractor=async()=>{throw new TypeError("Worker text extractor unavailable");};
+  const router=createSignatureRecoveryRouter({
+    authenticateFirebaseRequest:async()=>({user_id:"owner-1",token:"test"}),
+    getFirestoreDocument:async()=>null,buildContext:()=>f.ctx,
+    json:(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers}),
+    corsHeaders:()=>({})
+  });
+  const path="/api/recovery/envelopes/ENV-REC-1/emergency-retrieval";
+  const response=await router(new Request("https://worker.test"+path,{method:"POST"}),{},path);
+  assert.equal(response.status,409);
+  const body=await response.json();
+  assert.equal(body.code,"EMERGENCY_RETRIEVAL_FAILED:STAMP_LOAD");
+  assert.equal(body.step,"STAMP_LOAD");
+});
