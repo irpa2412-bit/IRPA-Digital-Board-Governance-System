@@ -296,7 +296,7 @@ export async function buildEmergencyRetrieval(ctx,user,id){
     let output;
     try{output=await appendEmergencyCertificatePage(built,events,signers,completedAt);}catch(error){return fail("PDF_BUILD",error);}
     let pageText;
-    try{pageText=await extractLastPdfPageText(output);}catch(error){return fail("CERT_PAGE_VERIFY",error);}
+    try{pageText=await extractLastPdfPageText(new Uint8Array(output));}catch(error){return fail("CERT_PAGE_VERIFY",error);}
     const certificate=verifyCertificatePageText(pageText,events,signers);
     if(!certificate.ok||!pageText.includes(EMERGENCY_COPY_DISCLAIMER)||!pageText.includes(EMERGENCY_COPY_LABEL))return fail("CERT_PAGE_VERIFY","CERTIFICATE_PAGE_VERIFICATION_FAILED:"+certificate.failures.join(","));
     stage("CERT_PAGE_VERIFY","pass");
