@@ -41,7 +41,13 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   const suppliedHash = await sha256Hex(parts[2].toLowerCase());
   const currentHash = String(signer?.tokenHash || "");
   const matchesCurrent = Boolean(currentHash) && safeEqual(suppliedHash, currentHash);
-  const sessionMatch = Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
+  // A forwarded invitation can be opened by more than one browser. Keep each
+  // short-lived session independently valid instead of replacing the previous
+  // recipient's session whenever another person opens the same invitation.
+  const sessions = Array.isArray(signer?.emailLinkSessions) ? signer.emailLinkSessions : [];
+  const sessionRecord = sessions.find(item => item?.tokenHash && safeEqual(suppliedHash, String(item.tokenHash)));
+  const legacySessionMatch = !sessionRecord && Boolean(signer?.emailLinkSessionHash) && safeEqual(suppliedHash, String(signer.emailLinkSessionHash));
+  const sessionMatch = Boolean(sessionRecord || legacySessionMatch);
 
   const completed = envelope?.status === "Completed";
   if (!matchesCurrent && !sessionMatch) {
@@ -51,8 +57,8 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
   }
   const tokenKind = sessionMatch ? "session" : "invitation";
   const completedReadOnly = completed && tokenKind === "invitation" && signer?.status === "Signed" && matchesCurrent;
-  const status = String(tokenKind === "session" ? signer.emailLinkSessionStatus : signer.emailLinkStatus || "");
-  const completedSession = tokenKind === "session" && envelope.status === "Completed" && signer.status === "Signed" && status === "used";
+  const status = String(tokenKind === "session" ? (sessionRecord?.status || signer.emailLinkSessionStatus || "") : signer.emailLinkStatus || "");
+  const completedSession = tokenKind === "session" && completed && signer.status === "Signed" && status === "used";
   if (CLOSED_ENVELOPES.has(String(envelope?.status || "")) && !completedSession && !completedReadOnly) {
     throw new HttpError(410, "This signing envelope is no longer active.");
   }
@@ -63,12 +69,12 @@ export async function inspectEmailSigningLink({ token, envelope, signer, now = n
     if (signer?.status === "Signed" && tokenKind === "invitation" && !completedReadOnly) throw new HttpError(410, EMAIL_SIGNING_ALREADY_SIGNED);
     throw new HttpError(410, "This signing link has expired or is no longer active.");
   }
-  const expiry = tokenKind === "session" ? signer.emailLinkSessionExpiresAt : null;
+  const expiry = tokenKind === "session" ? (sessionRecord?.expiresAt || signer.emailLinkSessionExpiresAt) : null;
   const expiryMs = Date.parse(String(expiry || ""));
   if (tokenKind === "session" && (!Number.isFinite(expiryMs) || new Date(now).getTime() > expiryMs)) {
     throw new HttpError(410, "This signing session has expired. Reopen the original email invitation.");
   }
-  return { ok: true, tokenKind, suppliedHash, expiry: Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null };
+  return { ok: true, tokenKind, suppliedHash, sessionRecord: sessionRecord || null, expiry: Number.isFinite(expiryMs) ? new Date(expiryMs).toISOString() : null };
 }
 export function createFreshSigningSession({ envelopeId, signerId, now = new Date(), durationMinutes = 30 }) {
   const secret = randomHex(32);
@@ -120,6 +126,7 @@ export async function commitEmailSigningResend(signer, { attemptId, tokenHash, n
     emailLinkSessionStatus: "revoked",
     emailLinkSessionHash: null,
     emailLinkSessionExpiresAt: null,
+    emailLinkSessions: [],
     emailLinkExpiresAt: null,
     tokenExpiresAt: null,
     emailLinkAttemptCount: 0,
@@ -167,7 +174,8 @@ export function markEmailSignerSigned(signer, at = new Date()) {
     status: "Signed",
     emailLinkStatus: "used",
     emailLinkSessionStatus: "used",
-    emailLinkSessionConsumedAt: new Date(at).toISOString()
+    emailLinkSessionConsumedAt: new Date(at).toISOString(),
+    emailLinkSessions: (Array.isArray(signer.emailLinkSessions) ? signer.emailLinkSessions : []).map(session => ({ ...session, status: "used", consumedAt: new Date(at).toISOString() }))
   };
 }
 
