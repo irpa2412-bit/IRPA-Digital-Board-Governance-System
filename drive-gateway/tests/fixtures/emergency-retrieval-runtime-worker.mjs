@@ -64,11 +64,11 @@ async function createFixture() {
   };
 }
 
-const contextPromise = createFixture();
+const context = await createFixture();
 const router = createSignatureRecoveryRouter({
   authenticateFirebaseRequest: async () => ({ user_id: ownerUid, token: "runtime-test-token" }),
   getFirestoreDocument: async () => null,
-  buildContext: () => contextPromise,
+  buildContext: () => context,
   json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
   corsHeaders: () => ({ "content-type": "application/json" })
 });
