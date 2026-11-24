@@ -119,7 +119,7 @@ export async function distributeCompletedPersonalCopies(ctx,envelope,completion,
     }
   }
   const rows=(await ctx.meta.list("signaturePersonalCopies")).filter(row=>row.envelopeId===envelope.id);
-  const summary={total:recipients.size,stored:rows.filter(row=>row.status==="Stored").length,failed:rows.filter(row=>row.status==="Failed").length,pending:rows.filter(row=>row.status==="Pending"||row.status==="Writing").length,skipped:(envelope.signers||[]).filter(s=>s?.status==="Signed"&&!s.profileUid&&!s.uid).length,files};
+  const summary={total:recipients.size,stored:rows.filter(row=>row.status==="Stored").length,failed:rows.filter(row=>row.status==="Failed").length,pending:rows.filter(row=>row.status==="Pending"||row.status==="Writing").length,skipped:(envelope.signers||[]).filter(s=>!s.profileUid&&!s.uid).length,files};
   const current=await ctx.meta.get("envelopes",envelope.id);
   if(current?.completion){
     const existing=Array.isArray(current.completion.files)?current.completion.files:[];
@@ -186,7 +186,7 @@ export async function distributeCompletedSignatureDocument(ctx,envelope,completi
       },{attempts:3,logger:{error(){}},shouldRetry:shouldRetryCompletionEmail,...(ctx.sleep?{sleep:ctx.sleep}:{})});
       await update(ctx,id,{status:"Sent",acceptedByMailServer:true,deliveryOutcome:"accepted",stageCode:null,replyCategory:"ACCEPTED",attempts:priorAttempts+activeAttempt,sentAt:ctx.now().toISOString(),messageId:clean(result?.messageId||result||"").slice(0,180),lastError:null});
     }catch(error){
-      const ambiguous=error?.deliveryOutcome==="unknown"||(stageCode(error)==="SUBMIT"&&replyCategory(error)==="UNKNOWN");
+      const ambiguous=error?.deliveryOutcome==="unknown"||(stageCode(error)==="SUBMIT"&&!["RATE_LIMITED","MAILBOX_FULL","RECIPIENT_REJECTED","AUTH_FAILED"].includes(replyCategory(error)));
       const finalStatus=ambiguous?"Unknown":"Failed";
       await update(ctx,id,{status:finalStatus,acceptedByMailServer:false,deliveryOutcome:ambiguous?"unknown":"not-accepted",stageCode:stageCode(error),replyCategory:replyCategory(error),attempts:priorAttempts+Math.max(1,activeAttempt),failedAt:ctx.now().toISOString(),lastError:safeError(error,recipient.email)});
       ctx.logger?.error?.("SIGNATURE_COMPLETION_EMAIL_FAILED",{envelopeId:envelope.id,recipientDomain:recipient.email.split("@")[1]||"unknown",status:finalStatus,stageCode:stageCode(error),replyCategory:replyCategory(error),attempt:priorAttempts+Math.max(1,activeAttempt)});
