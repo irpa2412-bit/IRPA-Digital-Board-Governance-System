@@ -36,6 +36,11 @@ try {
       await page.locator('select[name="meetingPlatform"]').selectOption({ label: "Physical Venue" });
       await page.locator('input[name="venue"]').fill("TEST Longido Meeting Room");
       await page.locator('input[name="chairperson"]').fill("TEST Fixture Chairperson");
+      // Formal proceedings need all three meeting-specific permanent appointments.
+      // The Board Member chairs; the registered Board Secretary is explicitly appointed as Secretary and technical Administrator.
+      await page.locator('select[name="meetingChairpersonUid"]').selectOption("fixture-board-member-auth-uid");
+      await page.locator('select[name="meetingSecretaryUid"]').selectOption("fixture-board-secretary-uid");
+      await page.locator('select[name="meetingAdministratorUid"]').selectOption("fixture-board-secretary-uid");
       await page.locator('textarea[name="agenda"]').fill("1. Confirm the agenda\n2. Review the work plan");
       await picker.locator("label").filter({ hasText: "TEST Active Board Member" }).locator('input[type="checkbox"]').check();
       await page.getByRole("button", { name: "Schedule Meeting" }).click();
@@ -48,6 +53,9 @@ try {
       assert.deepEqual(created.participantUids, ["fixture-board-member-auth-uid"], "authenticated participant UID must persist");
       assert.deepEqual(created.participantEmails, ["board-member@example.test"], "participant email must persist");
       assert.equal(created.venue, "TEST Longido Meeting Room");
+      assert.equal(created.meetingChairpersonUid, "fixture-board-member-auth-uid", "formal proceedings require the permanent meeting Chairperson");
+      assert.equal(created.meetingSecretaryUid, "fixture-board-secretary-uid", "formal proceedings require the permanent meeting Secretary");
+      assert.equal(created.meetingAdministratorUid, "fixture-board-secretary-uid", "the Meeting Administrator appointment is recorded independently");
       assert.equal(created.startTime, "10:00");
       assert.equal(created.endTime, "11:00");
       assert.equal(created.date, "2027-02-18");
