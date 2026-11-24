@@ -169,3 +169,29 @@ test("repeat distribution reuses a claimed legacy recipient record without dupli
   assert.equal(second.sent,2);
   assert.equal(ctx.sent.length,firstSendCount,"previously accepted owner and signer emails are not resent");
 });
+
+test("ambiguous SMTP SUBMIT outcome is recorded Unknown and is never automatically retried",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\ncompleted IRPA document");
+  const ctx=context(bytes,null);
+  ctx.sendCompletionEmail=async message=>{
+    ctx.sent.push(message);
+    await message.onStage?.("BUILD_MESSAGE","success","UNKNOWN",{messageId:"ambiguous-message"});
+    await message.onStage?.("SMTP_CONNECT","success","UNKNOWN",{messageId:"ambiguous-message"});
+    await message.onStage?.("SMTP_AUTH","success","UNKNOWN",{messageId:"ambiguous-message"});
+    await message.onStage?.("RCPT_ACCEPTED","success","UNKNOWN",{messageId:"ambiguous-message"});
+    await message.onStage?.("SUBMIT","failure","UNKNOWN",{messageId:"ambiguous-message"});
+    const error=new Error("SMTP connection closed after DATA");
+    error.stageCode="SUBMIT";
+    error.smtpReplyCategory="UNKNOWN";
+    throw error;
+  };
+  const envelope={id:"ENV-UNKNOWN-SUBMIT",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Resolution",documentId:"DOC-UNKNOWN",signers:[]};
+  const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
+  const result=await distributeCompletedSignatureDocument(ctx,envelope,completion);
+  assert.equal(result.unknown,1);
+  assert.equal(ctx.sent.length,1);
+  const row=(await ctx.meta.list("signatureDistributions"))[0];
+  assert.equal(row.status,"Unknown");
+  assert.equal(row.deliveryOutcome,"unknown");
+  assert.equal(row.attempts,1);
+});
