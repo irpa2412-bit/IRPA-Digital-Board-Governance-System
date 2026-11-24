@@ -532,6 +532,8 @@ if(Object.keys(changed).some(key=>MEETING_APPOINTMENT_KEYS.has(key))&&lower(curr
 const appointmentValidation=await validateMeetingAppointments(ctx,env,token,incoming,current);
 if(appointmentValidation.error)return fail(ctx,request,appointmentValidation.error,400);
 Object.assign(changed,appointmentValidation.patch);
+const newlyAppointed=[...MEETING_APPOINTMENT_KEYS].map(key=>clean(changed[key]??current[key])).filter(Boolean);
+if(newlyAppointed.length){const participantUids=[...new Set([...(Array.isArray(current.participantUids)?current.participantUids:[]),...(Array.isArray(current.attendeeUids)?current.attendeeUids:[]),...newlyAppointed])];changed.participantUids=participantUids;changed.attendeeUids=participantUids;changed.memberUids=[...new Set([...(Array.isArray(current.memberUids)?current.memberUids:[]),...newlyAppointed])];changed.invitedUids=[...new Set([...(Array.isArray(current.invitedUids)?current.invitedUids:[]),...newlyAppointed])];}
 if(changed.leadershipElectionRequired===true||current.leadershipElectionRequired===true){
  const transitionUids=["transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid"];
  const proposed={...current,...changed};
