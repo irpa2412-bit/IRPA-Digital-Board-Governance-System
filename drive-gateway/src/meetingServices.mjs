@@ -692,7 +692,7 @@ if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Voting cannot 
 if(resolutionId){const resolution=await getDoc(ctx,env,token,"resolutions",resolutionId);if(!resolution||resolution.meetingId!==meetingId)return fail(ctx,request,"The linked resolution must belong to the selected meeting.",409);}
 const id=await hash(meetingId+"|"+resolutionId+"|"+reference.toLowerCase());
 const prior=await getDoc(ctx,env,token,"votingIssues",id);
-if(prior&&lower(prior.status)==="open")return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});
+if(prior&&lower(prior.status)==="open"){await patchDoc(ctx,env,token,"meetings",meetingId,{votingRequired:true,votingReference:reference,votingIssueId:id,votingStatus:"Open",votingResult:"Pending",updatedAt:new Date()});return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});}
 if(prior&&lower(prior.status)==="closed")return fail(ctx,request,"This voting reference has already been closed. Use a new unique reference for a new ballot.",409);
 const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,leadershipElection:transitionCommitteeActive(c.meeting)&&c.meeting.leadershipElectionRequired===true,status:"Open",result:"Pending",anonymous:true,openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
 if(prior)await patchDoc(ctx,env,token,"votingIssues",id,issue);else await writeDoc(ctx,env,token,"votingIssues",id,issue,false);
@@ -739,7 +739,7 @@ if(!issue)return fail(ctx,request,"Voting issue not found.",404);
 const c=await context(ctx,env,token,claims,issue.meetingId);
 const controller=meetingSecretariatAuthority(c.meeting,c.uid)||(issue.leadershipElection===true&&c.meeting.leadershipElectionRequired===true&&meetingTransitionElectionAuthority(c.meeting,c.uid));
 if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may close voting.",403);
-if(issue.status!=="Open")return fail(ctx,request,"This voting issue is already closed.",409);
+if(issue.status!=="Open"){if(lower(issue.status)==="closed"&&clean(c.meeting.votingIssueId)===issueId)await patchDoc(ctx,env,token,"meetings",issue.meetingId,{votingStatus:"Completed",votingResult:clean(issue.result)||"Pending",updatedAt:new Date()});return fail(ctx,request,"This voting issue is already closed.",409);}
 const now=new Date(),base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/",writes=[];
 writes.push({update:{name:base+"votingIssues/"+issueId,fields:fields({status:"Closed",result:resultValue,closedAt:now,updatedAt:now})},updateMask:{fieldPaths:["status","result","closedAt","updatedAt"]},currentDocument:{updateTime:issue.updateTime}});
 if(issue.resolutionId){
@@ -749,8 +749,8 @@ writes.push({update:{name:base+"resolutions/"+issue.resolutionId,fields:fields({
 }
 const auditId=crypto.randomUUID();
 writes.push({update:{name:base+"audit/"+auditId,fields:fields({action:"VOTING_ISSUE_CLOSED",collection:"votingIssues",recordId:issueId,details:{result:resultValue,resolutionId:issue.resolutionId||null},actorUid:c.uid,actorEmail:c.email||null,createdAt:now})},currentDocument:{exists:false}});
+if(clean(c.meeting.votingIssueId)===issueId)writes.push({update:{name:base+"meetings/"+issue.meetingId,fields:fields({votingStatus:"Completed",votingResult:resultValue,updatedAt:now})},updateMask:{fieldPaths:["votingStatus","votingResult","updatedAt"]},currentDocument:{updateTime:c.meeting.updateTime}});
 await commitWrites(ctx,env,token,writes);
-if(clean(c.meeting.votingIssueId)===issueId)await patchDoc(ctx,env,token,"meetings",issue.meetingId,{votingStatus:"Completed",votingResult:resultValue,updatedAt:now});
 return response(ctx,request,{ok:true,result:resultValue,votingIssueId:issueId});
 }
 
