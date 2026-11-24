@@ -325,6 +325,7 @@ test("meeting governance Firestore rules restrict live voting control to the act
 
 const meetingServicesGovernanceSource = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
 const meetingRoomGovernanceSource = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.url), "utf8");
+const votingPageGovernanceSource = readFileSync(new URL("../src/pages/Voting.jsx", import.meta.url), "utf8");
 test("Transition Committee powers are limited to leadership election, invitations and appointment handover", () => {
   assert.match(meetingServicesGovernanceSource, /function meetingSecretariatAuthority\(meeting,uid\)\{return !transitionCommitteeActive\(meeting\)/);
   assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
@@ -359,4 +360,20 @@ test("Meeting Administrator alone controls admission, attendance and technical m
   assert.match(meetingRoomGovernanceSource, /isMeetingHost&&p\.participantId&&!\["PREPARING","DISPATCHED"\]\.includes\(dailyAttendanceDispatch\?\.status\)/);
   assert.match(meetingRoomGovernanceSource, /Only the Meeting Administrator appointed to this meeting may update the attendance sheet/);
   assert.match(meetingServicesGovernanceSource, /Only the Meeting Administrator appointed to this meeting may update the daily attendance sheet/);
+});
+
+
+test("leadership election ballots are operable by the Transition Committee through meeting-scoped controls", () => {
+  assert.match(meetingRoomGovernanceSource, /Leadership Election Ballot/);
+  assert.match(meetingRoomGovernanceSource, /if\(!currentItem&&!electionMode\)/);
+  assert.match(meetingRoomGovernanceSource, /electionController\|\|busy/);
+  assert.match(votingPageGovernanceSource, /function meetingVotingController\(meeting,uid,issue=null\)/);
+  assert.match(votingPageGovernanceSource, /callMeetingService\("\/api\/meeting-voting\/open"/);
+  assert.match(votingPageGovernanceSource, /callMeetingService\("\/api\/meeting-voting\/close"/);
+  assert.match(votingPageGovernanceSource, /canManageIssue\(issue\)/);
+  assert.doesNotMatch(votingPageGovernanceSource, /admin&&/);
+  const closeStart = meetingServicesGovernanceSource.indexOf('if(pathname==="/api/meeting-voting/close")');
+  assert.notEqual(closeStart, -1);
+  const closeBody = meetingServicesGovernanceSource.slice(closeStart, closeStart + 1800);
+  assert.match(closeBody, /issue\.leadershipElection===true&&c\.meeting\.leadershipElectionRequired===true&&meetingTransitionElectionAuthority/);
 });
