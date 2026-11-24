@@ -195,4 +195,6 @@ test("ambiguous SMTP SUBMIT outcome is recorded Unknown and is never automatical
   assert.equal(row.status,"Unknown");
   assert.equal(row.deliveryOutcome,"unknown");
   assert.equal(row.attempts,1);
+  await distributeCompletedSignatureDocument(ctx,envelope,completion,{retryFailed:true});
+  assert.equal(ctx.sent.length,1,"ambiguous submission is not resent by a later retry pass");
 });
