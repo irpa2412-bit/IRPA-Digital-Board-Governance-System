@@ -159,8 +159,7 @@ export function validateFieldValues(fields,signer,values,signature,fieldApplicat
     }else{
       value=String(value??"").trim();
       if(!value)throw new HttpError(400,"Complete the assigned "+f.type.toLowerCase()+" field.");
-      if(value.length>100)throw new HttpError(400,"A signing field value must not exceed 100 characters.");
-      if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
+      if(value.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))throw new HttpError(400,"A signing field value is invalid.");
     }
     out[f.fieldId]=value;
   }
