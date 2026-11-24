@@ -1,4 +1,5 @@
 import {sha256Hex, validateEmail} from "./util.mjs";
+import {signerCopyPath} from "./archives.mjs";
 
 const clean = value => String(value ?? "").trim();
 const safeError = (error, email) => String(error?.message || "Email delivery failed.")
@@ -37,6 +38,50 @@ export async function getSignatureDistributionSummary(ctx,envelopeId){
   const status=counts.total===0?"NotStarted":counts.sent===counts.total?"Sent":counts.failed>0&&counts.sent>0?"PartiallyFailed":counts.failed===counts.total?"Failed":"NotStarted";
   return{...counts,status,complete:counts.total>0&&counts.sent===counts.total,deliveries:rows.map(row=>({recipientAddress:row.maskedAddress||maskAddress(row.recipientEmail),accepted:row.acceptedByMailServer===true,status:row.status,stageCode:row.stageCode||null,replyCategory:row.replyCategory||"UNKNOWN",attempts:Number(row.attempts||0),lastError:row.lastError||null,sentAt:row.sentAt||null}))};
 }
+
+export async function distributeCompletedPersonalCopies(ctx,envelope,completion,{bytes=null,retryFailed=false}={}){
+  if(envelope?.status!=="Completed"||!completion?.primaryStorageId||!completion?.finalHash)throw new Error("Only a verified completed signature envelope can create personal copies.");
+  const finalBytes=bytes||await ctx.storage.get(completion.primaryStorageId);
+  if(!(finalBytes instanceof Uint8Array)||!finalBytes.length||await sha256Hex(finalBytes)!==completion.finalHash)throw new Error("The authoritative completed PDF failed its integrity check; personal copies were stopped.");
+  const recipients=new Map();
+  const add=(uid,kind,signerId=null)=>{if(!uid)return;const key=String(uid);const item=recipients.get(key)||{uid:key,kind,signerIds:[]};if(signerId&&!item.signerIds.includes(signerId))item.signerIds.push(signerId);if(kind==="owner-copy")item.kind=kind;recipients.set(key,item);};
+  add(envelope.createdBy,"owner-copy");
+  for(const signer of envelope.signers||[])if(signer?.status==="Signed")add(signer.profileUid||signer.uid,"signer-copy",signer.id);
+  const files=[];
+  for(const recipient of recipients.values()){
+    const uidHash=await sha256Hex(recipient.uid),id="personal-copy-"+envelope.id+"-"+uidHash.slice(0,32);
+    let record=await ctx.meta.get("signaturePersonalCopies",id);
+    if(!record){
+      const created={envelopeId:envelope.id,documentId:envelope.documentId,recipientUid:recipient.uid,signerIds:recipient.signerIds,copyKind:recipient.kind,fileName:completion.fileName,finalHash:completion.finalHash,status:"Pending",attempts:0,createdAt:ctx.now().toISOString()};
+      try{await ctx.meta.create("signaturePersonalCopies",id,created)}catch{record=await ctx.meta.get("signaturePersonalCopies",id);if(!record)throw new Error("Unable to create the personal-copy delivery record.");}
+      record=record||await ctx.meta.get("signaturePersonalCopies",id);
+    }
+    if(record?.status==="Stored"){files.push({kind:recipient.kind,signerId:recipient.signerIds[0]||null,recipientUid:recipient.uid,id:record.storageId,path:record.path});continue;}
+    if(record?.status==="Failed"&&!retryFailed&&Number(record.attempts||0)>0)continue;
+    const attempts=Number(record?.attempts||0)+1;
+    await update(ctx,id,{status:"Writing",attempts,lastAttemptAt:ctx.now().toISOString(),lastError:null});
+    try{
+      const path=signerCopyPath({ownerKey:recipient.uid,fileName:completion.fileName});
+      const stored=await ctx.storage.put({path,bytes:finalBytes,contentType:"application/pdf",metadata:{envelopeId:envelope.id,documentId:envelope.documentId,recipientUid:recipient.uid,recipientSignerId:recipient.signerIds.join(","),copyKind:recipient.kind,finalHash:completion.finalHash,state:"Final Completed Document",archive:"my-documents"}});
+      await update(ctx,id,{status:"Stored",storageId:stored.id,path,storedAt:ctx.now().toISOString(),lastError:null});
+      files.push({kind:recipient.kind,signerId:recipient.signerIds[0]||null,recipientUid:recipient.uid,id:stored.id,path});
+    }catch(error){
+      await update(ctx,id,{status:"Failed",failedAt:ctx.now().toISOString(),lastError:safeError(error,"")});
+      ctx.logger?.error?.("SIGNATURE_PERSONAL_COPY_WRITE_FAILED",{envelopeId:envelope.id,recipientUidHash:uidHash.slice(0,16),copyKind:recipient.kind,attempt:attempts,errorType:String(error?.name||"Error").slice(0,60)});
+    }
+  }
+  const rows=(await ctx.meta.list("signaturePersonalCopies")).filter(row=>row.envelopeId===envelope.id);
+  const summary={total:recipients.size,stored:rows.filter(row=>row.status==="Stored").length,failed:rows.filter(row=>row.status==="Failed").length,pending:rows.filter(row=>row.status==="Pending"||row.status==="Writing").length,skipped:(envelope.signers||[]).filter(s=>s?.status==="Signed"&&!s.profileUid&&!s.uid).length,files};
+  const current=await ctx.meta.get("envelopes",envelope.id);
+  if(current?.completion){
+    const existing=Array.isArray(current.completion.files)?current.completion.files:[];
+    const byId=new Map(existing.map(file=>[file.id,file]));
+    for(const file of files)byId.set(file.id,file);
+    await ctx.meta.update("envelopes",envelope.id,{completion:{...current.completion,files:[...byId.values()] }},{ifVersion:current._v});
+  }
+  return summary;
+}
+
 export async function distributeCompletedSignatureDocument(ctx,envelope,completion,{bytes=null,retryFailed=false}={}){
   if(envelope?.status!=="Completed"||!completion?.primaryStorageId||!completion?.finalHash)throw new Error("Only a verified completed signature envelope can be distributed.");
   const finalBytes=bytes||await ctx.storage.get(completion.primaryStorageId);
@@ -74,5 +119,6 @@ export async function retryFailedSignatureDistributions(ctx,user,envelopeId){
   if(!envelope||(envelope.createdBy!==user?.uid&&user?.isAdmin!==true)){const error=new Error("Not authorized.");error.status=403;throw error;}
   if(envelope.status!=="Completed"||!envelope.completion){const error=new Error("Only completed documents can be redistributed.");error.status=409;throw error;}
   const summary=await distributeCompletedSignatureDocument(ctx,envelope,envelope.completion,{retryFailed:true});
-  return{ok:true,envelopeId,distribution:summary};
+  const personalCopies=await distributeCompletedPersonalCopies(ctx,envelope,envelope.completion,{retryFailed:true});
+  return{ok:true,envelopeId,distribution:summary,personalCopies};
 }
