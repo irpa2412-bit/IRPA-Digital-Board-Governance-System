@@ -125,7 +125,8 @@ test("each signer position receives an independent delivery even when email addr
   const ctx=context(bytes,null);
   const envelope={id:"ENV-DUPLICATE-EMAIL",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Board Resolution",documentId:"DOC-DUP",signers:[
     {id:"S1",email:"shared@example.test",name:"Signer One",uid:null,status:"Signed",identityType:"email-link"},
-    {id:"S2",email:"shared@example.test",name:"Signer Two",uid:null,status:"Pending",identityType:"email-link"}
+    {id:"S2",email:"shared@example.test",name:"Signer Two",uid:null,status:"Pending",identityType:"email-link"},
+    {id:"S3",email:"shared@example.test",name:"Revoked Signer",uid:null,status:"Pending",identityType:"email-link",invitation:"Revoked",emailLinkStatus:"revoked"}
   ]};
   const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"board-resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
   const result=await distributeCompletedSignatureDocument(ctx,envelope,completion);
