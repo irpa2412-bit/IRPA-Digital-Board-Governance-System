@@ -12,9 +12,9 @@ test("frontend emitted asset URLs are unique to the deployment commit", async ()
     );
     const output = loaded?.config?.build?.rollupOptions?.output;
     assert.ok(output, "Vite Rollup output configuration must be present");
-    assert.equal(output.entryFileNames, "assets/[name]-0123456789-[hash].js");
-    assert.equal(output.chunkFileNames, "assets/[name]-0123456789-[hash].js");
-    assert.equal(output.assetFileNames, "assets/[name]-0123456789-[hash][extname]");
+    assert.equal(output.entryFileNames, "assets/[name]-0123456789ab-[hash].js");
+    assert.equal(output.chunkFileNames, "assets/[name]-0123456789ab-[hash].js");
+    assert.equal(output.assetFileNames, "assets/[name]-0123456789ab-[hash][extname]");
   } finally {
     if (previous === undefined) delete process.env.GITHUB_SHA;
     else process.env.GITHUB_SHA = previous;
