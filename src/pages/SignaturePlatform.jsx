@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState}from"react";
 import"../styles/signature-portal.css";
 import{getCurrentEmployeeProfile,getCurrentMemberProfile,getCurrentSigningAuthorityRegisterEntries,getControlledDocumentsForSigning,getRecords}from"../firebase/data";
-import{createGatewaySignatureEnvelope,voidGatewaySignatureEnvelope,downloadControlledDocumentBytes,downloadDriveBytes,downloadSignatureBytes,resendFailedGatewaySignatureInvitations,getGatewaySignatureEnvelopeStatus,retryGatewaySignatureDistribution,resendGatewayEmailInvitation,revokeGatewayEmailInvitation}from"../firebase/signatureStorage";
+import{createGatewaySignatureEnvelope,voidGatewaySignatureEnvelope,downloadControlledDocumentBytes,downloadDriveBytes,downloadSignatureBytes,resendFailedGatewaySignatureInvitations,getGatewaySignatureEnvelopeStatus,retryGatewaySignatureDistribution,fetchGatewayCompletedDocument,resendGatewayEmailInvitation,revokeGatewayEmailInvitation}from"../firebase/signatureStorage";
 import{auth}from"../firebase/config";
 import{resolveExpectedIntegrity,hasIntegrityMismatch,sha256Hex as signatureSha256}from"../utils/documentIntegrity.mjs";
 import{getMySignerIdentity}from"../firebase/signerIdentity";
@@ -730,6 +730,17 @@ export default function SignaturePlatform({signerOnly=false,signingEnvelopeId=nu
   }catch(error){setMessage("Preparation was not closed: "+(error?.message||"Unable to save the draft."));}
   finally{setBusy(false);}
  }
+ async function openTrackedCompletedDocument(envelope){
+  const popup=window.open("about:blank","_blank");
+  try{const result=await fetchGatewayCompletedDocument(envelope.gatewayEnvelopeId);const url=URL.createObjectURL(new Blob([result.bytes],{type:"application/pdf"}));if(popup)popup.location.href=url;else{const link=document.createElement("a");link.href=url;link.download=result.fileName;link.click();}window.setTimeout(()=>URL.revokeObjectURL(url),60000);setMessage("Authoritative completed PDF opened. Gateway verified the audit chain, all required signer states, and SHA-256 hash "+result.hash+".");}
+  catch(error){popup?.close();setMessage(error?.message||"Unable to open the authoritative completed PDF.");}
+ }
+ async function retryTrackedDistribution(envelope){
+  if(!envelope?.gatewayEnvelopeId||trackingBusy)return;setTrackingBusy(true);
+  try{const result=await retryGatewaySignatureDistribution(envelope.gatewayEnvelopeId);const status=await getGatewaySignatureEnvelopeStatus(envelope.gatewayEnvelopeId);setTrackingSnapshots(previous=>({...previous,[envelope.id]:status}));const delivery=result.distribution||status.distribution||{};const copies=result.personalCopies||{};setMessage("Distribution processed: "+(delivery.sent||0)+" email(s) accepted; "+(delivery.failed||0)+" failed; "+(delivery.unknown||0)+" ambiguous; personal copies stored "+(copies.stored||0)+", failed "+(copies.failed||0)+", skipped "+(copies.skipped||0)+". Successful and ambiguous email outcomes were not resent.");}
+  catch(error){setMessage(error?.message||"Unable to process completed-document distribution.");}
+  finally{setTrackingBusy(false);}
+ }
  async function refreshDocumentTracking(){
   if(trackingBusy)return;
   setTrackingBusy(true);
@@ -999,6 +1010,9 @@ function signerDeliveryLabel(item={}) {
        <div><small style={{opacity:.7}}>NEXT EXPECTED ACTION</small><div>{liveCompleted?"Retain and follow the archived record":liveClosed?"No further action":stage.includes("owner portal")?"Owner completes signature in the portal":stage.includes("invitation")?"Workflow owner issues the next signer invitation":activeHolders.length?"Current holder reviews and completes assigned fields":"Continue preparation or inspect workflow"}</div></div>
        <div><small style={{opacity:.7}}>AUDIT / LIVE STATUS</small><div>{live?.error?live.error:live?("Gateway "+live.status+" · "+(live.eventCount??"—")+" events"):"Not refreshed"}</div></div>
       </div>
+      {liveCompleted&&live?.distribution&&<div style={{borderTop:"1px solid var(--border)",paddingTop:8}}><strong>Recipient email delivery</strong><small style={{display:"block",opacity:.75}}>Sent means accepted by the mail server. Unknown is not retried automatically. Missing records remain not attempted until the first distribution action.</small>{(live.distribution.deliveries||[]).length===0?<p className="muted">No recipient delivery attempt is recorded yet.</p>:<div style={{display:"grid",gap:5,marginTop:6}}>{live.distribution.deliveries.map((delivery,index)=><div key={index} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:8}}><span>{delivery.recipientAddress||"Recipient"}</span><span><strong>{delivery.status==="Sent"?"Delivered":delivery.status==="Unknown"?"Unknown":delivery.status==="Failed"?"Failed":delivery.status==="Sending"?"Pending":delivery.status||"Not Attempted"}</strong> · {Number(delivery.attempts||0)} attempt(s){delivery.lastAttemptAt?" · Last attempt "+formatDate(delivery.lastAttemptAt):""}{delivery.lastError?" · "+delivery.lastError:""}</span></div>)}</div>}{(live.personalCopies||[]).length>0&&<div style={{marginTop:8}}><strong>Personal My Documents copies</strong>{live.personalCopies.map((copy,index)=><div key={index}><small>{copy.copyKind}: {copy.status} · {copy.attempts} attempt(s){copy.lastAttemptAt?" · "+formatDate(copy.lastAttemptAt):""}{copy.lastError?" · "+copy.lastError:""}</small></div>)}</div>}</div>}
+      {liveCompleted&&live?.auditChainValid===true&&live?.completion?.finalHash&&<small style={{display:"block",overflowWrap:"anywhere",opacity:.8}}>Verified authoritative PDF SHA-256: {live.completion.finalHash} · Completed {live.completion.completedAt?formatDate(live.completion.completedAt):"date not recorded"}</small>}
+      {liveCompleted&&<div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" className="text-button" disabled={trackingBusy||!!live?.error} onClick={()=>openTrackedCompletedDocument(envelope)}>Read completed document</button><button type="button" className="text-button" disabled={trackingBusy||!!live?.error} onClick={()=>retryTrackedDistribution(envelope)}>{trackingBusy?"Processing…":"Send not-attempted / retry failed deliveries"}</button></div>}
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" className="text-button" onClick={()=>{setSelected(envelope);setTab("Sign Document")}}>Open document record</button>{envelope.status==="Draft"&&(envelope.ownerUid===auth.currentUser?.uid||envelope.senderUid===auth.currentUser?.uid)&&<button type="button" className="text-button" onClick={()=>{setDraftEnvelopeId(envelope.id);setTitle(envelope.title||"");setDocumentId(envelope.documentId||"");setDocumentUrl(envelope.documentUrl||"");setRecipients((envelope.recipients||[]).filter(r=>r.uid!==auth.currentUser?.uid));setFields(envelope.fields||[]);setOwnerSigningEnabled(Boolean(envelope.ownerSigningEnabled));setActiveAssigneeUid(envelope.ownerSigningEnabled?auth.currentUser.uid:(envelope.recipients||[]).find(r=>r.uid!==auth.currentUser?.uid)?.uid||"");setSelectedField(null);setPreparationPage(1);setInitiatedDocument(docs.find(d=>d.id===envelope.documentId)||null);setTab("Prepare Envelope");setMessage("Draft reopened for preparation. No invitations have been sent.")}}>Continue preparation</button>}</div>
     </article>;
    })}
