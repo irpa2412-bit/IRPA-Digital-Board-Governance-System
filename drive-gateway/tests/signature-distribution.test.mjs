@@ -27,7 +27,7 @@ function context(bytes, failingEmail, failPersonalCopy=false) {
   return {
     sent,meta,failPersonalCopy,
     now:()=>new Date("2026-11-18T20:00:00.000Z"),
-    storage:{get:async id=>id==="signed-pdf"?bytes:null,async put({path,bytes}){if(context.failPersonalCopy&&path.startsWith("My Documents/"))throw new Error("R2 personal-copy write denied");return{id:path,link:"r2://"+path};}},
+    storage:{get:async id=>id==="signed-pdf"?bytes:null,async put({path,bytes}){if(failPersonalCopy&&path.startsWith("My Documents/"))throw new Error("R2 personal-copy write denied");return{id:path,link:"r2://"+path};}},
     logger:{error(){}},
     async sendCompletionEmail(message){
       sent.push(message);
