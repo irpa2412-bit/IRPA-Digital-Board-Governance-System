@@ -147,6 +147,17 @@ export async function provisionAllMeetingCategoryArchives() { return { testOnly:
 export async function listMeetingBoardMembers() {
   return clone(readStore().members.filter(m => m.boardMember === true && ["active", "activated"].includes(String(m.status || "").toLowerCase())));
 }
+export async function listMeetingPeople() {
+  const directory = await listMeetingInviteeDirectory();
+  const rows = [...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
+  const seen = new Set();
+  return rows.filter(row => {
+    const uid = String(row.uid || "").trim();
+    if (!uid || seen.has(uid)) return false;
+    seen.add(uid);
+    return true;
+  }).map(row => ({ ...row, uid: String(row.uid).trim(), name: String(row.name || row.email || row.uid), email: String(row.email || "").toLowerCase() }));
+}
 export async function listMeetingInviteeDirectory() {
   const store = readStore();
   const active = rows => clone(rows.filter(m => ["active", "activated"].includes(String(m.status || m.employmentStatus || m.registrationStatus || "").toLowerCase())));
