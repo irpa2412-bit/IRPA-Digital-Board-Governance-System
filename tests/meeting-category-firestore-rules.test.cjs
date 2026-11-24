@@ -129,7 +129,7 @@ test("meeting register is readable while meeting writes remain role-controlled",
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertSucceeds(staffDb.doc("meetings/governance-record").get());
+  await assertFails(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
 });
@@ -148,8 +148,9 @@ test("authenticated users can query the read-only meeting register across catego
   const boardDb = testEnv.authenticatedContext("board-member", {
     email: "board@example.test"
   }).firestore();
-  await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertFails(staffDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
   await assertSucceeds(boardDb.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
+  await assertSucceeds(staffDb.collection("meetings").where("meetingCategory", "==", "STAFF").get());
 });
 
 test("explicit category metadata overrides a conflicting legacy meeting type", async () => {
@@ -166,7 +167,7 @@ test("explicit category metadata overrides a conflicting legacy meeting type", a
   const staffDb = testEnv.authenticatedContext("staff-user", {
     email: "staff@example.test"
   }).firestore();
-  await assertSucceeds(boardDb.doc("meetings/category-mismatch").get());
+  await assertFails(boardDb.doc("meetings/category-mismatch").get());
   await assertSucceeds(staffDb.doc("meetings/category-mismatch").get());
 });
 
