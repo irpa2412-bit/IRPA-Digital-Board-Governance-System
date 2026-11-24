@@ -667,7 +667,8 @@ if(!meetingId||!reference)return fail(ctx,request,"Meeting ID and voting referen
 const c=await context(ctx,env,token,claims,meetingId);
 const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
 if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may open voting.",403);
-if(transitionCommitteeActive(c.meeting)&&["meetingChairpersonUid","meetingSecretaryUid","meetingAdministratorUid"].every(key=>clean(c.meeting[key]))===false&&c.meeting.leadershipElectionRequired!==true)return fail(ctx,request,"Voting is not available until the leadership-election workflow is declared.",409);
+const electionMode=transitionCommitteeActive(c.meeting)&&c.meeting.leadershipElectionRequired===true;
+if(!electionMode&&categoryOf(c.meeting)!=="GOVERNANCE")return fail(ctx,request,"This meeting category does not permit ordinary voting. Only an active Transition Committee may open a pre-proceedings leadership election.",409);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Voting cannot be opened for a closed meeting.",409);
 if(resolutionId){const resolution=await getDoc(ctx,env,token,"resolutions",resolutionId);if(!resolution||resolution.meetingId!==meetingId)return fail(ctx,request,"The linked resolution must belong to the selected meeting.",409);}
 const id=await hash(meetingId+"|"+resolutionId+"|"+reference.toLowerCase());
