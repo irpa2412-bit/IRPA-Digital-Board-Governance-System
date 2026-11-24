@@ -340,3 +340,16 @@ test("Transition Committee powers are limited to leadership election, invitation
   assert.match(meetingRoomGovernanceSource, /MeetingAccessControl meeting=\{selected\} controller=\{Boolean\(activeAdministrator\)\} admissionController=\{Boolean\(activeAdministrator\)\}/);
   assert.match(meetingRoomGovernanceSource, /MeetingWorkingDocuments meeting=\{selected\} controller=\{controller\}/);
 });
+
+
+const legacyLiveMeetingSource = readFileSync(new URL("../functions/liveMeeting.js", import.meta.url), "utf8");
+test("legacy LiveKit callable cannot bypass meeting-specific admission or Meeting Administrator moderation", () => {
+  assert.match(legacyLiveMeetingSource, /function moderatorForMeeting\(meeting = \{\}, uid\)/);
+  assert.match(legacyLiveMeetingSource, /meeting\.transitionAdministratorUid : meeting\.meetingAdministratorUid/);
+  assert.doesNotMatch(legacyLiveMeetingSource, /meeting\.chairpersonUid && text\(meeting\.chairpersonUid\) === uid/);
+  assert.doesNotMatch(legacyLiveMeetingSource, /meeting\.secretaryUid && text\(meeting\.secretaryUid\) === uid/);
+  assert.match(legacyLiveMeetingSource, /const moderator = moderatorForMeeting\(meeting, uid\)/);
+  assert.doesNotMatch(legacyLiveMeetingSource, /const moderator = isAdmin \|\|/);
+  assert.match(legacyLiveMeetingSource, /if \(!listed\)/);
+  assert.match(legacyLiveMeetingSource, /const controller = moderatorForMeeting\(meeting, uid\)/);
+});
