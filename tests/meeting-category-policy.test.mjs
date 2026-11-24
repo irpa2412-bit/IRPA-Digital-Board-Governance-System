@@ -43,15 +43,19 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
-test("meeting registration requires an active designated institutional role", () => {
+test("any active registered member or employee may initiate a meeting", () => {
   assert.equal(canRegisterMeeting({ active: true, role: "Departmental Director" }), true);
   assert.equal(canRegisterMeeting({ active: false, role: "Departmental Director" }), false);
-  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), false);
+  assert.equal(canRegisterMeeting({ active: true, role: "Staff" }), true);
+  assert.equal(canRegisterMeeting({ active: true, role: "Member" }), true);
   assert.equal(canRegisterMeeting({ isAdmin: true }), true);
 });
 
-test("released meeting edits are administrator-only", () => {
-  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, {
+test("released meeting general details remain protected while the initiator may manage appointments before proceedings", () => {
+  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered", initiatorUid: "secretary-1" }, {
+    uid: "secretary-1", active: true, role: "Board Secretary"
+  }), true);
+  assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered", initiatorUid: "secretary-1", status: "In Progress" }, {
     uid: "secretary-1", active: true, role: "Board Secretary"
   }), false);
   assert.equal(canEditMeeting({ ...governance, registerStatus: "Registered" }, { isAdmin: true }), true);
