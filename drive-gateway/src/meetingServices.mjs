@@ -549,6 +549,9 @@ if(lower(changed.status)==="in progress"||lower(changed.proceedingsStatus)==="in
  if(required.some(key=>!clean(proposed[key])))return fail(ctx,request,"Formal proceedings cannot begin until the meeting-specific Chairperson, Secretary and Meeting Administrator have all been declared.",409);
  for(const key of required){if(!await resolveActiveMeetingPerson(ctx,env,token,proposed[key]))return fail(ctx,request,"Formal proceedings are blocked because one or more appointed leaders are no longer active IRPA members or employees.",409);}
  if(proposed.transitionCommitteeActive===true){
+  const electionIssues=await listByField(ctx,env,token,"votingIssues","meetingId",meetingId);
+  const leadershipIssues=electionIssues.filter(issue=>issue.leadershipElection===true);
+  if(!leadershipIssues.length||leadershipIssues.some(issue=>lower(issue.status)!=="closed"))return fail(ctx,request,"The leadership election must be completed and every leadership ballot closed before formal proceedings can begin.",409);
   changed.transitionCommitteeActive=false;
   changed.transitionCommitteeMandateEndedAt=new Date();
   changed.transitionCommitteeMandateEndedAtProceedings=true;
@@ -670,7 +673,7 @@ if(resolutionId){const resolution=await getDoc(ctx,env,token,"resolutions",resol
 const id=await hash(meetingId+"|"+resolutionId+"|"+reference.toLowerCase());
 const prior=await getDoc(ctx,env,token,"votingIssues",id);
 if(prior&&lower(prior.status)!=="cancelled")return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});
-const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,status:"Open",result:"Pending",anonymous:true,openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
+const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,leadershipElection:transitionCommitteeActive(c.meeting)&&c.meeting.leadershipElectionRequired===true,status:"Open",result:"Pending",anonymous:true,openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
 if(prior)await patchDoc(ctx,env,token,"votingIssues",id,issue);else await writeDoc(ctx,env,token,"votingIssues",id,issue,false);
 await audit(ctx,env,token,claims,"MEETING_VOTING_ISSUE_OPENED",c.meeting,id,{votingReference:reference,resolutionId:resolutionId||null,anonymous:true});
 return response(ctx,request,{ok:true,issue:{...issue,id},alreadyOpen:false});
