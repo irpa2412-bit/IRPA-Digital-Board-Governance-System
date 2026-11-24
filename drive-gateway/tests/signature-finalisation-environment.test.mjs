@@ -54,3 +54,12 @@ test("only the document owner may issue the owner finalisation command",async()=
  const ctx={meta:{get:async()=>envelope}};
  await assert.rejects(()=>retryCompletion(ctx,{uid:"other-user"},envelope.id),error=>error.status===403);
 });
+
+
+test("ownerUid and createdByUid identities are recognised for the finalisation command",async()=>{
+ for(const field of ["ownerUid","createdByUid"]){
+  const envelope={id:"ENV-OWNER-ALIAS-"+field,createdBy:"someone-else",status:"CompletionFailed",[field]:"owner-1",signers:[{id:"S1",status:"Pending"}],events:[]};
+  const ctx={meta:{get:async()=>envelope}};
+  await assert.rejects(()=>retryCompletion(ctx,{uid:"owner-1"},envelope.id),error=>error.status===409&&/every required signer has signed/.test(error.message));
+ }
+});
