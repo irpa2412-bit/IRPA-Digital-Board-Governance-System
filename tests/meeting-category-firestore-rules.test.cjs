@@ -180,7 +180,7 @@ test("explicitly listed external participant can read only the meeting they are 
     email: "external@example.test"
   }).firestore();
   await assertSucceeds(externalDb.doc("meetings/invited-record").get());
-  await assertSucceeds(externalDb.doc("meetings/uninvited-record").get());
+  await assertFails(externalDb.doc("meetings/uninvited-record").get());
 });
 
 
@@ -192,7 +192,7 @@ test("meeting invitee can read only the invited meeting and its participant regi
     await db.doc("participants/other-record").set({meetingId:"other-meeting",participantEmail:"someone-else@example.test",participantName:"Other",attendanceStatus:"Invited"});
   });
   const db=testEnv.authenticatedContext("invitee-user",{email:"invitee@example.test"}).firestore();
-  await assertSucceeds(db.doc("meetings/invited-meeting").get()); await assertSucceeds(db.doc("meetings/other-meeting").get());
+  await assertSucceeds(db.doc("meetings/invited-meeting").get()); await assertFails(db.doc("meetings/other-meeting").get());
   await assertSucceeds(db.doc("participants/invitee-record").get()); await assertSucceeds(db.collection("participants").where("meetingId","==","invited-meeting").get()); await assertFails(db.doc("participants/other-record").get());
 });
 
