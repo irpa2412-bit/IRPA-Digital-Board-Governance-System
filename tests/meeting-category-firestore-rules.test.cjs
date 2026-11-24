@@ -340,7 +340,7 @@ test("Transition Committee authority and election voting expire when formal proc
     await db.doc("votingIssues/started-election-issue").set({
       meetingId: "started-election", resolutionId: null, leadershipElection: true,
       status: "Open", anonymous: true, votingReference: "Expired transition ballot"
-    }));
+    });
   });
   const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
   const transitionChairDb = testEnv.authenticatedContext("departmental-director", { email: "director@example.test" }).firestore();
