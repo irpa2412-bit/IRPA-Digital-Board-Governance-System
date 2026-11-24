@@ -90,8 +90,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   for (const signer of signers.filter(s => s.status === "Signed")) {
     const assignedSigner=(envelope.signers||[]).find(x=>(x.uid&&x.uid===signer.uid)||(x.email&&x.email===signer.email));
     const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""));
-    if(!signerCopy?.id)throw new Error("Completed signer archive copy is missing for an assigned signer.");
-    const signerArchiveUrl="https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view";
+    const signerArchiveUrl=signerCopy?.id?"https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view":null;
     const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid||assignedSigner?.id||signer.email);
     await updateDocument("signatures/"+signatureRecordId,{
       envelopeId,documentId:clean(existing.documentId||envelope.documentId),
@@ -106,7 +105,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
       signerDeclarations:assignedSigner?.signerDeclarations||{},
       declarationDiscrepancy:assignedSigner?.declarationDiscrepancy||null,
       signatureStatus:"Signed",status:"Signed",signedAt:signer.signedAt||timestamp,
-      signerArchiveUrl,signerArchiveFileId:signerCopy.id,copyRole:"Signer",personalCopyDeleted:false,
+      signerArchiveUrl,signerArchiveFileId:signerCopy?.id||null,personalCopyStatus:signerCopy?.id?"Stored":"NotStored",copyRole:"Signer",personalCopyDeleted:false,
       gatewayEnvelopeId:envelope.id,gatewayDocumentHash:completion.finalHash,
       cryptographicEvidenceStatus:(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner?.id)?"Verified":"GatewayAuditOnly",archiveProtocol:(completion.signerEvidence||[]).some(item=>item.signerId===assignedSigner?.id)?"IRPA-GATEWAY-CRYPTOGRAPHIC-EVIDENCE-1":"IRPA-GATEWAY-AUDIT-CHAIN-1",
       immutable:true
