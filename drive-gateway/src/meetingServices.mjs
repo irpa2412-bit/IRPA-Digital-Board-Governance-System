@@ -692,7 +692,8 @@ if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Voting cannot 
 if(resolutionId){const resolution=await getDoc(ctx,env,token,"resolutions",resolutionId);if(!resolution||resolution.meetingId!==meetingId)return fail(ctx,request,"The linked resolution must belong to the selected meeting.",409);}
 const id=await hash(meetingId+"|"+resolutionId+"|"+reference.toLowerCase());
 const prior=await getDoc(ctx,env,token,"votingIssues",id);
-if(prior&&lower(prior.status)!=="cancelled")return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});
+if(prior&&lower(prior.status)==="open")return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});
+if(prior&&lower(prior.status)==="closed")return fail(ctx,request,"This voting reference has already been closed. Use a new unique reference for a new ballot.",409);
 const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,leadershipElection:transitionCommitteeActive(c.meeting)&&c.meeting.leadershipElectionRequired===true,status:"Open",result:"Pending",anonymous:true,openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
 if(prior)await patchDoc(ctx,env,token,"votingIssues",id,issue);else await writeDoc(ctx,env,token,"votingIssues",id,issue,false);
 await patchDoc(ctx,env,token,"meetings",meetingId,{votingRequired:true,votingReference:reference,votingIssueId:id,votingStatus:"Open",votingResult:"Pending",updatedAt:now});
