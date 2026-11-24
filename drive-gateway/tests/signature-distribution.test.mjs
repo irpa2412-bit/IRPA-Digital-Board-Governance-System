@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { distributeCompletedSignatureDocument, retryFailedSignatureDistributions } from "../src/signatureDistribution.mjs";
+import { distributeCompletedSignatureDocument, distributeCompletedPersonalCopies, retryFailedSignatureDistributions } from "../src/signatureDistribution.mjs";
 import { sha256Hex } from "../src/util.mjs";
 
-function context(bytes, failingEmail) {
+function context(bytes, failingEmail, failPersonalCopy=false) {
   const records=new Map();
   const sent=[];
   const attempts=new Map();
@@ -25,9 +25,9 @@ function context(bytes, failingEmail) {
     }
   };
   return {
-    sent,meta,
+    sent,meta,failPersonalCopy,
     now:()=>new Date("2026-11-18T20:00:00.000Z"),
-    storage:{get:async id=>id==="signed-pdf"?bytes:null},
+    storage:{get:async id=>id==="signed-pdf"?bytes:null,async put({path,bytes}){if(failPersonalCopy&&path.startsWith("My Documents/"))throw new Error("R2 personal-copy write denied");return{id:path,link:"r2://"+path};}},
     logger:{error(){}},
     async sendCompletionEmail(message){
       sent.push(message);
@@ -82,4 +82,26 @@ test("failed completed-document email is retryable without resending already del
   assert.equal(ctx.sent.filter(item=>item.to==="owner@example.test").length,1);
   assert.equal(ctx.sent.filter(item=>item.to==="first@example.test").length,1);
   assert.equal(ctx.sent.filter(item=>item.to==="second@example.test").length,2);
+});
+
+test("personal-copy storage failures never block completed-document email delivery",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\ncompleted IRPA document");
+  const ctx=context(bytes,null,true);
+  const envelope={
+    id:"ENV-PERSONAL-COPY-FAIL",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Document Owner",
+    status:"Completed",title:"Board Resolution",documentId:"DOC-PERSONAL-COPY",
+    signers:[
+      {id:"S1",email:"first@example.test",name:"First Signer",uid:"first-uid",status:"Signed"},
+      {id:"S2",email:"second@example.test",name:"Second Signer",uid:null,profileUid:null,status:"Signed",identityType:"email-link"}
+    ]
+  };
+  const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"board-resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
+  const emailResult=await distributeCompletedSignatureDocument(ctx,envelope,completion);
+  assert.equal(emailResult.sent,3);
+  const copyResult=await distributeCompletedPersonalCopies(ctx,envelope,completion);
+  assert.equal(copyResult.total,2);
+  assert.equal(copyResult.failed,2);
+  assert.equal(copyResult.skipped,1);
+  assert.equal(ctx.sent.length,3);
+  assert.equal((await ctx.meta.list("signaturePersonalCopies")).length,2);
 });
