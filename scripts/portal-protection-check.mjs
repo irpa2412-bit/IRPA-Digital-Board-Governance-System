@@ -286,6 +286,14 @@ export function evaluatePolicy({ changedFiles, registry, windowState, record, ow
   return { ok: true, affected, protectedFiles, warning, reason: "Protected changes are declared and within the active 72-hour repair window." };
 }
 
+export function installLockTestDependencies(lockTests, run = execFileSync) {
+  const needsGatewayDependencies = (lockTests ?? []).some(path => String(path).startsWith("drive-gateway/"));
+  if (needsGatewayDependencies) {
+    run("npm", ["ci"], { cwd: "drive-gateway", stdio: "inherit" });
+  }
+  return needsGatewayDependencies;
+}
+
 async function main() {
   const event = process.env.GITHUB_EVENT_NAME ?? "pull_request";
   const base = process.env.GITHUB_BASE_REF || "main";
@@ -347,6 +355,7 @@ async function main() {
       return;
     }
     try {
+      installLockTestDependencies(lockTests);
       execFileSync("node", ["--test", ...lockTests], { stdio: "inherit" });
     } catch (error) {
       console.log(JSON.stringify({ ...result, ok: false, reason: "One or more owning portal lock tests failed: " + (error.message || error) }, null, 2));
