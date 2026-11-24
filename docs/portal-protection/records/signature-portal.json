@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Owner-authorised Signature Portal finalisation recovery for IRPA-ENV-2026-11501354. Record each finalisation stage and provide a zero-write sandbox diagnosis before any controlled retry.",
+    "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
     "files": [
       "docs/portal-protection/records/signature-portal.json",
       "docs/portal-protection/windows/signature-portal.json",
@@ -22,9 +22,14 @@
       "drive-gateway/src/signing.mjs",
       "drive-gateway/tests/signature-finalisation-recovery.test.mjs",
       "tests/signature-recovery-owner-panel-finalisation.test.mjs",
-      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md"
+      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+      "src/pages/SignaturePlatform.jsx",
+      "src/firebase/signatureStorage.js",
+      "drive-gateway/src/router.mjs",
+      "drive-gateway/src/signatureDistribution.mjs",
+      "drive-gateway/tests/completed-document-route.test.mjs"
     ],
-    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment.",
+    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment. The owner tracking register also exposes a hash-verified authoritative completed PDF, existing per-recipient delivery states, first-attempt delivery, failed-only retry and separate personal-copy outcomes; successful and ambiguous email outcomes remain protected from duplicate sends.",
     "prohibitedChanges": [
       "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
       "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
@@ -250,6 +255,19 @@
       "command": "approve",
       "reason": "Extend the Signature Portal repair scope to make recovery queue, evidence assessment and preview GET requests strictly non-mutating: move recovery-access telemetry out of envelope records into a separate recoveryAccessEvents store. Preserve the original signing audit chain, signatures, signer identities, fields, tokens, hashes, certificates, archive records and all signing/finalisation behavior.",
       "prNumber": 895
+    },
+    {
+      "at": "2026-11-24T06:25:00Z",
+      "action": "owner-authorised-scope-amendment-for-completed-document-tracking",
+      "pullRequest": 948,
+      "files": [
+        "src/pages/SignaturePlatform.jsx",
+        "src/firebase/signatureStorage.js",
+        "drive-gateway/src/router.mjs",
+        "drive-gateway/src/signatureDistribution.mjs",
+        "drive-gateway/tests/completed-document-route.test.mjs"
+      ],
+      "prohibitedBehaviorUnchanged": true
     }
   ],
   "repairWindow": {
