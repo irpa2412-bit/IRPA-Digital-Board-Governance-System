@@ -193,7 +193,7 @@ export async function distributeCompletedSignatureDocument(ctx,envelope,completi
       ctx.logger?.error?.("SIGNATURE_COMPLETION_EMAIL_FAILED",{envelopeId:envelope.id,recipientDomain:recipient.email.split("@")[1]||"unknown",status:finalStatus,stageCode:stageCode(error),replyCategory:replyCategory(error),attempt:priorAttempts+Math.max(1,activeAttempt)});
     }
   }
-  const summary=await getSignatureDistributionSummary(ctx,envelope.id);
+  const summary=await getSignatureDistributionSummary(ctx,envelope.id,envelope);
   await persistEnvelopeDistribution(ctx,envelope.id,summary);
   return summary;
 }
