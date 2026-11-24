@@ -6,8 +6,8 @@ const source = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.
 
 test("participant invitation context grants media entry but not host governance control", () => {
   assert.match(source, /hostController=roleControl\(member,selected\)/);
-  assert.match(source, /controller=Boolean\\(activeChair\\|\\|activeSecretary\\)/);
-  assert.match(source, /activeAdministrator=transitionActive\\?canTransitionAdministrator:canMeetingAdministrator/);
+  assert.match(source, /controller=Boolean\(activeChair\|\|activeSecretary\)/);
+  assert.match(source, /activeAdministrator=transitionActive\?canTransitionAdministrator:canMeetingAdministrator/);
   assert.doesNotMatch(source, /hostController=!!admin\?\.active/);
   assert.doesNotMatch(source, /controller=!!admin\?\.active\|\|roleControl\(member,selected\)\|\|Boolean\(entryContext\?\.participantId/);
   assert.match(source, /controller=\{Boolean\(hostController\|\|\(auth\.currentUser&&entryContext\?\.participantId&&entryContext\?\.meetingId===selected\?\.id\)\)\}/);
