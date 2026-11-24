@@ -138,7 +138,7 @@ const postMeetingGateway = (router, path, body = {}) => router(new Request("http
   body: JSON.stringify(body)
 }), { FIREBASE_PROJECT_ID: "test-project" }, path);
 
-async function createMeetingAsInstitutionalIdentity({ uid, email, member = null, employee = null, category = "GENERAL", meetingData = {} }) {
+async function createMeetingAsInstitutionalIdentity({ uid, email, member = null, employee = null, otherMembers = {}, otherEmployees = {}, category = "GENERAL", meetingData = {} }) {
   const originalFetch = globalThis.fetch;
   let meetingWrites = 0;
   globalThis.fetch = async (input, init = {}) => {
@@ -149,8 +149,8 @@ async function createMeetingAsInstitutionalIdentity({ uid, email, member = null,
       return new Response(JSON.stringify({ name: url.pathname + "/test-record", fields: {} }), { status: 200 });
     }
     const [collection, id] = documentPath.split("/");
-    const record = collection === "members" ? member : collection === "employees" ? employee : null;
-    if (id !== uid || !record) return new Response("{}", { status: 404 });
+    const record = collection === "members" ? (id === uid ? member : otherMembers[id]) : collection === "employees" ? (id === uid ? employee : otherEmployees[id]) : null;
+    if (!record) return new Response("{}", { status: 404 });
     const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, { stringValue: String(value) }]));
     return new Response(JSON.stringify({ name: url.pathname, fields }), { status: 200 });
   };
@@ -270,12 +270,15 @@ test("a declared leadership-election workflow requires all three temporary Trans
 });
 
 test("inactive identities cannot be appointed to a meeting position", async () => {
-  const uid = "inactive-appointee";
+  const inactiveUid = "inactive-appointee";
   const result = await createMeetingAsInstitutionalIdentity({
-    uid, email: "inactive@example.test",
-    member: { uid, email: "inactive@example.test", status: "Suspended", role: "Member" },
+    uid: "active-registrar", email: "registrar@example.test",
+    member: { uid: "active-registrar", email: "registrar@example.test", status: "Active", role: "Member" },
+    otherMembers: {
+      [inactiveUid]: { uid: inactiveUid, email: "inactive@example.test", status: "Suspended", role: "Member" }
+    },
     category: "STAFF",
-    meetingData: { meetingChairpersonUid: uid }
+    meetingData: { meetingChairpersonUid: inactiveUid }
   });
   assert.equal(result.response.status, 400);
   assert.equal(result.meetingWrites, 0);
@@ -292,7 +295,7 @@ test("staff and general meetings enable ballots only during an active leadership
   const capabilities = meetingCapabilities(meeting);
   assert.equal(capabilities.leadershipElection, true);
   assert.equal(capabilities.voting, true);
-  assert.equal(capabilities.resolutions, true);
+  assert.equal(capabilities.resolutions, false);
   assert.equal(canVoteInMeeting(meeting, {
     active: true, activeEmployee: true, isMeetingParticipant: true
   }), true);
