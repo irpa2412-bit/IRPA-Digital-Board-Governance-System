@@ -74,15 +74,18 @@ test("email signer mirror includes signer ID, declarations and verified per-sign
   assert.equal(record.declarationDiscrepancy.detected,true);
 });
 
-test("completion mirror fails closed when an assigned signer archive copy is missing", async () => {
+test("completion mirror records missing personal copies without blocking authoritative completion", async () => {
   const updates=[];
-  await assert.rejects(()=>persistCompletedSignatureEnvelope({
+  await persistCompletedSignatureEnvelope({
     envelope:{id:"ENV-MISSING",externalReference:"IRPA-ENV-MISSING",documentId:"DOC-MISSING",signers:[
       {id:"S1",uid:"signer-uid",name:"Signer",email:"signer@example.test",status:"Signed"}
     ]},
     completion:{finalHash:"b".repeat(64),completedAt:"2026-11-15T10:02:00.000Z",primaryStorageId:"archive-file",files:[{kind:"archive",id:"archive-file"}]},
     getDocument:async path=>path==="signatureEnvelopes/IRPA-ENV-MISSING"?{documentId:"DOC-MISSING"}:null,
     updateDocument:async(path,fields)=>updates.push({path,fields})
-  }),/archive copy is missing/);
-  assert.equal(updates.some(x=>x.path.startsWith("signatures/")),false);
+  });
+  const signature=updates.find(x=>x.path.startsWith("signatures/"));
+  assert.ok(signature);
+  assert.equal(signature.fields.personalCopyStatus,"NotStored");
+  assert.equal(signature.fields.signerArchiveFileId,null);
 });
