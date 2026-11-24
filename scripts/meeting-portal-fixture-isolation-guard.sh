@@ -138,6 +138,10 @@ const allowed = new Set([
   "tests/fixtures/meeting-portal-fixture.css",
   "tests/fixtures/mocks.js",
   "tests/meeting-portal-browser.test.mjs",
+  "functions/liveMeeting.js",
+  "scripts/check-meeting-media-governance.mjs",
+  "src/firebase/meetingPolicy.js",
+  "src/pages/Voting.jsx",
   "tests/meeting-room-authorization-boundary.test.mjs",
   // Explicitly permit the separate authenticated cross-portal mobile navigation race regression.
   "tests/browser/authenticated-governance-regression.spec.mjs",
