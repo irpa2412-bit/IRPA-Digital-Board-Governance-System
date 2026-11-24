@@ -465,9 +465,9 @@ return response(ctx,request,{ok:true,meetingId,meetingReference:clean(c.meeting.
 if(pathname==="/api/meeting-entry-requests/list"){
 const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
 const meeting=await getDoc(ctx,env,token,"meetings",meetingId);if(!meeting)return fail(ctx,request,"Meeting was not found.",404);
-const uid=clean(claims.user_id),email=lower(claims.email),adminProfile=await getDoc(ctx,env,token,"adminProfiles",uid);
-const authorised=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true||clean(meeting.initiatorUid)===uid||clean(meeting.chairpersonUid)===uid||clean(meeting.secretaryUid)===uid||email&&[meeting.chairpersonEmail,meeting.secretaryEmail].some(v=>lower(v)===email);
-if(!authorised)return fail(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may view entry requests.",403);
+const uid=clean(claims.user_id);
+const authorised=meetingRoleAssigned(meeting,uid,"administrator")||(transitionCommitteeActive(meeting)&&meetingRoleAssigned(meeting,uid,"transitionAdministrator"));
+if(!authorised)return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may view entry requests.",403);
 if(terminal.has(lower(meeting.status)))return fail(ctx,request,"Closed meetings cannot load pending entry requests.",409);
 const rows=await listByField(ctx,env,token,"meetingEntryRequests","meetingId",meetingId);
 const requests=rows.filter(row=>row.status==="PENDING"&&new Date(row.expiresAt||0).getTime()>Date.now()).map(row=>({id:row.id,participantId:clean(row.participantId),participantName:clean(row.participantName||row.participantEmail),participantEmail:clean(row.participantEmail),requestedAt:iso(row.requestedAt)}));
@@ -478,9 +478,9 @@ const requestId=clean(data.requestId),decision=clean(data.decision).toUpperCase(
 if(!requestId||!["ADMIT","DENY"].includes(decision))return fail(ctx,request,"An entry request ID and ADMIT or DENY decision are required.",400);
 const entry=await getDoc(ctx,env,token,"meetingEntryRequests",requestId);if(!entry)return fail(ctx,request,"Entry request was not found.",404);
 const meeting=await getDoc(ctx,env,token,"meetings",clean(entry.meetingId));if(!meeting)return fail(ctx,request,"Meeting was not found.",404);if(terminal.has(lower(meeting.status)))return fail(ctx,request,"Closed meetings cannot admit or decline new entry requests.",409);
-const uid=clean(claims.user_id),email=lower(claims.email),adminProfile=await getDoc(ctx,env,token,"adminProfiles",uid);
-const authorised=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true||clean(meeting.initiatorUid)===uid||clean(meeting.chairpersonUid)===uid||clean(meeting.secretaryUid)===uid||email&&[meeting.chairpersonEmail,meeting.secretaryEmail].some(v=>lower(v)===email);
-if(!authorised)return fail(ctx,request,"Only the meeting initiator, chairperson, secretary or active administrator may resolve entry requests.",403);
+const uid=clean(claims.user_id),email=lower(claims.email);
+const authorised=meetingRoleAssigned(meeting,uid,"administrator")||(transitionCommitteeActive(meeting)&&meetingRoleAssigned(meeting,uid,"transitionAdministrator"));
+if(!authorised)return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may resolve entry requests.",403);
 if(entry.status!=="PENDING")return fail(ctx,request,"This entry request has already been resolved.",409);
 const access=await getDoc(ctx,env,token,"meetingAccessTokens",clean(entry.accessId));
 if(!access||access.status!=="Active"||new Date(access.expiresAt||0).getTime()<=Date.now())return fail(ctx,request,"The invitation pass is expired, revoked or no longer active.",409);
