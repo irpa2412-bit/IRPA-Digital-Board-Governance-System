@@ -1,9 +1,43 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE, installLockTestDependencies } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE, installLockTestDependencies, isProtectionFile } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 
 const protectionCheckerSource = fs.readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
+
+test("meeting fixture isolation guard is classified only as Meeting Portal source, not cross-portal protection maintenance", () => {
+  const guard = "scripts/meeting-portal-fixture-isolation-guard.sh";
+  assert.equal(isProtectionFile(guard), false);
+  assert.ok(registry.portals["Meeting Portal"].paths.includes(guard));
+  const meetingRecord = {
+    status: "complete",
+    declaration: {
+      affectedPortals: ["Meeting Portal"], files: [guard],
+      reason: "Meeting Portal fixture isolation guard maintenance",
+      expectedEffect: "Keep browser fixtures isolated to local test records",
+      prohibitedChanges: ["No other portal scope or production data"]
+    },
+    baseline: { commit: valid.baseline.commit, rollbackCommit: valid.baseline.commit },
+    validation: {
+      baselineSmoke: "PASS", fullRegression: "PASS",
+      portalSmoke: { "Meeting Portal": "PASS" },
+      evidence: [
+        `Baseline smoke PASS for ${valid.baseline.commit} https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/11`,
+        `Full regression PASS for ${valid.baseline.commit} https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/12`,
+        `Meeting Portal portal smoke PASS for ${valid.baseline.commit} https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/1/job/13`
+      ],
+      behaviourDifferences: []
+    }
+  };
+  const result = evaluatePolicy({
+    changedFiles: [guard], registry, record: meetingRecord,
+    windowState: { ...windowState, scope: [guard] },
+    latestActivityAt: "2026-11-19T19:59:00Z", now
+  });
+  assert.equal(result.ok, true, result.reason);
+  assert.deepEqual(result.affected, ["Meeting Portal"]);
+});
+
 test("PR base fetch preserves ancestry for the three-dot changed-file comparison", () => {
   assert.ok(protectionCheckerSource.includes('execFileSync("git", ["fetch", "origin", base], { stdio: "inherit" });'));
   assert.equal(protectionCheckerSource.includes('execFileSync("git", ["fetch", "origin", base, "--depth=1"]'), false);
@@ -301,3 +335,5 @@ test("root-only owner lock tests do not install unnecessary Gateway dependencies
   assert.equal(installed, false);
   assert.equal(calls.length, 0);
 });
+
+// Regression coverage keeps Meeting Portal fixture guard classification portal-scoped.
