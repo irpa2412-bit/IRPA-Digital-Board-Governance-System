@@ -140,6 +140,42 @@ async function commitWrites(ctx,env,token,writes){const url=`https://firestore.g
 async function patchDoc(ctx,env,token,col,id,data){const mask=Object.keys(data).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");const url=`https://firestore.googleapis.com/v1/projects/${ctx.getFirebaseProjectId(env)}/databases/(default)/documents/${col}/${encodeURIComponent(id)}?${mask}`;const r=await fetch(url,{method:"PATCH",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({fields:fields(data)})});const b=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(`Firestore update failed (${r.status}).`);e.status=r.status;throw e;}return plain(b);}
 async function audit(ctx,env,token,claims,action,meeting,recordId,details={}){const collection=action.startsWith("MEETING_REGISTER_")||action.startsWith("MEETING_QUORUM_")?"meetings":action.startsWith("MEETING_PARTICIPANT_")?"participants":action.startsWith("MEETING_INVITATION_")?"meetingInvitations":action.startsWith("MEETING_DECISION_")?"decisions":action.startsWith("MEETING_ACTION_")?"actions":action.includes("VOTING")?"votingIssues":action.includes("RECORDING")?"meetingMediaRecordings":action==="LIVE_MEETING_TOKEN_ISSUED"?"liveMeetingSessions":"meetingRecords";await writeDoc(ctx,env,token,"audit",null,{action,collection,recordId:recordId||null,details:{meetingId:meeting.id,meetingCategory:categoryOf(meeting),confidentialityClass:clean(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL"),...details},actorUid:claims.user_id,actorEmail:claims.email||null,createdAt:new Date()},false);}
 async function context(ctx,env,token,claims,meetingId){const uid=clean(claims.user_id),email=lower(claims.email);if(!uid)throw Object.assign(new Error("Sign in to access meeting records."),{status:401});if(!meetingId)throw Object.assign(new Error("Meeting ID is required."),{status:400});const meeting=await getDoc(ctx,env,token,"meetings",meetingId);if(!meeting)throw Object.assign(new Error("Meeting record not found."),{status:404});const [adminProfile,member,employee,subscriptions,participants]=await Promise.all([getDoc(ctx,env,token,"adminProfiles",uid),getDoc(ctx,env,token,"members",uid),getDoc(ctx,env,token,"employees",uid),listByField(ctx,env,token,"meetingSubscriptions","meetingId",meetingId),listByField(ctx,env,token,"participants","meetingId",meetingId)]);const isAdmin=claims.admin===true||email==="irpa2412@gmail.com"||adminProfile?.active===true;const active= r=>r&&["active","activated"].includes(lower(r.status||r.registrationStatus||r.employmentStatus));const listed=[...(meeting.participantUids||[]),...(meeting.attendeeUids||[]),...(meeting.memberUids||[]),...(meeting.invitedUids||[]),...(meeting.subscriberUids||[])].includes(uid);const subscribed=subscriptions.some(s=>!denied.has(lower(s.status))&&([s.uid,s.subscriberUid,s.userId,s.memberUid,s.participantUid].map(clean).includes(uid)||email&&[s.email,s.subscriberEmail,s.participantEmail].some(x=>lower(x)===email)));const participantRecord=participants.some(p=>!denied.has(lower(p.status||p.registrationStatus))&&([p.uid,p.userId,p.participantUid,p.memberUid,p.invitedUid].map(clean).includes(uid)||email&&[p.email,p.participantEmail,p.invitedEmail].some(x=>lower(x)===email)));const participant=listed||subscribed||participantRecord;const chair=lower(meeting.chairpersonEmail)===email||clean(meeting.chairpersonUid)===uid;const secretary=lower(meeting.secretaryEmail)===email||clean(meeting.secretaryUid)===uid;const canManage=isAdmin||chair||secretary||clean(meeting.meetingHostUid)===uid||clean(meeting.hostUid)===uid||clean(meeting.organizerUid)===uid||clean(meeting.organiserUid)===uid||clean(meeting.createdByUid)===uid||clean(meeting.initiatorUid)===uid||clean(meeting.ownerUid)===uid;if(!isAdmin&&!active(member)&&!active(employee)&&!participant)throw Object.assign(new Error("An active IRPA identity or authorised meeting participant is required."),{status:403});return {uid,email,meeting,participant,canManage,canRead:canManage||participant||isAdmin,isAdmin,category:categoryOf(meeting),confidentiality:clean(meeting.confidentialityClass)||(categoryOf(meeting)==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};}
+const MEETING_APPOINTMENT_FIELDS = {
+  meetingChairpersonUid: "meetingChairpersonName",
+  meetingSecretaryUid: "meetingSecretaryName",
+  meetingAdministratorUid: "meetingAdministratorName",
+  transitionChairpersonUid: "transitionChairpersonName",
+  transitionSecretaryUid: "transitionSecretaryName",
+  transitionAdministratorUid: "transitionAdministratorName"
+};
+const MEETING_APPOINTMENT_KEYS = new Set(Object.keys(MEETING_APPOINTMENT_FIELDS));
+const activeInstitutionalRecord = record => !!record && ["active","activated"].includes(lower(record.status||record.registrationStatus||record.employmentStatus));
+async function resolveActiveMeetingPerson(ctx,env,token,uid){
+  const id=clean(uid); if(!id)return null;
+  const [member,employee]=await Promise.all([getDoc(ctx,env,token,"members",id),getDoc(ctx,env,token,"employees",id)]);
+  const profile=activeInstitutionalRecord(member)?member:activeInstitutionalRecord(employee)?employee:null;
+  if(!profile)return null;
+  return {uid:id,name:clean(profile.name||profile.fullName||profile.memberName||profile.employeeName||profile.displayName)||"IRPA member",email:lower(profile.email||profile.emailAddress||profile.contactEmail)||null};
+}
+async function validateMeetingAppointments(ctx,env,token,incoming,current=null){
+  const patch={};
+  for(const [uidField,nameField] of Object.entries(MEETING_APPOINTMENT_FIELDS)){
+    if(!Object.prototype.hasOwnProperty.call(incoming,uidField))continue;
+    const uid=clean(incoming[uidField]);
+    if(!uid){patch[uidField]="";patch[nameField]="";continue;}
+    const person=await resolveActiveMeetingPerson(ctx,env,token,uid);
+    if(!person)return {error:"Each meeting appointment must identify an active registered IRPA member or employee. Invalid appointment: "+uidField+"."};
+    patch[uidField]=person.uid;patch[nameField]=person.name;
+  }
+  return {patch};
+}
+function meetingRoleAssigned(meeting,uid,role){
+  const id=clean(uid);if(!id)return false;
+  const fields=role==="chair"?["meetingChairpersonUid","chairpersonUid"]:role==="secretary"?["meetingSecretaryUid","secretaryUid"]:role==="administrator"?["meetingAdministratorUid"]:role==="transitionChair"?["transitionChairpersonUid"]:role==="transitionSecretary"?["transitionSecretaryUid"]:role==="transitionAdministrator"?["transitionAdministratorUid"]:[];
+  if(fields.some(field=>clean(meeting[field])===id))return true;
+  return false;
+}
+function transitionCommitteeActive(meeting){return meeting?.transitionCommitteeActive===true&&lower(meeting.status)!=="in progress"&&lower(meeting.proceedingsStatus)!=="in progress";}
 function jwtBase64(value){const bytes=new TextEncoder().encode(typeof value==="string"?value:JSON.stringify(value));let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");}
 async function signedJwt(key,secret,claims){const head=jwtBase64({alg:"HS256",typ:"JWT"}),body=jwtBase64(claims),input=head+"."+body;const cryptoKey=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const sig=await crypto.subtle.sign("HMAC",cryptoKey,new TextEncoder().encode(input));let raw="";for(const b of new Uint8Array(sig))raw+=String.fromCharCode(b);return input+"."+btoa(raw).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");}
 async function roomName(meetingId){return "irpa-meeting-"+(await hash(`${meetingId}:shared-live-room`)).slice(0,32);}
@@ -467,11 +503,17 @@ const active=r=>r&&["active","activated"].includes(lower(r.status||r.registratio
 if(!isAdmin&&!(active(member)||active(employee)))return fail(ctx,request,"An active registered IRPA member or employee identity is required to initiate a meeting.",403);
 const category=clean(incoming.meetingCategory||incoming.meetingPolicyId||"OTHER").toUpperCase();
 if(!["GOVERNANCE","ADMINISTRATIVE","STAFF","GENERAL","OTHER"].includes(category))return fail(ctx,request,"Choose a valid meeting category.",400);
+const appointmentValidation=await validateMeetingAppointments(ctx,env,token,incoming);
+if(appointmentValidation.error)return fail(ctx,request,appointmentValidation.error,400);
+if(incoming.leadershipElectionRequired===true){
+ const transitionUids=["transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid"];
+ if(transitionUids.some(key=>!clean(appointmentValidation.patch[key]??incoming[key])))return fail(ctx,request,"A leadership-election meeting requires all three temporary Transition Committee appointments before election voting can open.",409);
+}
 // Meeting initiation is open to every active registered member and employee.
 // Category-specific access, participant admission, Board voting, quorum and
 // formal approval remain enforced by their separate policies and routes.
 if(clean(incoming.initiatorUid)!==uid)return fail(ctx,request,"The meeting initiator must match the authenticated account.",403);
-const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,environment:isAdmin&&meetingEnvironment(incoming.environment)==="TRIAL"?"TRIAL":"REAL",meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdByUid:uid,createdAt:now,updatedAt:now};
+const id=crypto.randomUUID(),now=new Date(),year=clean(incoming.date).slice(0,4)||String(now.getUTCFullYear()),record={...incoming,...appointmentValidation.patch,transitionCommitteeActive:incoming.leadershipElectionRequired===true,leadershipElectionStatus:incoming.leadershipElectionRequired===true?"PENDING":"NOT_REQUIRED",transitionCommitteeDeclaredAt:incoming.leadershipElectionRequired===true?now:null,environment:isAdmin&&meetingEnvironment(incoming.environment)==="TRIAL"?"TRIAL":"REAL",meetingCategory:category,meetingPolicyId:category,meetingIdentity:clean(incoming.meetingIdentity)||"IRPA-MEET-"+id.toUpperCase(),meetingReference:clean(incoming.meetingReference)||"IRPA-MTG-"+year+"-"+id.slice(0,8).toUpperCase(),registerStatus:"Registered",registeredAt:now,createdByUid:uid,createdAt:now,updatedAt:now};
 await writeDoc(ctx,env,token,"meetings",id,record,false);
 await audit(ctx,env,token,claims,"MEETING_REGISTER_CREATED",{id,...record},id,{meetingCategory:category});
 return response(ctx,request,{ok:true,id});
@@ -484,9 +526,33 @@ const changed={};
 for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt","environment"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
 if(JSON.stringify(value)!==JSON.stringify(current[key]))changed[key]=value;}
 if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,changedFields:[]});
-const controller=c.isAdmin||clean(current.meetingHostUid)===c.uid||clean(current.hostUid)===c.uid||clean(current.organizerUid)===c.uid||clean(current.organiserUid)===c.uid||clean(current.ownerUid)===c.uid||clean(current.initiatorUid)===c.uid||clean(current.chairpersonUid)===c.uid||clean(current.secretaryUid)===c.uid||lower(current.meetingHostEmail)===c.email||lower(current.hostEmail)===c.email||lower(current.initiatorEmail)===c.email||lower(current.chairpersonEmail)===c.email||lower(current.secretaryEmail)===c.email;
-if(!controller)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may update this meeting.",403);
+const controller=clean(current.initiatorUid)===c.uid||meetingRoleAssigned(current,c.uid,"chair")||meetingRoleAssigned(current,c.uid,"secretary")||meetingRoleAssigned(current,c.uid,"administrator")||(transitionCommitteeActive(current)&&(meetingRoleAssigned(current,c.uid,"transitionChair")||meetingRoleAssigned(current,c.uid,"transitionSecretary")||meetingRoleAssigned(current,c.uid,"transitionAdministrator")));
+if(!controller)return fail(ctx,request,"Only an authority appointed to this specific meeting or its registered initiator may update this meeting.",403);
+if(Object.keys(changed).some(key=>MEETING_APPOINTMENT_KEYS.has(key))&&lower(current.status)==="in progress")return fail(ctx,request,"Meeting appointments are locked once formal proceedings begin.",409);
+const appointmentValidation=await validateMeetingAppointments(ctx,env,token,incoming,current);
+if(appointmentValidation.error)return fail(ctx,request,appointmentValidation.error,400);
+Object.assign(changed,appointmentValidation.patch);
+if(changed.leadershipElectionRequired===true||current.leadershipElectionRequired===true){
+ const transitionUids=["transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid"];
+ const proposed={...current,...changed};
+ if(transitionUids.some(key=>!clean(proposed[key])))return fail(ctx,request,"The Transition Committee requires a Chairperson, Secretary and Administrator before leadership election voting can be opened.",409);
+ if(lower(current.status)==="in progress")return fail(ctx,request,"A Transition Committee cannot be reactivated after formal proceedings begin.",409);
+ changed.transitionCommitteeActive=true;
+ changed.leadershipElectionStatus=clean(changed.leadershipElectionStatus||current.leadershipElectionStatus||"PENDING");
+}
 if(changed.status&&!["Scheduled","In Progress","Completed","Cancelled"].includes(clean(changed.status)))return fail(ctx,request,"Unsupported meeting status transition.",400);
+if(lower(changed.status)==="in progress"||lower(changed.proceedingsStatus)==="in progress"){
+ const proposed={...current,...changed};
+ const required=["meetingChairpersonUid","meetingSecretaryUid","meetingAdministratorUid"];
+ if(required.some(key=>!clean(proposed[key])))return fail(ctx,request,"Formal proceedings cannot begin until the meeting-specific Chairperson, Secretary and Meeting Administrator have all been declared.",409);
+ for(const key of required){if(!await resolveActiveMeetingPerson(ctx,env,token,proposed[key]))return fail(ctx,request,"Formal proceedings are blocked because one or more appointed leaders are no longer active IRPA members or employees.",409);}
+ if(proposed.transitionCommitteeActive===true){
+  changed.transitionCommitteeActive=false;
+  changed.transitionCommitteeMandateEndedAt=new Date();
+  changed.transitionCommitteeMandateEndedAtProceedings=true;
+  changed.leadershipElectionStatus="LEADERSHIP_RECORDED";
+ }
+}
 if(lower(changed.status)==="in progress"&&isBoardMeeting(current)){
  const quorumDate=clean(changed.quorumAttendanceDate||current.quorumAttendanceDate||current.quorumAssessment?.attendanceDate||current.date||current.meetingDate)||null;const assessment=await buildQuorumAssessment(ctx,env,token,current,quorumDate,claims);
  if(!assessment.quorumMet)return fail(ctx,request,assessment.status==="NOT_ASSESSABLE"?"A Board meeting cannot start: no eligible registered Board members are recorded for quorum.":`A Board meeting cannot start without quorum: ${assessment.present} of ${assessment.counts.boardMembers} registered Board members present; ${assessment.required} required.`,409);
@@ -495,7 +561,7 @@ if(lower(changed.status)==="in progress"&&isBoardMeeting(current)){
 
 if(terminal.has(lower(current.status))&&changed.status&&lower(changed.status)!==lower(current.status))return fail(ctx,request,"A terminal meeting status cannot be changed through the meeting portal.",409);
 const sessionFields=new Set(["status","proceedingsStatus","quorumRequired","quorumAttendanceDate","quorumVerified","quorumVerifiedAt","quorumAssessment","quorumAssessmentStatus","quorumAssessmentAt","closedAt","currentAgendaItem","currentAgendaItemIndex","currentAgendaItemStatus","currentMotion","transcript","transcriptAutoSavedAt","transcriptCaptureStartedAt","transcriptCaptureLimitHours","currentDecision","votingRequired","votingReference","votingIssueId","votingStatus","votingResult","actionItems","actionId","actionReference","decisionId","decisionReference","signingFields","signingFieldSetVersion","updatedAt","updatedByUid","updatedByEmail","recordingStatus","recordingEgressId","recordingStartedAt","recordingStartedByUid","recordingStoppedAt","recordingStoppedByUid","recordingStorage"]);
-if(!c.isAdmin&&Object.keys(changed).some(key=>!sessionFields.has(key)))return fail(ctx,request,"This meeting is registered. Non-administrator updates are limited to authorised meeting-session and proceedings fields.",403);
+if(Object.keys(changed).some(key=>!sessionFields.has(key)&&!MEETING_APPOINTMENT_KEYS.has(key)&&!["leadershipElectionRequired","leadershipElectionStatus","transitionCommitteeActive","transitionCommitteeDeclaredAt"].includes(key)))return fail(ctx,request,"This meeting is registered. Updates are limited to authorised meeting-session fields and meeting-specific appointment records.",403);
 if(current.registerStatus!=="Registered"&&!c.isAdmin)return fail(ctx,request,"Only an administrator may update an unregistered meeting.",403);
 changed.updatedAt=new Date();
 await patchDoc(ctx,env,token,"meetings",meetingId,changed);
@@ -594,8 +660,9 @@ if(pathname==="/api/meeting-voting/open"){
 const meetingId=clean(data.meetingId),reference=clean(data.votingReference),resolutionId=clean(data.resolutionId);
 if(!meetingId||!reference)return fail(ctx,request,"Meeting ID and voting reference are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-const controller=c.isAdmin||clean(c.meeting.initiatorUid)===c.uid||clean(c.meeting.chairpersonUid)===c.uid||clean(c.meeting.secretaryUid)===c.uid||lower(c.meeting.initiatorEmail)===c.email||lower(c.meeting.chairpersonEmail)===c.email||lower(c.meeting.secretaryEmail)===c.email;
-if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may open voting.",403);
+const controller=clean(c.meeting.initiatorUid)===c.uid||meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may open voting.",403);
+if(transitionCommitteeActive(c.meeting)&&["meetingChairpersonUid","meetingSecretaryUid","meetingAdministratorUid"].every(key=>clean(c.meeting[key]))===false&&c.meeting.leadershipElectionRequired!==true)return fail(ctx,request,"Voting is not available until the leadership-election workflow is declared.",409);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Voting cannot be opened for a closed meeting.",409);
 if(resolutionId){const resolution=await getDoc(ctx,env,token,"resolutions",resolutionId);if(!resolution||resolution.meetingId!==meetingId)return fail(ctx,request,"The linked resolution must belong to the selected meeting.",409);}
 const id=await hash(meetingId+"|"+resolutionId+"|"+reference.toLowerCase());
@@ -643,8 +710,8 @@ if(!issueId)return fail(ctx,request,"A voting issue is required.",400);
 const issue=await getDoc(ctx,env,token,"votingIssues",issueId);
 if(!issue)return fail(ctx,request,"Voting issue not found.",404);
 const c=await context(ctx,env,token,claims,issue.meetingId);
-const controller=c.isAdmin||clean(c.meeting.initiatorUid)===c.uid||clean(c.meeting.chairpersonUid)===c.uid||clean(c.meeting.secretaryUid)===c.uid||lower(c.meeting.initiatorEmail)===c.email||lower(c.meeting.chairpersonEmail)===c.email||lower(c.meeting.secretaryEmail)===c.email;
-if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may close voting.",403);
+const controller=clean(c.meeting.initiatorUid)===c.uid||meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may close voting.",403);
 if(issue.status!=="Open")return fail(ctx,request,"This voting issue is already closed.",409);
 const now=new Date(),base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/",writes=[];
 writes.push({update:{name:base+"votingIssues/"+issueId,fields:fields({status:"Closed",result:resultValue,closedAt:now,updatedAt:now})},updateMask:{fieldPaths:["status","result","closedAt","updatedAt"]},currentDocument:{updateTime:issue.updateTime}});
