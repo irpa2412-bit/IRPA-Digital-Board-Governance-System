@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-24T11:11:00Z",
+  "lastActivityAt": "2026-11-24T11:24:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-authorised 24 November 2026 scope extension for meeting-specific leadership appointments and temporary Transition Committee governance. The scope includes server-side Worker authorization, meeting UI and client authorization helpers, meeting category policy, and the corresponding Firestore meeting rules and regression tests. The change requires a complete Transition Committee for leadership-election infrastructure, permits repeated identities, requires all permanent appointments and closed election ballots before proceedings, and ends temporary authority atomically at proceedings start. No unrelated portal, collection or signature behavior is changed.",
@@ -22,7 +22,9 @@
     "firestore.rules",
     "tests/meeting-room-authorization-boundary.test.mjs",
     "tests/meeting-invitation-resend-quorum.test.mjs",
-    "tests/meeting-quorum-reconciliation.test.mjs"
+    "tests/meeting-quorum-reconciliation.test.mjs",
+    "functions/liveMeeting.js",
+    "scripts/check-meeting-media-governance.mjs"
   ],
   "activityLog": [
     {
@@ -70,6 +72,11 @@
       "at": "2026-11-24T11:11:00Z",
       "action": "owner-authorised meeting leadership and Transition Committee governance scope extension",
       "description": "User explicitly authorised repair of all failed PR #955 tests, necessary rule changes, retesting, merge and live production promotion. Scope extended to the exact changed Meeting Portal source, Firestore meeting rules and regression test files; no multi-portal scope is included."
+    },
+    {
+      "at": "2026-11-24T11:24:00Z",
+      "action": "owner-authorised legacy live-media authorization hardening",
+      "description": "Closed legacy callable bypasses: only the meeting-specific Meeting Administrator can moderate LiveKit or start/stop recording; appointed leaders are admitted by meeting-scoped UID; uninvited global administrators cannot enter live rooms. The Cloudflare Worker remains the active client gateway."
     }
   ],
   "baseline": {
