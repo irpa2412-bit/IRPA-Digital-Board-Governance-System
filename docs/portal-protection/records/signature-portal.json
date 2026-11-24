@@ -34,7 +34,13 @@
     ],
     "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment. The owner tracking register also exposes a hash-verified authoritative completed PDF, existing per-recipient delivery states, first-attempt delivery, failed-only retry and separate personal-copy outcomes; successful and ambiguous email outcomes remain protected from duplicate sends. The 24 November distribution repair additionally delivers independently to the document owner and each signer position (including separate email-link assignments sharing an address), includes invited signers regardless of signed/pending state, retries only known transient SMTP failures up to three attempts, records SMTP stage history, and preserves ambiguous outcomes without duplicate resend. Existing manual tracking, recovery, backup-first retry and fallback controls remain unchanged. Email PDF distribution and My Documents copy creation are separate delivery trails with separate records, retry decisions, statuses and failure summaries. An exception in either must not prevent the other from running or change its outcome.",
     "prohibitedChanges": [
-      "Do not change PDF building, hashing, certificate generation, authoritative archive writes or the meaning/order of Completed. Distribution changes are limited to SR-2026-11-24-01: recipient-position identity, invited-recipient coverage, bounded transient SMTP retry and delivery-stage recording."
+      "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
+      "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
+      "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
+      "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
+      "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
+      "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
+      "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
     ],
     "lockTests": [
       "tests/signature-field-assignment-setup.test.mjs",
@@ -103,6 +109,10 @@
       {
         "path": "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
         "expectedEffect": "Records source findings, owner-approved scope, manual backup preservation, exact files and validation/release gates."
+      },
+      {
+        "path": "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+        "expectedEffect": "Appends the owner-authorised automatic email-link distribution repair decision and records that existing manual backup and recovery controls remain unchanged."
       }
     ]
   },
