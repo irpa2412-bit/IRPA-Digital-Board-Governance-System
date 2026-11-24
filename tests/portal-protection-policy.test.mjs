@@ -335,3 +335,5 @@ test("root-only owner lock tests do not install unnecessary Gateway dependencies
   assert.equal(installed, false);
   assert.equal(calls.length, 0);
 });
+
+// Regression coverage keeps Meeting Portal fixture guard classification portal-scoped.
