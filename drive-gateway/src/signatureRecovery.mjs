@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { canonicalJson, sha256Hex, HttpError } from "./util.mjs";
-import { resendInvitation } from "./signing.mjs";
+import { resendInvitation,resolveEnvelopeFinalisationEnvironment } from "./signing.mjs";
 import { cleanText, randomHex, validateEmail, validateName } from "./util.mjs";
 import { matchRecoveryEvidenceRoute } from "./esignPathPolicy.mjs";
 import { buildUnarchivedCompletedCopy } from "./courtRecoveryCopy.mjs";
@@ -127,12 +127,19 @@ export async function assessRecoveryEvidence(ctx,user,id,{recordAccess=true}={})
     if(!normalized)return "MISSING";
     return "UNRECOGNIZED";
   };
-  const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
-  const runtimeDataEnvironment=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
+  const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase()||"unknown";
   const envelopeEnvironment=environmentClass(envelope.dataEnvironment);
   const pendingEnvironment=environmentClass(pendingRecord?.environment);
-  const expectedEnvironment=environmentClass(runtimeDataEnvironment);
-  const environmentDiagnostics={envelope:envelopeEnvironment,preservedCopy:pendingEnvironment,gatewayExpected:expectedEnvironment,allMatch:Boolean(runtimeDataEnvironment)&&["ACTUAL","TRIAL","TEST"].includes(envelopeEnvironment)&&envelopeEnvironment===pendingEnvironment&&envelopeEnvironment===expectedEnvironment};
+  let runtimeCompatible=false;
+  try{
+    if(envelope.externalReference)await resolveEnvelopeFinalisationEnvironment(ctx,envelope);
+    else{
+      const workerDefault=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
+      runtimeCompatible=Boolean(workerDefault)&&workerDefault===envelopeEnvironment;
+    }
+    if(envelope.externalReference)runtimeCompatible=true;
+  }catch{runtimeCompatible=false;}
+  const environmentDiagnostics={envelope:envelopeEnvironment,preservedCopy:pendingEnvironment,gatewayRuntime:runtimeEnvironment,gatewayExpected:envelopeEnvironment,allMatch:runtimeCompatible&&["ACTUAL","TRIAL","TEST"].includes(envelopeEnvironment)&&envelopeEnvironment===pendingEnvironment};
   let artifactIntegrityStatus="NOT_CHECKED";
   if(pendingRecord?.storageId&&/^[a-f0-9]{64}$/.test(pendingHash)){
     try{

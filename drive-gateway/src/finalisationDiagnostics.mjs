@@ -2,6 +2,7 @@ import {buildSignedPdf} from "./pdf.mjs";
 import {createCryptographicEvidence} from "./cryptographicGate.mjs";
 import {archivePath} from "./archives.mjs";
 import {HttpError,sha256Hex} from "./util.mjs";
+import {resolveEnvelopeFinalisationEnvironment} from "./signing.mjs";
 const safeCode=value=>String(value?.code||value?.name||"DIAGNOSTIC_FAILED").replace(/[^A-Z0-9_-]/gi,"").slice(0,48)||"DIAGNOSTIC_FAILED";
 const safeMessage=value=>String(value?.message||"Diagnostic step failed.").replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[REDACTED EMAIL]").replace(/https?:\/\/\S+/gi,"[URL REDACTED]").slice(0,180);
 const fail=(stage,error,fields=[])=>({stageCode:stage,status:"FAILED",errorCode:safeCode(error),message:safeMessage(error),fields});
@@ -25,13 +26,12 @@ async function buildEvidence(envelope,bytes,ctx){
 export async function diagnoseFinalisation(ctx,user,envelopeId){
  const envelope=await ctx.meta.get("envelopes",envelopeId);
  if(!envelope)throw new HttpError(404,"Envelope not found.");
- const runtimeEnvironment=String(ctx.env?.IRPA_ENVIRONMENT||"").trim().toLowerCase();
- const runtimeDataEnvironment=runtimeEnvironment==="staging"?"TRIAL":runtimeEnvironment==="production"?"ACTUAL":runtimeEnvironment==="trial"?"TRIAL":runtimeEnvironment==="actual"?"ACTUAL":runtimeEnvironment==="test"?"TEST":null;
- const dataEnvironment=String(envelope.dataEnvironment||"").trim().toUpperCase();
- if(!runtimeDataEnvironment||runtimeDataEnvironment!==dataEnvironment||!["TRIAL","ACTUAL","TEST"].includes(dataEnvironment))throw new HttpError(409,"Finalisation diagnostics are blocked because the recorded envelope data environment is invalid for this Gateway.");
  if(!user?.uid)throw new HttpError(401,"Authentication required.");
  const isEnvelopeOwner=[envelope.createdBy,envelope.createdByUid,envelope.ownerUid].includes(user.uid);
  if(!isEnvelopeOwner&&user?.isAdmin!==true&&user?.isOwner!==true)throw new HttpError(403,"Not authorized.");
+ // Use the same source-draft verification as authoritative finalisation. A production
+ // Worker may safely process a TRIAL envelope only when its linked source draft verifies as TRIAL.
+ await resolveEnvelopeFinalisationEnvironment(ctx,envelope);
  if(!["CompletionFailed","Completing","Completed"].includes(envelope.status))throw new HttpError(409,"Only a completed or failed-completion envelope can be diagnosed.");
  const fields=fieldsFor(envelope),report={schema:"IRPA-FINALISATION-DIAGNOSTIC-1",envelopeId:String(envelope.id),status:envelope.status,readOnly:true,generatedAt:ctx.now().toISOString(),timezone:"East Africa Time (UTC+3)",steps:[],fieldChecks:[],summary:{passed:0,failed:0,firstFailedStage:null}};
  report.fieldChecks=fields.map(field=>({...field,status:["Signature","Initials","Date","Name","Title","Text","Number","Comment","Remarks","Checkbox"].includes(field.type)&&[0,90,180,270].includes(field.rotation)&&Object.values(field.position).every(Number.isFinite)?"PASS":"FAILED",errorCode:null,message:null}));

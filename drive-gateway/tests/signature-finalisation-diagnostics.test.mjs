@@ -21,3 +21,25 @@ test("finalisation dry-run accepts each supported owner identity field and denie
   await assert.rejects(()=>diagnoseFinalisation(ctx,{uid:"intruder"},"ENV-DRYRUN-001"),e=>e.status===403);
  }
 });
+
+
+test("production Worker diagnostics accept a linked TRIAL envelope only after source-draft verification",async()=>{
+ const {ctx,envelope}=await fixture();
+ envelope.dataEnvironment="TRIAL";
+ envelope.externalReference="IRPA-TRIAL-DRAFT-1";
+ ctx.env.IRPA_ENVIRONMENT="production";
+ ctx.resolveEnvelopeDataEnvironment=async(reference,ownerUid)=>{assert.equal(reference,"IRPA-TRIAL-DRAFT-1");assert.equal(ownerUid,"owner-1");return "TRIAL";};
+ const report=await diagnoseFinalisation(ctx,{uid:"owner-1"},envelope.id);
+ assert.equal(report.readOnly,true);
+ assert.equal(report.steps.find(step=>step.stageCode==="PDF_BUILD").status,"PASS");
+ assert.equal(report.steps.find(step=>step.stageCode==="HASH").status,"PASS");
+});
+
+test("production Worker diagnostics reject a TRIAL envelope whose linked source verifies as ACTUAL",async()=>{
+ const {ctx,envelope}=await fixture();
+ envelope.dataEnvironment="TRIAL";
+ envelope.externalReference="IRPA-TRIAL-DRAFT-2";
+ ctx.env.IRPA_ENVIRONMENT="production";
+ ctx.resolveEnvelopeDataEnvironment=async()=>"ACTUAL";
+ await assert.rejects(()=>diagnoseFinalisation(ctx,{uid:"owner-1"},envelope.id),error=>error.status===409);
+});
