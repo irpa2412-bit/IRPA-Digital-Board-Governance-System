@@ -155,3 +155,17 @@ test("legacy email-keyed Sent delivery is claimed once and not resent for the fi
   assert.equal(shared.length,2);
   assert.deepEqual(new Set(shared.map(row=>row.recipientKey)),new Set(["signer:S1","signer:S2"]));
 });
+
+test("repeat distribution reuses a claimed legacy recipient record without duplicate delivery",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\ncompleted IRPA document");
+  const ctx=context(bytes,null);
+  const envelope={id:"ENV-LEGACY-IDEMPOTENT",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Resolution",documentId:"DOC-LEGACY-IDEMPOTENT",signers:[
+    {id:"S1",email:"shared@example.test",name:"Signer One",uid:null,status:"Signed",identityType:"email-link"}
+  ]};
+  const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
+  await distributeCompletedSignatureDocument(ctx,envelope,completion);
+  const firstSendCount=ctx.sent.length;
+  const second=await distributeCompletedSignatureDocument(ctx,envelope,completion,{retryFailed:true});
+  assert.equal(second.sent,2);
+  assert.equal(ctx.sent.length,firstSendCount,"previously accepted owner and signer emails are not resent");
+});
