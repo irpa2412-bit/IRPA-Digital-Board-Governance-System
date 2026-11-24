@@ -321,3 +321,22 @@ test("meeting governance Firestore rules restrict live voting control to the act
   assert.match(rules, /meetingAllowsVoting/);
   assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingUser\(\)/);
 });
+
+
+const meetingServicesGovernanceSource = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+const meetingRoomGovernanceSource = readFileSync(new URL("../src/pages/MeetingRoom.jsx", import.meta.url), "utf8");
+test("Transition Committee powers are limited to leadership election, invitations and appointment handover", () => {
+  assert.match(meetingServicesGovernanceSource, /function meetingSecretariatAuthority\(meeting,uid\)\{return !transitionCommitteeActive\(meeting\)/);
+  assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
+  for (const route of ["/api/meeting-actions/create", "/api/meeting-decisions/create"]) {
+    const start = meetingServicesGovernanceSource.indexOf(`if(pathname==="${route}")`);
+    assert.notEqual(start, -1, `expected ${route}`);
+    const end = meetingServicesGovernanceSource.indexOf("\\n}", start);
+    const body = meetingServicesGovernanceSource.slice(start, end < 0 ? start + 2500 : end);
+    assert.match(body, /const controller=!transitionCommitteeActive\(c\.meeting\)/);
+  }
+  assert.match(meetingRoomGovernanceSource, /controller=Boolean\(!transitionActive&&\(canChair\|\|canSecretary\)\),electionController=Boolean\(transitionActive&&\(canTransitionChair\|\|canTransitionSecretary\)\),canControlVoting=controller\|\|electionController/);
+  assert.match(meetingRoomGovernanceSource, /async function openVote\(\)\{if\(!canControlVoting\)return deny\(\)/);
+  assert.match(meetingRoomGovernanceSource, /MeetingAccessControl meeting=\{selected\} controller=\{Boolean\(activeAdministrator\)\} admissionController=\{Boolean\(activeAdministrator\)\}/);
+  assert.match(meetingRoomGovernanceSource, /MeetingWorkingDocuments meeting=\{selected\} controller=\{controller\}/);
+});
