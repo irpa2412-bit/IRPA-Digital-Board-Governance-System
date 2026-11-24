@@ -711,7 +711,7 @@ if(!issueId)return fail(ctx,request,"A voting issue is required.",400);
 const issue=await getDoc(ctx,env,token,"votingIssues",issueId);
 if(!issue)return fail(ctx,request,"Voting issue not found.",404);
 const c=await context(ctx,env,token,claims,issue.meetingId);
-const controller=clean(c.meeting.initiatorUid)===c.uid||meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
 if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may close voting.",403);
 if(issue.status!=="Open")return fail(ctx,request,"This voting issue is already closed.",409);
 const now=new Date(),base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/",writes=[];
