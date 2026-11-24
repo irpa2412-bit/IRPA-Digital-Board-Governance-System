@@ -48,6 +48,32 @@ test("29 same-position signers receive invitations together and the next positio
 
 test("30 non-hierarchical parallel signing invites everyone together and accepts any signing order",async()=>{const s=setup();await up(s);const created=await route(post("/api/envelopes",{documentId:"DOC-001",signingMode:"Parallel",signers:[{name:"A",email:"a@example.org",order:1,identityType:"email-link"},{name:"B",email:"b@example.org",order:1,identityType:"email-link"},{name:"C",email:"c@example.org",order:1,identityType:"email-link"}],archives:["legal-contracts"]},"u1"),s.ctx);assert.equal(created.status,201);const body=await created.json();const envelope=await s.meta.get("envelopes",body.envelopeId);assert.equal(envelope.signingMode,"Parallel");assert.deepEqual(envelope.signers.map(x=>x.order),[1,1,1]);assert.deepEqual(s.invites.map(i=>i.to).sort(),["a@example.org","b@example.org","c@example.org"]);for(const [email,name] of [["b@example.org","B signer"],["a@example.org","A signer"],["c@example.org","C signer"]]){const opened=await openSession(s,s.tokenFor(email));assert.equal(opened.response.status,200);const response=await route(sig(opened.sessionToken,name),s.ctx);assert.equal(response.status,200);if(email==="c@example.org")assert.equal((await response.json()).completed,true);}const completed=await s.meta.get("envelopes",body.envelopeId);assert.equal(completed.status,"Completed");});
 
+
+test("multi-signer completion and email delivery survive every My Documents copy write failing",async()=>{
+  const s=setup(),sent=[];
+  s.ctx.sendCompletionEmail=async message=>{sent.push(message);return{messageId:"completion-"+sent.length};};
+  const signers=[
+    {name:"Signer Two",email:"two@example.org",uid:"u2",order:1},
+    {name:"Signer Three",email:"three@example.org",uid:"u3",order:2},
+    {name:"Signer Four",email:"four@example.org",uid:"u4",order:3}
+  ];
+  const id=await env(s,signers);
+  for(const [email,user,name] of [["two@example.org","u2","Signer Two"],["three@example.org","u3","Signer Three"]]){
+    const response=await route(post("/api/sign/submit",{token:s.tokenFor(email),consent:true,signature:{type:"typed",value:name}},user),s.ctx);
+    assert.equal(response.status,200);
+  }
+  s.storage.failPutWhen=(_count,input)=>String(input?.path||"").startsWith("My Documents/");
+  const final=await route(post("/api/sign/submit",{token:s.tokenFor("four@example.org"),consent:true,signature:{type:"typed",value:"Signer Four"}},"u4"),s.ctx);
+  assert.equal(final.status,200);
+  assert.equal((await final.json()).completed,true);
+  const completed=await s.meta.get("envelopes",id);
+  assert.equal(completed.status,"Completed");
+  assert.equal(completed.completionFailure,null);
+  assert.equal(sent.length,4);
+  assert.equal(completed.distributionStatus,"Sent");
+  const copies=await s.meta.list("signaturePersonalCopies");
+  assert.equal(copies.filter(row=>row.envelopeId===id&&row.status==="Failed").length,4);
+});
 test("signer 101 is accepted, invited and can open its email-link without restarting the envelope",async()=>{
   const s=setup();
   await up(s);
