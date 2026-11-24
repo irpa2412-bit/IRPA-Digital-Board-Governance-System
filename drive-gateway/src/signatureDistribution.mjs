@@ -150,8 +150,7 @@ export async function distributeCompletedSignatureDocument(ctx,envelope,completi
           await ctx.meta.update("signatureDistributions",legacyId,{
             recipientKey:recipient.recipientKey,
             recipientId:recipient.recipientKey,
-            signerIds:recipient.signerIds,
-            recipientRoles:recipient.roles
+            legacyRecipientRecord:true
           },{ifVersion:legacy._v});
         }
         record=await ctx.meta.get("signatureDistributions",legacyId);
