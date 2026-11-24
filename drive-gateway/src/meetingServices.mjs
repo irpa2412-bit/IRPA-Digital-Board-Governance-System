@@ -684,7 +684,7 @@ if(pathname==="/api/meeting-voting/open"){
 const meetingId=clean(data.meetingId),reference=clean(data.votingReference),resolutionId=clean(data.resolutionId);
 if(!meetingId||!reference)return fail(ctx,request,"Meeting ID and voting reference are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+const controller=meetingSecretariatAuthority(c.meeting,c.uid)||meetingTransitionElectionAuthority(c.meeting,c.uid);
 if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may open voting.",403);
 const electionMode=transitionCommitteeActive(c.meeting)&&c.meeting.leadershipElectionRequired===true;
 if(!electionMode&&categoryOf(c.meeting)!=="GOVERNANCE")return fail(ctx,request,"This meeting category does not permit ordinary voting. Only an active Transition Committee may open a pre-proceedings leadership election.",409);
@@ -695,6 +695,7 @@ const prior=await getDoc(ctx,env,token,"votingIssues",id);
 if(prior&&lower(prior.status)!=="cancelled")return response(ctx,request,{ok:true,issue:{...prior,id},alreadyOpen:true});
 const now=new Date(),issue={meetingId,meetingReference:clean(data.meetingReference||c.meeting.title||meetingId),resolutionId:resolutionId||null,resolutionReference:clean(data.resolutionReference)||null,votingReference:reference,leadershipElection:transitionCommitteeActive(c.meeting)&&c.meeting.leadershipElectionRequired===true,status:"Open",result:"Pending",anonymous:true,openedAt:now,openedByUid:c.uid,createdAt:prior?.createdAt||now,updatedAt:now};
 if(prior)await patchDoc(ctx,env,token,"votingIssues",id,issue);else await writeDoc(ctx,env,token,"votingIssues",id,issue,false);
+await patchDoc(ctx,env,token,"meetings",meetingId,{votingRequired:true,votingReference:reference,votingIssueId:id,votingStatus:"Open",votingResult:"Pending",updatedAt:now});
 await audit(ctx,env,token,claims,"MEETING_VOTING_ISSUE_OPENED",c.meeting,id,{votingReference:reference,resolutionId:resolutionId||null,anonymous:true});
 return response(ctx,request,{ok:true,issue:{...issue,id},alreadyOpen:false});
 }
@@ -735,7 +736,7 @@ if(!issueId)return fail(ctx,request,"A voting issue is required.",400);
 const issue=await getDoc(ctx,env,token,"votingIssues",issueId);
 if(!issue)return fail(ctx,request,"Voting issue not found.",404);
 const c=await context(ctx,env,token,claims,issue.meetingId);
-const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+const controller=meetingSecretariatAuthority(c.meeting,c.uid)||(issue.leadershipElection===true&&c.meeting.leadershipElectionRequired===true&&meetingTransitionElectionAuthority(c.meeting,c.uid));
 if(!controller)return fail(ctx,request,"Only the Chairperson or Secretary appointed to this meeting (or its active Transition Committee during the leadership election) may close voting.",403);
 if(issue.status!=="Open")return fail(ctx,request,"This voting issue is already closed.",409);
 const now=new Date(),base="projects/"+ctx.getFirebaseProjectId(env)+"/databases/(default)/documents/",writes=[];
@@ -748,6 +749,7 @@ writes.push({update:{name:base+"resolutions/"+issue.resolutionId,fields:fields({
 const auditId=crypto.randomUUID();
 writes.push({update:{name:base+"audit/"+auditId,fields:fields({action:"VOTING_ISSUE_CLOSED",collection:"votingIssues",recordId:issueId,details:{result:resultValue,resolutionId:issue.resolutionId||null},actorUid:c.uid,actorEmail:c.email||null,createdAt:now})},currentDocument:{exists:false}});
 await commitWrites(ctx,env,token,writes);
+if(clean(c.meeting.votingIssueId)===issueId)await patchDoc(ctx,env,token,"meetings",issue.meetingId,{votingStatus:"Completed",votingResult:resultValue,updatedAt:now});
 return response(ctx,request,{ok:true,result:resultValue,votingIssueId:issueId});
 }
 
