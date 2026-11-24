@@ -145,13 +145,15 @@ export async function distributeCompletedSignatureDocument(ctx,envelope,completi
       const legacyHash=await sha256Hex(recipient.email);
       const legacyId="delivery-"+envelope.id+"-"+legacyHash.slice(0,32);
       const legacy=await ctx.meta.get("signatureDistributions",legacyId);
-      if(legacy&&!legacy.recipientKey){
-        await ctx.meta.update("signatureDistributions",legacyId,{
-          recipientKey:recipient.recipientKey,
-          recipientId:recipient.recipientKey,
-          signerIds:recipient.signerIds,
-          recipientRoles:recipient.roles
-        },{ifVersion:legacy._v});
+      if(legacy&&(!legacy.recipientKey||legacy.recipientKey===recipient.recipientKey)){
+        if(!legacy.recipientKey){
+          await ctx.meta.update("signatureDistributions",legacyId,{
+            recipientKey:recipient.recipientKey,
+            recipientId:recipient.recipientKey,
+            signerIds:recipient.signerIds,
+            recipientRoles:recipient.roles
+          },{ifVersion:legacy._v});
+        }
         record=await ctx.meta.get("signatureDistributions",legacyId);
       }
     }
