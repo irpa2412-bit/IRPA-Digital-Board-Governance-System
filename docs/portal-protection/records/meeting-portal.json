@@ -29,7 +29,8 @@
       "functions/liveMeeting.js",
       "scripts/check-meeting-media-governance.mjs",
       "src/pages/Voting.jsx",
-      "tests/meeting-category-firestore-rules.test.cjs"
+      "tests/meeting-category-firestore-rules.test.cjs",
+      "src/firebase/data.js"
     ],
     "expectedEffect": "Allow active registered IRPA members and employees to initiate meetings; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections. The legacy Firebase LiveKit callable is also hardened so only the meeting-specific Meeting Administrator can receive room moderation or control recording; global administrators, initiators, Chairpersons and Secretaries cannot obtain technical moderation by legacy callable paths. The Voting Process page now opens and closes ballots through the meeting Worker using the current meeting's Chairperson/Secretary or active Transition Committee Chairperson/Secretary; global administrator status alone does not confer voting control. Ordinary governance votes remain Board-member-only, while pre-proceedings leadership-election ballots admit listed active members and employees.",
     "prohibitedChanges": [
