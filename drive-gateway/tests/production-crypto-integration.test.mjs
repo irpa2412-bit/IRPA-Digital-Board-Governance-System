@@ -115,3 +115,75 @@ test("C-I03 production completion fails closed when the cryptographic key provid
   assert.equal(f.storage.objs.size,before+1);
   assert.equal((await f.meta.list("cryptographicEvidence")).length,0);
 });
+
+
+test("C-I04 post-completion distribution/reporting failures never roll back Completed", async () => {
+  const f = await fixture();
+  const originalGet = f.meta.get.bind(f.meta);
+  f.meta.get = async (collection, id) => {
+    if (collection === "envelopes") {
+      const current = await originalGet(collection, id);
+      if (current?.status === "Completed") throw new Error("mock post-completion envelope read failure");
+      return current;
+    }
+    return originalGet(collection, id);
+  };
+  const keyProvider = createSignerKeyProvider(new Map([[f.envelope.signers[0].uid,{keyId:"IRPA-KEY-PROD-001",...f.keyPair}]]));
+  const result = await finalizeEnvelope({
+    meta:f.meta,
+    storage:f.storage,
+    env:{DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"production"},
+    now:()=>new Date("2026-10-07T19:00:00.000Z"),
+    config:{ttlDays:14},
+    crypto:{keyProvider},
+    logger:{error(){}},
+  },f.envelope.id);
+  assert.equal(result.ok,true);
+  assert.equal(result.completed,true);
+  assert.equal(result.status,"Completed");
+  assert.equal(result.distributionRecoveryRequired,true);
+  const state = await originalGet("envelopes",f.envelope.id);
+  assert.equal(state.status,"Completed");
+  assert.ok(state.completion.primaryStorageId);
+  assert.equal(await f.storage.get(state.completion.primaryStorageId) instanceof Uint8Array,true);
+  assert.equal(state.completion.finalHash,result.completion.finalHash);
+});
+
+
+test("C-I05 already-completed envelope stays Completed when delivery reconciliation reads fail", async () => {
+  const f = await fixture();
+  const keyProvider = createSignerKeyProvider(new Map([[f.envelope.signers[0].uid,{keyId:"IRPA-KEY-PROD-001",...f.keyPair}]]));
+  const ctx = {
+    meta:f.meta,
+    storage:f.storage,
+    env:{DRIVE_MOCK:"false",IRPA_ENVIRONMENT:"production"},
+    now:()=>new Date("2026-10-07T19:00:00.000Z"),
+    config:{ttlDays:14},
+    crypto:{keyProvider},
+    logger:{error(){}},
+  };
+  const first = await finalizeEnvelope(ctx,f.envelope.id);
+  assert.equal(first.completed,true);
+  const originalGet = f.meta.get.bind(f.meta);
+  let allowInitialEnvelopeRead = true;
+  f.meta.get = async (collection,id) => {
+    if (collection === "envelopes") {
+      const current = await originalGet(collection,id);
+      if (current?.status === "Completed" && allowInitialEnvelopeRead) {
+        allowInitialEnvelopeRead = false;
+        return current;
+      }
+      if (current?.status === "Completed") throw new Error("mock completed reconciliation read failure");
+      return current;
+    }
+    return originalGet(collection,id);
+  };
+  const retried = await finalizeEnvelope(ctx,f.envelope.id);
+  assert.equal(retried.ok,true);
+  assert.equal(retried.completed,true);
+  assert.equal(retried.status,"Completed");
+  assert.equal(retried.distributionRecoveryRequired,true);
+  const state = await originalGet("envelopes",f.envelope.id);
+  assert.equal(state.status,"Completed");
+  assert.equal(state.completion.finalHash,first.completion.finalHash);
+});
