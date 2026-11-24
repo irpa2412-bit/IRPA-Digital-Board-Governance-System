@@ -7,10 +7,10 @@
   "warningHours": 12,
   "openedAt": "2026-11-22T18:06:00.000Z",
   "expiresAt": "2026-11-25T18:06:00.000Z",
-  "lastActivityAt": "2026-11-22T18:13:01Z",
+  "lastActivityAt": "2026-11-24T08:11:25Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
+  "reason": "Owner-authorised 24 November 2026 repair of automatic completion distribution for the signature email-link workflow. Correct recipient identity to owner plus each signer position (not email address), include every invited signer, add bounded transient SMTP retries and persist per-attempt SMTP stages. Preserve Completed semantics, authoritative PDF/hash/certificate/archive, identity and token protections, manual owner recovery and backup controls. No SMTP settings, secrets, Worker bindings, Firestore rules or production records are changed.",
   "scope": [
     "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
@@ -36,7 +36,10 @@
     "src/firebase/signatureStorage.js",
     "drive-gateway/src/router.mjs",
     "drive-gateway/src/signatureDistribution.mjs",
-    "drive-gateway/tests/completed-document-route.test.mjs"
+    "drive-gateway/tests/completed-document-route.test.mjs",
+    "drive-gateway/src/index.js",
+    "drive-gateway/tests/signature-distribution.test.mjs",
+    "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
   ],
   "activityLog": [
     {
@@ -92,16 +95,24 @@
         "drive-gateway/src/signatureDistribution.mjs",
         "drive-gateway/tests/completed-document-route.test.mjs"
       ]
+    },
+    {
+      "at": "2026-11-24T08:11:25Z",
+      "action": "owner-authorised-automatic-signature-distribution-repair",
+      "description": "Owner authorised repair of automatic completion distribution without affecting available systems. Scope: stable recipient identity per signer position (not email), all invited signer positions, at most three automatic retries for known transient SMTP failures, per-attempt SMTP stage recording and personal copies for eligible profile holders. Preserve existing manual tracking, backup-first recovery, retry and fallback designs. Completed remains independent of email delivery. No SMTP settings/secrets/bindings, Firestore rules, signing identity/tokens/sessions, PDF/hash/certificate/archive logic or production records may be changed.",
+      "files": [
+        "drive-gateway/src/signatureDistribution.mjs",
+        "drive-gateway/src/index.js",
+        "drive-gateway/tests/signature-distribution.test.mjs",
+        "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
+        "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+        "docs/portal-protection/records/signature-portal.json",
+        "docs/portal-protection/windows/signature-portal.json"
+      ]
     }
   ],
   "emergencyExpiresAt": null,
   "prohibitions": [
-    "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
-    "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
-    "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
-    "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
-    "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
-    "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
-    "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
+    "Do not change PDF building, hashing, certificate generation, authoritative archive writes or the meaning/order of Completed. Distribution changes are limited to owner-approved SR-2026-11-24-01; all existing manual backup/recovery controls must remain available."
   ]
 }
