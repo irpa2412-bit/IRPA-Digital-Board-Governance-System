@@ -547,6 +547,12 @@ if(changed.leadershipElectionRequired===true||current.leadershipElectionRequired
  if(current.leadershipElectionRequired!==true)changed.transitionCommitteeDeclaredAt=new Date();
  changed.leadershipElectionStatus=clean(changed.leadershipElectionStatus||current.leadershipElectionStatus||"PENDING");
 }
+const appointmentWorkflowFields=new Set([...MEETING_APPOINTMENT_KEYS,"leadershipElectionRequired","leadershipElectionStatus","transitionCommitteeActive","transitionCommitteeDeclaredAt","participantUids","attendeeUids","memberUids","invitedUids"]);
+const appointmentWorkflowChange=Object.keys(changed).some(key=>appointmentWorkflowFields.has(key));
+const nonAppointmentChange=Object.keys(changed).some(key=>!appointmentWorkflowFields.has(key));
+const isMeetingInitiator=clean(current.initiatorUid)===c.uid;
+if(nonAppointmentChange&&!meetingSecretariatAuthority(current,c.uid))return fail(ctx,request,"Only the appointed Chairperson or Secretary may change formal meeting proceedings and governance records.",403);
+if(appointmentWorkflowChange&&!meetingSecretariatAuthority(current,c.uid)&&!isMeetingInitiator)return fail(ctx,request,"Only the meeting initiator or its appointed Chairperson/Secretary may declare or amend meeting-specific appointments before proceedings.",403);
 if(changed.status&&!["Scheduled","In Progress","Completed","Cancelled"].includes(clean(changed.status)))return fail(ctx,request,"Unsupported meeting status transition.",400);
 if(changed.status&&clean(current.meetingChairpersonUid)!==c.uid&&lower(changed.status)!=="in progress")return fail(ctx,request,"Only the appointed meeting Chairperson may pause or close formal proceedings.",403);
 if(lower(changed.status)==="in progress"||lower(changed.proceedingsStatus)==="in progress"){
