@@ -51,7 +51,7 @@ function participantListed(meeting = {}, uid) {
     meeting.meetingChairpersonUid ? [meeting.meetingChairpersonUid] : [],
     meeting.meetingSecretaryUid ? [meeting.meetingSecretaryUid] : [],
     meeting.meetingAdministratorUid ? [meeting.meetingAdministratorUid] : [],
-    meeting.transitionCommitteeActive === true ? [meeting.transitionChairpersonUid, meeting.transitionSecretaryUid, meeting.transitionAdministratorUid] : []
+    meeting.transitionCommitteeActive === true && !["in progress", "completed", "cancelled", "canceled"].includes(text(meeting.status).toLowerCase()) && text(meeting.proceedingsStatus).toLowerCase() !== "in progress" ? [meeting.transitionChairpersonUid, meeting.transitionSecretaryUid, meeting.transitionAdministratorUid] : []
   ];
   if (arrays.some(list => Array.isArray(list) && list.some(value => text(value) === uid))) return true;
 
