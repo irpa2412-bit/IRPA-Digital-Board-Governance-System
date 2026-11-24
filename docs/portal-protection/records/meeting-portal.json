@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised organisation-wide Meeting Portal access repair: every active registered IRPA member and employee may initiate meetings from the existing Meeting Centre; Staff and General meeting participation remains category-scoped; Board voting, quorum, resolutions and formal approval authority remain separately restricted. Meeting creation continues through the authenticated Cloudflare Worker; direct Firestore rules and shared policy files remain unchanged.",
+    "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -15,9 +15,12 @@
       "drive-gateway/tests/meeting-environment.test.mjs",
       "docs/portal-protection/records/meeting-portal.json",
       "tests/meeting-category-policy.test.mjs",
-      "docs/portal-protection/windows/meeting-portal.json"
+      "docs/portal-protection/windows/meeting-portal.json",
+      "src/pages/SignaturePlatform.jsx",
+      "src/firebase/signatureStorage.js",
+      "drive-gateway/src/router.mjs"
     ],
-    "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings.",
+    "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings. Shared Signature Portal dependencies may be updated for the owner-only completed-document tracking feature; Meeting Portal functionality, data, authorization and permissions remain unchanged.",
     "prohibitedChanges": [
       "Never delete REAL or unclassified meetings.",
       "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
@@ -61,6 +64,17 @@
       "at": "2026-11-23T19:55:00Z",
       "action": "scope extended for owner-authorised organisation-wide meeting initiation repair",
       "pullRequest": 941
+    },
+    {
+      "at": "2026-11-24T06:25:00Z",
+      "action": "owner-authorised-shared-dependency-scope-amendment-for-signature-tracking",
+      "pullRequest": 948,
+      "files": [
+        "src/pages/SignaturePlatform.jsx",
+        "src/firebase/signatureStorage.js",
+        "drive-gateway/src/router.mjs"
+      ],
+      "meetingBehaviorChanged": false
     }
   ],
   "attendanceCallableAudit": {
