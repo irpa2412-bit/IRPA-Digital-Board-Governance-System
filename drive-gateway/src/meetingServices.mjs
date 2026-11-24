@@ -537,12 +537,14 @@ if(appointmentValidation.error)return fail(ctx,request,appointmentValidation.err
 Object.assign(changed,appointmentValidation.patch);
 const newlyAppointed=[...MEETING_APPOINTMENT_KEYS].map(key=>clean(changed[key]??current[key])).filter(Boolean);
 if(newlyAppointed.length){const participantUids=[...new Set([...(Array.isArray(current.participantUids)?current.participantUids:[]),...(Array.isArray(current.attendeeUids)?current.attendeeUids:[]),...newlyAppointed])];changed.participantUids=participantUids;changed.attendeeUids=participantUids;changed.memberUids=[...new Set([...(Array.isArray(current.memberUids)?current.memberUids:[]),...newlyAppointed])];changed.invitedUids=[...new Set([...(Array.isArray(current.invitedUids)?current.invitedUids:[]),...newlyAppointed])];}
+if(changed.leadershipElectionRequired===false&&current.leadershipElectionRequired===true)return fail(ctx,request,"Once declared, the leadership-election workflow cannot be switched off; complete the election and record the new leadership first.",409);
 if(changed.leadershipElectionRequired===true||current.leadershipElectionRequired===true){
  const transitionUids=["transitionChairpersonUid","transitionSecretaryUid","transitionAdministratorUid"];
  const proposed={...current,...changed};
  if(transitionUids.some(key=>!clean(proposed[key])))return fail(ctx,request,"The Transition Committee requires a Chairperson, Secretary and Administrator before leadership election voting can be opened.",409);
  if(lower(current.status)==="in progress")return fail(ctx,request,"A Transition Committee cannot be reactivated after formal proceedings begin.",409);
  changed.transitionCommitteeActive=true;
+ if(current.leadershipElectionRequired!==true)changed.transitionCommitteeDeclaredAt=new Date();
  changed.leadershipElectionStatus=clean(changed.leadershipElectionStatus||current.leadershipElectionStatus||"PENDING");
 }
 if(changed.status&&!["Scheduled","In Progress","Completed","Cancelled"].includes(clean(changed.status)))return fail(ctx,request,"Unsupported meeting status transition.",400);
