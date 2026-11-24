@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE } from "../scripts/portal-protection-check.mjs";
+import { evaluatePolicy, parseActivityTimestamps, parseGitHubJobEvidence, newPortalWarningUntil, portalPolicyPaths, resolvePortalPolicyPaths, classifyProtectionOnlyChange, MAINTENANCE_APPROVAL_QUOTE, installLockTestDependencies } from "../scripts/portal-protection-check.mjs";
 import fs from "node:fs";
 
 const protectionCheckerSource = fs.readFileSync(new URL("../scripts/portal-protection-check.mjs", import.meta.url), "utf8");
@@ -279,4 +279,25 @@ test("a protection file for one portal mixed with another portal's source fails 
   const result = evaluatePolicy({ changedFiles: changed, registry, record: valid, windowState });
   assert.equal(result.ok, false);
   assert.match(result.reason, /multi-portal changes are blocked/);
+});
+
+test("shared owner lock tests install Gateway-only dependencies before importing Gateway modules", () => {
+  const calls = [];
+  const installed = installLockTestDependencies([
+    "tests/signature-field-assignment-setup.test.mjs",
+    "drive-gateway/tests/signature-field-assignment-regression.test.mjs"
+  ], (...args) => calls.push(args));
+  assert.equal(installed, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "npm");
+  assert.deepEqual(calls[0][1], ["ci"]);
+  assert.equal(calls[0][2].cwd, "drive-gateway");
+  assert.equal(calls[0][2].stdio, "inherit");
+});
+
+test("root-only owner lock tests do not install unnecessary Gateway dependencies", () => {
+  const calls = [];
+  const installed = installLockTestDependencies(["tests/meeting-portal-protection.test.mjs"], (...args) => calls.push(args));
+  assert.equal(installed, false);
+  assert.equal(calls.length, 0);
 });
