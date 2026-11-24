@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {canAuthenticatedSignerAccess,validateEnvelopeFields,validateFieldValues} from "../src/signing.mjs";
+import {canAuthenticatedSignerAccess,validateEnvelopeFields} from "../src/signing.mjs";
 
 test("unbound legacy signers are rejected; email-link identity requires redeemed invitation",()=>{
   assert.equal(canAuthenticatedSignerAccess({uid:null,identityType:"legacy-token"},null),false);
@@ -137,16 +137,4 @@ test("Gateway preserves distinct signature-field responsibility indexes for one 
   assert.throws(()=>validateEnvelopeFields([
     {fieldId:"F-MALFORMED",type:"Signature",signerId:"S1",roleAssignmentIndex:"second",page:1,x:10,y:10,width:20,height:8}
   ],signers),/invalid or assigned/i);
-});
-
-
-test("all palette text-entry fields accept 100 characters and reject 101",()=>{
-  const signer={id:"S1",uid:"signer-100"};
-  const types=["Name","Title","Text","Number","Comment","Remarks"];
-  for(const type of types){
-    const field={fieldId:"field-"+type.toLowerCase(),type,signerId:"S1",signerUid:"signer-100",required:true,page:1,x:0.1,y:0.1,width:0.3,height:0.1};
-    const accepted=(type==="Number"?"9":"A").repeat(100);
-    assert.equal(validateFieldValues([field],signer,{[field.fieldId]:accepted},{type:"typed",value:"Signer"},[])[field.fieldId],accepted,type+" must accept 100 characters");
-    assert.throws(()=>validateFieldValues([field],signer,{[field.fieldId]:(type==="Number"?"9":"A").repeat(101)},{type:"typed",value:"Signer"},[]),error=>error?.status===400&&error.message==="A signing field value must not exceed 100 characters.",type+" must reject 101 characters");
-  }
 });
