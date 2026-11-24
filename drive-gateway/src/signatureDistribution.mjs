@@ -33,12 +33,21 @@ async function persistEnvelopeDistribution(ctx,envelopeId,summary){
   const current=await ctx.meta.get("envelopes",envelopeId);if(!current)return;
   await ctx.meta.update("envelopes",envelopeId,{distributionStatus:summary.status,distribution:{status:summary.status,total:summary.total,sent:summary.sent,failed:summary.failed,updatedAt:ctx.now().toISOString()}},{ifVersion:current._v});
 }
-export async function getSignatureDistributionSummary(ctx,envelopeId){
+export async function getSignatureDistributionSummary(ctx,envelopeId,envelope=null){
   const rows=(await ctx.meta.list("signatureDistributions")).filter(row=>row.envelopeId===envelopeId);
   const counts={total:rows.length,sent:0,failed:0,pending:0,sending:0,unknown:0};
   for(const row of rows){if(row.status==="Sent")counts.sent++;else if(row.status==="Failed")counts.failed++;else if(row.status==="Sending")counts.sending++;else if(row.status==="Unknown")counts.unknown++;else counts.pending++;}
   const status=counts.total===0?"NotStarted":counts.sent===counts.total?"Sent":counts.failed>0&&counts.sent>0?"PartiallyFailed":counts.failed===counts.total?"Failed":"NotStarted";
-  return{...counts,status,complete:counts.total>0&&counts.sent===counts.total,deliveries:rows.map(row=>({recipientAddress:row.maskedAddress||maskAddress(row.recipientEmail),accepted:row.acceptedByMailServer===true,status:row.status,stageCode:row.stageCode||null,replyCategory:row.replyCategory||"UNKNOWN",attempts:Number(row.attempts||0),lastError:row.lastError||null,sentAt:row.sentAt||null}))};
+  const matched=new Set();
+  const deliveries=(envelope?recipientsFor(envelope):[]).map(recipient=>{
+    const index=rows.findIndex((row,i)=>!matched.has(i)&&(recipient.email?clean(row.recipientEmail).toLowerCase()===recipient.email:!clean(row.recipientEmail)&&recipient.uid&&row.recipientUid===recipient.uid));
+    const row=index>=0?rows[index]:null;
+    if(index>=0)matched.add(index);
+    const skipped=!recipient.email;
+    return{recipientAddress:maskAddress(recipient.email)||recipient.name||"Recipient",recipientRoles:recipient.roles,accepted:row?.acceptedByMailServer===true,status:skipped?"Skipped":row?.status||"Not Attempted",stageCode:row?.stageCode||(skipped?"RECIPIENT_EMAIL_MISSING":null),replyCategory:row?.replyCategory||"UNKNOWN",attempts:Number(row?.attempts||0),lastError:row?.lastError||null,lastAttemptAt:row?.lastAttemptAt||null,sentAt:row?.sentAt||null};
+  });
+  rows.forEach((row,index)=>{if(!matched.has(index))deliveries.push({recipientAddress:row.maskedAddress||maskAddress(row.recipientEmail)||"Recipient",recipientRoles:row.recipientRoles||[],accepted:row.acceptedByMailServer===true,status:row.status,stageCode:row.stageCode||null,replyCategory:row.replyCategory||"UNKNOWN",attempts:Number(row.attempts||0),lastError:row.lastError||null,lastAttemptAt:row.lastAttemptAt||null,sentAt:row.sentAt||null});});
+  return{...counts,status,complete:counts.total>0&&counts.sent===counts.total,deliveries};
 }
 
 export async function distributeCompletedPersonalCopies(ctx,envelope,completion,{bytes=null,retryFailed=false}={}){
