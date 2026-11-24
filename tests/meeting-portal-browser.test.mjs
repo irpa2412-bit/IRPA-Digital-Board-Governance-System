@@ -36,6 +36,11 @@ try {
       await page.locator('select[name="meetingPlatform"]').selectOption({ label: "Physical Venue" });
       await page.locator('input[name="venue"]').fill("TEST Longido Meeting Room");
       await page.locator('input[name="chairperson"]').fill("TEST Fixture Chairperson");
+      // Formal proceedings need all three meeting-specific permanent appointments.
+      // The Board Member chairs; the registered Board Secretary is explicitly appointed as Secretary and technical Administrator.
+      await page.locator('select[name="meetingChairpersonUid"]').selectOption("fixture-board-member-auth-uid");
+      await page.locator('select[name="meetingSecretaryUid"]').selectOption("fixture-board-secretary-uid");
+      await page.locator('select[name="meetingAdministratorUid"]').selectOption("fixture-board-secretary-uid");
       await page.locator('textarea[name="agenda"]').fill("1. Confirm the agenda\n2. Review the work plan");
       await picker.locator("label").filter({ hasText: "TEST Active Board Member" }).locator('input[type="checkbox"]').check();
       await page.getByRole("button", { name: "Schedule Meeting" }).click();
@@ -44,10 +49,13 @@ try {
       const persisted = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), storeKey);
       const created = persisted.meetings.find(meeting => meeting.title === createdTitle);
       assert.ok(created, "TEST meeting should be saved in isolated localStorage");
-      assert.deepEqual(created.memberUids, ["fixture-board-member-active"], "Board member document ID must persist");
-      assert.deepEqual(created.participantUids, ["fixture-board-member-auth-uid"], "authenticated participant UID must persist");
-      assert.deepEqual(created.participantEmails, ["board-member@example.test"], "participant email must persist");
+      assert.deepEqual(created.memberUids, ["fixture-board-member-active", "fixture-board-secretary-employee"], "Board Member and explicitly appointed Board Secretary employee records must persist");
+      assert.deepEqual(created.participantUids, ["fixture-board-member-auth-uid", "fixture-board-secretary-uid"], "authenticated Board Member and explicitly appointed Board Secretary participant UIDs must persist");
+      assert.deepEqual(created.participantEmails, ["board-member@example.test", "board-secretary@example.test"], "participant emails must persist");
       assert.equal(created.venue, "TEST Longido Meeting Room");
+      assert.equal(created.meetingChairpersonUid, "fixture-board-member-auth-uid", "formal proceedings require the permanent meeting Chairperson");
+      assert.equal(created.meetingSecretaryUid, "fixture-board-secretary-uid", "formal proceedings require the permanent meeting Secretary");
+      assert.equal(created.meetingAdministratorUid, "fixture-board-secretary-uid", "the Meeting Administrator appointment is recorded independently");
       assert.equal(created.startTime, "10:00");
       assert.equal(created.endTime, "11:00");
       assert.equal(created.date, "2027-02-18");
@@ -105,7 +113,7 @@ try {
       await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 2", { exact: true }).waitFor();
       await page.locator("#irpa-meeting-quorum").getByText("TEST Guest — Position 3", { exact: true }).waitFor();
       await page.locator("#irpa-meeting-quorum").getByText("TEST Active Board Member", { exact: true }).waitFor();
-      await page.getByText("4/4 Present", { exact: true }).waitFor();
+      await page.getByText("5/5 Present", { exact: true }).waitFor();
       await page.waitForFunction(id => (window.__irpaFixtureActions || []).some(action => action.type === "quorum-assess" && action.meetingId === id), created.id);
 
       await page.getByRole("button", { name: /1\. Confirm the agenda/ }).click();
@@ -131,12 +139,12 @@ try {
       await page.getByText(/Signing requests dispatched through the Signature Portal email-link workflow/).waitFor();
       const signing = await page.evaluate(() => (window.__irpaFixtureActions || []).findLast(x => x.type === "attendance-signing-mock"));
       assert.ok(signing, "attendance signing must use the Signature Portal mock");
-      assert.equal(signing.assignments.length, 4, "registered member and three guest positions must each receive a signer");
+      assert.equal(signing.assignments.length, 5, "both appointed institutional participants and three guest positions must each receive a signer");
       assert.equal(signing.sameEmailCount, 3, "three guest positions sharing one email must remain separate signers");
       assert.equal(signing.emailSent, false, "the fixture must never send real email");
       const allMockActions = await page.evaluate(() => window.__irpaFixtureActions || []);
       assert.ok(allMockActions.every(action => action.emailSent === false), "no fixture action may send real email");
-      assert.equal(new Set(signing.assignments.map(x => x.signerId)).size, 4, "each participant position must have its own signer ID");
+      assert.equal(new Set(signing.assignments.map(x => x.signerId)).size, 5, "each participant position must have its own signer ID");
 
       await page.getByPlaceholder(/The AI Assistant transcript appears here automatically/).fill("TEST minutes source: the Board reviewed and approved the work plan.");
       await page.getByRole("button", { name: "Save Transcript Now" }).click();
