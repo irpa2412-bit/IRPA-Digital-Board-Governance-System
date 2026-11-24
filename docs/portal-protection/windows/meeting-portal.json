@@ -3,10 +3,10 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-23T20:04:00Z",
+  "lastActivityAt": "2026-11-24T11:11:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
+  "reason": "Owner-authorised 24 November 2026 scope extension for meeting-specific leadership appointments and temporary Transition Committee governance. The scope includes server-side Worker authorization, meeting UI and client authorization helpers, meeting category policy, and the corresponding Firestore meeting rules and regression tests. The change requires a complete Transition Committee for leadership-election infrastructure, permits repeated identities, requires all permanent appointments and closed election ballots before proceedings, and ends temporary authority atomically at proceedings start. No unrelated portal, collection or signature behavior is changed.",
   "scope": [
     "tests/meeting-category-policy.test.mjs",
     "docs/portal-protection/records/meeting-portal.json",
@@ -15,7 +15,14 @@
     "src/pages/Meetings.jsx",
     "src/pages/SignaturePlatform.jsx",
     "src/firebase/signatureStorage.js",
-    "drive-gateway/src/router.mjs"
+    "drive-gateway/src/router.mjs",
+    "src/firebase/meetingGatewayApi.js",
+    "src/pages/MeetingRoom.jsx",
+    "src/firebase/meetingPolicy.js",
+    "firestore.rules",
+    "tests/meeting-room-authorization-boundary.test.mjs",
+    "tests/meeting-invitation-resend-quorum.test.mjs",
+    "tests/meeting-quorum-reconciliation.test.mjs"
   ],
   "activityLog": [
     {
@@ -58,6 +65,11 @@
         "src/firebase/signatureStorage.js",
         "drive-gateway/src/router.mjs"
       ]
+    },
+    {
+      "at": "2026-11-24T11:11:00Z",
+      "action": "owner-authorised meeting leadership and Transition Committee governance scope extension",
+      "description": "User explicitly authorised repair of all failed PR #955 tests, necessary rule changes, retesting, merge and live production promotion. Scope extended to the exact changed Meeting Portal source, Firestore meeting rules and regression test files; no multi-portal scope is included."
     }
   ],
   "baseline": {
