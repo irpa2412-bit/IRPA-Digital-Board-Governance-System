@@ -661,7 +661,7 @@ export async function getEnvelopeStatus(ctx,user,id){
 }),lastEvent,completion:e.completion?{finalHash:e.completion.finalHash,completedAt:e.completion.completedAt,files:e.completion.files}:null,eventCount:e.events.length,auditChainValid:await verifyChain(e.events),distribution:await getSignatureDistributionSummary(ctx,id),personalCopies:personalCopyRows.map(row=>({copyKind:row.copyKind||"recipient-copy",status:row.status||"Not Attempted",attempts:Number(row.attempts||0),lastAttemptAt:row.lastAttemptAt||null,storedAt:row.storedAt||null,lastError:row.lastError||null}))}}
 export async function getCompletedDocumentForOwner(ctx,user,id){
  const e=await ctx.meta.get("envelopes",id);
- const authorised=Boolean(user?.uid)&&(e?.createdBy===user.uid||e?.createdByUid===user.uid||e?.ownerUid===user.uid||user?.isAdmin===true);
+ const authorised=Boolean(user?.uid)&&(e?.createdBy===user.uid||e?.createdByUid===user.uid||e?.ownerUid===user.uid);
  if(!e||!authorised)throw new HttpError(403,"Not authorized.");
  if(e.status!=="Completed")throw new HttpError(409,"The authoritative completed document is not available.");
  if(!Array.isArray(e.signers)||!e.signers.length||e.signers.some(signer=>signer?.status!=="Signed"))throw new HttpError(409,"Every required signer must be signed before the completed document can be read.");
