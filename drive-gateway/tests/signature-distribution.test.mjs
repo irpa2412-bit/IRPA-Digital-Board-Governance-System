@@ -135,3 +135,23 @@ test("each signer position receives an independent delivery even when email addr
   assert.equal(new Set(rows.filter(row=>row.recipientEmail==="shared@example.test").map(row=>row.recipientKey)).size,2);
   assert.deepEqual(result.deliveries.filter(row=>row.recipientAddress==="s***@example.test").map(row=>row.signerIds[0]),["S1","S2"]);
 });
+
+test("legacy email-keyed Sent delivery is claimed once and not resent for the first signer position",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\ncompleted IRPA document");
+  const ctx=context(bytes,null);
+  const envelope={id:"ENV-LEGACY-DISTRIBUTION",createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Owner",status:"Completed",title:"Resolution",documentId:"DOC-LEGACY",signers:[
+    {id:"S1",email:"shared@example.test",name:"Signer One",uid:null,status:"Signed",identityType:"email-link"},
+    {id:"S2",email:"shared@example.test",name:"Signer Two",uid:null,status:"Signed",identityType:"email-link"}
+  ]};
+  const legacyId="delivery-"+envelope.id+"-"+(await sha256Hex("shared@example.test")).slice(0,32);
+  await ctx.meta.create("signatureDistributions",legacyId,{envelopeId:envelope.id,recipientEmail:"shared@example.test",recipientEmailHash:await sha256Hex("shared@example.test"),recipientRoles:["Signer"],signerIds:["S1","S2"],status:"Sent",attempts:1,acceptedByMailServer:true,replyCategory:"ACCEPTED"});
+  const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
+  const result=await distributeCompletedSignatureDocument(ctx,envelope,completion);
+  assert.equal(result.total,3);
+  assert.equal(result.sent,3);
+  assert.equal(ctx.sent.filter(item=>item.to==="shared@example.test").length,1,"only the second signer position receives a new message");
+  const rows=await ctx.meta.list("signatureDistributions");
+  const shared=rows.filter(row=>row.recipientEmail==="shared@example.test");
+  assert.equal(shared.length,2);
+  assert.deepEqual(new Set(shared.map(row=>row.recipientKey)),new Set(["signer:S1","signer:S2"]));
+});
