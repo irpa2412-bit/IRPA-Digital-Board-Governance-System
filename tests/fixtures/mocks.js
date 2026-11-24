@@ -68,12 +68,12 @@ export function setFixtureActor(kind = "host") {
   } : { ...hostUser };
   recordAction({ type: "actor-switch", actor: kind });
 }
-export async function getCurrentMemberProfile() {
+export async function getCurrentMemberProfile() { return null; }
+export async function getCurrentEmployeeProfile() {
   return auth.currentUser.uid === hostUser.uid
-    ? { uid: hostUser.uid, email: hostUser.email, role: "Board Secretary", status: "Active", registrationStatus: "Activated" }
+    ? { uid: hostUser.uid, email: hostUser.email, name: hostUser.displayName, role: "Board Secretary", department: "Board Secretariat", status: "Active", employmentStatus: "Active", employeeNumber: "TEST-EMP-001" }
     : null;
 }
-export async function getCurrentEmployeeProfile() { return null; }
 export async function getAdminProfile() { return null; }
 export async function getRecords(collection) { return clone(readStore()[collection] || []); }
 export async function getAccessibleMeetingRecords() {
