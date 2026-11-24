@@ -171,9 +171,12 @@ async function validateMeetingAppointments(ctx,env,token,incoming,current=null){
 }
 function meetingRoleAssigned(meeting,uid,role){
   const id=clean(uid);if(!id)return false;
-  const fields=role==="chair"?["meetingChairpersonUid","chairpersonUid"]:role==="secretary"?["meetingSecretaryUid","secretaryUid"]:role==="administrator"?["meetingAdministratorUid"]:role==="transitionChair"?["transitionChairpersonUid"]:role==="transitionSecretary"?["transitionSecretaryUid"]:role==="transitionAdministrator"?["transitionAdministratorUid"]:[];
-  if(fields.some(field=>clean(meeting[field])===id))return true;
-  return false;
+  if(transitionCommitteeActive(meeting)){
+    const temporaryFields=role==="chair"||role==="transitionChair"?["transitionChairpersonUid"]:role==="secretary"||role==="transitionSecretary"?["transitionSecretaryUid"]:role==="administrator"||role==="transitionAdministrator"?["transitionAdministratorUid"]:[];
+    return temporaryFields.some(field=>clean(meeting[field])===id);
+  }
+  const permanentFields=role==="chair"?["meetingChairpersonUid","chairpersonUid"]:role==="secretary"?["meetingSecretaryUid","secretaryUid"]:role==="administrator"?["meetingAdministratorUid"]:role==="transitionChair"||role==="transitionSecretary"||role==="transitionAdministrator"?[]:[];
+  return permanentFields.some(field=>clean(meeting[field])===id);
 }
 function transitionCommitteeActive(meeting){return meeting?.transitionCommitteeActive===true&&lower(meeting.status)!=="in progress"&&lower(meeting.proceedingsStatus)!=="in progress";}
 function meetingSecretariatAuthority(meeting,uid){return meetingRoleAssigned(meeting,uid,"chair")||meetingRoleAssigned(meeting,uid,"secretary")||(transitionCommitteeActive(meeting)&&(meetingRoleAssigned(meeting,uid,"transitionChair")||meetingRoleAssigned(meeting,uid,"transitionSecretary")));}
