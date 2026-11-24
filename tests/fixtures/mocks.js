@@ -30,7 +30,7 @@ function initialStore() {
       { id: "fixture-board-member-inactive", name: "TEST Inactive Board Member", role: "Board Member", boardMember: true, status: "Inactive", email: "inactive@example.test", memberNumber: "TEST-BM-002", uid: "fixture-board-member-inactive-uid" },
       { id: "fixture-ordinary-member", name: "TEST Ordinary Member", role: "Member", boardMember: false, status: "Active", email: "ordinary@example.test", memberNumber: "TEST-M-001", uid: "fixture-ordinary-member-uid" }
     ],
-    employees: [], participants: [], resolutions: [], decisions: [], actions: [],
+    employees: [{ id: "fixture-board-secretary-employee", uid: "fixture-board-secretary-uid", name: "TEST Fixture Board Secretary", email: "board-secretary@example.test", role: "Board Secretary", department: "Board Secretariat", status: "Active", employeeNumber: "TEST-EMP-001" }], participants: [], resolutions: [], decisions: [], actions: [],
     meetingSubscriptions: [], votes: [], meetingRoomEvents: [], meetingRecords: [],
     meetingDailyAttendance: [], dailyAttendanceDispatches: {}, meetingWorkingDocuments: []
   };
@@ -149,7 +149,7 @@ export async function listMeetingBoardMembers() {
 }
 export async function listMeetingPeople() {
   const directory = await listMeetingInviteeDirectory();
-  const rows = [...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
+  const rows = [...(Array.isArray(directory.boardMembers) ? directory.boardMembers : []), ...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
   const seen = new Set();
   return rows.filter(row => {
     const uid = String(row.uid || "").trim();
