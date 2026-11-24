@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Meeting Portal"
     ],
-    "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
+    "reason": "Owner-authorised 24 November 2026 meeting governance change for meeting-specific Chairperson, Secretary and Meeting Administrator appointments; temporary Transition Committee election workflow; server-enforced role separation; meeting-scoped invitations, ballots and media moderation; and immediate Transition Committee mandate expiry when formal proceedings begin. This change explicitly includes the necessary meeting-scoped Firestore authorization rules; no unrelated collection, portal or signature rules are changed.",
     "files": [
       "drive-gateway/src/meetingServices.mjs",
       "drive-gateway/src/meetingDeletion.mjs",
@@ -18,14 +18,23 @@
       "docs/portal-protection/windows/meeting-portal.json",
       "src/pages/SignaturePlatform.jsx",
       "src/firebase/signatureStorage.js",
-      "drive-gateway/src/router.mjs"
+      "drive-gateway/src/router.mjs",
+      "src/firebase/meetingGatewayApi.js",
+      "src/pages/MeetingRoom.jsx",
+      "src/firebase/meetingPolicy.js",
+      "firestore.rules",
+      "tests/meeting-room-authorization-boundary.test.mjs",
+      "tests/meeting-invitation-resend-quorum.test.mjs",
+      "tests/meeting-quorum-reconciliation.test.mjs"
     ],
-    "expectedEffect": "Allow every active registered IRPA member and employee to initiate meetings in the shared Meeting Portal and participate in Staff and General meeting categories, without granting Board voting, quorum, resolution approval, minutes approval, administrator rights or unrestricted access to restricted meetings. Shared Signature Portal dependencies may be updated for the owner-only completed-document tracking feature; Meeting Portal functionality, data, authorization and permissions remain unchanged.",
+    "expectedEffect": "Allow active registered IRPA members and employees to initiate meetings; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections.",
     "prohibitedChanges": [
-      "Never delete REAL or unclassified meetings.",
-      "Do not weaken administrator authorization, legal hold, retention, pending-review or version checks.",
-      "Do not change Board voting, quorum, resolution approval, minutes approval, signature workflows, or unrelated portal permissions.",
-      "Do not change Firestore rules or staging Firestore rules; the authenticated Worker path is sufficient."
+      "Do not create portal-wide meeting leadership roles.",
+      "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
+      "Do not retain Transition Committee authority after formal proceedings begin.",
+      "Do not allow appointments or permissions to leak between concurrent meetings.",
+      "Do not weaken Board quorum, ordinary governance voting, signature, legal-hold, retention, audit or protected deletion safeguards.",
+      "Do not change unrelated Firestore collections or other portal permissions."
     ]
   },
   "repairWindow": {
@@ -75,6 +84,20 @@
         "drive-gateway/src/router.mjs"
       ],
       "meetingBehaviorChanged": false
+    },
+    {
+      "at": "2026-11-24T11:11:00Z",
+      "action": "owner-authorised meeting-scoped leadership and Transition Committee governance scope extension",
+      "pullRequest": 955,
+      "files": [
+        "src/firebase/meetingGatewayApi.js",
+        "src/pages/MeetingRoom.jsx",
+        "src/firebase/meetingPolicy.js",
+        "firestore.rules",
+        "tests/meeting-room-authorization-boundary.test.mjs",
+        "tests/meeting-invitation-resend-quorum.test.mjs",
+        "tests/meeting-quorum-reconciliation.test.mjs"
+      ]
     }
   ],
   "attendanceCallableAudit": {
