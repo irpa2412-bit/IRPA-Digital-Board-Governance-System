@@ -16,8 +16,6 @@
       "docs/portal-protection/records/meeting-portal.json",
       "tests/meeting-category-policy.test.mjs",
       "docs/portal-protection/windows/meeting-portal.json",
-      "src/pages/SignaturePlatform.jsx",
-      "src/firebase/signatureStorage.js",
       "drive-gateway/src/router.mjs",
       "src/firebase/meetingGatewayApi.js",
       "src/pages/MeetingRoom.jsx",
