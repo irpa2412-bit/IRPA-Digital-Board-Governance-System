@@ -89,7 +89,7 @@ export async function persistCompletedSignatureEnvelope({envelope, completion, g
   });
   for (const signer of signers.filter(s => s.status === "Signed")) {
     const assignedSigner=(envelope.signers||[]).find(x=>(x.uid&&x.uid===signer.uid)||(x.email&&x.email===signer.email));
-    const signerCopy=(completion.files||[]).find(file=>file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""));
+    const signerCopy=(completion.files||[]).find(file=>(file?.kind==="signer-copy"&&file.signerId===(assignedSigner?.id||""))||(file?.kind==="owner-copy"&&clean(envelope.createdBy)===clean(signer.profileUid||signer.uid)));
     const signerArchiveUrl=signerCopy?.id?"https://drive.google.com/file/d/"+encodeURIComponent(signerCopy.id)+"/view":null;
     const signatureRecordId="gateway-"+envelopeId+"-"+clean(signer.uid||assignedSigner?.id||signer.email);
     await updateDocument("signatures/"+signatureRecordId,{
