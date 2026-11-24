@@ -30,7 +30,7 @@ function initialStore() {
       { id: "fixture-board-member-inactive", name: "TEST Inactive Board Member", role: "Board Member", boardMember: true, status: "Inactive", email: "inactive@example.test", memberNumber: "TEST-BM-002", uid: "fixture-board-member-inactive-uid" },
       { id: "fixture-ordinary-member", name: "TEST Ordinary Member", role: "Member", boardMember: false, status: "Active", email: "ordinary@example.test", memberNumber: "TEST-M-001", uid: "fixture-ordinary-member-uid" }
     ],
-    employees: [], participants: [], resolutions: [], decisions: [], actions: [],
+    employees: [{ id: "fixture-board-secretary-employee", uid: "fixture-board-secretary-uid", name: "TEST Fixture Board Secretary", email: "board-secretary@example.test", role: "Board Secretary", department: "Board Secretariat", status: "Active", employeeNumber: "TEST-EMP-001" }], participants: [], resolutions: [], decisions: [], actions: [],
     meetingSubscriptions: [], votes: [], meetingRoomEvents: [], meetingRecords: [],
     meetingDailyAttendance: [], dailyAttendanceDispatches: {}, meetingWorkingDocuments: []
   };
@@ -68,12 +68,12 @@ export function setFixtureActor(kind = "host") {
   } : { ...hostUser };
   recordAction({ type: "actor-switch", actor: kind });
 }
-export async function getCurrentMemberProfile() {
+export async function getCurrentMemberProfile() { return null; }
+export async function getCurrentEmployeeProfile() {
   return auth.currentUser.uid === hostUser.uid
-    ? { uid: hostUser.uid, email: hostUser.email, role: "Board Secretary", status: "Active", registrationStatus: "Activated" }
+    ? { uid: hostUser.uid, email: hostUser.email, name: hostUser.displayName, role: "Board Secretary", department: "Board Secretariat", status: "Active", employmentStatus: "Active", employeeNumber: "TEST-EMP-001" }
     : null;
 }
-export async function getCurrentEmployeeProfile() { return null; }
 export async function getAdminProfile() { return null; }
 export async function getRecords(collection) { return clone(readStore()[collection] || []); }
 export async function getAccessibleMeetingRecords() {
@@ -147,6 +147,17 @@ export async function provisionAllMeetingCategoryArchives() { return { testOnly:
 export async function listMeetingBoardMembers() {
   return clone(readStore().members.filter(m => m.boardMember === true && ["active", "activated"].includes(String(m.status || "").toLowerCase())));
 }
+export async function listMeetingPeople() {
+  const directory = await listMeetingInviteeDirectory();
+  const rows = [...(Array.isArray(directory.boardMembers) ? directory.boardMembers : []), ...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
+  const seen = new Set();
+  return rows.filter(row => {
+    const uid = String(row.uid || "").trim();
+    if (!uid || seen.has(uid)) return false;
+    seen.add(uid);
+    return true;
+  }).map(row => ({ ...row, uid: String(row.uid).trim(), name: String(row.name || row.email || row.uid), email: String(row.email || "").toLowerCase() }));
+}
 export async function listMeetingInviteeDirectory() {
   const store = readStore();
   const active = rows => clone(rows.filter(m => ["active", "activated"].includes(String(m.status || m.employmentStatus || m.registrationStatus || "").toLowerCase())));
@@ -194,7 +205,7 @@ export async function assessMeetingQuorum({ meetingId } = {}) {
   const store = readStore();
   recordAction({ type: "quorum-assess", meetingId, quorumMet: true });
   const participants = store.participants.filter(p => p.meetingId === meetingId);
-  const boardMembers = participants.filter(p => p.participantUid);
+  const boardMembers = participants.filter(p => p.participantUid && /board member|board chairperson/i.test(String(p.participantRole || p.role || "")));
   return { assessment: {
     meetingId, boardMeeting: true, required: 1, present: 1, quorumMet: true, status: "MET",
     rule: "TEST fixture quorum: one authenticated Board Member",

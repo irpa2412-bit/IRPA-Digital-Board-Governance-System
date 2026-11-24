@@ -39,3 +39,14 @@ export const assessMeetingQuorum = payload => callMeetingService("/api/meeting-q
 export const listMeetingBoardMembers = async () => (await callMeetingService("/api/meeting-board-register/list")).boardMembers || [];
 
 export const listMeetingInviteeDirectory = async () => callMeetingService("/api/meeting-invitee-directory/list");
+export const listMeetingPeople = async () => {
+  const directory = await listMeetingInviteeDirectory();
+  const rows = [...(Array.isArray(directory.boardMembers) ? directory.boardMembers : []), ...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
+  const seen = new Set();
+  return rows.filter(row => {
+    const uid = String(row.uid || "").trim();
+    if (!uid || seen.has(uid)) return false;
+    seen.add(uid);
+    return true;
+  }).map(row => ({ ...row, uid: String(row.uid).trim(), name: String(row.name || row.email || row.uid), email: String(row.email || "").toLowerCase() }));
+};

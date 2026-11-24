@@ -47,9 +47,13 @@ function participantListed(meeting = {}, uid) {
     meeting.attendeeUids,
     meeting.memberUids,
     meeting.invitedUids,
-    meeting.subscriberUids
+    meeting.subscriberUids,
+    meeting.meetingChairpersonUid ? [meeting.meetingChairpersonUid] : [],
+    meeting.meetingSecretaryUid ? [meeting.meetingSecretaryUid] : [],
+    meeting.meetingAdministratorUid ? [meeting.meetingAdministratorUid] : [],
+    meeting.transitionCommitteeActive === true && !["in progress", "completed", "cancelled", "canceled"].includes(text(meeting.status).toLowerCase()) && text(meeting.proceedingsStatus).toLowerCase() !== "in progress" ? [meeting.transitionChairpersonUid, meeting.transitionSecretaryUid, meeting.transitionAdministratorUid] : []
   ];
-  if (arrays.some(list => Array.isArray(list) && list.includes(uid))) return true;
+  if (arrays.some(list => Array.isArray(list) && list.some(value => text(value) === uid))) return true;
 
   const participantCollections = [meeting.participants, meeting.attendees];
   for (const list of participantCollections) {
@@ -73,15 +77,12 @@ function liveKitConfigured() {
   return Boolean(text(LIVEKIT_URL.value()) && text(LIVEKIT_API_KEY.value()) && text(LIVEKIT_API_SECRET.value()));
 }
 
-function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
-  const actorEmail = text(email).toLowerCase();
-  const authority = text(selectedAuthority).toLowerCase();
-  if (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) return true;
-  if (meeting.secretaryUid && text(meeting.secretaryUid) === uid) return true;
-  if (text(meeting.chairpersonEmail).toLowerCase() === actorEmail && actorEmail) return true;
-  if (text(meeting.secretaryEmail).toLowerCase() === actorEmail && actorEmail) return true;
-  return ["board chairperson","board secretary","chairperson","meeting chair","meeting secretary","secretary"]
-    .includes(authority);
+function moderatorForMeeting(meeting = {}, uid) {
+  const transitionActive = meeting.transitionCommitteeActive === true &&
+    !["in progress", "completed", "cancelled", "canceled"].includes(text(meeting.status).toLowerCase()) &&
+    text(meeting.proceedingsStatus).toLowerCase() !== "in progress";
+  const administratorUid = transitionActive ? meeting.transitionAdministratorUid : meeting.meetingAdministratorUid;
+  return Boolean(uid && text(administratorUid) === uid);
 }
 
 /**
@@ -156,11 +157,11 @@ exports.issueLiveMeetingToken = onCall({
   }
 
   const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
-  const activeIdentity = isAdmin || records.some(activeRecord) || Boolean(invitedParticipant);
+  const activeIdentity = records.some(activeRecord) || Boolean(invitedParticipant);
   if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member, employee, or verified meeting invitee identity is required.");
 
   const listed = Boolean(invitedParticipant) || participantListed(meeting, uid);
-  if (!isAdmin && !listed) {
+  if (!listed) {
     throw new HttpsError("permission-denied", "This account is not registered as a participant in the selected meeting.");
   }
 
@@ -183,7 +184,7 @@ exports.issueLiveMeetingToken = onCall({
   // unique audit records and must not partition host and invitee into separate rooms.
   const roomName = opaqueRoomName(meetingId, "shared-live-room");
   const participantIdentity = `uid-${uid}`;
-  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
+  const moderator = moderatorForMeeting(meeting, uid);
   const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
@@ -293,8 +294,7 @@ async function resolveRecordingControl(request, meetingId, options = {}) {
     db.collection("meetingSubscriptions").where("meetingId", "==", meetingId).where("subscriberUid", "==", uid).limit(1).get().catch(() => ({ empty: true }))
   ]);
   const invited = Boolean(invitedParticipant) || participantListed(meeting, uid) || subQueries.some(s => !s.empty);
-  if (!isAdmin && (!activeIdentity && !invited)) throw new HttpsError("permission-denied", "An active IRPA identity or verified invitee is required.");
-  if (!isAdmin && !invited) throw new HttpsError("permission-denied", "This account is not registered or subscribed to the selected meeting.");
+  if (!activeIdentity || !invited) throw new HttpsError("permission-denied", "An active, invited or appointed meeting participant identity is required.");
   const authority = text(request.data?.selectedAuthority);
   const profileRoles = profiles.flatMap(registeredRoles);
   const invitedRoles = invitedParticipant ? [
@@ -303,17 +303,7 @@ async function resolveRecordingControl(request, meetingId, options = {}) {
   ].map(text).filter(Boolean) : [];
   const authorityMatches = !authority || profileRoles.includes(authority) || invitedRoles.includes(authority);
   if (!authorityMatches) throw new HttpsError("permission-denied", "The selected access authority is not registered to this account.");
-  const trustedModeratorRole = profileRoles.concat(invitedRoles).find(role =>
-    ["board chairperson", "board secretary", "chairperson", "meeting chair", "meeting secretary", "secretary"].includes(text(role).toLowerCase())
-  ) || "";
-  const controller = isAdmin ||
-    (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) ||
-    (meeting.secretaryUid && text(meeting.secretaryUid) === uid) ||
-    (text(meeting.chairpersonEmail).toLowerCase() === email && Boolean(email)) ||
-    (text(meeting.secretaryEmail).toLowerCase() === email && Boolean(email)) ||
-    text(meeting.createdByUid) === uid ||
-    text(meeting.initiatorUid) === uid ||
-    moderatorForMeeting(meeting, uid, email, trustedModeratorRole);
+  const controller = moderatorForMeeting(meeting, uid);
   return { uid, email, meeting, isAdmin, invited, controller };
 }
 function recordingRoomName(meetingId) {
@@ -341,7 +331,7 @@ exports.startMeetingRecording = onCall({
   secrets: [LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]
 }, async request => {
   const ctx = await resolveRecordingControl(request, text(request.data?.meetingId));
-  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may start recording.");
+  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the Meeting Administrator appointed to this meeting may start recording.");
   const roomName = recordingRoomName(ctx.meeting.id);
   const activeRecordings = await db.collection("meetingMediaRecordings").where("meetingId", "==", ctx.meeting.id).get();
   if (activeRecordings.docs.some(doc => ["STARTING", "RECORDING", "STOPPING"].includes(text(doc.data()?.recordingStatus)))) {
@@ -397,7 +387,7 @@ exports.stopMeetingRecording = onCall({
   const recordingId = text(request.data?.recordingId || request.data?.egressId);
   if (!recordingId) throw new HttpsError("invalid-argument", "Recording ID is required.");
   const ctx = await resolveRecordingControl(request, meetingId);
-  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the meeting administrator, initiator, chairperson or secretary may stop recording.");
+  if (!ctx.controller) throw new HttpsError("permission-denied", "Only the Meeting Administrator appointed to this meeting may stop recording.");
   const ref = db.collection("meetingMediaRecordings").doc(recordingId);
   const snap = await ref.get();
   if (!snap.exists || text(snap.data()?.meetingId) !== meetingId) throw new HttpsError("not-found", "Recording does not belong to this meeting.");

@@ -33,8 +33,8 @@ test("failed, undelivered and revoked invitations are excluded from attendance a
   assert.match(room,/"cancelled","canceled","cancelled invitation","canceled invitation"/);
   assert.match(room,/"failed","error","revoked","undelivered"/);
   assert.match(room,/p\.meetingAccessDispatched!==false/);
-  assert.match(room,/const eligible=useMemo\(\(\)=>attending\.filter\(votingRole\)/);
-  assert.match(room,/eligiblePresent=useMemo\(\(\)=>present\.filter\(votingRole\)/);
+  assert.match(room,/const eligible=useMemo\(\(\)=>attending\.filter\(p=>votingRole\(p,selected\)\)/);
+  assert.match(room,/eligiblePresent=useMemo\(\(\)=>present\.filter\(p=>votingRole\(p,selected\)\)/);
 });
 
 test("bulk resend targets only explicit failed or error-reported invitation records",()=>{

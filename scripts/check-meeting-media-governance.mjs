@@ -32,7 +32,7 @@ const livekitWorkflow=fs.readFileSync(".github/workflows/deploy-livekit-staging.
 const checks=[
  ["Registration buttons use the authoritative active-role policy",meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button type="button" onClick={startCreate}>+ Register Meeting</button>}')&&meetingsCentre.includes('{canRegisterMeeting({...actorIdentity,isAdmin:admin})&&<button className="secondary-button" onClick={startCreate}>+ New Meeting</button>}')],
  ["Released meeting edits remain administrator-only",meetingsCentre.includes("if(editing&&!canEditMeeting(editing,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("function edit(m){if(!canEditMeeting(m,{...actorIdentity,isAdmin:admin}))")&&meetingsCentre.includes("released. Only an authorised administrator may edit it.")],
- ["Firestore create retains registrar, initiator and meeting-category validation",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingRegistrar()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
+ ["Firestore create permits active IRPA members and employees while binding the initiator and validating meeting category",(()=>{const rules=fs.readFileSync("firestore.rules","utf8");const meetingRule=rules.split("match /meetings/{id}")[1]?.split("match /")[0]||"";return meetingRule.includes('allow create:if (meetingUser()&&request.resource.data.get("initiatorUid","")==request.auth.uid&&validMeetingCategory(request.resource.data))&&actualCreateAllowed()');})()],
  ["Meeting media client exists",fs.existsSync("src/meeting/IRPADGBSMeetingRoomMedia.jsx")],
  ["Participant invitation creates a meeting access pass",participantPage.includes("createMeetingAccessInvitation")&&participantPage.includes("meetingAccess")],
  ["Meeting access pass is dispatched through the independent Meeting Worker API",participantPage.includes("dispatchMeetingInvitation")&&meetingApi.includes("/api/meeting-invitations/dispatch")],
@@ -56,7 +56,7 @@ const checks=[
  ["Meeting entry asks for gate password separately from URL",entryGateway.includes('state==="password"')&&entryGateway.includes('type="password"')&&entryGateway.includes("Verify Password & Continue")],
  ["Meeting Room selects the meeting from the invitation gate context",room.includes("entryContext?.meetingId")&&room.includes("setSelectedId(invitedMeeting.id)")],
  ["Verified invitee context enables the media join control",room.includes("entryContext?.participantId")&&room.includes("entryContext?.meetingId===selected?.id")],
- ["Moderator authority is initialized before LiveKit grant",liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")>=0&&liveMeeting.indexOf("const moderator = isAdmin || moderatorForMeeting")<liveMeeting.indexOf("roomAdmin: moderator")],
+ ["Only the meeting-specific Meeting Administrator receives LiveKit room moderation authority",liveMeeting.includes("const moderator = moderatorForMeeting(meeting, uid)")&&liveMeeting.includes("meetingAdministratorUid")&&liveMeeting.includes("if (!listed)")&&liveMeeting.includes("const activeIdentity = records.some(activeRecord) || Boolean(invitedParticipant)")&&!liveMeeting.includes("const moderator = isAdmin ||")&&!liveMeeting.includes("if (!isAdmin && !listed)")&&!liveMeeting.includes("meeting.chairpersonUid && text(meeting.chairpersonUid) === uid")],
  ["Every participant for one meeting receives the same deterministic LiveKit room name",liveMeeting.includes('opaqueRoomName(meetingId, "shared-live-room")')&&!liveMeeting.includes("opaqueRoomName(meetingId, sessionRef.id)")],
  ["Invitation gate participant ID is forwarded to media authorization",media.includes("participantId:gateParticipantId")&&media.includes("irpaMeetingEntryContext")],
  ["Live media revalidates invitation participant against meeting and identity",liveMeeting.includes('db.collection("participants").doc(participantId).get()')&&liveMeeting.includes('text(candidate.meetingId) !== meetingId')&&liveMeeting.includes("boundUid !== uid")&&liveMeeting.includes("boundEmail !== email")],
@@ -89,7 +89,7 @@ const checks=[
  ["Governance chat signalling",media.includes('type:"chat"')],
  ["Hand raise signalling",media.includes('type:"hand"')],
  ["Meeting token route",fs.readFileSync("src/main.jsx","utf8").includes("meetingToken")],
- ["Firestore rules present and not part of this feature contract",fs.existsSync("firestore.rules")],
+ ["Firestore rules remain present with meeting-scoped authorization",fs.existsSync("firestore.rules")&&fs.readFileSync("firestore.rules","utf8").includes("meetingLeadershipElectionVoter")&&fs.readFileSync("firestore.rules","utf8").includes("meetingVotingController")],
  ["Meeting gate issues meeting ID",gateway.includes("meetingId,meetingPassword")],
  ["Meeting gate issues gate password",gateway.includes("meetingPassword=gatePassword")],
  ["Meeting gate stores password hash",gateway.includes("passwordHash")],
@@ -136,7 +136,7 @@ const report={
   "General Meetings":"Auto registration, attendance, live media, General Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default.",
   "Other Meetings":"Auto registration, attendance, live media, Other Meeting Documents, Decisions & Actions and transcript/proceedings; no quorum, voting, resolutions, authorization or signature by default."
  },
- limitation:"This is an automated repository/software contract report. Actual audio/video quality, latency, packet loss, device compatibility and long-session endurance require a deployed staging LiveKit endpoint and browser/device E2E run; this script does not falsely mark those as passed. Category gating here defines the Meeting Room workflow surface; downstream portal authorization remains governed by the existing Firebase authorization model and no Firebase rules are changed by this feature."
+ limitation:"This is an automated repository/software contract report. Actual audio/video quality, latency, packet loss, device compatibility and long-session endurance require a deployed staging LiveKit endpoint and browser/device E2E run; this script does not falsely mark those as passed. Category gating and meeting-scoped voting/moderation authorization are enforced by the Worker and corresponding Firestore meeting rules; unrelated collection and portal rules remain outside this feature."
 };
 fs.mkdirSync("reports",{recursive:true});
 fs.writeFileSync("reports/meeting-media-governance-verification.json",JSON.stringify(report,null,2)+"\n");

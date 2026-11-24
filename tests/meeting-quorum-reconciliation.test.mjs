@@ -81,7 +81,8 @@ test("Board Register is the authoritative UID-only quorum denominator",()=>{
   assert.match(service,/registrationCategory:"BOARD_MEMBER",meetingParticipantRegistered:false/);
   assert.match(service,/UNMATCHED_BOARD_REGISTRATION/);
   assert.match(api,/\/api\/meeting-board-register\/list/);
-  assert.match(meetings,/includes\(String\(m\.uid\)\)/);
+  assert.match(meetings,/const selectedIds=new Set\(/);
+  assert.match(meetings,/chosenPeople\.filter\(m=>selectedIds\.has\(String\(m\.uid\)\)\)/);
   assert.match(meetings,/selectedBoardMemberIds:Array\.isArray\(m\.participantUids\)/);
 });
 test("meeting participant registration cannot redefine the Board Register denominator",()=>{
