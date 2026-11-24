@@ -145,8 +145,8 @@ test("all palette text-entry fields accept 100 characters and reject 101",()=>{
   const types=["Name","Title","Text","Number","Comment","Remarks"];
   for(const type of types){
     const field={fieldId:"field-"+type.toLowerCase(),type,signerId:"S1",signerUid:"signer-100",required:true,page:1,x:0.1,y:0.1,width:0.3,height:0.1};
-    const accepted="A".repeat(100);
+    const accepted=(type==="Number"?"9":"A").repeat(100);
     assert.equal(validateFieldValues([field],signer,{[field.fieldId]:accepted},{type:"typed",value:"Signer"},[])[field.fieldId],accepted,type+" must accept 100 characters");
-    assert.throws(()=>validateFieldValues([field],signer,{[field.fieldId]:"A".repeat(101)},{type:"typed",value:"Signer"},[]),error=>error?.status===400&&error.message==="A signing field value must not exceed 100 characters.",type+" must reject 101 characters");
+    assert.throws(()=>validateFieldValues([field],signer,{[field.fieldId]:(type==="Number"?"9":"A").repeat(101)},{type:"typed",value:"Signer"},[]),error=>error?.status===400&&error.message==="A signing field value must not exceed 100 characters.",type+" must reject 101 characters");
   }
 });
