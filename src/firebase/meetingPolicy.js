@@ -47,9 +47,16 @@ export function canEditMeeting(meeting={},identity={}){
   return policy.registrationRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&
     String(meeting.initiatorUid||"")===String(identity.uid||"");
 }
+function leadershipElectionActive(meeting={}){
+  return meeting.leadershipElectionRequired===true&&meeting.transitionCommitteeActive===true&&
+    !["in progress","completed","cancelled","canceled"].includes(String(meeting.status||"").trim().toLowerCase())&&
+    String(meeting.proceedingsStatus||"").trim().toLowerCase()!=="in progress";
+}
 export function canVoteInMeeting(meeting={},identity={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  if(!policy.votingEnabled||identity.active!==true)return false;
+  if(identity.active!==true)return false;
+  if(leadershipElectionActive(meeting))return identity.isMeetingParticipant===true;
+  if(!policy.votingEnabled)return false;
   const roles=identityRoles(identity);
   return policy.votingRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&identity.isBoardMember===true;
 }
@@ -89,11 +96,13 @@ export function normalizeMeetingForV3(meeting={}){
 export function meetingCapabilities(meeting={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   const boardMeeting=isBoardMeeting(meeting);
+  const leadershipElection=leadershipElectionActive(meeting);
   return {
     policy,
     quorum:boardMeeting,
     quorumRequired:boardMeeting,
-    voting:policy.votingEnabled,
+    leadershipElection,
+    voting:policy.votingEnabled||leadershipElection,
     resolutions:policy.resolutionsEnabled,
     boardPapers:policy.id==="GOVERNANCE",
     minutesApproval:policy.id==="GOVERNANCE"||policy.id==="ADMINISTRATIVE",
