@@ -17,7 +17,7 @@ function text(value) {
 
 function activeRecord(record = {}) {
   const status = text(record.status || record.employmentStatus || record.registrationStatus).toLowerCase();
-  return !status || ["active", "activated", "current"].includes(status);
+  return ["active", "activated", "current"].includes(status);
 }
 
 function registeredRoles(record = {}) {
@@ -155,7 +155,17 @@ exports.issueLiveMeetingToken = onCall({
   const activeIdentity = records.some(activeRecord) || Boolean(invitedParticipant);
   if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member, employee, or verified meeting invitee identity is required.");
 
-  const listed = Boolean(invitedParticipant) || participantListed(meeting, uid);
+  const appointedForMeeting = [
+    meeting.meetingChairpersonUid,
+    meeting.meetingSecretaryUid,
+    meeting.meetingAdministratorUid,
+    ...(meeting.transitionCommitteeActive === true &&
+      text(meeting.status || "Scheduled").toLowerCase() !== "in progress" &&
+      text(meeting.proceedingsStatus || "").toLowerCase() !== "in progress"
+      ? [meeting.transitionChairpersonUid, meeting.transitionSecretaryUid, meeting.transitionAdministratorUid]
+      : [])
+  ].some(value => text(value) === uid);
+  const listed = Boolean(invitedParticipant) || participantListed(meeting, uid) || appointedForMeeting;
   if (!listed) {
     throw new HttpsError("permission-denied", "This account is not registered as a participant in the selected meeting.");
   }
