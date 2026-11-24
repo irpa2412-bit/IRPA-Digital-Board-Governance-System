@@ -205,7 +205,7 @@ export async function assessMeetingQuorum({ meetingId } = {}) {
   const store = readStore();
   recordAction({ type: "quorum-assess", meetingId, quorumMet: true });
   const participants = store.participants.filter(p => p.meetingId === meetingId);
-  const boardMembers = participants.filter(p => p.participantUid);
+  const boardMembers = participants.filter(p => p.participantUid && /board member|board chairperson/i.test(String(p.participantRole || p.role || "")));
   return { assessment: {
     meetingId, boardMeeting: true, required: 1, present: 1, quorumMet: true, status: "MET",
     rule: "TEST fixture quorum: one authenticated Board Member",
