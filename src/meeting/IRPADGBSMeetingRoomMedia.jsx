@@ -3,7 +3,7 @@ import React,{useEffect,useMemo,useRef,useState}from"react";
 import{auth}from"../firebase/config";
 import{getMeetingRecordingStatus,startMeetingRecording,stopMeetingRecording}from"../firebase/meetingRecords";
 import{uploadMeetingProductToDrive}from"../firebase/signatureStorage";
-import{issueLiveMeetingToken,callMeetingService}from"../firebase/meetingGatewayApi";
+import{issueLiveMeetingToken}from"../firebase/meetingGatewayApi";
 import{Room,RoomEvent}from"livekit-client";
 
 const encoder=new TextEncoder();
@@ -95,7 +95,6 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
      setError(e?.message||"Camera/microphone permission or device check failed.");
    }finally{stream?.getTracks?.().forEach(track=>track.stop())}
  }
- async function moderateParticipant(identity,action){if(!moderator||!meeting?.id)return;setError("");try{await callMeetingService("/api/meeting-media/moderate",{meetingId:meeting.id,identity,action});setMessages(v=>[...v,{from:"System",text:action==="MUTE_MICROPHONE"?"A participant microphone was muted by the Meeting Administrator.":"A participant was removed by the Meeting Administrator."}].slice(-30));if(action==="REMOVE_PARTICIPANT")setParticipants(v=>v.filter(p=>p.identity!==identity));else if(roomRef.current)refreshParticipants(roomRef.current)}catch(e){setError(e?.message||"The participant moderation action was rejected.")}}
  async function disconnect(){roomRef.current?.disconnect()}
  async function toggleMic(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isMicrophoneEnabled;await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);setMuted(!enabled);refreshParticipants(roomRef.current)}
  async function toggleCamera(){if(!roomRef.current)return;const enabled=!roomRef.current.localParticipant.isCameraEnabled;await roomRef.current.localParticipant.setCameraEnabled(enabled,{videoCaptureOptions:{resolution:{width:1280,height:720},frameRate:30}});setCamera(enabled);refreshParticipants(roomRef.current)}
@@ -159,7 +158,7 @@ export default function IRPADGBSMeetingRoomMedia({meeting,selectedAuthority="",c
     <div ref={localRef} style={{minHeight:170,border:"1px solid var(--border)",borderRadius:12,padding:8,overflow:"hidden"}}><span className="muted">Your camera / screen preview</span></div>
     <div className="panel" style={{marginTop:10,padding:12}}>
      <strong>Participants</strong>
-     <div style={{display:"grid",gap:7,marginTop:8}}>{participants.length?participants.map(p=><div key={p.identity} className="table-subtext" style={{padding:"7px 0",borderBottom:"1px solid var(--border)"}}><strong>{p.local?"You":p.name}</strong> · {p.audio?"Mic on":"Mic off"} · {p.video?"Camera on":"Camera off"}{moderator&&!p.local&&<div className="member-actions" style={{marginTop:5}}><button type="button" className="secondary-button" onClick={()=>moderateParticipant(p.identity,"MUTE_MICROPHONE")} disabled={!p.audio}>Mute microphone</button><button type="button" className="danger-button" onClick={()=>{if(window.confirm("Remove this participant from the selected meeting?"))moderateParticipant(p.identity,"REMOVE_PARTICIPANT")}}>Remove participant</button></div>}</div>):<span className="muted">No connected participants.</span>}</div>
+     <div style={{display:"grid",gap:7,marginTop:8}}>{participants.length?participants.map(p=><div key={p.identity} className="table-subtext"><strong>{p.local?"You":p.name}</strong> · {p.audio?"Mic on":"Mic off"} · {p.video?"Camera on":"Camera off"}</div>):<span className="muted">No connected participants.</span>}</div>
     </div>
    </div>
   </div>
