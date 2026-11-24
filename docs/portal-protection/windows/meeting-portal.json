@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-24T11:40:00Z",
+  "lastActivityAt": "2026-11-24T11:46:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-authorised 24 November 2026 scope extension for meeting-specific leadership appointments and temporary Transition Committee governance. The scope includes server-side Worker authorization, meeting UI and client authorization helpers, meeting category policy, and the corresponding Firestore meeting rules and regression tests. The change requires a complete Transition Committee for leadership-election infrastructure, permits repeated identities, requires all permanent appointments and closed election ballots before proceedings, and ends temporary authority atomically at proceedings start. No unrelated portal, collection or signature behavior is changed.",
@@ -26,7 +26,8 @@
     "functions/liveMeeting.js",
     "scripts/check-meeting-media-governance.mjs",
     "src/pages/Voting.jsx",
-    "tests/meeting-category-firestore-rules.test.cjs"
+    "tests/meeting-category-firestore-rules.test.cjs",
+    "src/firebase/data.js"
   ],
   "activityLog": [
     {
@@ -84,6 +85,11 @@
       "at": "2026-11-24T11:40:00Z",
       "action": "owner-authorised voting portal and ballot eligibility hardening",
       "description": "Voting controls are now meeting-scoped; Transition Committee Chair/Secretary can open and close only leadership-election ballots; ordinary governance ballots are restricted to listed Board members; listed active members/employees can vote in pre-proceedings leadership elections."
+    },
+    {
+      "at": "2026-11-24T11:46:00Z",
+      "action": "meeting participant data integration included in active scope",
+      "description": "The final scope also includes the meeting participant/voting data adapter used by the meeting and voting portals."
     }
   ],
   "baseline": {
