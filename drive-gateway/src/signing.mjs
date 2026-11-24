@@ -104,7 +104,7 @@ async function load(ctx,t){
   return{env:e,signer,tokenKind,session:sessionRecord||null};
 }
 function active(ctx,e,s=null){if(["Voided","Declined","Cancelled","Canceled"].includes(e.status))throw new HttpError(403,"This envelope is no longer active.");if(s?.identityType==="email-link")return;const expiry=s?.tokenExpiresAt||e.expiresAt;if(expiry&&ctx.now().getTime()>new Date(expiry).getTime())throw new HttpError(403,"This signing link has expired.")}
-const can=(e,s)=>s.status==="Pending"&&e.signers.every(x=>x.order>=s.order||x.status==="Signed");
+const can=(e,s)=>s.status==="Pending"&&(e.signingMode==="Parallel"||e.signers.every(x=>x.order>=s.order||x.status==="Signed"));
 // Email-link bearer access is valid only after the one-time invitation redemption; every lookup remains scoped by load() to this envelope and signer ID.
 export function canAuthenticatedSignerAccess(signer,user){
   if(signer?.identityType==="email-link") return signer.emailLinkSessionStatus==="active"||signer.emailLinkSessionStatus==="used"||signer.emailLinkStatus==="opened"||(Array.isArray(signer.emailLinkSessions)&&signer.emailLinkSessions.some(session=>["active","used"].includes(session?.status)));

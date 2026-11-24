@@ -27,7 +27,7 @@ test("email-link Submit remains visible in review and gated by required fields, 
   assert.match(page, /!declarations\.name\.trim\(\)\|\|!consent/);
   assert.match(page, /if\(!record\?\.canSign\)/);
   assert.match(page, /if\(incomplete\.length\)\{setError\("Complete all required assigned fields before submitting/);
-  assert.match(gateway, /const can=\(e,s\)=>s\.status==="Pending"&&e\.signers\.every\(x=>x\.order>=s\.order\|\|x\.status==="Signed"\)/);
+  assert.match(gateway, /const can=\(e,s\)=>s\.status==="Pending"&&\(e\.signingMode==="Parallel"\|\|e\.signers\.every\(x=>x\.order>=s\.order\|\|x\.status==="Signed"\)\)/);
 });
 
 test("leaving an email signing session never redirects to the IRPA public website or app root", () => {
