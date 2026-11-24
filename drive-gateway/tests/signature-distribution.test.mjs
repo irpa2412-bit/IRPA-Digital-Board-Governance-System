@@ -199,3 +199,32 @@ test("ambiguous SMTP SUBMIT outcome is recorded Unknown and is never automatical
   await distributeCompletedSignatureDocument(ctx,envelope,completion,{retryFailed:true});
   assert.equal(ctx.sent.length,1,"ambiguous submission is not resent by a later retry pass");
 });
+
+test("email and My Documents retry trails continue independently when either summary fails",async()=>{
+  const bytes=new TextEncoder().encode("%PDF-1.7\\ncompleted IRPA document");
+  const envelopeFor=id=>({
+    id,createdBy:"owner-uid",ownerEmail:"owner@example.test",ownerName:"Document Owner",
+    status:"Completed",title:"Board Resolution",documentId:id,
+    signers:[{id:"S1",email:"signer@example.test",name:"Signer",uid:"signer-uid",status:"Signed"}],
+    completion:{primaryStorageId:"signed-pdf",finalHash:null,fileName:"board-resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"}
+  });
+  const first=context(bytes,null);
+  const firstEnvelope=envelopeFor("ENV-EMAIL-SUMMARY-FAIL");
+  firstEnvelope.completion.finalHash=await sha256Hex(bytes);
+  await first.meta.create("envelopes",firstEnvelope.id,firstEnvelope);
+  const firstList=first.meta.list.bind(first.meta);
+  first.meta.list=async collection=>{if(collection==="signatureDistributions")throw new Error("email summary store unavailable");return firstList(collection);};
+  const firstResult=await retryFailedSignatureDistributions(first,{uid:"owner-uid"},firstEnvelope.id);
+  assert.equal(firstResult.distribution.status,"Error");
+  assert.equal(firstResult.personalCopies.stored,2,"owner and signer My Documents copies still complete");
+
+  const second=context(bytes,null);
+  const secondEnvelope=envelopeFor("ENV-PERSONAL-SUMMARY-FAIL");
+  secondEnvelope.completion.finalHash=await sha256Hex(bytes);
+  await second.meta.create("envelopes",secondEnvelope.id,secondEnvelope);
+  const secondList=second.meta.list.bind(second.meta);
+  second.meta.list=async collection=>{if(collection==="signaturePersonalCopies")throw new Error("My Documents index unavailable");return secondList(collection);};
+  const secondResult=await retryFailedSignatureDistributions(second,{uid:"owner-uid"},secondEnvelope.id);
+  assert.equal(secondResult.distribution.sent,2,"owner and signer email deliveries complete");
+  assert.equal(secondResult.personalCopies.status,"Error");
+});
