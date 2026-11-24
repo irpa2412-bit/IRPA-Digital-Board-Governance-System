@@ -149,7 +149,7 @@ function SignatureRecoveryOwnerPanelInner({envelopeId,item}){
    {previewReason&&<p role="status">Preview not available: {previewReason}</p>}{previewUrl&&<><p>Preview is a non-authoritative copy marked “RECOVERY PREVIEW — NOT COMPLETED”. It is not a court-ready completed document.</p><a href={previewUrl} target="_blank" rel="noreferrer">Open / save watermarked preview PDF</a></>}
   </>}
   {notice&&<p role="status">{notice}</p>}
-  <p style={{fontSize:12,marginTop:10}}>Assessment and dry-run are read-only. No retry, reassignment, repair, finalisation, or change to the original document, signers, signatures, signing events, hashes, certificates or archive records is performed. / Tathmini haisaini tena, haibadilishi msaini, hairekebishi wala kubadilisha hati ya awali au ushahidi wake.</p>
+  <p style={{fontSize:12,marginTop:10}}>Evidence assessment and dry-run are read-only. Finalisation occurs only when the document owner or authorised administrator explicitly invokes the separate command above; that command does not reassign signers, request new signatures, or rewrite existing signing events. / Tathmini haisaini tena, haibadilishi msaini, hairekebishi wala kubadilisha hati ya awali au ushahidi wake.</p>
  </section>;
 }
 
