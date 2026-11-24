@@ -261,3 +261,67 @@ test("active institutional users can read the organisation-wide member and emplo
   await assertSucceeds(db.collection("members").get());
   await assertSucceeds(db.collection("employees").get());
 });
+
+
+async function castRuleTestVote(db, { meetingId, issueId, uid, leadershipElection }) {
+  const batch = db.batch();
+  batch.set(db.doc(`votingIssues/${issueId}/participants/${uid}`), { uid, issueId });
+  batch.set(db.doc(`votes/${issueId}-${uid}`), {
+    votingIssueId: issueId,
+    meetingId,
+    meetingReference: meetingId,
+    resolutionId: null,
+    votingReference: issueId,
+    leadershipElection,
+    outcome: "For",
+    result: "Pending",
+    status: "Locked",
+    anonymous: true,
+    votedAt: new Date(),
+    createdAt: new Date()
+  });
+  await batch.commit();
+}
+
+test("ordinary governance ballots are restricted to listed Board Members and Board Chairpersons", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/board-vote").set(meeting({
+      meetingCategory: "GOVERNANCE", meetingPolicyId: "GOVERNANCE", meetingType: "Board Meeting",
+      registerStatus: "Registered", participantUids: ["board-member", "staff-user"]
+    }));
+    await db.doc("votingIssues/board-issue").set({
+      meetingId: "board-vote", resolutionId: null, leadershipElection: false,
+      status: "Open", anonymous: true, votingReference: "Board motion"
+    });
+  });
+  const boardDb = testEnv.authenticatedContext("board-member", { email: "board@example.test" }).firestore();
+  const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  await assertSucceeds(castRuleTestVote(boardDb, { meetingId: "board-vote", issueId: "board-issue", uid: "board-member", leadershipElection: false }));
+  await assertFails(castRuleTestVote(staffDb, { meetingId: "board-vote", issueId: "board-issue", uid: "staff-user", leadershipElection: false }));
+});
+
+test("active listed members and employees can vote in a Transition Committee leadership election, but only its Chair or Secretary can close the ballot", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await db.doc("meetings/staff-election").set(meeting({
+      meetingCategory: "STAFF", meetingPolicyId: "STAFF", meetingType: "Staff Meeting",
+      registerStatus: "Registered", leadershipElectionRequired: true, transitionCommitteeActive: true,
+      transitionChairpersonUid: "departmental-director", transitionSecretaryUid: "board-member",
+      transitionAdministratorUid: "staff-user", participantUids: ["staff-user"]
+    }));
+    await db.doc("votingIssues/staff-election-issue").set({
+      meetingId: "staff-election", resolutionId: null, leadershipElection: true,
+      status: "Open", anonymous: true, votingReference: "Staff Association Chairperson — nominee"
+    });
+  });
+  const staffDb = testEnv.authenticatedContext("staff-user", { email: "staff@example.test" }).firestore();
+  const chairDb = testEnv.authenticatedContext("departmental-director", { email: "director@example.test" }).firestore();
+  await assertSucceeds(castRuleTestVote(staffDb, { meetingId: "staff-election", issueId: "staff-election-issue", uid: "staff-user", leadershipElection: true }));
+  await assertFails(staffDb.doc("votingIssues/staff-election-issue").update({
+    status: "Closed", result: "Passed", closedAt: new Date(), updatedAt: new Date()
+  }));
+  await assertSucceeds(chairDb.doc("votingIssues/staff-election-issue").update({
+    status: "Closed", result: "Passed", closedAt: new Date(), updatedAt: new Date()
+  }));
+});
