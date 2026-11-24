@@ -671,14 +671,14 @@ export default {
               if(failure)throw failure;
               return result;
             },
-            sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes}) => {
+            sendCompletionEmail: async ({to,name,recipientRoles,title,fileName,completedAt,finalHash,bytes,onStage}) => {
               const safeTitle=String(title||"Completed signed document").replace(/[\r\n]+/g," ").slice(0,180);
               const safeName=String(name||"IRPA participant").slice(0,160);
               const roles=Array.isArray(recipientRoles)?recipientRoles.join(", "):"Signing participant";
               const subject="Completed signed document: "+safeTitle;
               const text="Dear "+safeName+",\n\nThe signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.\n\nDocument: "+safeTitle+"\nYour role: "+roles+"\nCompleted: "+String(completedAt||"")+"\nSHA-256: "+String(finalHash||"")+"\n\nKeep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.";
               const html="<p>Dear "+escapeMailHtml(safeName)+",</p><p>The signing process for the following IRPA document is complete. The fully executed PDF is attached to this email.</p><p><strong>Document:</strong> "+escapeMailHtml(safeTitle)+"<br><strong>Your role:</strong> "+escapeMailHtml(roles)+"<br><strong>Completed:</strong> "+escapeMailHtml(completedAt||"")+"</p><p><strong>SHA-256:</strong> "+escapeMailHtml(finalHash||"")+"</p><p>Keep this copy for your records. The authoritative execution record and audit trail remain protected in IRPA-DBGS.</p>";
-              return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}]});
+              return smtpSend(env,{to,subject,text,html,attachments:[{filename:fileName,contentType:"application/pdf",bytes}],onStage});
             },
             smtpSelfCheck: async () => { const result=await smtpSend(env,{to:resolveSmtpConfiguration(env).from,subject:"IRPA DBGS SMTP self-check",text:"This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.",html:"<p>This is a controlled SMTP connectivity and delivery self-check for IRPA-DBGS.</p>"}); return {ok:true,stageCode:"SUBMIT",providerResponseClass:String(result||"").slice(0,3)}; },
             resolveEmailLinkProfileUid: async (email, signerName) => {
