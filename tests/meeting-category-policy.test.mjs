@@ -353,3 +353,10 @@ test("legacy LiveKit callable cannot bypass meeting-specific admission or Meetin
   assert.match(legacyLiveMeetingSource, /if \(!listed\)/);
   assert.match(legacyLiveMeetingSource, /const controller = moderatorForMeeting\(meeting, uid\)/);
 });
+
+test("Meeting Administrator alone controls admission, attendance and technical media operations", () => {
+  assert.match(meetingRoomGovernanceSource, /MeetingAccessControl meeting=\{selected\} controller=\{Boolean\(activeAdministrator\)\} admissionController=\{Boolean\(activeAdministrator\)\}/);
+  assert.match(meetingRoomGovernanceSource, /isMeetingHost&&p\.participantId&&!\["PREPARING","DISPATCHED"\]\.includes\(dailyAttendanceDispatch\?\.status\)/);
+  assert.match(meetingRoomGovernanceSource, /Only the Meeting Administrator appointed to this meeting may update the attendance sheet/);
+  assert.match(meetingServicesGovernanceSource, /Only the Meeting Administrator appointed to this meeting may update the daily attendance sheet/);
+});
