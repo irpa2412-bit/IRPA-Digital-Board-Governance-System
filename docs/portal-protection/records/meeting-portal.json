@@ -25,9 +25,11 @@
       "firestore.rules",
       "tests/meeting-room-authorization-boundary.test.mjs",
       "tests/meeting-invitation-resend-quorum.test.mjs",
-      "tests/meeting-quorum-reconciliation.test.mjs"
+      "tests/meeting-quorum-reconciliation.test.mjs",
+      "functions/liveMeeting.js",
+      "scripts/check-meeting-media-governance.mjs"
     ],
-    "expectedEffect": "Allow active registered IRPA members and employees to initiate meetings; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections.",
+    "expectedEffect": "Allow active registered IRPA members and employees to initiate meetings; permit initial registration with no permanent leadership appointments; require a complete temporary Transition Committee before leadership-election invitations and ballots; allow eligible participants to vote only in that election; require all three permanent meeting appointments and closed election ballots before proceedings; expire temporary authority atomically at proceedings start; keep Meeting Administrator authority operational only; preserve Board-only quorum, voting, resolutions, signature and record protections. The legacy Firebase LiveKit callable is also hardened so only the meeting-specific Meeting Administrator can receive room moderation or control recording; global administrators, initiators, Chairpersons and Secretaries cannot obtain technical moderation by legacy callable paths.",
     "prohibitedChanges": [
       "Do not create portal-wide meeting leadership roles.",
       "Do not allow Meeting Administrator to chair, vote, establish quorum, approve resolutions or approve minutes by virtue of that role.",
