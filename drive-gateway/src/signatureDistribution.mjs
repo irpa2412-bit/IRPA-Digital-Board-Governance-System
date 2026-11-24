@@ -10,6 +10,7 @@ const safeError = (error, email) => String(error?.message || "Email delivery fai
 const maskAddress=email=>{const [local,domain]=String(email||"").split("@");if(!local||!domain)return "";return local.slice(0,1)+"***@"+domain;};
 const replyCategory=error=>["ACCEPTED","RATE_LIMITED","AUTH_FAILED","CONNECTION_REFUSED","MAILBOX_FULL","RECIPIENT_REJECTED","UNKNOWN"].includes(error?.smtpReplyCategory)?error.smtpReplyCategory:"UNKNOWN";
 const stageCode=error=>["BUILD_MESSAGE","SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"].includes(error?.stageCode)?error.stageCode:"SUBMIT";
+const isRevokedSigner=signer=>signer?.invitation==="Revoked"||signer?.emailLinkStatus==="revoked"||String(signer?.status||"").toLowerCase()==="revoked";
 
 function recipientsFor(envelope) {
   const recipients = [];
@@ -34,7 +35,7 @@ function recipientsFor(envelope) {
     "owner:" + String(ownerUid || envelope.id || "document-owner")
   );
   (envelope.signers || []).forEach((signer, index) => {
-    if (!signer) return;
+    if (!signer || isRevokedSigner(signer)) return;
     const signerId = clean(signer.id) || "position-" + String(index + 1);
     add(
       signer.email || signer.recipientEmail || signer.emailAddress,
@@ -94,7 +95,7 @@ export async function distributeCompletedPersonalCopies(ctx,envelope,completion,
   const recipients=new Map();
   const add=(uid,kind,signerId=null)=>{if(!uid)return;const key=String(uid);const item=recipients.get(key)||{uid:key,kind,signerIds:[]};if(signerId&&!item.signerIds.includes(signerId))item.signerIds.push(signerId);if(kind==="owner-copy")item.kind=kind;recipients.set(key,item);};
   add(envelope.createdBy,"owner-copy");
-  for(const signer of envelope.signers||[])add(signer.profileUid||signer.uid,"signer-copy",signer.id);
+  for(const signer of envelope.signers||[])if(!isRevokedSigner(signer))add(signer.profileUid||signer.uid,"signer-copy",signer.id);
   const files=[];
   for(const recipient of recipients.values()){
     const uidHash=await sha256Hex(recipient.uid),id="personal-copy-"+envelope.id+"-"+uidHash.slice(0,32);
@@ -119,7 +120,7 @@ export async function distributeCompletedPersonalCopies(ctx,envelope,completion,
     }
   }
   const rows=(await ctx.meta.list("signaturePersonalCopies")).filter(row=>row.envelopeId===envelope.id);
-  const summary={total:recipients.size,stored:rows.filter(row=>row.status==="Stored").length,failed:rows.filter(row=>row.status==="Failed").length,pending:rows.filter(row=>row.status==="Pending"||row.status==="Writing").length,skipped:(envelope.signers||[]).filter(s=>!s.profileUid&&!s.uid).length,files};
+  const summary={total:recipients.size,stored:rows.filter(row=>row.status==="Stored").length,failed:rows.filter(row=>row.status==="Failed").length,pending:rows.filter(row=>row.status==="Pending"||row.status==="Writing").length,skipped:(envelope.signers||[]).filter(s=>!isRevokedSigner(s)&&!s.profileUid&&!s.uid).length,files};
   const current=await ctx.meta.get("envelopes",envelope.id);
   if(current?.completion){
     const existing=Array.isArray(current.completion.files)?current.completion.files:[];
