@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { makeContext, route } from "../src/router.mjs";
-import { sha256Hex, canonicalJson } from "../src/util.mjs";\nimport { getSignatureDistributionSummary } from "../src/signatureDistribution.mjs";
+import { sha256Hex, canonicalJson } from "../src/util.mjs";
+import { getSignatureDistributionSummary } from "../src/signatureDistribution.mjs";
 
 async function fixture({actor="owner",tamper=false,corruptChain=false}={}) {
   const bytes=new TextEncoder().encode("%PDF-1.7\\nIRPA completed document");
