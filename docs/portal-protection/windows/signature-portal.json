@@ -109,6 +109,16 @@
         "docs/portal-protection/records/signature-portal.json",
         "docs/portal-protection/windows/signature-portal.json"
       ]
+    },
+    {
+      "at": "2026-11-24T08:57:03Z",
+      "action": "clarify-independent-email-and-my-documents-delivery-trails",
+      "description": "Owner requires the participant email-PDF delivery trail to remain distinct from the My Documents personal-copy trail. Separate records, statuses, retry decisions and failure reporting; either channel must continue if the other fails. Implemented independent error handling in the owner-triggered retry path and added a two-direction failure-isolation test.",
+      "files": [
+        "drive-gateway/src/signatureDistribution.mjs",
+        "drive-gateway/tests/signature-distribution.test.mjs",
+        "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
+      ]
     }
   ],
   "emergencyExpiresAt": null,
