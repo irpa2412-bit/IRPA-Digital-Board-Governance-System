@@ -532,7 +532,8 @@ const changed={};
 for(const [key,value] of Object.entries(incoming)){if(["id","updateTime","createdAt","environment"].includes(key)||(!c.isAdmin&&key==="registeredAt"))continue;
 if(JSON.stringify(value)!==JSON.stringify(current[key]))changed[key]=value;}
 if(!Object.keys(changed).length)return response(ctx,request,{ok:true,meetingId,changedFields:[]});
-const controller=clean(current.initiatorUid)===c.uid||meetingRoleAssigned(current,c.uid,"chair")||meetingRoleAssigned(current,c.uid,"secretary")||meetingRoleAssigned(current,c.uid,"administrator")||(transitionCommitteeActive(current)&&(meetingRoleAssigned(current,c.uid,"transitionChair")||meetingRoleAssigned(current,c.uid,"transitionSecretary")||meetingRoleAssigned(current,c.uid,"transitionAdministrator")));
+const formalStartByElectedChair=lower(incoming.status)==="in progress"&&clean(current.meetingChairpersonUid)===c.uid;
+const controller=clean(current.initiatorUid)===c.uid||meetingRoleAssigned(current,c.uid,"chair")||meetingRoleAssigned(current,c.uid,"secretary")||meetingRoleAssigned(current,c.uid,"administrator")||formalStartByElectedChair;
 if(!controller)return fail(ctx,request,"Only an authority appointed to this specific meeting or its registered initiator may update this meeting.",403);
 if(Object.keys(changed).some(key=>MEETING_APPOINTMENT_KEYS.has(key))&&lower(current.status)==="in progress")return fail(ctx,request,"Meeting appointments are locked once formal proceedings begin.",409);
 const appointmentValidation=await validateMeetingAppointments(ctx,env,token,incoming,current);
@@ -554,7 +555,7 @@ const appointmentWorkflowFields=new Set([...MEETING_APPOINTMENT_KEYS,"leadership
 const appointmentWorkflowChange=Object.keys(changed).some(key=>appointmentWorkflowFields.has(key));
 const nonAppointmentChange=Object.keys(changed).some(key=>!appointmentWorkflowFields.has(key));
 const isMeetingInitiator=clean(current.initiatorUid)===c.uid;
-if(nonAppointmentChange&&!meetingSecretariatAuthority(current,c.uid))return fail(ctx,request,"Only the appointed Chairperson or Secretary may change formal meeting proceedings and governance records.",403);
+if(nonAppointmentChange&&!meetingSecretariatAuthority(current,c.uid)&&!formalStartByElectedChair)return fail(ctx,request,"Only the currently authorised Chairperson or Secretary may change formal meeting proceedings and governance records; the newly elected Chairperson may only commence formal proceedings.",403);
 if(appointmentWorkflowChange&&!meetingSecretariatAuthority(current,c.uid)&&!isMeetingInitiator)return fail(ctx,request,"Only the meeting initiator or its appointed Chairperson/Secretary may declare or amend meeting-specific appointments before proceedings.",403);
 if(changed.status&&!["Scheduled","In Progress","Completed","Cancelled"].includes(clean(changed.status)))return fail(ctx,request,"Unsupported meeting status transition.",400);
 if(changed.status&&clean(current.meetingChairpersonUid)!==c.uid&&lower(changed.status)!=="in progress")return fail(ctx,request,"Only the appointed meeting Chairperson may pause or close formal proceedings.",403);
