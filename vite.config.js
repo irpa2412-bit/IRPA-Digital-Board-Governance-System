@@ -10,6 +10,11 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_IRPA_ENVIRONMENT === "staging" ||
     process.env.VITE_FIREBASE_PROJECT_ID === STAGING_PROJECT_ID;
   const configuredGatewayUrl = String(process.env.VITE_GOOGLE_DRIVE_GATEWAY_URL || "").trim();
+  // Give every deployment a unique asset URL so Cloudflare cannot serve bytes
+  // cached under a prior deployment's otherwise-identical Vite chunk path.
+  const assetBuildId = String(
+    process.env.GITHUB_SHA || process.env.VITE_BUILD_COMMIT || process.env.VITE_BUILD_STAMP || "local"
+  ).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 12);
 
   if (stagingBuild && !configuredGatewayUrl) {
     throw new Error("Refusing staging build: VITE_GOOGLE_DRIVE_GATEWAY_URL is required.");
@@ -34,7 +39,14 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       minify: process.env.VITE_DIAGNOSTIC_UNMINIFIED === "true" ? false : "esbuild",
-      sourcemap: process.env.VITE_DIAGNOSTIC_UNMINIFIED === "true"
+      sourcemap: process.env.VITE_DIAGNOSTIC_UNMINIFIED === "true",
+      rollupOptions: {
+        output: {
+          entryFileNames: `assets/[name]-${assetBuildId}-[hash].js`,
+          chunkFileNames: `assets/[name]-${assetBuildId}-[hash].js`,
+          assetFileNames: `assets/[name]-${assetBuildId}-[hash][extname]`
+        }
+      }
     },
     server: { port: 5173 }
   };
