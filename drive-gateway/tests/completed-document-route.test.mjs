@@ -17,7 +17,7 @@ function fixture({actor="owner",tamper=false}={}) {
   const expected=sha256Hex(bytes);
   const meta={async get(collection,id){return collection==="envelopes"&&id===envelope.id?envelope:null;},async list(){return [];}};
   const storage={async get(id){return id==="signed-pdf"?(tamper?new TextEncoder().encode("%PDF-1.7\\ntampered"):bytes):null;}};
-  const ctx=makeContext({meta,storage,verifyUser:async request=>request.headers.get("authorization")==="Bearer "+actor?{uid:actor}:null});
+  const ctx=makeContext({meta,storage,now:()=>new Date("2026-11-24T06:00:00.000Z"),verifyUser:async request=>request.headers.get("authorization")==="Bearer "+actor?{uid:actor}:null});
   return {ctx,envelope,bytes,expected};
 }
 
