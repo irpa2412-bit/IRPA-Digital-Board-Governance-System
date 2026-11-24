@@ -3,19 +3,32 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-23T20:04:00Z",
+  "lastActivityAt": "2026-11-24T12:48:22Z",
   "inactivityCloseHours": 72,
   "emergency": false,
-  "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
+  "reason": "Owner-authorised 24 November 2026 scope extension for meeting-specific leadership appointments and temporary Transition Committee governance. The scope includes server-side Worker authorization, meeting UI and client authorization helpers, meeting category policy, and the corresponding Firestore meeting rules and regression tests. The change requires a complete Transition Committee for leadership-election infrastructure, permits repeated identities, requires all permanent appointments and closed election ballots before proceedings, and ends temporary authority atomically at proceedings start. No unrelated portal, collection or signature behavior is changed.",
   "scope": [
     "tests/meeting-category-policy.test.mjs",
     "docs/portal-protection/records/meeting-portal.json",
     "docs/portal-protection/windows/meeting-portal.json",
     "drive-gateway/src/meetingServices.mjs",
     "src/pages/Meetings.jsx",
-    "src/pages/SignaturePlatform.jsx",
-    "src/firebase/signatureStorage.js",
-    "drive-gateway/src/router.mjs"
+    "drive-gateway/src/router.mjs",
+    "src/firebase/meetingGatewayApi.js",
+    "src/pages/MeetingRoom.jsx",
+    "src/firebase/meetingPolicy.js",
+    "firestore.rules",
+    "tests/meeting-room-authorization-boundary.test.mjs",
+    "tests/meeting-invitation-resend-quorum.test.mjs",
+    "tests/meeting-quorum-reconciliation.test.mjs",
+    "functions/liveMeeting.js",
+    "scripts/check-meeting-media-governance.mjs",
+    "src/pages/Voting.jsx",
+    "tests/meeting-category-firestore-rules.test.cjs",
+    "src/firebase/data.js",
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "tests/fixtures/mocks.js",
+    "tests/meeting-portal-browser.test.mjs"
   ],
   "activityLog": [
     {
@@ -58,11 +71,36 @@
         "src/firebase/signatureStorage.js",
         "drive-gateway/src/router.mjs"
       ]
+    },
+    {
+      "at": "2026-11-24T11:11:00Z",
+      "action": "owner-authorised meeting leadership and Transition Committee governance scope extension",
+      "description": "User explicitly authorised repair of all failed PR #955 tests, necessary rule changes, retesting, merge and live production promotion. Scope extended to the exact changed Meeting Portal source, Firestore meeting rules and regression test files; no multi-portal scope is included."
+    },
+    {
+      "at": "2026-11-24T11:24:00Z",
+      "action": "owner-authorised legacy live-media authorization hardening",
+      "description": "Closed legacy callable bypasses: only the meeting-specific Meeting Administrator can moderate LiveKit or start/stop recording; appointed leaders are admitted by meeting-scoped UID; uninvited global administrators cannot enter live rooms. The Cloudflare Worker remains the active client gateway."
+    },
+    {
+      "at": "2026-11-24T11:40:00Z",
+      "action": "owner-authorised voting portal and ballot eligibility hardening",
+      "description": "Voting controls are now meeting-scoped; Transition Committee Chair/Secretary can open and close only leadership-election ballots; ordinary governance ballots are restricted to listed Board members; listed active members/employees can vote in pre-proceedings leadership elections."
+    },
+    {
+      "at": "2026-11-24T11:46:00Z",
+      "action": "meeting participant data integration included in active scope",
+      "description": "The final scope also includes the meeting participant/voting data adapter used by the meeting and voting portals."
+    },
+    {
+      "at": "2026-11-24T11:48:00Z",
+      "action": "verified baseline refresh",
+      "description": "The Meeting Portal baseline and rollback target now match the exact PR #955 base commit 331201cb3c626cc96cd006fe8263bf69bafea9b1. Baseline smoke and full regression were verified successful on that exact commit using run 45385986460."
     }
   ],
   "baseline": {
-    "commit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c",
-    "rollbackCommit": "7f285df5437f96a58e4fcf9e7d2a85b8a9ee112c"
+    "commit": "331201cb3c626cc96cd006fe8263bf69bafea9b1",
+    "rollbackCommit": "331201cb3c626cc96cd006fe8263bf69bafea9b1"
   },
   "durationHours": 72,
   "warningHours": 12,
