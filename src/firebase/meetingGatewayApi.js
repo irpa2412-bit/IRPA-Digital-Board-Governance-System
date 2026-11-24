@@ -41,7 +41,7 @@ export const listMeetingBoardMembers = async () => (await callMeetingService("/a
 export const listMeetingInviteeDirectory = async () => callMeetingService("/api/meeting-invitee-directory/list");
 export const listMeetingPeople = async () => {
   const directory = await listMeetingInviteeDirectory();
-  const rows = [...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
+  const rows = [...(Array.isArray(directory.boardMembers) ? directory.boardMembers : []), ...(Array.isArray(directory.members) ? directory.members : []), ...(Array.isArray(directory.employees) ? directory.employees : [])];
   const seen = new Set();
   return rows.filter(row => {
     const uid = String(row.uid || "").trim();
