@@ -4,7 +4,7 @@
 - Baseline: 2d4e39d4394ca84ee2246573a3936711979f53af
 - Branch: fix/signature-email-link-auto-distribution-20261124
 - Owner authorisation: 2026-11-24T08:11:25Z
-- Status: implementation branch; PR/CI/live delivery verification pending
+- Status: PR #953 merged and deployed; completion-first hardening follow-up under review
 
 ## Diagnosis
 
@@ -67,3 +67,24 @@ The owner clarified on 2026-11-24 that sending/distributing the completed PDF to
 - My Documents: `signaturePersonalCopies`, keyed by recipient profile UID, with independent storage attempt/status and stored path.
 
 A failure or exception in one channel must not prevent the other channel from running or make the other channel appear failed. The owner-triggered retry now attempts both channels independently and returns separate `distribution` and `personalCopies` results. The completed PDF and its integrity hash remain common immutable source material, not a shared delivery status. The automatic finalisation path already isolates the two channel calls; this change also enforces isolation in the manual retry path.
+
+
+## Owner directive — completion-first invariant (2026-11-24)
+
+The owner explicitly requires that **no email-link e-signature distribution failure may prevent, delay, reverse, or invalidate document completion**. This is a system invariant, not merely a delivery retry preference.
+
+### Mandatory processing boundary
+
+1. Signing, PDF construction, integrity hashing, required certificate/evidence sealing, and authoritative archive persistence remain the prerequisites for completion.
+2. The system commits the authoritative envelope state as `Completed` and preserves its completed PDF, final hash, certificate/evidence references, and signing audit chain.
+3. Only after that commit may downstream delivery run: (a) participant email distribution and (b) profile-specific My Documents copies. These channels retain independent records, statuses, retries, and recovery.
+4. Once the `Completed` commit succeeds, no later exception—including a distribution failure, storage/index failure, summary write failure, status read failure, logging/diagnostic failure, or retry failure—may enter the pre-completion rollback handler, delete authoritative completion artifacts, or change the envelope to `CompletionFailed`.
+5. A downstream failure is reported as a delivery/reconciliation problem while the envelope remains `Completed`. Recovery must reuse the authoritative completed PDF and must not reopen signing or create duplicate signature events.
+
+### Code-level guard and regression test
+
+The finalisation routine now records the successful completion commit as an irreversible boundary for that execution. If an unexpected post-commit exception escapes the isolated email/My Documents handlers, the routine returns a completed result with distribution reconciliation flagged; it does not execute cryptographic rollback, delete archived files, or mark the envelope failed.
+
+Regression test: `C-I04 post-completion distribution/reporting failures never roll back Completed` in `drive-gateway/tests/production-crypto-integration.test.mjs`.
+
+This guard does not relax any prerequisite for completion. Failures before the authoritative `Completed` commit—including source integrity, PDF construction, certificate/evidence sealing, and authoritative archive persistence—remain completion failures and retain the existing fail-closed recovery path.
