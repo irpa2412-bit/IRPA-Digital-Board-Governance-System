@@ -49,7 +49,10 @@ export function canEditMeeting(meeting={},identity={}){
 }
 export function canVoteInMeeting(meeting={},identity={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
-  if(!policy.votingEnabled||identity.active!==true)return false;
+  if(identity.active!==true)return false;
+  const leadershipElection=meeting.leadershipElectionRequired===true&&meeting.transitionCommitteeActive===true&&identity.isMeetingParticipant===true;
+  if(leadershipElection)return identity.activeMember===true||identity.activeEmployee===true;
+  if(!policy.votingEnabled)return false;
   const roles=identityRoles(identity);
   return policy.votingRoles.some(role=>roles.has(NORMALIZE_ROLE(role)))&&identity.isBoardMember===true;
 }
@@ -89,19 +92,21 @@ export function normalizeMeetingForV3(meeting={}){
 export function meetingCapabilities(meeting={}){
   const policy=resolveCategory(meeting.meetingCategory||meeting.meetingPolicyId||meeting.category||meeting.meetingType);
   const boardMeeting=isBoardMeeting(meeting);
+  const leadershipElection=meeting.leadershipElectionRequired===true&&meeting.transitionCommitteeActive===true&&String(meeting.status||"").toLowerCase()!=="in progress"&&String(meeting.proceedingsStatus||"").toLowerCase()!=="in progress";
   return {
     policy,
     quorum:boardMeeting,
     quorumRequired:boardMeeting,
-    voting:policy.votingEnabled,
-    resolutions:policy.resolutionsEnabled,
+    leadershipElection,
+    voting:policy.votingEnabled||leadershipElection,
+    resolutions:policy.resolutionsEnabled||leadershipElection,
     boardPapers:policy.id==="GOVERNANCE",
     minutesApproval:policy.id==="GOVERNANCE"||policy.id==="ADMINISTRATIVE",
     aiReview:policy.aiReviewRequired,
     accessScope:policy.accessScope,
     accessRoles:policy.accessRoles,
     registrationRoles:policy.registrationRoles,
-    votingRoles:policy.votingRoles,
+    votingRoles:leadershipElection?["Eligible Meeting Members"]:policy.votingRoles,
     editAfterRelease:policy.editAfterRelease,
     minutesApprovalRoles:policy.minutesApprovalRoles,
     facilities:{
@@ -111,7 +116,7 @@ export function meetingCapabilities(meeting={}){
       signature:policy.signatureAccess,
       documents:policy.documentsAccess,
       authorization:policy.authorizationAccess,
-      resolutions:policy.resolutionsEnabled,
+      resolutions:policy.resolutionsEnabled||leadershipElection,
       decisions:policy.decisionsAccess,
       actions:policy.actionsAccess,
       transcript:policy.transcriptAccess,
