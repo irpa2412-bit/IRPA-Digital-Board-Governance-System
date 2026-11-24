@@ -179,7 +179,8 @@ function meetingRoleAssigned(meeting,uid,role){
   return permanentFields.some(field=>clean(meeting[field])===id);
 }
 function transitionCommitteeActive(meeting){return meeting?.transitionCommitteeActive===true&&lower(meeting.status)!=="in progress"&&lower(meeting.proceedingsStatus)!=="in progress";}
-function meetingSecretariatAuthority(meeting,uid){return meetingRoleAssigned(meeting,uid,"chair")||meetingRoleAssigned(meeting,uid,"secretary")||(transitionCommitteeActive(meeting)&&(meetingRoleAssigned(meeting,uid,"transitionChair")||meetingRoleAssigned(meeting,uid,"transitionSecretary")));}
+function meetingSecretariatAuthority(meeting,uid){return !transitionCommitteeActive(meeting)&&(meetingRoleAssigned(meeting,uid,"chair")||meetingRoleAssigned(meeting,uid,"secretary"));}
+function meetingTransitionElectionAuthority(meeting,uid){return transitionCommitteeActive(meeting)&&(meetingRoleAssigned(meeting,uid,"transitionChair")||meetingRoleAssigned(meeting,uid,"transitionSecretary"));}
 function meetingAdministratorAuthority(meeting,uid){return meetingRoleAssigned(meeting,uid,"administrator")||(transitionCommitteeActive(meeting)&&meetingRoleAssigned(meeting,uid,"transitionAdministrator"));}
 
 function jwtBase64(value){const bytes=new TextEncoder().encode(typeof value==="string"?value:JSON.stringify(value));let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");}
@@ -556,7 +557,7 @@ const appointmentWorkflowChange=Object.keys(changed).some(key=>appointmentWorkfl
 const nonAppointmentChange=Object.keys(changed).some(key=>!appointmentWorkflowFields.has(key));
 const isMeetingInitiator=clean(current.initiatorUid)===c.uid;
 if(nonAppointmentChange&&!meetingSecretariatAuthority(current,c.uid)&&!formalStartByElectedChair)return fail(ctx,request,"Only the currently authorised Chairperson or Secretary may change formal meeting proceedings and governance records; the newly elected Chairperson may only commence formal proceedings.",403);
-if(appointmentWorkflowChange&&!meetingSecretariatAuthority(current,c.uid)&&!isMeetingInitiator)return fail(ctx,request,"Only the meeting initiator or its appointed Chairperson/Secretary may declare or amend meeting-specific appointments before proceedings.",403);
+if(appointmentWorkflowChange&&!meetingSecretariatAuthority(current,c.uid)&&!meetingTransitionElectionAuthority(current,c.uid)&&!isMeetingInitiator)return fail(ctx,request,"Only the meeting initiator, permanent Chairperson/Secretary or active Transition Committee Chairperson/Secretary may declare or amend meeting-specific appointments before proceedings.",403);
 if(changed.status&&!["Scheduled","In Progress","Completed","Cancelled"].includes(clean(changed.status)))return fail(ctx,request,"Unsupported meeting status transition.",400);
 if(changed.status&&clean(current.meetingChairpersonUid)!==c.uid&&lower(changed.status)!=="in progress")return fail(ctx,request,"Only the appointed meeting Chairperson may pause or close formal proceedings.",403);
 if(lower(changed.status)==="in progress"||lower(changed.proceedingsStatus)==="in progress"){
@@ -702,7 +703,7 @@ if(pathname==="/api/meeting-actions/create"){
 const incoming=data.data&&typeof data.data==="object"?data.data:{},meetingId=clean(incoming.meetingId);
 if(!meetingId)return fail(ctx,request,"Meeting ID is required for a meeting-linked action.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+const controller=!transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary"));
 if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may record a meeting action.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"An action cannot be added to a closed meeting.",409);
 const title=clean(incoming.title||incoming.description);
@@ -717,7 +718,7 @@ if(pathname==="/api/meeting-decisions/create"){
 const incoming=data.data&&typeof data.data==="object"?data.data:{},meetingId=clean(incoming.meetingId);
 if(!meetingId)return fail(ctx,request,"Meeting ID is required for a meeting-linked decision.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-const controller=meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary")||(transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"transitionChair")||meetingRoleAssigned(c.meeting,c.uid,"transitionSecretary")));
+const controller=!transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary"));
 if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may record a meeting decision.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"A decision cannot be added to a closed meeting.",409);
 const title=clean(incoming.title||incoming.description);
