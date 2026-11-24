@@ -28,7 +28,7 @@ function recipientsFor(envelope) {
 }
 async function update(ctx,id,patch){const current=await ctx.meta.get("signatureDistributions",id);if(!current)return;await ctx.meta.update("signatureDistributions",id,patch,{ifVersion:current._v});}
 async function updatePersonalCopy(ctx,id,patch){const current=await ctx.meta.get("signaturePersonalCopies",id);if(!current)return;await ctx.meta.update("signaturePersonalCopies",id,patch,{ifVersion:current._v});}
-const safePersonalCopyError=error=>String(error?.message||"Personal copy write failed.").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[recipient]").replace(/Bearer\s+\\S+/gi,"Bearer [REDACTED]").slice(0,240);
+const safePersonalCopyError=error=>String(error?.message||"Personal copy write failed.").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[recipient]").replace(/Bearer\s+\S+/gi,"Bearer [REDACTED]").slice(0,240);
 async function persistEnvelopeDistribution(ctx,envelopeId,summary){
   const current=await ctx.meta.get("envelopes",envelopeId);if(!current)return;
   await ctx.meta.update("envelopes",envelopeId,{distributionStatus:summary.status,distribution:{status:summary.status,total:summary.total,sent:summary.sent,failed:summary.failed,updatedAt:ctx.now().toISOString()}},{ifVersion:current._v});
