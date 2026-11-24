@@ -14,7 +14,10 @@ async function fixture({actor="owner",tamper=false,corruptChain=false}={}) {
     events:[],
     completion:{primaryStorageId:"signed-pdf",finalHash:"",fileName:"completed.pdf",completedAt:"2026-11-24T06:00:00.000Z"}
   };
-  const expected=sha256Hex(bytes);\n  const eventBody={type:"envelope.created",at:"2026-11-24T06:00:00.000Z",actor:"owner",documentHash:"source-hash",signerCount:1,prevHash:"GENESIS"};\n  envelope.events=[{...eventBody,hash:await sha256Hex(canonicalJson(eventBody))}];\n  if(corruptChain)envelope.events[0].actor="tampered";
+  const expected=sha256Hex(bytes);
+  const eventBody={type:"envelope.created",at:"2026-11-24T06:00:00.000Z",actor:"owner",documentHash:"source-hash",signerCount:1,prevHash:"GENESIS"};
+  envelope.events=[{...eventBody,hash:await sha256Hex(canonicalJson(eventBody))}];
+  if(corruptChain)envelope.events[0].actor="tampered";
   let mirrorWrites=0;const meta={async get(collection,id){return collection==="envelopes"&&id===envelope.id?envelope:null;},async list(){return [];},async update(){mirrorWrites++;}};
   const storage={async get(id){return id==="signed-pdf"?(tamper?new TextEncoder().encode("%PDF-1.7\\ntampered"):bytes):null;}};
   const ctx=makeContext({meta,storage,now:()=>new Date("2026-11-24T06:00:00.000Z"),verifyUser:async request=>request.headers.get("authorization")==="Bearer "+actor?{uid:actor}:null});
@@ -27,7 +30,8 @@ test("owner can read only the completed PDF after signer, audit and SHA-256 chec
   assert.equal(response.status,200);
   assert.equal(response.headers.get("content-type"),"application/pdf");
   assert.equal(response.headers.get("x-document-sha256"),await f.expected);
-  assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes);\n  assert.equal(f.mirrorWrites,0,"the read-only completed-document route must not reconcile or mutate the Firestore mirror");
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()),f.bytes);
+  assert.equal(f.mirrorWrites,0,"the read-only completed-document route must not reconcile or mutate the Firestore mirror");
 });
 
 test("non-owner cannot retrieve the authoritative completed PDF",async()=>{
