@@ -38,7 +38,7 @@ export async function getSignatureDistributionSummary(ctx,envelopeId){
   const counts={total:rows.length,sent:0,failed:0,pending:0,sending:0,unknown:0};
   for(const row of rows){if(row.status==="Sent")counts.sent++;else if(row.status==="Failed")counts.failed++;else if(row.status==="Sending")counts.sending++;else if(row.status==="Unknown")counts.unknown++;else counts.pending++;}
   const status=counts.total===0?"NotStarted":counts.sent===counts.total?"Sent":counts.failed>0&&counts.sent>0?"PartiallyFailed":counts.failed===counts.total?"Failed":"NotStarted";
-  return{...counts,status,complete:counts.total>0&&counts.sent===counts.total,deliveries:rows.map(row=>({recipientAddress:row.maskedAddress||maskAddress(row.recipientEmail),accepted:row.acceptedByMailServer===true,status:row.status,stageCode:row.stageCode||null,replyCategory:row.replyCategory||"UNKNOWN",attempts:Number(row.attempts||0),lastError:row.lastError||null,sentAt:row.sentAt||null}))};
+  return{...counts,status,complete:counts.total>0&&counts.sent===counts.total,deliveries:rows.map(row=>({recipientAddress:row.maskedAddress||maskAddress(row.recipientEmail),accepted:row.acceptedByMailServer===true,status:row.status,stageCode:row.stageCode||null,replyCategory:row.replyCategory||"UNKNOWN",attempts:Number(row.attempts||0),lastError:row.lastError||null,lastAttemptAt:row.lastAttemptAt||null,sentAt:row.sentAt||null}))};
 }
 
 export async function distributeCompletedPersonalCopies(ctx,envelope,completion,{bytes=null,retryFailed=false}={}){
