@@ -58,6 +58,8 @@ test("multi-signer completion and email delivery survive every My Documents copy
     {name:"Signer Four",email:"four@example.org",uid:"u4",order:3}
   ];
   const id=await env(s,signers);
+  const envelope=await s.meta.get("envelopes",id);
+  await s.meta.update("envelopes",id,{ownerEmail:"owner@example.org",ownerName:"Document Owner"},{ifVersion:envelope._v});
   for(const [email,user,name] of [["two@example.org","u2","Signer Two"],["three@example.org","u3","Signer Three"]]){
     const response=await route(post("/api/sign/submit",{token:s.tokenFor(email),consent:true,signature:{type:"typed",value:name}},user),s.ctx);
     assert.equal(response.status,200);
@@ -69,7 +71,7 @@ test("multi-signer completion and email delivery survive every My Documents copy
   const completed=await s.meta.get("envelopes",id);
   assert.equal(completed.status,"Completed");
   assert.equal(completed.completionFailure,null);
-  assert.equal(sent.length,3);
+  assert.equal(sent.length,4);
   assert.equal(completed.distributionStatus,"Sent");
   const copies=await s.meta.list("signaturePersonalCopies");
   assert.equal(copies.filter(row=>row.envelopeId===id&&row.status==="Failed").length,4);
