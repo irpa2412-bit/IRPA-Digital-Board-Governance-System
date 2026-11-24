@@ -26,7 +26,9 @@
     "src/pages/Voting.jsx",
     "tests/meeting-category-firestore-rules.test.cjs",
     "src/firebase/data.js",
-    "scripts/meeting-portal-fixture-isolation-guard.sh"
+    "scripts/meeting-portal-fixture-isolation-guard.sh",
+    "tests/fixtures/mocks.js",
+    "tests/meeting-portal-browser.test.mjs"
   ],
   "activityLog": [
     {
