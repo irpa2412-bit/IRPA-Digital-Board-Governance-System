@@ -319,7 +319,7 @@ test("meeting governance Firestore rules restrict live voting control to the act
   assert.match(rules, /function meetingVotingController\(meetingId\).*transitionCommitteeActive/);
   assert.match(rules, /meetingLeadershipElectionVoter/);
   assert.match(rules, /meetingAllowsVoting/);
-  assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingUser\(\)/);
+  assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingCategoryReadAllowed\(resource\.data\)/);
 });
 
 
