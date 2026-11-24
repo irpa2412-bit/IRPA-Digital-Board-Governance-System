@@ -74,11 +74,12 @@ function liveKitConfigured() {
 }
 
 function moderatorForMeeting(meeting = {}, uid) {
-  if (text(meeting.meetingAdministratorUid) === uid) return true;
-  return meeting.transitionCommitteeActive === true &&
-    text(meeting.transitionAdministratorUid) === uid &&
+  const transitionActive = meeting.transitionCommitteeActive === true &&
     text(meeting.status || "Scheduled").toLowerCase() !== "in progress" &&
     text(meeting.proceedingsStatus || "").toLowerCase() !== "in progress";
+  return transitionActive
+    ? text(meeting.transitionAdministratorUid) === uid
+    : text(meeting.meetingAdministratorUid) === uid;
 }
 
 /**
