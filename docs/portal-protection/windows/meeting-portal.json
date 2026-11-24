@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-24T11:48:00Z",
+  "lastActivityAt": "2026-11-24T12:48:22Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-authorised 24 November 2026 scope extension for meeting-specific leadership appointments and temporary Transition Committee governance. The scope includes server-side Worker authorization, meeting UI and client authorization helpers, meeting category policy, and the corresponding Firestore meeting rules and regression tests. The change requires a complete Transition Committee for leadership-election infrastructure, permits repeated identities, requires all permanent appointments and closed election ballots before proceedings, and ends temporary authority atomically at proceedings start. No unrelated portal, collection or signature behavior is changed.",
