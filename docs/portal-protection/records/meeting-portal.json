@@ -75,7 +75,7 @@
       "Baseline smoke evidence on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257",
       "Full regression PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460, job 138416884498 checked out that SHA and completed npm run test:all in the Firestore emulator successfully.",
       "Full regression evidence on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884498",
-      "Meeting Portal baseline smoke PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257"
+      "Meeting Portal portal smoke PASS on exact PR #955 base 331201cb3c626cc96cd006fe8263bf69bafea9b1: run 45385986460 job 138416884257 checked out the exact baseline and executed npm run test:protected-portals, which reported PASS for all seven registered portals including Meeting Portal. https://github.com/irpa2412-bit/IRPA-Digital-Board-Governance-System/actions/runs/45385986460/job/138416884257"
     ]
   },
   "renewals": [
