@@ -623,7 +623,7 @@ export async function getEnvelopeStatus(ctx,user,id){
  const completionFailure=e.status==="CompletionFailed"?(e.completionFailure||{}):null;const completionFailureMessage=completionFailure?(()=>{const stage=String(completionFailure.stage||"NOT_RECORDED").replace(/[^A-Z0-9_]/g,"").slice(0,48);const errorType=String(completionFailure.errorType||"UnknownError").replace(/[^A-Za-z0-9_]/g,"").slice(0,48);const failedAt=typeof completionFailure.failedAt==="string"?completionFailure.failedAt:"time not recorded";const retryable=completionFailure.retryable===true?"A controlled owner retry is available.":"A controlled retry is not confirmed as safe.";return `Document completion failed at stage ${stage} (${errorType}) at ${failedAt}. ${retryable} Signer records have been retained.`;})():null;
  let mirrorSync={status:"not-linked",documentStatus:e.status};
  if(e.externalReference){
-  if(!await verifyChain(e.events))throw new HttpError(409,"Signing audit chain failed verification.");
+  if(!Array.isArray(e.events)||!e.events.length||!await verifyChain(e.events))throw new HttpError(409,"Signing audit chain failed verification.");
   if(e.status==="Completed"){
    if(!Array.isArray(e.signers)||!e.signers.length||e.signers.some(signer=>signer.status!=="Signed"))throw new HttpError(409,"The Gateway completion record does not show every required signer as signed.");
    const completion=e.completion||{};
