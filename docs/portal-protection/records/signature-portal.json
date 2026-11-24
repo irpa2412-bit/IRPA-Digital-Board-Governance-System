@@ -32,7 +32,7 @@
       "drive-gateway/tests/signature-distribution.test.mjs",
       "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
     ],
-    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment. The owner tracking register also exposes a hash-verified authoritative completed PDF, existing per-recipient delivery states, first-attempt delivery, failed-only retry and separate personal-copy outcomes; successful and ambiguous email outcomes remain protected from duplicate sends. The 24 November distribution repair additionally delivers independently to the document owner and each signer position (including separate email-link assignments sharing an address), includes invited signers regardless of signed/pending state, retries only known transient SMTP failures up to three attempts, records SMTP stage history, and preserves ambiguous outcomes without duplicate resend. Existing manual tracking, recovery, backup-first retry and fallback controls remain unchanged.",
+    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment. The owner tracking register also exposes a hash-verified authoritative completed PDF, existing per-recipient delivery states, first-attempt delivery, failed-only retry and separate personal-copy outcomes; successful and ambiguous email outcomes remain protected from duplicate sends. The 24 November distribution repair additionally delivers independently to the document owner and each signer position (including separate email-link assignments sharing an address), includes invited signers regardless of signed/pending state, retries only known transient SMTP failures up to three attempts, records SMTP stage history, and preserves ambiguous outcomes without duplicate resend. Existing manual tracking, recovery, backup-first retry and fallback controls remain unchanged. Email PDF distribution and My Documents copy creation are separate delivery trails with separate records, retry decisions, statuses and failure summaries. An exception in either must not prevent the other from running or change its outcome.",
     "prohibitedChanges": [
       "Do not change PDF building, hashing, certificate generation, authoritative archive writes or the meaning/order of Completed. Distribution changes are limited to SR-2026-11-24-01: recipient-position identity, invited-recipient coverage, bounded transient SMTP retry and delivery-stage recording."
     ],
@@ -90,7 +90,7 @@
       },
       {
         "path": "drive-gateway/src/signatureDistribution.mjs",
-        "expectedEffect": "Uses stable owner/signer-position recipient keys, preserves one legacy email-keyed record for one participant, sends every invited signer position independently, records per-attempt SMTP stages, retries known transient failures at most three times, and never retries ambiguous accepted-or-not outcomes."
+        "expectedEffect": "Uses stable owner/signer-position recipient keys, preserves one legacy email-keyed record for one participant, sends every invited signer position independently, records per-attempt SMTP stages, retries known transient failures at most three times, and never retries ambiguous accepted-or-not outcomes. Email and My Documents retry trails are isolated; a failure in one does not block the other."
       },
       {
         "path": "drive-gateway/src/index.js",
@@ -493,6 +493,6 @@
       "docs/portal-protection/records/signature-portal.json",
       "docs/portal-protection/windows/signature-portal.json"
     ],
-    "expectedEffect": "Per-signer-position automatic email distribution for owner and all invited signer assignments; three-attempt bounded transient SMTP retry; persisted stage history; independent personal copies for profile holders; legacy successful/ambiguous deliveries protected from duplicate sends; manual recovery and backup controls unchanged."
+    "expectedEffect": "Per-signer-position automatic email distribution for owner and all invited signer assignments; three-attempt bounded transient SMTP retry; persisted stage history; independent personal copies for profile holders; legacy successful/ambiguous deliveries protected from duplicate sends; manual recovery and backup controls unchanged. Email and My Documents delivery remain independent, with separate records, statuses and retry/failure reporting."
   }
 }
