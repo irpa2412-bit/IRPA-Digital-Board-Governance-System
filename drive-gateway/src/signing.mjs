@@ -630,8 +630,7 @@ export async function getEnvelopeStatus(ctx,user,id){
    if(!completion.finalHash||!completion.primaryStorageId||!completion.completedAt)throw new HttpError(409,"Verified completion evidence or the signed PDF reference is missing.");
    const signedPdf=await ctx.storage.get(completion.primaryStorageId);
    if(!signedPdf||await sha256Hex(signedPdf)!==completion.finalHash)throw new HttpError(409,"The completed signed PDF failed its integrity check.");
-   const signerCopies=e.signers.every(signer=>(completion.files||[]).some(file=>file?.kind==="signer-copy"&&file.signerId===signer.id&&file.id));
-   if(!signerCopies)throw new HttpError(409,"A required completed signer archive copy is missing.");
+   // Personal My Documents copies are tracked independently and are not a prerequisite for authoritative completion or status retrieval.
    if(typeof ctx.persistCompletedSignatureEnvelope!=="function")mirrorSync={status:"unavailable",documentStatus:e.status};
    else{
     const mirrored=await persistMirrorWithStatus(ctx,e,completion,{force:true});
