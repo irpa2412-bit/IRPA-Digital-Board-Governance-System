@@ -752,7 +752,12 @@ if(clean(incoming.sourceType)==="Manual Invitee"&&(authoritativeRoles.has(lower(
 const participantId=crypto.randomUUID(),now=new Date(),record={...incoming,participantName,participantEmail,meetingId,meetingIdentity:clean(incoming.meetingIdentity)||clean(c.meeting.meetingIdentity),meetingReference:clean(incoming.meetingReference)||clean(c.meeting.meetingReference||c.meeting.reference),meetingAccessDispatched:false,meetingAccessDispatchStatus:"Pending",invitationStatus:"Not Sent",attendanceStatus:clean(incoming.attendanceStatus)||"Invited",createdByUid:c.uid,createdAt:now,updatedAt:now};
 delete record.id;delete record.updateTime;
 await writeDoc(ctx,env,token,"participants",participantId,record,false);
-await audit(ctx,env,token,claims,"MEETING_PARTICIPANT_CREATED",c.meeting,participantId,{participantEmail,participantRole:clean(record.participantRole)});
+const registeredUid=clean(record.participantUid||record.uid||record.userId),registeredEmail=lower(record.participantEmail||record.email);
+const meetingPatch={};
+if(registeredUid){for(const key of ["participantUids","attendeeUids","memberUids","invitedUids"])meetingPatch[key]=[...new Set([...(Array.isArray(c.meeting[key])?c.meeting[key]:[]),registeredUid])];}
+if(registeredEmail){for(const key of ["participantEmails","attendeeEmails","invitedEmails"])meetingPatch[key]=[...new Set([...(Array.isArray(c.meeting[key])?c.meeting[key]:[]),registeredEmail])];}
+if(Object.keys(meetingPatch).length)await patchDoc(ctx,env,token,"meetings",meetingId,meetingPatch);
+await audit(ctx,env,token,claims,"MEETING_PARTICIPANT_CREATED",c.meeting,participantId,{participantEmail,participantUid:registeredUid||null,participantRole:clean(record.participantRole)});
 return response(ctx,request,{ok:true,participantId});
 }
 if(pathname==="/api/meeting-participants/update"){
