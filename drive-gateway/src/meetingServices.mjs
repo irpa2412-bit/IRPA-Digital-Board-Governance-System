@@ -362,14 +362,14 @@ const verifiedGatewaySigners=dispatch?.gatewayAuditChainValid===true&&gatewaySta
 const gatewaySignersById=new Map((Array.isArray(verifiedGatewaySigners)?verifiedGatewaySigners:[]).map(signer=>[clean(signer.id),signer]));
 const signedByUid=new Map((Array.isArray(dispatch?.gatewaySignerMap)?dispatch.gatewaySignerMap:[]).map(binding=>[clean(binding.participantUid),gatewaySignersById.get(clean(binding.signerId))]).filter(([participantUid,signer])=>participantUid&&signer?.status==="Signed"));
 for(const row of rows){const signer=signedByUid.get(clean(row.participantUid));if(signer){row.signed=true;row.signedAt=iso(signer.signedAt);}}
-const hostUid=clean(c.meeting.meetingHostUid||c.meeting.hostUid||c.meeting.organizerUid||c.meeting.organiserUid||c.meeting.initiatorUid||c.meeting.createdByUid||c.meeting.ownerUid||c.meeting.chairpersonUid);
-return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||null,hostName:clean(c.meeting.meetingHostName||c.meeting.initiatorName||c.meeting.chairpersonName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:dispatch.ownerUid||null,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null,gatewayEnvelopeId:dispatch.gatewayEnvelopeId||null,gatewaySignerMap:Array.isArray(dispatch.gatewaySignerMap)?dispatch.gatewaySignerMap:[]}:null});
+const hostUid=clean(c.meeting.meetingAdministratorUid||(transitionCommitteeActive(c.meeting)?c.meeting.transitionAdministratorUid:""));
+return response(ctx,request,{ok:true,meetingId,date,hostUid:hostUid||null,hostName:clean(c.meeting.meetingAdministratorName||c.meeting.transitionAdministratorName),meetingTitle:clean(c.meeting.title),meetingReference:clean(c.meeting.reference||c.meeting.meetingReference),rows,dispatch:dispatch?{status:dispatch.status,envelopeId:dispatch.envelopeId,documentId:dispatch.documentId,ownerUid:dispatch.ownerUid||null,dispatchedAt:iso(dispatch.dispatchedAt),gatewayInvitationStatus:dispatch.gatewayInvitationStatus||null,gatewayEnvelopeId:dispatch.gatewayEnvelopeId||null,gatewaySignerMap:Array.isArray(dispatch.gatewaySignerMap)?dispatch.gatewaySignerMap:[]}:null});
 }
 if(pathname==="/api/meeting-attendance/daily/mark"){
 const meetingId=clean(data.meetingId),date=clean(data.date),participantId=clean(data.participantId),attendanceStatus=clean(data.attendanceStatus);
 if(!meetingId||!participantId||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!["Present","Absent","Excused","N/A"].includes(attendanceStatus))return fail(ctx,request,"Meeting, date, participant and valid daily attendance status are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-if(!c.canManage)return fail(ctx,request,"Only the authorised meeting host may update daily attendance.",403);
+if(!meetingRoleAssigned(c.meeting,c.uid,"administrator")&&!(transitionCommitteeActive(c.meeting)&&meetingRoleAssigned(c.meeting,c.uid,"transitionAdministrator")))return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may update the daily attendance sheet.",403);
 const participant=await getDoc(ctx,env,token,"participants",participantId);
 if(!participant||participant.meetingId!==meetingId||denied.has(lower(participant.status||participant.registrationStatus)))return fail(ctx,request,"An active registered participant for this meeting is required.",404);
 const priorDispatch=(await listByField(ctx,env,token,"meetingAttendanceDispatches","meetingId",meetingId)).find(r=>clean(r.attendanceDate)===date);
@@ -427,7 +427,7 @@ const c=await context(ctx,env,token,claims,meetingId),participant=await getDoc(c
 if(!participant||participant.meetingId!==meetingId)return fail(ctx,request,"Participant record does not belong to this meeting.",404);
 const own=[participant.uid,participant.userId,participant.participantUid,participant.memberUid,participant.invitedUid].map(clean).includes(c.uid)||c.email&&[participant.email,participant.participantEmail,participant.invitedEmail,participant.subscriberEmail].some(v=>lower(v)===c.email);
 if(data.self===true){if(!own||attendanceStatus!=="Present")return fail(ctx,request,"Self-registration is limited to the authenticated participant marking their own attendance as Present.",403);}
-else if(!c.canManage)return fail(ctx,request,"Only the authorised meeting administrator, initiator, chairperson or secretary may update another participant's attendance.",403);
+else if(!meetingRoleAssigned(c.meeting,c.uid,"administrator")&&!(transitionCommitteeActive(c.meeting)&&meetingRoleAssigned(c.meeting,c.uid,"transitionAdministrator")))return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may update another participant's attendance.",403);
 if(denied.has(lower(participant.status||participant.registrationStatus)))return fail(ctx,request,"Inactive participant records cannot be marked for attendance.",409);
 const now=new Date(),patch={attendanceStatus,attendanceRecordedAt:now,attendanceRecordedByUid:c.uid,updatedAt:now};
 await patchDoc(ctx,env,token,"participants",participantId,patch);
