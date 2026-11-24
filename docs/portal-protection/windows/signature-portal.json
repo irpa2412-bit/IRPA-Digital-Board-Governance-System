@@ -7,10 +7,10 @@
   "warningHours": 12,
   "openedAt": "2026-11-22T18:06:00.000Z",
   "expiresAt": "2026-11-25T18:06:00.000Z",
-  "lastActivityAt": "2026-11-22T18:13:01Z",
+  "lastActivityAt": "2026-11-24T08:11:25Z",
   "emergency": false,
   "emergencyLimitHours": 24,
-  "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
+  "reason": "Owner-authorised 24 November 2026 repair of automatic completion distribution for the signature email-link workflow. Correct recipient identity to owner plus each signer position (not email address), include every invited signer, add bounded transient SMTP retries and persist per-attempt SMTP stages. Preserve Completed semantics, authoritative PDF/hash/certificate/archive, identity and token protections, manual owner recovery and backup controls. No SMTP settings, secrets, Worker bindings, Firestore rules or production records are changed.",
   "scope": [
     "src/pages/SignaturePlatform.jsx",
     "src/pages/SignaturePlatformWithUpload.jsx",
@@ -36,7 +36,10 @@
     "src/firebase/signatureStorage.js",
     "drive-gateway/src/router.mjs",
     "drive-gateway/src/signatureDistribution.mjs",
-    "drive-gateway/tests/completed-document-route.test.mjs"
+    "drive-gateway/tests/completed-document-route.test.mjs",
+    "drive-gateway/src/index.js",
+    "drive-gateway/tests/signature-distribution.test.mjs",
+    "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
   ],
   "activityLog": [
     {
@@ -91,6 +94,30 @@
         "drive-gateway/src/router.mjs",
         "drive-gateway/src/signatureDistribution.mjs",
         "drive-gateway/tests/completed-document-route.test.mjs"
+      ]
+    },
+    {
+      "at": "2026-11-24T08:11:25Z",
+      "action": "owner-authorised-automatic-signature-distribution-repair",
+      "description": "Owner authorised repair of automatic completion distribution without affecting available systems. Scope: stable recipient identity per signer position (not email), all invited signer positions, at most three automatic retries for known transient SMTP failures, per-attempt SMTP stage recording and personal copies for eligible profile holders. Preserve existing manual tracking, backup-first recovery, retry and fallback designs. Completed remains independent of email delivery. No SMTP settings/secrets/bindings, Firestore rules, signing identity/tokens/sessions, PDF/hash/certificate/archive logic or production records may be changed.",
+      "files": [
+        "drive-gateway/src/signatureDistribution.mjs",
+        "drive-gateway/src/index.js",
+        "drive-gateway/tests/signature-distribution.test.mjs",
+        "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
+        "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+        "docs/portal-protection/records/signature-portal.json",
+        "docs/portal-protection/windows/signature-portal.json"
+      ]
+    },
+    {
+      "at": "2026-11-24T08:57:03Z",
+      "action": "clarify-independent-email-and-my-documents-delivery-trails",
+      "description": "Owner requires the participant email-PDF delivery trail to remain distinct from the My Documents personal-copy trail. Separate records, statuses, retry decisions and failure reporting; either channel must continue if the other fails. Implemented independent error handling in the owner-triggered retry path and added a two-direction failure-isolation test.",
+      "files": [
+        "drive-gateway/src/signatureDistribution.mjs",
+        "drive-gateway/tests/signature-distribution.test.mjs",
+        "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
       ]
     }
   ],

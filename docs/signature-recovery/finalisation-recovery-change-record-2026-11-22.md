@@ -87,3 +87,34 @@ Retry is owner/admin only and enabled after an all-PASS dry run or explicit owne
 ### Immutable boundaries
 
 No envelope is to be modified during this work or its diagnosis. Do not touch, redo, reassign or delete any existing signature, audit event or stored hash. Do not modify PDF building, hashing, certificate or archive logic. Do not change signing rules, tokens, link format, sessions, signer identity, field assignment, secrets, environment variables, SMTP settings, Firestore rules or branch protection.
+
+
+## Owner decision amendment — 2026-11-24 08:11:25Z (automatic distribution repair)
+
+The owner explicitly authorises repair of the automatic email-link completion distribution system and requires the existing manual backup/recovery designs to remain available and unchanged.
+
+### Verified source defects
+
+- `drive-gateway/src/signatureDistribution.mjs` selects recipients through a map keyed by normalized email. Distinct signer positions sharing an address are collapsed into one distribution record and one email.
+- The recipient selector includes only signers with `status === "Signed"`, excluding invited signer positions not in that state.
+- Automatic completion distribution makes one send attempt per recipient. The existing owner-triggered retry endpoint is separate; it does not provide the required bounded automatic transient retry.
+- The completion email adapter in `drive-gateway/src/index.js` does not pass through the existing SMTP `onStage` callback, preventing persisted stage-level delivery diagnostics.
+- Personal-copy generation also filters to signed signers, rather than all eligible profile holders associated with the completed envelope.
+
+### Approved implementation boundary
+
+1. Key distribution records by stable recipient position: one document-owner identity and one identity per envelope signer ID. Do not deduplicate by email.
+2. Include the document owner and every invited signer/email-link assignment in the envelope. A forwarded-link holder is not a new authorised recipient.
+3. Automatically retry only known transient/pre-submit SMTP failures and explicit temporary SMTP rate-limit responses, for no more than three attempts. Do not retry authentication failures, invalid recipients, mailbox-full/permanent failures, or ambiguous SUBMIT outcomes.
+4. Pass the existing SMTP stage callback into completion email sending and persist bounded, sanitised per-attempt stage evidence.
+5. Create My Documents copies for eligible profile UIDs among the owner and signer positions. Email-only recipients continue to receive email and do not require a profile.
+6. Preserve one legacy email-keyed delivery record for one matching recipient position, so previously accepted or ambiguous outcomes are not blindly resent. Additional signer positions sharing that address receive independent records.
+7. Preserve the existing manual tracking, first-send/retry controls, recovery assessment, backup-first retry, seven-day undo and fallback designs. No manual control is removed, redesigned or made unavailable.
+
+### Immutable boundaries
+
+`Completed` continues to mean that signing evidence, the completed PDF, its hash, certificate and authoritative archive write succeeded. Email delivery remains independent and cannot block or reverse completion. No existing signatures, signer records, tokens, links, sessions, fields, stamps, audit evidence, source hashes, PDF construction, hashing, certificate or authoritative archive logic may be changed. No Firestore rules, SMTP settings, secrets, Worker bindings, credentials or production envelope records may be changed.
+
+### Validation and release gates
+
+Test independent duplicate-email signer positions, invited signer inclusion, automatic transient retry capped at three, no retry for ambiguous SMTP outcomes, stage-history persistence, personal-copy independence, legacy delivery compatibility, and preservation of manual backup/recovery controls. Merge only after required checks and portal-protection checks pass. Production deployment and live delivery claims require their own release approval and verification.
