@@ -57,3 +57,13 @@ No changes are made to the Signature Platform manual tracking UI, first-send/ret
 - Merge: NOT DONE
 - Production deployment: NOT AUTHORIZED / NOT DONE
 - Live recipient delivery: NOT RUN
+
+
+## Owner clarification — independent delivery trails
+
+The owner clarified on 2026-11-24 that sending/distributing the completed PDF to participants by email must follow a different trail from placing personal copies in My Documents. These are separate delivery channels with separate records, statuses, retry decisions and failure reporting:
+
+- Email: `signatureDistributions`, keyed by owner or signer position, with SMTP stage history and accepted/failed/unknown outcome.
+- My Documents: `signaturePersonalCopies`, keyed by recipient profile UID, with independent storage attempt/status and stored path.
+
+A failure or exception in one channel must not prevent the other channel from running or make the other channel appear failed. The owner-triggered retry now attempts both channels independently and returns separate `distribution` and `personalCopies` results. The completed PDF and its integrity hash remain common immutable source material, not a shared delivery status. The automatic finalisation path already isolates the two channel calls; this change also enforces isolation in the manual retry path.
