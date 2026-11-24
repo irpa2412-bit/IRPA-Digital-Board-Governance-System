@@ -331,7 +331,7 @@ test("Transition Committee powers are limited to leadership election, invitation
   for (const route of ["/api/meeting-actions/create", "/api/meeting-decisions/create"]) {
     const start = meetingServicesGovernanceSource.indexOf(`if(pathname==="${route}")`);
     assert.notEqual(start, -1, `expected ${route}`);
-    const end = meetingServicesGovernanceSource.indexOf("\\n}", start);
+    const end = meetingServicesGovernanceSource.indexOf("\n}", start);
     const body = meetingServicesGovernanceSource.slice(start, end < 0 ? start + 2500 : end);
     assert.match(body, /const controller=!transitionCommitteeActive\(c\.meeting\)/);
   }
