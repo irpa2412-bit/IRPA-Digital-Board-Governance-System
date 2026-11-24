@@ -377,3 +377,9 @@ test("leadership election ballots are operable by the Transition Committee throu
   const closeBody = meetingServicesGovernanceSource.slice(closeStart, closeStart + 1800);
   assert.match(closeBody, /issue\.leadershipElection===true&&c\.meeting\.leadershipElectionRequired===true&&meetingTransitionElectionAuthority/);
 });
+
+test("leadership-election invitation management cannot be bypassed by the initiator or global administrator", () => {
+  assert.match(meetingServicesGovernanceSource, /const canManageParticipants=meeting\.leadershipElectionRequired===true\?\(chair\|\|secretary\|\|meetingAdministrator\)/);
+  assert.match(meetingServicesGovernanceSource, /if\(!c\.canManageParticipants\)return fail/);
+  assert.match(meetingServicesGovernanceSource, /function meetingTransitionElectionAuthority\(meeting,uid\)/);
+});
