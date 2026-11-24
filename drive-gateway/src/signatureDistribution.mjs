@@ -202,7 +202,20 @@ export async function retryFailedSignatureDistributions(ctx,user,envelopeId){
   const envelope=await ctx.meta.get("envelopes",envelopeId);
   if(!envelope||(envelope.createdBy!==user?.uid&&user?.isAdmin!==true)){const error=new Error("Not authorized.");error.status=403;throw error;}
   if(envelope.status!=="Completed"||!envelope.completion){const error=new Error("Only completed documents can be redistributed.");error.status=409;throw error;}
-  const summary=await distributeCompletedSignatureDocument(ctx,envelope,envelope.completion,{retryFailed:true});
-  const personalCopies=await distributeCompletedPersonalCopies(ctx,envelope,envelope.completion,{retryFailed:true});
-  return{ok:true,envelopeId,distribution:summary,personalCopies};
+  // Keep the two delivery trails independent: an exception in one must never
+  // prevent the other from being attempted or change its recorded outcome.
+  let distribution=null,personalCopies=null;
+  try{
+    distribution=await distributeCompletedSignatureDocument(ctx,envelope,envelope.completion,{retryFailed:true});
+  }catch(error){
+    ctx.logger?.error?.("SIGNATURE_EMAIL_DISTRIBUTION_RETRY_FAILED",{envelopeId,errorType:String(error?.name||"Error").slice(0,60)});
+    distribution={status:"Error",error:"Email distribution could not be reconciled. My Documents processing will continue."};
+  }
+  try{
+    personalCopies=await distributeCompletedPersonalCopies(ctx,envelope,envelope.completion,{retryFailed:true});
+  }catch(error){
+    ctx.logger?.error?.("SIGNATURE_MY_DOCUMENTS_RETRY_FAILED",{envelopeId,errorType:String(error?.name||"Error").slice(0,60)});
+    personalCopies={status:"Error",error:"My Documents copies could not be reconciled. Email distribution remains independent."};
+  }
+  return{ok:true,envelopeId,distribution,personalCopies};
 }
