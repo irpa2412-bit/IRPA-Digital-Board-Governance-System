@@ -665,7 +665,7 @@ export async function getCompletedDocumentForOwner(ctx,user,id){
  if(!e||!authorised)throw new HttpError(403,"Not authorized.");
  if(e.status!=="Completed")throw new HttpError(409,"The authoritative completed document is not available.");
  if(!Array.isArray(e.signers)||!e.signers.length||e.signers.some(signer=>signer?.status!=="Signed"))throw new HttpError(409,"Every required signer must be signed before the completed document can be read.");
- if(!await verifyChain(e.events))throw new HttpError(409,"Signing audit chain failed verification.");
+ if(!Array.isArray(e.events)||!e.events.length||!await verifyChain(e.events))throw new HttpError(409,"Signing audit chain failed verification.");
  const completion=e.completion||{};
  if(!completion.finalHash||!completion.primaryStorageId||!completion.completedAt)throw new HttpError(409,"Verified completion evidence or the signed PDF reference is missing.");
  const bytes=await ctx.storage.get(completion.primaryStorageId);
