@@ -20,7 +20,7 @@ async function fixture({actor="owner",tamper=false,corruptChain=false}={}) {
   if(corruptChain)envelope.events[0].actor="tampered";
   let mirrorWrites=0;const meta={async get(collection,id){return collection==="envelopes"&&id===envelope.id?envelope:null;},async list(){return [];},async update(){mirrorWrites++;}};
   const storage={async get(id){return id==="signed-pdf"?(tamper?new TextEncoder().encode("%PDF-1.7\\ntampered"):bytes):null;}};
-  const ctx=makeContext({meta,storage,now:()=>new Date("2026-11-24T06:00:00.000Z"),verifyUser:async request=>request.headers.get("authorization")==="Bearer "+actor?{uid:actor}:null});
+  const ctx=makeContext({meta,storage,now:()=>new Date("2026-11-24T06:00:00.000Z"),verifyUser:async request=>request.headers.get("authorization")==="Bearer "+actor?{uid:actor,isAdmin:actor==="admin"}:null});
   ctx.persistCompletedSignatureEnvelope=async()=>{mirrorWrites++;};return {ctx,envelope,bytes,expected,get mirrorWrites(){return mirrorWrites;}};
 }
 
@@ -50,4 +50,10 @@ test("completed PDF is withheld when the audit chain is altered",async()=>{
   const f=await fixture({corruptChain:true});f.envelope.completion.finalHash=await f.expected;
   const response=await route(new Request("https://gateway.test/api/envelopes/ENV-COMPLETED-00000001/completed-document.pdf",{headers:{authorization:"Bearer owner"}}),f.ctx);
   assert.equal(response.status,409);
+});
+
+test("administrator without document ownership cannot retrieve the completed PDF",async()=>{
+  const f=await fixture({actor:"admin"});f.envelope.completion.finalHash=await f.expected;
+  const response=await route(new Request("https://gateway.test/api/envelopes/ENV-COMPLETED-00000001/completed-document.pdf",{headers:{authorization:"Bearer admin"}}),f.ctx);
+  assert.equal(response.status,403);
 });
