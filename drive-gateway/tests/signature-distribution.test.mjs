@@ -105,18 +105,19 @@ test("personal-copy storage failures never block completed-document email delive
     status:"Completed",title:"Board Resolution",documentId:"DOC-PERSONAL-COPY",
     signers:[
       {id:"S1",email:"first@example.test",name:"First Signer",uid:"first-uid",status:"Signed"},
-      {id:"S2",email:"second@example.test",name:"Second Signer",uid:null,profileUid:null,status:"Signed",identityType:"email-link"}
+      {id:"S2",email:"second@example.test",name:"Second Signer",uid:null,profileUid:null,status:"Signed",identityType:"email-link"},
+      {id:"S3",email:"pending-profile@example.test",name:"Pending Profile Signer",uid:"pending-profile-uid",status:"Pending"}
     ]
   };
   const completion={primaryStorageId:"signed-pdf",finalHash:await sha256Hex(bytes),fileName:"board-resolution-signed.pdf",completedAt:"2026-11-18T20:00:00.000Z"};
   const emailResult=await distributeCompletedSignatureDocument(ctx,envelope,completion);
-  assert.equal(emailResult.sent,3);
+  assert.equal(emailResult.sent,4);
   const copyResult=await distributeCompletedPersonalCopies(ctx,envelope,completion);
-  assert.equal(copyResult.total,2);
-  assert.equal(copyResult.failed,2);
+  assert.equal(copyResult.total,3);
+  assert.equal(copyResult.failed,3);
   assert.equal(copyResult.skipped,1);
-  assert.equal(ctx.sent.length,3);
-  assert.equal((await ctx.meta.list("signaturePersonalCopies")).length,2);
+  assert.equal(ctx.sent.length,4);
+  assert.equal((await ctx.meta.list("signaturePersonalCopies")).length,3);
 });
 
 test("each signer position receives an independent delivery even when email addresses are duplicated",async()=>{
