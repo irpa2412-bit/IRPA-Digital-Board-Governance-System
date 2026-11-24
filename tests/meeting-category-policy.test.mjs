@@ -320,7 +320,7 @@ test("meeting governance source enforces the proceedings gate and immediate tran
 
 test("meeting governance Firestore rules restrict live voting control to the active meeting mandate", () => {
   const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
-  assert.match(rules, /function meetingVotingController\(meetingId,leadershipElection\).*leadershipElection==true.*transitionCommitteeActive/);
+  assert.match(rules, /function meetingVotingController\(meetingId,leadershipElection\).*transitionCommitteeActive.*leadershipElectionRequired.*leadershipElection==true/);
   assert.match(rules, /meetingLeadershipElectionVoter/);
   assert.match(rules, /meetingAllowsVoting/);
   assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingCategoryReadAllowed\(resource\.data\)/);
