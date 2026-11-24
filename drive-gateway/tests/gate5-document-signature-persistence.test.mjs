@@ -206,7 +206,7 @@ async function assertCertificateText(bytes, expected) {
 
 async function completionFiles(s, state) {
   assert.ok(state.completion);
-  assert.equal(state.completion.files.length, 3);
+  assert.equal(state.completion.files.length, 4);
   return Promise.all(
     state.completion.files.map(async (file) => ({
       file,
