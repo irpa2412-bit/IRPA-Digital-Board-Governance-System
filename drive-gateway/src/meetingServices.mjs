@@ -588,6 +588,7 @@ if(current.registerStatus!=="Registered"&&!c.isAdmin)return fail(ctx,request,"On
 changed.updatedAt=new Date();
 await patchDoc(ctx,env,token,"meetings",meetingId,changed);
 await audit(ctx,env,token,claims,"MEETING_REGISTER_UPDATED",current,meetingId,{changedFields:Object.keys(changed)});
+if(current.transitionCommitteeActive===true&&changed.transitionCommitteeActive===false)await audit(ctx,env,token,claims,"MEETING_TRANSITION_COMMITTEE_MANDATE_ENDED",current,meetingId,{mandateEndedAt:new Date().toISOString(),permanentChairpersonUid:clean(current.meetingChairpersonUid),permanentSecretaryUid:clean(current.meetingSecretaryUid),permanentAdministratorUid:clean(current.meetingAdministratorUid),leadershipElectionStatus:"LEADERSHIP_RECORDED"});
 return response(ctx,request,{ok:true,meetingId,changedFields:Object.keys(changed)});
 }
 const loadMeetingChildren = async meetingId => (await Promise.all(
