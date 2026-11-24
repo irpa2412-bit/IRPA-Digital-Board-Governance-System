@@ -73,15 +73,12 @@ function liveKitConfigured() {
   return Boolean(text(LIVEKIT_URL.value()) && text(LIVEKIT_API_KEY.value()) && text(LIVEKIT_API_SECRET.value()));
 }
 
-function moderatorForMeeting(meeting = {}, uid, email, selectedAuthority) {
-  const actorEmail = text(email).toLowerCase();
-  const authority = text(selectedAuthority).toLowerCase();
-  if (meeting.chairpersonUid && text(meeting.chairpersonUid) === uid) return true;
-  if (meeting.secretaryUid && text(meeting.secretaryUid) === uid) return true;
-  if (text(meeting.chairpersonEmail).toLowerCase() === actorEmail && actorEmail) return true;
-  if (text(meeting.secretaryEmail).toLowerCase() === actorEmail && actorEmail) return true;
-  return ["board chairperson","board secretary","chairperson","meeting chair","meeting secretary","secretary"]
-    .includes(authority);
+function moderatorForMeeting(meeting = {}, uid) {
+  if (text(meeting.meetingAdministratorUid) === uid) return true;
+  return meeting.transitionCommitteeActive === true &&
+    text(meeting.transitionAdministratorUid) === uid &&
+    text(meeting.status || "Scheduled").toLowerCase() !== "in progress" &&
+    text(meeting.proceedingsStatus || "").toLowerCase() !== "in progress";
 }
 
 /**
@@ -155,27 +152,16 @@ exports.issueLiveMeetingToken = onCall({
     invitedParticipant = candidate;
   }
 
-  const isAdmin = request.auth?.token?.admin === true || email === "irpa2412@gmail.com";
-  const activeIdentity = isAdmin || records.some(activeRecord) || Boolean(invitedParticipant);
+  const activeIdentity = records.some(activeRecord) || Boolean(invitedParticipant);
   if (!activeIdentity) throw new HttpsError("permission-denied", "An active IRPA member, employee, or verified meeting invitee identity is required.");
 
   const listed = Boolean(invitedParticipant) || participantListed(meeting, uid);
-  if (!isAdmin && !listed) {
+  if (!listed) {
     throw new HttpsError("permission-denied", "This account is not registered as a participant in the selected meeting.");
   }
 
-  const invitedRoles = invitedParticipant
-    ? [
-        invitedParticipant.role,
-        invitedParticipant.participantRole,
-        invitedParticipant.authority,
-        ...(Array.isArray(invitedParticipant.roles) ? invitedParticipant.roles : [])
-      ].map(value => text(value)).filter(Boolean)
-    : [];
-  const authorityMatches = records.some(record => selectedAuthorityMatches(record, selectedAuthority)) || invitedRoles.includes(selectedAuthority);
-  if (!isAdmin && selectedAuthority && !authorityMatches) {
-    throw new HttpsError("permission-denied", "The selected access authority is not registered to this account.");
-  }
+  // The invitation and meeting participant record establish entry authority.
+  // A client-supplied title or selectedAuthority never grants meeting control.
 
   const sessionRef = db.collection("liveMeetingSessions").doc();
   // The room identity is meeting-scoped, not session-scoped: every authorized
@@ -183,7 +169,7 @@ exports.issueLiveMeetingToken = onCall({
   // unique audit records and must not partition host and invitee into separate rooms.
   const roomName = opaqueRoomName(meetingId, "shared-live-room");
   const participantIdentity = `uid-${uid}`;
-  const moderator = isAdmin || moderatorForMeeting(meeting, uid, email, selectedAuthority);
+  const moderator = moderatorForMeeting(meeting, uid);
   const token = new AccessToken(LIVEKIT_API_KEY.value(), LIVEKIT_API_SECRET.value(), {
     identity: participantIdentity,
     name: text(meeting.displayName || meeting.title || "IRPA participant"),
@@ -199,7 +185,7 @@ exports.issueLiveMeetingToken = onCall({
     roomAdmin: moderator
   });
 
-  const participantLabel = selectedAuthority || "Meeting Participant";
+  const participantLabel = moderator ? "Meeting Administrator" : "Meeting Participant";
   await sessionRef.set({
     meetingId,
     meetingReference: text(meeting.reference || meeting.title) || null,
