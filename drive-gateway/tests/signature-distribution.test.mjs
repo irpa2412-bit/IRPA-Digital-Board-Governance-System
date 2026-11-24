@@ -33,8 +33,15 @@ function context(bytes, failingEmail, failPersonalCopy=false, failuresBeforeSucc
       sent.push(message);
       const count=(attempts.get(message.to)||0)+1;
       attempts.set(message.to,count);
-      if(message.to===failingEmail&&count<=failuresBeforeSuccess){const error=new Error("SMTP temporarily unavailable");error.stageCode="SMTP_CONNECT";error.smtpReplyCategory="CONNECTION_REFUSED";throw error;}
-      return {messageId:"mail-"+count};
+      const messageId="mail-"+count;
+      await message.onStage?.("BUILD_MESSAGE","success","UNKNOWN",{messageId});
+      if(message.to===failingEmail&&count<=failuresBeforeSuccess){
+        await message.onStage?.("SMTP_CONNECT","failure","CONNECTION_REFUSED",{messageId});
+        const error=new Error("SMTP temporarily unavailable");error.stageCode="SMTP_CONNECT";error.smtpReplyCategory="CONNECTION_REFUSED";throw error;
+      }
+      for(const stage of ["SMTP_CONNECT","SMTP_AUTH","RCPT_ACCEPTED","SUBMIT"])
+        await message.onStage?.(stage,"success",stage==="SUBMIT"?"ACCEPTED":"UNKNOWN",{messageId});
+      return {messageId};
     }
   };
 }
@@ -57,6 +64,10 @@ test("completion distribution emails the integrity-verified PDF to owner and eve
   assert.equal(result.failed,0);
   assert.deepEqual(new Set(ctx.sent.map(item=>item.to)),new Set(["owner@example.test","first@example.test","second@example.test"]));
   assert.equal(ctx.sent.filter(item=>item.to==="second@example.test").length,2,"one transient connection failure is retried automatically");
+  const secondRecord=(await ctx.meta.list("signatureDistributions")).find(row=>row.recipientEmail==="second@example.test");
+  assert.equal(secondRecord.attempts,2);
+  assert.ok(secondRecord.stageHistory.some(item=>item.stage==="SMTP_CONNECT"&&item.outcome==="failure"));
+  assert.ok(secondRecord.stageHistory.some(item=>item.stage==="SUBMIT"&&item.outcome==="success"));
   for(const item of ctx.sent)assert.deepEqual(item.bytes,bytes);
 });
 
