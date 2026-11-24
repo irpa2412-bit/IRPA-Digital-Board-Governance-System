@@ -572,6 +572,16 @@ export async function retryGatewaySignatureDistribution(envelopeId) {
   return data;
 }
 
+export async function fetchGatewayCompletedDocument(envelopeId) {
+  if(!envelopeId)throw new Error("A Gateway envelope ID is required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/completed-document.pdf");
+  if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||"Unable to retrieve the verified completed document.");}
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  const hash=response.headers.get("x-document-sha256")||"";
+  if(!bytes.length||!/^([a-f0-9]{64})$/.test(hash))throw new Error("The Gateway did not return verified completed-document evidence.");
+  return {bytes,hash,fileName:(response.headers.get("content-disposition")||"").match(/filename="?([^";]+)"?/i)?.[1]||"completed-signed-document.pdf"};
+}
+
 export async function resendGatewayEmailInvitation(envelopeId,signerId) {
   if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
   const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/resend",{method:"POST",body:JSON.stringify({})});
