@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { makeContext, route } from "../src/router.mjs";
-import { sha256Hex, canonicalJson } from "../src/util.mjs";
+import { sha256Hex, canonicalJson } from "../src/util.mjs";\nimport { getSignatureDistributionSummary } from "../src/signatureDistribution.mjs";
 
 async function fixture({actor="owner",tamper=false,corruptChain=false}={}) {
   const bytes=new TextEncoder().encode("%PDF-1.7\\nIRPA completed document");
@@ -56,4 +56,15 @@ test("administrator without document ownership cannot retrieve the completed PDF
   const f=await fixture({actor:"admin"});f.envelope.completion.finalHash=await f.expected;
   const response=await route(new Request("https://gateway.test/api/envelopes/ENV-COMPLETED-00000001/completed-document.pdf",{headers:{authorization:"Bearer admin"}}),f.ctx);
   assert.equal(response.status,403);
+});
+
+test("tracking summary lists every recipient as Not Attempted before the first email send and marks missing-email recipients Skipped",async()=>{
+  const envelope={id:"ENV-TRACK-1",ownerEmail:"owner@example.org",ownerName:"Owner",createdBy:"owner",signers:[
+    {id:"S1",uid:"signer-1",email:"signer@example.org",name:"Signer",status:"Signed"},
+    {id:"S2",uid:"signer-2",email:"",name:"No email",status:"Signed"}
+  ]};
+  const summary=await getSignatureDistributionSummary({meta:{list:async()=>[]}},"ENV-TRACK-1",envelope);
+  assert.equal(summary.deliveries.length,3);
+  assert.deepEqual(summary.deliveries.map(item=>item.status),["Not Attempted","Not Attempted","Skipped"]);
+  assert.deepEqual(summary.deliveries.map(item=>item.recipientAddress),["o***@example.org","s***@example.org","No email"]);
 });
