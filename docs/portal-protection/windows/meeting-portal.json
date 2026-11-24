@@ -25,7 +25,8 @@
     "scripts/check-meeting-media-governance.mjs",
     "src/pages/Voting.jsx",
     "tests/meeting-category-firestore-rules.test.cjs",
-    "src/firebase/data.js"
+    "src/firebase/data.js",
+    "scripts/meeting-portal-fixture-isolation-guard.sh"
   ],
   "activityLog": [
     {
