@@ -390,7 +390,7 @@ test("evidence assessment reports sanitised environment agreement and verifies p
   await f.ctx.meta.update("envelopes","ENV-REC-1",{completion:{archivePending:{storageId:stored.id,finalHash:hash,environment:"TEST",fileName:"preserved.pdf"}}});
   const before=await f.ctx.meta.get("envelopes","ENV-REC-1");
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
-  assert.deepEqual(result.environmentDiagnostics,{envelope:"TEST",preservedCopy:"TEST",gatewayExpected:"TEST",allMatch:true});
+  assert.deepEqual(result.environmentDiagnostics,{envelope:"TEST",preservedCopy:"TEST",gatewayRuntime:"test",gatewayExpected:"TEST",allMatch:true});
   assert.equal(result.archivePending.artifactBytesVerified,true);
   assert.equal(result.archivePending.artifactIntegrityStatus,"MATCH");
   assert.equal(JSON.stringify(result).includes(stored.id),false);
@@ -402,7 +402,7 @@ test("evidence assessment classifies legacy production environment without accep
   const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
   await f.ctx.meta.update("envelopes","ENV-REC-1",{dataEnvironment:"PRODUCTION",completion:{archivePending:{storageId:"missing-pending",finalHash:"a".repeat(64),environment:"PRODUCTION"}}});
   const result=await assessRecoveryEvidence(f.ctx,f.user,"ENV-REC-1");
-  assert.deepEqual(result.environmentDiagnostics,{envelope:"LEGACY_PRODUCTION",preservedCopy:"LEGACY_PRODUCTION",gatewayExpected:"TEST",allMatch:false});
+  assert.deepEqual(result.environmentDiagnostics,{envelope:"LEGACY_PRODUCTION",preservedCopy:"LEGACY_PRODUCTION",gatewayRuntime:"test",gatewayExpected:"LEGACY_PRODUCTION",allMatch:false});
   assert.equal(result.archivePending.artifactIntegrityStatus,"MISSING");
 });
 
@@ -563,4 +563,21 @@ test("repeat emergency retrieval has the same verification result",async()=>{
   assert.equal(second.ok,true);
   assert.deepEqual(first.stages,second.stages);
   assert.equal(first.stages.find(stage=>stage.stageCode==="CERT_VERIFY").status,"PASS");
+});
+
+
+test("recovery assessment distinguishes production Worker runtime from a verified TRIAL data environment",async()=>{
+ const f=await fixture();
+ const envelope=await f.ctx.meta.get("envelopes","ENV-REC-1");
+ envelope.dataEnvironment="TRIAL";
+ envelope.externalReference="IRPA-TRIAL-SOURCE-1";
+ envelope.completion={archivePending:{storageId:"pending-trial",finalHash:await sha256Hex(await f.ctx.storage.get((await f.ctx.meta.get("documents","DOC-REC-1")).primaryStorageId)),environment:"TRIAL"}};
+ const sourceBytes=await f.ctx.storage.get((await f.ctx.meta.get("documents","DOC-REC-1")).primaryStorageId);
+ await f.ctx.storage.put({path:"pending/trial.pdf",bytes:sourceBytes,contentType:"application/pdf",metadata:{}}).then(async stored=>{envelope.completion.archivePending.storageId=stored.id;await f.ctx.meta.update("envelopes",envelope.id,envelope)});
+ f.ctx.env.IRPA_ENVIRONMENT="production";
+ f.ctx.resolveEnvelopeDataEnvironment=async(reference,ownerUid)=>{assert.equal(reference,"IRPA-TRIAL-SOURCE-1");assert.equal(ownerUid,"owner-1");return "TRIAL";};
+ const result=await assessRecoveryEvidence(f.ctx,f.user,envelope.id);
+ assert.equal(result.environmentDiagnostics.gatewayRuntime,"production");
+ assert.equal(result.environmentDiagnostics.gatewayExpected,"TRIAL");
+ assert.equal(result.environmentDiagnostics.allMatch,true);
 });
