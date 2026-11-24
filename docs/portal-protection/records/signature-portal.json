@@ -6,7 +6,7 @@
     "affectedPortals": [
       "Signature Portal"
     ],
-    "reason": "Owner-authorised 24 November 2026 scope extension for the completed-document tracking register: add a document-owner-only reader for the authoritative completed PDF after Gateway status, required signer states, audit chain and SHA-256 are verified; expose existing recipient email and personal-copy delivery states; allow the owner to initiate first delivery for not-attempted recipients and retry failed recipients only. Existing distribution service continues to skip Sent and Unknown outcomes. No meeting workflow, signing identity, token, signer, field, stamp, PDF construction, hash algorithm, certificate, archive or Firestore rules behavior is changed.",
+    "reason": "Owner-authorised 24 November 2026 repair of automatic completion distribution for the signature email-link workflow. Correct recipient identity to owner plus each signer position (not email address), include every invited signer, add bounded transient SMTP retries and persist per-attempt SMTP stages. Preserve Completed semantics, authoritative PDF/hash/certificate/archive, identity and token protections, manual owner recovery and backup controls. No SMTP settings, secrets, Worker bindings, Firestore rules or production records are changed.",
     "files": [
       "docs/portal-protection/records/signature-portal.json",
       "docs/portal-protection/windows/signature-portal.json",
@@ -27,17 +27,14 @@
       "src/firebase/signatureStorage.js",
       "drive-gateway/src/router.mjs",
       "drive-gateway/src/signatureDistribution.mjs",
-      "drive-gateway/tests/completed-document-route.test.mjs"
+      "drive-gateway/tests/completed-document-route.test.mjs",
+      "drive-gateway/src/index.js",
+      "drive-gateway/tests/signature-distribution.test.mjs",
+      "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md"
     ],
-    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment. The owner tracking register also exposes a hash-verified authoritative completed PDF, existing per-recipient delivery states, first-attempt delivery, failed-only retry and separate personal-copy outcomes; successful and ambiguous email outcomes remain protected from duplicate sends.",
+    "expectedEffect": "The recovery panel records finalisation stage outcomes for PDF_BUILD, HASH, ARCHIVE, CERTIFICATE and DISTRIBUTION with sanitised error codes/messages; a sandboxed Diagnose finalisation action reports each stage without writes. A second PR adds backup-first, audited, rate-limited owner/admin retry with seven-day undo and no direct Completed assignment. The owner tracking register also exposes a hash-verified authoritative completed PDF, existing per-recipient delivery states, first-attempt delivery, failed-only retry and separate personal-copy outcomes; successful and ambiguous email outcomes remain protected from duplicate sends. The 24 November distribution repair additionally delivers independently to the document owner and each signer position (including separate email-link assignments sharing an address), includes invited signers regardless of signed/pending state, retries only known transient SMTP failures up to three attempts, records SMTP stage history, and preserves ambiguous outcomes without duplicate resend. Existing manual tracking, recovery, backup-first retry and fallback controls remain unchanged.",
     "prohibitedChanges": [
-      "Do not touch, redo, reassign, overwrite or delete any existing signature, signer record, signature stamp, signing audit event or stored source hash.",
-      "Do not change signing rules, tokens, link format, sessions, signer identity, field assignment or stamping/PDF-building logic.",
-      "Do not change the implementation logic of PDF building, hashing, certificate generation, archive writes or distribution/email delivery; only add stage-recording wrappers around the existing calls.",
-      "Dry run must use isolated in-memory/sandbox dependencies and perform zero writes to the envelope, signing audit chain, archive, cryptographic evidence store or Google Drive.",
-      "Do not change Firestore rules, secrets, environment variables, SMTP settings, Worker bindings, credentials or branch protection.",
-      "Do not set Completed directly; only the existing normal finalisation flow may set Completed after every required step succeeds.",
-      "Do not bypass branch protection, required checks, portal-protection checks or production deployment approvals."
+      "Do not change PDF building, hashing, certificate generation, authoritative archive writes or the meaning/order of Completed. Distribution changes are limited to SR-2026-11-24-01: recipient-position identity, invited-recipient coverage, bounded transient SMTP retry and delivery-stage recording."
     ],
     "lockTests": [
       "tests/signature-field-assignment-setup.test.mjs",
@@ -90,6 +87,22 @@
       {
         "path": "docs/signature-recovery/pr-partial-evidence-change-record-2026-11-22.md",
         "expectedEffect": "Records exact request sequence, source findings, scope, prohibited changes, baseline/rollback, validation limitations and deployment evidence status for SR-2026-11-22-01."
+      },
+      {
+        "path": "drive-gateway/src/signatureDistribution.mjs",
+        "expectedEffect": "Uses stable owner/signer-position recipient keys, preserves one legacy email-keyed record for one participant, sends every invited signer position independently, records per-attempt SMTP stages, retries known transient failures at most three times, and never retries ambiguous accepted-or-not outcomes."
+      },
+      {
+        "path": "drive-gateway/src/index.js",
+        "expectedEffect": "Passes the existing Cloudflare SMTP transport stage callback through completion email delivery; no SMTP host, port, credentials, secrets or bindings change."
+      },
+      {
+        "path": "drive-gateway/tests/signature-distribution.test.mjs",
+        "expectedEffect": "Covers automatic bounded retry, stage audit, duplicate-email signer positions, invited-but-not-signed recipients, and preservation of independent manual retry behavior."
+      },
+      {
+        "path": "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
+        "expectedEffect": "Records source findings, owner-approved scope, manual backup preservation, exact files and validation/release gates."
       }
     ]
   },
@@ -427,15 +440,59 @@
         "rateLimitPerHour": 3,
         "neverSetCompletedDirectly": true
       }
+    },
+    {
+      "changeId": "SR-2026-11-24-01",
+      "status": "owner-approved-scope-amendment",
+      "approvedAt": "2026-11-24T08:11:25Z",
+      "ownerDecision": "Repair automatic distribution in the signature email-link e-signature system without affecting available systems; preserve existing manual backup designs.",
+      "sourceFindings": [
+        "Recipient selection deduplicates by normalized email, merging distinct signer positions that share an address.",
+        "Recipient selection filters to Signed signers and excludes invited signer positions not in Signed state.",
+        "Completion email delivery bypasses the existing bounded retry helper and makes one automatic attempt; the retry endpoint is separate and owner-triggered.",
+        "The completion email callback does not pass smtpSend's existing onStage callback, so individual SMTP stage evidence is not persisted.",
+        "Personal My Documents copies are restricted to Signed signers with a profile UID."
+      ],
+      "approvedScope": {
+        "files": [
+          "drive-gateway/src/signatureDistribution.mjs",
+          "drive-gateway/src/index.js",
+          "drive-gateway/tests/signature-distribution.test.mjs"
+        ],
+        "recipientIdentity": "Stable document-owner identity and one stable signer-position identity per envelope signer ID; never deduplicate by email.",
+        "recipients": "Document owner plus every invited signer/email-link assignment in the envelope; forwarded-link holders are not added as recipients.",
+        "retries": "At most three automatic attempts for known transient/pre-submit failures and explicit SMTP 4xx rate-limit responses. Authentication, invalid recipient, mailbox-full, permanent failures and ambiguous SUBMIT outcomes are not retried.",
+        "audit": "Persist bounded, sanitised per-attempt BUILD_MESSAGE, SMTP_CONNECT, SMTP_AUTH, RCPT_ACCEPTED and SUBMIT stage outcomes.",
+        "personalCopies": "Keep one independent My Documents copy per eligible profile UID, including profile holders among invited signer positions; email-only participants continue to receive email without a profile copy.",
+        "manualBackup": "Do not remove, redesign, disable or replace existing manual tracking, first-send/retry controls, recovery assessment, backup-first retry, or fallback paths."
+      },
+      "invariants": [
+        "Completed remains independent of email delivery.",
+        "No changes to signatures, signer identity, tokens, links, sessions, fields, stamping, PDF building, hashes, certificates or authoritative archive writes.",
+        "No Firestore rules, SMTP settings, secrets, Worker bindings, credentials or production envelope mutations.",
+        "Sent and Unknown outcomes are not automatically resent; ambiguous SUBMIT outcomes remain Unknown.",
+        "Manual backup and recovery designs remain intact."
+      ],
+      "validation": {
+        "sourceReview": "PASS",
+        "automatedTests": "PENDING",
+        "prChecks": "PENDING",
+        "productionDeployment": "NOT_AUTHORIZED",
+        "liveDeliveryVerification": "NOT_RUN"
+      }
     }
   ],
   "activeAmendment": {
-    "ownerDecision": "Do not move Completed after distribution. Completed is independent of email delivery; implement envelope-level distribution status and failed-recipient-only resend in its own PR.",
+    "ownerDecision": "Repair automatic email-link completion distribution while preserving all manual backup/recovery designs. Completed remains independent of email delivery.",
     "files": [
       "drive-gateway/src/signatureDistribution.mjs",
-      "drive-gateway/src/signing.mjs",
-      "src/pages/SignatureRecoveryOwnerPanel.jsx"
+      "drive-gateway/src/index.js",
+      "drive-gateway/tests/signature-distribution.test.mjs",
+      "docs/signature-recovery/signature-email-link-distribution-change-record-2026-11-24.md",
+      "docs/signature-recovery/finalisation-recovery-change-record-2026-11-22.md",
+      "docs/portal-protection/records/signature-portal.json",
+      "docs/portal-protection/windows/signature-portal.json"
     ],
-    "expectedEffect": "First PR stage recording and zero-write dry run; second PR envelope-level distribution status and failed-recipient-only resend; third PR backup-first audited retry. Completed remains independent of email delivery."
+    "expectedEffect": "Per-signer-position automatic email distribution for owner and all invited signer assignments; three-attempt bounded transient SMTP retry; persisted stage history; independent personal copies for profile holders; legacy successful/ambiguous deliveries protected from duplicate sends; manual recovery and backup controls unchanged."
   }
 }
