@@ -138,7 +138,7 @@ const postMeetingGateway = (router, path, body = {}) => router(new Request("http
   body: JSON.stringify(body)
 }), { FIREBASE_PROJECT_ID: "test-project" }, path);
 
-async function createMeetingAsInstitutionalIdentity({ uid, email, member = null, employee = null, category = "GENERAL" }) {
+async function createMeetingAsInstitutionalIdentity({ uid, email, member = null, employee = null, category = "GENERAL", meetingData = {} }) {
   const originalFetch = globalThis.fetch;
   let meetingWrites = 0;
   globalThis.fetch = async (input, init = {}) => {
@@ -166,6 +166,7 @@ async function createMeetingAsInstitutionalIdentity({ uid, email, member = null,
         meetingCategory: category,
         meetingPolicyId: category,
         meetingType: category === "GOVERNANCE" ? "Board Meeting" : "General Meeting",
+        ...meetingData,
         initiatorUid: uid,
         initiatorEmail: email,
         date: "2026-11-24"
@@ -208,4 +209,112 @@ test("inactive institutional identities cannot initiate meetings through the Wor
   assert.equal(result.response.status, 403);
   assert.equal(result.body.ok, false);
   assert.equal(result.meetingWrites, 0);
+});
+
+
+test("meeting registration keeps all three permanent appointments optional", async () => {
+  const result = await createMeetingAsInstitutionalIdentity({
+    uid: "member-no-leaders", email: "member@example.test",
+    member: { uid: "member-no-leaders", email: "member@example.test", status: "Active", role: "Member" },
+    category: "STAFF"
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.meetingWrites, 1);
+});
+
+test("repeated appointee identities are accepted for all three meeting positions", async () => {
+  const uid = "same-person";
+  const result = await createMeetingAsInstitutionalIdentity({
+    uid, email: "same@example.test",
+    member: { uid, email: "same@example.test", status: "Active", role: "Member" },
+    category: "STAFF",
+    meetingData: {
+      meetingChairpersonUid: uid,
+      meetingSecretaryUid: uid,
+      meetingAdministratorUid: uid
+    }
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.meetingWrites, 1);
+});
+
+test("a declared leadership-election workflow requires all three temporary Transition Committee appointments", async () => {
+  const uid = "transition-member";
+  const base = {
+    uid, email: "transition@example.test",
+    member: { uid, email: "transition@example.test", status: "Active", role: "Member" },
+    category: "STAFF"
+  };
+  const complete = await createMeetingAsInstitutionalIdentity({
+    ...base,
+    meetingData: {
+      leadershipElectionRequired: true,
+      transitionChairpersonUid: uid,
+      transitionSecretaryUid: uid,
+      transitionAdministratorUid: uid
+    }
+  });
+  assert.equal(complete.response.status, 200);
+  const incomplete = await createMeetingAsInstitutionalIdentity({
+    ...base,
+    meetingData: {
+      leadershipElectionRequired: true,
+      transitionChairpersonUid: uid,
+      transitionSecretaryUid: uid
+    }
+  });
+  assert.equal(incomplete.response.status, 409);
+  assert.equal(incomplete.meetingWrites, 0);
+});
+
+test("inactive identities cannot be appointed to a meeting position", async () => {
+  const uid = "inactive-appointee";
+  const result = await createMeetingAsInstitutionalIdentity({
+    uid, email: "inactive@example.test",
+    member: { uid, email: "inactive@example.test", status: "Suspended", role: "Member" },
+    category: "STAFF",
+    meetingData: { meetingChairpersonUid: uid }
+  });
+  assert.equal(result.response.status, 400);
+  assert.equal(result.meetingWrites, 0);
+});
+
+test("staff and general meetings enable ballots only during an active leadership election", () => {
+  const meeting = {
+    meetingCategory: "STAFF",
+    meetingPolicyId: "STAFF",
+    leadershipElectionRequired: true,
+    transitionCommitteeActive: true,
+    status: "Scheduled"
+  };
+  const capabilities = meetingCapabilities(meeting);
+  assert.equal(capabilities.leadershipElection, true);
+  assert.equal(capabilities.voting, true);
+  assert.equal(capabilities.resolutions, true);
+  assert.equal(canVoteInMeeting(meeting, {
+    active: true, activeEmployee: true, isMeetingParticipant: true
+  }), true);
+  assert.equal(canVoteInMeeting(meeting, {
+    active: true, activeEmployee: true, isMeetingParticipant: false
+  }), false);
+  assert.equal(meetingCapabilities({ ...meeting, transitionCommitteeActive: false }).voting, false);
+});
+
+test("meeting governance source enforces the proceedings gate and immediate transition mandate expiry", () => {
+  const source = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
+  assert.match(source, /Formal proceedings cannot begin until the meeting-specific Chairperson, Secretary and Meeting Administrator have all been declared/);
+  assert.match(source, /leadershipIssues\.some\(issue=>lower\(issue\.status\)!=="closed"\)/);
+  assert.match(source, /MEETING_TRANSITION_COMMITTEE_MANDATE_ENDED/);
+  assert.match(source, /transitionCommitteeMandateEndedAtProceedings=true/);
+  assert.match(source, /Only the Chairperson appointed to this meeting may open formal proceedings/);
+});
+
+test("meeting governance Firestore rules restrict live voting control to the active meeting mandate", () => {
+  const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  assert.match(rules, /function meetingVotingController\(meetingId\).*transitionCommitteeActive/);
+  assert.match(rules, /meetingLeadershipElectionVoter/);
+  assert.match(rules, /meetingAllowsVoting/);
+  assert.match(rules, /match \/meetings\/\{id\}\{allow read:if meetingUser\(\)/);
 });
