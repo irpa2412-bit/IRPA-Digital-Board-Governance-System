@@ -572,6 +572,14 @@ export async function retryGatewaySignatureDistribution(envelopeId) {
   return data;
 }
 
+export async function retryGatewaySignatureFinalisation(envelopeId) {
+  if(!envelopeId)throw new Error("A Gateway envelope ID is required.");
+  const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/retry-completion",{method:"POST",body:JSON.stringify({})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.ok===false||data.completed!==true)throw new Error(data.error||data.failure?.stage||"The document could not be finalised. Review the recorded completion failure.");
+  return data;
+}
+
 export async function resendGatewayEmailInvitation(envelopeId,signerId) {
   if(!envelopeId||!signerId)throw new Error("A Gateway envelope and signer assignment are required.");
   const response=await gatewayAuthenticatedRequest("/api/envelopes/"+encodeURIComponent(envelopeId)+"/invitations/"+encodeURIComponent(signerId)+"/resend",{method:"POST",body:JSON.stringify({})});
