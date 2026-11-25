@@ -25,7 +25,7 @@ function identityRoles(identity={}){
 export function canRegisterMeeting(identity={}){
   // Every authenticated IRPA identity may initiate a meeting; the meeting-specific
   // leadership appointments govern proceedings, not access to initiation.
-  return identity.isAdmin===true||identity.admin===true||Boolean(identity.uid||identity.authenticated===true);
+  return identity.isAdmin===true||identity.admin===true||Boolean(identity.uid||identity.authenticated===true||identity.active===true);
 }
 export function canAccessMeetingCategory(meeting={},identity={},options={}){
   if(identity.isAdmin===true||identity.admin===true)return true;
