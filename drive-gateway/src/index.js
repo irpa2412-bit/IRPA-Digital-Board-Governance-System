@@ -913,7 +913,7 @@ async function upload(request, env) {
     if (ownerUid !== claims.user_id) {
       return json({ ok: false, error: "A signature profile may only be uploaded by its owner." }, 403, corsHeaders(request));
     }
-    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims);
+    const { memberRecord, employeeRecord } = await getInstitutionalProfileForUser(env, claims, adminToken);
     const adminRecord = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, await getFirestoreAdminAccessToken(env));
     if (!memberRecord && !employeeRecord && !adminRecord?.fields?.active?.booleanValue) {
       return json({ ok: false, error: "A registered IRPA member or employee profile is required before a Signature Profile asset can be uploaded." }, 403, corsHeaders(request));
@@ -2873,8 +2873,8 @@ async function sendRegistrationNumber(request, env) {
   const data = await request.json();
   const uid = cleanId(data.uid || claims.user_id);
   if (uid !== claims.user_id) return json({ok:false,error:"Registration-number email may only be requested for the authenticated account."},403,corsHeaders(request));
-  const member = await getFirestoreDocument(env, `members/${uid}`, claims.token);
-  const employee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
+  const member = await getFirestoreDocument(env, `members/${uid}`, adminToken);
+  const employee = await getFirestoreDocument(env, `employees/${uid}`, adminToken);
   const memberFields = member?.fields || {};
   const employeeFields = employee?.fields || {};
   const number = employeeFields.employeeNumber?.stringValue || memberFields.memberNumber?.stringValue || "";
@@ -3563,7 +3563,8 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
 }
 
 async function assertActivatedPortalUser(claims, env) {
-  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, claims.token);
+  const adminToken = await getFirestoreAdminAccessToken(env);
+  const admin = await getFirestoreDocument(env, `adminProfiles/${claims.user_id}`, adminToken);
   if (admin?.fields?.active?.booleanValue === true) return;
 
   // Invitation activation preserves the canonical institutional record ID
@@ -3714,15 +3715,15 @@ async function getFirestoreDocumentsByEmail(env, collectionName, email, firebase
   return rows.filter(row => row.document).map(row => row.document);
 }
 
-async function getInstitutionalProfileForUser(env, claims) {
+async function getInstitutionalProfileForUser(env, claims, adminToken) {
   const uid = claims.user_id;
   const email = String(claims.email || "").trim().toLowerCase();
   const directMember = await getFirestoreDocument(env, `members/${uid}`, claims.token);
   const directEmployee = await getFirestoreDocument(env, `employees/${uid}`, claims.token);
   if (directMember || directEmployee) return { memberRecord: directMember, employeeRecord: directEmployee };
   const [memberMatches, employeeMatches] = await Promise.all([
-    getFirestoreDocumentsByEmail(env, "members", email, claims.token),
-    getFirestoreDocumentsByEmail(env, "employees", email, claims.token)
+    getFirestoreDocumentsByEmail(env, "members", email, adminToken),
+    getFirestoreDocumentsByEmail(env, "employees", email, adminToken)
   ]);
   return {
     memberRecord: memberMatches[0] || null,
