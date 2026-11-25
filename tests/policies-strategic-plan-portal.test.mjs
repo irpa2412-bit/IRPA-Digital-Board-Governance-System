@@ -78,7 +78,7 @@ test("shared Research Portal upload control exposes Research Archive only to Res
 
 test("Policies and Strategic Plans is a static top-level Portals entry for Administrator, Research and ordinary member authorities",()=>{
  assert.ok(app.includes('"Documents","Policies and Strategic Plans","Signature Platform"'));
- assert.ok(app.includes('const BASE_MEMBER_MODULES=["Dashboard","Role Descriptions",...UNIVERSAL_MEETING_MODULES'));
+ assert.ok(app.includes('const BASE_MEMBER_MODULES=["Dashboard","Role Descriptions","Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Documents","Policies and Strategic Plans"'));
  assert.ok(app.includes('modules=sessionAdministrator?[...ALL_MODULES,...registeredPortalModules]'));
  assert.ok(app.includes('RESEARCH_AUTHORITY_ROLES.includes(selected)?["Dashboard","Documents","Policies and Strategic Plans"'));
  assert.ok(app.includes('Object.entries(NAV).map'));
