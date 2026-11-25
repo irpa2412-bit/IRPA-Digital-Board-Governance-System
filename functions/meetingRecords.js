@@ -22,7 +22,7 @@ async function context(req,meetingId){
  const secretary=text(meeting.secretaryEmail).toLowerCase()===email;
  const memberSnap=await db.collection("members").doc(uid).get();
  const employeeSnap=await db.collection("employees").doc(uid).get();
- const identityActive=admin(req)||(memberSnap.exists&&["Active","Activated"].includes(text(memberSnap.data()?.status||memberSnap.data()?.registrationStatus)))||(employeeSnap.exists&&["Active","Activated"].includes(text(employeeSnap.data()?.status||employeeSnap.data()?.employmentStatus||employeeSnap.data()?.registrationStatus)));
+ const identityInIrpa=admin(req)||memberSnap.exists||employeeSnap.exists;
  const listed=[...(meeting.participantUids||[]),...(meeting.attendeeUids||[]),...(meeting.memberUids||[]),...(meeting.invitedUids||[]),...(meeting.subscriberUids||[])].includes(uid);
  const subResults=await Promise.all([
   db.collection("meetingSubscriptions").where("meetingId","==",meetingId).where("uid","==",uid).limit(1).get().catch(()=>({empty:true})),
@@ -38,16 +38,20 @@ async function context(req,meetingId){
  });
  const subscribed=subResults.some(s=>!s.empty);
  const participant=listed||subscribed||participantRecord;
- if(!identityActive&&!participant)throw new HttpsError("permission-denied","An active IRPA identity or authorised meeting participant is required.");
- const canManage=admin(req)||chair||secretary||text(meeting.chairpersonUid)===uid||text(meeting.secretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
- return {uid,email,meeting,category:cat,participant,subscribed,canManage,canRead:canManage||participant,confidentiality:text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL")};
+ if(!identityInIrpa)throw new HttpsError("permission-denied","An IRPA member or employee identity is required to use the Meeting Portal.");
+ const canManage=admin(req)||chair||secretary||text(meeting.meetingChairpersonUid)===uid||text(meeting.meetingSecretaryUid)===uid||text(meeting.createdByUid)===uid||text(meeting.initiatorUid)===uid;
+ const member=memberSnap.data()||{},employee=employeeSnap.data()||{};
+ const roles=[member.role,member.title,member.position,member.departmentalRole,member.boardPosition,employee.role,employee.title,employee.position,employee.departmentalRole,employee.boardPosition,...(Array.isArray(member.roles)?member.roles:[]),...(Array.isArray(employee.roles)?employee.roles:[])].map(v=>text(v).toLowerCase());
+ const governanceReader=admin(req)||member.boardMember===true||employee.boardMember===true||Boolean(text(member.boardPosition)||text(employee.boardPosition))||roles.some(v=>["board member","board chairperson","board secretary","secretary to the board","executive director","director internal oversight"].includes(v));
+ const confidentiality=text(meeting.confidentialityClass)||(cat==="GOVERNANCE"?"BOARD_RESTRICTED":"INTERNAL");
+ return {uid,email,meeting,category:cat,participant,subscribed,canManage,canRead:true,canReadRestrictedRecords:confidentiality!=="BOARD_RESTRICTED"||governanceReader,confidentiality};
 }
 function recordLabel(type){return ({TRANSCRIPT:"Meeting Transcript",MINUTES_DRAFT:"Draft Minutes",MINUTES_FINAL:"Approved / Final Minutes",AI_MINUTES_DRAFT:"AI-Assisted Draft Minutes",AI_SUMMARY_DRAFT:"AI-Assisted Meeting Summary Draft",SUBSCRIBER_TRANSCRIPT_DRAFT:"Subscriber Proceedings Draft",DECISION_REGISTER:"Decision Register",ATTENDANCE_REGISTER:"Attendance Register",OTHER:"Other Meeting Record"})[type]||"Meeting Record";}
 async function audit(action,ctx,recordId,details={}){await db.collection("audit").add({action,collection:"meetingRecords",recordId:recordId||null,details:{meetingId:ctx.meeting.id,meetingCategory:ctx.category,confidentialityClass:ctx.confidentiality,...details},actorUid:ctx.uid,actorEmail:ctx.email||null,createdAt:FieldValue.serverTimestamp()});}
 exports.captureMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),type=text(req.data?.recordType).toUpperCase(),content=text(req.data?.content),title=text(req.data?.title);
  const ctx=await context(req,meetingId);
- if(!ctx.canManage)throw new HttpsError("permission-denied","Only the meeting administrator, chairperson or secretary may capture an authoritative meeting record.");
+ if(!ctx.canManage)throw new HttpsError("permission-denied","Only the appointed Chairperson or Secretary may capture an authoritative meeting record.");
  if(!["TRANSCRIPT","MINUTES_DRAFT","MINUTES_FINAL","DECISION_REGISTER","ATTENDANCE_REGISTER","OTHER"].includes(type))throw new HttpsError("invalid-argument","Unsupported meeting record type.");
  if(!content)throw new HttpsError("invalid-argument","Record content is empty.");
  if(content.length>900000)throw new HttpsError("invalid-argument","Text record exceeds the 900,000 character limit. Store large files through the controlled Documents Portal.");
@@ -131,7 +135,7 @@ exports.listMeetingRecords=onCall({region:"us-central1",timeoutSeconds:30},async
  const meetingId=text(req.data?.meetingId),ctx=await context(req,meetingId);
  if(!ctx.canRead)throw new HttpsError("permission-denied","You are not authorised to list records for this meeting.");
  const snap=await db.collection("meetingRecords").where("meetingId","==",meetingId).get();
- const records=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==="Active").sort((a,b)=>(b.capturedAt?.toMillis?.()||0)-(a.capturedAt?.toMillis?.()||0));
+ const records=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==="Active"&&(text(r.confidentialityClass||ctx.confidentiality).toUpperCase()!=="BOARD_RESTRICTED"||ctx.canReadRestrictedRecords)).sort((a,b)=>(b.capturedAt?.toMillis?.()||0)-(a.capturedAt?.toMillis?.()||0));
  await audit("MEETING_RECORD_REGISTER_VIEWED",ctx,null,{recordCount:records.length});
  return {ok:true,records:records.map(r=>({id:r.id,title:r.title,recordType:r.recordType,recordLabel:r.recordLabel,contentHash:r.contentHash,integrityStatus:r.integrityStatus,confidentialityClass:r.confidentialityClass,version:r.version,capturedAt:r.capturedAt?.toDate?.().toISOString?.()||null,retainUntil:r.retainUntil?.toDate?.().toISOString?.()||null,retentionYears:r.retentionYears,legalHold:r.legalHold===true,deletionStatus:r.deletionStatus||"NOT_ELIGIBLE",storageDestination:r.storageDestination}))};
 });
@@ -141,7 +145,7 @@ exports.retrieveMeetingRecord=onCall({region:"us-central1",timeoutSeconds:30},as
  const snap=await db.collection("meetingRecords").doc(recordId).get();
  if(!snap.exists)throw new HttpsError("not-found","Meeting record not found.");
  const record={id:snap.id,...snap.data()},ctx=await context(req,record.meetingId);
- if(!ctx.canRead||record.status!=="Active")throw new HttpsError("permission-denied","This record is not available to this identity or is no longer active.");
+ if(!ctx.canRead||record.status!=="Active"||(text(record.confidentialityClass||ctx.confidentiality).toUpperCase()==="BOARD_RESTRICTED"&&!ctx.canReadRestrictedRecords))throw new HttpsError("permission-denied","This record is not available to this identity or is no longer active.");
  const actual=hash(record.content||"");
  if(actual!==record.contentHash) {await audit("MEETING_RECORD_INTEGRITY_FAILURE",ctx,recordId,{expectedHash:record.contentHash||null,actualHash:actual});throw new HttpsError("data-loss","Record integrity verification failed. Access is blocked and an audit event was recorded.");}
  await audit("MEETING_RECORD_RETRIEVED",ctx,recordId,{recordType:record.recordType,contentHash:actual});
@@ -164,7 +168,7 @@ exports.updateMeetingRecordProtection=onCall({region:"us-central1",timeoutSecond
   const years=Number(req.data?.retentionYears);
   if(!Number.isInteger(years)||years<10||years>30)throw new HttpsError("invalid-argument","Meeting record retention must be at least 10 years and no more than 30 years.");
   const until=addYears(new Date(),years);
-  await ref.update({retentionYears:years,retainUntil:until,retentionPolicyVersion:"IRPA-MEETING-RETENTION-1.0-EXTENDED",retentionExtendedByUid:ctx.uid,retentionExtendedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+  await ref.update({retentionYears:years,retainUntil:until,retentionPolicyVersion:"IRPA-MEETING-RETENTION-2.0-MINIMUM-10-YEARS-EXTENDED",retentionExtendedByUid:ctx.uid,retentionExtendedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
   await audit("MEETING_RECORD_RETENTION_EXTENDED",ctx,recordId,{retentionYears:years,retainUntil:until.toISOString()});
   return {ok:true,retentionYears:years,retainUntil:until.toISOString()};
  }
@@ -364,6 +368,7 @@ exports.listMeetingWorkingDocuments=onCall({region:"us-central1",timeoutSeconds:
  const docs=[];
  for(const row of snap.docs){
   const d=row.data()||{};
+  if(text(d.classification||ctx.confidentiality).toLowerCase()==="board_restricted"&&!ctx.canReadRestrictedRecords)continue;
   const reviews=await db.collection("meetingDocumentReviews").where("workingDocumentId","==",row.id).get();
   docs.push({id:row.id,documentId:text(d.documentId),title:text(d.title),reference:text(d.reference),fileName:text(d.fileName),webViewLink:text(d.webViewLink),classification:text(d.classification||"INTERNAL"),reviews:reviews.docs.map(r=>{const v=r.data()||{};return{id:r.id,reviewType:text(v.reviewType),comment:text(v.comment),status:text(v.status),reviewerName:text(v.reviewerName),createdAt:v.createdAt?.toDate?.()?.toISOString?.()||null};})});
  }
@@ -372,7 +377,7 @@ exports.listMeetingWorkingDocuments=onCall({region:"us-central1",timeoutSeconds:
 exports.submitMeetingDocumentReview=onCall({region:"us-central1",timeoutSeconds:30},async req=>{
  const meetingId=text(req.data?.meetingId),id=text(req.data?.workingDocumentId),type=text(req.data?.reviewType).toUpperCase(),comment=text(req.data?.comment);
  const ctx=await context(req,meetingId);
- if(!ctx.canRead||!ctx.participant&&!ctx.canManage)throw new HttpsError("permission-denied","Only an authorised meeting participant may review working documents.");
+ if(!ctx.canRead)throw new HttpsError("permission-denied","Meeting Portal access is required to review working documents.");
  if(!id||!["ASSESSMENT","COMMENT","SIGNATURE_REQUEST"].includes(type))throw new HttpsError("invalid-argument","A working document and supported review type are required.");
  if(!comment||comment.length>5000)throw new HttpsError("invalid-argument","Enter a comment or assessment of up to 5,000 characters.");
  const docRef=db.collection("meetingWorkingDocuments").doc(id),docSnap=await docRef.get();
