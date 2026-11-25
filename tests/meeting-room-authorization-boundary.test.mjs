@@ -8,9 +8,13 @@ test("participant invitation context grants media entry but not host governance 
   assert.match(source, /hostController=roleControl\(member,selected\)/);
   assert.ok(source.includes("controller=Boolean(!transitionActive&&(canChair||canSecretary)),electionController=Boolean(transitionActive&&(canTransitionChair||canTransitionSecretary)),canControlVoting=controller||electionController"));
   assert.match(source, /activeAdministrator=transitionActive\?canTransitionAdministrator:canMeetingAdministrator/);
+  const media = readFileSync(new URL("../src/meeting/IRPADGBSMeetingRoomMedia.jsx", import.meta.url), "utf8");
+  assert.match(media, /function IRPADGBSMeetingRoomMedia\(\{meeting,selectedAuthority="",controller=false,canJoin=false\}\)/);
+  assert.match(media, /if\(!canJoin\)return setError/);
+  assert.match(media, /\{controller&&recordingAllowed&&/);
   assert.doesNotMatch(source, /hostController=!!admin\?\.active/);
   assert.doesNotMatch(source, /controller=!!admin\?\.active\|\|roleControl\(member,selected\)\|\|Boolean\(entryContext\?\.participantId/);
-  assert.match(source, /controller=\{Boolean\(hostController\|\|\(auth\.currentUser&&entryContext\?\.participantId&&entryContext\?\.meetingId===selected\?\.id\)\)\}/);
+  assert.match(source, /controller=\{Boolean\(activeAdministrator\)\} canJoin=\{Boolean\(hostController\|\|\(auth\.currentUser&&entryContext\?\.participantId&&entryContext\?\.meetingId===selected\?\.id\)\)\}/);
 });
 
 test("host governance mutations retain the explicit controller guard", () => {
