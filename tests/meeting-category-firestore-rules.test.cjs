@@ -34,6 +34,12 @@ beforeEach(async () => {
       status: "Active",
       role: "Staff"
     });
+    await db.doc("employees/inactive-staff").set({
+      uid: "inactive-staff",
+      email: "inactive@example.test",
+      status: "Suspended",
+      role: "Staff"
+    });
     await db.doc("adminProfiles/admin-user").set({ active: true, email: "admin@example.test" });
     await db.doc("systemSettings/actualDataAccess").set({enabled:true,status:"OPEN",finalTestsAttested:true});
   });
@@ -132,6 +138,22 @@ test("everyone in IRPA can read all meeting categories while meeting writes rema
   await assertSucceeds(staffDb.doc("meetings/governance-record").get());
   await assertSucceeds(boardDb.doc("meetings/governance-record").get());
   await assertSucceeds(staffDb.doc("meetings/staff-record").get());
+});
+
+test("IRPA employees are not denied Meeting Portal access by inactive employment status", async () => {
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await context.firestore().doc("meetings/inactive-staff-meeting").set(meeting({
+      meetingCategory: "GOVERNANCE",
+      meetingPolicyId: "GOVERNANCE",
+      meetingType: "Board Meeting",
+      initiatorUid: "inactive-staff"
+    }));
+  });
+  const db = testEnv.authenticatedContext("inactive-staff", {
+    email: "inactive@example.test"
+  }).firestore();
+  await assertSucceeds(db.doc("meetings/inactive-staff-meeting").get());
+  await assertSucceeds(db.collection("meetings").where("meetingCategory", "==", "GOVERNANCE").get());
 });
 
 test("every authenticated IRPA identity can query the meeting register across categories", async () => {
