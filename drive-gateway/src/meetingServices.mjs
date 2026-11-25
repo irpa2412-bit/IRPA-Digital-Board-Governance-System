@@ -759,7 +759,7 @@ if(pathname==="/api/meeting-participants/create"){
 const incoming=data.data&&typeof data.data==="object"?data.data:{},meetingId=clean(incoming.meetingId);
 if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
-if(!c.canManageParticipants)return fail(ctx,request,"Only the appointed meeting Chairperson, Secretary or Meeting Administrator may register participants; leadership-election meetings require their active Transition Committee before proceedings.",403);
+if(!c.canManageParticipants)return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may register, update or remove participants.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"Participants cannot be added to a closed meeting.",409);
 const participantName=clean(incoming.participantName),participantEmail=lower(incoming.participantEmail||incoming.email);
 if(!participantName||!participantEmail||!/^\S+@\S+\.\S+$/.test(participantEmail))return fail(ctx,request,"A participant name and valid email address are required.",400);
