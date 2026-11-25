@@ -322,6 +322,9 @@ test("all meeting proceedings and records have a minimum ten-year retention peri
   assert.match(source, /IRPA-MEETING-RETENTION-2\.0-MINIMUM-10-YEARS/);
   assert.match(source, /n<10\|\|n>30/);
   assert.match(source, /requiredUntil=yearsFrom\(capturedAt,10\)/);
+  const legacy = readFileSync(new URL("../functions/meetingRecords.js", import.meta.url), "utf8");
+  assert.match(legacy, /RETENTION_YEARS=\{GOVERNANCE:10,ADMINISTRATIVE:10,STAFF:10,GENERAL:10,OTHER:10\}/);
+  assert.match(legacy, /years<10\|\|years>30/);
 });
 
 test("meeting governance source enforces the proceedings gate and immediate transition mandate expiry", () => {
