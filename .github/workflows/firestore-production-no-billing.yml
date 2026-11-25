@@ -4,10 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       confirm_production_firestore_rules_deployment:
-        description: "Type DEPLOY RULES to publish production Firestore rules and indexes"
+        description: "Select DEPLOY RULES to publish production Firestore rules and indexes"
         required: true
-        type: string
-        default: "no"
+        type: choice
+        options:
+          - "DEPLOY RULES"
+        default: "DEPLOY RULES"
 
 permissions:
   contents: read
