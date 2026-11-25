@@ -22,11 +22,20 @@ test("host governance mutations retain the explicit controller guard", () => {
     const start = source.indexOf(`async function ${name}(`);
     assert.notEqual(start, -1, `expected ${name} handler`);
     const body = source.slice(start, start + 500);
-    assert.match(body, /if\(!canChair\)/, `${name} must be restricted to the permanent meeting Chairperson`);
+    assert.match(body, /if\(!canChair\)/, `${name} must be restricted to the Chairperson appointed for this meeting`);
   }
   const fieldStart = source.indexOf("async function addMeetingField(");
   assert.notEqual(fieldStart, -1, "expected addMeetingField handler");
   assert.match(source.slice(fieldStart, fieldStart + 500), /if\(!controller\)return deny\(\)/, "governance field changes must require the active chair or secretary");
+});
+
+test("only the meeting-specific Administrator receives admission and moderation controls", () => {
+  const access = readFileSync(new URL("../src/meeting/MeetingAccessControl.jsx", import.meta.url), "utf8");
+  assert.match(source, /<MeetingAccessControl meeting=\{selected\} controller=\{Boolean\(activeAdministrator\)\}/);
+  assert.match(access, /Only the Meeting Administrator appointed to this specific meeting can admit or decline a participant/);
+  const media = readFileSync(new URL("../src/meeting/IRPADGBSMeetingRoomMedia.jsx", import.meta.url), "utf8");
+  assert.match(media, /controller&&recordingAllowed/);
+  assert.match(media, /disabled=\{!canJoin\|\|status==="AUTHORIZING"\}/);
 });
 
 test("meeting room UI describes host restrictions accurately", () => {
