@@ -2,6 +2,14 @@ name: Deploy production Firestore rules and indexes (no Cloud Functions)
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_production_firestore_rules_deployment:
+        description: "Select DEPLOY RULES to publish production Firestore rules and indexes"
+        required: true
+        type: choice
+        options:
+          - "DEPLOY RULES"
+        default: "DEPLOY RULES"
 
 permissions:
   contents: read
@@ -34,6 +42,7 @@ jobs:
           project_id: irpa-digital-board-governance
 
       - name: Deploy Firestore Rules and Indexes only
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_production_firestore_rules_deployment == 'DEPLOY RULES'
         run: |
           set -euo pipefail
           npx --yes firebase-tools deploy --project irpa-digital-board-governance --only firestore:rules,firestore:indexes --non-interactive
