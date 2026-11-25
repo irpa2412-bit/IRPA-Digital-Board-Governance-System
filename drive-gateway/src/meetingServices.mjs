@@ -263,7 +263,7 @@ if(pathname==="/api/meeting-board-register/list"){
 }
 if(pathname==="/api/meeting-quorum/assess"){
  const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
- const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead)return fail(ctx,request,"Meeting participant access is required.",403);
+ const c=await context(ctx,env,token,claims,meetingId);if(!c.canRead||(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords))return fail(ctx,request,"Meeting Portal access and the applicable Board governance authority are required for this quorum assessment.",403);
  const attendanceDate=clean(data.date)||null;if(attendanceDate&&!/^\d{4}-\d{2}-\d{2}$/.test(attendanceDate))return fail(ctx,request,"A valid attendance date is required.",400);const assessment=await buildQuorumAssessment(ctx,env,token,c.meeting,attendanceDate,claims);
  if(data.save===true){
   if(!meetingSecretariatAuthority(c.meeting,c.uid))return fail(ctx,request,"Only the appointed Chairperson or Secretary may save a quorum assessment.",403);
@@ -322,6 +322,7 @@ if(pathname==="/api/meeting-attendance/daily/register"){
 const meetingId=clean(data.meetingId),date=clean(data.date),uid=clean(claims.user_id);
 if(!meetingId||!/^\d{4}-\d{2}-\d{2}$/.test(date))return fail(ctx,request,"Meeting ID and a valid attendance date are required.",400);
 const c=await context(ctx,env,token,claims,meetingId);
+if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted attendance register is available only to authorised governance readers.",403);
 if(!meetingAdministratorAuthority(c.meeting,c.uid))return fail(ctx,request,"Only the Meeting Administrator appointed to this meeting may compile the daily attendance sheet.",403);
 const [participants,memberRecords,employeeRecords,dailyRows,dispatchRows]=await Promise.all([
  listByField(ctx,env,token,"participants","meetingId",meetingId),
@@ -444,7 +445,7 @@ return response(ctx,request,{ok:true,meetingId,participantId,attendanceStatus,re
 }
 if(pathname==="/api/meeting-attendance/register"){
 const meetingId=clean(data.meetingId);if(!meetingId)return fail(ctx,request,"Meeting ID is required.",400);
-const c=await context(ctx,env,token,claims,meetingId),manager=meetingAdministratorAuthority(c.meeting,c.uid);
+const c=await context(ctx,env,token,claims,meetingId),manager=meetingAdministratorAuthority(c.meeting,c.uid);if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted attendance register is available only to authorised governance readers.",403);
 const [participants,signatures,memberRecords]=await Promise.all([
  listByField(ctx,env,token,"participants","meetingId",meetingId),
  listByField(ctx,env,token,"meetingAttendanceSignatures","meetingId",meetingId),
@@ -706,8 +707,9 @@ if(pathname==="/api/meeting-actions/create"){
 const incoming=data.data&&typeof data.data==="object"?data.data:{},meetingId=clean(incoming.meetingId);
 if(!meetingId)return fail(ctx,request,"Meeting ID is required for a meeting-linked action.",400);
 const c=await context(ctx,env,token,claims,meetingId);
+if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted meeting is available only to authorised governance readers.",403);
 const controller=!transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary"));
-if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may record a meeting action.",403);
+if(!controller)return fail(ctx,request,"Only the appointed Chairperson or Secretary may record a meeting action.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"An action cannot be added to a closed meeting.",409);
 const title=clean(incoming.title||incoming.description);
 if(!title)return fail(ctx,request,"Action description is required.",400);
@@ -721,8 +723,9 @@ if(pathname==="/api/meeting-decisions/create"){
 const incoming=data.data&&typeof data.data==="object"?data.data:{},meetingId=clean(incoming.meetingId);
 if(!meetingId)return fail(ctx,request,"Meeting ID is required for a meeting-linked decision.",400);
 const c=await context(ctx,env,token,claims,meetingId);
+if(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords)return fail(ctx,request,"This Board-restricted meeting is available only to authorised governance readers.",403);
 const controller=!transitionCommitteeActive(c.meeting)&&(meetingRoleAssigned(c.meeting,c.uid,"chair")||meetingRoleAssigned(c.meeting,c.uid,"secretary"));
-if(!controller)return fail(ctx,request,"Only the authorised meeting initiator, chairperson, secretary or administrator may record a meeting decision.",403);
+if(!controller)return fail(ctx,request,"Only the appointed Chairperson or Secretary may record a meeting decision.",403);
 if(terminal.has(lower(c.meeting.status)))return fail(ctx,request,"A decision cannot be added to a closed meeting.",409);
 const title=clean(incoming.title||incoming.description);
 if(!title)return fail(ctx,request,"Decision text is required.",400);
@@ -837,7 +840,7 @@ return response(ctx,request,{ok:true,eventId,createdAt:now.toISOString()});
 }
 if(pathname==="/api/meeting-room/activity"){
 const meetingId=clean(data.meetingId),c=await context(ctx,env,token,claims,meetingId);
-if(!c.canRead)return fail(ctx,request,"You are not authorised to view this meeting's activity.",403);
+if(!c.canRead||(lower(c.confidentiality)==="board_restricted"&&!c.canReadRestrictedRecords))return fail(ctx,request,"Meeting Portal access and the applicable Board confidentiality authority are required to view this meeting's activity.",403);
 const [events,votes]=await Promise.all([listByField(ctx,env,token,"meetingRoomEvents","meetingId",meetingId),listByField(ctx,env,token,"votes","meetingId",meetingId)]);
 const recentEvents=events.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))).slice(0,30);
 const activeIssue=clean(c.meeting.votingIssueId)?await getDoc(ctx,env,token,"votingIssues",clean(c.meeting.votingIssueId)):null;const voteClosed=["completed","closed"].includes(lower(c.meeting.votingStatus))||["completed","closed"].includes(lower(c.meeting.status))||lower(activeIssue?.status)==="closed";
