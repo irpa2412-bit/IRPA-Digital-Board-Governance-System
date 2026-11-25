@@ -62,6 +62,13 @@ test("production and staging Firestore rules apply universal IRPA Meeting Portal
   }
 });
 
+test("meeting archive access is universal for IRPA identities except Board-restricted records", () => {
+  const gateway = readFileSync(new URL("../drive-gateway/src/index.js", import.meta.url), "utf8");
+  assert.match(gateway, /if\(confidentiality==="BOARD_RESTRICTED"&&!governanceReader\)/);
+  assert.match(gateway, /if\(memberDoc\|\|employeeDoc\)return \{meeting,category,uid,email,privilegedToken\}/);
+  assert.match(gateway, /This account is not an IRPA identity or a verified invitee for the selected meeting/);
+});
+
 test("minutes editing and report distribution belong to the meeting-specific Chairperson and Secretary", () => {
   const meetings = readFileSync(new URL("../src/pages/Meetings.jsx", import.meta.url), "utf8");
   assert.match(meetings, /const meetingSecretariat=Boolean\(selected&&/);
