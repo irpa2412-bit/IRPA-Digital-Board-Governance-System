@@ -3,7 +3,7 @@
   "portal": "Meeting Portal",
   "status": "open",
   "openedAt": "2026-11-22T18:10:00Z",
-  "lastActivityAt": "2026-11-25T06:35:00Z",
+  "lastActivityAt": "2026-11-25T06:55:00Z",
   "inactivityCloseHours": 72,
   "emergency": false,
   "reason": "Owner-authorised completion of universal full Meeting Portal access for everyone in IRPA and open meeting initiation, while preserving meeting-specific Chairperson, Secretary and Administrator responsibilities, optional registration-stage appointments, mandatory validation before proceedings, temporary Transition Committee handover, invitation-based live-room admission, Board governance safeguards and a minimum ten-year meeting-record retention period. Portal access must not be restricted by organisational role, department, membership/employment status, invitation or participant listing. No unrelated portal, collection or signature behavior is changed.",
@@ -35,7 +35,8 @@
     "src/meeting/IRPADGBSMeetingRoomMedia.jsx",
     "src/pages/OperationalGatewaysParticipants.jsx",
     "functions/meetingAttendanceRegister.js",
-    "firestore.staging.rules"
+    "firestore.staging.rules",
+    "tests/meeting-working-documents-security.test.mjs"
   ],
   "activityLog": [
     {
@@ -113,6 +114,11 @@
       "at": "2026-11-25T06:25:00Z",
       "action": "completed universal access audit across application shell, staging rules and legacy functions",
       "description": "The audit found and corrected remaining app-shell authority-selection/module visibility gates, staging Firestore role restrictions, legacy attendance/record callable paths and media UI conflation between live-room admission and moderation authority. All IRPA identities now receive the full Meeting Portal module set without role selection; external invitees retain only their invited meeting access. Meeting Administrator controls admission, participant removal, attendance and media moderation. Chairperson/Secretary controls remain separate."
+    },
+    {
+      "at": "2026-11-25T06:55:00Z",
+      "action": "closed remaining direct Firestore and legacy authorization bypasses",
+      "description": "Direct Firestore invitation/participant writes now require the meeting-specific Administrator; formal proceedings require all three validated meeting appointments; direct deletion of real meetings and meeting-linked governance records is blocked; trial-only deletion is preserved. Legacy attendance and working-document callables were aligned with the same access and authority boundaries."
     }
   ],
   "baseline": {
