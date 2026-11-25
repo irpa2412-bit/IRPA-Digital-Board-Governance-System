@@ -51,14 +51,6 @@ on:
         required: true
         type: string
         default: "no"
-      authorize_production_functions_deployment:
-        description: "Owner approval to deploy production Firebase Functions"
-        required: true
-        type: choice
-        options:
-          - "no"
-          - "yes"
-        default: "no"
 
 jobs:
   build-and-deploy:
