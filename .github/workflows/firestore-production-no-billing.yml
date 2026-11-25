@@ -6,10 +6,7 @@ on:
       confirm_production_firestore_rules_deployment:
         description: "Type DEPLOY RULES to publish production Firestore rules and indexes"
         required: true
-        type: choice
-        options:
-          - "no"
-          - "yes"
+        type: string
         default: "no"
 
 permissions:
