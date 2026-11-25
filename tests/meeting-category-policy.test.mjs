@@ -74,6 +74,7 @@ test("initiator edit authority ends at proceedings and meeting roles remain meet
   assert.match(policy, /const initiator=String\(meeting\.initiatorUid\|\|""\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
   assert.match(policy, /meeting\.meetingAdministratorUid/);
   assert.match(policy, /return initiator\|\|assigned\.map/);
+  assert.doesNotMatch(policy.match(/const assigned=transitionActive[\s\S]*?return initiator/)[0], /transitionAdministratorUid|meetingAdministratorUid/);
   const worker = readFileSync(new URL("../drive-gateway/src/meetingServices.mjs", import.meta.url), "utf8");
   assert.match(worker, /const initiatorCanManage=clean\(meeting\.initiatorUid\)===uid&&!\["in progress","completed","cancelled","canceled"\]/);
 });
