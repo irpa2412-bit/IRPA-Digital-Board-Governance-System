@@ -3,8 +3,8 @@ name: Deploy production Firestore rules and indexes (no Cloud Functions)
 on:
   workflow_dispatch:
     inputs:
-      confirm_production_firestore_release:
-        description: "Explicitly authorize publishing production Firestore Rules and Indexes"
+      confirm_production_firestore_rules_deployment:
+        description: "Type DEPLOY RULES to publish production Firestore rules and indexes"
         required: true
         type: choice
         options:
@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require explicit owner confirmation
-        if: ${{ inputs.confirm_production_firestore_release != 'yes' }}
+        if: ${{ inputs.confirm_production_firestore_rules_deployment != 'DEPLOY RULES' }}
         run: |
-          echo "::error::Production Firestore deployment requires the explicit 'yes' confirmation."
+          echo "::error::Production Firestore deployment requires the exact 'DEPLOY RULES' confirmation."
           exit 1
 
       - uses: actions/checkout@v4
