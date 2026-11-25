@@ -1,4 +1,5 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";\nconst DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
   "application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -3522,7 +3523,7 @@ async function driveFetch(env, accessToken, path, options = {}) {
 
 async function authenticateFirebaseRequest(request, env, options = {}) {
   const header = request.headers.get("Authorization") || "";
-  const match = header.match(/^Bearer\\s+([^\\s]+)$/i);
+  const match = header.match(/^Bearer\s+([^\s]+)$/i);
   if (!match) {
     const error = new Error("Firebase authentication is required.");
     error.status = 401;
