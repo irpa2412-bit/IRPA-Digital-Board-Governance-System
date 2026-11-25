@@ -3550,7 +3550,7 @@ async function authenticateFirebaseRequest(request, env, options = {}) {
       issuer: `https://securetoken.google.com/${getFirebaseProjectId(env)}`,
       audience: getFirebaseProjectId(env),
       algorithms: ["RS256"],
-      requiredClaims: ["exp", "iat", "sub", "aud", "iss"],
+      requiredClaims: ["exp", "sub", "aud", "iss"],
       clockTolerance: 5
     });
     payload = verified.payload;
