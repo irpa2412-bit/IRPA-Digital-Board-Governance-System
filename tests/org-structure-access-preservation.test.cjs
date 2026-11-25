@@ -36,6 +36,7 @@ async function seedMeeting(id) {
   await env.withSecurityRulesDisabled(async context => {
     await context.firestore().doc(`meetings/${id}`).set({
       title: "Administrator preservation test",
+      recordOrigin: "TRIAL",
       meetingCategory: "ADMINISTRATIVE",
       meetingPolicyId: "ADMINISTRATIVE",
       meetingType: "Management Meeting",
