@@ -110,6 +110,21 @@
         "tests/meeting-invitation-resend-quorum.test.mjs",
         "tests/meeting-quorum-reconciliation.test.mjs"
       ]
+    },
+    {
+      "at": "2026-11-25T05:50:00Z",
+      "action": "owner-directed universal full Meeting Portal access and ten-year proceedings retention correction",
+      "pullRequest": 959,
+      "files": [
+        "src/firebase/meetingPolicy.js",
+        "src/firebase/data.js",
+        "drive-gateway/src/meetingServices.mjs",
+        "firestore.rules",
+        "functions/meetingRecords.js",
+        "src/pages/Meetings.jsx",
+        "src/pages/MeetingRoom.jsx",
+        "tests/meeting-category-policy.test.mjs"
+      ]
     }
   ],
   "attendanceCallableAudit": {
@@ -225,7 +240,7 @@
   "accessInitiationChange": {
     "changeId": "MP-2026-11-23-ORG-WIDE-INITIATION",
     "relatedPullRequest": 941,
-    "status": "SUBMITTED_FOR_VALIDATION",
+    "status": "IMPLEMENTED_IN_PR_959_PENDING_VALIDATION",
     "scope": [
       "tests/meeting-category-policy.test.mjs",
       "drive-gateway/src/meetingServices.mjs",
@@ -233,6 +248,7 @@
     ],
     "ownerInstruction": "24-25 November 2026: everyone in IRPA must have full access to the entire Meeting Portal; anyone in IRPA may initiate/register a meeting; access is not restricted by role, department, membership/employment status, invitation or participant listing. Meeting-specific leadership and live-room admission remain separate controls.",
     "governanceBoundary": "Universal Meeting Portal access and meeting initiation do not bypass meeting-specific live-room admission, Chairperson/Secretary/Administrator responsibilities, Board voting eligibility, quorum, resolutions, formal approvals, or protected governance-record safeguards.",
-    "validation": "Universal access implemented in the shared client policy, Meeting Centre query selection, Worker read authorization, Worker meeting initiation, meeting-specific Firestore rules, attendance register reads and working-document review; Board-restricted records remain protected. Worker and legacy meeting-record callable retention policies are aligned to a minimum ten-year period, and existing Worker records are reconciled on record-register retrieval. Regression tests added. Production promotion and live verification must be recorded separately."
+    "validation": "Universal portal access now applies across all meeting categories and meeting-record access paths for IRPA identities; active-status and participant-list gates are not used for portal entry, meeting initiation, meeting record listing or working-document review. Ongoing live-room admission and protected Board records remain separately governed. CI and production verification pending.",
+    "policyCorrectionPullRequest": 959
   }
 }
