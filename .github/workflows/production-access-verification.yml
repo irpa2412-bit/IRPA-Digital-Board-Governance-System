@@ -130,6 +130,7 @@ jobs:
                 probeOriginal=d.fields?.[probeField];
                 const r=await req(base+"/"+probePath+"?updateMask.fieldPaths="+encodeURIComponent(probeField),member.token,"PATCH",{fields:{[probeField]:{stringValue:"temporary-verification"}}});
                 probeWritten=r.ok;
+                if(probeWritten)productionWrites.push({record:probePath+"."+probeField,action:"CREATED",detail:"unique temporary allowed-write probe field"});
                 add("Member allowed Firestore write","2xx","HTTP "+r.status,r.ok,true);
               }catch(e){add("Member allowed Firestore write","2xx",e.message,false,true);}
               try {
@@ -207,7 +208,8 @@ jobs:
             }catch(e){console.error("TEST PROFILE CLEANUP FAILED: "+e.message);add("Test profile final cleanup","members/"+process.env.EXPECTED_MEMBER_UID+" deleted only if testAccount=true",e.message,false,true);}
 
             const testTable=["| test | expected | actual | pass/fail |","|---|---|---|---|",...rows.map(x=>`| ${x.t} | ${x.e} | ${x.a.replace(/\\|/g,"/")} | ${x.p?"PASS":"FAIL"} |`)].join("\n");
-            const writeTable=["| production record | action | detail |","|---|---|---|",...productionWrites.map(x=>`| ${x.record} | ${x.action} | ${x.detail} |`)].join("\n");
+            const remaining=productionWrites.some(x=>x.action==="PRESERVED")?"One or more records were preserved; inspect rows above":"NONE";
+            const writeTable=["| production record | action | detail |","|---|---|---|",...productionWrites.map(x=>`| ${x.record} | ${x.action} | ${x.detail} |`),`| Production remainder | ${remaining==="NONE"?"NONE":"REVIEW"} | ${remaining} |`].join("\n");
             console.log(testTable);
             console.log("\nFINAL PRODUCTION WRITES\n"+writeTable);
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"## Production verification results\n\n"+testTable+"\n\n## Final production writes\n\n"+writeTable+"\n");
