@@ -13,7 +13,7 @@ for (const name of files) {
     if (customStagingPublisher &&
         (!condition.includes("github.event_name == 'workflow_dispatch'") ||
          !condition.includes("inputs.confirm_staging_firestore_rules_deployment == 'DEPLOY RULES'"))) {
-      failures.push(name + ': custom staging Firestore rules publisher lacks manual workflow_dispatch and explicit yes confirmation.');
+      failures.push(name + ': custom staging Firestore rules publisher lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
     }
 
     if (!/--only\s+[^\n]*firestore/i.test(block) || !deployCommand.test(block)) continue;
@@ -33,7 +33,7 @@ for (const name of files) {
     }
     if (!condition.includes("github.event_name == 'workflow_dispatch'") ||
         !condition.includes("inputs.confirm_production_firestore_rules_deployment == 'yes'")) {
-      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and exact DEPLOY RULES confirmation.');
+      failures.push(name + ': production Firestore deployment lacks manual workflow_dispatch and explicit yes confirmation.');
     }
   }
 }
