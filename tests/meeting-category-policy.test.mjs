@@ -49,6 +49,16 @@ test("explicitly invited participants can access their meeting regardless of ins
   }, { isInvited: true }), true);
 });
 
+test("production and staging Firestore rules apply universal IRPA Meeting Portal access", () => {
+  const production = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+  const staging = readFileSync(new URL("../firestore.staging.rules", import.meta.url), "utf8");
+  for (const rules of [production, staging]) {
+    assert.match(rules, /function meetingUser\(\)\{return admin\(\)\|\|memberProfileExists\(\)\|\|employeeProfileExists\(\);\}/);
+    assert.match(rules, /function meetingRegistrar\(\)\{return meetingUser\(\);\}/);
+    assert.match(rules, /function meetingCategoryReadAllowed\(data\)\{return meetingUser\(\)\|\|meetingParticipant\(data\);\}/);
+  }
+});
+
 test("IRPA users receive every Meeting Portal module without organisational-role selection", () => {
   const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /const UNIVERSAL_MEETING_MODULES=\["Meetings","Meeting Room","Participants","Resolutions","Voting","Actions","Decisions"\]/);
